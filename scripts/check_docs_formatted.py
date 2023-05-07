@@ -49,6 +49,7 @@ def format_str(
 def format_file(
     file: Path,
     black_mode: black.FileMode,
+    error_known: bool,  # noqa: FBT001
     args: argparse.Namespace,
 ) -> int:
     """Check the formatting of a single docs file."""
@@ -63,7 +64,7 @@ def format_file(
 
     new_contents, errors = format_str(contents, black_mode)
 
-    if errors and not args.skip_errors:
+    if errors and not args.skip_errors and not error_known:
         for error in errors:
             rule_name = file.name.split(".")[0]
             print(f"Docs parse error for {rule_name} docs: {error}")
@@ -182,13 +183,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     violations = 0
     errors = 0
     for file in [*static_docs, *generated_docs]:
-        if file.name.split(".")[0] in known_formatting_violations:
+        rule_name = file.name.split(".")[0]
+        if rule_name in known_formatting_violations:
             continue
 
-        result = format_file(file, black_mode, args)
+        error_known = rule_name in known_parse_errors
+
+        result = format_file(file, black_mode, error_known, args)
         if result == 1:
             violations += 1
-        elif result == 2 and file.name.split(".")[0] not in known_parse_errors:
+        elif result == 2 and not error_known:
             errors += 1
 
     if violations > 0:
