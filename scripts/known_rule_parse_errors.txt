@@ -1,0 +1,4 @@
+blank-line-with-whitespace
+missing-newline-at-end-of-file
+mixed-spaces-and-tabs
+trailing-whitespace
