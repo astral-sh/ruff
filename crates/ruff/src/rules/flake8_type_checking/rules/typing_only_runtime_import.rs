@@ -2,9 +2,7 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{
-    Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
-};
+use ruff_python_semantic::binding::{Binding, BindingKind, ExecutionContext};
 
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 use crate::settings::Settings;
@@ -160,7 +158,7 @@ impl Violation for TypingOnlyStandardLibraryImport {
 }
 
 /// Return `true` if `this` is implicitly loaded via importing `that`.
-fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
+fn is_implicit_import(_this: &Binding, _that: &Binding) -> bool {
     true
     // match &this.kind {
     //     BindingKind::Importation(Importation {

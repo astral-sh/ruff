@@ -11,10 +11,7 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::analyze::visibility::{module_visibility, Modifier, VisibleScope};
-use crate::binding::{
-    Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
-    Importation, SubmoduleImportation,
-};
+use crate::binding::{Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext};
 use crate::node::{NodeId, Nodes};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 

@@ -1,8 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{
-    Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
-};
+use ruff_python_semantic::binding::{Binding, BindingKind, ExecutionContext};
 
 /// ## What it does
 /// Checks for runtime imports defined in a type-checking block.
