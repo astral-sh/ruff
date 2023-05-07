@@ -143,7 +143,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # For some docs, we don't want black to fix the formatting as this would remove the
     # reason for the example. These files will be stored in
-    # `scripts/known_formatting_erorrs.txt`
+    # `scripts/known_formatting_violations.txt`
 
     with Path("scripts/known_rule_formatting_violations.txt").open() as f:
         known_formatting_violations = f.read().splitlines()
@@ -166,6 +166,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
+    # For some docs, black is unable to parse the example code. These files will be
+    # stored at `scripts/known_rule_parse_errors.txt`
+
+    with Path("scripts/known_rule_parse_errors.txt").open() as f:
+        known_parse_errors = f.read().splitlines()
+
+    # Check known parse errors is sorted alphabetically and has no duplicates
+    # This will reduce the diff when adding new parse errors
+
+    known_parse_errors_sorted = sorted(known_parse_errors)
+    if known_parse_errors != known_parse_errors_sorted:
+        print(
+            "Known parse errors is not sorted alphabetically. Please sort and re-run.",
+        )
+        return 1
+
+    if len(known_parse_errors) != len(set(known_parse_errors)):
+        print(
+            "Known parse errors has duplicates. Please remove them and re-run.",
+        )
+        return 1
+
     violations = 0
     errors = 0
     for file in [*static_docs, *generated_docs]:
@@ -175,14 +197,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = format_file(file, black_mode, args)
         if result == 1:
             violations += 1
-        elif result == 2:
+        elif result == 2 and file.name.split(".")[0] not in known_parse_errors:
             errors += 1
 
     if violations > 0:
         print(f"Formatting violations identified: {violations}")
 
     if errors > 0:
-        print(f"Code block parse errors identified: {errors}")
+        print(f"New code block parse errors identified: {errors}")
 
     if violations > 0 or errors > 0:
         return 1
