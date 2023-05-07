@@ -134,13 +134,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     # For some docs, we don't want black to fix the formatting as this would remove the
-    # reason for the example. These files will be stored in
+    # reason for the example. These rules will be stored in
     # `scripts/known_formatting_violations.txt`
 
     with Path("scripts/known_rule_formatting_violations.txt").open() as f:
         known_formatting_violations = f.read().splitlines()
 
-    # For some docs, black is unable to parse the example code. These files will be
+    # For some docs, black is unable to parse the example code. These rules will be
     # stored at `scripts/known_rule_parse_errors.txt`
 
     with Path("scripts/known_rule_parse_errors.txt").open() as f:
