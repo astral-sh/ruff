@@ -49,6 +49,7 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                 let (import_edit, binding) = get_or_import_symbol(
                     "sys",
                     "exit",
+                    func.start(),
                     &checker.ctx,
                     &checker.importer,
                     checker.locator,

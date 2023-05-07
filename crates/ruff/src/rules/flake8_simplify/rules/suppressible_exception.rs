@@ -94,6 +94,7 @@ pub fn suppressible_exception(
                     let (import_edit, binding) = get_or_import_symbol(
                         "contextlib",
                         "suppress",
+                        stmt.start(),
                         &checker.ctx,
                         &checker.importer,
                         checker.locator,
