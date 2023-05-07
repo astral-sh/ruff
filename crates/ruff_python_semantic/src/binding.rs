@@ -59,45 +59,28 @@ impl<'a> Binding<'a> {
 
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Importation(Importation { full_name, .. }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
-                    full_name: existing,
-                    ..
-                }) = &existing.kind
-                {
-                    return full_name == existing;
+            BindingKind::Importation(import) => {
+                if let BindingKind::SubmoduleImportation(existing) = &existing.kind {
+                    return import.full_name == existing.full_name;
                 }
             }
-            BindingKind::FromImportation(FromImportation { full_name, .. }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
-                    full_name: existing,
-                    ..
-                }) = &existing.kind
-                {
-                    return full_name == existing;
+            BindingKind::FromImportation(import) => {
+                if let BindingKind::SubmoduleImportation(existing) = &existing.kind {
+                    return import.full_name == existing.full_name;
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => {
-                match &existing.kind {
-                    BindingKind::Importation(Importation {
-                        full_name: existing,
-                        ..
-                    })
-                    | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                        full_name: existing,
-                        ..
-                    }) => {
-                        return full_name == existing;
-                    }
-                    BindingKind::FromImportation(FromImportation {
-                        full_name: existing,
-                        ..
-                    }) => {
-                        return full_name == existing;
-                    }
-                    _ => {}
+            BindingKind::SubmoduleImportation(import) => match &existing.kind {
+                BindingKind::Importation(existing) => {
+                    return import.full_name == existing.full_name;
                 }
-            }
+                BindingKind::SubmoduleImportation(existing) => {
+                    return import.full_name == existing.full_name;
+                }
+                BindingKind::FromImportation(existing) => {
+                    return import.full_name == existing.full_name;
+                }
+                _ => {}
+            },
             BindingKind::Annotation => {
                 return false;
             }
@@ -259,11 +242,11 @@ pub enum BindingKind<'a> {
     Builtin,
     ClassDefinition,
     FunctionDefinition,
-    Export(Export<'a>),
+    Export(Box<Export<'a>>),
     FutureImportation,
-    Importation(Importation<'a>),
-    FromImportation(FromImportation<'a>),
-    SubmoduleImportation(SubmoduleImportation<'a>),
+    Importation(Box<Importation<'a>>),
+    FromImportation(Box<FromImportation<'a>>),
+    SubmoduleImportation(Box<SubmoduleImportation<'a>>),
 }
 
 bitflags! {

@@ -40,8 +40,10 @@ pub struct SubmoduleImportation<'a> {
     pub full_name: &'a str,
 }
 
+// If we box, this goes from 48 to 16
+// If we use a u32 pointer, this goes to 8
 #[derive(Clone, Debug)]
-pub enum BindingKind<'a> {
+pub enum BindingKind {
     Annotation,
     Argument,
     Assignment,
@@ -54,14 +56,14 @@ pub enum BindingKind<'a> {
     ClassDefinition,
     FunctionDefinition,
     // 32
-    Export(Export<'a>),
+    Export(u32),
     FutureImportation,
     // 40
-    Importation(Importation<'a>),
+    Importation(u32),
     // 48
-    FromImportation(FromImportation<'a>),
+    FromImportation(u32),
     // 48
-    SubmoduleImportation(SubmoduleImportation<'a>),
+    SubmoduleImportation(u32),
 }
 
 fn main() {

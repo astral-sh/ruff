@@ -85,11 +85,8 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
     // irrelevant bindings (like non-Pandas imports).
     if let ExprKind::Name { id, .. } = &value.node {
         if checker.ctx.find_binding(id).map_or(true, |binding| {
-            if let BindingKind::Importation(Importation {
-                full_name: module, ..
-            }) = &binding.kind
-            {
-                module != &"pandas"
+            if let BindingKind::Importation(import) = &binding.kind {
+                import.full_name != "pandas"
             } else {
                 matches!(
                     binding.kind,

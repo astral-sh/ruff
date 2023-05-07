@@ -927,10 +927,9 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::SubmoduleImportation(SubmoduleImportation {
-                                    name,
-                                    full_name,
-                                }),
+                                kind: BindingKind::SubmoduleImportation(Box::new(
+                                    SubmoduleImportation { name, full_name },
+                                )),
                                 runtime_usage: None,
                                 synthetic_usage: None,
                                 typing_usage: None,
@@ -954,7 +953,10 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::Importation(Importation { name, full_name }),
+                                kind: BindingKind::Importation(Box::new(Importation {
+                                    name,
+                                    full_name,
+                                })),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id, alias.range()))
@@ -1307,10 +1309,10 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::FromImportation(FromImportation {
+                                kind: BindingKind::FromImportation(Box::new(FromImportation {
                                     name,
                                     full_name,
-                                }),
+                                })),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id, alias.range()))
@@ -4412,13 +4414,13 @@ impl<'a> Checker<'a> {
                 //   import pyarrow.csv
                 //   print(pa.csv.read_csv("test.csv"))
                 match &self.ctx.bindings[*index].kind {
-                    BindingKind::Importation(Importation { name, full_name })
-                    | BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) =>
-                    {
+                    BindingKind::Importation(import) => {
+                        let name = import.name;
+                        let full_name = import.full_name;
                         let has_alias = full_name
                             .split('.')
                             .last()
-                            .map(|segment| &segment != name)
+                            .map(|segment| segment != name)
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
@@ -4431,11 +4433,32 @@ impl<'a> Checker<'a> {
                             }
                         }
                     }
-                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
+                    BindingKind::SubmoduleImportation(import) => {
+                        let name = import.name;
+                        let full_name = import.full_name;
                         let has_alias = full_name
                             .split('.')
                             .last()
-                            .map(|segment| &segment != name)
+                            .map(|segment| segment != name)
+                            .unwrap_or_default();
+                        if has_alias {
+                            // Mark the sub-importation as used.
+                            if let Some(index) = scope.get(full_name) {
+                                self.ctx.bindings[*index].mark_used(
+                                    self.ctx.scope_id,
+                                    expr.range(),
+                                    context,
+                                );
+                            }
+                        }
+                    }
+                    BindingKind::FromImportation(import) => {
+                        let name = import.name;
+                        let full_name = &import.full_name;
+                        let has_alias = full_name
+                            .split('.')
+                            .last()
+                            .map(|segment| segment != name)
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
@@ -4665,10 +4688,8 @@ impl<'a> Checker<'a> {
                     // Grab the existing bound __all__ values.
                     if let StmtKind::AugAssign { .. } = &parent.node {
                         if let Some(index) = scope.get("__all__") {
-                            if let BindingKind::Export(Export { names: existing }) =
-                                &self.ctx.bindings[*index].kind
-                            {
-                                names.extend_from_slice(existing);
+                            if let BindingKind::Export(export) = &self.ctx.bindings[*index].kind {
+                                names.extend(&export.names);
                             }
                         }
                     }
@@ -4693,7 +4714,7 @@ impl<'a> Checker<'a> {
                 self.add_binding(
                     id,
                     Binding {
-                        kind: BindingKind::Export(Export { names: all_names }),
+                        kind: BindingKind::Export(Box::new(Export { names: all_names })),
                         runtime_usage: None,
                         synthetic_usage: None,
                         typing_usage: None,
@@ -4981,7 +5002,7 @@ impl<'a> Checker<'a> {
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
-                    BindingKind::Export(Export { names }) => Some((names, binding.range)),
+                    BindingKind::Export(export) => Some((&export.names, binding.range)),
                     _ => None,
                 });
 
@@ -5013,7 +5034,7 @@ impl<'a> Checker<'a> {
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => Some((names.as_slice(), binding.range)),
+                BindingKind::Export(export) => Some((export.names.as_slice(), binding.range)),
                 _ => None,
             });
 
@@ -5223,14 +5244,9 @@ impl<'a> Checker<'a> {
                     let binding = &self.ctx.bindings[*index];
 
                     let full_name = match &binding.kind {
-                        BindingKind::Importation(Importation { full_name, .. }) => full_name,
-                        BindingKind::FromImportation(FromImportation { full_name, .. }) => {
-                            full_name.as_str()
-                        }
-                        BindingKind::SubmoduleImportation(SubmoduleImportation {
-                            full_name,
-                            ..
-                        }) => full_name,
+                        BindingKind::Importation(import) => import.full_name,
+                        BindingKind::FromImportation(import) => import.full_name.as_str(),
+                        BindingKind::SubmoduleImportation(import) => import.full_name,
                         _ => continue,
                     };
 

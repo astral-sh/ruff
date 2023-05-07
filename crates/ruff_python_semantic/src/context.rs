@@ -166,10 +166,8 @@ impl<'a> Context<'a> {
             return None;
         };
         match &binding.kind {
-            BindingKind::Importation(Importation {
-                full_name: name, ..
-            })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
+            BindingKind::Importation(import) => {
+                let name = import.full_name;
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
@@ -188,9 +186,28 @@ impl<'a> Context<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::FromImportation(FromImportation {
-                full_name: name, ..
-            }) => {
+            BindingKind::SubmoduleImportation(import) => {
+                let name = import.name;
+                if name.starts_with('.') {
+                    if let Some(module) = &self.module_path {
+                        let mut source_path = from_relative_import(module, name);
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    let mut source_path: CallPath = from_unqualified_name(name);
+                    source_path.extend(call_path.into_iter().skip(1));
+                    Some(source_path)
+                }
+            }
+            BindingKind::FromImportation(import) => {
+                let name = &import.full_name;
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
@@ -243,16 +260,19 @@ impl<'a> Context<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { name, full_name }) => {
-                        if full_name == &module {
+                    BindingKind::Importation(import) => {
+                        if import.full_name == module {
                             // Verify that `sys` isn't bound in an inner scope.
                             if self
                                 .scopes()
                                 .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
+                                .all(|scope| scope.get(import.name).is_none())
                             {
                                 if let Some(source) = binding.source {
-                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                    return Some((
+                                        self.stmts[source],
+                                        format!("{}.{member}", import.name),
+                                    ));
                                 }
                             }
                         }
@@ -260,17 +280,22 @@ impl<'a> Context<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
-                        if let Some((target_module, target_member)) = full_name.split_once('.') {
+                    BindingKind::FromImportation(import) => {
+                        if let Some((target_module, target_member)) =
+                            import.full_name.split_once('.')
+                        {
                             if target_module == module && target_member == member {
                                 // Verify that `join` isn't bound in an inner scope.
                                 if self
                                     .scopes()
                                     .take(scope_index)
-                                    .all(|scope| scope.get(name).is_none())
+                                    .all(|scope| scope.get(import.name).is_none())
                                 {
                                     if let Some(source) = binding.source {
-                                        return Some((self.stmts[source], (*name).to_string()));
+                                        return Some((
+                                            self.stmts[source],
+                                            (*import.name).to_string(),
+                                        ));
                                     }
                                 }
                             }
@@ -278,16 +303,19 @@ impl<'a> Context<'a> {
                     }
                     // Ex) Given `module="os"` and `object="name"`:
                     // `import os.path ` -> `os.name`
-                    BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
-                        if name == &module {
+                    BindingKind::SubmoduleImportation(import) => {
+                        if import.name == module {
                             // Verify that `os` isn't bound in an inner scope.
                             if self
                                 .scopes()
                                 .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
+                                .all(|scope| scope.get(import.name).is_none())
                             {
                                 if let Some(source) = binding.source {
-                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                    return Some((
+                                        self.stmts[source],
+                                        format!("{}.{member}", import.name),
+                                    ));
                                 }
                             }
                         }

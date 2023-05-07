@@ -161,66 +161,67 @@ impl Violation for TypingOnlyStandardLibraryImport {
 
 /// Return `true` if `this` is implicitly loaded via importing `that`.
 fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
-    match &this.kind {
-        BindingKind::Importation(Importation {
-            full_name: this_name,
-            ..
-        })
-        | BindingKind::SubmoduleImportation(SubmoduleImportation {
-            name: this_name, ..
-        }) => match &that.kind {
-            BindingKind::FromImportation(FromImportation {
-                full_name: that_name,
-                ..
-            }) => {
-                // Ex) `pkg.A` vs. `pkg`
-                this_name
-                    .rfind('.')
-                    .map_or(false, |i| this_name[..i] == *that_name)
-            }
-            BindingKind::Importation(Importation {
-                full_name: that_name,
-                ..
-            })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                name: that_name, ..
-            }) => {
-                // Ex) `pkg.A` vs. `pkg.B`
-                this_name == that_name
-            }
-            _ => false,
-        },
-        BindingKind::FromImportation(FromImportation {
-            full_name: this_name,
-            ..
-        }) => match &that.kind {
-            BindingKind::Importation(Importation {
-                full_name: that_name,
-                ..
-            })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                name: that_name, ..
-            }) => {
-                // Ex) `pkg.A` vs. `pkg`
-                this_name
-                    .rfind('.')
-                    .map_or(false, |i| &this_name[..i] == *that_name)
-            }
-            BindingKind::FromImportation(FromImportation {
-                full_name: that_name,
-                ..
-            }) => {
-                // Ex) `pkg.A` vs. `pkg.B`
-                this_name.rfind('.').map_or(false, |i| {
-                    that_name
-                        .rfind('.')
-                        .map_or(false, |j| this_name[..i] == that_name[..j])
-                })
-            }
-            _ => false,
-        },
-        _ => false,
-    }
+    true
+    // match &this.kind {
+    //     BindingKind::Importation(Importation {
+    //         full_name: this_name,
+    //         ..
+    //     })
+    //     | BindingKind::SubmoduleImportation(SubmoduleImportation {
+    //         name: this_name, ..
+    //     }) => match &that.kind {
+    //         BindingKind::FromImportation(FromImportation {
+    //             full_name: that_name,
+    //             ..
+    //         }) => {
+    //             // Ex) `pkg.A` vs. `pkg`
+    //             this_name
+    //                 .rfind('.')
+    //                 .map_or(false, |i| this_name[..i] == *that_name)
+    //         }
+    //         BindingKind::Importation(Importation {
+    //             full_name: that_name,
+    //             ..
+    //         })
+    //         | BindingKind::SubmoduleImportation(SubmoduleImportation {
+    //             name: that_name, ..
+    //         }) => {
+    //             // Ex) `pkg.A` vs. `pkg.B`
+    //             this_name == that_name
+    //         }
+    //         _ => false,
+    //     },
+    //     BindingKind::FromImportation(FromImportation {
+    //         full_name: this_name,
+    //         ..
+    //     }) => match &that.kind {
+    //         BindingKind::Importation(Importation {
+    //             full_name: that_name,
+    //             ..
+    //         })
+    //         | BindingKind::SubmoduleImportation(SubmoduleImportation {
+    //             name: that_name, ..
+    //         }) => {
+    //             // Ex) `pkg.A` vs. `pkg`
+    //             this_name
+    //                 .rfind('.')
+    //                 .map_or(false, |i| &this_name[..i] == *that_name)
+    //         }
+    //         BindingKind::FromImportation(FromImportation {
+    //             full_name: that_name,
+    //             ..
+    //         }) => {
+    //             // Ex) `pkg.A` vs. `pkg.B`
+    //             this_name.rfind('.').map_or(false, |i| {
+    //                 that_name
+    //                     .rfind('.')
+    //                     .map_or(false, |j| this_name[..i] == that_name[..j])
+    //             })
+    //         }
+    //         _ => false,
+    //     },
+    //     _ => false,
+    // }
 }
 
 /// Return `true` if `name` is exempt from typing-only enforcement.
@@ -257,9 +258,9 @@ pub fn typing_only_runtime_import(
     }
 
     let full_name = match &binding.kind {
-        BindingKind::Importation(Importation { full_name, .. }) => full_name,
-        BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
+        BindingKind::Importation(import) => import.full_name,
+        BindingKind::FromImportation(import) => import.full_name.as_str(),
+        BindingKind::SubmoduleImportation(import) => import.full_name,
         _ => return None,
     };
 
