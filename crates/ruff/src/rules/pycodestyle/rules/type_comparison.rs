@@ -16,12 +16,15 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## Example
 /// ```python
 /// if type(obj) is type(1):
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if isinstance(obj, int):
+///     pass
 /// if type(a1) is type(b1):
+///     pass
 /// ```
 #[violation]
 pub struct TypeComparison;

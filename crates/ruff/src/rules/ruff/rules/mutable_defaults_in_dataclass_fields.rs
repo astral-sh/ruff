@@ -77,14 +77,18 @@ impl Violation for MutableDataclassDefault {
 /// ```python
 /// from dataclasses import dataclass
 ///
-/// def creating_list() -> list[]:
+///
+/// def creating_list() -> list[int]:
 ///     return [1, 2, 3, 4]
+///
 ///
 /// @dataclass
 /// class A:
 ///     mutable_default: list[int] = creating_list()
 ///
+///
 /// # also:
+///
 ///
 /// @dataclass
 /// class B:
@@ -95,12 +99,15 @@ impl Violation for MutableDataclassDefault {
 /// ```python
 /// from dataclasses import dataclass, field
 ///
-/// def creating_list() -> list[]:
+///
+/// def creating_list() -> list[int]:
 ///     return [1, 2, 3, 4]
+///
 ///
 /// @dataclass
 /// class A:
 ///     mutable_default: list[int] = field(default_factory=creating_list)
+///
 ///
 /// @dataclass
 /// class B:
@@ -112,10 +119,13 @@ impl Violation for MutableDataclassDefault {
 /// ```python
 /// from dataclasses import dataclass
 ///
-/// def creating_list() -> list[]:
+///
+/// def creating_list() -> list[int]:
 ///     return [1, 2, 3, 4]
 ///
+///
 /// I_KNOW_THIS_IS_SHARED_STATE = creating_list()
+///
 ///
 /// @dataclass
 /// class A:
