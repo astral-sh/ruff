@@ -237,19 +237,19 @@ static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
 
 // Matches against any of the 4 recognized PATTERNS.
 static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
-    let PATTERNS: [&str; 4] = [
+    let patterns: [&str; 4] = [
         r#"^#\s*(?i)(TODO).*$"#,
         r#"^#\s*(?i)(BUG).*$"#,
         r#"^#\s*(?i)(FIXME).*$"#,
         r#"^#\s*(?i)(XXX).*$"#,
     ];
 
-    return RegexSet::new(PATTERNS).unwrap();
+    return RegexSet::new(patterns).unwrap();
 });
 
 // Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the length of the
 // tag that we're trying to capture.
-static PATTERN_LENGTHS: Lazy<HashMap<usize, usize>> = Lazy::new(|| {
+static PATTERN_TAG_LENGTH: Lazy<HashMap<usize, usize>> = Lazy::new(|| {
     HashMap::from([
         (0usize, 4usize),
         (1usize, 3usize),
@@ -298,7 +298,7 @@ pub fn check_todos(
         };
 
         check_for_tag_errors(token_range, &tag, &mut diagnostics, autofix, settings);
-        check_for_static_errors(comment, &tag, &mut diagnostics);
+        check_for_static_errors(comment, token_range, &tag, &mut diagnostics);
 
         // TDO-003
         let todo_start = tag.range.start();
@@ -319,15 +319,13 @@ pub fn check_todos(
     diagnostics
 }
 
-// TODO: update all comments
-
 /// Returns the tag pulled out of a given comment if it exists.
 fn detect_tag<'a>(comment: &'a String, comment_range: &'a TextRange) -> Option<Tag<'a>> {
     let Some(regex_index) = TODO_REGEX_SET.matches(comment).into_iter().next() else {
         return None;
     };
 
-    let pattern_length = *PATTERN_LENGTHS.get(&regex_index).unwrap();
+    let tag_length = *PATTERN_TAG_LENGTH.get(&regex_index).unwrap();
 
     let mut tag_start_offset = 0usize;
     for (i, char) in comment.chars().enumerate() {
@@ -340,12 +338,11 @@ fn detect_tag<'a>(comment: &'a String, comment_range: &'a TextRange) -> Option<T
 
     Some(Tag {
         content: comment
-            .get(tag_start_offset..tag_start_offset + pattern_length)
+            .get(tag_start_offset..tag_start_offset + tag_length)
             .unwrap(),
-        range: TextRange::new(
-            comment_range.start() + TextSize::new(tag_start_offset.try_into().ok().unwrap()),
-            comment_range.start()
-                + TextSize::new((tag_start_offset + pattern_length).try_into().ok().unwrap()),
+        range: TextRange::at(
+            comment_range.start() + TextSize::try_from(tag_start_offset).ok().unwrap(),
+            TextSize::try_from(tag_length).ok().unwrap(),
         ),
     })
 }
@@ -390,30 +387,54 @@ fn check_for_tag_errors(
     }
 }
 
-}
+/// Checks for "static" errors in the comment - missing colon, missing author, etc. This function
+/// modifies `diagnostics` in-place.
+fn check_for_static_errors(
+    comment: &str,
+    comment_range: &TextRange,
+    tag: &Tag,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    // Relative offset of the current character vs.the comment range, after we skip the tag
+    let mut current_offset: usize = usize::try_from(tag.range.end() - comment_range.start())
+        .ok()
+        .unwrap();
+    let end_of_tag_char = current_offset;
+    let mut comment_chars = comment.chars().skip(current_offset).peekable();
 
-/// Mapper for static regex errors caused by a capture group at index i (i > 1 since the tag
-/// capture group could lead to multiple diagnostics being pushed)
-fn get_regex_error(
-    i: usize,
-    range: TextRange,
-    diagnostics: &mut [Diagnostic],
-) -> Option<Diagnostic> {
-    match i {
-        2usize => Some(Diagnostic::new(MissingAuthorInTodo, range)),
-        3usize => Some(Diagnostic::new(MissingColonInTodo, range)),
-        4usize => {
-            if diagnostics
-                .last()
-                .map_or(true, |last| last.kind != MissingColonInTodo.into())
-            {
-                Some(Diagnostic::new(MissingSpaceAfterColonInTodo, range))
-            } else {
-                None
+
+    // An "author block" must be contained in parantheses, like "(ruff)". To check if it exists,
+    // we can skip all whitespace characters from the end of the tag. If the first one is a left
+    // parenthesis, we can say that we have an author's block.
+    let mut has_author = false;
+    while let Some(char) = comment_chars.next() {
+        current_offset += 1;
+        if char.is_whitespace() {
+            continue;
+        }
+
+        if char == '(' {
+            has_author = true;
+        }
+
+        break;
+    }
+    if has_author {
+        // Move to the end of the author block.
+        while let Some(char) = comment_chars.next() {
+            current_offset += 1;
+            if char == ')' {
+                break;
             }
         }
-        5usize => Some(Diagnostic::new(MissingTextInTodo, range)),
-        _ => None,
+    } else {
+        diagnostics.push(Diagnostic::new(
+            MissingAuthorInTodo,
+            TextRange::at(
+                comment_range.start() + TextSize::try_from(end_of_tag_char).ok().unwrap(),
+                TextSize::new(1),
+            ),
+        ));
     }
 }
 
@@ -480,23 +501,7 @@ mod tests {
             detect_tag(
                 &test_comment.to_owned(),
                 &TextRange::new(TextSize::new(0), TextSize::new(17)),
-                5
             )
         );
-    }
-
-    #[test]
-    fn test_check_static_errors() {
-        let mut diagnostics: Vec<Diagnostic> = vec![];
-        let test_comment = "# TODO: this has no author";
-        let test_range = TextRange::new(
-            TextSize::new(0),
-            TextSize::try_from(test_comment.len()).ok().unwrap(),
-        );
-        let tag = "TODO";
-
-        check_for_static_errors(test_comment, &test_range, tag, &mut diagnostics);
-
-        assert_eq!(true, false);
     }
 }

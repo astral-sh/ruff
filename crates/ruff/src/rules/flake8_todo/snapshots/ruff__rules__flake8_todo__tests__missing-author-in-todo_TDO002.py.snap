@@ -1,12 +1,21 @@
 ---
 source: crates/ruff/src/rules/flake8_todo/mod.rs
 ---
-TDO002.py:5:1: TDO002 Missing author in TODO. Try: # TODO (<author_name>): ...
+TDO002.py:5:7: TDO002 Missing author in TODO. Try: # TODO (<author_name>): ...
   |
 5 | # TODO(evanrittenhouse): this also has an author
 6 | # T002 - errors
 7 | # TODO: this has no author
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ TDO002
+  |       ^ TDO002
+8 | # TODO : this also has no author
+  |
+
+TDO002.py:6:7: TDO002 Missing author in TODO. Try: # TODO (<author_name>): ...
+  |
+6 | # T002 - errors
+7 | # TODO: this has no author
+8 | # TODO : this also has no author
+  |       ^ TDO002
   |
 
 
