@@ -118,9 +118,9 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 ///
 /// ## Example
 /// ```python
-/// """
+/// '''
 /// bar
-/// """
+/// '''
 /// ```
 ///
 /// Assuming `docstring-quotes` is set to `double`, use instead:

@@ -1,4 +1,5 @@
 avoidable-escaped-quote
+bad-quotes-docstring
 bad-quotes-inline-string
 bad-quotes-multiline-string
 explicit-string-concatenation
