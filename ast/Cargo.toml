@@ -13,6 +13,7 @@ constant-optimization = ["fold"]
 source-code = ["fold"]
 fold = []
 unparse = ["rustpython-literal"]
+visitor = []
 
 [dependencies]
 rustpython-parser-core = { workspace = true }
