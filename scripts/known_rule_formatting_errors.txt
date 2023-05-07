@@ -1,5 +1,6 @@
 avoidable-escaped-quote
 bad-quotes-inline-string
+bad-quotes-multiline-string
 explicit-string-concatenation
 line-too-long
 missing-trailing-comma
