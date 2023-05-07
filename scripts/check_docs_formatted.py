@@ -140,45 +140,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     with Path("scripts/known_rule_formatting_violations.txt").open() as f:
         known_formatting_violations = f.read().splitlines()
 
-    # Check known formatting violations is sorted alphabetically and has no duplicates
-    # This will reduce the diff when adding new violations
-
-    known_formatting_violations_sorted = sorted(known_formatting_violations)
-    if known_formatting_violations != known_formatting_violations_sorted:
-        print(
-            "Known formatting violations is not sorted alphabetically. Please sort and"
-            " re-run.",
-        )
-        return 1
-
-    if len(known_formatting_violations) != len(set(known_formatting_violations)):
-        print(
-            "Known formatting violations has duplicates. Please remove them and"
-            " re-run.",
-        )
-        return 1
-
     # For some docs, black is unable to parse the example code. These files will be
     # stored at `scripts/known_rule_parse_errors.txt`
 
     with Path("scripts/known_rule_parse_errors.txt").open() as f:
         known_parse_errors = f.read().splitlines()
 
-    # Check known parse errors is sorted alphabetically and has no duplicates
-    # This will reduce the diff when adding new parse errors
+    # Check known formatting violations and parse errors are sorted alphabetically and
+    # have no duplicates. This will reduce the diff when adding new violations
 
-    known_parse_errors_sorted = sorted(known_parse_errors)
-    if known_parse_errors != known_parse_errors_sorted:
-        print(
-            "Known parse errors is not sorted alphabetically. Please sort and re-run.",
-        )
-        return 1
+    for known_list, file_string in [
+        (known_formatting_violations, "formatting violations"),
+        (known_parse_errors, "parse errors"),
+    ]:
+        if known_list != sorted(known_list):
+            print(
+                f"Known {file_string} is not sorted alphabetically. Please sort and"
+                " re-run.",
+            )
+            return 1
 
-    if len(known_parse_errors) != len(set(known_parse_errors)):
-        print(
-            "Known parse errors has duplicates. Please remove them and re-run.",
-        )
-        return 1
+        if len(known_list) != len(set(known_list)):
+            print(f"Known {file_string} has duplicates. Please remove them and re-run.")
+            return 1
 
     violations = 0
     errors = 0
