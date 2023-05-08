@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
+use rustpython_parser::ast::{Cmpop, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -191,10 +191,27 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(operand, checker.stylist),
-            expr.range(),
-        )));
+        if checker.ctx.in_boolean_test {
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                unparse_expr(operand, checker.stylist),
+                expr.range(),
+            )));
+        } else if checker.ctx.is_builtin("bool") {
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                unparse_expr(
+                    &create_expr(ExprKind::Call {
+                        func: Box::new(create_expr(ExprKind::Name {
+                            id: "bool".to_string(),
+                            ctx: ExprContext::Load,
+                        })),
+                        args: vec![*operand.clone()],
+                        keywords: vec![],
+                    }),
+                    checker.stylist,
+                ),
+                expr.range(),
+            )));
+        };
     }
     checker.diagnostics.push(diagnostic);
 }

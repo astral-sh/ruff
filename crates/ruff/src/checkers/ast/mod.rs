@@ -7,7 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
-    ExprKind, KeywordData, Located, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite,
+    ExprKind, KeywordData, Located, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite, Unaryop,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix};
@@ -2299,7 +2299,16 @@ where
         let prev_in_type_definition = self.ctx.in_type_definition;
         let prev_in_boolean_test = self.ctx.in_boolean_test;
 
-        if !matches!(expr.node, ExprKind::BoolOp { .. }) {
+        // If we're in a boolean test (e.g., the `test` of a `StmtKind::If`), but now within a
+        // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
+        if !matches!(
+            expr.node,
+            ExprKind::BoolOp { .. }
+                | ExprKind::UnaryOp {
+                    op: Unaryop::Not,
+                    ..
+                }
+        ) {
             self.ctx.in_boolean_test = false;
         }
 
