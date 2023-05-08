@@ -140,7 +140,8 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                             pass_stmt.range().add_end(index),
                         )));
                     } else {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             delete_stmt(
                                 pass_stmt,
                                 None,

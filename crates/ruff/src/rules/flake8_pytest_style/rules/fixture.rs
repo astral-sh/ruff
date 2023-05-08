@@ -316,7 +316,8 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                             Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             let expr_range = diagnostic.range();
-                            diagnostic.try_set_fix(|| {
+                            #[allow(deprecated)]
+                            diagnostic.try_set_fix_from_edit(|| {
                                 fix_extraneous_scope_function(
                                     checker.locator,
                                     decorator.start(),

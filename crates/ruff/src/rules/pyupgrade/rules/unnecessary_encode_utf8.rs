@@ -176,7 +176,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -197,7 +198,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -225,7 +227,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -246,7 +249,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),

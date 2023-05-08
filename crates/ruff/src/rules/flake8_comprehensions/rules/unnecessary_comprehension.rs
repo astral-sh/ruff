@@ -66,7 +66,8 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr)
         });
     }

@@ -4033,7 +4033,8 @@ where
                                         name_range,
                                     );
                                     if self.patch(Rule::UnusedVariable) {
-                                        diagnostic.try_set_fix(|| {
+                                        #[allow(deprecated)]
+                                        diagnostic.try_set_fix_from_edit(|| {
                                             pyflakes::fixes::remove_exception_handler_assignment(
                                                 excepthandler,
                                                 self.locator,

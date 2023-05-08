@@ -78,7 +78,8 @@ pub fn unnecessary_literal_dict(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_literal_dict(checker.locator, checker.stylist, expr)
         });
     }

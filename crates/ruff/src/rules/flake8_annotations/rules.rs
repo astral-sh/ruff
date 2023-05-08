@@ -666,7 +666,8 @@ pub fn definition(
                             helpers::identifier_range(stmt, checker.locator),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_set_fix(|| {
+                            #[allow(deprecated)]
+                            diagnostic.try_set_fix_from_edit(|| {
                                 fixes::add_return_annotation(checker.locator, stmt, "None")
                             });
                         }
@@ -688,7 +689,8 @@ pub fn definition(
                     let return_type = SIMPLE_MAGIC_RETURN_TYPES.get(name);
                     if let Some(return_type) = return_type {
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_set_fix(|| {
+                            #[allow(deprecated)]
+                            diagnostic.try_set_fix_from_edit(|| {
                                 fixes::add_return_annotation(checker.locator, stmt, return_type)
                             });
                         }

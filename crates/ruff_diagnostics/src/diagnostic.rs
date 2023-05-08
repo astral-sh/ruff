@@ -5,7 +5,7 @@ use ruff_text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::Fix;
+use crate::{Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -55,9 +55,20 @@ impl Diagnostic {
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
     #[inline]
-    pub fn try_set_fix<T: Into<Fix>>(&mut self, func: impl FnOnce() -> Result<T>) {
+    pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
-            Ok(fix) => self.fix = Some(fix.into()),
+            Ok(fix) => self.fix = Some(fix),
+            Err(err) => error!("Failed to create fix: {}", err),
+        }
+    }
+
+    /// Sets an [`Edit`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    #[deprecated(note = "Use Diagnostic::try_set_fix instead")]
+    pub fn try_set_fix_from_edit(&mut self, func: impl FnOnce() -> Result<Edit>) {
+        match func() {
+            Ok(edit) => self.fix = Some(Fix::unspecified(edit)),
             Err(err) => error!("Failed to create fix: {}", err),
         }
     }
