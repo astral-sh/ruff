@@ -77,9 +77,11 @@ pub fn inplace_argument(
                 //    the star argument _doesn't_ contain an override).
                 // 2. The call is part of a larger expression (we're converting an expression to a
                 //    statement, and expressions can't contain statements).
+                // 3. The call is in a lambda (we can't assign to a variable in a lambda).
                 let fixable = !seen_star
                     && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
-                    && checker.ctx.current_expr_parent().is_none();
+                    && checker.ctx.current_expr_parent().is_none()
+                    && !checker.ctx.scope().kind.is_lambda();
                 let mut diagnostic =
                     Diagnostic::new(PandasUseOfInplaceArgument { fixable }, keyword.range());
                 if fixable && checker.patch(diagnostic.kind.rule()) {
