@@ -2,7 +2,7 @@ use itertools::Itertools;
 use log::error;
 use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
 
@@ -105,7 +105,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(defined_by));
                 }
-                diagnostic.set_fix(fix);
+                diagnostic.set_fix(Fix::unspecified(fix));
             }
             Err(e) => error!("Failed to remove `__future__` import: {e}"),
         }

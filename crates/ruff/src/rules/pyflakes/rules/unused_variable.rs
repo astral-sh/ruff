@@ -4,7 +4,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
@@ -194,7 +194,7 @@ fn remove_unused_variable(
     stmt: &Stmt,
     range: TextRange,
     checker: &Checker,
-) -> Option<(DeletionKind, Edit)> {
+) -> Option<(DeletionKind, Fix)> {
     // First case: simple assignment (`x = 1`)
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
@@ -206,11 +206,11 @@ fn remove_unused_variable(
                     // but preserve the right-hand side.
                     Some((
                         DeletionKind::Partial,
-                        Edit::deletion(
+                        Fix::unspecified(Edit::deletion(
                             target.start(),
                             match_token_after(target, checker.locator, |tok| tok == Tok::Equal)
                                 .start(),
-                        ),
+                        )),
                     ))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
@@ -224,7 +224,7 @@ fn remove_unused_variable(
                         checker.indexer,
                         checker.stylist,
                     ) {
-                        Ok(fix) => Some((DeletionKind::Whole, fix)),
+                        Ok(fix) => Some((DeletionKind::Whole, Fix::unspecified(fix))),
                         Err(err) => {
                             error!("Failed to delete unused variable: {}", err);
                             None
@@ -248,10 +248,10 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 Some((
                     DeletionKind::Partial,
-                    Edit::deletion(
+                    Fix::unspecified(Edit::deletion(
                         stmt.start(),
                         match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal).start(),
-                    ),
+                    )),
                 ))
             } else {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
@@ -265,7 +265,7 @@ fn remove_unused_variable(
                     checker.indexer,
                     checker.stylist,
                 ) {
-                    Ok(fix) => Some((DeletionKind::Whole, fix)),
+                    Ok(edit) => Some((DeletionKind::Whole, Fix::unspecified(edit))),
                     Err(err) => {
                         error!("Failed to delete unused variable: {}", err);
                         None
@@ -284,7 +284,7 @@ fn remove_unused_variable(
                 if optional_vars.range() == range {
                     return Some((
                         DeletionKind::Partial,
-                        Edit::deletion(
+                        Fix::unspecified(Edit::deletion(
                             item.context_expr.end(),
                             // The end of the `Withitem` is the colon, comma, or closing
                             // parenthesis following the `optional_vars`.
@@ -292,7 +292,7 @@ fn remove_unused_variable(
                                 tok == Tok::Colon || tok == Tok::Comma || tok == Tok::Rpar
                             })
                             .start(),
-                        ),
+                        )),
                     ));
                 }
             }

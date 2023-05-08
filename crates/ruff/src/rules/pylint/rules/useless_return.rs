@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
 use ruff_python_ast::types::RefEquality;
@@ -116,11 +116,11 @@ pub fn useless_return<'a>(
             checker.indexer,
             checker.stylist,
         ) {
-            Ok(fix) => {
-                if fix.is_deletion() || fix.content() == Some("pass") {
+            Ok(edit) => {
+                if edit.is_deletion() || edit.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(last_stmt));
                 }
-                diagnostic.set_fix(fix);
+                diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => {
                 error!("Failed to delete `return` statement: {}", e);

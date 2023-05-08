@@ -121,7 +121,8 @@ fn create_check(
                 mode_param.range(),
             )));
         } else {
-            diagnostic.try_set_fix(|| create_remove_param_fix(locator, expr, mode_param));
+            #[allow(deprecated)]
+            diagnostic.try_set_fix_from_edit(|| create_remove_param_fix(locator, expr, mode_param));
         }
     }
     diagnostic

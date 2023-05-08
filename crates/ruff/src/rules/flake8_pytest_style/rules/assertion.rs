@@ -426,8 +426,10 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
             && !has_comments_in(stmt.range(), checker.locator);
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion { fixable }, stmt.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            diagnostic
-                .try_set_fix(|| fix_composite_condition(stmt, checker.locator, checker.stylist));
+            #[allow(deprecated)]
+            diagnostic.try_set_fix_from_edit(|| {
+                fix_composite_condition(stmt, checker.locator, checker.stylist)
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

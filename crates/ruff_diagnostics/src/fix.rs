@@ -38,9 +38,3 @@ impl Fix {
         self.edits
     }
 }
-
-impl From<Edit> for Fix {
-    fn from(edit: Edit) -> Self {
-        Self { edits: vec![edit] }
-    }
-}

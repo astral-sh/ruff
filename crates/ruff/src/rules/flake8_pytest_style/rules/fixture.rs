@@ -239,7 +239,7 @@ fn has_abstractmethod_decorator(decorators: &[Expr], checker: &Checker) -> bool 
 fn pytest_fixture_parentheses(
     checker: &mut Checker,
     decorator: &Expr,
-    fix: Edit,
+    fix: Fix,
     preferred: &str,
     actual: &str,
 ) {
@@ -283,7 +283,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Edit::deletion(func.end(), decorator.end());
+                let fix = Fix::unspecified(Edit::deletion(func.end(), decorator.end()));
                 pytest_fixture_parentheses(checker, decorator, fix, "", "()");
             }
 
@@ -316,7 +316,8 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                             Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             let expr_range = diagnostic.range();
-                            diagnostic.try_set_fix(|| {
+                            #[allow(deprecated)]
+                            diagnostic.try_set_fix_from_edit(|| {
                                 fix_extraneous_scope_function(
                                     checker.locator,
                                     decorator.start(),
@@ -338,7 +339,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 .enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
                 && checker.settings.flake8_pytest_style.fixture_parentheses
             {
-                let fix = Edit::insertion("()".to_string(), decorator.end());
+                let fix = Fix::unspecified(Edit::insertion("()".to_string(), decorator.end()));
                 pytest_fixture_parentheses(checker, decorator, fix, "()", "");
             }
         }

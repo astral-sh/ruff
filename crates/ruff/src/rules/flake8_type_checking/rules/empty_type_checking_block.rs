@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
 
@@ -70,11 +70,11 @@ pub fn empty_type_checking_block<'a, 'b>(
                 checker.indexer,
                 checker.stylist,
             ) {
-                Ok(fix) => {
-                    if fix.is_deletion() || fix.content() == Some("pass") {
+                Ok(edit) => {
+                    if edit.is_deletion() || edit.content() == Some("pass") {
                         checker.deletions.insert(RefEquality(stmt));
                     }
-                    diagnostic.set_fix(fix);
+                    diagnostic.set_fix(Fix::unspecified(edit));
                 }
                 Err(e) => error!("Failed to remove empty type-checking block: {e}"),
             }

@@ -140,7 +140,8 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                             pass_stmt.range().add_end(index),
                         )));
                     } else {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             delete_stmt(
                                 pass_stmt,
                                 None,
@@ -208,7 +209,8 @@ pub fn duplicate_class_field_definition<'a, 'b>(
                 ) {
                     Ok(fix) => {
                         checker.deletions.insert(RefEquality(stmt));
-                        diagnostic.set_fix(fix);
+                        #[allow(deprecated)]
+                        diagnostic.set_fix_from_edit(fix);
                     }
                     Err(err) => {
                         error!("Failed to remove duplicate class definition: {}", err);

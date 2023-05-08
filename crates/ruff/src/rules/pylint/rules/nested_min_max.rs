@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use ruff_diagnostics::{Diagnostic, Edit, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments, unparse_expr};
 use ruff_python_semantic::context::Context;
@@ -121,10 +121,10 @@ pub fn nested_min_max(
                     keywords: keywords.to_owned(),
                 },
             );
-            diagnostic.set_fix(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&flattened_expr, checker.stylist),
                 expr.range(),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }
