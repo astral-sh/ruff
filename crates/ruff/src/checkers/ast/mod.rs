@@ -1887,7 +1887,7 @@ where
                                 flake8_pyi::rules::prefix_type_params(self, value, targets);
                             }
                             if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
-                                flake8_pyi::rules::assignment_default_in_stub(self, targets, value);
+                                flake8_pyi::rules::assignment_default_in_stub(self, targets, value, None);
                             }
                         }
                     }
@@ -1927,8 +1927,8 @@ where
                         if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
                             // Ignore assignments in function bodies; those are covered by other rules.
                             if !self.ctx.scopes().any(|scope| scope.kind.is_function()) {
-                                flake8_pyi::rules::annotated_assignment_default_in_stub(
-                                    self, target, value, annotation,
+                                flake8_pyi::rules::assignment_default_in_stub(
+                                    self, std::slice::from_ref(&**target), value, None,
                                 );
                             }
                         }

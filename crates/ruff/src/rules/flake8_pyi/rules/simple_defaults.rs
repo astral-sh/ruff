@@ -394,7 +394,7 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PYI015
-pub fn check_default_value_in_stub(
+pub fn assignment_default_in_stub(
     checker: &mut Checker,
     targets: &[Expr],
     value: &Expr,
