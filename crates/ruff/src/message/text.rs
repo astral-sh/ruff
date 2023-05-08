@@ -71,13 +71,13 @@ impl Emitter for TextEmitter {
                     write!(
                         writer,
                         "cell {cell}{sep}",
-                        cell = jupyter_index.row_to_cell[start_location.row.get()],
+                        cell = jupyter_index.row_to_cell[start_location.row.to_one_indexed()],
                         sep = ":".cyan(),
                     )?;
 
                     SourceLocation {
                         row: OneIndexed::new(
-                            jupyter_index.row_to_row_in_cell[start_location.row.get()] as usize,
+                            jupyter_index.row_to_row_in_cell[start_location.row.to_one_indexed()],
                         )
                         .unwrap(),
                         column: start_location.column,
@@ -219,7 +219,7 @@ impl Display for MessageCodeFrame<'_> {
             title: None,
             slices: vec![Slice {
                 source: &source.text,
-                line_start: content_start_index.get(),
+                line_start: content_start_index.to_one_indexed(),
                 annotations: vec![SourceAnnotation {
                     label: &label,
                     annotation_type: AnnotationType::Error,

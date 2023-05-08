@@ -1,6 +1,6 @@
 use crate::fs::relativize_path;
 use crate::jupyter::JupyterIndex;
-use crate::message::diff::calculate_print_width;
+use crate::message::diff::{calculate_padding_width, calculate_print_width};
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
@@ -9,7 +9,7 @@ use colored::Colorize;
 use ruff_python_ast::source_code::OneIndexed;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
-use std::num::NonZeroUsize;
+use std::num::NonZeroU32;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
@@ -82,8 +82,8 @@ struct DisplayGroupedMessage<'a> {
     message: MessageWithLocation<'a>,
     show_fix_status: bool,
     show_source: bool,
-    row_length: NonZeroUsize,
-    column_length: NonZeroUsize,
+    row_length: NonZeroU32,
+    column_length: NonZeroU32,
     jupyter_index: Option<&'a JupyterIndex>,
 }
 
@@ -97,8 +97,7 @@ impl Display for DisplayGroupedMessage<'_> {
         write!(
             f,
             "  {row_padding}",
-            row_padding =
-                " ".repeat(self.row_length.get() - calculate_print_width(start_location.row).get())
+            row_padding = " ".repeat(calculate_padding_width(self.row_length, start_location.row))
         )?;
 
         // Check if we're working on a jupyter notebook and translate positions with cell accordingly
@@ -106,11 +105,11 @@ impl Display for DisplayGroupedMessage<'_> {
             write!(
                 f,
                 "cell {cell}{sep}",
-                cell = jupyter_index.row_to_cell[start_location.row.get()],
+                cell = jupyter_index.row_to_cell[start_location.row.to_one_indexed()],
                 sep = ":".cyan()
             )?;
             (
-                jupyter_index.row_to_row_in_cell[start_location.row.get()] as usize,
+                jupyter_index.row_to_row_in_cell[start_location.row.to_one_indexed()],
                 start_location.column.get(),
             )
         } else {
@@ -121,9 +120,10 @@ impl Display for DisplayGroupedMessage<'_> {
             f,
             "{row}{sep}{col}{col_padding} {code_and_body}",
             sep = ":".cyan(),
-            col_padding = " ".repeat(
-                self.column_length.get() - calculate_print_width(start_location.column).get()
-            ),
+            col_padding = " ".repeat(calculate_padding_width(
+                self.column_length,
+                start_location.column
+            )),
             code_and_body = RuleCodeAndBody {
                 message_kind: &message.kind,
                 show_fix_status: self.show_fix_status

@@ -4,7 +4,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use std::num::NonZeroUsize;
+use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -236,49 +236,71 @@ impl IndexKind {
 /// Type-safe wrapper for a value whose logical range starts at `1`, for
 /// instance the line or column numbers in a file
 ///
-/// Internally this is represented as a [`NonZeroUsize`], this enables some
+/// Internally this is represented as a [`NonZeroU32`], this enables some
 /// memory optimizations
+///
+/// Conversion between `usize` and `OneIndexed` always specify
+/// zero-indexed or one-indexed. The internal representation is always
+/// one-indexed.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct OneIndexed(NonZeroUsize);
+pub struct OneIndexed(NonZeroU32);
+
+#[allow(clippy::cast_possible_truncation)] // manually checked
+const fn index_to_u32(value: usize) -> u32 {
+    assert!(
+        value <= u32::MAX as usize,
+        "Value is too large to be represented as a OneIndexed"
+    );
+    value as u32
+}
 
 impl OneIndexed {
     // SAFETY: These constants are being initialized with non-zero values
     /// The smallest value that can be represented by this integer type.
     pub const MIN: Self = unwrap(Self::new(1));
     /// The largest value that can be represented by this integer type
-    pub const MAX: Self = unwrap(Self::new(usize::MAX));
+    pub const MAX: Self = unwrap(Self::new(u32::MAX));
 
-    pub const ONE: NonZeroUsize = unwrap(NonZeroUsize::new(1));
+    pub const ONE: NonZeroU32 = unwrap(NonZeroU32::new(1));
 
     /// Creates a non-zero if the given value is not zero.
-    pub const fn new(value: usize) -> Option<Self> {
-        match NonZeroUsize::new(value) {
+    pub const fn new(value: u32) -> Option<Self> {
+        match NonZeroU32::new(value) {
             Some(value) => Some(Self(value)),
             None => None,
         }
     }
 
     /// Construct a new [`OneIndexed`] from a zero-indexed value
+    ///
+    /// # Panics
+    /// Panics if the given value doesn't fit in u32
     pub const fn from_zero_indexed(value: usize) -> Self {
+        let value = index_to_u32(value);
         Self(Self::ONE.saturating_add(value))
     }
 
     /// Returns the value as a primitive type.
-    pub const fn get(self) -> usize {
+    pub const fn get(self) -> u32 {
         self.0.get()
+    }
+
+    /// Return the one-indexed primitive value for this [`OneIndexed`]
+    pub const fn to_one_indexed(self) -> usize {
+        self.get() as _
     }
 
     /// Return the zero-indexed primitive value for this [`OneIndexed`]
     pub const fn to_zero_indexed(self) -> usize {
-        self.0.get() - 1
+        self.0.get() as usize - 1
     }
 
     /// Saturating integer addition. Computes `self + rhs`, saturating at
     /// the numeric bounds instead of overflowing.
     #[must_use]
-    pub const fn saturating_add(self, rhs: usize) -> Self {
-        match NonZeroUsize::new(self.0.get().saturating_add(rhs)) {
+    pub const fn saturating_add(self, rhs: u32) -> Self {
+        match NonZeroU32::new(self.0.get().saturating_add(rhs)) {
             Some(value) => Self(value),
             None => Self::MAX,
         }
@@ -287,8 +309,8 @@ impl OneIndexed {
     /// Saturating integer subtraction. Computes `self - rhs`, saturating
     /// at the numeric bounds instead of overflowing.
     #[must_use]
-    pub const fn saturating_sub(self, rhs: usize) -> Self {
-        match NonZeroUsize::new(self.0.get().saturating_sub(rhs)) {
+    pub const fn saturating_sub(self, rhs: u32) -> Self {
+        match NonZeroU32::new(self.0.get().saturating_sub(rhs)) {
             Some(value) => Self(value),
             None => Self::MIN,
         }

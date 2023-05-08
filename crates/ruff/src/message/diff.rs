@@ -5,7 +5,7 @@ use ruff_python_ast::source_code::{OneIndexed, SourceFile};
 use ruff_text_size::{TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
-use std::num::NonZeroUsize;
+use std::num::NonZeroU32;
 
 /// Renders a diff that shows the code fixes.
 ///
@@ -158,7 +158,7 @@ impl From<ChangeTag> for LineStyle {
 
 struct Line {
     index: Option<OneIndexed>,
-    width: NonZeroUsize,
+    width: NonZeroU32,
 }
 
 impl Display for Line {
@@ -170,13 +170,13 @@ impl Display for Line {
                 }
                 Ok(())
             }
-            Some(idx) => write!(f, "{:<width$}", idx, width = self.width.get()),
+            Some(idx) => write!(f, "{:<width$}", idx, width = self.width.get() as usize),
         }
     }
 }
 
 /// Calculate the length of the string representation of `value`
-pub(super) fn calculate_print_width(mut value: OneIndexed) -> NonZeroUsize {
+pub(super) fn calculate_print_width(mut value: OneIndexed) -> NonZeroU32 {
     const TEN: OneIndexed = OneIndexed::from_zero_indexed(9);
 
     let mut width = OneIndexed::ONE;
@@ -187,4 +187,10 @@ pub(super) fn calculate_print_width(mut value: OneIndexed) -> NonZeroUsize {
     }
 
     width
+}
+
+/// Calculate the length of the padding to print string representation of `value`
+pub(super) fn calculate_padding_width(length: NonZeroU32, value: OneIndexed) -> usize {
+    let padding = length.get() - calculate_print_width(value).get();
+    padding as _
 }
