@@ -8,7 +8,7 @@ pub use prefix_type_params::{prefix_type_params, UnprefixedTypeParam};
 pub use quoted_annotation_in_stub::{quoted_annotation_in_stub, QuotedAnnotationInStub};
 pub use simple_defaults::{
     annotated_assignment_default_in_stub, argument_simple_defaults, assignment_default_in_stub,
-    typed_argument_simple_defaults, ArgumentDefaultInStub, AssignmentDefaultInStub,
+    assignment_default_in_async_stub, typed_argument_simple_defaults, ArgumentDefaultInStub, AssignmentDefaultInStub,
     TypedArgumentDefaultInStub,
 };
 pub use type_alias_naming::{
