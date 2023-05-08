@@ -10,7 +10,7 @@ use rustpython_parser::ast::{
     ExprKind, KeywordData, Located, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite,
 };
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
@@ -5324,8 +5324,8 @@ impl<'a> Checker<'a> {
                         if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.start());
                         }
-                        if let Some(fix) = &fix {
-                            diagnostic.set_fix(fix.clone());
+                        if let Some(edit) = &fix {
+                            diagnostic.set_fix(Fix::unspecified(edit.clone()));
                         }
                         diagnostics.push(diagnostic);
                     }

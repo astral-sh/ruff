@@ -40,14 +40,21 @@ impl Diagnostic {
 
     /// Set the [`Fix`] used to fix the diagnostic.
     #[inline]
-    pub fn set_fix<T: Into<Fix>>(&mut self, fix: T) {
-        self.fix = Some(fix.into());
+    pub fn set_fix(&mut self, fix: Fix) {
+        self.fix = Some(fix);
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    #[deprecated(note = "Use `Diagnostic::set_fix` instead.")]
+    pub fn set_fix_from_edit(&mut self, edit: Edit) {
+        self.fix = Some(Fix::unspecified(edit));
     }
 
     /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
     #[inline]
     #[must_use]
-    pub fn with_fix<T: Into<Fix>>(mut self, fix: T) -> Self {
+    pub fn with_fix(mut self, fix: Fix) -> Self {
         self.set_fix(fix);
         self
     }

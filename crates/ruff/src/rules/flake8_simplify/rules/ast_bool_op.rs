@@ -695,7 +695,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(edit);
+            diagnostic.set_fix(Fix::unspecified(edit));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -714,7 +714,7 @@ pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(edit);
+            diagnostic.set_fix(Fix::unspecified(edit));
         }
         checker.diagnostics.push(diagnostic);
     }

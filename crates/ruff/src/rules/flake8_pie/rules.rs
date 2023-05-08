@@ -209,7 +209,8 @@ pub fn duplicate_class_field_definition<'a, 'b>(
                 ) {
                     Ok(fix) => {
                         checker.deletions.insert(RefEquality(stmt));
-                        diagnostic.set_fix(fix);
+                        #[allow(deprecated)]
+                        diagnostic.set_fix_from_edit(fix);
                     }
                     Err(err) => {
                         error!("Failed to remove duplicate class definition: {}", err);

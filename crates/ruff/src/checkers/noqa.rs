@@ -102,7 +102,8 @@ pub fn check_noqa(
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, *noqa_range);
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(delete_noqa(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix_from_edit(delete_noqa(
                                 *leading_spaces,
                                 *noqa_range,
                                 *trailing_spaces,
@@ -171,7 +172,8 @@ pub fn check_noqa(
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                diagnostic.set_fix(delete_noqa(
+                                #[allow(deprecated)]
+                                diagnostic.set_fix_from_edit(delete_noqa(
                                     *leading_spaces,
                                     *range,
                                     *trailing_spaces,

@@ -54,7 +54,7 @@ fn pytest_mark_parentheses(
     checker: &mut Checker,
     decorator: &Expr,
     call_path: &CallPath,
-    fix: Edit,
+    fix: Fix,
     preferred: &str,
     actual: &str,
 ) {
@@ -84,13 +84,13 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &C
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Edit::deletion(func.end(), decorator.end());
+                let fix = Fix::unspecified(Edit::deletion(func.end(), decorator.end()));
                 pytest_mark_parentheses(checker, decorator, call_path, fix, "", "()");
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
-                let fix = Edit::insertion("()".to_string(), decorator.end());
+                let fix = Fix::unspecified(Edit::insertion("()".to_string(), decorator.end()));
                 pytest_mark_parentheses(checker, decorator, call_path, fix, "()", "");
             }
         }

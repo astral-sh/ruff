@@ -297,14 +297,14 @@ pub fn nested_if_statements(
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
-            Ok(fix) => {
-                if fix
+            Ok(edit) => {
+                if edit
                     .content()
                     .unwrap_or_default()
                     .universal_newlines()
                     .all(|line| line.width() <= checker.settings.line_length)
                 {
-                    diagnostic.set_fix(fix);
+                    diagnostic.set_fix(Fix::unspecified(edit));
                 }
             }
             Err(err) => error!("Failed to fix nested if: {err}"),

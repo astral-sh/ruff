@@ -138,7 +138,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     } else {
                         Edit::range_replacement(new_indent, over_indented)
                     };
-                    diagnostic.set_fix(edit);
+                    diagnostic.set_fix(Fix::unspecified(edit));
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -2,7 +2,7 @@ use log::error;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
 
@@ -61,11 +61,11 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             checker.indexer,
             checker.stylist,
         ) {
-            Ok(fix) => {
-                if fix.is_deletion() || fix.content() == Some("pass") {
+            Ok(edit) => {
+                if edit.is_deletion() || edit.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(defined_by));
                 }
-                diagnostic.set_fix(fix);
+                diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => error!("Failed to fix remove metaclass type: {e}"),
         }
