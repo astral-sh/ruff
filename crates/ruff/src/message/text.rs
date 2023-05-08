@@ -12,7 +12,6 @@ use ruff_text_size::{TextRange, TextSize};
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
-use unicode_width::UnicodeWidthChar;
 
 bitflags! {
     #[derive(Default)]
@@ -276,9 +275,8 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
             '\n' | '\r' => {
                 column = 0;
             }
-            #[allow(clippy::cast_possible_truncation)]
             _ => {
-                column += c.width().unwrap_or(0) as u32;
+                column += 1;
             }
         }
     }
