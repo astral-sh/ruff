@@ -267,7 +267,7 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enable specific docstring convention, add the following to your `pyproject.toml`:
+Yes! To enforce a docstring convention, add the following to your `pyproject.toml`:
 
 ```toml
 [tool.ruff.pydocstyle]
@@ -278,7 +278,8 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside `convention`, you'll want to explicitly enable the `D` rule code prefix, like so:
+Alongside `convention`, you'll want to explicitly enable the `D` rule code prefix, since the `D`
+rules are not enabled by default:
 
 ```toml
 [tool.ruff]
@@ -292,6 +293,8 @@ convention = "google"
 
 Setting a `convention` force-disables any rules that are incompatible with that convention, no
 matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
+By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
+alone.
 
 ## How can I tell what settings Ruff is using to check my code?
 
