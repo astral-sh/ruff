@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::whitespace;
@@ -90,10 +90,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
                         TextRange::at(line.start(), line_indent.text_len()),
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -151,10 +151,10 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
                         TextRange::at(last.start(), line_indent.text_len()),
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -22,7 +22,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
@@ -169,7 +169,10 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {
                         if !binding.used() {
-                            diagnostic.set_fix(Edit::range_replacement(rename, expr.range()));
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                rename,
+                                expr.range(),
+                            )));
                         }
                     }
                 }

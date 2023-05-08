@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -71,10 +71,10 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             capitalized_word,
             TextRange::at(body.start(), first_word.text_len()),
-        ));
+        )));
     }
 
     checker.diagnostics.push(diagnostic);

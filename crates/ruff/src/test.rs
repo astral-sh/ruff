@@ -64,7 +64,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
 
     if diagnostics
         .iter()
-        .any(|diagnostic| !diagnostic.fix.is_empty())
+        .any(|diagnostic| diagnostic.fix.is_some())
     {
         let mut diagnostics = diagnostics.clone();
         let mut contents = contents.clone();

@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
 
@@ -88,10 +88,10 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line before the docstring.
-                diagnostic.set_fix(Edit::deletion(
+                diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                     blank_lines_start,
                     docstring.start() - docstring.indentation.text_len(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -149,7 +149,10 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line after the docstring.
-                diagnostic.set_fix(Edit::deletion(first_line_end, blank_lines_end));
+                diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                    first_line_end,
+                    blank_lines_end,
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

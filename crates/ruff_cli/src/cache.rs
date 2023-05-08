@@ -124,7 +124,7 @@ impl Serialize for SerializeMessage<'_> {
 struct MessageHeader {
     kind: DiagnosticKind,
     range: TextRange,
-    fix: Fix,
+    fix: Option<Fix>,
     file_id: usize,
     noqa_row: TextSize,
 }

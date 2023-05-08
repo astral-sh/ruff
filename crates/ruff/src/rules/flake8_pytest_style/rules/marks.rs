@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 
@@ -113,9 +113,9 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
     if !has_parameters {
         let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::range_deletion(
+            diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
                 decorator.range().sub_start(TextSize::from(1)),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

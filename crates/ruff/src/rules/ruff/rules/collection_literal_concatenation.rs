@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Operator};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, has_comments, unparse_expr};
 
@@ -108,7 +108,10 @@ pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if fixable {
-            diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                contents,
+                expr.range(),
+            )));
         }
     }
     checker.diagnostics.push(diagnostic);

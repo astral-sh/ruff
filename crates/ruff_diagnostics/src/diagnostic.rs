@@ -24,7 +24,7 @@ pub struct DiagnosticKind {
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub range: TextRange,
-    pub fix: Fix,
+    pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
 }
 
@@ -33,7 +33,7 @@ impl Diagnostic {
         Self {
             kind: kind.into(),
             range,
-            fix: Fix::empty(),
+            fix: None,
             parent: None,
         }
     }
@@ -41,7 +41,7 @@ impl Diagnostic {
     /// Set the [`Fix`] used to fix the diagnostic.
     #[inline]
     pub fn set_fix<T: Into<Fix>>(&mut self, fix: T) {
-        self.fix = fix.into();
+        self.fix = Some(fix.into());
     }
 
     /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
@@ -57,7 +57,7 @@ impl Diagnostic {
     #[inline]
     pub fn try_set_fix<T: Into<Fix>>(&mut self, func: impl FnOnce() -> Result<T>) {
         match func() {
-            Ok(fix) => self.fix = fix.into(),
+            Ok(fix) => self.fix = Some(fix.into()),
             Err(err) => error!("Failed to create fix: {}", err),
         }
     }

@@ -33,7 +33,7 @@ use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 pub struct Message {
     pub kind: DiagnosticKind,
     pub range: TextRange,
-    pub fix: Fix,
+    pub fix: Option<Fix>,
     pub file: SourceFile,
     pub noqa_offset: TextSize,
 }
@@ -191,10 +191,10 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
-        .with_fix(Fix::new(vec![Edit::deletion(
+        .with_fix(Fix::unspecified(Edit::deletion(
             TextSize::from(94),
             TextSize::from(99),
-        )]));
+        )));
 
         let file_2 = r#"if a == 1: pass"#;
 
