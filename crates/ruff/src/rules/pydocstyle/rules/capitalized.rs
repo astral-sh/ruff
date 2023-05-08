@@ -40,36 +40,27 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     }
 
     let body = docstring.body();
-
     let Some(first_word) = body.split(' ').next() else {
         return
     };
-    if first_word == first_word.to_uppercase() {
-        return;
-    }
+
+    // Like pydocstyle, we only support ASCII for now.
     for char in first_word.chars() {
         if !char.is_ascii_alphabetic() && char != '\'' {
             return;
         }
     }
+
     let mut first_word_chars = first_word.chars();
     let Some(first_char) = first_word_chars.next() else {
         return;
     };
-    if first_char.is_uppercase() {
-        return;
-    };
-    if first_char
-        .to_uppercase()
-        .next()
-        .map_or(false, |uppercase_first_char| {
-            uppercase_first_char == first_char
-        })
-    {
+    let uppercase_first_char = first_char.to_ascii_uppercase();
+    if first_char == uppercase_first_char {
         return;
     }
 
-    let capitalized_word = first_char.to_uppercase().to_string() + first_word_chars.as_str();
+    let capitalized_word = uppercase_first_char.to_string() + first_word_chars.as_str();
 
     let mut diagnostic = Diagnostic::new(
         FirstLineCapitalized {
