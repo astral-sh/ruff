@@ -36,12 +36,15 @@ impl From<&Cmpop> for EqCmpop {
 /// ## Example
 /// ```python
 /// if arg != None:
+///     pass
 /// if None == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is not None:
+///     pass
 /// ```
 ///
 /// ## References
@@ -78,13 +81,17 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// ## Example
 /// ```python
 /// if arg == True:
+///     pass
 /// if False == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is True:
+///     pass
 /// if arg is False:
+///     pass
 /// ```
 ///
 /// ## References

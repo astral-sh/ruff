@@ -25,13 +25,13 @@ use crate::registry::AsRule;
 ///
 /// ## Example
 /// ```python
-/// f = lambda x: 2*x
+/// f = lambda x: 2 * x
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def f(x):
-///    return 2 * x
+///     return 2 * x
 /// ```
 ///
 /// ## References

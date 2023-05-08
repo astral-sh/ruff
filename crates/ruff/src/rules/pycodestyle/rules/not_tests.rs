@@ -16,15 +16,15 @@ use crate::rules::pycodestyle::helpers::compare;
 /// ## Example
 /// ```python
 /// Z = not X in Y
-/// if not X.B in Y:\n    pass
-///
+/// if not X.B in Y:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if x not in y:\n    pass
-/// assert (X in Y or X is Z)
-///
+/// if x not in y:
+///     pass
+/// assert X in Y or X is Z
 /// ```
 #[violation]
 pub struct NotInTest;

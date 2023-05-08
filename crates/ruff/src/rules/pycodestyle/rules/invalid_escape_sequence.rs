@@ -14,12 +14,12 @@ use ruff_python_ast::source_code::Locator;
 ///
 /// ## Example
 /// ```python
-/// regex = '\.png$'
+/// regex = "\.png$"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// regex = r'\.png$'
+/// regex = r"\.png$"
 /// ```
 #[violation]
 pub struct InvalidEscapeSequence(pub char);

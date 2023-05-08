@@ -14,10 +14,12 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// var = 1
 ///
+///
 /// def foo():
 ///     global var  # [global-statement]
 ///     var = 10
 ///     print(var)
+///
 ///
 /// foo()
 /// print(var)
@@ -27,9 +29,11 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// var = 1
 ///
+///
 /// def foo():
 ///     print(var)
 ///     return 10
+///
 ///
 /// var = foo()
 /// print(var)

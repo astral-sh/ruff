@@ -18,12 +18,12 @@ use ruff_python_ast::source_code::Locator;
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\b'
+/// x = "\b"
 /// ```
 #[violation]
 pub struct InvalidCharacterBackspace;
@@ -51,12 +51,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterBackspace {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\x1A'
+/// x = "\x1A"
 /// ```
 #[violation]
 pub struct InvalidCharacterSub;
@@ -84,12 +84,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterSub {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\x1B'
+/// x = "\x1B"
 /// ```
 #[violation]
 pub struct InvalidCharacterEsc;
@@ -117,12 +117,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterEsc {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\0'
+/// x = "\0"
 /// ```
 #[violation]
 pub struct InvalidCharacterNul;
@@ -149,12 +149,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterNul {
 ///
 /// ## Example
 /// ```python
-/// x = 'Dear Sir/Madam'
+/// x = "Dear Sir/Madam"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = 'Dear Sir\u200B/\u200BMadam'  # zero width space
+/// x = "Dear Sir\u200B/\u200BMadam"  # zero width space
 /// ```
 #[violation]
 pub struct InvalidCharacterZeroWidthSpace;

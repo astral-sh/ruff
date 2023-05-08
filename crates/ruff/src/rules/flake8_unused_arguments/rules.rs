@@ -65,6 +65,7 @@ impl Violation for UnusedFunctionArgument {
 /// ```python
 /// class MyClass:
 ///     def my_method(self, arg1):
+///         print(arg1)
 /// ```
 #[violation]
 pub struct UnusedMethodArgument {

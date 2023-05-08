@@ -17,12 +17,12 @@ use crate::settings::{flags, Settings};
 ///
 /// ## Example
 /// ```python
-/// if foo == 'blah': do_blah_thing()
+/// if foo == "blah": do_blah_thing()
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if foo == 'blah':
+/// if foo == "blah":
 ///     do_blah_thing()
 /// ```
 ///
