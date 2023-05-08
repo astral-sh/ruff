@@ -75,7 +75,7 @@ def format_str(
 def format_file(
     file: Path,
     black_mode: black.FileMode,
-    error_known: bool,  # noqa: FBT001
+    error_known: bool,
     args: argparse.Namespace,
 ) -> int:
     """Check the formatting of a single docs file.
@@ -171,8 +171,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ]:
         if known_list != sorted(known_list):
             print(
-                f"Known {file_string} is not sorted alphabetically. Please sort and"
-                " re-run.",
+                f"Known {file_string} is not sorted alphabetically. Please sort and "
+                f"re-run.",
             )
             return 1
 
