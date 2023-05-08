@@ -191,8 +191,9 @@ pub fn unittest_assertion(
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = checker.ctx.current_expr_parent().is_none()
-                    && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
+                let fixable = matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
+                    && checker.ctx.current_expr_parent().is_none()
+                    && !checker.ctx.scope().kind.is_lambda()
                     && !has_comments_in(expr.range(), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {

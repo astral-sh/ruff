@@ -77,7 +77,10 @@ pub fn inplace_argument(
                 //    the star argument _doesn't_ contain an override).
                 // 2. The call is part of a larger expression (we're converting an expression to a
                 //    statement, and expressions can't contain statements).
-                // 3. The call is in a lambda (we can't assign to a variable in a lambda).
+                // 3. The call is in a lambda (we can't assign to a variable in a lambda). This
+                //    should be unnecessary, as lambdas are expressions, and so (2) should apply,
+                //    but we don't currently restore expression stacks when parsing deferred nodes,
+                //    and so the parent is lost.
                 let fixable = !seen_star
                     && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
                     && checker.ctx.current_expr_parent().is_none()
