@@ -20,6 +20,32 @@ SNIPPED_RE = re.compile(
     re.DOTALL | re.MULTILINE,
 )
 
+# For some rules, we don't want black to fix the formatting as this would "fix" the
+# example.
+KNOWN_FORMATTING_VIOLATIONS = [
+    "avoidable-escaped-quote",
+    "bad-quotes-docstring",
+    "bad-quotes-inline-string",
+    "bad-quotes-multiline-string",
+    "explicit-string-concatenation",
+    "line-too-long",
+    "missing-trailing-comma",
+    "multi-line-implicit-string-concatenation",
+    "multiple-statements-on-one-line-colon",
+    "multiple-statements-on-one-line-semicolon",
+    "prohibited-trailing-comma",
+    "trailing-comma-on-bare-tuple",
+    "useless-semicolon",
+]
+
+# For some docs, black is unable to parse the example code.
+KNOWN_PARSE_ERRORS = [
+    "blank-line-with-whitespace",
+    "missing-newline-at-end-of-file",
+    "mixed-spaces-and-tabs",
+    "trailing-whitespace",
+]
+
 
 class CodeBlockError(Exception):
     """A code block parse error."""
@@ -52,7 +78,10 @@ def format_file(
     error_known: bool,  # noqa: FBT001
     args: argparse.Namespace,
 ) -> int:
-    """Check the formatting of a single docs file."""
+    """Check the formatting of a single docs file.
+
+    Returns the exit code for the script.
+    """
     with file.open() as f:
         contents = f.read()
 
@@ -67,15 +96,15 @@ def format_file(
     if errors and not args.skip_errors and not error_known:
         for error in errors:
             rule_name = file.name.split(".")[0]
-            print(f"Docs parse error for {rule_name} docs: {error}")
+            print(f"Docs parse error for `{rule_name}` docs: {error}")
 
         return 2
 
     if contents != new_contents:
         rule_name = file.name.split(".")[0]
         print(
-            f"Rule {rule_name} docs are not formatted. This section should be"
-            " rewritten to:",
+            f"Rule `{rule_name}` docs are not formatted. This section should be "
+            f"rewritten to:",
         )
 
         # Add indentation so that snipped can be copied directly to docs
@@ -133,25 +162,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         target_versions={TargetVersion[val.upper()] for val in TARGET_VERSIONS},
     )
 
-    # For some docs, we don't want black to fix the formatting as this would remove the
-    # reason for the example. These rules will be stored in
-    # `scripts/known_formatting_violations.txt`
-
-    with Path("scripts/known_rule_formatting_violations.txt").open() as f:
-        known_formatting_violations = f.read().splitlines()
-
-    # For some docs, black is unable to parse the example code. These rules will be
-    # stored at `scripts/known_rule_parse_errors.txt`
-
-    with Path("scripts/known_rule_parse_errors.txt").open() as f:
-        known_parse_errors = f.read().splitlines()
-
     # Check known formatting violations and parse errors are sorted alphabetically and
     # have no duplicates. This will reduce the diff when adding new violations
 
     for known_list, file_string in [
-        (known_formatting_violations, "formatting violations"),
-        (known_parse_errors, "parse errors"),
+        (KNOWN_FORMATTING_VIOLATIONS, "formatting violations"),
+        (KNOWN_PARSE_ERRORS, "parse errors"),
     ]:
         if known_list != sorted(known_list):
             print(
@@ -171,10 +187,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     errors = 0
     for file in [*static_docs, *generated_docs]:
         rule_name = file.name.split(".")[0]
-        if rule_name in known_formatting_violations:
+        if rule_name in KNOWN_FORMATTING_VIOLATIONS:
             continue
 
-        error_known = rule_name in known_parse_errors
+        error_known = rule_name in KNOWN_PARSE_ERRORS
 
         result = format_file(file, black_mode, error_known, args)
         if result == 1:
