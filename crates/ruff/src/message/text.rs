@@ -245,36 +245,39 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: TextSize = TextSize::new(4);
+    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `pycodestyle.tab-size`
 
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
     let mut column = 0;
 
-    for (index, m) in source.match_indices(['\t', '\n', '\r']) {
-        match m {
-            "\t" => {
-                let tab_width = TAB_SIZE - TextSize::new(column % 4);
+    for (index, c) in source.chars().enumerate() {
+        match c {
+            '\t' => {
+                let tab_width = TAB_SIZE - column % TAB_SIZE;
+                column += tab_width;
 
                 if index < usize::from(annotation_range.start()) {
-                    range += tab_width - TextSize::new(1);
+                    range += TextSize::new(tab_width - 1);
                 } else if index < usize::from(annotation_range.end()) {
-                    range = range.add_end(tab_width - TextSize::new(1));
+                    range = range.add_end(TextSize::new(tab_width - 1));
                 }
 
                 result.push_str(&source[last_end..index]);
 
-                for _ in 0..u32::from(tab_width) {
+                for _ in 0..tab_width {
                     result.push(' ');
                 }
 
                 last_end = index + 1;
             }
-            "\n" | "\r" => {
+            '\n' | '\r' => {
                 column = 0;
             }
-            _ => unreachable!(),
+            _ => {
+                column += 1;
+            }
         }
     }
 

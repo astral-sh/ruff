@@ -28,7 +28,7 @@ E27.py:24:5: E272 Multiple spaces before keyword
 26 | this  and False
    |      E272
 27 | #: E273
-28 | a and    b
+28 | a and   b
    |
 
 
