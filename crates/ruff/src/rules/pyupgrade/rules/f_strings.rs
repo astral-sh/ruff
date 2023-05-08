@@ -267,7 +267,11 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
     let existing = checker.locator.slice(TextRange::up_to(expr.start()));
-    if existing.chars().last().unwrap().is_ascii_alphabetic() {
+    if existing
+        .chars()
+        .last()
+        .map_or(false, |char| char.is_ascii_alphabetic())
+    {
         contents.insert(0, ' ');
     }
 
