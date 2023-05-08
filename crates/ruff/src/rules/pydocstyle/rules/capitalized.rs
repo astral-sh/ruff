@@ -59,6 +59,15 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if first_char.is_uppercase() {
         return;
     };
+    if first_char
+        .to_uppercase()
+        .next()
+        .map_or(false, |uppercase_first_char| {
+            uppercase_first_char == first_char
+        })
+    {
+        return;
+    }
 
     let capitalized_word = first_char.to_uppercase().to_string() + first_word_chars.as_str();
 
