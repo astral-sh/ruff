@@ -4,12 +4,14 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+    use test_case::test_case;
+
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
-    use anyhow::Result;
-    use std::path::Path;
-    use test_case::test_case;
 
     #[test_case(Rule::StaticJoinToFString, Path::new("FLY002.py"); "FLY002")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

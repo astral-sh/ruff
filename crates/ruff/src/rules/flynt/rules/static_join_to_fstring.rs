@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -11,21 +11,18 @@ use crate::rules::flynt::helpers;
 #[violation]
 pub struct StaticJoinToFString {
     pub expr: String,
-    pub fixable: bool,
 }
 
-impl Violation for StaticJoinToFString {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
-
+impl AlwaysAutofixableViolation for StaticJoinToFString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StaticJoinToFString { expr, .. } = self;
+        let StaticJoinToFString { expr } = self;
         format!("Consider `{expr}` instead of string join")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|StaticJoinToFString { expr, .. }| format!("Replace with `{expr}`"))
+    fn autofix_title(&self) -> String {
+        let StaticJoinToFString { expr } = self;
+        format!("Replace with `{expr}`")
     }
 }
 
@@ -44,12 +41,12 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             // gracefully right now.
             return None;
         }
-        if !first {
+        if !std::mem::take(&mut first) {
             fstring_elems.push(helpers::to_constant_string(joiner));
         }
         fstring_elems.push(helpers::to_fstring_elem(expr)?);
-        first = false;
     }
+
     Some(create_expr(ExprKind::JoinedStr {
         values: fstring_elems,
     }))
@@ -57,20 +54,20 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
 
 pub fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
     let ExprKind::Call {
-        func: _,
         args,
         keywords,
+        ..
     } = &expr.node else {
         return;
     };
 
     if !keywords.is_empty() || args.len() != 1 {
-        // If there are kwargs or more than one argument,
-        // this is some non-standard string join call.
+        // If there are kwargs or more than one argument, this is some non-standard
+        // string join call.
         return;
     }
 
-    // Get the elements to join; skip e.g. generators, sets, etc.
+    // Get the elements to join; skip (e.g.) generators, sets, etc.
     let joinees = match &args[0].node {
         ExprKind::List { elts, .. } if is_static_length(elts) => elts,
         ExprKind::Tuple { elts, .. } if is_static_length(elts) => elts,
@@ -86,12 +83,14 @@ pub fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) 
     let mut diagnostic = Diagnostic::new(
         StaticJoinToFString {
             expr: contents.clone(),
-            fixable: true,
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
