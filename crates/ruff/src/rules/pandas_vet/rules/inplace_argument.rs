@@ -82,8 +82,8 @@ pub fn inplace_argument(
                 //    but we don't currently restore expression stacks when parsing deferred nodes,
                 //    and so the parent is lost.
                 let fixable = !seen_star
-                    && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
-                    && checker.ctx.current_expr_parent().is_none()
+                    && matches!(checker.ctx.stmt().node, StmtKind::Expr { .. })
+                    && checker.ctx.expr_parent().is_none()
                     && !checker.ctx.scope().kind.is_lambda();
                 let mut diagnostic =
                     Diagnostic::new(PandasUseOfInplaceArgument { fixable }, keyword.range());
