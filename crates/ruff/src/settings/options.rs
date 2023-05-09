@@ -445,14 +445,6 @@ pub struct Options {
     )]
     /// A list of rule codes or prefixes to consider non-autofix-able.
     pub unfixable: Option<Vec<RuleSelector>>,
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = "update-check = true"
-    )]
-    /// Enable or disable automatic update checks (overridden by the
-    /// `--update-check` and `--no-update-check` command-line flags).
-    pub update_check: Option<bool>,
     #[option_group]
     /// Options for the `flake8-annotations` plugin.
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,

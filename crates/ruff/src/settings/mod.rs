@@ -57,7 +57,6 @@ impl AllSettings {
                 fix_only: config.fix_only.unwrap_or(false),
                 format: config.format.unwrap_or_default(),
                 show_fixes: config.show_fixes.unwrap_or(false),
-                update_check: config.update_check.unwrap_or_default(),
             },
             lib: Settings::from_configuration(config, project_root)?,
         })
@@ -74,7 +73,6 @@ pub struct CliSettings {
     pub fix_only: bool,
     pub format: SerializationFormat,
     pub show_fixes: bool,
-    pub update_check: bool,
 }
 
 #[derive(Debug, CacheKey)]

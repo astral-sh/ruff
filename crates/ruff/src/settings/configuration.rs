@@ -65,7 +65,6 @@ pub struct Configuration {
     pub target_version: Option<PythonVersion>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
-    pub update_check: Option<bool>,
     // Plugins
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
     pub flake8_bandit: Option<flake8_bandit::settings::Options>,
@@ -201,7 +200,6 @@ impl Configuration {
             target_version: options.target_version,
             task_tags: options.task_tags,
             typing_modules: options.typing_modules,
-            update_check: options.update_check,
             // Plugins
             flake8_annotations: options.flake8_annotations,
             flake8_bandit: options.flake8_bandit,
@@ -272,7 +270,6 @@ impl Configuration {
             target_version: self.target_version.or(config.target_version),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
-            update_check: self.update_check.or(config.update_check),
             // Plugins
             flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
             flake8_bandit: self.flake8_bandit.or(config.flake8_bandit),
