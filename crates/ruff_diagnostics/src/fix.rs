@@ -7,7 +7,6 @@ use crate::edit::Edit;
 /// Indicates confidence in the correctness of a suggested fix.
 #[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[non_exhaustive]
 pub enum Applicability {
     /// The fix is definitely what the user intended, or maintains the exact meaning of the code.
     /// This fix should be automatically applied.
