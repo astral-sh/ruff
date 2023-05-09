@@ -120,4 +120,9 @@ impl Fix {
     pub fn into_edits(self) -> Vec<Edit> {
         self.edits
     }
+
+    pub fn applicability(&self) -> Applicability {
+        self.applicability
+    }
+
 }
