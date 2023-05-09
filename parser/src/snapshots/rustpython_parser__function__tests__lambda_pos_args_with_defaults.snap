@@ -4,12 +4,12 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
+        Attributed {
             range: 0..23,
             custom: (),
             node: Expr(
                 StmtExpr {
-                    value: Located {
+                    value: Attributed {
                         range: 0..23,
                         custom: (),
                         node: Lambda(
@@ -17,7 +17,7 @@ Ok(
                                 args: Arguments {
                                     posonlyargs: [],
                                     args: [
-                                        Located {
+                                        Attributed {
                                             range: 7..8,
                                             custom: (),
                                             node: ArgData {
@@ -26,7 +26,7 @@ Ok(
                                                 type_comment: None,
                                             },
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 10..11,
                                             custom: (),
                                             node: ArgData {
@@ -35,7 +35,7 @@ Ok(
                                                 type_comment: None,
                                             },
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 16..17,
                                             custom: (),
                                             node: ArgData {
@@ -50,7 +50,7 @@ Ok(
                                     kw_defaults: [],
                                     kwarg: None,
                                     defaults: [
-                                        Located {
+                                        Attributed {
                                             range: 12..14,
                                             custom: (),
                                             node: Constant(
@@ -62,7 +62,7 @@ Ok(
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 18..20,
                                             custom: (),
                                             node: Constant(
@@ -76,7 +76,7 @@ Ok(
                                         },
                                     ],
                                 },
-                                body: Located {
+                                body: Attributed {
                                     range: 22..23,
                                     custom: (),
                                     node: Constant(

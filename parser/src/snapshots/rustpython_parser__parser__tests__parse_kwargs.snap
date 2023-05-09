@@ -3,17 +3,17 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..32,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 0..32,
                     custom: (),
                     node: Call(
                         ExprCall {
-                            func: Located {
+                            func: Attributed {
                                 range: 0..7,
                                 custom: (),
                                 node: Name(
@@ -24,7 +24,7 @@ expression: parse_ast
                                 ),
                             },
                             args: [
-                                Located {
+                                Attributed {
                                     range: 8..20,
                                     custom: (),
                                     node: Constant(
@@ -38,14 +38,14 @@ expression: parse_ast
                                 },
                             ],
                             keywords: [
-                                Located {
+                                Attributed {
                                     range: 22..31,
                                     custom: (),
                                     node: KeywordData {
                                         arg: Some(
                                             "keyword",
                                         ),
-                                        value: Located {
+                                        value: Attributed {
                                             range: 30..31,
                                             custom: (),
                                             node: Constant(

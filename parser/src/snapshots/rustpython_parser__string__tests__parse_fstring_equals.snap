@@ -3,17 +3,17 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..13,
         custom: (),
         node: FormattedValue(
             ExprFormattedValue {
-                value: Located {
+                value: Attributed {
                     range: 3..11,
                     custom: (),
                     node: Compare(
                         ExprCompare {
-                            left: Located {
+                            left: Attributed {
                                 range: 3..5,
                                 custom: (),
                                 node: Constant(
@@ -29,7 +29,7 @@ expression: parse_ast
                                 Eq,
                             ],
                             comparators: [
-                                Located {
+                                Attributed {
                                     range: 9..11,
                                     custom: (),
                                     node: Constant(

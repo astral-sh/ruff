@@ -3,13 +3,13 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..5,
         custom: (),
         node: Delete(
             StmtDelete {
                 targets: [
-                    Located {
+                    Attributed {
                         range: 4..5,
                         custom: (),
                         node: Name(

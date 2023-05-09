@@ -4,7 +4,7 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
+        Attributed {
             range: 0..13,
             custom: (),
             node: FunctionDef(
@@ -20,7 +20,7 @@ Ok(
                         defaults: [],
                     },
                     body: [
-                        Located {
+                        Attributed {
                             range: 9..13,
                             custom: (),
                             node: Pass,

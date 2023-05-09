@@ -3,18 +3,18 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..15,
         custom: (),
         node: Assign(
             StmtAssign {
                 targets: [
-                    Located {
+                    Attributed {
                         range: 0..3,
                         custom: (),
                         node: Attribute(
                             ExprAttribute {
-                                value: Located {
+                                value: Attributed {
                                     range: 0..1,
                                     custom: (),
                                     node: Name(
@@ -30,13 +30,13 @@ expression: parse_ast
                         ),
                     },
                 ],
-                value: Located {
+                value: Attributed {
                     range: 6..15,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 7..8,
                                     custom: (),
                                     node: Constant(
@@ -48,7 +48,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 10..11,
                                     custom: (),
                                     node: Constant(
@@ -60,7 +60,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 13..14,
                                     custom: (),
                                     node: Constant(

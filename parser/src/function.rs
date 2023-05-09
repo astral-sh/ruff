@@ -19,7 +19,7 @@ type ParameterDef = (ast::Arg, Option<ast::Expr>);
 pub(crate) fn validate_arguments(
     arguments: ast::Arguments,
 ) -> Result<ast::Arguments, LexicalError> {
-    let mut all_args: Vec<&ast::Located<ast::ArgData>> = vec![];
+    let mut all_args: Vec<&ast::Attributed<ast::ArgData>> = vec![];
 
     all_args.extend(arguments.posonlyargs.iter());
     all_args.extend(arguments.args.iter());

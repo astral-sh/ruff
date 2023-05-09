@@ -3,13 +3,13 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..26,
         custom: (),
         node: Assign(
             StmtAssign {
                 targets: [
-                    Located {
+                    Attributed {
                         range: 0..1,
                         custom: (),
                         node: Name(
@@ -20,12 +20,12 @@ expression: parse_ast
                         ),
                     },
                 ],
-                value: Located {
+                value: Attributed {
                     range: 4..26,
                     custom: (),
                     node: SetComp(
                         ExprSetComp {
-                            elt: Located {
+                            elt: Attributed {
                                 range: 5..6,
                                 custom: (),
                                 node: Name(
@@ -37,7 +37,7 @@ expression: parse_ast
                             },
                             generators: [
                                 Comprehension {
-                                    target: Located {
+                                    target: Attributed {
                                         range: 11..12,
                                         custom: (),
                                         node: Name(
@@ -47,13 +47,13 @@ expression: parse_ast
                                             },
                                         ),
                                     },
-                                    iter: Located {
+                                    iter: Attributed {
                                         range: 16..25,
                                         custom: (),
                                         node: Tuple(
                                             ExprTuple {
                                                 elts: [
-                                                    Located {
+                                                    Attributed {
                                                         range: 17..18,
                                                         custom: (),
                                                         node: Constant(
@@ -65,7 +65,7 @@ expression: parse_ast
                                                             },
                                                         ),
                                                     },
-                                                    Located {
+                                                    Attributed {
                                                         range: 20..21,
                                                         custom: (),
                                                         node: Constant(
@@ -77,7 +77,7 @@ expression: parse_ast
                                                             },
                                                         ),
                                                     },
-                                                    Located {
+                                                    Attributed {
                                                         range: 23..24,
                                                         custom: (),
                                                         node: Constant(

@@ -3,18 +3,18 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..17,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 0..17,
                     custom: (),
                     node: JoinedStr(
                         ExprJoinedStr {
                             values: [
-                                Located {
+                                Attributed {
                                     range: 0..17,
                                     custom: (),
                                     node: Constant(

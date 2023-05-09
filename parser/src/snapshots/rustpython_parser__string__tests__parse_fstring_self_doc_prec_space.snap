@@ -3,7 +3,7 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..10,
         custom: (),
         node: Constant(
@@ -15,7 +15,7 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 0..10,
         custom: (),
         node: Constant(
@@ -27,12 +27,12 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 0..10,
         custom: (),
         node: FormattedValue(
             ExprFormattedValue {
-                value: Located {
+                value: Attributed {
                     range: 3..4,
                     custom: (),
                     node: Name(

@@ -1,4 +1,4 @@
-use crate::{text_size::TextSize, Location};
+use crate::{source_code::SourceLocation, text_size::TextSize};
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -62,18 +62,23 @@ impl<T> BaseError<T> {
         BaseError::from(self)
     }
 
-    pub fn into_located<U>(self, locator: &str) -> LocatedError<U>
+    pub fn into_located<U>(self, locator: &mut super::SourceLocator) -> LocatedError<U>
     where
         T: Into<U>,
     {
-        todo!()
+        let location = locator.locate(self.offset);
+        LocatedError {
+            error: self.error.into(),
+            location: Some(location),
+            source_path: self.source_path,
+        }
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct LocatedError<T> {
     pub error: T,
-    pub location: Location,
+    pub location: Option<SourceLocation>,
     pub source_path: String,
 }
 
@@ -99,6 +104,17 @@ impl<T> LocatedError<T> {
     {
         LocatedError::from(self)
     }
+
+    pub fn python_location(&self) -> (usize, usize) {
+        if let Some(location) = self.location {
+            (
+                location.row.to_one_indexed(),
+                location.column.to_one_indexed(),
+            )
+        } else {
+            (0, 0)
+        }
+    }
 }
 
 impl<T> Display for LocatedError<T>
@@ -106,11 +122,10 @@ where
     T: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} at row {} col {}",
-            &self.error, self.location.row, self.location.column,
-        )
+        let (row, column) = self.location.map_or((0, 0), |l| {
+            (l.row.to_one_indexed(), l.column.to_one_indexed())
+        });
+        write!(f, "{} at row {} col {}", &self.error, row, column,)
     }
 }
 

@@ -3,19 +3,19 @@ source: parser/src/parser.rs
 expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
-    Located {
+    Attributed {
         range: 0..11,
         custom: (),
         node: Assign(
             StmtAssign {
                 targets: [
-                    Located {
+                    Attributed {
                         range: 0..4,
                         custom: (),
                         node: Tuple(
                             ExprTuple {
                                 elts: [
-                                    Located {
+                                    Attributed {
                                         range: 0..1,
                                         custom: (),
                                         node: Name(
@@ -25,7 +25,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    Located {
+                                    Attributed {
                                         range: 3..4,
                                         custom: (),
                                         node: Name(
@@ -41,13 +41,13 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         ),
                     },
                 ],
-                value: Located {
+                value: Attributed {
                     range: 7..11,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 7..8,
                                     custom: (),
                                     node: Constant(
@@ -59,7 +59,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 10..11,
                                     custom: (),
                                     node: Constant(

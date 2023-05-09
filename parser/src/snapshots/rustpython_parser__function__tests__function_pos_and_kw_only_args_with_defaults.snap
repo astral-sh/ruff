@@ -4,7 +4,7 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
+        Attributed {
             range: 0..38,
             custom: (),
             node: FunctionDef(
@@ -13,7 +13,7 @@ Ok(
                     args: Arguments {
                         posonlyargs: [],
                         args: [
-                            Located {
+                            Attributed {
                                 range: 6..7,
                                 custom: (),
                                 node: ArgData {
@@ -22,7 +22,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 9..10,
                                 custom: (),
                                 node: ArgData {
@@ -31,7 +31,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 12..13,
                                 custom: (),
                                 node: ArgData {
@@ -43,7 +43,7 @@ Ok(
                         ],
                         vararg: None,
                         kwonlyargs: [
-                            Located {
+                            Attributed {
                                 range: 18..19,
                                 custom: (),
                                 node: ArgData {
@@ -52,7 +52,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 21..22,
                                 custom: (),
                                 node: ArgData {
@@ -61,7 +61,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 27..28,
                                 custom: (),
                                 node: ArgData {
@@ -72,7 +72,7 @@ Ok(
                             },
                         ],
                         kw_defaults: [
-                            Located {
+                            Attributed {
                                 range: 23..25,
                                 custom: (),
                                 node: Constant(
@@ -84,7 +84,7 @@ Ok(
                                     },
                                 ),
                             },
-                            Located {
+                            Attributed {
                                 range: 29..31,
                                 custom: (),
                                 node: Constant(
@@ -101,7 +101,7 @@ Ok(
                         defaults: [],
                     },
                     body: [
-                        Located {
+                        Attributed {
                             range: 34..38,
                             custom: (),
                             node: Pass,

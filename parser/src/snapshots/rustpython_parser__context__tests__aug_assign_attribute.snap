@@ -3,17 +3,17 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..16,
         custom: (),
         node: AugAssign(
             StmtAugAssign {
-                target: Located {
+                target: Attributed {
                     range: 0..3,
                     custom: (),
                     node: Attribute(
                         ExprAttribute {
-                            value: Located {
+                            value: Attributed {
                                 range: 0..1,
                                 custom: (),
                                 node: Name(
@@ -29,13 +29,13 @@ expression: parse_ast
                     ),
                 },
                 op: Add,
-                value: Located {
+                value: Attributed {
                     range: 7..16,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 8..9,
                                     custom: (),
                                     node: Constant(
@@ -47,7 +47,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 11..12,
                                     custom: (),
                                     node: Constant(
@@ -59,7 +59,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 14..15,
                                     custom: (),
                                     node: Constant(

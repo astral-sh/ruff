@@ -4,7 +4,7 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
+        Attributed {
             range: 0..29,
             custom: (),
             node: FunctionDef(
@@ -15,7 +15,7 @@ Ok(
                         args: [],
                         vararg: None,
                         kwonlyargs: [
-                            Located {
+                            Attributed {
                                 range: 9..10,
                                 custom: (),
                                 node: ArgData {
@@ -24,7 +24,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 12..13,
                                 custom: (),
                                 node: ArgData {
@@ -33,7 +33,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 18..19,
                                 custom: (),
                                 node: ArgData {
@@ -44,7 +44,7 @@ Ok(
                             },
                         ],
                         kw_defaults: [
-                            Located {
+                            Attributed {
                                 range: 14..16,
                                 custom: (),
                                 node: Constant(
@@ -56,7 +56,7 @@ Ok(
                                     },
                                 ),
                             },
-                            Located {
+                            Attributed {
                                 range: 20..22,
                                 custom: (),
                                 node: Constant(
@@ -73,7 +73,7 @@ Ok(
                         defaults: [],
                     },
                     body: [
-                        Located {
+                        Attributed {
                             range: 25..29,
                             custom: (),
                             node: Pass,

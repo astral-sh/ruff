@@ -1,7 +1,5 @@
-use rustpython_compiler_core::{
-    text_size::{TextRange, TextSize},
-    Location, LocationRange,
-};
+use crate::location::{SourceLocation, SourceRange};
+use rustpython_compiler_core::text_size::{TextRange, TextSize};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attributed<T, U = ()> {
@@ -53,16 +51,16 @@ impl<T> Attributed<T, ()> {
     }
 }
 
-impl<T> Attributed<T, LocationRange> {
+impl<T> Attributed<T, SourceRange> {
     /// Returns the absolute start position of the node from the beginning of the document.
     #[inline]
-    pub const fn location(&self) -> Location {
+    pub const fn location(&self) -> SourceLocation {
         self.custom.start
     }
 
     /// Returns the absolute position at which the node ends in the source document.
     #[inline]
-    pub const fn end_location(&self) -> Location {
+    pub const fn end_location(&self) -> Option<SourceLocation> {
         self.custom.end
     }
 }

@@ -3,17 +3,17 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..14,
         custom: (),
         node: If(
             StmtIf {
-                test: Located {
+                test: Attributed {
                     range: 3..8,
                     custom: (),
                     node: NamedExpr(
                         ExprNamedExpr {
-                            target: Located {
+                            target: Attributed {
                                 range: 3..4,
                                 custom: (),
                                 node: Name(
@@ -23,7 +23,7 @@ expression: parse_ast
                                     },
                                 ),
                             },
-                            value: Located {
+                            value: Attributed {
                                 range: 7..8,
                                 custom: (),
                                 node: Constant(
@@ -39,7 +39,7 @@ expression: parse_ast
                     ),
                 },
                 body: [
-                    Located {
+                    Attributed {
                         range: 10..14,
                         custom: (),
                         node: Pass,

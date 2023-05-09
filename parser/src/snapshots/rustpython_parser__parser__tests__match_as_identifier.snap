@@ -3,28 +3,28 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 1..16,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 1..16,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 1..13,
                                     custom: (),
                                     node: BinOp(
                                         ExprBinOp {
-                                            left: Located {
+                                            left: Attributed {
                                                 range: 1..9,
                                                 custom: (),
                                                 node: BinOp(
                                                     ExprBinOp {
-                                                        left: Located {
+                                                        left: Attributed {
                                                             range: 1..6,
                                                             custom: (),
                                                             node: Name(
@@ -35,7 +35,7 @@ expression: parse_ast
                                                             ),
                                                         },
                                                         op: Mult,
-                                                        right: Located {
+                                                        right: Attributed {
                                                             range: 8..9,
                                                             custom: (),
                                                             node: Name(
@@ -49,7 +49,7 @@ expression: parse_ast
                                                 ),
                                             },
                                             op: Add,
-                                            right: Located {
+                                            right: Attributed {
                                                 range: 12..13,
                                                 custom: (),
                                                 node: Name(
@@ -62,7 +62,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 15..16,
                                     custom: (),
                                     node: Name(
@@ -80,23 +80,23 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 42..59,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 42..59,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 42..56,
                                     custom: (),
                                     node: BinOp(
                                         ExprBinOp {
-                                            left: Located {
+                                            left: Attributed {
                                                 range: 42..47,
                                                 custom: (),
                                                 node: Name(
@@ -107,12 +107,12 @@ expression: parse_ast
                                                 ),
                                             },
                                             op: Mult,
-                                            right: Located {
+                                            right: Attributed {
                                                 range: 50..55,
                                                 custom: (),
                                                 node: BinOp(
                                                     ExprBinOp {
-                                                        left: Located {
+                                                        left: Attributed {
                                                             range: 50..51,
                                                             custom: (),
                                                             node: Name(
@@ -123,7 +123,7 @@ expression: parse_ast
                                                             ),
                                                         },
                                                         op: Add,
-                                                        right: Located {
+                                                        right: Attributed {
                                                             range: 54..55,
                                                             custom: (),
                                                             node: Name(
@@ -139,7 +139,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 58..59,
                                     custom: (),
                                     node: Name(
@@ -157,17 +157,17 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 85..102,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 85..102,
                     custom: (),
                     node: Call(
                         ExprCall {
-                            func: Located {
+                            func: Attributed {
                                 range: 85..90,
                                 custom: (),
                                 node: Name(
@@ -178,17 +178,17 @@ expression: parse_ast
                                 ),
                             },
                             args: [
-                                Located {
+                                Attributed {
                                     range: 92..98,
                                     custom: (),
                                     node: Starred(
                                         ExprStarred {
-                                            value: Located {
+                                            value: Attributed {
                                                 range: 93..98,
                                                 custom: (),
                                                 node: BinOp(
                                                     ExprBinOp {
-                                                        left: Located {
+                                                        left: Attributed {
                                                             range: 93..94,
                                                             custom: (),
                                                             node: Name(
@@ -199,7 +199,7 @@ expression: parse_ast
                                                             ),
                                                         },
                                                         op: Add,
-                                                        right: Located {
+                                                        right: Attributed {
                                                             range: 97..98,
                                                             custom: (),
                                                             node: Name(
@@ -216,7 +216,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 100..101,
                                     custom: (),
                                     node: Name(
@@ -234,22 +234,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 129..145,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 129..145,
                     custom: (),
                     node: BinOp(
                         ExprBinOp {
-                            left: Located {
+                            left: Attributed {
                                 range: 129..141,
                                 custom: (),
                                 node: BinOp(
                                     ExprBinOp {
-                                        left: Located {
+                                        left: Attributed {
                                             range: 129..134,
                                             custom: (),
                                             node: Name(
@@ -260,12 +260,12 @@ expression: parse_ast
                                             ),
                                         },
                                         op: Sub,
-                                        right: Located {
+                                        right: Attributed {
                                             range: 136..141,
                                             custom: (),
                                             node: BinOp(
                                                 ExprBinOp {
-                                                    left: Located {
+                                                    left: Attributed {
                                                         range: 136..137,
                                                         custom: (),
                                                         node: Name(
@@ -276,7 +276,7 @@ expression: parse_ast
                                                         ),
                                                     },
                                                     op: Mult,
-                                                    right: Located {
+                                                    right: Attributed {
                                                         range: 140..141,
                                                         custom: (),
                                                         node: Name(
@@ -293,7 +293,7 @@ expression: parse_ast
                                 ),
                             },
                             op: Add,
-                            right: Located {
+                            right: Attributed {
                                 range: 144..145,
                                 custom: (),
                                 node: Name(
@@ -309,22 +309,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 172..190,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 172..190,
                     custom: (),
                     node: BinOp(
                         ExprBinOp {
-                            left: Located {
+                            left: Attributed {
                                 range: 172..186,
                                 custom: (),
                                 node: BinOp(
                                     ExprBinOp {
-                                        left: Located {
+                                        left: Attributed {
                                             range: 172..177,
                                             custom: (),
                                             node: Name(
@@ -335,12 +335,12 @@ expression: parse_ast
                                             ),
                                         },
                                         op: Sub,
-                                        right: Located {
+                                        right: Attributed {
                                             range: 180..185,
                                             custom: (),
                                             node: BinOp(
                                                 ExprBinOp {
-                                                    left: Located {
+                                                    left: Attributed {
                                                         range: 180..181,
                                                         custom: (),
                                                         node: Name(
@@ -351,7 +351,7 @@ expression: parse_ast
                                                         ),
                                                     },
                                                     op: Mult,
-                                                    right: Located {
+                                                    right: Attributed {
                                                         range: 184..185,
                                                         custom: (),
                                                         node: Name(
@@ -368,7 +368,7 @@ expression: parse_ast
                                 ),
                             },
                             op: Add,
-                            right: Located {
+                            right: Attributed {
                                 range: 189..190,
                                 custom: (),
                                 node: Name(
@@ -384,27 +384,27 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 217..235,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 217..235,
                     custom: (),
                     node: BinOp(
                         ExprBinOp {
-                            left: Located {
+                            left: Attributed {
                                 range: 217..231,
                                 custom: (),
                                 node: BinOp(
                                     ExprBinOp {
-                                        left: Located {
+                                        left: Attributed {
                                             range: 217..227,
                                             custom: (),
                                             node: Call(
                                                 ExprCall {
-                                                    func: Located {
+                                                    func: Attributed {
                                                         range: 217..222,
                                                         custom: (),
                                                         node: Name(
@@ -415,13 +415,13 @@ expression: parse_ast
                                                         ),
                                                     },
                                                     args: [
-                                                        Located {
+                                                        Attributed {
                                                             range: 224..226,
                                                             custom: (),
                                                             node: UnaryOp(
                                                                 ExprUnaryOp {
                                                                     op: USub,
-                                                                    operand: Located {
+                                                                    operand: Attributed {
                                                                         range: 225..226,
                                                                         custom: (),
                                                                         node: Name(
@@ -440,7 +440,7 @@ expression: parse_ast
                                             ),
                                         },
                                         op: Mult,
-                                        right: Located {
+                                        right: Attributed {
                                             range: 230..231,
                                             custom: (),
                                             node: Name(
@@ -454,7 +454,7 @@ expression: parse_ast
                                 ),
                             },
                             op: Add,
-                            right: Located {
+                            right: Attributed {
                                 range: 234..235,
                                 custom: (),
                                 node: Name(
@@ -470,22 +470,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 263..273,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 263..273,
                     custom: (),
                     node: Attribute(
                         ExprAttribute {
-                            value: Located {
+                            value: Attributed {
                                 range: 263..271,
                                 custom: (),
                                 node: Call(
                                     ExprCall {
-                                        func: Located {
+                                        func: Attributed {
                                             range: 263..268,
                                             custom: (),
                                             node: Name(
@@ -508,22 +508,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 290..302,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 290..302,
                     custom: (),
                     node: Attribute(
                         ExprAttribute {
-                            value: Located {
+                            value: Attributed {
                                 range: 290..300,
                                 custom: (),
                                 node: Call(
                                     ExprCall {
-                                        func: Located {
+                                        func: Attributed {
                                             range: 290..295,
                                             custom: (),
                                             node: Name(
@@ -534,7 +534,7 @@ expression: parse_ast
                                             ),
                                         },
                                         args: [
-                                            Located {
+                                            Attributed {
                                                 range: 297..299,
                                                 custom: (),
                                                 node: Tuple(
@@ -557,22 +557,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 321..334,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 321..334,
                     custom: (),
                     node: Attribute(
                         ExprAttribute {
-                            value: Located {
+                            value: Attributed {
                                 range: 321..332,
                                 custom: (),
                                 node: Call(
                                     ExprCall {
-                                        func: Located {
+                                        func: Attributed {
                                             range: 321..326,
                                             custom: (),
                                             node: Name(
@@ -583,7 +583,7 @@ expression: parse_ast
                                             ),
                                         },
                                         args: [
-                                            Located {
+                                            Attributed {
                                                 range: 328..330,
                                                 custom: (),
                                                 node: Tuple(
@@ -606,22 +606,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 353..364,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 353..364,
                     custom: (),
                     node: Attribute(
                         ExprAttribute {
-                            value: Located {
+                            value: Attributed {
                                 range: 353..362,
                                 custom: (),
                                 node: Subscript(
                                     ExprSubscript {
-                                        value: Located {
+                                        value: Attributed {
                                             range: 353..358,
                                             custom: (),
                                             node: Name(
@@ -631,7 +631,7 @@ expression: parse_ast
                                                 },
                                             ),
                                         },
-                                        slice: Located {
+                                        slice: Attributed {
                                             range: 360..361,
                                             custom: (),
                                             node: Name(
@@ -653,22 +653,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 382..394,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 382..394,
                     custom: (),
                     node: Attribute(
                         ExprAttribute {
-                            value: Located {
+                            value: Attributed {
                                 range: 382..392,
                                 custom: (),
                                 node: Subscript(
                                     ExprSubscript {
-                                        value: Located {
+                                        value: Attributed {
                                             range: 382..387,
                                             custom: (),
                                             node: Name(
@@ -678,13 +678,13 @@ expression: parse_ast
                                                 },
                                             ),
                                         },
-                                        slice: Located {
+                                        slice: Attributed {
                                             range: 389..391,
                                             custom: (),
                                             node: Tuple(
                                                 ExprTuple {
                                                     elts: [
-                                                        Located {
+                                                        Attributed {
                                                             range: 389..390,
                                                             custom: (),
                                                             node: Name(
@@ -711,22 +711,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 435..449,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 435..449,
                     custom: (),
                     node: Attribute(
                         ExprAttribute {
-                            value: Located {
+                            value: Attributed {
                                 range: 435..447,
                                 custom: (),
                                 node: Subscript(
                                     ExprSubscript {
-                                        value: Located {
+                                        value: Attributed {
                                             range: 435..440,
                                             custom: (),
                                             node: Name(
@@ -736,13 +736,13 @@ expression: parse_ast
                                                 },
                                             ),
                                         },
-                                        slice: Located {
+                                        slice: Attributed {
                                             range: 442..446,
                                             custom: (),
                                             node: Tuple(
                                                 ExprTuple {
                                                     elts: [
-                                                        Located {
+                                                        Attributed {
                                                             range: 443..444,
                                                             custom: (),
                                                             node: Name(
@@ -769,22 +769,22 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 470..487,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 470..487,
                     custom: (),
                     node: Subscript(
                         ExprSubscript {
-                            value: Located {
+                            value: Attributed {
                                 range: 470..477,
                                 custom: (),
                                 node: Call(
                                     ExprCall {
-                                        func: Located {
+                                        func: Attributed {
                                             range: 470..475,
                                             custom: (),
                                             node: Name(
@@ -799,13 +799,13 @@ expression: parse_ast
                                     },
                                 ),
                             },
-                            slice: Located {
+                            slice: Attributed {
                                 range: 478..486,
                                 custom: (),
                                 node: Slice(
                                     ExprSlice {
                                         lower: Some(
-                                            Located {
+                                            Attributed {
                                                 range: 478..479,
                                                 custom: (),
                                                 node: Name(
@@ -817,7 +817,7 @@ expression: parse_ast
                                             },
                                         ),
                                         upper: Some(
-                                            Located {
+                                            Attributed {
                                                 range: 485..486,
                                                 custom: (),
                                                 node: Name(
@@ -839,17 +839,17 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 507..526,
         custom: (),
         node: If(
             StmtIf {
-                test: Located {
+                test: Attributed {
                     range: 510..520,
                     custom: (),
                     node: NamedExpr(
                         ExprNamedExpr {
-                            target: Located {
+                            target: Attributed {
                                 range: 510..515,
                                 custom: (),
                                 node: Name(
@@ -859,7 +859,7 @@ expression: parse_ast
                                     },
                                 ),
                             },
-                            value: Located {
+                            value: Attributed {
                                 range: 519..520,
                                 custom: (),
                                 node: Constant(
@@ -875,7 +875,7 @@ expression: parse_ast
                     ),
                 },
                 body: [
-                    Located {
+                    Attributed {
                         range: 522..526,
                         custom: (),
                         node: Pass,
@@ -885,12 +885,12 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 527..581,
         custom: (),
         node: Match(
             StmtMatch {
-                subject: Located {
+                subject: Attributed {
                     range: 533..538,
                     custom: (),
                     node: Name(
@@ -902,12 +902,12 @@ expression: parse_ast
                 },
                 cases: [
                     MatchCase {
-                        pattern: Located {
+                        pattern: Attributed {
                             range: 549..550,
                             custom: (),
                             node: MatchValue(
                                 PatternMatchValue {
-                                    value: Located {
+                                    value: Attributed {
                                         range: 549..550,
                                         custom: (),
                                         node: Constant(
@@ -924,7 +924,7 @@ expression: parse_ast
                         },
                         guard: None,
                         body: [
-                            Located {
+                            Attributed {
                                 range: 552..556,
                                 custom: (),
                                 node: Pass,
@@ -932,12 +932,12 @@ expression: parse_ast
                         ],
                     },
                     MatchCase {
-                        pattern: Located {
+                        pattern: Attributed {
                             range: 566..567,
                             custom: (),
                             node: MatchValue(
                                 PatternMatchValue {
-                                    value: Located {
+                                    value: Attributed {
                                         range: 566..567,
                                         custom: (),
                                         node: Constant(
@@ -954,7 +954,7 @@ expression: parse_ast
                         },
                         guard: None,
                         body: [
-                            Located {
+                            Attributed {
                                 range: 577..581,
                                 custom: (),
                                 node: Pass,
@@ -965,13 +965,13 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 582..618,
         custom: (),
         node: Assign(
             StmtAssign {
                 targets: [
-                    Located {
+                    Attributed {
                         range: 582..587,
                         custom: (),
                         node: Name(
@@ -982,7 +982,7 @@ expression: parse_ast
                         ),
                     },
                 ],
-                value: Located {
+                value: Attributed {
                     range: 590..618,
                     custom: (),
                     node: Lambda(
@@ -990,7 +990,7 @@ expression: parse_ast
                             args: Arguments {
                                 posonlyargs: [],
                                 args: [
-                                    Located {
+                                    Attributed {
                                         range: 597..602,
                                         custom: (),
                                         node: ArgData {
@@ -1006,12 +1006,12 @@ expression: parse_ast
                                 kwarg: None,
                                 defaults: [],
                             },
-                            body: Located {
+                            body: Attributed {
                                 range: 604..618,
                                 custom: (),
                                 node: Compare(
                                     ExprCompare {
-                                        left: Located {
+                                        left: Attributed {
                                             range: 604..609,
                                             custom: (),
                                             node: Name(
@@ -1025,7 +1025,7 @@ expression: parse_ast
                                             Eq,
                                         ],
                                         comparators: [
-                                            Located {
+                                            Attributed {
                                                 range: 613..618,
                                                 custom: (),
                                                 node: Name(
@@ -1046,17 +1046,17 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 619..635,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 619..635,
                     custom: (),
                     node: Call(
                         ExprCall {
-                            func: Located {
+                            func: Attributed {
                                 range: 619..624,
                                 custom: (),
                                 node: Name(
@@ -1067,12 +1067,12 @@ expression: parse_ast
                                 ),
                             },
                             args: [
-                                Located {
+                                Attributed {
                                     range: 625..634,
                                     custom: (),
                                     node: Call(
                                         ExprCall {
-                                            func: Located {
+                                            func: Attributed {
                                                 range: 625..630,
                                                 custom: (),
                                                 node: Name(
@@ -1083,7 +1083,7 @@ expression: parse_ast
                                                 ),
                                             },
                                             args: [
-                                                Located {
+                                                Attributed {
                                                     range: 631..633,
                                                     custom: (),
                                                     node: Constant(

@@ -32,6 +32,8 @@ rand = "0.8.5"
 serde = "1.0"
 static_assertions = "1.1"
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
+ruff_python_ast = { git = "https://github.com/youknowone/ruff.git", rev = "583df5c1fa43b2732896219f8ab425116c140c80" }
+# ruff_python_ast = { path = "../ruff/crates/ruff_python_ast" }
 
 [profile.dev.package."*"]
 opt-level = 3

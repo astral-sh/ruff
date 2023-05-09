@@ -3,7 +3,7 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 1..49,
         custom: (),
         node: FunctionDef(
@@ -13,18 +13,18 @@ expression: parse_ast
                     posonlyargs: [],
                     args: [],
                     vararg: Some(
-                        Located {
+                        Attributed {
                             range: 20..29,
                             custom: (),
                             node: ArgData {
                                 arg: "args",
                                 annotation: Some(
-                                    Located {
+                                    Attributed {
                                         range: 26..29,
                                         custom: (),
                                         node: Starred(
                                             ExprStarred {
-                                                value: Located {
+                                                value: Attributed {
                                                     range: 27..29,
                                                     custom: (),
                                                     node: Name(
@@ -49,12 +49,12 @@ expression: parse_ast
                     defaults: [],
                 },
                 body: [
-                    Located {
+                    Attributed {
                         range: 46..49,
                         custom: (),
                         node: Expr(
                             StmtExpr {
-                                value: Located {
+                                value: Attributed {
                                     range: 46..49,
                                     custom: (),
                                     node: Constant(
@@ -70,12 +70,12 @@ expression: parse_ast
                 ],
                 decorator_list: [],
                 returns: Some(
-                    Located {
+                    Attributed {
                         range: 34..44,
                         custom: (),
                         node: Subscript(
                             ExprSubscript {
-                                value: Located {
+                                value: Attributed {
                                     range: 34..39,
                                     custom: (),
                                     node: Name(
@@ -85,12 +85,12 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                slice: Located {
+                                slice: Attributed {
                                     range: 40..43,
                                     custom: (),
                                     node: Starred(
                                         ExprStarred {
-                                            value: Located {
+                                            value: Attributed {
                                                 range: 41..43,
                                                 custom: (),
                                                 node: Name(

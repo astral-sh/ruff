@@ -1,41 +1,14 @@
 use crate::attributed::Attributed;
 use crate::fold_helpers::Foldable;
-use rustpython_compiler_core::{
-    text_size::{TextRange, TextSize},
-    Location, LocationRange,
-};
+use crate::location::SourceRange;
+use rustpython_compiler_core::SourceLocator;
 
-/// Converts source code byte-offset to Python convention line and column numbers.
-#[derive(Default)]
-pub struct Locator<'a> {
-    source: &'a str,
+pub fn locate<X: Foldable<(), SourceRange>>(locator: &mut SourceLocator, ast: X) -> X::Mapped {
+    ast.fold(locator).unwrap()
 }
 
-impl<'a> Locator<'a> {
-    #[inline]
-    pub fn new(source: &'a str) -> Self {
-        Self { source }
-    }
-
-    pub fn source(&'a self) -> &'a str {
-        self.source
-    }
-
-    pub fn locate(&mut self, offset: TextSize) -> Location {
-        todo!()
-    }
-
-    pub fn locate_range(&mut self, range: TextRange) -> LocationRange {
-        self.locate(range.start())..self.locate(range.end())
-    }
-
-    pub fn locate_ast<X: Foldable<(), LocationRange>>(&mut self, ast: X) -> X::Mapped {
-        ast.fold(self).unwrap()
-    }
-}
-
-impl crate::fold::Fold<()> for Locator<'_> {
-    type TargetU = LocationRange;
+impl crate::fold::Fold<()> for SourceLocator<'_> {
+    type TargetU = SourceRange;
     type Error = std::convert::Infallible;
 
     #[cold]
@@ -47,10 +20,11 @@ impl crate::fold::Fold<()> for Locator<'_> {
         &mut self,
         node: Attributed<T, ()>,
     ) -> Result<Attributed<T, Self::TargetU>, Self::Error> {
-        let location = self.locate_range(node.range);
+        let start = self.locate(node.range.start());
+        let end = self.locate(node.range.end());
         Ok(Attributed {
             range: node.range,
-            custom: location,
+            custom: (start..end).into(),
             node: node.node,
         })
     }

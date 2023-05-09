@@ -3,12 +3,12 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..18,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
+                value: Attributed {
                     range: 0..18,
                     custom: (),
                     node: Lambda(
@@ -16,7 +16,7 @@ expression: parse_ast
                             args: Arguments {
                                 posonlyargs: [],
                                 args: [
-                                    Located {
+                                    Attributed {
                                         range: 7..8,
                                         custom: (),
                                         node: ArgData {
@@ -25,7 +25,7 @@ expression: parse_ast
                                             type_comment: None,
                                         },
                                     },
-                                    Located {
+                                    Attributed {
                                         range: 10..11,
                                         custom: (),
                                         node: ArgData {
@@ -41,12 +41,12 @@ expression: parse_ast
                                 kwarg: None,
                                 defaults: [],
                             },
-                            body: Located {
+                            body: Attributed {
                                 range: 13..18,
                                 custom: (),
                                 node: BinOp(
                                     ExprBinOp {
-                                        left: Located {
+                                        left: Attributed {
                                             range: 13..14,
                                             custom: (),
                                             node: Name(
@@ -57,7 +57,7 @@ expression: parse_ast
                                             ),
                                         },
                                         op: Mult,
-                                        right: Located {
+                                        right: Attributed {
                                             range: 17..18,
                                             custom: (),
                                             node: Name(

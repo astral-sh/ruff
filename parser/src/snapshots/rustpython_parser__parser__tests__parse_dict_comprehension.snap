@@ -2,12 +2,12 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Located {
+Attributed {
     range: 0..19,
     custom: (),
     node: DictComp(
         ExprDictComp {
-            key: Located {
+            key: Attributed {
                 range: 1..3,
                 custom: (),
                 node: Name(
@@ -17,7 +17,7 @@ Located {
                     },
                 ),
             },
-            value: Located {
+            value: Attributed {
                 range: 5..7,
                 custom: (),
                 node: Name(
@@ -29,7 +29,7 @@ Located {
             },
             generators: [
                 Comprehension {
-                    target: Located {
+                    target: Attributed {
                         range: 12..13,
                         custom: (),
                         node: Name(
@@ -39,7 +39,7 @@ Located {
                             },
                         ),
                     },
-                    iter: Located {
+                    iter: Attributed {
                         range: 17..18,
                         custom: (),
                         node: Name(

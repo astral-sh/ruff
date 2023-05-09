@@ -1,7 +1,10 @@
 //! Implement python as a virtual machine with bytecode. This module
 //! implements bytecode structure.
 
-use crate::{marshal, Location};
+use crate::{
+    marshal,
+    source_code::{OneIndexed, SourceLocation},
+};
 use bitflags::bitflags;
 use itertools::Itertools;
 use num_bigint::BigInt;
@@ -89,14 +92,14 @@ impl ConstantBag for BasicBag {
 #[derive(Clone)]
 pub struct CodeObject<C: Constant = ConstantData> {
     pub instructions: Box<[CodeUnit]>,
-    pub locations: Box<[Location]>,
+    pub locations: Box<[SourceLocation]>,
     pub flags: CodeFlags,
     pub posonlyarg_count: u32,
     // Number of positional-only arguments
     pub arg_count: u32,
     pub kwonlyarg_count: u32,
     pub source_path: C::Name,
-    pub first_line_number: u32,
+    pub first_line_number: OneIndexed,
     pub max_stackdepth: u32,
     pub obj_name: C::Name,
     // Name of the object that created this code object
@@ -974,14 +977,14 @@ impl<C: Constant> CodeObject<C> {
         let label_targets = self.label_targets();
         let line_digits = (3).max(self.locations.last().unwrap().row.to_string().len());
         let offset_digits = (4).max(self.instructions.len().to_string().len());
-        let mut last_line = u32::MAX;
+        let mut last_line = OneIndexed::MAX;
         let mut arg_state = OpArgState::default();
         for (offset, &instruction) in self.instructions.iter().enumerate() {
             let (instruction, arg) = arg_state.get(instruction);
             // optional line number
             let line = self.locations[offset].row;
             if line != last_line {
-                if last_line != u32::MAX {
+                if last_line != OneIndexed::MAX {
                     writeln!(f)?;
                 }
                 last_line = line;

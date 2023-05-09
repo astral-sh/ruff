@@ -2,14 +2,14 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Located {
+Attributed {
     range: 0..6,
     custom: (),
     node: BoolOp(
         ExprBoolOp {
             op: Or,
             values: [
-                Located {
+                Attributed {
                     range: 0..1,
                     custom: (),
                     node: Name(
@@ -19,7 +19,7 @@ Located {
                         },
                     ),
                 },
-                Located {
+                Attributed {
                     range: 5..6,
                     custom: (),
                     node: Name(

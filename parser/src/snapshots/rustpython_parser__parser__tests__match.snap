@@ -3,19 +3,19 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 1..73,
         custom: (),
         node: Match(
             StmtMatch {
-                subject: Located {
+                subject: Attributed {
                     range: 7..18,
                     custom: (),
                     node: Dict(
                         ExprDict {
                             keys: [
                                 Some(
-                                    Located {
+                                    Attributed {
                                         range: 8..14,
                                         custom: (),
                                         node: Constant(
@@ -30,7 +30,7 @@ expression: parse_ast
                                 ),
                             ],
                             values: [
-                                Located {
+                                Attributed {
                                     range: 16..17,
                                     custom: (),
                                     node: Constant(
@@ -48,7 +48,7 @@ expression: parse_ast
                 },
                 cases: [
                     MatchCase {
-                        pattern: Located {
+                        pattern: Attributed {
                             range: 29..52,
                             custom: (),
                             node: MatchMapping(
@@ -63,17 +63,17 @@ expression: parse_ast
                         },
                         guard: None,
                         body: [
-                            Located {
+                            Attributed {
                                 range: 62..73,
                                 custom: (),
                                 node: Expr(
                                     StmtExpr {
-                                        value: Located {
+                                        value: Attributed {
                                             range: 62..73,
                                             custom: (),
                                             node: Call(
                                                 ExprCall {
-                                                    func: Located {
+                                                    func: Attributed {
                                                         range: 62..67,
                                                         custom: (),
                                                         node: Name(
@@ -84,7 +84,7 @@ expression: parse_ast
                                                         ),
                                                     },
                                                     args: [
-                                                        Located {
+                                                        Attributed {
                                                             range: 68..72,
                                                             custom: (),
                                                             node: Name(
@@ -108,19 +108,19 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 74..177,
         custom: (),
         node: Match(
             StmtMatch {
-                subject: Located {
+                subject: Attributed {
                     range: 80..97,
                     custom: (),
                     node: Dict(
                         ExprDict {
                             keys: [
                                 Some(
-                                    Located {
+                                    Attributed {
                                         range: 81..88,
                                         custom: (),
                                         node: Constant(
@@ -135,7 +135,7 @@ expression: parse_ast
                                 ),
                             ],
                             values: [
-                                Located {
+                                Attributed {
                                     range: 90..96,
                                     custom: (),
                                     node: Constant(
@@ -153,13 +153,13 @@ expression: parse_ast
                 },
                 cases: [
                     MatchCase {
-                        pattern: Located {
+                        pattern: Attributed {
                             range: 108..155,
                             custom: (),
                             node: MatchMapping(
                                 PatternMatchMapping {
                                     keys: [
-                                        Located {
+                                        Attributed {
                                             range: 118..125,
                                             custom: (),
                                             node: Constant(
@@ -173,24 +173,24 @@ expression: parse_ast
                                         },
                                     ],
                                     patterns: [
-                                        Located {
+                                        Attributed {
                                             range: 127..148,
                                             custom: (),
                                             node: MatchAs(
                                                 PatternMatchAs {
                                                     pattern: Some(
-                                                        Located {
+                                                        Attributed {
                                                             range: 127..139,
                                                             custom: (),
                                                             node: MatchOr(
                                                                 PatternMatchOr {
                                                                     patterns: [
-                                                                        Located {
+                                                                        Attributed {
                                                                             range: 127..132,
                                                                             custom: (),
                                                                             node: MatchClass(
                                                                                 PatternMatchClass {
-                                                                                    cls: Located {
+                                                                                    cls: Attributed {
                                                                                         range: 127..130,
                                                                                         custom: (),
                                                                                         node: Name(
@@ -206,7 +206,7 @@ expression: parse_ast
                                                                                 },
                                                                             ),
                                                                         },
-                                                                        Located {
+                                                                        Attributed {
                                                                             range: 135..139,
                                                                             custom: (),
                                                                             node: MatchSingleton(
@@ -233,17 +233,17 @@ expression: parse_ast
                         },
                         guard: None,
                         body: [
-                            Located {
+                            Attributed {
                                 range: 165..177,
                                 custom: (),
                                 node: Expr(
                                     StmtExpr {
-                                        value: Located {
+                                        value: Attributed {
                                             range: 165..177,
                                             custom: (),
                                             node: Call(
                                                 ExprCall {
-                                                    func: Located {
+                                                    func: Attributed {
                                                         range: 165..170,
                                                         custom: (),
                                                         node: Name(
@@ -254,7 +254,7 @@ expression: parse_ast
                                                         ),
                                                     },
                                                     args: [
-                                                        Located {
+                                                        Attributed {
                                                             range: 171..176,
                                                             custom: (),
                                                             node: Name(
@@ -278,12 +278,12 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 178..218,
         custom: (),
         node: Match(
             StmtMatch {
-                subject: Located {
+                subject: Attributed {
                     range: 184..185,
                     custom: (),
                     node: Name(
@@ -295,18 +295,18 @@ expression: parse_ast
                 },
                 cases: [
                     MatchCase {
-                        pattern: Located {
+                        pattern: Attributed {
                             range: 196..203,
                             custom: (),
                             node: MatchSequence(
                                 PatternMatchSequence {
                                     patterns: [
-                                        Located {
+                                        Attributed {
                                             range: 197..198,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 197..198,
                                                         custom: (),
                                                         node: Constant(
@@ -321,12 +321,12 @@ expression: parse_ast
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 200..201,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 200..201,
                                                         custom: (),
                                                         node: Constant(
@@ -347,13 +347,13 @@ expression: parse_ast
                         },
                         guard: None,
                         body: [
-                            Located {
+                            Attributed {
                                 range: 213..218,
                                 custom: (),
                                 node: Assign(
                                     StmtAssign {
                                         targets: [
-                                            Located {
+                                            Attributed {
                                                 range: 213..214,
                                                 custom: (),
                                                 node: Name(
@@ -364,7 +364,7 @@ expression: parse_ast
                                                 ),
                                             },
                                         ],
-                                        value: Located {
+                                        value: Attributed {
                                             range: 217..218,
                                             custom: (),
                                             node: Constant(
@@ -386,12 +386,12 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 219..259,
         custom: (),
         node: Match(
             StmtMatch {
-                subject: Located {
+                subject: Attributed {
                     range: 225..226,
                     custom: (),
                     node: Name(
@@ -403,18 +403,18 @@ expression: parse_ast
                 },
                 cases: [
                     MatchCase {
-                        pattern: Located {
+                        pattern: Attributed {
                             range: 237..244,
                             custom: (),
                             node: MatchSequence(
                                 PatternMatchSequence {
                                     patterns: [
-                                        Located {
+                                        Attributed {
                                             range: 238..239,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 238..239,
                                                         custom: (),
                                                         node: Constant(
@@ -429,12 +429,12 @@ expression: parse_ast
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 241..242,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 241..242,
                                                         custom: (),
                                                         node: Constant(
@@ -455,13 +455,13 @@ expression: parse_ast
                         },
                         guard: None,
                         body: [
-                            Located {
+                            Attributed {
                                 range: 254..259,
                                 custom: (),
                                 node: Assign(
                                     StmtAssign {
                                         targets: [
-                                            Located {
+                                            Attributed {
                                                 range: 254..255,
                                                 custom: (),
                                                 node: Name(
@@ -472,7 +472,7 @@ expression: parse_ast
                                                 ),
                                             },
                                         ],
-                                        value: Located {
+                                        value: Attributed {
                                             range: 258..259,
                                             custom: (),
                                             node: Constant(
@@ -494,12 +494,12 @@ expression: parse_ast
             },
         ),
     },
-    Located {
+    Attributed {
         range: 260..297,
         custom: (),
         node: Match(
             StmtMatch {
-                subject: Located {
+                subject: Attributed {
                     range: 266..267,
                     custom: (),
                     node: Name(
@@ -511,18 +511,18 @@ expression: parse_ast
                 },
                 cases: [
                     MatchCase {
-                        pattern: Located {
+                        pattern: Attributed {
                             range: 278..282,
                             custom: (),
                             node: MatchSequence(
                                 PatternMatchSequence {
                                     patterns: [
-                                        Located {
+                                        Attributed {
                                             range: 279..280,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 279..280,
                                                         custom: (),
                                                         node: Constant(
@@ -543,13 +543,13 @@ expression: parse_ast
                         },
                         guard: None,
                         body: [
-                            Located {
+                            Attributed {
                                 range: 292..297,
                                 custom: (),
                                 node: Assign(
                                     StmtAssign {
                                         targets: [
-                                            Located {
+                                            Attributed {
                                                 range: 292..293,
                                                 custom: (),
                                                 node: Name(
@@ -560,7 +560,7 @@ expression: parse_ast
                                                 ),
                                             },
                                         ],
-                                        value: Located {
+                                        value: Attributed {
                                             range: 296..297,
                                             custom: (),
                                             node: Constant(

@@ -3,14 +3,14 @@ source: parser/src/parser.rs
 expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
-    Located {
+    Attributed {
         range: 0..12,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 5..6,
                             custom: (),
                             node: Constant(
@@ -26,7 +26,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 8..12,
                         custom: (),
                         node: Pass,
@@ -36,14 +36,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 13..30,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 18..19,
                             custom: (),
                             node: Constant(
@@ -56,7 +56,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 23..24,
                                 custom: (),
                                 node: Name(
@@ -70,7 +70,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 26..30,
                         custom: (),
                         node: Pass,
@@ -80,14 +80,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 31..46,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 36..37,
                             custom: (),
                             node: Constant(
@@ -102,7 +102,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         optional_vars: None,
                     },
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 39..40,
                             custom: (),
                             node: Constant(
@@ -118,7 +118,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 42..46,
                         custom: (),
                         node: Pass,
@@ -128,14 +128,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 47..72,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 52..53,
                             custom: (),
                             node: Constant(
@@ -148,7 +148,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 57..58,
                                 custom: (),
                                 node: Name(
@@ -161,7 +161,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         ),
                     },
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 60..61,
                             custom: (),
                             node: Constant(
@@ -174,7 +174,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 65..66,
                                 custom: (),
                                 node: Name(
@@ -188,7 +188,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 68..72,
                         custom: (),
                         node: Pass,
@@ -198,19 +198,19 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 73..97,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 78..91,
                             custom: (),
                             node: IfExp(
                                 ExprIfExp {
-                                    test: Located {
+                                    test: Attributed {
                                         range: 83..84,
                                         custom: (),
                                         node: Constant(
@@ -222,7 +222,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    body: Located {
+                                    body: Attributed {
                                         range: 78..79,
                                         custom: (),
                                         node: Constant(
@@ -234,7 +234,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    orelse: Located {
+                                    orelse: Attributed {
                                         range: 90..91,
                                         custom: (),
                                         node: Constant(
@@ -253,7 +253,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 93..97,
                         custom: (),
                         node: Pass,
@@ -263,19 +263,19 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 98..127,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 103..116,
                             custom: (),
                             node: IfExp(
                                 ExprIfExp {
-                                    test: Located {
+                                    test: Attributed {
                                         range: 108..109,
                                         custom: (),
                                         node: Constant(
@@ -287,7 +287,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    body: Located {
+                                    body: Attributed {
                                         range: 103..104,
                                         custom: (),
                                         node: Constant(
@@ -299,7 +299,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    orelse: Located {
+                                    orelse: Attributed {
                                         range: 115..116,
                                         custom: (),
                                         node: Constant(
@@ -315,7 +315,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 120..121,
                                 custom: (),
                                 node: Name(
@@ -329,7 +329,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 123..127,
                         custom: (),
                         node: Pass,
@@ -339,14 +339,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 128..141,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 133..135,
                             custom: (),
                             node: Tuple(
@@ -360,7 +360,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 137..141,
                         custom: (),
                         node: Pass,
@@ -370,14 +370,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 142..160,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 147..149,
                             custom: (),
                             node: Tuple(
@@ -388,7 +388,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 153..154,
                                 custom: (),
                                 node: Name(
@@ -402,7 +402,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 156..160,
                         custom: (),
                         node: Pass,
@@ -412,14 +412,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 161..175,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 167..168,
                             custom: (),
                             node: Constant(
@@ -435,7 +435,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 171..175,
                         custom: (),
                         node: Pass,
@@ -445,14 +445,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 176..195,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 182..183,
                             custom: (),
                             node: Constant(
@@ -465,7 +465,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 188..189,
                                 custom: (),
                                 node: Name(
@@ -479,7 +479,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 191..195,
                         custom: (),
                         node: Pass,
@@ -489,14 +489,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 196..211,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 202..203,
                             custom: (),
                             node: Constant(
@@ -512,7 +512,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 207..211,
                         custom: (),
                         node: Pass,
@@ -522,20 +522,20 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 212..232,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 217..221,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 218..219,
                                             custom: (),
                                             node: Constant(
@@ -553,7 +553,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 225..226,
                                 custom: (),
                                 node: Name(
@@ -567,7 +567,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 228..232,
                         custom: (),
                         node: Pass,
@@ -577,14 +577,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 233..250,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 239..240,
                             custom: (),
                             node: Constant(
@@ -599,7 +599,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         optional_vars: None,
                     },
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 242..243,
                             custom: (),
                             node: Constant(
@@ -615,7 +615,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 246..250,
                         custom: (),
                         node: Pass,
@@ -625,20 +625,20 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 251..273,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 256..262,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 257..258,
                                             custom: (),
                                             node: Constant(
@@ -650,7 +650,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 260..261,
                                             custom: (),
                                             node: Constant(
@@ -668,7 +668,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 266..267,
                                 custom: (),
                                 node: Name(
@@ -682,7 +682,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 269..273,
                         custom: (),
                         node: Pass,
@@ -692,25 +692,25 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 274..290,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 279..284,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 280..282,
                                             custom: (),
                                             node: Starred(
                                                 ExprStarred {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 281..282,
                                                         custom: (),
                                                         node: Name(
@@ -733,7 +733,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 286..290,
                         custom: (),
                         node: Pass,
@@ -743,25 +743,25 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 291..312,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 296..301,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 297..299,
                                             custom: (),
                                             node: Starred(
                                                 ExprStarred {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 298..299,
                                                         custom: (),
                                                         node: Name(
@@ -781,7 +781,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 305..306,
                                 custom: (),
                                 node: Name(
@@ -795,7 +795,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 308..312,
                         custom: (),
                         node: Pass,
@@ -805,20 +805,20 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 313..331,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 318..325,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 319..320,
                                             custom: (),
                                             node: Constant(
@@ -830,12 +830,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 322..324,
                                             custom: (),
                                             node: Starred(
                                                 ExprStarred {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 323..324,
                                                         custom: (),
                                                         node: Name(
@@ -858,7 +858,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 327..331,
                         custom: (),
                         node: Pass,
@@ -868,20 +868,20 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 332..355,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 337..344,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 338..339,
                                             custom: (),
                                             node: Constant(
@@ -893,12 +893,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 341..343,
                                             custom: (),
                                             node: Starred(
                                                 ExprStarred {
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 342..343,
                                                         custom: (),
                                                         node: Name(
@@ -918,7 +918,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 348..349,
                                 custom: (),
                                 node: Name(
@@ -932,7 +932,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 351..355,
                         custom: (),
                         node: Pass,
@@ -942,19 +942,19 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 356..375,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 362..368,
                             custom: (),
                             node: NamedExpr(
                                 ExprNamedExpr {
-                                    target: Located {
+                                    target: Attributed {
                                         range: 362..363,
                                         custom: (),
                                         node: Name(
@@ -964,7 +964,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    value: Located {
+                                    value: Attributed {
                                         range: 367..368,
                                         custom: (),
                                         node: Constant(
@@ -983,7 +983,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 371..375,
                         custom: (),
                         node: Pass,
@@ -993,19 +993,19 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 376..400,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 382..388,
                             custom: (),
                             node: NamedExpr(
                                 ExprNamedExpr {
-                                    target: Located {
+                                    target: Attributed {
                                         range: 382..383,
                                         custom: (),
                                         node: Name(
@@ -1015,7 +1015,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    value: Located {
+                                    value: Attributed {
                                         range: 387..388,
                                         custom: (),
                                         node: Constant(
@@ -1031,7 +1031,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 393..394,
                                 custom: (),
                                 node: Name(
@@ -1045,7 +1045,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 396..400,
                         custom: (),
                         node: Pass,
@@ -1055,25 +1055,25 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 401..428,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 406..422,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 407..413,
                                             custom: (),
                                             node: NamedExpr(
                                                 ExprNamedExpr {
-                                                    target: Located {
+                                                    target: Attributed {
                                                         range: 407..408,
                                                         custom: (),
                                                         node: Name(
@@ -1083,7 +1083,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                             },
                                                         ),
                                                     },
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 412..413,
                                                         custom: (),
                                                         node: Constant(
@@ -1098,12 +1098,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 415..421,
                                             custom: (),
                                             node: NamedExpr(
                                                 ExprNamedExpr {
-                                                    target: Located {
+                                                    target: Attributed {
                                                         range: 415..416,
                                                         custom: (),
                                                         node: Name(
@@ -1113,7 +1113,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                             },
                                                         ),
                                                     },
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 420..421,
                                                         custom: (),
                                                         node: Constant(
@@ -1137,7 +1137,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 424..428,
                         custom: (),
                         node: Pass,
@@ -1147,25 +1147,25 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 429..461,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 434..450,
                             custom: (),
                             node: Tuple(
                                 ExprTuple {
                                     elts: [
-                                        Located {
+                                        Attributed {
                                             range: 435..441,
                                             custom: (),
                                             node: NamedExpr(
                                                 ExprNamedExpr {
-                                                    target: Located {
+                                                    target: Attributed {
                                                         range: 435..436,
                                                         custom: (),
                                                         node: Name(
@@ -1175,7 +1175,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                             },
                                                         ),
                                                     },
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 440..441,
                                                         custom: (),
                                                         node: Constant(
@@ -1190,12 +1190,12 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                 },
                                             ),
                                         },
-                                        Located {
+                                        Attributed {
                                             range: 443..449,
                                             custom: (),
                                             node: NamedExpr(
                                                 ExprNamedExpr {
-                                                    target: Located {
+                                                    target: Attributed {
                                                         range: 443..444,
                                                         custom: (),
                                                         node: Name(
@@ -1205,7 +1205,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                             },
                                                         ),
                                                     },
-                                                    value: Located {
+                                                    value: Attributed {
                                                         range: 448..449,
                                                         custom: (),
                                                         node: Constant(
@@ -1226,7 +1226,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 454..455,
                                 custom: (),
                                 node: Name(
@@ -1240,7 +1240,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 457..461,
                         custom: (),
                         node: Pass,
@@ -1250,14 +1250,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 462..481,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 468..469,
                             custom: (),
                             node: Constant(
@@ -1270,7 +1270,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 473..474,
                                 custom: (),
                                 node: Name(
@@ -1284,7 +1284,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 477..481,
                         custom: (),
                         node: Pass,
@@ -1294,14 +1294,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 482..502,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 488..489,
                             custom: (),
                             node: Constant(
@@ -1314,7 +1314,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 493..494,
                                 custom: (),
                                 node: Name(
@@ -1328,7 +1328,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 498..502,
                         custom: (),
                         node: Pass,
@@ -1338,14 +1338,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 503..530,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 509..510,
                             custom: (),
                             node: Constant(
@@ -1358,7 +1358,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 514..515,
                                 custom: (),
                                 node: Name(
@@ -1371,7 +1371,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         ),
                     },
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 517..518,
                             custom: (),
                             node: Constant(
@@ -1384,7 +1384,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 522..523,
                                 custom: (),
                                 node: Name(
@@ -1398,7 +1398,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 526..530,
                         custom: (),
                         node: Pass,
@@ -1408,14 +1408,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
     },
-    Located {
+    Attributed {
         range: 531..559,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 537..538,
                             custom: (),
                             node: Constant(
@@ -1428,7 +1428,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 542..543,
                                 custom: (),
                                 node: Name(
@@ -1441,7 +1441,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         ),
                     },
                     Withitem {
-                        context_expr: Located {
+                        context_expr: Attributed {
                             range: 545..546,
                             custom: (),
                             node: Constant(
@@ -1454,7 +1454,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             ),
                         },
                         optional_vars: Some(
-                            Located {
+                            Attributed {
                                 range: 550..551,
                                 custom: (),
                                 node: Name(
@@ -1468,7 +1468,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     },
                 ],
                 body: [
-                    Located {
+                    Attributed {
                         range: 555..559,
                         custom: (),
                         node: Pass,

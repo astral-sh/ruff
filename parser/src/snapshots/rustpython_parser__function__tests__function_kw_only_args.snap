@@ -4,7 +4,7 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
+        Attributed {
             range: 0..23,
             custom: (),
             node: FunctionDef(
@@ -15,7 +15,7 @@ Ok(
                         args: [],
                         vararg: None,
                         kwonlyargs: [
-                            Located {
+                            Attributed {
                                 range: 9..10,
                                 custom: (),
                                 node: ArgData {
@@ -24,7 +24,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 12..13,
                                 custom: (),
                                 node: ArgData {
@@ -33,7 +33,7 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
+                            Attributed {
                                 range: 15..16,
                                 custom: (),
                                 node: ArgData {
@@ -48,7 +48,7 @@ Ok(
                         defaults: [],
                     },
                     body: [
-                        Located {
+                        Attributed {
                             range: 19..23,
                             custom: (),
                             node: Pass,

@@ -2,17 +2,17 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Located {
+Attributed {
     range: 0..23,
     custom: (),
     node: GeneratorExp(
         ExprGeneratorExp {
-            elt: Located {
+            elt: Attributed {
                 range: 1..11,
                 custom: (),
                 node: NamedExpr(
                     ExprNamedExpr {
-                        target: Located {
+                        target: Attributed {
                             range: 1..2,
                             custom: (),
                             node: Name(
@@ -22,12 +22,12 @@ Located {
                                 },
                             ),
                         },
-                        value: Located {
+                        value: Attributed {
                             range: 6..11,
                             custom: (),
                             node: BinOp(
                                 ExprBinOp {
-                                    left: Located {
+                                    left: Attributed {
                                         range: 6..7,
                                         custom: (),
                                         node: Name(
@@ -38,7 +38,7 @@ Located {
                                         ),
                                     },
                                     op: Add,
-                                    right: Located {
+                                    right: Attributed {
                                         range: 10..11,
                                         custom: (),
                                         node: Constant(
@@ -58,7 +58,7 @@ Located {
             },
             generators: [
                 Comprehension {
-                    target: Located {
+                    target: Attributed {
                         range: 16..17,
                         custom: (),
                         node: Name(
@@ -68,7 +68,7 @@ Located {
                             },
                         ),
                     },
-                    iter: Located {
+                    iter: Attributed {
                         range: 21..22,
                         custom: (),
                         node: Name(

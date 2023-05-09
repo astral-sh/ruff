@@ -3,12 +3,12 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..28,
         custom: (),
         node: If(
             StmtIf {
-                test: Located {
+                test: Attributed {
                     range: 3..4,
                     custom: (),
                     node: Constant(
@@ -21,12 +21,12 @@ expression: parse_ast
                     ),
                 },
                 body: [
-                    Located {
+                    Attributed {
                         range: 6..8,
                         custom: (),
                         node: Expr(
                             StmtExpr {
-                                value: Located {
+                                value: Attributed {
                                     range: 6..8,
                                     custom: (),
                                     node: Constant(
@@ -43,12 +43,12 @@ expression: parse_ast
                     },
                 ],
                 orelse: [
-                    Located {
+                    Attributed {
                         range: 9..28,
                         custom: (),
                         node: If(
                             StmtIf {
-                                test: Located {
+                                test: Attributed {
                                     range: 14..15,
                                     custom: (),
                                     node: Constant(
@@ -61,12 +61,12 @@ expression: parse_ast
                                     ),
                                 },
                                 body: [
-                                    Located {
+                                    Attributed {
                                         range: 17..19,
                                         custom: (),
                                         node: Expr(
                                             StmtExpr {
-                                                value: Located {
+                                                value: Attributed {
                                                     range: 17..19,
                                                     custom: (),
                                                     node: Constant(
@@ -83,12 +83,12 @@ expression: parse_ast
                                     },
                                 ],
                                 orelse: [
-                                    Located {
+                                    Attributed {
                                         range: 26..28,
                                         custom: (),
                                         node: Expr(
                                             StmtExpr {
-                                                value: Located {
+                                                value: Attributed {
                                                     range: 26..28,
                                                     custom: (),
                                                     node: Constant(

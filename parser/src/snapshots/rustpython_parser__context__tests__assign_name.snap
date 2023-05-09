@@ -3,13 +3,13 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..13,
         custom: (),
         node: Assign(
             StmtAssign {
                 targets: [
-                    Located {
+                    Attributed {
                         range: 0..1,
                         custom: (),
                         node: Name(
@@ -20,13 +20,13 @@ expression: parse_ast
                         ),
                     },
                 ],
-                value: Located {
+                value: Attributed {
                     range: 4..13,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 5..6,
                                     custom: (),
                                     node: Constant(
@@ -38,7 +38,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 8..9,
                                     custom: (),
                                     node: Constant(
@@ -50,7 +50,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 11..12,
                                     custom: (),
                                     node: Constant(

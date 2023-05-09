@@ -4,12 +4,12 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
+        Attributed {
             range: 0..9,
             custom: (),
             node: Expr(
                 StmtExpr {
-                    value: Located {
+                    value: Attributed {
                         range: 0..9,
                         custom: (),
                         node: Lambda(
@@ -23,7 +23,7 @@ Ok(
                                     kwarg: None,
                                     defaults: [],
                                 },
-                                body: Located {
+                                body: Attributed {
                                     range: 8..9,
                                     custom: (),
                                     node: Constant(

@@ -3,12 +3,12 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..6,
         custom: (),
         node: AugAssign(
             StmtAugAssign {
-                target: Located {
+                target: Attributed {
                     range: 0..1,
                     custom: (),
                     node: Name(
@@ -19,7 +19,7 @@ expression: parse_ast
                     ),
                 },
                 op: Add,
-                value: Located {
+                value: Attributed {
                     range: 5..6,
                     custom: (),
                     node: Constant(

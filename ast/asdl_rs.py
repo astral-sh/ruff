@@ -761,7 +761,11 @@ class TraitImplVisitor(EmitVisitor):
     def extract_location(self, typename, depth):
         row = self.decode_field(asdl.Field("int", "lineno"), typename)
         column = self.decode_field(asdl.Field("int", "col_offset"), typename)
-        self.emit(f"let _location = Location::new({row}, {column});", depth)
+        self.emit(f"""let _location = {{
+        let row = try_location_field({row}, _vm)?;
+        let column = try_location_field({column}, _vm)?;
+        SourceLocation {{ row, column }}
+        }};""", depth)
 
     def decode_field(self, field, typename):
         name = json.dumps(field.name)
@@ -785,10 +789,7 @@ def write_generic_def(mod, typeinfo, f):
     f.write(
         textwrap.dedent(
             """
-        #![allow(clippy::derive_partial_eq_without_eq)]
-        
         pub use crate::{Attributed, constant::*};
-        use rustpython_compiler_core::{text_size::{TextSize, TextRange}};
 
         type Ident = String;
         \n
@@ -804,15 +805,15 @@ def write_located_def(typeinfo, f):
     f.write(
         textwrap.dedent(
             """
-            use rustpython_compiler_core::LocationRange;
+            use crate::location::SourceRange;
 
-            pub type Located<T> = super::generic::Attributed<T, LocationRange>;
+            pub type Located<T> = super::generic::Attributed<T, SourceRange>;
             """
         )
     )
     for info in typeinfo.values():
         if info.has_userdata:
-            generics = "::<LocationRange>"
+            generics = "::<SourceRange>"
         else:
             generics = ""
         f.write(

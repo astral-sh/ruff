@@ -2,14 +2,14 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Located {
+Attributed {
     range: 0..25,
     custom: (),
     node: Dict(
         ExprDict {
             keys: [
                 Some(
-                    Located {
+                    Attributed {
                         range: 1..4,
                         custom: (),
                         node: Constant(
@@ -24,7 +24,7 @@ Located {
                 ),
                 None,
                 Some(
-                    Located {
+                    Attributed {
                         range: 16..19,
                         custom: (),
                         node: Constant(
@@ -39,7 +39,7 @@ Located {
                 ),
             ],
             values: [
-                Located {
+                Attributed {
                     range: 6..9,
                     custom: (),
                     node: Constant(
@@ -51,7 +51,7 @@ Located {
                         },
                     ),
                 },
-                Located {
+                Attributed {
                     range: 13..14,
                     custom: (),
                     node: Name(
@@ -61,7 +61,7 @@ Located {
                         },
                     ),
                 },
-                Located {
+                Attributed {
                     range: 21..24,
                     custom: (),
                     node: Constant(

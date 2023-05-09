@@ -3,12 +3,12 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..24,
         custom: (),
         node: For(
             StmtFor {
-                target: Located {
+                target: Attributed {
                     range: 4..5,
                     custom: (),
                     node: Name(
@@ -18,13 +18,13 @@ expression: parse_ast
                         },
                     ),
                 },
-                iter: Located {
+                iter: Attributed {
                     range: 9..18,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 10..11,
                                     custom: (),
                                     node: Constant(
@@ -36,7 +36,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 13..14,
                                     custom: (),
                                     node: Constant(
@@ -48,7 +48,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 16..17,
                                     custom: (),
                                     node: Constant(
@@ -66,7 +66,7 @@ expression: parse_ast
                     ),
                 },
                 body: [
-                    Located {
+                    Attributed {
                         range: 20..24,
                         custom: (),
                         node: Pass,

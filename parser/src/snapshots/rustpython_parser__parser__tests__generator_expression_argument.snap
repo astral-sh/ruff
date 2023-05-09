@@ -2,17 +2,17 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Located {
+Attributed {
     range: 0..141,
     custom: (),
     node: Call(
         ExprCall {
-            func: Located {
+            func: Attributed {
                 range: 0..8,
                 custom: (),
                 node: Attribute(
                     ExprAttribute {
-                        value: Located {
+                        value: Attributed {
                             range: 0..3,
                             custom: (),
                             node: Constant(
@@ -30,12 +30,12 @@ Located {
                 ),
             },
             args: [
-                Located {
+                Attributed {
                     range: 14..139,
                     custom: (),
                     node: GeneratorExp(
                         ExprGeneratorExp {
-                            elt: Located {
+                            elt: Attributed {
                                 range: 14..17,
                                 custom: (),
                                 node: Name(
@@ -47,7 +47,7 @@ Located {
                             },
                             generators: [
                                 Comprehension {
-                                    target: Located {
+                                    target: Attributed {
                                         range: 26..29,
                                         custom: (),
                                         node: Name(
@@ -57,18 +57,18 @@ Located {
                                             },
                                         ),
                                     },
-                                    iter: Located {
+                                    iter: Attributed {
                                         range: 33..139,
                                         custom: (),
                                         node: Tuple(
                                             ExprTuple {
                                                 elts: [
-                                                    Located {
+                                                    Attributed {
                                                         range: 43..80,
                                                         custom: (),
                                                         node: IfExp(
                                                             ExprIfExp {
-                                                                test: Located {
+                                                                test: Attributed {
                                                                     range: 65..70,
                                                                     custom: (),
                                                                     node: Name(
@@ -78,12 +78,12 @@ Located {
                                                                         },
                                                                     ),
                                                                 },
-                                                                body: Located {
+                                                                body: Attributed {
                                                                     range: 43..61,
                                                                     custom: (),
                                                                     node: BinOp(
                                                                         ExprBinOp {
-                                                                            left: Located {
+                                                                            left: Attributed {
                                                                                 range: 43..53,
                                                                                 custom: (),
                                                                                 node: Constant(
@@ -96,7 +96,7 @@ Located {
                                                                                 ),
                                                                             },
                                                                             op: Mod,
-                                                                            right: Located {
+                                                                            right: Attributed {
                                                                                 range: 56..61,
                                                                                 custom: (),
                                                                                 node: Name(
@@ -109,7 +109,7 @@ Located {
                                                                         },
                                                                     ),
                                                                 },
-                                                                orelse: Located {
+                                                                orelse: Attributed {
                                                                     range: 76..80,
                                                                     custom: (),
                                                                     node: Constant(
@@ -122,12 +122,12 @@ Located {
                                                             },
                                                         ),
                                                     },
-                                                    Located {
+                                                    Attributed {
                                                         range: 90..132,
                                                         custom: (),
                                                         node: IfExp(
                                                             ExprIfExp {
-                                                                test: Located {
+                                                                test: Attributed {
                                                                     range: 116..122,
                                                                     custom: (),
                                                                     node: Name(
@@ -137,12 +137,12 @@ Located {
                                                                         },
                                                                     ),
                                                                 },
-                                                                body: Located {
+                                                                body: Attributed {
                                                                     range: 91..111,
                                                                     custom: (),
                                                                     node: BinOp(
                                                                         ExprBinOp {
-                                                                            left: Located {
+                                                                            left: Attributed {
                                                                                 range: 91..102,
                                                                                 custom: (),
                                                                                 node: Constant(
@@ -155,7 +155,7 @@ Located {
                                                                                 ),
                                                                             },
                                                                             op: Mod,
-                                                                            right: Located {
+                                                                            right: Attributed {
                                                                                 range: 105..111,
                                                                                 custom: (),
                                                                                 node: Name(
@@ -168,7 +168,7 @@ Located {
                                                                         },
                                                                     ),
                                                                 },
-                                                                orelse: Located {
+                                                                orelse: Attributed {
                                                                     range: 128..132,
                                                                     custom: (),
                                                                     node: Constant(

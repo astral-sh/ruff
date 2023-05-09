@@ -3,17 +3,17 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
+    Attributed {
         range: 0..17,
         custom: (),
         node: AugAssign(
             StmtAugAssign {
-                target: Located {
+                target: Attributed {
                     range: 0..4,
                     custom: (),
                     node: Subscript(
                         ExprSubscript {
-                            value: Located {
+                            value: Attributed {
                                 range: 0..1,
                                 custom: (),
                                 node: Name(
@@ -23,7 +23,7 @@ expression: parse_ast
                                     },
                                 ),
                             },
-                            slice: Located {
+                            slice: Attributed {
                                 range: 2..3,
                                 custom: (),
                                 node: Name(
@@ -38,13 +38,13 @@ expression: parse_ast
                     ),
                 },
                 op: Add,
-                value: Located {
+                value: Attributed {
                     range: 8..17,
                     custom: (),
                     node: Tuple(
                         ExprTuple {
                             elts: [
-                                Located {
+                                Attributed {
                                     range: 9..10,
                                     custom: (),
                                     node: Constant(
@@ -56,7 +56,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 12..13,
                                     custom: (),
                                     node: Constant(
@@ -68,7 +68,7 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                Located {
+                                Attributed {
                                     range: 15..16,
                                     custom: (),
                                     node: Constant(

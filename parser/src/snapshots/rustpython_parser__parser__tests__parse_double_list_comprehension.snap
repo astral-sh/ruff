@@ -2,12 +2,12 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Located {
+Attributed {
     range: 0..48,
     custom: (),
     node: ListComp(
         ExprListComp {
-            elt: Located {
+            elt: Attributed {
                 range: 1..2,
                 custom: (),
                 node: Name(
@@ -19,13 +19,13 @@ Located {
             },
             generators: [
                 Comprehension {
-                    target: Located {
+                    target: Attributed {
                         range: 7..12,
                         custom: (),
                         node: Tuple(
                             ExprTuple {
                                 elts: [
-                                    Located {
+                                    Attributed {
                                         range: 7..8,
                                         custom: (),
                                         node: Name(
@@ -35,7 +35,7 @@ Located {
                                             },
                                         ),
                                     },
-                                    Located {
+                                    Attributed {
                                         range: 10..12,
                                         custom: (),
                                         node: Name(
@@ -50,7 +50,7 @@ Located {
                             },
                         ),
                     },
-                    iter: Located {
+                    iter: Attributed {
                         range: 16..17,
                         custom: (),
                         node: Name(
@@ -64,7 +64,7 @@ Located {
                     is_async: 0,
                 },
                 Comprehension {
-                    target: Located {
+                    target: Attributed {
                         range: 22..23,
                         custom: (),
                         node: Name(
@@ -74,7 +74,7 @@ Located {
                             },
                         ),
                     },
-                    iter: Located {
+                    iter: Attributed {
                         range: 27..28,
                         custom: (),
                         node: Name(
@@ -85,12 +85,12 @@ Located {
                         ),
                     },
                     ifs: [
-                        Located {
+                        Attributed {
                             range: 32..37,
                             custom: (),
                             node: Compare(
                                 ExprCompare {
-                                    left: Located {
+                                    left: Attributed {
                                         range: 32..33,
                                         custom: (),
                                         node: Name(
@@ -104,7 +104,7 @@ Located {
                                         Lt,
                                     ],
                                     comparators: [
-                                        Located {
+                                        Attributed {
                                             range: 36..37,
                                             custom: (),
                                             node: Constant(
@@ -120,12 +120,12 @@ Located {
                                 },
                             ),
                         },
-                        Located {
+                        Attributed {
                             range: 41..47,
                             custom: (),
                             node: Compare(
                                 ExprCompare {
-                                    left: Located {
+                                    left: Attributed {
                                         range: 41..42,
                                         custom: (),
                                         node: Name(
@@ -139,7 +139,7 @@ Located {
                                         Gt,
                                     ],
                                     comparators: [
-                                        Located {
+                                        Attributed {
                                             range: 45..47,
                                             custom: (),
                                             node: Constant(
