@@ -47,6 +47,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             type_.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(elt, checker.stylist),
                 type_.range(),

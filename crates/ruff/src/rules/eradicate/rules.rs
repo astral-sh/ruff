@@ -57,7 +57,9 @@ pub fn commented_out_code(
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
         let mut diagnostic = Diagnostic::new(CommentedOutCode, range);
+
         if autofix.into() && settings.rules.should_fix(Rule::CommentedOutCode) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
                 locator.full_lines_range(range),
             )));

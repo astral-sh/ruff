@@ -210,6 +210,7 @@ fn convert_to_class(
     base_class: &Expr,
     stylist: &Stylist,
 ) -> Fix {
+    #[allow(deprecated)]
     Fix::unspecified(Edit::range_replacement(
         unparse_stmt(
             &create_class_def_stmt(class_name, body, total_keyword, base_class),

@@ -78,6 +78,7 @@ pub fn invalid_literal_comparison(
                             None
                         }
                     } {
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             content,
                             located_op.range() + location.start(),

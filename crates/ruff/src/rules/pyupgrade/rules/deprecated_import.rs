@@ -551,6 +551,7 @@ pub fn deprecated_import(
         );
         if checker.patch(Rule::DeprecatedImport) {
             if let Some(content) = fix {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     content,
                     stmt.range(),

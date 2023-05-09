@@ -31,6 +31,7 @@ pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "str".to_string(),
                 expr.range(),

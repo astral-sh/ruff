@@ -38,6 +38,9 @@ pub struct Fix {
 
 impl Fix {
     /// Create a new [`Fix`] with an unspecified applicability from an [`Edit`] element.
+    #[deprecated(
+        note = "Use `Fix::automatic`, `Fix::suggested`, or `Fix::manual` instead to specify an applicability."
+    )]
     pub fn unspecified(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
@@ -46,6 +49,9 @@ impl Fix {
     }
 
     /// Create a new [`Fix`] with an unspecified applicability from multiple [`Edit`] elements.
+    #[deprecated(
+        note = "Use `Fix::automatic_edits`, `Fix::suggested_edits`, or `Fix::manual_edits` instead to specify an applicability."
+    )]
     pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         Self {
             edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
@@ -85,7 +91,6 @@ impl Fix {
         }
     }
 
-
     /// Create a new [`Fix`] with manual applicability from an [`Edit`] element.
     pub fn manual(edit: Edit) -> Self {
         Self {
@@ -101,7 +106,6 @@ impl Fix {
             applicability: Applicability::Manual,
         }
     }
-
 
     /// Return the [`TextSize`] of the first [`Edit`] in the [`Fix`].
     pub fn min_start(&self) -> Option<TextSize> {

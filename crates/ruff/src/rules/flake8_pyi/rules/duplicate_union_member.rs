@@ -77,6 +77,7 @@ fn traverse_union<'a>(
             };
 
             // Replace the parent with its non-duplicate child.
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
                     if expr.node == left.node { right } else { left },

@@ -97,6 +97,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(edit));
         }
     }

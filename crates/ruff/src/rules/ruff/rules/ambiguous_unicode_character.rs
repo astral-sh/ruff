@@ -136,6 +136,7 @@ pub fn ambiguous_unicode_character(
                     );
                     if settings.rules.enabled(diagnostic.kind.rule()) {
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 (representant as char).to_string(),
                                 char_range,

@@ -64,6 +64,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
                 && !trimmed.ends_with(':')
                 && !trimmed.ends_with(';')
             {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),

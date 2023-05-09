@@ -70,6 +70,7 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 match type_name {
                     "unicode" => "str",

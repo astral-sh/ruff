@@ -444,6 +444,7 @@ pub(crate) fn printf_string_formatting(
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents,
             expr.range(),

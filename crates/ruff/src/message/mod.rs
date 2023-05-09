@@ -185,6 +185,7 @@ def fibonacci(n):
 
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
+        #[allow(deprecated)]
         let unused_variable = Diagnostic::new(
             UnusedVariable {
                 name: "x".to_string(),

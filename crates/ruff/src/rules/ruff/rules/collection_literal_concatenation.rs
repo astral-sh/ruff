@@ -108,6 +108,7 @@ pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if fixable {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 contents,
                 expr.range(),

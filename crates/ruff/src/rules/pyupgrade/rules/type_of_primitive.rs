@@ -46,6 +46,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
     };
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             primitive.builtin(),
             expr.range(),

@@ -47,6 +47,7 @@ impl Diagnostic {
     /// Set the [`Fix`] used to fix the diagnostic.
     #[inline]
     #[deprecated(note = "Use `Diagnostic::set_fix` instead.")]
+    #[allow(deprecated)]
     pub fn set_fix_from_edit(&mut self, edit: Edit) {
         self.fix = Some(Fix::unspecified(edit));
     }
@@ -62,6 +63,7 @@ impl Diagnostic {
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
     #[inline]
+    #[allow(deprecated)]
     pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
@@ -73,6 +75,7 @@ impl Diagnostic {
     /// Otherwise, log the error.
     #[inline]
     #[deprecated(note = "Use Diagnostic::try_set_fix instead")]
+    #[allow(deprecated)]
     pub fn try_set_fix_from_edit(&mut self, func: impl FnOnce() -> Result<Edit>) {
         match func() {
             Ok(edit) => self.fix = Some(Fix::unspecified(edit)),

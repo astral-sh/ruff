@@ -68,6 +68,7 @@ pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr
                             checker.locator,
                         )?;
                         let reference_edit = Edit::range_replacement(binding, expr.range());
+                        #[allow(deprecated)]
                         Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
                     });
                 }

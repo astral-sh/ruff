@@ -292,6 +292,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 && args.is_empty()
                 && keywords.is_empty()
             {
+                #[allow(deprecated)]
                 let fix = Fix::unspecified(Edit::deletion(func.end(), decorator.end()));
                 pytest_fixture_parentheses(
                     checker,
@@ -354,6 +355,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 .enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
                 && checker.settings.flake8_pytest_style.fixture_parentheses
             {
+                #[allow(deprecated)]
                 let fix = Fix::unspecified(Edit::insertion(
                     Parentheses::Empty.to_string(),
                     decorator.end(),
@@ -423,6 +425,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
                             stmt.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "return".to_string(),
                                 TextRange::at(stmt.start(), "yield".text_len()),
@@ -495,6 +498,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let range = checker.locator.full_lines_range(expr.range());
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -511,6 +515,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let line_range = checker.locator.full_lines_range(expr.range());
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(line_range)));
                 }
                 checker.diagnostics.push(diagnostic);

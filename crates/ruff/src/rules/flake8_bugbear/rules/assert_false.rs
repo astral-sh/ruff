@@ -63,6 +63,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
 
     let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_stmt(&assertion_error(msg), checker.stylist),
             stmt.range(),

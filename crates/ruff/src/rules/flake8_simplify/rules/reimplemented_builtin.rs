@@ -227,6 +227,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,
                         stmt.start(),
@@ -308,6 +309,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,
                         stmt.start(),

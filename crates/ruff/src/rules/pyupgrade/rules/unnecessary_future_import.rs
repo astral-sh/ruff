@@ -105,6 +105,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(defined_by));
                 }
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(fix));
             }
             Err(e) => error!("Failed to remove `__future__` import: {e}"),

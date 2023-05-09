@@ -203,6 +203,7 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
         }),
         stylist,
     );
+    #[allow(deprecated)]
     Fix::unspecified_edits(
         Edit::insertion(
             format!(

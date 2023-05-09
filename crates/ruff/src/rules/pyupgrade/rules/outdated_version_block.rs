@@ -177,6 +177,7 @@ fn fix_py2_block(
         ) {
             Ok(edit) => {
                 checker.deletions.insert(RefEquality(defined_by));
+                #[allow(deprecated)]
                 Some(Fix::unspecified(edit))
             }
             Err(err) => {
@@ -193,6 +194,7 @@ fn fix_py2_block(
 
         if indentation(checker.locator, start).is_none() {
             // Inline `else` block (e.g., `else: x = 1`).
+            #[allow(deprecated)]
             Some(Fix::unspecified(Edit::range_replacement(
                 checker
                     .locator
@@ -212,6 +214,7 @@ fn fix_py2_block(
                     .ok()
                 })
                 .map(|contents| {
+                    #[allow(deprecated)]
                     Fix::unspecified(Edit::replacement(
                         contents,
                         checker.locator.line_start(stmt.start()),
@@ -233,6 +236,7 @@ fn fix_py2_block(
                 end_location = body.last().unwrap().end();
             }
         }
+        #[allow(deprecated)]
         Some(Fix::unspecified(Edit::deletion(stmt.start(), end_location)))
     }
 }
@@ -254,6 +258,7 @@ fn fix_py3_block(
 
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
+                #[allow(deprecated)]
                 Some(Fix::unspecified(Edit::range_replacement(
                     checker
                         .locator
@@ -273,6 +278,7 @@ fn fix_py3_block(
                         .ok()
                     })
                     .map(|contents| {
+                        #[allow(deprecated)]
                         Fix::unspecified(Edit::replacement(
                             contents,
                             checker.locator.line_start(stmt.start()),
@@ -286,6 +292,7 @@ fn fix_py3_block(
             // the rest.
             let end = body.last().unwrap();
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
+            #[allow(deprecated)]
             Some(Fix::unspecified(Edit::range_replacement(
                 format!("else{text}"),
                 stmt.range(),

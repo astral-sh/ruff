@@ -56,6 +56,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             checker.stylist.line_ending().as_str(),
                             whitespace::clean(docstring.indentation)
                         );
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                             content,
                             docstring.expr.end() - num_trailing_quotes - num_trailing_spaces,

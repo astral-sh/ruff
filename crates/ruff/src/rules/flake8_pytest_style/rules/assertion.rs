@@ -204,6 +204,8 @@ pub fn unittest_assertion(
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                        #[allow(deprecated)]
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_stmt(&stmt, checker.stylist),
                             expr.range(),

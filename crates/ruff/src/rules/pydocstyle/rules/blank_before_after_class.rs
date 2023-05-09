@@ -94,6 +94,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete the blank line before the class.
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                         blank_lines_start,
                         docstring.start() - docstring.indentation.text_len(),
@@ -116,6 +117,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Insert one blank line before the class.
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         checker.stylist.line_ending().to_string(),
                         blank_lines_start,
@@ -163,6 +165,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Insert a blank line before the class (replacing any existing lines).
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                     checker.stylist.line_ending().to_string(),
                     first_line_start,

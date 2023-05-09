@@ -53,6 +53,7 @@ pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, nam
         alias.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {

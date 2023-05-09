@@ -71,6 +71,7 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             capitalized_word,
             TextRange::at(body.start(), first_word.text_len()),

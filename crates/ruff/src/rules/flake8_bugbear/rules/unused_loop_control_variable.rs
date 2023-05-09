@@ -169,6 +169,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {
                         if !binding.used() {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 rename,
                                 expr.range(),

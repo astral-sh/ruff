@@ -74,6 +74,7 @@ pub fn empty_type_checking_block<'a, 'b>(
                     if edit.is_deletion() || edit.content() == Some("pass") {
                         checker.deletions.insert(RefEquality(stmt));
                     }
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(edit));
                 }
                 Err(e) => error!("Failed to remove empty type-checking block: {e}"),

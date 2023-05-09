@@ -171,6 +171,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         "warning".to_string(),
                         level_call_range,

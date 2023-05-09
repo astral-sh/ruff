@@ -289,6 +289,7 @@ fn docstring(
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             fixed_contents,
             range,
@@ -367,6 +368,7 @@ fn strings(
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     fixed_contents,
                     *range,
@@ -433,6 +435,7 @@ fn strings(
 
                         fixed_contents.push(quote);
 
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             fixed_contents,
                             *range,
@@ -459,6 +462,7 @@ fn strings(
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         fixed_contents,
                         *range,

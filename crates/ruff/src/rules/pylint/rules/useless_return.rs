@@ -120,6 +120,7 @@ pub fn useless_return<'a>(
                 if edit.is_deletion() || edit.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(last_stmt));
                 }
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => {

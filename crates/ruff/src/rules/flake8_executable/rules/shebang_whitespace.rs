@@ -32,6 +32,7 @@ pub fn shebang_whitespace(
                 TextRange::at(range.start(), *n_spaces),
             );
             if autofix {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::at(
                     range.start(),
                     *n_spaces,
