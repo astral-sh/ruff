@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Excepthandler, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -72,7 +72,11 @@ where
 }
 
 /// TRY301
-pub fn raise_within_try(checker: &mut Checker, body: &[Stmt]) {
+pub fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[Excepthandler]) {
+    if handlers.is_empty() {
+        return;
+    }
+
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
         for stmt in body {

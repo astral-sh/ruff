@@ -45,3 +45,10 @@ def good():
         logger.exception("a failed")
     except Exception:
         logger.exception("something failed")
+
+
+def fine():
+    try:
+        a = process()  # This throws the exception now
+    finally:
+        print("finally")
