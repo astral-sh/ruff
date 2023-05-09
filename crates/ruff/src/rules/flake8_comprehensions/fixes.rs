@@ -1,10 +1,11 @@
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
-    Arg, AssignEqual, AssignTargetExpression, Call, Codegen, CodegenState, CompFor, Dict, DictComp,
-    DictElement, Element, Expr, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
-    LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace, RightCurlyBrace,
-    RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace, Tuple,
+    Arg, AssignEqual, AssignTargetExpression, Call, Codegen, CodegenState, Comment, CompFor, Dict,
+    DictComp, DictElement, Element, EmptyLine, Expr, Expression, GeneratorExp, LeftCurlyBrace,
+    LeftParen, LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace,
+    ParenthesizedWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp,
+    SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
 
 use ruff_diagnostics::Edit;
@@ -1156,6 +1157,108 @@ pub fn fix_unnecessary_comprehension_any_all(
         );
     };
 
+    let mut new_empty_lines = vec![];
+
+    if let ParenthesizableWhitespace::ParenthesizedWhitespace(ParenthesizedWhitespace {
+        first_line,
+        empty_lines,
+        ..
+    }) = &list_comp.lbracket.whitespace_after
+    {
+        // If there's a comment on the line after the opening bracket, we need
+        // to preserve it. The way we do this is by adding a new empty line
+        // with the same comment.
+        //
+        // Example:
+        // ```python
+        // any(
+        //     [  # comment
+        //         ...
+        //     ]
+        // )
+        //
+        // # The above code will be converted to:
+        // any(
+        //     # comment
+        //     ...
+        // )
+        // ```
+        if let TrailingWhitespace {
+            comment: Some(comment),
+            ..
+        } = first_line
+        {
+            // The indentation should be same as that of the opening bracket,
+            // but we don't have that information here. This will be addressed
+            // before adding these new nodes.
+            new_empty_lines.push(EmptyLine {
+                comment: Some(comment.clone()),
+                ..EmptyLine::default()
+            });
+        }
+        if !empty_lines.is_empty() {
+            new_empty_lines.extend(empty_lines.clone());
+        }
+    }
+
+    if !new_empty_lines.is_empty() {
+        call.whitespace_before_args = match &call.whitespace_before_args {
+            ParenthesizableWhitespace::ParenthesizedWhitespace(ParenthesizedWhitespace {
+                first_line,
+                indent,
+                last_line,
+                ..
+            }) => {
+                // Add the indentation of the opening bracket to all the new
+                // empty lines.
+                for empty_line in &mut new_empty_lines {
+                    empty_line.whitespace = last_line.clone();
+                }
+                ParenthesizableWhitespace::ParenthesizedWhitespace(ParenthesizedWhitespace {
+                    first_line: first_line.clone(),
+                    empty_lines: new_empty_lines,
+                    indent: *indent,
+                    last_line: last_line.clone(),
+                })
+            }
+            // This is a rare case, but it can happen if the opening bracket
+            // is on the same line as the function call.
+            //
+            // Example:
+            // ```python
+            // any([
+            //         ...
+            //     ]
+            // )
+            // ```
+            ParenthesizableWhitespace::SimpleWhitespace(whitespace) => {
+                for empty_line in &mut new_empty_lines {
+                    empty_line.whitespace = whitespace.clone();
+                }
+                ParenthesizableWhitespace::ParenthesizedWhitespace(ParenthesizedWhitespace {
+                    empty_lines: new_empty_lines,
+                    ..ParenthesizedWhitespace::default()
+                })
+            }
+        }
+    }
+
+    let rbracket_comment =
+        if let ParenthesizableWhitespace::ParenthesizedWhitespace(ParenthesizedWhitespace {
+            first_line:
+                TrailingWhitespace {
+                    whitespace,
+                    comment: Some(comment),
+                    ..
+                },
+            ..
+        }) = &list_comp.rbracket.whitespace_before
+        {
+            Some(format!("{}{}", whitespace.0, comment.0))
+        } else {
+            None
+        };
+
     call.args[0].value = Expression::GeneratorExp(Box::new(GeneratorExp {
         elt: list_comp.elt.clone(),
         for_in: list_comp.for_in.clone(),
@@ -1163,10 +1266,46 @@ pub fn fix_unnecessary_comprehension_any_all(
         rpar: list_comp.rpar.clone(),
     }));
 
-    if let Some(comma) = &call.args[0].comma {
-        call.args[0].whitespace_after_arg = comma.whitespace_after.clone();
-        call.args[0].comma = None;
-    }
+    let whitespace_after_arg = match &call.args[0].comma {
+        Some(comma) => {
+            let whitespace_after_comma = comma.whitespace_after.clone();
+            call.args[0].comma = None;
+            whitespace_after_comma
+        }
+        _ => call.args[0].whitespace_after_arg.clone(),
+    };
+
+    let new_comment;
+    call.args[0].whitespace_after_arg = match rbracket_comment {
+        Some(existing_comment) => {
+            if let ParenthesizableWhitespace::ParenthesizedWhitespace(ParenthesizedWhitespace {
+                first_line:
+                    TrailingWhitespace {
+                        whitespace: SimpleWhitespace(whitespace),
+                        comment: Some(Comment(comment)),
+                        ..
+                    },
+                empty_lines,
+                indent,
+                last_line,
+            }) = &whitespace_after_arg
+            {
+                new_comment = format!("{existing_comment}{whitespace}{comment}");
+                ParenthesizableWhitespace::ParenthesizedWhitespace(ParenthesizedWhitespace {
+                    first_line: TrailingWhitespace {
+                        comment: Some(Comment(new_comment.as_str())),
+                        ..TrailingWhitespace::default()
+                    },
+                    empty_lines: empty_lines.clone(),
+                    indent: *indent,
+                    last_line: last_line.clone(),
+                })
+            } else {
+                whitespace_after_arg
+            }
+        }
+        _ => whitespace_after_arg,
+    };
 
     let mut state = CodegenState {
         default_newline: &stylist.line_ending(),
