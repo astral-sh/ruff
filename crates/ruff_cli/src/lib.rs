@@ -217,6 +217,16 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             warn_user_once!("--format 'text' is used in watch mode.");
         }
 
+        // Configure the file watcher.
+        let (tx, rx) = channel();
+        let mut watcher = recommended_watcher(tx)?;
+        for file in &cli.files {
+            watcher.watch(file, RecursiveMode::Recursive)?;
+        }
+        if let Some(file) = pyproject_config.path.as_ref() {
+            watcher.watch(file, RecursiveMode::Recursive)?;
+        }
+
         // Perform an initial run instantly.
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
@@ -227,19 +237,9 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             &overrides,
             cache.into(),
             noqa.into(),
-            flags::FixMode::None,
+            autofix,
         )?;
         printer.write_continuously(&messages)?;
-
-        // Configure the file watcher.
-        let (tx, rx) = channel();
-        let mut watcher = recommended_watcher(tx)?;
-        for file in &cli.files {
-            watcher.watch(file, RecursiveMode::Recursive)?;
-        }
-        if let Some(file) = pyproject_config.path.as_ref() {
-            watcher.watch(file, RecursiveMode::Recursive)?;
-        }
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
