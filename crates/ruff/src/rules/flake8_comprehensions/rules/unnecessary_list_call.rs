@@ -11,7 +11,7 @@ use super::helpers;
 /// ## What it does
 /// Checks for unnecessary `list` calls around list comprehensions.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It is redundant to use a `list` call around a list comprehension.
 ///
 /// ## Examples

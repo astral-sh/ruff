@@ -12,7 +12,7 @@ use super::helpers;
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
 /// arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,
 /// since there is a literal syntax for these types.
 ///
