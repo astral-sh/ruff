@@ -26,6 +26,27 @@ impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
     }
 }
 
+/// ## What it does
+/// Check for `None` passed as the default value in `dict.get()`.
+///
+/// ## Why is this bad?
+/// `None` is the default value for `dict.get()`, so it is redundant to pass it
+/// explicitly.
+///
+/// ## Example
+/// ```python
+/// ages = {"Tom": 23, "Maria": 23, "Loca": 11}
+/// age = ages.get("Hodge", None)  # None
+/// ```
+///
+/// Use instead:
+/// ```python
+/// ages = {"Tom": 23, "Maria": 23, "Loca": 11}
+/// age = ages.get("Hodge")  # None
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[violation]
 pub struct DictGetWithNoneDefault {
     expected: String,

@@ -5,6 +5,40 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `return` statements in `try`/`except` and `finally` blocks.
+///
+/// ## Why is this bad?
+/// The `return` statement in `finally` blocks will always be executed, even if
+/// an exception is raised in the `try` or `except` blocks. This can lead to
+/// unexpected behavior.
+///
+/// ## Example
+/// ```python
+/// def squared(n):  # always returns -1
+///     try:
+///         sqr = n**2
+///         return sqr
+///     except Exception:
+///         return "An exception occurred"
+///     finally:
+///         return -1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def squared(n):
+///     try:
+///         return_value = n**2
+///     except Exception:
+///         return_value = "An exception occurred"
+///     finally:
+///         return_value = -1
+///     return return_value
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/errors.html#defining-clean-up-actions)
 #[violation]
 pub struct ReturnInTryExceptFinally;
 
