@@ -33,6 +33,7 @@ pub struct RuleSelection {
     pub extend_select: Vec<RuleSelector>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub unfixable: Vec<RuleSelector>,
+    pub extend_fixable: Vec<RuleSelector>,
 }
 
 #[derive(Debug, Default)]
@@ -104,7 +105,13 @@ impl Configuration {
                     .collect(),
                 extend_select: options.extend_select.unwrap_or_default(),
                 fixable: options.fixable,
-                unfixable: options.unfixable.unwrap_or_default(),
+                unfixable: options
+                    .unfixable
+                    .into_iter()
+                    .flatten()
+                    .chain(options.extend_unfixable.into_iter().flatten())
+                    .collect(),
+                extend_fixable: options.extend_fixable.unwrap_or_default(),
             }],
             allowed_confusables: options.allowed_confusables,
             builtins: options.builtins,

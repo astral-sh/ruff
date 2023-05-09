@@ -264,16 +264,11 @@ impl From<&Configuration> for RuleTable {
         // across config files (which otherwise wouldn't be possible since ruff
         // only has `extended` but no `extended-by`).
         let mut carryover_ignores: Option<&[RuleSelector]> = None;
+        let mut carryover_unfixables: Option<&[RuleSelector]> = None;
 
         let mut redirects = FxHashMap::default();
 
         for selection in &config.rule_selections {
-            // We do not have an extend-fixable option, so fixable and unfixable
-            // selectors can simply be applied directly to fixable_set.
-            if selection.fixable.is_some() {
-                fixable_set.clear();
-            }
-
             // If a selection only specifies extend-select we cannot directly
             // apply its rule selectors to the select_set because we firstly have
             // to resolve the effectively selected rules within the current rule selection
@@ -282,10 +277,13 @@ impl From<&Configuration> for RuleTable {
             // We do this via the following HashMap where the bool indicates
             // whether to enable or disable the given rule.
             let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
+            let mut fixable_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
 
             let carriedover_ignores = carryover_ignores.take();
+            let carriedover_unfixables = carryover_unfixables.take();
 
             for spec in Specificity::iter() {
+                // Iterate over rule selectors in order of specificity.
                 for selector in selection
                     .select
                     .iter()
@@ -307,17 +305,26 @@ impl From<&Configuration> for RuleTable {
                         select_map_updates.insert(rule, false);
                     }
                 }
-                if let Some(fixable) = &selection.fixable {
-                    fixable_set
-                        .extend(fixable.iter().filter(|s| s.specificity() == spec).flatten());
+                // Apply the same logic to `fixable` and `unfixable`.
+                for selector in selection
+                    .fixable
+                    .iter()
+                    .flatten()
+                    .chain(selection.extend_fixable.iter())
+                    .filter(|s| s.specificity() == spec)
+                {
+                    for rule in selector {
+                        fixable_map_updates.insert(rule, true);
+                    }
                 }
                 for selector in selection
                     .unfixable
                     .iter()
+                    .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector {
-                        fixable_set.remove(rule);
+                        fixable_map_updates.insert(rule, false);
                     }
                 }
             }
@@ -347,6 +354,29 @@ impl From<&Configuration> for RuleTable {
                 }
             }
 
+            // Apply the same logic to `fixable` and `unfixable`.
+            if let Some(fixable) = &selection.fixable {
+                fixable_set = fixable_map_updates
+                    .into_iter()
+                    .filter_map(|(rule, enabled)| enabled.then_some(rule))
+                    .collect();
+
+                if fixable.is_empty()
+                    && selection.extend_fixable.is_empty()
+                    && !selection.unfixable.is_empty()
+                {
+                    carryover_unfixables = Some(&selection.unfixable);
+                }
+            } else {
+                for (rule, enabled) in fixable_map_updates {
+                    if enabled {
+                        fixable_set.insert(rule);
+                    } else {
+                        fixable_set.remove(rule);
+                    }
+                }
+            }
+
             // We insert redirects into the hashmap so that we
             // can warn the users about remapped rule codes.
             for selector in selection
@@ -357,6 +387,7 @@ impl From<&Configuration> for RuleTable {
                 .chain(selection.ignore.iter())
                 .chain(selection.extend_select.iter())
                 .chain(selection.unfixable.iter())
+                .chain(selection.extend_fixable.iter())
             {
                 if let RuleSelector::Prefix {
                     prefix,
