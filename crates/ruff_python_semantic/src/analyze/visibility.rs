@@ -60,13 +60,21 @@ pub fn is_override(ctx: &Context, decorator_list: &[Expr]) -> bool {
         .any(|expr| ctx.match_typing_expr(map_callable(expr), "override"))
 }
 
-/// Returns `true` if a function definition is an `@abstractmethod`.
+/// Returns `true` if a function definition is an abstract method based on its decorators.
 pub fn is_abstract(ctx: &Context, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
         ctx.resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
-                call_path.as_slice() == ["abc", "abstractmethod"]
-                    || call_path.as_slice() == ["abc", "abstractproperty"]
+                matches!(
+                    call_path.as_slice(),
+                    [
+                        "abc",
+                        "abstractmethod"
+                            | "abstractclassmethod"
+                            | "abstractstaticmethod"
+                            | "abstractproperty"
+                    ]
+                )
             })
     })
 }

@@ -93,7 +93,8 @@ pub fn unnecessary_literal_within_list_call(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_literal_within_list_call(checker.locator, checker.stylist, expr)
         });
     }

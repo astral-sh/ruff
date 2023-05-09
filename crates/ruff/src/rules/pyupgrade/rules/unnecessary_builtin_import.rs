@@ -2,8 +2,9 @@ use itertools::Itertools;
 use log::error;
 use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::RefEquality;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -113,18 +114,18 @@ pub fn unnecessary_builtin_import(
             .collect();
         match autofix::actions::remove_unused_imports(
             unused_imports.iter().map(String::as_str),
-            defined_by.into(),
-            defined_in.map(Into::into),
+            defined_by,
+            defined_in,
             &deleted,
             checker.locator,
             checker.indexer,
             checker.stylist,
         ) {
-            Ok(fix) => {
-                if fix.is_deletion() || fix.content() == Some("pass") {
-                    checker.deletions.insert(*defined_by);
+            Ok(edit) => {
+                if edit.is_deletion() || edit.content() == Some("pass") {
+                    checker.deletions.insert(RefEquality(defined_by));
                 }
-                diagnostic.set_fix(fix);
+                diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => error!("Failed to remove builtin import: {e}"),
         }

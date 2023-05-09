@@ -3,7 +3,7 @@
 use itertools::Itertools;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::source_code::Locator;
 
 use crate::noqa;
@@ -102,7 +102,8 @@ pub fn check_noqa(
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, *noqa_range);
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(delete_noqa(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix_from_edit(delete_noqa(
                                 *leading_spaces,
                                 *noqa_range,
                                 *trailing_spaces,
@@ -171,17 +172,18 @@ pub fn check_noqa(
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                diagnostic.set_fix(delete_noqa(
+                                #[allow(deprecated)]
+                                diagnostic.set_fix_from_edit(delete_noqa(
                                     *leading_spaces,
                                     *range,
                                     *trailing_spaces,
                                     locator,
                                 ));
                             } else {
-                                diagnostic.set_fix(Edit::range_replacement(
+                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     *range,
-                                ));
+                                )));
                             }
                         }
                         diagnostics.push(diagnostic);

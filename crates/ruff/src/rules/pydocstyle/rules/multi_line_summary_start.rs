@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
@@ -67,10 +67,10 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 // Delete until first non-whitespace char.
                 for line in content_lines {
                     if let Some(end_column) = line.find(|c: char| !c.is_whitespace()) {
-                        diagnostic.set_fix(Edit::deletion(
+                        diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                             first_line.end(),
                             line.start() + TextSize::try_from(end_column).unwrap(),
-                        ));
+                        )));
                         break;
                     }
                 }
@@ -123,7 +123,11 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                         first_line.strip_prefix(prefix).unwrap().trim_start()
                     );
 
-                    diagnostic.set_fix(Edit::replacement(repl, body.start(), first_line.end()));
+                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                        repl,
+                        body.start(),
+                        first_line.end(),
+                    )));
                 }
             }
             checker.diagnostics.push(diagnostic);

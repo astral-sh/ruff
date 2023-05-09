@@ -6,7 +6,7 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-ruff = { path = "../ruff" }
+ruff = { path = "../ruff", features = ["schemars"] }
 ruff_cli = { path = "../ruff_cli" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 

@@ -6,7 +6,7 @@ use libcst_native::{
 use log::error;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -257,7 +257,10 @@ pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 value.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::range_replacement("mock".to_string(), value.range()));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    "mock".to_string(),
+                    value.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -300,8 +303,10 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             name.range(),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic
-                                .set_fix(Edit::range_replacement(content.clone(), stmt.range()));
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                content.clone(),
+                                stmt.range(),
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -326,7 +331,8 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             format_import_from(stmt, indent, checker.locator, checker.stylist)
                                 .map(|content| Edit::range_replacement(content, stmt.range()))
                         });

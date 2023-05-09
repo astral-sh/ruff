@@ -7,7 +7,7 @@ use rustpython_common::cformat::{
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
@@ -444,7 +444,10 @@ pub(crate) fn printf_string_formatting(
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

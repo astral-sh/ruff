@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Located, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -24,10 +24,10 @@ fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
     let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
     if checker.patch(diagnostic.kind.rule()) {
         let contents = checker.locator.slice(node.range());
-        diagnostic.set_fix(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents.replacen("cElementTree", "ElementTree", 1),
             node.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

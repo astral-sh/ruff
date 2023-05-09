@@ -1,5 +1,16 @@
 # Breaking Changes
 
+## 0.0.265
+
+### `--fix-only` now exits with a zero exit code, unless `--exit-non-zero-on-fix` is specified ([#4146](https://github.com/charliermarsh/ruff/pull/4146))
+
+Previously, `--fix-only` would exit with a non-zero exit code if any fixes were applied. This
+behavior was inconsistent with `--fix`, and further, meant that `--exit-non-zero-on-fix` was
+effectively ignored when `--fix-only` was specified.
+
+Now, `--fix-only` will exit with a zero exit code, unless `--exit-non-zero-on-fix` is specified,
+in which case it will exit with a non-zero exit code if any fixes were applied.
+
 ## 0.0.260
 
 ### Fixes are now represented as a list of edits ([#3709](https://github.com/charliermarsh/ruff/pull/3709))

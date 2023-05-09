@@ -1,6 +1,5 @@
 //! Settings for the `flake8-bandit` plugin.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
@@ -11,14 +10,13 @@ fn default_tmp_dirs() -> Vec<String> {
         .to_vec()
 }
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Flake8BanditOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = "[\"/tmp\", \"/var/tmp\", \"/dev/shm\"]",

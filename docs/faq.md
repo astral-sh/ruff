@@ -8,6 +8,12 @@ the `line-length` setting is consistent between the two.
 As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
 stylistic lint rules that are obviated by autoformatting.
 
+Note that Ruff and Black treat line-length enforcement a little differently. Black makes a
+best-effort attempt to adhere to the `line-length`, but avoids automatic line-wrapping in some cases
+(e.g., within comments). Ruff, on the other hand, will flag rule `E501` for any line that exceeds
+the `line-length` setting. As such, if `E501` is enabled, Ruff can still trigger line-length
+violations even when Black is enabled.
+
 ## How does Ruff compare to Flake8?
 
 (Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
@@ -59,6 +65,7 @@ natively, including:
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/charliermarsh/ruff/issues/2102))
 - [isort](https://pypi.org/project/isort/)
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
@@ -156,6 +163,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/charliermarsh/ruff/issues/2102))
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
@@ -261,7 +269,7 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enable specific docstring convention, add the following to your `pyproject.toml`:
+Yes! To enforce a docstring convention, add the following to your `pyproject.toml`:
 
 ```toml
 [tool.ruff.pydocstyle]
@@ -272,7 +280,8 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside `convention`, you'll want to explicitly enable the `D` rule code prefix, like so:
+Alongside `convention`, you'll want to explicitly enable the `D` rule code prefix, since the `D`
+rules are not enabled by default:
 
 ```toml
 [tool.ruff]
@@ -286,6 +295,8 @@ convention = "google"
 
 Setting a `convention` force-disables any rules that are incompatible with that convention, no
 matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
+By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
+alone.
 
 ## How can I tell what settings Ruff is using to check my code?
 

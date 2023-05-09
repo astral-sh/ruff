@@ -21,6 +21,7 @@ pub struct UnusedCodes {
 /// ```python
 /// import foo  # noqa: F401
 ///
+///
 /// def bar():
 ///     foo.bar()
 /// ```
@@ -28,6 +29,7 @@ pub struct UnusedCodes {
 /// Use instead:
 /// ```python
 /// import foo
+///
 ///
 /// def bar():
 ///     foo.bar()

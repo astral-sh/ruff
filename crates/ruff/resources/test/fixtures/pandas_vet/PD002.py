@@ -22,3 +22,5 @@ if True:
 x.drop(["a"], axis=1, **kwargs, inplace=True)
 x.drop(["a"], axis=1, inplace=True, **kwargs)
 f(x.drop(["a"], axis=1, inplace=True))
+
+x.apply(lambda x: x.sort_values('a', inplace=True))

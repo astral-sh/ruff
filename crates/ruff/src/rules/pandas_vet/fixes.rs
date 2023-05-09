@@ -41,5 +41,5 @@ pub(super) fn convert_inplace_argument_to_assignment(
     )
     .ok()?;
 
-    Some(Fix::from_iter([insert_assignment, remove_argument]))
+    Some(Fix::unspecified_edits(insert_assignment, [remove_argument]))
 }

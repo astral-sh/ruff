@@ -29,6 +29,7 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// def create_list() -> list[int]:
 ///     return [1, 2, 3]
 ///
+///
 /// def mutable_default(arg: list[int] = create_list()) -> list[int]:
 ///     arg.append(4)
 ///     return arg
@@ -48,6 +49,7 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// assigning to a module-level variable:
 /// ```python
 /// I_KNOW_THIS_IS_SHARED_STATE = create_list()
+///
 ///
 /// def mutable_default(arg: list[int] = I_KNOW_THIS_IS_SHARED_STATE) -> list[int]:
 ///     arg.append(4)

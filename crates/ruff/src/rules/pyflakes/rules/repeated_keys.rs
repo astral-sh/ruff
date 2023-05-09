@@ -3,7 +3,7 @@ use std::hash::{BuildHasherDefault, Hash};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
 use ruff_python_ast::helpers::unparse_expr;
@@ -109,10 +109,10 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(Edit::deletion(
+                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
-                                    ));
+                                    )));
                                 }
                             } else {
                                 seen_values.insert(comparable_value);
@@ -137,10 +137,10 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(Edit::deletion(
+                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
-                                    ));
+                                    )));
                                 }
                             } else {
                                 seen_values.insert(comparable_value);

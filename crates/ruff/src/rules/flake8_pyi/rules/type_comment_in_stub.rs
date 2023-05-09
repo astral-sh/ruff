@@ -17,7 +17,7 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## Example
 /// ```python
-/// x = 1 # type: int
+/// x = 1  # type: int
 /// ```
 ///
 /// Use instead:

@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 
@@ -14,11 +14,11 @@ pub struct LRUCacheWithoutParameters;
 impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parameters to `functools.lru_cache`")
+        format!("Unnecessary parentheses to `functools.lru_cache`")
     }
 
     fn autofix_title(&self) -> String {
-        "Remove unnecessary parameters".to_string()
+        "Remove unnecessary parentheses".to_string()
     }
 }
 
@@ -48,10 +48,10 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
                 TextRange::new(func.end(), expr.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(func, checker.stylist),
                     expr.range(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

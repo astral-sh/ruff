@@ -1,5 +1,4 @@
 pub mod all;
-pub mod branch_detection;
 pub mod call_path;
 pub mod cast;
 pub mod comparable;

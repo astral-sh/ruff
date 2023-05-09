@@ -156,6 +156,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BinaryOpException,
+    rules::pylint::rules::ImportSelf,
     rules::pylint::rules::InvalidCharacterBackspace,
     rules::pylint::rules::InvalidCharacterSub,
     rules::pylint::rules::InvalidCharacterEsc,
@@ -188,6 +189,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::LoggingTooFewArgs,
     rules::pylint::rules::LoggingTooManyArgs,
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
+    rules::pylint::rules::NestedMinMax,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -539,6 +541,9 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::DuplicateUnionMember,
+    rules::flake8_pyi::rules::QuotedAnnotationInStub,
+    rules::flake8_pyi::rules::SnakeCaseTypeAlias,
+    rules::flake8_pyi::rules::TSuffixedTypeAlias,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,
@@ -665,6 +670,8 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
     rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
+    // flynt
+    rules::flynt::rules::StaticJoinToFString,
 );
 
 pub trait AsRule {
@@ -820,6 +827,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flynt](https://pypi.org/project/flynt/)
+    #[prefix = "FLY"]
+    Flynt,
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,

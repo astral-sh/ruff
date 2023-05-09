@@ -1,10 +1,5 @@
 //! Options that the user can provide via pyproject.toml.
 
-use ruff_macros::ConfigurationOptions;
-use rustc_hash::FxHashMap;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -14,11 +9,13 @@ use crate::rules::{
     pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
+use ruff_macros::ConfigurationOptions;
+use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"[]"#,
@@ -71,7 +68,7 @@ pub struct Options {
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     pub dummy_variable_rgx: Option<String>,
     #[option(
-        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
+        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
         value_type = "list[str]",
         example = r#"
             exclude = [".venv"]
@@ -164,7 +161,7 @@ pub struct Options {
     ///
     /// This option has been **deprecated** in favor of `ignore`
     /// since its usage is now interchangeable with `ignore`.
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schemars", schemars(skip))]
     pub extend_ignore: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",

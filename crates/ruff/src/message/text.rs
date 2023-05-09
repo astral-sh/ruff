@@ -8,7 +8,8 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
+use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
@@ -172,6 +173,7 @@ impl Display for MessageCodeFrame<'_> {
         };
 
         let source_code = file.to_source_code();
+
         let content_start_index = source_code.line_index(range.start());
         let mut start_index = content_start_index.saturating_sub(2);
 
@@ -200,26 +202,23 @@ impl Display for MessageCodeFrame<'_> {
         let start_offset = source_code.line_start(start_index);
         let end_offset = source_code.line_end(end_index);
 
-        let source_text = source_code.slice(TextRange::new(start_offset, end_offset));
+        let source = replace_whitespace(
+            source_code.slice(TextRange::new(start_offset, end_offset)),
+            range - start_offset,
+        );
 
-        let annotation_start_offset = range.start() - start_offset;
-        let annotation_end_offset = range.end() - start_offset;
-
-        let start_char = source_text[TextRange::up_to(annotation_start_offset)]
+        let start_char = source.text[TextRange::up_to(source.annotation_range.start())]
             .chars()
             .count();
 
-        let char_length = source_text
-            [TextRange::new(annotation_start_offset, annotation_end_offset)]
-        .chars()
-        .count();
+        let char_length = source.text[source.annotation_range].chars().count();
 
         let label = kind.rule().noqa_code().to_string();
 
         let snippet = Snippet {
             title: None,
             slices: vec![Slice {
-                source: source_text,
+                source: &source.text,
                 line_start: content_start_index.get(),
                 annotations: vec![SourceAnnotation {
                     label: &label,
@@ -243,6 +242,63 @@ impl Display for MessageCodeFrame<'_> {
 
         writeln!(f, "{message}", message = DisplayList::from(snippet))
     }
+}
+
+fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
+    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `pycodestyle.tab-size`
+
+    let mut result = String::new();
+    let mut last_end = 0;
+    let mut range = annotation_range;
+    let mut column = 0;
+
+    for (index, c) in source.chars().enumerate() {
+        match c {
+            '\t' => {
+                let tab_width = TAB_SIZE - column % TAB_SIZE;
+                column += tab_width;
+
+                if index < usize::from(annotation_range.start()) {
+                    range += TextSize::new(tab_width - 1);
+                } else if index < usize::from(annotation_range.end()) {
+                    range = range.add_end(TextSize::new(tab_width - 1));
+                }
+
+                result.push_str(&source[last_end..index]);
+
+                for _ in 0..tab_width {
+                    result.push(' ');
+                }
+
+                last_end = index + 1;
+            }
+            '\n' | '\r' => {
+                column = 0;
+            }
+            _ => {
+                column += 1;
+            }
+        }
+    }
+
+    // No tabs
+    if result.is_empty() {
+        SourceCode {
+            annotation_range,
+            text: Cow::Borrowed(source),
+        }
+    } else {
+        result.push_str(&source[last_end..]);
+        SourceCode {
+            annotation_range: range,
+            text: Cow::Owned(result),
+        }
+    }
+}
+
+struct SourceCode<'a> {
+    text: Cow<'a, str>,
+    annotation_range: TextRange,
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::typing::AnnotationKind;
@@ -100,21 +100,22 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     };
 
-    // Avoid fixing forward references.
-    let fixable = checker
-        .ctx
-        .in_deferred_string_type_definition
-        .as_ref()
-        .map_or(true, AnnotationKind::is_simple);
+    // Avoid fixing forward references, or types not in an annotation.
+    let fixable = checker.ctx.in_type_definition
+        && checker
+            .ctx
+            .in_deferred_string_type_definition
+            .as_ref()
+            .map_or(true, AnnotationKind::is_simple);
 
     match typing_member {
         TypingMember::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation { fixable }, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&optional(slice), checker.stylist),
                     expr.range(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -126,17 +127,17 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                         // Invalid type annotation.
                     }
                     ExprKind::Tuple { elts, .. } => {
-                        diagnostic.set_fix(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_expr(&union(elts), checker.stylist),
                             expr.range(),
-                        ));
+                        )));
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.set_fix(Edit::range_replacement(
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_expr(slice, checker.stylist),
                             expr.range(),
-                        ));
+                        )));
                     }
                 }
             }

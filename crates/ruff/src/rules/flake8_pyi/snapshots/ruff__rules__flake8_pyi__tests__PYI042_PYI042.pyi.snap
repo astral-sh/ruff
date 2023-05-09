@@ -1,0 +1,32 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI042.pyi:10:1: PYI042 Type alias `just_literals_pipe_union` should be CamelCase
+   |
+10 | )
+11 | 
+12 | just_literals_pipe_union: TypeAlias = (
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ PYI042
+13 |     Literal[True] | Literal["idk"]
+14 | )  # PYI042, since not camel case
+   |
+
+PYI042.pyi:19:1: PYI042 Type alias `snake_case_alias1` should be CamelCase
+   |
+19 | _PrivateAliasS2: TypeAlias = Annotated[str, "also okay"]
+20 | 
+21 | snake_case_alias1: TypeAlias = str | int  # PYI042, since not camel case
+   | ^^^^^^^^^^^^^^^^^ PYI042
+22 | _snake_case_alias2: TypeAlias = Literal["whatever"]  # PYI042, since not camel case
+23 | Snake_case_alias: TypeAlias = int | float  # PYI042, since not camel case
+   |
+
+PYI042.pyi:20:1: PYI042 Type alias `_snake_case_alias2` should be CamelCase
+   |
+20 | snake_case_alias1: TypeAlias = str | int  # PYI042, since not camel case
+21 | _snake_case_alias2: TypeAlias = Literal["whatever"]  # PYI042, since not camel case
+   | ^^^^^^^^^^^^^^^^^^ PYI042
+22 | Snake_case_alias: TypeAlias = int | float  # PYI042, since not camel case
+   |
+
+

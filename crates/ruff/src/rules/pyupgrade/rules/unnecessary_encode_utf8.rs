@@ -2,7 +2,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -106,8 +106,8 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
     None
 }
 
-/// Return an [`Edit`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -> Edit {
+/// Return a [`Fix`] replacing the call to encode with a byte string.
+fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
     let contents = locator.slice(constant.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
@@ -129,7 +129,7 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -
         }
         prev = Some(range.end());
     }
-    Edit::range_replacement(replacement, expr.range())
+    Fix::unspecified(Edit::range_replacement(replacement, expr.range()))
 }
 
 /// UP012
@@ -176,7 +176,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -197,7 +198,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -225,7 +227,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -246,7 +249,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),

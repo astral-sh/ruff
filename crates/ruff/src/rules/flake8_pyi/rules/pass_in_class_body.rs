@@ -48,7 +48,8 @@ pub fn pass_in_class_body<'a>(checker: &mut Checker<'a>, parent: &'a Stmt, body:
                         if fix.is_deletion() || fix.content() == Some("pass") {
                             checker.deletions.insert(RefEquality(stmt));
                         }
-                        diagnostic.set_fix(fix);
+                        #[allow(deprecated)]
+                        diagnostic.set_fix_from_edit(fix);
                     }
                     Err(e) => {
                         error!("Failed to delete `pass` statement: {}", e);

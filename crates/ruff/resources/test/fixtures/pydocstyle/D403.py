@@ -13,3 +13,15 @@ def another_function():
 
 def utf8_function():
     """éste docstring is capitalized."""
+
+def uppercase_char_not_possible():
+    """'args' is not capitalized."""
+
+def non_alphabetic():
+    """th!is is not capitalized."""
+
+def non_ascii():
+    """th•s is not capitalized."""
+
+def all_caps():
+    """th•s is not capitalized."""
