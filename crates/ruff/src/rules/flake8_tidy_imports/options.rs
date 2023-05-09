@@ -1,7 +1,6 @@
 //! Settings for the `flake8-tidy-imports` plugin.
 
 use rustc_hash::FxHashMap;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::ConfigurationOptions;
@@ -10,14 +9,13 @@ use super::banned_api::ApiBan;
 use super::relative_imports::Strictness;
 use super::Settings;
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Flake8TidyImportsOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#""parents""#,
