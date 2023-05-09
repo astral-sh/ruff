@@ -42,6 +42,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/charliermarsh/ruff"
+Documentation = "https://beta.ruff.rs/docs/"
 Changelog = "https://github.com/charliermarsh/ruff/releases"
 
 [tool.maturin]
