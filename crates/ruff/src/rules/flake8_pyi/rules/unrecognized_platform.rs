@@ -77,7 +77,7 @@ impl Violation for UnrecognizedPlatformCheck {
 /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
 #[violation]
 pub struct UnrecognizedPlatformName {
-    pub platform: String,
+    platform: String,
 }
 
 impl Violation for UnrecognizedPlatformName {

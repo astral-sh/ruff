@@ -36,7 +36,7 @@ use ruff_python_semantic::binding::{
 /// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
-    pub full_name: String,
+    full_name: String,
 }
 
 impl Violation for RuntimeImportInTypeCheckingBlock {

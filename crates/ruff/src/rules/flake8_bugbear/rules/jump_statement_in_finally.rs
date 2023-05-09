@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct JumpStatementInFinally {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for JumpStatementInFinally {

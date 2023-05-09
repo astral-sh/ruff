@@ -38,7 +38,7 @@ fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
 
 #[violation]
 pub struct CollapsibleIf {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for CollapsibleIf {
@@ -57,8 +57,8 @@ impl Violation for CollapsibleIf {
 
 #[violation]
 pub struct NeedlessBool {
-    pub condition: String,
-    pub fixable: bool,
+    condition: String,
+    fixable: bool,
 }
 
 impl Violation for NeedlessBool {
@@ -109,8 +109,8 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
 
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
-    pub contents: String,
-    pub fixable: bool,
+    contents: String,
+    fixable: bool,
 }
 
 impl Violation for IfElseBlockInsteadOfIfExp {
@@ -162,8 +162,8 @@ impl Violation for IfWithSameArms {
 
 #[violation]
 pub struct IfElseBlockInsteadOfDictGet {
-    pub contents: String,
-    pub fixable: bool,
+    contents: String,
+    fixable: bool,
 }
 
 impl Violation for IfElseBlockInsteadOfDictGet {

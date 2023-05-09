@@ -11,7 +11,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct NonPEP604Annotation {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for NonPEP604Annotation {

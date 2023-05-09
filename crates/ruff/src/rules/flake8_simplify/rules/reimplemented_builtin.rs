@@ -14,7 +14,7 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct ReimplementedBuiltin {
-    pub repl: String,
+    repl: String,
 }
 
 impl AlwaysAutofixableViolation for ReimplementedBuiltin {

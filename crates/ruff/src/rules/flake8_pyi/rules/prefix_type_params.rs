@@ -47,7 +47,7 @@ impl fmt::Display for VarKind {
 /// ```
 #[violation]
 pub struct UnprefixedTypeParam {
-    pub kind: VarKind,
+    kind: VarKind,
 }
 
 impl Violation for UnprefixedTypeParam {

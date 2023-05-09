@@ -32,7 +32,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryComprehension {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryComprehension {

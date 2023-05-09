@@ -29,7 +29,7 @@ impl From<&Cmpop> for IsCmpop {
 
 #[violation]
 pub struct IsLiteral {
-    pub cmpop: IsCmpop,
+    cmpop: IsCmpop,
 }
 
 impl AlwaysAutofixableViolation for IsLiteral {

@@ -8,8 +8,8 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct TooManyArguments {
-    pub c_args: usize,
-    pub max_args: usize,
+    c_args: usize,
+    max_args: usize,
 }
 
 impl Violation for TooManyArguments {

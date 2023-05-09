@@ -7,8 +7,8 @@ use ruff_python_ast::source_code::Locator;
 
 #[violation]
 pub struct TooManyStatements {
-    pub statements: usize,
-    pub max_statements: usize,
+    statements: usize,
+    max_statements: usize,
 }
 
 impl Violation for TooManyStatements {

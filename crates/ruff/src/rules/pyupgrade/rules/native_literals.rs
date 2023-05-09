@@ -26,7 +26,7 @@ impl fmt::Display for LiteralType {
 
 #[violation]
 pub struct NativeLiterals {
-    pub literal_type: LiteralType,
+    literal_type: LiteralType,
 }
 
 impl AlwaysAutofixableViolation for NativeLiterals {

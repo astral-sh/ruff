@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct LoopVariableOverridesIterator {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for LoopVariableOverridesIterator {

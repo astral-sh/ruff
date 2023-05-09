@@ -9,7 +9,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct IfExprWithTrueFalse {
-    pub expr: String,
+    expr: String,
 }
 
 impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
@@ -27,7 +27,7 @@ impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
 
 #[violation]
 pub struct IfExprWithFalseTrue {
-    pub expr: String,
+    expr: String,
 }
 
 impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
@@ -45,8 +45,8 @@ impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
 
 #[violation]
 pub struct IfExprWithTwistedArms {
-    pub expr_body: String,
-    pub expr_else: String,
+    expr_body: String,
+    expr_else: String,
 }
 
 impl AlwaysAutofixableViolation for IfExprWithTwistedArms {

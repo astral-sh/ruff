@@ -27,8 +27,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 #[violation]
 pub struct UnconventionalImportAlias {
-    pub name: String,
-    pub asname: String,
+    name: String,
+    asname: String,
 }
 
 impl Violation for UnconventionalImportAlias {

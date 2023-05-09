@@ -9,8 +9,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct UncapitalizedEnvironmentVariables {
-    pub expected: String,
-    pub original: String,
+    expected: String,
+    original: String,
 }
 
 impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
@@ -28,8 +28,8 @@ impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
 
 #[violation]
 pub struct DictGetWithNoneDefault {
-    pub expected: String,
-    pub original: String,
+    expected: String,
+    original: String,
 }
 
 impl Violation for DictGetWithNoneDefault {

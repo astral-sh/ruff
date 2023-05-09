@@ -44,7 +44,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// [NEP 19]: https://numpy.org/neps/nep-0019-rng-policy.html
 #[violation]
 pub struct NumpyLegacyRandom {
-    pub method_name: String,
+    method_name: String,
 }
 
 impl Violation for NumpyLegacyRandom {

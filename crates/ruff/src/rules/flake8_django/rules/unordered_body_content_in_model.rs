@@ -62,8 +62,8 @@ use super::helpers;
 /// [Django Style Guide]: https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#model-style
 #[violation]
 pub struct DjangoUnorderedBodyContentInModel {
-    pub elem_type: ContentType,
-    pub before: ContentType,
+    elem_type: ContentType,
+    before: ContentType,
 }
 
 impl Violation for DjangoUnorderedBodyContentInModel {

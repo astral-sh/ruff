@@ -10,7 +10,7 @@ use super::super::helpers::string_literal;
 
 #[violation]
 pub struct HashlibInsecureHashFunction {
-    pub string: String,
+    string: String,
 }
 
 impl Violation for HashlibInsecureHashFunction {

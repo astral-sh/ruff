@@ -29,7 +29,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 #[violation]
 pub struct BannedImportFrom {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for BannedImportFrom {

@@ -9,8 +9,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct FirstLineCapitalized {
-    pub first_word: String,
-    pub capitalized_word: String,
+    first_word: String,
+    capitalized_word: String,
 }
 
 impl AlwaysAutofixableViolation for FirstLineCapitalized {

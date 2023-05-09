@@ -8,8 +8,8 @@ use ruff_python_ast::visitor::Visitor;
 
 #[violation]
 pub struct TooManyReturnStatements {
-    pub returns: usize,
-    pub max_returns: usize,
+    returns: usize,
+    max_returns: usize,
 }
 
 impl Violation for TooManyReturnStatements {

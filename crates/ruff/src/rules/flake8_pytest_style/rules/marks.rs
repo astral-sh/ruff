@@ -12,9 +12,9 @@ use super::helpers::get_mark_decorators;
 
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
-    pub mark_name: String,
-    pub expected_parens: String,
-    pub actual_parens: String,
+    mark_name: String,
+    expected_parens: String,
+    actual_parens: String,
 }
 
 impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {

@@ -48,7 +48,7 @@ use crate::registry::{AsRule, Rule};
 /// ```
 #[violation]
 pub struct RawStringInException {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for RawStringInException {
@@ -105,7 +105,7 @@ impl Violation for RawStringInException {
 /// ```
 #[violation]
 pub struct FStringInException {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for FStringInException {
@@ -164,7 +164,7 @@ impl Violation for FStringInException {
 /// ```
 #[violation]
 pub struct DotFormatInException {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for DotFormatInException {

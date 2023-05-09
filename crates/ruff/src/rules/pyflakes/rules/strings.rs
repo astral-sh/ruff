@@ -19,7 +19,7 @@ use super::super::format::FormatSummary;
 
 #[violation]
 pub struct PercentFormatInvalidFormat {
-    pub message: String,
+    pub(crate) message: String,
 }
 
 impl Violation for PercentFormatInvalidFormat {
@@ -52,7 +52,7 @@ impl Violation for PercentFormatExpectedSequence {
 
 #[violation]
 pub struct PercentFormatExtraNamedArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
@@ -72,7 +72,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
 
 #[violation]
 pub struct PercentFormatMissingArgument {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl Violation for PercentFormatMissingArgument {
@@ -96,8 +96,8 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 
 #[violation]
 pub struct PercentFormatPositionalCountMismatch {
-    pub wanted: usize,
-    pub got: usize,
+    wanted: usize,
+    got: usize,
 }
 
 impl Violation for PercentFormatPositionalCountMismatch {
@@ -120,7 +120,7 @@ impl Violation for PercentFormatStarRequiresSequence {
 
 #[violation]
 pub struct PercentFormatUnsupportedFormatCharacter {
-    pub char: char,
+    pub(crate) char: char,
 }
 
 impl Violation for PercentFormatUnsupportedFormatCharacter {
@@ -133,7 +133,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 
 #[violation]
 pub struct StringDotFormatInvalidFormat {
-    pub message: String,
+    pub(crate) message: String,
 }
 
 impl Violation for StringDotFormatInvalidFormat {
@@ -146,7 +146,7 @@ impl Violation for StringDotFormatInvalidFormat {
 
 #[violation]
 pub struct StringDotFormatExtraNamedArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
@@ -166,7 +166,7 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
 
 #[violation]
 pub struct StringDotFormatExtraPositionalArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
@@ -186,7 +186,7 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
 
 #[violation]
 pub struct StringDotFormatMissingArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl Violation for StringDotFormatMissingArguments {

@@ -11,8 +11,8 @@ use crate::settings::{flags, Settings};
 
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
-    pub confusable: char,
-    pub representant: char,
+    confusable: char,
+    representant: char,
 }
 
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
@@ -39,8 +39,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
 
 #[violation]
 pub struct AmbiguousUnicodeCharacterDocstring {
-    pub confusable: char,
-    pub representant: char,
+    confusable: char,
+    representant: char,
 }
 
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
@@ -67,8 +67,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
 
 #[violation]
 pub struct AmbiguousUnicodeCharacterComment {
-    pub confusable: char,
-    pub representant: char,
+    confusable: char,
+    representant: char,
 }
 
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
