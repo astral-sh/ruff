@@ -7,19 +7,11 @@ use ruff_python_stdlib::typing::PEP_585_SUBSCRIPT_ELIGIBLE;
 
 use crate::checkers::ast::Checker;
 
-/// ## What it does
-/// Checks for missing `from __future__ import annotations` import if a type used in the
-/// module can be rewritten using PEP 563.
-///
-/// ## Why is this bad?
-/// Pairs well with pyupgrade with the --py37-plus flag or higher, since pyupgrade only
-/// replaces type annotations with the PEP 563 rules if `from __future__ import annotations`
-/// is present.
-///
 /// ## Example
 /// ```python
 /// import typing as t
 /// from typing import List
+///
 ///
 /// def function(a_dict: t.Dict[str, t.Optional[int]]) -> None:
 ///     a_list: List[str] = []
@@ -33,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// import typing as t
 /// from typing import List
 ///
+///
 /// def function(a_dict: t.Dict[str, t.Optional[int]]) -> None:
 ///     a_list: List[str] = []
 ///     a_list.append("hello")
@@ -41,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// After running additional pyupgrade autofixes:
 /// ```python
 /// from __future__ import annotations
+///
 ///
 /// def function(a_dict: dict[str, int | None]) -> None:
 ///     a_list: list[str] = []
