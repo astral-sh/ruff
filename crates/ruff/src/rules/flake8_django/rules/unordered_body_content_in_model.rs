@@ -13,7 +13,7 @@ use super::helpers;
 /// Checks for the order of Model's inner classes, methods, and fields as per
 /// the [Django Style Guide].
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// The [Django Style Guide] specifies that the order of Model inner classes,
 /// attributes and methods should be as follows:
 ///
