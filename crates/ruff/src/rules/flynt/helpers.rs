@@ -1,5 +1,6 @@
-use ruff_python_ast::helpers::create_expr;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
+
+use ruff_python_ast::helpers::create_expr;
 
 /// Wrap an expression in a `FormattedValue` with no special formatting.
 fn to_formatted_value_expr(inner: &Expr) -> Expr {
