@@ -127,7 +127,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let mut pyproject_config = resolve::resolve(
+    let pyproject_config = resolve::resolve(
         cli.isolated,
         cli.config.as_deref(),
         &overrides,
@@ -240,6 +240,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         if let Some(file) = pyproject_config.path.as_ref() {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
+
+        // In watch mode, we may need to re-resolve the configuration.
+        // TODO(charlie): Re-compute other derivative values, like the `printer`.
+        let mut pyproject_config = pyproject_config;
 
         loop {
             match rx.recv() {
