@@ -1,6 +1,7 @@
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -21,24 +22,40 @@ use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
 };
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Parentheses {
+    None,
+    Empty,
+}
+
+impl fmt::Display for Parentheses {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Parentheses::None => fmt.write_str(""),
+            Parentheses::Empty => fmt.write_str("()"),
+        }
+    }
+}
+
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
-    pub expected_parens: String,
-    pub actual_parens: String,
+    pub expected: Parentheses,
+    pub actual: Parentheses,
 }
 
 impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestFixtureIncorrectParenthesesStyle {
-            expected_parens,
-            actual_parens,
-        } = self;
-        format!("Use `@pytest.fixture{expected_parens}` over `@pytest.fixture{actual_parens}`")
+        let PytestFixtureIncorrectParenthesesStyle { expected, actual } = self;
+        format!("Use `@pytest.fixture{expected}` over `@pytest.fixture{actual}`")
     }
 
     fn autofix_title(&self) -> String {
-        "Add/remove parentheses".to_string()
+        let PytestFixtureIncorrectParenthesesStyle { expected, .. } = self;
+        match expected {
+            Parentheses::None => "Remove parentheses".to_string(),
+            Parentheses::Empty => "Add parentheses".to_string(),
+        }
     }
 }
 
@@ -235,14 +252,11 @@ fn pytest_fixture_parentheses(
     checker: &mut Checker,
     decorator: &Expr,
     fix: Fix,
-    preferred: &str,
-    actual: &str,
+    expected: Parentheses,
+    actual: Parentheses,
 ) {
     let mut diagnostic = Diagnostic::new(
-        PytestFixtureIncorrectParenthesesStyle {
-            expected_parens: preferred.to_string(),
-            actual_parens: actual.to_string(),
-        },
+        PytestFixtureIncorrectParenthesesStyle { expected, actual },
         decorator.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
@@ -279,7 +293,13 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 && keywords.is_empty()
             {
                 let fix = Fix::unspecified(Edit::deletion(func.end(), decorator.end()));
-                pytest_fixture_parentheses(checker, decorator, fix, "", "()");
+                pytest_fixture_parentheses(
+                    checker,
+                    decorator,
+                    fix,
+                    Parentheses::None,
+                    Parentheses::Empty,
+                );
             }
 
             if checker
@@ -334,8 +354,17 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 .enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
                 && checker.settings.flake8_pytest_style.fixture_parentheses
             {
-                let fix = Fix::unspecified(Edit::insertion("()".to_string(), decorator.end()));
-                pytest_fixture_parentheses(checker, decorator, fix, "()", "");
+                let fix = Fix::unspecified(Edit::insertion(
+                    Parentheses::Empty.to_string(),
+                    decorator.end(),
+                ));
+                pytest_fixture_parentheses(
+                    checker,
+                    decorator,
+                    fix,
+                    Parentheses::Empty,
+                    Parentheses::None,
+                );
             }
         }
     }
