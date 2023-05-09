@@ -268,7 +268,7 @@ impl OneIndexed {
     /// The largest value that can be represented by this integer type
     pub const MAX: Self = unwrap(Self::new(u32::MAX));
 
-    pub const ONE: NonZeroU32 = unwrap(NonZeroU32::new(1));
+    const ONE: NonZeroU32 = unwrap(NonZeroU32::new(1));
 
     /// Creates a non-zero if the given value is not zero.
     pub const fn new(value: u32) -> Option<Self> {

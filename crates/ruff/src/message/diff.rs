@@ -184,7 +184,7 @@ impl Display for Line {
 pub(super) fn calculate_print_width(mut value: OneIndexed) -> NonZeroU32 {
     const TEN: OneIndexed = OneIndexed::from_zero_indexed(9);
 
-    let mut width = OneIndexed::ONE;
+    let mut width = NonZeroU32::new(1).unwrap();
 
     while value >= TEN {
         value = OneIndexed::new(value.get() / 10).unwrap_or(OneIndexed::MIN);
