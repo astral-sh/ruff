@@ -1,8 +1,8 @@
-use std::{collections::HashMap, str::Chars};
+use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 
-use regex::{CaptureMatches, Regex, RegexSet};
+use regex::{Regex, RegexSet};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::{TextRange, TextSize};
@@ -207,34 +207,6 @@ impl Violation for MissingSpaceAfterColonInTodo {
     }
 }
 
-// Capture groups correspond to checking:
-//      1. Tag (used to match against `TODO` in capitalization and spelling, e.g. ToDo and FIXME)
-//      2. Author exists (in parentheses) with 0 or 1 spaces between it and the tag, but before colon
-//      3. Colon exists after author
-//      4. Space exists after colon
-//      5. Text exists after space
-//
-// We can check if any of these exist in one regex. Capture groups that don't pick anything up
-// evaluate to `None` in Rust, so the capture group index will always correspond to its respective rule
-// whether the token has been found or not.
-//
-// Example:
-// ```python
-// # TODO(evanrittenhouse): This is a completely valid TODO
-// ```
-// will yield [Some("TODO") Some("evanrittenhouse"), Some(":"), Some(" "), Some("This is a completely valid TODO")], whereas
-// ```python
-// # ToDo this is completely wrong
-// ```
-// will yield [Some("ToDo"), None, None, Some(" "), Some("this is completely wrong")]. Note the
-// `Nones` for the colon and space checks.
-//
-// Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
-static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^# {0,1}(?i)(?P<tag>TODO|BUG|FIXME|XXX)(?-i)( {0,1}\(.*\))?(:)?( )?(.+)?$")
-        .unwrap()
-});
-
 // Matches against any of the 4 recognized PATTERNS.
 static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     let patterns: [&str; 4] = [
@@ -244,7 +216,7 @@ static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
         r#"^#\s*(?i)(XXX).*$"#,
     ];
 
-    return RegexSet::new(patterns).unwrap();
+    RegexSet::new(patterns).unwrap()
 });
 
 // Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the length of the
@@ -266,9 +238,6 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     ])
     .unwrap()
 });
-
-static NUM_CAPTURE_GROUPS: usize = 5usize;
-static TODO_LENGTH: u32 = 4u32;
 
 // If this struct ever gets pushed outside of this module, it may be worth creating an enum for
 // the different tag types + other convenience methods.
@@ -297,11 +266,10 @@ pub fn check_todos(
             continue;
         };
 
-        check_for_tag_errors(token_range, &tag, &mut diagnostics, autofix, settings);
+        check_for_tag_errors(&tag, &mut diagnostics, autofix, settings);
         check_for_static_errors(comment, token_range, &tag, &mut diagnostics);
 
         // TDO-003
-        let todo_start = tag.range.start();
         if let Some((next_token, _next_range)) = iter.peek() {
             if let Tok::Comment(next_comment) = next_token {
                 if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
@@ -320,7 +288,7 @@ pub fn check_todos(
 }
 
 /// Returns the tag pulled out of a given comment if it exists.
-fn detect_tag<'a>(comment: &'a String, comment_range: &'a TextRange) -> Option<Tag<'a>> {
+fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<'a>> {
     let Some(regex_index) = TODO_REGEX_SET.matches(comment).into_iter().next() else {
         return None;
     };
@@ -347,10 +315,8 @@ fn detect_tag<'a>(comment: &'a String, comment_range: &'a TextRange) -> Option<T
     })
 }
 
-/// Check that the tag is valid since we're not using capture groups anymore. This function
-/// modifies `diagnostics` in-place.
+/// Check that the tag is valid. This function modifies `diagnostics` in-place.
 fn check_for_tag_errors(
-    comment_range: &TextRange,
     tag: &Tag,
     diagnostics: &mut Vec<Diagnostic>,
     autofix: flags::Autofix,
@@ -408,7 +374,7 @@ fn check_for_static_errors(
     // An "author block" must be contained in parantheses, like "(ruff)". To check if it exists,
     // we can check the first non-whitespace character after the tag. If that first character is a
     // left parenthesis, we can say that we have an author's block.
-    while let Some(char) = comment_chars.next() {
+    for char in comment_chars.by_ref() {
         relative_offset += 1;
         if char.is_whitespace() {
             continue;
@@ -433,7 +399,7 @@ fn check_for_static_errors(
 
     if let Some(range) = author_range {
         let mut author_block_length = 0usize;
-        while let Some(char) = comment_chars.next() {
+        for char in comment_chars.by_ref() {
             relative_offset += 1;
             author_block_length += 1;
 
@@ -462,24 +428,21 @@ fn check_for_static_errors(
     }
 
     if let Some(range) = colon_offset {
-        match comment_chars.next() {
-            Some(char) => {
-                if char == ' ' {
-                    return;
-                }
-
-                diagnostics.push(Diagnostic::new(
-                    MissingSpaceAfterColonInTodo,
-                    TextRange::at(range, TextSize::new(1)),
-                ));
+        if let Some(char) = comment_chars.next() {
+            if char == ' ' {
+                return;
             }
-            None => {}
+
+            diagnostics.push(Diagnostic::new(
+                MissingSpaceAfterColonInTodo,
+                TextRange::at(range, TextSize::new(1)),
+            ));
         }
     } else {
         // Adjust where the colon should be based on the length of the author block, if it exists.
         let adjusted_colon_position = tag.range.end()
-            + if author_range.is_some() {
-                author_range.unwrap().len()
+            + if let Some(author_range) = author_range {
+                author_range.len()
             } else {
                 TextSize::new(0)
             };
@@ -506,7 +469,6 @@ mod tests {
     #[test]
     fn test_detect_tag() {
         let test_comment = "# TODO: todo tag";
-        let mut chars = test_comment.chars();
         let expected = Tag {
             content: "TODO",
             range: TextRange::new(TextSize::new(2), TextSize::new(6)),
@@ -520,7 +482,6 @@ mod tests {
         );
 
         let test_comment = "#TODO: todo tag";
-        let mut chars = test_comment.chars();
         let expected = Tag {
             content: "TODO",
             range: TextRange::new(TextSize::new(1), TextSize::new(5)),
@@ -535,7 +496,6 @@ mod tests {
 
         // sanity checks :)
         let test_comment = "# todo: todo tag";
-        let mut chars = test_comment.chars();
         let expected = Tag {
             content: "todo",
             range: TextRange::new(TextSize::new(2), TextSize::new(6)),
@@ -548,7 +508,6 @@ mod tests {
             )
         );
         let test_comment = "# fixme: fixme tag";
-        let mut chars = test_comment.chars();
         let expected = Tag {
             content: "fixme",
             range: TextRange::new(TextSize::new(2), TextSize::new(7)),
