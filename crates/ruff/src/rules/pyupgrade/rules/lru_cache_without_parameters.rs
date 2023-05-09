@@ -14,11 +14,11 @@ pub struct LRUCacheWithoutParameters;
 impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parameters to `functools.lru_cache`")
+        format!("Unnecessary parentheses to `functools.lru_cache`")
     }
 
     fn autofix_title(&self) -> String {
-        "Remove unnecessary parameters".to_string()
+        "Remove unnecessary parentheses".to_string()
     }
 }
 
