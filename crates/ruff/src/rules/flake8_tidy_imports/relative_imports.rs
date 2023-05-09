@@ -1,5 +1,4 @@
 use rustpython_parser::ast::{Stmt, StmtKind};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -13,10 +12,9 @@ use crate::registry::AsRule;
 
 pub type Settings = Strictness;
 
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema, Default,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum Strictness {
     /// Ban imports that extend into the parent module or beyond.
     #[default]
