@@ -395,18 +395,19 @@ fn check_for_static_errors(
     tag: &Tag,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    // Relative offset of the current character vs.the comment range, after we skip the tag
-    let mut current_offset: usize = usize::try_from(tag.range.end() - comment_range.start())
+    // Relative offset of the current character vs.the comment range, after we skip the tag.
+    let mut relative_offset: usize = usize::try_from(tag.range.end() - comment_range.start())
         .ok()
         .unwrap();
-    let end_of_tag_char = current_offset;
-    let mut comment_chars = comment.chars().skip(current_offset).peekable();
-
+    let mut comment_chars = comment.chars().skip(relative_offset).peekable();
+    // An absolute offset of the comment's author block from the start of the file.
+    let mut author_range: Option<TextRange> = None;
+    // An absolute offset of the comment's colon from the start of the file.
+    let mut colon_offset: Option<TextSize> = None;
 
     // An "author block" must be contained in parantheses, like "(ruff)". To check if it exists,
-    // we can skip all whitespace characters from the end of the tag. If the first one is a left
-    // parenthesis, we can say that we have an author's block.
-    let mut has_author = false;
+    // we can check the first non-whitespace character after the tag. If that first character is a
+    // left parenthesis, we can say that we have an author's block.
     while let Some(char) = comment_chars.next() {
         current_offset += 1;
         if char.is_whitespace() {
@@ -438,8 +439,14 @@ fn check_for_static_errors(
     }
 }
 
-fn get_captured_matches(text: &str) -> CaptureMatches {
-    TODO_REGEX.captures_iter(text)
+
+    match comment_chars.next() {
+        Some(_) => {}
+        None => diagnostics.push(Diagnostic::new(
+            MissingTextInTodo,
+            TextRange::at(comment_range.end(), TextSize::new(1)),
+        )),
+    };
 }
 
 #[cfg(test)]
