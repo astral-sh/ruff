@@ -46,7 +46,7 @@ use crate::rules::{
     flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
     flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, 
+    flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle,
     pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
