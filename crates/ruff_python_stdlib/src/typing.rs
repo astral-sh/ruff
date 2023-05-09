@@ -200,6 +200,8 @@ pub const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
 
 // See: https://peps.python.org/pep-0585/
 pub const PEP_585_SUBSCRIPT_ELIGIBLE: &[&[&str]] = &[
+    &["typing", "DefaultDict"],
+    &["typing", "Deque"],
     &["typing", "Dict"],
     &["typing", "FrozenSet"],
     &["typing", "List"],
