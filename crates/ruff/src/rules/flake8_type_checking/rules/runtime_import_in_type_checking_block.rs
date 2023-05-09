@@ -16,7 +16,8 @@ use ruff_python_semantic::binding::{
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///    import foo
+///     import foo
+///
 ///
 /// def bar() -> None:
 ///     foo.bar()  # raises NameError: name 'foo' is not defined
@@ -26,8 +27,9 @@ use ruff_python_semantic::binding::{
 /// ```python
 /// import foo
 ///
+///
 /// def bar() -> None:
-///    foo.bar()
+///     foo.bar()
 /// ```
 ///
 /// ## References

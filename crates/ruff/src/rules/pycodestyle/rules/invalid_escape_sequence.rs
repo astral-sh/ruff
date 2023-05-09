@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::error;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -14,12 +14,12 @@ use ruff_python_ast::source_code::Locator;
 ///
 /// ## Example
 /// ```python
-/// regex = '\.png$'
+/// regex = "\.png$"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// regex = r'\.png$'
+/// regex = r"\.png$"
 /// ```
 #[violation]
 pub struct InvalidEscapeSequence(pub char);
@@ -108,10 +108,10 @@ pub fn invalid_escape_sequence(
             let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
             let mut diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
             if autofix {
-                diagnostic.set_fix(Edit::insertion(
+                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                     r"\".to_string(),
                     range.start() + TextSize::from(1),
-                ));
+                )));
             }
             diagnostics.push(diagnostic);
         }

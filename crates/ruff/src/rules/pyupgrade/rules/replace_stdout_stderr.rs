@@ -38,10 +38,17 @@ fn generate_fix(
     } else {
         (stderr, stdout)
     };
-    Ok(Fix::new(vec![
+    Ok(Fix::unspecified_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
-        remove_argument(locator, func.start(), second.range(), args, keywords, false)?,
-    ]))
+        [remove_argument(
+            locator,
+            func.start(),
+            second.range(),
+            args,
+            keywords,
+            false,
+        )?],
+    ))
 }
 
 /// UP022

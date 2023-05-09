@@ -1,9 +1,8 @@
-use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
+use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
-
-use crate::checkers::ast::Checker;
+use ruff_python_semantic::context::Context;
 
 pub(super) fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (&Expr, CallPath)> {
     decorators.iter().filter_map(|decorator| {
@@ -18,49 +17,30 @@ pub(super) fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (
     })
 }
 
-pub(super) fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(call)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["pytest", "fail"]
-        })
+pub(super) fn is_pytest_fail(context: &Context, call: &Expr) -> bool {
+    context.resolve_call_path(call).map_or(false, |call_path| {
+        call_path.as_slice() == ["pytest", "fail"]
+    })
 }
 
-pub(super) fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(if let ExprKind::Call { func, .. } = &decorator.node {
-            func
-        } else {
-            decorator
-        })
+pub(super) fn is_pytest_fixture(context: &Context, decorator: &Expr) -> bool {
+    context
+        .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "fixture"]
         })
 }
 
-pub(super) fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
-    checker
-        .ctx
+pub(super) fn is_pytest_yield_fixture(context: &Context, decorator: &Expr) -> bool {
+    context
         .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "yield_fixture"]
         })
 }
 
-pub(super) fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(decorator)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["abc", "abstractmethod"]
-        })
-}
-
-pub(super) fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
-    checker
-        .ctx
+pub(super) fn is_pytest_parametrize(context: &Context, decorator: &Expr) -> bool {
+    context
         .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "mark", "parametrize"]

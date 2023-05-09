@@ -3,20 +3,20 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E27.py:28:3: E274 Tab before keyword
    |
-28 | a and	b
+28 | a and   b
 29 | #: E274
-30 | a		and b
-   |   E274
+30 | a       and b
+   |      E274
 31 | #: E273 E274
-32 | this		and	False
+32 | this        and False
    |
 
 E27.py:30:6: E274 Tab before keyword
    |
-30 | a		and b
+30 | a       and b
 31 | #: E273 E274
-32 | this		and	False
-   |      E274
+32 | this        and False
+   |          E274
 33 | #: Okay
 34 | from u import (a, b)
    |

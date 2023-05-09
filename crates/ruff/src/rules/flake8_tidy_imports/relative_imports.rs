@@ -1,8 +1,7 @@
 use rustpython_parser::ast::{Stmt, StmtKind};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
 use ruff_python_ast::helpers::{create_stmt, resolve_imported_module_path, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -13,10 +12,9 @@ use crate::registry::AsRule;
 
 pub type Settings = Strictness;
 
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema, Default,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum Strictness {
     /// Ban imports that extend into the parent module or beyond.
     #[default]
@@ -91,7 +89,7 @@ fn fix_banned_relative_import(
     module: Option<&str>,
     module_path: Option<&[String]>,
     stylist: &Stylist,
-) -> Option<Edit> {
+) -> Option<Fix> {
     // Only fix is the module path is known.
     let Some(module_path) = resolve_imported_module_path(level, module, module_path) else {
         return None;
@@ -115,7 +113,10 @@ fn fix_banned_relative_import(
         stylist,
     );
 
-    Some(Edit::range_replacement(content, stmt.range()))
+    Some(Fix::unspecified(Edit::range_replacement(
+        content,
+        stmt.range(),
+    )))
 }
 
 /// TID252

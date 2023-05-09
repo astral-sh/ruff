@@ -33,7 +33,7 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_async_context" {
         return false;
     }
-    for parent in &checker.ctx.parents {
+    for parent in checker.ctx.parents() {
         if let StmtKind::With { items, .. } = &parent.node {
             for item in items {
                 if let ExprKind::Call { func, .. } = &item.context_expr.node {
@@ -68,7 +68,7 @@ fn match_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_context" {
         return false;
     }
-    for parent in &checker.ctx.parents {
+    for parent in checker.ctx.parents() {
         if let StmtKind::With { items, .. } = &parent.node {
             for item in items {
                 if let ExprKind::Call { func, .. } = &item.context_expr.node {

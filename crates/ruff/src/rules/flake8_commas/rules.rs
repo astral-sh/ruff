@@ -4,7 +4,7 @@ use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -110,6 +110,29 @@ impl Context {
     }
 }
 
+/// ## What it does
+/// Checks for the absence of trailing commas.
+///
+/// ## Why is this bad?
+/// The presence of a trailing comma can reduce diff size when parameters or
+/// elements are added or removed from function calls, function definitions,
+/// literals, etc.
+///
+/// ## Example
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2
+/// }
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2,
+/// }
+/// ```
 #[violation]
 pub struct MissingTrailingComma;
 
@@ -124,6 +147,37 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of trailing commas on bare (i.e., unparenthesized)
+/// tuples.
+///
+/// ## Why is this bad?
+/// The presence of a misplaced comma will cause Python to interpret the value
+/// as a tuple, which can lead to unexpected behaviour.
+///
+/// ## Example
+/// ```python
+/// import json
+///
+///
+/// foo = json.dumps({"bar": 1}),
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import json
+///
+///
+/// foo = json.dumps({"bar": 1})
+/// ```
+///
+/// In the event that a tuple is intended, then use instead:
+/// ```python
+/// import json
+///
+///
+/// foo = (json.dumps({"bar": 1}),)
+/// ```
 #[violation]
 pub struct TrailingCommaOnBareTuple;
 
@@ -134,6 +188,22 @@ impl Violation for TrailingCommaOnBareTuple {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of prohibited trailing commas.
+///
+/// ## Why is this bad?
+/// Trailing commas are not essential in some cases and can therefore be viewed
+/// as unnecessary.
+///
+/// ## Example
+/// ```python
+/// foo = (1, 2, 3,)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = (1, 2, 3)
+/// ```
 #[violation]
 pub struct ProhibitedTrailingComma;
 
@@ -255,7 +325,7 @@ pub fn trailing_commas(
             let comma = prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
             if autofix.into() && settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
-                diagnostic.set_fix(Edit::range_deletion(diagnostic.range()));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(diagnostic.range())));
             }
             diagnostics.push(diagnostic);
         }
@@ -295,10 +365,10 @@ pub fn trailing_commas(
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
                 let contents = locator.slice(missing_comma.1);
-                diagnostic.set_fix(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     format!("{contents},"),
                     missing_comma.1,
-                ));
+                )));
             }
             diagnostics.push(diagnostic);
         }

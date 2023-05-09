@@ -2,7 +2,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -289,7 +289,10 @@ fn docstring(
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        diagnostic.set_fix(Edit::range_replacement(fixed_contents, range));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            fixed_contents,
+            range,
+        )));
     }
     Some(diagnostic)
 }
@@ -364,7 +367,10 @@ fn strings(
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                diagnostic.set_fix(Edit::range_replacement(fixed_contents, *range));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    fixed_contents,
+                    *range,
+                )));
             }
             diagnostics.push(diagnostic);
         } else {
@@ -427,7 +433,10 @@ fn strings(
 
                         fixed_contents.push(quote);
 
-                        diagnostic.set_fix(Edit::range_replacement(fixed_contents, *range));
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            fixed_contents,
+                            *range,
+                        )));
                     }
                     diagnostics.push(diagnostic);
                 }
@@ -450,7 +459,10 @@ fn strings(
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
-                    diagnostic.set_fix(Edit::range_replacement(fixed_contents, *range));
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        fixed_contents,
+                        *range,
+                    )));
                 }
                 diagnostics.push(diagnostic);
             }

@@ -14,7 +14,7 @@ E20.py:55:10: E203 Whitespace before ',', ';', or ':'
    |
 55 |     x, y = y, x
 56 | #: E203:1:10
-57 | if x == 4	:
+57 | if x == 4   :
    |           E203
 58 |     print x, y
 59 |     x, y = y, x
@@ -34,7 +34,7 @@ E20.py:63:15: E203 Whitespace before ',', ';', or ':'
    |
 63 | #: E203:2:15 E702:2:16
 64 | if x == 4:
-65 |     print x, y	; x, y = y, x
+65 |     print x, y  ; x, y = y, x
    |                E203
 66 | #: E203:3:13
 67 | if x == 4:
@@ -54,7 +54,7 @@ E20.py:71:13: E203 Whitespace before ',', ';', or ':'
    |
 71 | if x == 4:
 72 |     print x, y
-73 |     x, y = y	, x
+73 |     x, y = y    , x
    |              E203
 74 | #: Okay
 75 | if x == 4:

@@ -49,12 +49,13 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                 let (import_edit, binding) = get_or_import_symbol(
                     "sys",
                     "exit",
+                    func.start(),
                     &checker.ctx,
                     &checker.importer,
                     checker.locator,
                 )?;
                 let reference_edit = Edit::range_replacement(binding, func.range());
-                Ok(Fix::from_iter([import_edit, reference_edit]))
+                Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);

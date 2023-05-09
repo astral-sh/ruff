@@ -94,6 +94,7 @@ pub fn suppressible_exception(
                     let (import_edit, binding) = get_or_import_symbol(
                         "contextlib",
                         "suppress",
+                        stmt.start(),
                         &checker.ctx,
                         &checker.importer,
                         checker.locator,
@@ -104,7 +105,10 @@ pub fn suppressible_exception(
                     );
                     let handler_line_begin = checker.locator.line_start(handler.start());
                     let remove_handler = Edit::deletion(handler_line_begin, handler.end());
-                    Ok(Fix::from_iter([import_edit, replace_try, remove_handler]))
+                    Ok(Fix::unspecified_edits(
+                        import_edit,
+                        [replace_try, remove_handler],
+                    ))
                 });
             }
 

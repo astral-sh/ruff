@@ -3,7 +3,7 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::registry::Rule;
@@ -17,12 +17,12 @@ use crate::settings::{flags, Settings};
 ///
 /// ## Example
 /// ```python
-/// if foo == 'blah': do_blah_thing()
+/// if foo == "blah": do_blah_thing()
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if foo == 'blah':
+/// if foo == "blah":
 ///     do_blah_thing()
 /// ```
 ///
@@ -164,7 +164,7 @@ pub fn compound_statements(
                     let mut diagnostic =
                         Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
                     if autofix.into() && settings.rules.should_fix(Rule::UselessSemicolon) {
-                        diagnostic.set_fix(Edit::deletion(start, end));
+                        diagnostic.set_fix(Fix::unspecified(Edit::deletion(start, end)));
                     };
                     diagnostics.push(diagnostic);
                 }

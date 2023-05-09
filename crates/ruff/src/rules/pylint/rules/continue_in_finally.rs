@@ -16,21 +16,21 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// while True:
-///  try:
-///     pass
-///  finally:
-///     continue
+///     try:
+///         pass
+///     finally:
+///         continue
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// while True:
-///  try:
-///     pass
-///  except Exception:
-///     pass
-///  else:
-///     continue
+///     try:
+///         pass
+///     except Exception:
+///         pass
+///     else:
+///         continue
 /// ```
 #[violation]
 pub struct ContinueInFinally;

@@ -121,15 +121,6 @@ jobs:
       - run: cargo check
       - run: cargo fmt --all --check
 
-  typos:
-    name: "spell check"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: crate-ci/typos@master
-        with:
-          files: .
-
   ecosystem:
     name: "ecosystem"
     runs-on: ubuntu-latest
@@ -246,5 +237,7 @@ jobs:
         run: python scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
         run: python scripts/generate_mkdocs.py
+      - name: "Check docs formatting"
+        run: python scripts/check_docs_formatted.py
       - name: "Build docs"
         run: mkdocs build --strict

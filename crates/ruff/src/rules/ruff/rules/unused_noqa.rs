@@ -10,6 +10,33 @@ pub struct UnusedCodes {
     pub unmatched: Vec<String>,
 }
 
+/// ## What it does
+/// Checks for `noqa` directives that are no longer applicable.
+///
+/// ## Why is this bad?
+/// A `noqa` directive that no longer matches any diagnostic violations is
+/// likely included by mistake, and should be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// import foo  # noqa: F401
+///
+///
+/// def bar():
+///     foo.bar()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import foo
+///
+///
+/// def bar():
+///     foo.bar()
+/// ```
+///
+/// ## References
+/// - [Automatic `noqa` management](https://beta.ruff.rs/docs/configuration/#automatic-noqa-management)
 #[violation]
 pub struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,

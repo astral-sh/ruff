@@ -1,6 +1,7 @@
 mod ambiguous_unicode_character;
 mod asyncio_dangling_task;
 mod collection_literal_concatenation;
+mod confusables;
 mod mutable_defaults_in_class_fields;
 mod pairwise_over_zipped;
 mod unused_noqa;

@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -209,14 +209,14 @@ fn convert_to_class(
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
     stylist: &Stylist,
-) -> Edit {
-    Edit::range_replacement(
+) -> Fix {
+    Fix::unspecified(Edit::range_replacement(
         unparse_stmt(
             &create_class_def_stmt(class_name, body, total_keyword, base_class),
             stylist,
         ),
         stmt.range(),
-    )
+    ))
 }
 
 /// UP013

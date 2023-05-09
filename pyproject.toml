@@ -7,7 +7,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.263"
+version = "0.0.265"
 description = "An extremely fast Python linter, written in Rust."
 authors = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
 maintainers = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
@@ -39,7 +39,11 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Quality Assurance",
 ]
-urls = { repository = "https://github.com/charliermarsh/ruff" }
+
+[project.urls]
+Repository = "https://github.com/charliermarsh/ruff"
+Documentation = "https://beta.ruff.rs/docs/"
+Changelog = "https://github.com/charliermarsh/ruff/releases"
 
 [tool.maturin]
 bindings = "bin"

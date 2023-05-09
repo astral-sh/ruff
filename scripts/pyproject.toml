@@ -16,6 +16,7 @@ ignore = [
   "S",    # bandit
   "G",    # flake8-logging
   "T",    # flake8-print
+  "FBT",  # flake8-boolean-trap
 ]
 
 [tool.ruff.pydocstyle]

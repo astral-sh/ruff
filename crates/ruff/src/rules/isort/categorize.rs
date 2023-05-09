@@ -4,7 +4,6 @@ use std::{fs, iter};
 
 use log::debug;
 use rustc_hash::FxHashMap;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -27,11 +26,11 @@ use super::types::{ImportBlock, Importable};
     Hash,
     Serialize,
     Deserialize,
-    JsonSchema,
     CacheKey,
     EnumIter,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum ImportType {
     Future,
     StandardLibrary,
@@ -40,10 +39,9 @@ pub enum ImportType {
     LocalFolder,
 }
 
-#[derive(
-    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, JsonSchema, CacheKey,
-)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, CacheKey)]
 #[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum ImportSection {
     Known(ImportType),
     UserDefined(String),

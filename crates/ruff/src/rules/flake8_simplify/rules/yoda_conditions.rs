@@ -2,7 +2,7 @@ use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_stdlib::str::{self};
@@ -161,7 +161,10 @@ pub fn yoda_conditions(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::range_replacement(suggestion, expr.range()));
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                suggestion,
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     } else {

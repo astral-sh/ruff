@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use rustc_hash::FxHashMap;
 
-use crate::resolver::{PyprojectDiscovery, Resolver};
+use crate::resolver::{PyprojectConfig, Resolver};
 
 // If we have a Python package layout like:
 // - root/
@@ -82,7 +82,7 @@ fn detect_package_root_with_cache<'a>(
 pub fn detect_package_roots<'a>(
     files: &[&'a Path],
     resolver: &'a Resolver,
-    pyproject_strategy: &'a PyprojectDiscovery,
+    pyproject_config: &'a PyprojectConfig,
 ) -> FxHashMap<&'a Path, Option<&'a Path>> {
     // Pre-populate the module cache, since the list of files could (but isn't
     // required to) contain some `__init__.py` files.
@@ -98,9 +98,7 @@ pub fn detect_package_roots<'a>(
     // Search for the package root for each file.
     let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
     for file in files {
-        let namespace_packages = &resolver
-            .resolve(file, pyproject_strategy)
-            .namespace_packages;
+        let namespace_packages = &resolver.resolve(file, pyproject_config).namespace_packages;
         if let Some(package) = file.parent() {
             if package_roots.contains_key(package) {
                 continue;

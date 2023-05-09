@@ -5,7 +5,7 @@ use rustpython_common::format::{
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
 
@@ -200,8 +200,15 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
                             converted.push(']');
                         }
                         FieldNamePart::StringIndex(index) => {
+                            let quote = match *trailing_quote {
+                                "'" | "'''" | "\"\"\"" => '"',
+                                "\"" => '\'',
+                                _ => unreachable!("invalid trailing quote"),
+                            };
                             converted.push('[');
+                            converted.push(quote);
                             converted.push_str(&index);
+                            converted.push(quote);
                             converted.push(']');
                         }
                     }
@@ -260,13 +267,20 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
     let existing = checker.locator.slice(TextRange::up_to(expr.start()));
-    if existing.chars().last().unwrap().is_ascii_alphabetic() {
+    if existing
+        .chars()
+        .last()
+        .map_or(false, |char| char.is_ascii_alphabetic())
+    {
         contents.insert(0, ' ');
     }
 
     let mut diagnostic = Diagnostic::new(FString, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            expr.range(),
+        )));
     };
     checker.diagnostics.push(diagnostic);
 }

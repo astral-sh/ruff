@@ -5,6 +5,25 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for unnecessary direct calls to lambda expressions.
+///
+/// ## Why is this bad?
+/// Calling a lambda expression directly is unnecessary. The expression can be
+/// executed inline instead to improve readability.
+///
+/// ## Example
+/// ```python
+/// area = (lambda r: 3.14 * r**2)(radius)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// area = 3.14 * radius**2
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#lambda)
 #[violation]
 pub struct UnnecessaryDirectLambdaCall;
 

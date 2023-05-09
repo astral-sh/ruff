@@ -1,4 +1,3 @@
-use std::iter;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -8,27 +7,27 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
-    ExprKind, KeywordData, Located, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite,
+    ExprKind, KeywordData, Located, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite, Unaryop,
 };
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, RefEquality};
 use ruff_python_ast::typing::parse_type_annotation;
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use ruff_python_ast::{branch_detection, cast, helpers, str, visitor};
+use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze;
+use ruff_python_semantic::analyze::branch_detection;
 use ruff_python_semantic::analyze::typing::{Callable, SubscriptKind};
 use ruff_python_semantic::binding::{
     Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
     Importation, StarImportation, SubmoduleImportation,
 };
 use ruff_python_semantic::context::Context;
-use ruff_python_semantic::scope::{
-    ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
-};
+use ruff_python_semantic::node::NodeId;
+use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -46,9 +45,9 @@ use crate::rules::{
     flake8_django, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_logging_format, flake8_pie, flake8_print, flake8_pyi,
     flake8_pytest_style, flake8_raise, flake8_return, flake8_self, flake8_simplify,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
-    numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
-    pyupgrade, ruff, tryceratops,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, flynt,
+    mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks,
+    pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -178,7 +177,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        self.ctx.push_parent(stmt);
+        self.ctx.push_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match &stmt.node {
@@ -199,7 +198,7 @@ where
                 self.ctx.futures_allowed = false;
                 if !self.ctx.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !helpers::in_nested_block(self.ctx.parents.iter().rev().map(Into::into))
+                    && !helpers::in_nested_block(self.ctx.parents())
                 {
                     self.ctx.seen_import_boundary = true;
                 }
@@ -211,8 +210,7 @@ where
             &stmt.node,
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
         ) {
-            let scope_index = self.ctx.scope_id();
-            if scope_index.is_global() && self.ctx.current_stmt_parent().is_none() {
+            if self.ctx.at_top_level() {
                 self.importer.visit_import(stmt);
             }
         }
@@ -220,14 +218,13 @@ where
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
-                let scope_index = self.ctx.scope_id();
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !scope_index.is_global() {
+                if !self.ctx.scope_id.is_global() {
                     // Add the binding to the current scope.
                     let context = self.ctx.execution_context();
                     let exceptions = self.ctx.exceptions();
-                    let scope = &mut self.ctx.scopes[scope_index];
-                    let usage = Some((scope.id, stmt.range()));
+                    let scope = &mut self.ctx.scopes[self.ctx.scope_id];
+                    let usage = Some((self.ctx.scope_id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Global,
@@ -235,7 +232,7 @@ where
                             synthetic_usage: usage,
                             typing_usage: None,
                             range: *range,
-                            source: Some(RefEquality(stmt)),
+                            source: self.ctx.stmt_id,
                             context,
                             exceptions,
                         });
@@ -251,13 +248,12 @@ where
                 }
             }
             StmtKind::Nonlocal { names } => {
-                let scope_index = self.ctx.scope_id();
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !scope_index.is_global() {
+                if !self.ctx.scope_id.is_global() {
                     let context = self.ctx.execution_context();
                     let exceptions = self.ctx.exceptions();
-                    let scope = &mut self.ctx.scopes[scope_index];
-                    let usage = Some((scope.id, stmt.range()));
+                    let scope = &mut self.ctx.scopes[self.ctx.scope_id];
+                    let usage = Some((self.ctx.scope_id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
                         let id = self.ctx.bindings.push(Binding {
@@ -266,7 +262,7 @@ where
                             synthetic_usage: usage,
                             typing_usage: None,
                             range: *range,
-                            source: Some(RefEquality(stmt)),
+                            source: self.ctx.stmt_id,
                             context,
                             exceptions,
                         });
@@ -276,20 +272,18 @@ where
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        let mut exists = false;
-                        let mut scopes_iter = self.ctx.scope_stack.iter();
-                        // Skip the global scope
-                        scopes_iter.next_back();
+                        let binding_id = self
+                            .ctx
+                            .scopes
+                            .ancestors(self.ctx.scope_id)
+                            .skip(1)
+                            .take_while(|scope| !scope.kind.is_module())
+                            .find_map(|scope| scope.get(name.as_str()));
 
-                        for index in scopes_iter.skip(1) {
-                            if let Some(index) = self.ctx.scopes[*index].get(name.as_str()) {
-                                exists = true;
-                                self.ctx.bindings[*index].runtime_usage = usage;
-                            }
-                        }
-
-                        // Ensure that every nonlocal has an existing binding from a parent scope.
-                        if !exists {
+                        if let Some(binding_id) = binding_id {
+                            self.ctx.bindings[*binding_id].runtime_usage = usage;
+                        } else {
+                            // Ensure that every nonlocal has an existing binding from a parent scope.
                             if self.settings.rules.enabled(Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pylint::rules::NonlocalWithoutBinding {
@@ -311,10 +305,9 @@ where
             }
             StmtKind::Break => {
                 if self.settings.rules.enabled(Rule::BreakOutsideLoop) {
-                    if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
-                        stmt,
-                        &mut self.ctx.parents.iter().rev().map(Into::into).skip(1),
-                    ) {
+                    if let Some(diagnostic) =
+                        pyflakes::rules::break_outside_loop(stmt, &mut self.ctx.parents().skip(1))
+                    {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -323,7 +316,7 @@ where
                 if self.settings.rules.enabled(Rule::ContinueOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                         stmt,
-                        &mut self.ctx.parents.iter().rev().map(Into::into).skip(1),
+                        &mut self.ctx.parents().skip(1),
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -696,7 +689,7 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: stmt.range(),
-                        source: Some(*self.ctx.current_stmt()),
+                        source: self.ctx.stmt_id,
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -935,10 +928,10 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((self.ctx.scope_id(), alias.range())),
+                                synthetic_usage: Some((self.ctx.scope_id, alias.range())),
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(*self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -968,7 +961,7 @@ where
                                 synthetic_usage: None,
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(*self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -990,13 +983,13 @@ where
                                 kind: BindingKind::Importation(Importation { name, full_name }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
-                                    Some((self.ctx.scope_id(), alias.range()))
+                                    Some((self.ctx.scope_id, alias.range()))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(*self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1033,6 +1026,13 @@ where
                     }
                     if self.settings.rules.enabled(Rule::ManualFromImport) {
                         pylint::rules::manual_from_import(self, stmt, alias, names);
+                    }
+                    if self.settings.rules.enabled(Rule::ImportSelf) {
+                        if let Some(diagnostic) =
+                            pylint::rules::import_self(alias, self.module_path.as_deref())
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
                     }
 
                     if let Some(asname) = &alias.node.asname {
@@ -1246,10 +1246,10 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((self.ctx.scope_id(), alias.range())),
+                                synthetic_usage: Some((self.ctx.scope_id, alias.range())),
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(*self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1339,13 +1339,13 @@ where
                                 }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
-                                    Some((self.ctx.scope_id(), alias.range()))
+                                    Some((self.ctx.scope_id, alias.range()))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(*self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1511,6 +1511,17 @@ where
                     }
                 }
 
+                if self.settings.rules.enabled(Rule::ImportSelf) {
+                    if let Some(diagnostic) = pylint::rules::import_from_self(
+                        *level,
+                        module.as_deref(),
+                        names,
+                        self.module_path.as_deref(),
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+
                 if self.settings.rules.enabled(Rule::BannedImportFrom) {
                     if let Some(diagnostic) = flake8_import_conventions::rules::banned_import_from(
                         stmt,
@@ -1586,14 +1597,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::IfWithSameArms) {
                     flake8_simplify::rules::if_with_same_arms(
                         self,
                         stmt,
-                        self.ctx.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::NeedlessBool) {
@@ -1610,14 +1621,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::IfElseBlockInsteadOfIfExp) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
-                        self.ctx.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent(),
                     );
                 }
                 if self
@@ -1631,7 +1642,7 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::TypeCheckWithoutTypeError) {
@@ -1640,7 +1651,7 @@ where
                         body,
                         test,
                         orelse,
-                        self.ctx.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::OutdatedVersionBlock) {
@@ -1698,7 +1709,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.ctx.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::RedefinedLoopName) {
@@ -1728,10 +1739,9 @@ where
                 ..
             } => {
                 if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
-                    self.deferred.for_loops.push((
-                        stmt,
-                        (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
-                    ));
+                    self.deferred
+                        .for_loops
+                        .push((self.ctx.scope_id, self.ctx.stmt_id));
                 }
                 if self
                     .settings
@@ -1827,7 +1837,7 @@ where
                     tryceratops::rules::verbose_log_message(self, handlers);
                 }
                 if self.settings.rules.enabled(Rule::RaiseWithinTry) {
-                    tryceratops::rules::raise_within_try(self, body);
+                    tryceratops::rules::raise_within_try(self, body, handlers);
                 }
                 if self.settings.rules.enabled(Rule::ErrorInsteadOfException) {
                     tryceratops::rules::error_instead_of_exception(self, handlers);
@@ -1949,6 +1959,14 @@ where
                             }
                         }
                     }
+                    if self.ctx.match_typing_expr(annotation, "TypeAlias") {
+                        if self.settings.rules.enabled(Rule::SnakeCaseTypeAlias) {
+                            flake8_pyi::rules::snake_case_type_alias(self, target);
+                        }
+                        if self.settings.rules.enabled(Rule::TSuffixedTypeAlias) {
+                            flake8_pyi::rules::t_suffixed_type_alias(self, target);
+                        }
+                    }
                 }
             }
             StmtKind::Delete { targets } => {
@@ -2012,7 +2030,7 @@ where
                 self.deferred.definitions.push((
                     definition,
                     scope.visibility,
-                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
                 self.ctx.visible_scope = scope;
 
@@ -2031,7 +2049,7 @@ where
                             synthetic_usage: None,
                             typing_usage: None,
                             range: stmt.range(),
-                            source: Some(RefEquality(stmt)),
+                            source: self.ctx.stmt_id,
                             context: self.ctx.execution_context(),
                             exceptions: self.ctx.exceptions(),
                         });
@@ -2049,8 +2067,7 @@ where
                 }));
 
                 self.deferred.functions.push((
-                    stmt,
-                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                     self.ctx.visible_scope,
                 ));
             }
@@ -2075,7 +2092,7 @@ where
                 self.deferred.definitions.push((
                     definition,
                     scope.visibility,
-                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
                 self.ctx.visible_scope = scope;
 
@@ -2094,7 +2111,7 @@ where
                             synthetic_usage: None,
                             typing_usage: None,
                             range: stmt.range(),
-                            source: Some(RefEquality(stmt)),
+                            source: self.ctx.stmt_id,
                             context: self.ctx.execution_context(),
                             exceptions: self.ctx.exceptions(),
                         });
@@ -2255,7 +2272,7 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: stmt.range(),
-                        source: Some(*self.ctx.current_stmt()),
+                        source: self.ctx.stmt_id,
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -2264,7 +2281,7 @@ where
             _ => {}
         }
 
-        self.ctx.pop_parent();
+        self.ctx.pop_stmt();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -2290,13 +2307,13 @@ where
                     expr.range(),
                     value,
                     (self.ctx.in_annotation, self.ctx.in_type_checking_block),
-                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
             } else {
                 self.deferred.type_definitions.push((
                     expr,
                     (self.ctx.in_annotation, self.ctx.in_type_checking_block),
-                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
             }
             return;
@@ -2308,7 +2325,16 @@ where
         let prev_in_type_definition = self.ctx.in_type_definition;
         let prev_in_boolean_test = self.ctx.in_boolean_test;
 
-        if !matches!(expr.node, ExprKind::BoolOp { .. }) {
+        // If we're in a boolean test (e.g., the `test` of a `StmtKind::If`), but now within a
+        // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
+        if !matches!(
+            expr.node,
+            ExprKind::BoolOp { .. }
+                | ExprKind::UnaryOp {
+                    op: Unaryop::Not,
+                    ..
+                }
+        ) {
             self.ctx.in_boolean_test = false;
         }
 
@@ -2316,8 +2342,7 @@ where
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...], Union[...]
-                if self.ctx.in_type_definition
-                    && !self.settings.pyupgrade.keep_runtime_typing
+                if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
@@ -2472,6 +2497,8 @@ where
                     // pyupgrade
                     Rule::FormatLiterals,
                     Rule::FString,
+                    // flynt
+                    Rule::StaticJoinToFString,
                 ]) {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {
@@ -2479,7 +2506,12 @@ where
                             ..
                         } = &value.node
                         {
-                            if attr == "format" {
+                            if attr == "join" {
+                                // "...".join(...) call
+                                if self.settings.rules.enabled(Rule::StaticJoinToFString) {
+                                    flynt::rules::static_join_to_fstring(self, expr, value);
+                                }
+                            } else if attr == "format" {
                                 // "...".format(...) call
                                 let location = expr.range();
                                 match pyflakes::format::FormatSummary::try_from(value.as_ref()) {
@@ -2744,7 +2776,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_set(
                         self,
                         expr,
-                        self.ctx.current_expr_parent().map(Into::into),
+                        self.ctx.current_expr_parent(),
                         func,
                         args,
                         keywords,
@@ -2754,7 +2786,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_dict(
                         self,
                         expr,
-                        self.ctx.current_expr_parent().map(Into::into),
+                        self.ctx.current_expr_parent(),
                         func,
                         args,
                         keywords,
@@ -2859,7 +2891,7 @@ where
                     flake8_comprehensions::rules::unnecessary_map(
                         self,
                         expr,
-                        self.ctx.current_expr_parent().map(Into::into),
+                        self.ctx.current_expr_parent(),
                         func,
                         args,
                     );
@@ -3009,6 +3041,9 @@ where
                 }
                 if self.settings.rules.enabled(Rule::InvalidEnvvarValue) {
                     pylint::rules::invalid_envvar_value(self, func, args, keywords);
+                }
+                if self.settings.rules.enabled(Rule::NestedMinMax) {
+                    pylint::rules::nested_min_max(self, expr, func, args, keywords);
                 }
 
                 // flake8-pytest-style
@@ -3524,7 +3559,7 @@ where
                         expr.range(),
                         value,
                         (self.ctx.in_annotation, self.ctx.in_type_checking_block),
-                        (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                        (self.ctx.scope_id, self.ctx.stmt_id),
                     ));
                 }
                 if self
@@ -3645,10 +3680,9 @@ where
         // Recurse.
         match &expr.node {
             ExprKind::Lambda { .. } => {
-                self.deferred.lambdas.push((
-                    expr,
-                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
-                ));
+                self.deferred
+                    .lambdas
+                    .push((expr, (self.ctx.scope_id, self.ctx.stmt_id)));
             }
             ExprKind::IfExp { test, body, orelse } => {
                 visit_boolean_test!(self, test);
@@ -4041,7 +4075,8 @@ where
                                         name_range,
                                     );
                                     if self.patch(Rule::UnusedVariable) {
-                                        diagnostic.try_set_fix(|| {
+                                        #[allow(deprecated)]
+                                        diagnostic.try_set_fix_from_edit(|| {
                                             pyflakes::fixes::remove_exception_handler_assignment(
                                                 excepthandler,
                                                 self.locator,
@@ -4132,7 +4167,7 @@ where
                 synthetic_usage: None,
                 typing_usage: None,
                 range: arg.range(),
-                source: Some(*self.ctx.current_stmt()),
+                source: self.ctx.stmt_id,
                 context: self.ctx.execution_context(),
                 exceptions: self.ctx.exceptions(),
             },
@@ -4176,7 +4211,7 @@ where
                     synthetic_usage: None,
                     typing_usage: None,
                     range: pattern.range(),
-                    source: Some(*self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4209,28 +4244,21 @@ where
 impl<'a> Checker<'a> {
     fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) {
         let binding_id = self.ctx.bindings.next_id();
-        if let Some((stack_index, existing_binding_index)) = self
+        if let Some((stack_index, existing_binding_id)) = self
             .ctx
-            .scope_stack
-            .iter()
+            .scopes
+            .ancestors(self.ctx.scope_id)
             .enumerate()
-            .find_map(|(stack_index, scope_index)| {
-                self.ctx.scopes[*scope_index]
-                    .get(name)
-                    .map(|binding_id| (stack_index, *binding_id))
+            .find_map(|(stack_index, scope)| {
+                scope.get(name).map(|binding_id| (stack_index, *binding_id))
             })
         {
-            let existing = &self.ctx.bindings[existing_binding_index];
+            let existing = &self.ctx.bindings[existing_binding_id];
             let in_current_scope = stack_index == 0;
             if !existing.kind.is_builtin()
                 && existing.source.map_or(true, |left| {
                     binding.source.map_or(true, |right| {
-                        !branch_detection::different_forks(
-                            left,
-                            right,
-                            &self.ctx.depths,
-                            &self.ctx.child_to_parent,
-                        )
+                        !branch_detection::different_forks(left, right, &self.ctx.stmts)
                     })
                 })
             {
@@ -4261,7 +4289,7 @@ impl<'a> Checker<'a> {
                         && !(existing.kind.is_function_definition()
                             && analyze::visibility::is_overload(
                                 &self.ctx,
-                                cast::decorator_list(existing.source.as_ref().unwrap()),
+                                cast::decorator_list(self.ctx.stmts[existing.source.unwrap()]),
                             ))
                     {
                         if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
@@ -4278,13 +4306,17 @@ impl<'a> Checker<'a> {
                                     BindingKind::ClassDefinition | BindingKind::FunctionDefinition
                                 )
                                 .then(|| {
-                                    binding.source.as_ref().map_or(binding.range, |source| {
-                                        helpers::identifier_range(source, self.locator)
+                                    binding.source.map_or(binding.range, |source| {
+                                        helpers::identifier_range(
+                                            self.ctx.stmts[source],
+                                            self.locator,
+                                        )
                                     })
                                 })
                                 .unwrap_or(binding.range),
                             );
-                            if let Some(parent) = binding.source.as_ref() {
+                            if let Some(parent) = binding.source {
+                                let parent = self.ctx.stmts[parent];
                                 if matches!(parent.node, StmtKind::ImportFrom { .. })
                                     && parent.range().contains_range(binding.range)
                                 {
@@ -4297,14 +4329,27 @@ impl<'a> Checker<'a> {
                 } else if existing_is_import && binding.redefines(existing) {
                     self.ctx
                         .shadowed_bindings
-                        .entry(existing_binding_index)
+                        .entry(existing_binding_id)
                         .or_insert_with(Vec::new)
                         .push(binding_id);
                 }
             }
         }
 
-        let scope = self.ctx.scope();
+        // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
+        // expressions in generators and comprehensions bind to the scope that contains the
+        // outermost comprehension.
+        let scope_id = if binding.kind.is_named_expr_assignment() {
+            self.ctx
+                .scopes
+                .ancestor_ids(self.ctx.scope_id)
+                .find_or_last(|scope_id| !self.ctx.scopes[*scope_id].kind.is_generator())
+                .unwrap_or(self.ctx.scope_id)
+        } else {
+            self.ctx.scope_id
+        };
+        let scope = &mut self.ctx.scopes[scope_id];
+
         let binding = if let Some(index) = scope.get(name) {
             let existing = &self.ctx.bindings[*index];
             match &existing.kind {
@@ -4336,17 +4381,20 @@ impl<'a> Checker<'a> {
 
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
-        let scope = self.ctx.scope_mut();
-        if !(binding.kind.is_annotation() && scope.defines(name)) {
-            scope.add(name, binding_id);
+        if binding.kind.is_annotation() && scope.defines(name) {
+            self.ctx.bindings.push(binding);
+            return;
         }
 
+        // Add the binding to the scope.
+        scope.add(name, binding_id);
+
+        // Add the binding to the arena.
         self.ctx.bindings.push(binding);
     }
 
     fn bind_builtins(&mut self) {
-        let scope =
-            &mut self.ctx.scopes[self.ctx.scope_stack.top().expect("No current scope found")];
+        let scope = &mut self.ctx.scopes[self.ctx.scope_id];
 
         for builtin in BUILTINS
             .iter()
@@ -4372,16 +4420,13 @@ impl<'a> Checker<'a> {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        let scope_id = self.ctx.scope_id();
 
         let mut first_iter = true;
         let mut in_generator = false;
         let mut import_starred = false;
 
-        for scope_index in self.ctx.scope_stack.iter() {
-            let scope = &self.ctx.scopes[*scope_index];
-
-            if matches!(scope.kind, ScopeKind::Class(_)) {
+        for scope in self.ctx.scopes.ancestors(self.ctx.scope_id) {
+            if scope.kind.is_class() {
                 if id == "__class__" {
                     return;
                 } else if !first_iter && !in_generator {
@@ -4392,7 +4437,7 @@ impl<'a> Checker<'a> {
             if let Some(index) = scope.get(id.as_str()) {
                 // Mark the binding as used.
                 let context = self.ctx.execution_context();
-                self.ctx.bindings[*index].mark_used(scope_id, expr.range(), context);
+                self.ctx.bindings[*index].mark_used(self.ctx.scope_id, expr.range(), context);
 
                 if self.ctx.bindings[*index].kind.is_annotation()
                     && self.ctx.in_deferred_string_type_definition.is_none()
@@ -4422,7 +4467,7 @@ impl<'a> Checker<'a> {
                             // Mark the sub-importation as used.
                             if let Some(index) = scope.get(full_name) {
                                 self.ctx.bindings[*index].mark_used(
-                                    scope_id,
+                                    self.ctx.scope_id,
                                     expr.range(),
                                     context,
                                 );
@@ -4439,7 +4484,7 @@ impl<'a> Checker<'a> {
                             // Mark the sub-importation as used.
                             if let Some(index) = scope.get(full_name.as_str()) {
                                 self.ctx.bindings[*index].mark_used(
-                                    scope_id,
+                                    self.ctx.scope_id,
                                     expr.range(),
                                     context,
                                 );
@@ -4517,21 +4562,10 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
-        let parent = self.ctx.current_stmt().0;
+        let parent = self.ctx.current_stmt();
 
         if self.settings.rules.enabled(Rule::UndefinedLocal) {
-            let scopes: Vec<&Scope> = self
-                .ctx
-                .scope_stack
-                .iter()
-                .rev()
-                .map(|index| &self.ctx.scopes[*index])
-                .collect();
-            if let Some(diagnostic) =
-                pyflakes::rules::undefined_local(id, &scopes, &self.ctx.bindings)
-            {
-                self.diagnostics.push(diagnostic);
-            }
+            pyflakes::rules::undefined_local(self, id);
         }
 
         if self
@@ -4587,7 +4621,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: Some(*self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4607,7 +4641,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: Some(*self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4624,7 +4658,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: Some(*self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4632,9 +4666,10 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let current = self.ctx.scope();
+        let scope = self.ctx.scope();
+
         if id == "__all__"
-            && matches!(current.kind, ScopeKind::Module)
+            && scope.kind.is_module()
             && matches!(
                 parent.node,
                 StmtKind::Assign { .. } | StmtKind::AugAssign { .. } | StmtKind::AnnAssign { .. }
@@ -4672,7 +4707,7 @@ impl<'a> Checker<'a> {
 
                     // Grab the existing bound __all__ values.
                     if let StmtKind::AugAssign { .. } = &parent.node {
-                        if let Some(index) = current.get("__all__") {
+                        if let Some(index) = scope.get("__all__") {
                             if let BindingKind::Export(Export { names: existing }) =
                                 &self.ctx.bindings[*index].kind
                             {
@@ -4706,13 +4741,34 @@ impl<'a> Checker<'a> {
                         synthetic_usage: None,
                         typing_usage: None,
                         range: expr.range(),
-                        source: Some(*self.ctx.current_stmt()),
+                        source: self.ctx.stmt_id,
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
                 );
                 return;
             }
+        }
+
+        if self
+            .ctx
+            .expr_ancestors()
+            .any(|expr| matches!(expr.node, ExprKind::NamedExpr { .. }))
+        {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::NamedExprAssignment,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
+                    range: expr.range(),
+                    source: self.ctx.stmt_id,
+                    context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
+                },
+            );
+            return;
         }
 
         self.add_binding(
@@ -4723,7 +4779,7 @@ impl<'a> Checker<'a> {
                 synthetic_usage: None,
                 typing_usage: None,
                 range: expr.range(),
-                source: Some(*self.ctx.current_stmt()),
+                source: self.ctx.stmt_id,
                 context: self.ctx.execution_context(),
                 exceptions: self.ctx.exceptions(),
             },
@@ -4734,7 +4790,7 @@ impl<'a> Checker<'a> {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        if helpers::on_conditional_branch(&mut self.ctx.parents.iter().rev().map(Into::into)) {
+        if helpers::on_conditional_branch(&mut self.ctx.parents()) {
             return;
         }
 
@@ -4769,7 +4825,7 @@ impl<'a> Checker<'a> {
                 docstring,
             },
             self.ctx.visible_scope.visibility,
-            (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+            (self.ctx.scope_id, self.ctx.stmt_id),
         ));
         docstring.is_some()
     }
@@ -4777,11 +4833,11 @@ impl<'a> Checker<'a> {
     fn check_deferred_type_definitions(&mut self) {
         while !self.deferred.type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.type_definitions);
-            for (expr, (in_annotation, in_type_checking_block), (scopes, parents)) in
+            for (expr, (in_annotation, in_type_checking_block), (scope_id, stmt_id)) in
                 type_definitions
             {
-                self.ctx.scope_stack = scopes;
-                self.ctx.parents = parents;
+                self.ctx.scope_id = scope_id;
+                self.ctx.stmt_id = stmt_id;
                 self.ctx.in_annotation = in_annotation;
                 self.ctx.in_type_checking_block = in_type_checking_block;
                 self.ctx.in_type_definition = true;
@@ -4796,7 +4852,7 @@ impl<'a> Checker<'a> {
     fn check_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         while !self.deferred.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
-            for (range, value, (in_annotation, in_type_checking_block), (scopes, parents)) in
+            for (range, value, (in_annotation, in_type_checking_block), (scope_id, stmt_id)) in
                 type_definitions
             {
                 if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
@@ -4805,11 +4861,16 @@ impl<'a> Checker<'a> {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
                     }
+                    if self.is_stub {
+                        if self.settings.rules.enabled(Rule::QuotedAnnotationInStub) {
+                            flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
+                        }
+                    }
 
                     let expr = allocator.alloc(expr);
 
-                    self.ctx.scope_stack = scopes;
-                    self.ctx.parents = parents;
+                    self.ctx.scope_id = scope_id;
+                    self.ctx.stmt_id = stmt_id;
                     self.ctx.in_annotation = in_annotation;
                     self.ctx.in_type_checking_block = in_type_checking_block;
                     self.ctx.in_type_definition = true;
@@ -4838,14 +4899,12 @@ impl<'a> Checker<'a> {
     fn check_deferred_functions(&mut self) {
         while !self.deferred.functions.is_empty() {
             let deferred_functions = std::mem::take(&mut self.deferred.functions);
-            for (stmt, (scopes, parents), visibility) in deferred_functions {
-                let scope_snapshot = scopes.snapshot();
-                let parents_snapshot = parents.len();
-                self.ctx.scope_stack = scopes;
-                self.ctx.parents = parents;
+            for ((scope_id, stmt_id), visibility) in deferred_functions {
+                self.ctx.scope_id = scope_id;
+                self.ctx.stmt_id = stmt_id;
                 self.ctx.visible_scope = visibility;
 
-                match &stmt.node {
+                match &self.ctx.current_stmt().node {
                     StmtKind::FunctionDef { body, args, .. }
                     | StmtKind::AsyncFunctionDef { body, args, .. } => {
                         self.visit_arguments(args);
@@ -4856,13 +4915,7 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                let mut scopes = std::mem::take(&mut self.ctx.scope_stack);
-                scopes.restore(scope_snapshot);
-
-                let mut parents = std::mem::take(&mut self.ctx.parents);
-                parents.truncate(parents_snapshot);
-
-                self.deferred.assignments.push((scopes, parents));
+                self.deferred.assignments.push((scope_id, stmt_id));
             }
         }
     }
@@ -4870,12 +4923,9 @@ impl<'a> Checker<'a> {
     fn check_deferred_lambdas(&mut self) {
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
-            for (expr, (scopes, parents)) in lambdas {
-                let scope_snapshot = scopes.snapshot();
-                let parents_snapshot = parents.len();
-
-                self.ctx.scope_stack = scopes;
-                self.ctx.parents = parents;
+            for (expr, (scope_id, stmt_id)) in lambdas {
+                self.ctx.scope_id = scope_id;
+                self.ctx.stmt_id = stmt_id;
 
                 if let ExprKind::Lambda { args, body } = &expr.node {
                     self.visit_arguments(args);
@@ -4884,12 +4934,7 @@ impl<'a> Checker<'a> {
                     unreachable!("Expected ExprKind::Lambda");
                 }
 
-                let mut scopes = std::mem::take(&mut self.ctx.scope_stack);
-                scopes.restore(scope_snapshot);
-
-                let mut parents = std::mem::take(&mut self.ctx.parents);
-                parents.truncate(parents_snapshot);
-                self.deferred.assignments.push((scopes, parents));
+                self.deferred.assignments.push((scope_id, stmt_id));
             }
         }
     }
@@ -4897,17 +4942,13 @@ impl<'a> Checker<'a> {
     fn check_deferred_assignments(&mut self) {
         while !self.deferred.assignments.is_empty() {
             let assignments = std::mem::take(&mut self.deferred.assignments);
-            for (scopes, ..) in assignments {
-                let mut scopes_iter = scopes.iter();
-                let scope_index = *scopes_iter.next().unwrap();
-                let parent_scope_index = *scopes_iter.next().unwrap();
-
+            for (scope_id, ..) in assignments {
                 // pyflakes
                 if self.settings.rules.enabled(Rule::UnusedVariable) {
-                    pyflakes::rules::unused_variable(self, scope_index);
+                    pyflakes::rules::unused_variable(self, scope_id);
                 }
                 if self.settings.rules.enabled(Rule::UnusedAnnotation) {
-                    pyflakes::rules::unused_annotation(self, scope_index);
+                    pyflakes::rules::unused_annotation(self, scope_id);
                 }
 
                 if !self.is_stub {
@@ -4919,11 +4960,13 @@ impl<'a> Checker<'a> {
                         Rule::UnusedStaticMethodArgument,
                         Rule::UnusedLambdaArgument,
                     ]) {
+                        let scope = &self.ctx.scopes[scope_id];
+                        let parent = &self.ctx.scopes[scope.parent.unwrap()];
                         self.diagnostics
                             .extend(flake8_unused_arguments::rules::unused_arguments(
                                 self,
-                                &self.ctx.scopes[parent_scope_index],
-                                &self.ctx.scopes[scope_index],
+                                parent,
+                                scope,
                                 &self.ctx.bindings,
                             ));
                     }
@@ -4936,17 +4979,15 @@ impl<'a> Checker<'a> {
         while !self.deferred.for_loops.is_empty() {
             let for_loops = std::mem::take(&mut self.deferred.for_loops);
 
-            for (stmt, (scopes, parents)) in for_loops {
-                self.ctx.scope_stack = scopes;
-                self.ctx.parents = parents;
+            for (scope_id, stmt_id) in for_loops {
+                self.ctx.scope_id = scope_id;
+                self.ctx.stmt_id = stmt_id;
 
                 if let StmtKind::For { target, body, .. }
-                | StmtKind::AsyncFor { target, body, .. } = &stmt.node
+                | StmtKind::AsyncFor { target, body, .. } = &self.ctx.current_stmt().node
                 {
                     if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
-                        flake8_bugbear::rules::unused_loop_control_variable(
-                            self, stmt, target, body,
-                        );
+                        flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
                     }
                 } else {
                     unreachable!("Expected ExprKind::For | ExprKind::AsyncFor");
@@ -5045,10 +5086,10 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for (index, stack) in self.ctx.dead_scopes.iter().rev() {
-            let scope = &self.ctx.scopes[*index];
+        for scope_id in self.ctx.dead_scopes.iter().rev() {
+            let scope = &self.ctx.scopes[*scope_id];
 
-            if index.is_global() {
+            if scope.kind.is_module() {
                 // F822
                 if self.settings.rules.enabled(Rule::UndefinedExport) {
                     if !self.path.ends_with("__init__.py") {
@@ -5096,7 +5137,8 @@ impl<'a> Checker<'a> {
                 for (name, index) in scope.bindings() {
                     let binding = &self.ctx.bindings[*index];
                     if binding.kind.is_global() {
-                        if let Some(stmt) = &binding.source {
+                        if let Some(source) = binding.source {
+                            let stmt = &self.ctx.stmts[source];
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(
                                     pylint::rules::GlobalVariableNotAssigned {
@@ -5150,13 +5192,17 @@ impl<'a> Checker<'a> {
                                             | BindingKind::FunctionDefinition
                                     )
                                     .then(|| {
-                                        rebound.source.as_ref().map_or(rebound.range, |source| {
-                                            helpers::identifier_range(source, self.locator)
+                                        rebound.source.map_or(rebound.range, |source| {
+                                            helpers::identifier_range(
+                                                self.ctx.stmts[source],
+                                                self.locator,
+                                            )
                                         })
                                     })
                                     .unwrap_or(rebound.range),
                                 );
-                                if let Some(parent) = &rebound.source {
+                                if let Some(source) = rebound.source {
+                                    let parent = &self.ctx.stmts[source];
                                     if matches!(parent.node, StmtKind::ImportFrom { .. })
                                         && parent.range().contains_range(rebound.range)
                                     {
@@ -5174,11 +5220,10 @@ impl<'a> Checker<'a> {
                 let runtime_imports: Vec<&Binding> = if self.settings.flake8_type_checking.strict {
                     vec![]
                 } else {
-                    stack
-                        .iter()
-                        .rev()
-                        .chain(iter::once(index))
-                        .flat_map(|index| runtime_imports[usize::from(*index)].iter())
+                    self.ctx
+                        .scopes
+                        .ancestor_ids(*scope_id)
+                        .flat_map(|scope_id| runtime_imports[usize::from(scope_id)].iter())
                         .copied()
                         .collect()
                 };
@@ -5211,11 +5256,7 @@ impl<'a> Checker<'a> {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 type UnusedImport<'a> = (&'a str, &'a TextRange);
-                type BindingContext<'a, 'b> = (
-                    &'a RefEquality<'b, Stmt>,
-                    Option<&'a RefEquality<'b, Stmt>>,
-                    Exceptions,
-                );
+                type BindingContext<'a> = (NodeId, Option<NodeId>, Exceptions);
 
                 let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
@@ -5240,12 +5281,12 @@ impl<'a> Checker<'a> {
                         continue;
                     }
 
-                    let defined_by = binding.source.as_ref().unwrap();
-                    let defined_in = self.ctx.child_to_parent.get(defined_by);
-                    let exceptions = binding.exceptions;
-                    let child: &Stmt = defined_by.into();
+                    let child_id = binding.source.unwrap();
+                    let parent_id = self.ctx.stmts.parent_id(child_id);
 
+                    let exceptions = binding.exceptions;
                     let diagnostic_offset = binding.range.start();
+                    let child = &self.ctx.stmts[child_id];
                     let parent_offset = if matches!(child.node, StmtKind::ImportFrom { .. }) {
                         Some(child.start())
                     } else {
@@ -5258,12 +5299,12 @@ impl<'a> Checker<'a> {
                         })
                     {
                         ignored
-                            .entry((defined_by, defined_in, exceptions))
+                            .entry((child_id, parent_id, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     } else {
                         unused
-                            .entry((defined_by, defined_in, exceptions))
+                            .entry((child_id, parent_id, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     }
@@ -5273,10 +5314,10 @@ impl<'a> Checker<'a> {
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
                 for ((defined_by, defined_in, exceptions), unused_imports) in unused
                     .into_iter()
-                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.start())
+                    .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
                 {
-                    let child: &Stmt = defined_by.into();
-                    let parent: Option<&Stmt> = defined_in.map(Into::into);
+                    let child = self.ctx.stmts[defined_by];
+                    let parent = defined_in.map(|defined_in| self.ctx.stmts[defined_in]);
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
@@ -5294,7 +5335,7 @@ impl<'a> Checker<'a> {
                         ) {
                             Ok(fix) => {
                                 if fix.is_deletion() || fix.content() == Some("pass") {
-                                    self.deletions.insert(*defined_by);
+                                    self.deletions.insert(RefEquality(child));
                                 }
                                 Some(fix)
                             }
@@ -5325,17 +5366,17 @@ impl<'a> Checker<'a> {
                         if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.start());
                         }
-                        if let Some(fix) = &fix {
-                            diagnostic.set_fix(fix.clone());
+                        if let Some(edit) = &fix {
+                            diagnostic.set_fix(Fix::unspecified(edit.clone()));
                         }
                         diagnostics.push(diagnostic);
                     }
                 }
-                for ((defined_by, .., exceptions), unused_imports) in ignored
+                for ((child, .., exceptions), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.start())
+                    .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
                 {
-                    let child: &Stmt = defined_by.into();
+                    let child = self.ctx.stmts[child];
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
@@ -5431,9 +5472,9 @@ impl<'a> Checker<'a> {
         let mut overloaded_name: Option<String> = None;
         while !self.deferred.definitions.is_empty() {
             let definitions = std::mem::take(&mut self.deferred.definitions);
-            for (definition, visibility, (scopes, parents)) in definitions {
-                self.ctx.scope_stack = scopes;
-                self.ctx.parents = parents;
+            for (definition, visibility, (scope_id, stmt_id)) in definitions {
+                self.ctx.scope_id = scope_id;
+                self.ctx.stmt_id = stmt_id;
 
                 // flake8-annotations
                 if enforce_annotations {
@@ -5703,8 +5744,8 @@ pub fn check_ast(
     checker.check_definitions();
 
     // Reset the scope to module-level, and check all consumed scopes.
-    checker.ctx.scope_stack = ScopeStack::default();
-    checker.ctx.pop_scope();
+    checker.ctx.scope_id = ScopeId::global();
+    checker.ctx.dead_scopes.push(ScopeId::global());
     checker.check_dead_scopes();
 
     checker.diagnostics

@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::token_kind::TokenKind;
 
@@ -144,7 +144,7 @@ impl<'a> LogicalLinesContext<'a> {
             self.diagnostics.push(Diagnostic {
                 kind,
                 range,
-                fix: Fix::empty(),
+                fix: None,
                 parent: None,
             });
         }

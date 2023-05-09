@@ -1,6 +1,6 @@
-use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{ArgData, Expr, ExprKind, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::scope::ScopeKind;
 
@@ -39,14 +39,13 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
         return;
     }
     let scope = checker.ctx.scope();
-    let parents: Vec<&Stmt> = checker.ctx.parents.iter().map(Into::into).collect();
 
     // Check: are we in a Function scope?
     if !matches!(scope.kind, ScopeKind::Function { .. }) {
         return;
     }
 
-    let mut parents = parents.iter().rev();
+    let mut parents = checker.ctx.parents();
 
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
@@ -97,8 +96,8 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(fix) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
-            diagnostic.set_fix(fix);
+        if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
+            diagnostic.set_fix(Fix::unspecified(edit));
         }
     }
     checker.diagnostics.push(diagnostic);

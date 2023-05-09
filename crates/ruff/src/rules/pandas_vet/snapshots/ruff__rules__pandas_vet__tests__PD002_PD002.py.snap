@@ -105,6 +105,7 @@ PD002.py:22:33: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
    22 |+x = x.drop(["a"], axis=1, **kwargs)
 23 23 | x.drop(["a"], axis=1, inplace=True, **kwargs)
 24 24 | f(x.drop(["a"], axis=1, inplace=True))
+25 25 | 
 
 PD002.py:23:23: PD002 `inplace=True` should be avoided; it has inconsistent behavior
    |
@@ -120,6 +121,16 @@ PD002.py:24:25: PD002 `inplace=True` should be avoided; it has inconsistent beha
 25 | x.drop(["a"], axis=1, inplace=True, **kwargs)
 26 | f(x.drop(["a"], axis=1, inplace=True))
    |                         ^^^^^^^^^^^^ PD002
+27 | 
+28 | x.apply(lambda x: x.sort_values('a', inplace=True))
+   |
+
+PD002.py:26:38: PD002 `inplace=True` should be avoided; it has inconsistent behavior
+   |
+26 | f(x.drop(["a"], axis=1, inplace=True))
+27 | 
+28 | x.apply(lambda x: x.sort_values('a', inplace=True))
+   |                                      ^^^^^^^^^^^^ PD002
    |
 
 

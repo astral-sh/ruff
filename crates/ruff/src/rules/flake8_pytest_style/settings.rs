@@ -1,6 +1,5 @@
 //! Settings for the `flake8-pytest-style` plugin.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
@@ -21,14 +20,13 @@ fn default_broad_exceptions() -> Vec<String> {
     .to_vec()
 }
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Flake8PytestStyleOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = "true",
