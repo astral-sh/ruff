@@ -35,14 +35,14 @@ impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
 ///
 /// ## Example
 /// ```python
-/// ages = {"Tom": 23, "Maria": 23, "Loca": 11}
-/// age = ages.get("Hodge", None)  # None
+/// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+/// age = ages.get("Cat", None)  # None
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// ages = {"Tom": 23, "Maria": 23, "Loca": 11}
-/// age = ages.get("Hodge")  # None
+/// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+/// age = ages.get("Cat")  # None
 /// ```
 ///
 /// ## References
