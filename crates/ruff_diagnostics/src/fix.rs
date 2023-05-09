@@ -124,5 +124,4 @@ impl Fix {
     pub fn applicability(&self) -> Applicability {
         self.applicability
     }
-
 }

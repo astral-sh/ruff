@@ -65,7 +65,7 @@ pub fn native_literals(
             }}, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
-diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
