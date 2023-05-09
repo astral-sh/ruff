@@ -79,7 +79,6 @@ impl Default for Settings {
             namespace_packages: vec![],
             per_file_ignores: vec![],
             respect_gitignore: true,
-            show_source: false,
             src: vec![path_dedot::CWD.clone()],
             project_root: path_dedot::CWD.clone(),
             target_version: TARGET_VERSION,

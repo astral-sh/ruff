@@ -150,6 +150,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         fix_only,
         format,
         show_fixes,
+        show_source,
         ..
     } = pyproject_config.settings.cli;
 
@@ -181,8 +182,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIXES;
     }
-
-    if pyproject_config.settings.lib.show_source {
+    if show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
 
