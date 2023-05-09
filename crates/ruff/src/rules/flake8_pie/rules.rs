@@ -21,12 +21,13 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `pass` in a class or function definition with an empty body,
+/// Checks for unnecessary `pass` statements in class and function bodies.
 /// where it is not needed syntactically (e.g., when an indented docstring is
 /// present).
 ///
 /// ## Why is this bad?
-/// The `pass` statement is redundant.
+/// When a function or class definition contains a docstring, an additional
+/// `pass` statement is redundant.
 ///
 /// ## Example
 /// ```python
@@ -58,10 +59,11 @@ impl AlwaysAutofixableViolation for UnnecessaryPass {
 }
 
 /// ## What it does
-/// Checks for duplicate field definitions in a class.
+/// Checks for duplicate field definitions in classes.
 ///
 /// ## Why is this bad?
-/// The field is defined multiple times, which is redundant and confusing.
+/// Defining a field multiple times in a class body is redundant and likely a
+/// mistake.
 ///
 /// ## Example
 /// ```python
@@ -94,10 +96,11 @@ impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
 }
 
 /// ## What it does
-/// Checks for enums with fields that have the same value.
+/// Checks for enums that contain duplicate values.
 ///
 /// ## Why is this bad?
-/// This is likely redundant and a mistake.
+/// Enum values should be unique. Non-unique values are redundant and likely a
+/// mistake.
 ///
 /// ## Example
 /// ```python
@@ -137,10 +140,11 @@ impl Violation for NonUniqueEnums {
 }
 
 /// ## What it does
-/// Checks for unnecessary dictionary unpacking operators `**`.
+/// Checks for unnecessary dictionary unpacking operators (`**`).
 ///
 /// ## Why is this bad?
-/// They are redundant and make the code less readable.
+/// Unpacking a dictionary into another dictionary is redundant. The unpacking
+/// operator can be removed, making the code more readable.
 ///
 /// ## Example
 /// ```python
@@ -167,12 +171,13 @@ impl Violation for UnnecessarySpread {
 }
 
 /// ## What it does
-/// Checks for `startswith` or `endswith` calls on the same string with
+/// Checks for `startswith` or `endswith` calls on the same value with
 /// different prefixes or suffixes.
 ///
 /// ## Why is this bad?
-/// Pass a tuple of prefixes or suffixes instead, as it is less verbose and
-/// more efficient.
+/// The `startswith` and `endswith` methods accept tuples of prefixes or
+/// suffixes respectively. Passing a tuple of prefixes or suffixes is more
+/// more efficient and readable than calling the method multiple times.
 ///
 /// ## Example
 /// ```python
@@ -248,10 +253,10 @@ impl Violation for UnnecessaryDictKwargs {
 }
 
 /// ## What it does
-/// Checks for a reimplemented `list` builtin.
+/// Checks for lambdas that can be replaced with the `list` builtin.
 ///
 /// ## Why is this bad?
-/// Using `list` is more readable and efficient.
+/// Using `list` builtin is more readable.
 ///
 /// ## Example
 /// ```python
