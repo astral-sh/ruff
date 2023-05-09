@@ -166,7 +166,6 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     // TODO(charlie): Consider adding ESLint's `--fix-dry-run`, which would generate
     // but not apply fixes. That would allow us to avoid special-casing JSON
     // here.
-    // TODO(konstin): Remove ecosystem ci once [ruff::message::diff::Diff] is stable.
     let autofix = if cli.diff {
         flags::FixMode::Diff
     } else if fix || fix_only {
