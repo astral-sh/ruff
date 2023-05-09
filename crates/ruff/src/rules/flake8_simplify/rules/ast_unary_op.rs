@@ -10,8 +10,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct NegateEqualOp {
-    pub left: String,
-    pub right: String,
+    left: String,
+    right: String,
 }
 
 impl AlwaysAutofixableViolation for NegateEqualOp {
@@ -28,8 +28,8 @@ impl AlwaysAutofixableViolation for NegateEqualOp {
 
 #[violation]
 pub struct NegateNotEqualOp {
-    pub left: String,
-    pub right: String,
+    left: String,
+    right: String,
 }
 
 impl AlwaysAutofixableViolation for NegateNotEqualOp {
@@ -46,7 +46,7 @@ impl AlwaysAutofixableViolation for NegateNotEqualOp {
 
 #[violation]
 pub struct DoubleNegation {
-    pub expr: String,
+    expr: String,
 }
 
 impl AlwaysAutofixableViolation for DoubleNegation {

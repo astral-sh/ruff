@@ -22,7 +22,7 @@ use crate::rules::pydocstyle::settings::Convention;
 
 #[violation]
 pub struct SectionNotOverIndented {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionNotOverIndented {
@@ -40,7 +40,7 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
 
 #[violation]
 pub struct SectionUnderlineNotOverIndented {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
@@ -58,7 +58,7 @@ impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
 
 #[violation]
 pub struct CapitalizeSectionName {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for CapitalizeSectionName {
@@ -76,7 +76,7 @@ impl AlwaysAutofixableViolation for CapitalizeSectionName {
 
 #[violation]
 pub struct NewLineAfterSectionName {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for NewLineAfterSectionName {
@@ -94,7 +94,7 @@ impl AlwaysAutofixableViolation for NewLineAfterSectionName {
 
 #[violation]
 pub struct DashedUnderlineAfterSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
@@ -112,7 +112,7 @@ impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
 
 #[violation]
 pub struct SectionUnderlineAfterName {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
@@ -130,7 +130,7 @@ impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
 
 #[violation]
 pub struct SectionUnderlineMatchesSectionLength {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
@@ -148,7 +148,7 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
 
 #[violation]
 pub struct NoBlankLineAfterSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
@@ -166,7 +166,7 @@ impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
 
 #[violation]
 pub struct NoBlankLineBeforeSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
@@ -184,7 +184,7 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 
 #[violation]
 pub struct BlankLineAfterLastSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
@@ -202,7 +202,7 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
 
 #[violation]
 pub struct EmptyDocstringSection {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for EmptyDocstringSection {
@@ -215,7 +215,7 @@ impl Violation for EmptyDocstringSection {
 
 #[violation]
 pub struct SectionNameEndsInColon {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionNameEndsInColon {
@@ -252,7 +252,7 @@ impl Violation for UndocumentedParam {
 
 #[violation]
 pub struct BlankLinesBetweenHeaderAndContent {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for BlankLinesBetweenHeaderAndContent {

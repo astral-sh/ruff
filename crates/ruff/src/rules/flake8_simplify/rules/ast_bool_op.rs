@@ -48,7 +48,7 @@ use crate::registry::AsRule;
 #[violation]
 pub struct DuplicateIsinstanceCall {
     pub name: Option<String>,
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for DuplicateIsinstanceCall {
@@ -78,7 +78,7 @@ impl Violation for DuplicateIsinstanceCall {
 
 #[violation]
 pub struct CompareWithTuple {
-    pub replacement: String,
+    replacement: String,
 }
 
 impl AlwaysAutofixableViolation for CompareWithTuple {
@@ -96,7 +96,7 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
 
 #[violation]
 pub struct ExprAndNotExpr {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for ExprAndNotExpr {
@@ -113,7 +113,7 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
 
 #[violation]
 pub struct ExprOrNotExpr {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for ExprOrNotExpr {
@@ -165,8 +165,8 @@ pub enum ContentAround {
 /// ```
 #[violation]
 pub struct ExprOrTrue {
-    pub expr: String,
-    pub remove: ContentAround,
+    expr: String,
+    remove: ContentAround,
 }
 
 impl AlwaysAutofixableViolation for ExprOrTrue {
@@ -217,8 +217,8 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 /// ```
 #[violation]
 pub struct ExprAndFalse {
-    pub expr: String,
-    pub remove: ContentAround,
+    expr: String,
+    remove: ContentAround,
 }
 
 impl AlwaysAutofixableViolation for ExprAndFalse {

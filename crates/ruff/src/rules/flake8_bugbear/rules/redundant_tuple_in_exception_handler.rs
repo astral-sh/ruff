@@ -9,7 +9,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct RedundantTupleInExceptionHandler {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {

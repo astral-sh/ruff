@@ -3,10 +3,11 @@ use rustpython_parser::ast::{
     Constant, Excepthandler, ExcepthandlerKind, ExprKind, Located, Stmt, StmtKind,
 };
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::has_comments;
 
 use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
@@ -14,19 +15,24 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct SuppressibleException {
-    pub exception: String,
+    exception: String,
+    fixable: bool,
 }
 
-impl AlwaysAutofixableViolation for SuppressibleException {
+impl Violation for SuppressibleException {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuppressibleException { exception } = self;
+        let SuppressibleException { exception, .. } = self;
         format!("Use `contextlib.suppress({exception})` instead of `try`-`except`-`pass`")
     }
 
-    fn autofix_title(&self) -> String {
-        let SuppressibleException { exception } = self;
-        format!("Replace with `contextlib.suppress({exception})`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|SuppressibleException { exception, .. }| {
+                format!("Replace with `contextlib.suppress({exception})`")
+            })
     }
 }
 
@@ -82,14 +88,16 @@ pub fn suppressible_exception(
             } else {
                 handler_names.join(", ")
             };
+            let fixable = !has_comments(stmt, checker.locator);
             let mut diagnostic = Diagnostic::new(
                 SuppressibleException {
                     exception: exception.clone(),
+                    fixable,
                 },
                 stmt.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
+            if fixable && checker.patch(diagnostic.kind.rule()) {
                 diagnostic.try_set_fix(|| {
                     let (import_edit, binding) = get_or_import_symbol(
                         "contextlib",

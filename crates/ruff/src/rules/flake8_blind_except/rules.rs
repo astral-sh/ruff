@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct BlindExcept {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for BlindExcept {

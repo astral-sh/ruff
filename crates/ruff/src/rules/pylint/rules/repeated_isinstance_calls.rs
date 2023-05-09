@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct RepeatedIsinstanceCalls {
-    pub obj: String,
+    obj: String,
     pub types: Vec<String>,
 }
 

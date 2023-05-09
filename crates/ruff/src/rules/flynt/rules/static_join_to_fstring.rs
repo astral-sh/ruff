@@ -10,7 +10,7 @@ use crate::rules::flynt::helpers;
 
 #[violation]
 pub struct StaticJoinToFString {
-    pub expr: String,
+    expr: String,
 }
 
 impl AlwaysAutofixableViolation for StaticJoinToFString {

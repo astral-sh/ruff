@@ -125,7 +125,7 @@ impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
 /// - [Python documentation](https://docs.python.org/3/library/enum.html#enum.Enum)
 #[violation]
 pub struct NonUniqueEnums {
-    pub value: String,
+    value: String,
 }
 
 impl Violation for NonUniqueEnums {
@@ -193,7 +193,7 @@ impl Violation for UnnecessarySpread {
 /// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.endswith)
 #[violation]
 pub struct MultipleStartsEndsWith {
-    pub attr: String,
+    attr: String,
 }
 
 impl AlwaysAutofixableViolation for MultipleStartsEndsWith {

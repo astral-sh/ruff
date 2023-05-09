@@ -11,7 +11,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct DuplicateUnionMember {
-    pub duplicate_name: String,
+    duplicate_name: String,
 }
 
 impl AlwaysAutofixableViolation for DuplicateUnionMember {

@@ -9,8 +9,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct NonPEP585Annotation {
-    pub name: String,
-    pub fixable: bool,
+    name: String,
+    fixable: bool,
 }
 
 impl Violation for NonPEP585Annotation {

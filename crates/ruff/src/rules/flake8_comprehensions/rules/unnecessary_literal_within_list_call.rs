@@ -33,7 +33,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralWithinListCall {
-    pub literal: String,
+    literal: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinListCall {

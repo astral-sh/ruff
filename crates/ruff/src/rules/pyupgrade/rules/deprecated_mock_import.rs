@@ -24,7 +24,7 @@ pub enum MockReference {
 
 #[violation]
 pub struct DeprecatedMockImport {
-    pub reference_type: MockReference,
+    reference_type: MockReference,
 }
 
 impl AlwaysAutofixableViolation for DeprecatedMockImport {

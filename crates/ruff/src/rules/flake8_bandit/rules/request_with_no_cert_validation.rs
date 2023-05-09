@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct RequestWithNoCertValidation {
-    pub string: String,
+    string: String,
 }
 
 impl Violation for RequestWithNoCertValidation {

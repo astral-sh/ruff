@@ -28,8 +28,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 #[violation]
 pub struct BannedImportAlias {
-    pub name: String,
-    pub asname: String,
+    name: String,
+    asname: String,
 }
 
 impl Violation for BannedImportAlias {

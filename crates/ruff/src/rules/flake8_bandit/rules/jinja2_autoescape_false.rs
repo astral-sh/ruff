@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct Jinja2AutoescapeFalse {
-    pub value: bool,
+    value: bool,
 }
 
 impl Violation for Jinja2AutoescapeFalse {

@@ -13,8 +13,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct ConvertTypedDictFunctionalToClass {
-    pub name: String,
-    pub fixable: bool,
+    name: String,
+    fixable: bool,
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {

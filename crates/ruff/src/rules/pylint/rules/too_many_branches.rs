@@ -7,8 +7,8 @@ use ruff_python_ast::source_code::Locator;
 
 #[violation]
 pub struct TooManyBranches {
-    pub branches: usize,
-    pub max_branches: usize,
+    branches: usize,
+    max_branches: usize,
 }
 
 impl Violation for TooManyBranches {

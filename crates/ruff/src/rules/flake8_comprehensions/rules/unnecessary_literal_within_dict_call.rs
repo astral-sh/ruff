@@ -46,7 +46,7 @@ impl fmt::Display for DictKind {
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralWithinDictCall {
-    pub kind: DictKind,
+    kind: DictKind,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinDictCall {

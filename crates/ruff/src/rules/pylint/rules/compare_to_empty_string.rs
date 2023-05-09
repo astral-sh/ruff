@@ -77,8 +77,8 @@ impl std::fmt::Display for EmptyStringCmpop {
 /// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct CompareToEmptyString {
-    pub existing: String,
-    pub replacement: String,
+    existing: String,
+    replacement: String,
 }
 
 impl Violation for CompareToEmptyString {

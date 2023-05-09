@@ -127,7 +127,7 @@ impl Violation for UndefinedLocalWithNestedImportStarUsage {
 
 #[violation]
 pub struct FutureFeatureNotDefined {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for FutureFeatureNotDefined {

@@ -12,7 +12,7 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct NoBlankLineBeforeFunction {
-    pub num_lines: usize,
+    num_lines: usize,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
@@ -29,7 +29,7 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
 
 #[violation]
 pub struct NoBlankLineAfterFunction {
-    pub num_lines: usize,
+    num_lines: usize,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {

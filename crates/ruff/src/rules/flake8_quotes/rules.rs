@@ -34,7 +34,7 @@ use super::settings::Quote;
 /// ```
 #[violation]
 pub struct BadQuotesInlineString {
-    pub quote: Quote,
+    quote: Quote,
 }
 
 impl AlwaysAutofixableViolation for BadQuotesInlineString {
@@ -83,7 +83,7 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 /// ```
 #[violation]
 pub struct BadQuotesMultilineString {
-    pub quote: Quote,
+    quote: Quote,
 }
 
 impl AlwaysAutofixableViolation for BadQuotesMultilineString {
@@ -131,7 +131,7 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 /// ```
 #[violation]
 pub struct BadQuotesDocstring {
-    pub quote: Quote,
+    quote: Quote,
 }
 
 impl AlwaysAutofixableViolation for BadQuotesDocstring {

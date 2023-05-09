@@ -7,7 +7,7 @@ use super::super::helpers::{matches_password_name, string_literal};
 
 #[violation]
 pub struct HardcodedPasswordString {
-    pub string: String,
+    string: String,
 }
 
 impl Violation for HardcodedPasswordString {

@@ -36,7 +36,7 @@ use super::types::Argumentable;
 /// ```
 #[violation]
 pub struct UnusedFunctionArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedFunctionArgument {
@@ -69,7 +69,7 @@ impl Violation for UnusedFunctionArgument {
 /// ```
 #[violation]
 pub struct UnusedMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedMethodArgument {
@@ -110,7 +110,7 @@ impl Violation for UnusedMethodArgument {
 /// ```
 #[violation]
 pub struct UnusedClassMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedClassMethodArgument {
@@ -151,7 +151,7 @@ impl Violation for UnusedClassMethodArgument {
 /// ```
 #[violation]
 pub struct UnusedStaticMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedStaticMethodArgument {
@@ -183,7 +183,7 @@ impl Violation for UnusedStaticMethodArgument {
 /// ```
 #[violation]
 pub struct UnusedLambdaArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedLambdaArgument {

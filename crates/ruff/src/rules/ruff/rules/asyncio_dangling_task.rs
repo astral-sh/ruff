@@ -51,7 +51,7 @@ use ruff_python_ast::call_path::CallPath;
 /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 #[violation]
 pub struct AsyncioDanglingTask {
-    pub method: Method,
+    method: Method,
 }
 
 impl Violation for AsyncioDanglingTask {

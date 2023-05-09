@@ -9,8 +9,8 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct LoadBeforeGlobalDeclaration {
-    pub name: String,
-    pub line: OneIndexed,
+    name: String,
+    line: OneIndexed,
 }
 
 impl Violation for LoadBeforeGlobalDeclaration {

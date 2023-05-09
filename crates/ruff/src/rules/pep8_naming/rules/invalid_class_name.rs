@@ -36,7 +36,7 @@ use ruff_python_ast::source_code::Locator;
 /// [PEP 8]: https://peps.python.org/pep-0008/#class-names
 #[violation]
 pub struct InvalidClassName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for InvalidClassName {

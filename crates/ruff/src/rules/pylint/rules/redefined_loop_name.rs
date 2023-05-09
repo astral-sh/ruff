@@ -94,9 +94,9 @@ impl PartialEq<InnerBindingKind> for OuterBindingKind {
 /// ```
 #[violation]
 pub struct RedefinedLoopName {
-    pub name: String,
-    pub outer_kind: OuterBindingKind,
-    pub inner_kind: InnerBindingKind,
+    name: String,
+    outer_kind: OuterBindingKind,
+    inner_kind: InnerBindingKind,
 }
 
 impl Violation for RedefinedLoopName {

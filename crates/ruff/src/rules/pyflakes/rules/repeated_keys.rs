@@ -13,8 +13,8 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
-    pub name: String,
-    pub repeated_value: bool,
+    name: String,
+    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
@@ -39,8 +39,8 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 }
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
-    pub name: String,
-    pub repeated_value: bool,
+    name: String,
+    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyVariable {

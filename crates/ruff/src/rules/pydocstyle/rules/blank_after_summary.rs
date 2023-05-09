@@ -8,7 +8,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct BlankLineAfterSummary {
-    pub num_lines: usize,
+    num_lines: usize,
 }
 
 fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String {

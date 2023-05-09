@@ -43,7 +43,7 @@ use super::fix_with;
 /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[violation]
 pub struct MultipleWithStatements {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for MultipleWithStatements {

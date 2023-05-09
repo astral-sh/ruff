@@ -30,7 +30,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessarySubscriptReversal {
-    pub func: String,
+    func: String,
 }
 
 impl Violation for UnnecessarySubscriptReversal {

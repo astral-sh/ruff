@@ -15,7 +15,7 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct DuplicateTryBlockException {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for DuplicateTryBlockException {

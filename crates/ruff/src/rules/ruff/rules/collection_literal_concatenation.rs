@@ -9,8 +9,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct CollectionLiteralConcatenation {
-    pub expr: String,
-    pub fixable: bool,
+    expr: String,
+    fixable: bool,
 }
 
 impl Violation for CollectionLiteralConcatenation {

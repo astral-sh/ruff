@@ -30,7 +30,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralDict {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralDict {

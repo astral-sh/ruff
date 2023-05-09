@@ -10,7 +10,7 @@ use super::super::types::Primitive;
 
 #[violation]
 pub struct TypeOfPrimitive {
-    pub primitive: Primitive,
+    primitive: Primitive,
 }
 
 impl AlwaysAutofixableViolation for TypeOfPrimitive {

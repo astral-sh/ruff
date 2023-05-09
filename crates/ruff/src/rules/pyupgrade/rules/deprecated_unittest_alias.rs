@@ -10,8 +10,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct DeprecatedUnittestAlias {
-    pub alias: String,
-    pub target: String,
+    alias: String,
+    target: String,
 }
 
 impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {

@@ -9,7 +9,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct DatetimeTimezoneUTC {
-    pub straight_import: bool,
+    straight_import: bool,
 }
 
 impl Violation for DatetimeTimezoneUTC {

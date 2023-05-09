@@ -10,7 +10,7 @@ use crate::registry::Rule;
 
 #[violation]
 pub struct AbstractBaseClassWithoutAbstractMethod {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
@@ -22,7 +22,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 }
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for EmptyMethodWithoutAbstractDecorator {

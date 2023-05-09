@@ -30,7 +30,7 @@ use crate::registry::AsRule;
 /// ```
 #[violation]
 pub struct NumpyDeprecatedTypeAlias {
-    pub type_name: String,
+    type_name: String,
 }
 
 impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {

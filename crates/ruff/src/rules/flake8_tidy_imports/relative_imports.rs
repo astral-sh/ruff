@@ -59,7 +59,7 @@ pub enum Strictness {
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
 pub struct RelativeImports {
-    pub strictness: Strictness,
+    strictness: Strictness,
 }
 
 impl Violation for RelativeImports {

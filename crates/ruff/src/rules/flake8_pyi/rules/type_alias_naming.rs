@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct SnakeCaseTypeAlias {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for SnakeCaseTypeAlias {
@@ -20,7 +20,7 @@ impl Violation for SnakeCaseTypeAlias {
 
 #[violation]
 pub struct TSuffixedTypeAlias {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for TSuffixedTypeAlias {

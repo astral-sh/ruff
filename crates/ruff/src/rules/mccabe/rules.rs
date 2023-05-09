@@ -48,9 +48,9 @@ use ruff_python_ast::source_code::Locator;
 /// ```
 #[violation]
 pub struct ComplexStructure {
-    pub name: String,
-    pub complexity: usize,
-    pub max_complexity: usize,
+    name: String,
+    complexity: usize,
+    max_complexity: usize,
 }
 
 impl Violation for ComplexStructure {
