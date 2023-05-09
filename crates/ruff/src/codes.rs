@@ -737,6 +737,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Django, "012") => Rule::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => Rule::DjangoNonLeadingReceiverDecorator,
 
+        // flynt
+        // Reserved: (Flynt, "001") => Rule::StringConcatenationToFString,
+        (Flynt, "002") => Rule::StaticJoinToFString,
+
         _ => return None,
     })
 }
