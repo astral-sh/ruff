@@ -417,7 +417,7 @@ fn handle_value_rows(
 
 pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     for decorator in decorators {
-        if is_pytest_parametrize(decorator, checker) {
+        if is_pytest_parametrize(&checker.ctx, decorator) {
             if let ExprKind::Call { args, .. } = &decorator.node {
                 if checker
                     .settings
