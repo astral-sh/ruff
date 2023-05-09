@@ -137,7 +137,6 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
                         #[allow(deprecated)]
-                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
                             pass_stmt.range().add_end(index),
                         )));
