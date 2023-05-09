@@ -16,7 +16,7 @@ mod tests {
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"); "SIM101")]
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"); "SIM102")]
     #[test_case(Rule::NeedlessBool, Path::new("SIM103.py"); "SIM103")]
-    #[test_case(Rule::SuppressibleException, Path::new("SIM105.py"); "SIM105")]
+    #[test_case(Rule::SuppressibleException, Path::new("SIM105_0.py"); "SIM105_0")]
     #[test_case(Rule::SuppressibleException, Path::new("SIM105_1.py"); "SIM105_1")]
     #[test_case(Rule::SuppressibleException, Path::new("SIM105_2.py"); "SIM105_2")]
     #[test_case(Rule::ReturnInTryExceptFinally, Path::new("SIM107.py"); "SIM107")]
