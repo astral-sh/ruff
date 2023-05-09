@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 
-use regex::{Regex, RegexSet};
+use regex::RegexSet;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::{TextRange, TextSize};
@@ -267,7 +267,7 @@ pub fn check_todos(
         };
 
         check_for_tag_errors(&tag, &mut diagnostics, autofix, settings);
-        check_for_static_errors(comment, token_range, &tag, &mut diagnostics);
+        check_for_static_errors(comment, *token_range, &tag, &mut diagnostics);
 
         // TDO-003
         if let Some((next_token, _next_range)) = iter.peek() {
@@ -341,11 +341,11 @@ fn check_for_tag_errors(
             );
 
             if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
-                invalid_capitalization.set_fix(Fix::new(vec![Edit::replacement(
+                invalid_capitalization.set_fix(Fix::unspecified(Edit::replacement(
                     "TODO".to_string(),
                     tag.range.start(),
                     tag.range.end(),
-                )]));
+                )));
             }
 
             diagnostics.push(invalid_capitalization);
@@ -357,11 +357,11 @@ fn check_for_tag_errors(
 /// modifies `diagnostics` in-place.
 fn check_for_static_errors(
     comment: &str,
-    comment_range: &TextRange,
+    comment_range: TextRange,
     tag: &Tag,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    // Relative offset of the current character vs.the comment range, after we skip the tag.
+    // Relative offset of the current character from the start of the comment.
     let mut relative_offset: usize = usize::try_from(tag.range.end() - comment_range.start())
         .ok()
         .unwrap();
@@ -371,7 +371,7 @@ fn check_for_static_errors(
     // Absolute offset of the comment's colon from the start of the file.
     let mut colon_offset: Option<TextSize> = None;
 
-    // An "author block" must be contained in parantheses, like "(ruff)". To check if it exists,
+    // An "author block" must be contained in parentheses, like "(ruff)". To check if it exists,
     // we can check the first non-whitespace character after the tag. If that first character is a
     // left parenthesis, we can say that we have an author's block.
     for char in comment_chars.by_ref() {
@@ -416,14 +416,16 @@ fn check_for_static_errors(
         ));
     }
 
-    // A valid colon must be the character after the author block. If the author block doesn't
-    // exist, the colon must directly follow the tag.
-    if let Some(char) = comment_chars.next() {
-        relative_offset += 1;
+    // A valid colon must be the character after the author block (or after the tag, if the author
+    // block doesn't exist).
+    if colon_offset.is_none() {
+        if let Some(char) = comment_chars.next() {
+            relative_offset += 1;
 
-        if char == ':' {
-            colon_offset =
-                Some(comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap());
+            if char == ':' {
+                colon_offset =
+                    Some(comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap());
+            }
         }
     }
 
@@ -450,7 +452,7 @@ fn check_for_static_errors(
         diagnostics.push(Diagnostic::new(
             MissingColonInTodo,
             TextRange::at(adjusted_colon_position, TextSize::new(1)),
-        ))
+        ));
     }
 
     match comment_chars.next() {
@@ -476,7 +478,7 @@ mod tests {
         assert_eq!(
             Some(expected),
             detect_tag(
-                &test_comment.to_owned(),
+                test_comment,
                 &TextRange::new(TextSize::new(0), TextSize::new(15)),
             )
         );
@@ -489,7 +491,7 @@ mod tests {
         assert_eq!(
             Some(expected),
             detect_tag(
-                &test_comment.to_owned(),
+                test_comment,
                 &TextRange::new(TextSize::new(0), TextSize::new(15)),
             )
         );
@@ -503,7 +505,7 @@ mod tests {
         assert_eq!(
             Some(expected),
             detect_tag(
-                &test_comment.to_owned(),
+                test_comment,
                 &TextRange::new(TextSize::new(0), TextSize::new(15)),
             )
         );
@@ -515,7 +517,7 @@ mod tests {
         assert_eq!(
             Some(expected),
             detect_tag(
-                &test_comment.to_owned(),
+                test_comment,
                 &TextRange::new(TextSize::new(0), TextSize::new(17)),
             )
         );

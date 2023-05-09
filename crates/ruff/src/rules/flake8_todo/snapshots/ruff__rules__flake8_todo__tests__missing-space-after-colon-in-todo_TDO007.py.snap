@@ -1,16 +1,6 @@
 ---
 source: crates/ruff/src/rules/flake8_todo/mod.rs
 ---
-TDO007.py:3:8: TDO007 Missing space after colon in TODO
-  |
-3 | # T007 - accepted
-4 | # TODO(evanrittenhouse): this has a space after a colon
-5 | # TODO: so does this
-  |        ^ TDO007
-6 | # T007 - errors
-7 | # TODO(evanrittenhouse):this has no space after a colon
-  |
-
 TDO007.py:5:25: TDO007 Missing space after colon in TODO
   |
 5 | # TODO: so does this
