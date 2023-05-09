@@ -71,13 +71,13 @@ impl Emitter for TextEmitter {
                     write!(
                         writer,
                         "cell {cell}{sep}",
-                        cell = jupyter_index.row_to_cell[start_location.row.to_one_indexed()],
+                        cell = jupyter_index.row_to_cell[start_location.row.to_usize()],
                         sep = ":".cyan(),
                     )?;
 
                     SourceLocation {
                         row: OneIndexed::new(
-                            jupyter_index.row_to_row_in_cell[start_location.row.to_one_indexed()],
+                            jupyter_index.row_to_row_in_cell[start_location.row.to_usize()],
                         )
                         .unwrap(),
                         column: start_location.column,
@@ -188,7 +188,7 @@ impl Display for MessageCodeFrame<'_> {
         let content_end_index = source_code.line_index(range.end());
         let mut end_index = content_end_index
             .saturating_add(2)
-            .min(OneIndexed::from_zero_indexed(source_code.line_count()));
+            .min(OneIndexed::try_from_zero_indexed(source_code.line_count()).unwrap());
 
         // Trim trailing empty lines
         while end_index > content_end_index {
@@ -219,7 +219,7 @@ impl Display for MessageCodeFrame<'_> {
             title: None,
             slices: vec![Slice {
                 source: &source.text,
-                line_start: content_start_index.to_one_indexed(),
+                line_start: content_start_index.to_usize(),
                 annotations: vec![SourceAnnotation {
                     label: &label,
                     annotation_type: AnnotationType::Error,

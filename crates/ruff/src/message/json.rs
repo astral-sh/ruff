@@ -96,7 +96,7 @@ impl Serialize for ExpandedEdits<'_> {
 fn to_zero_indexed_column(location: &SourceLocation) -> Value {
     json!({
         "row": location.row,
-        "column": location.column.to_zero_indexed()
+        "column": location.column.to_zero_indexed_usize()
     })
 }
 

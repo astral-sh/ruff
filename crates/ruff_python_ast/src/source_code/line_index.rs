@@ -91,7 +91,7 @@ impl LineIndex {
     ///
     /// If the offset is out of bounds.
     pub fn source_location(&self, offset: TextSize, content: &str) -> SourceLocation {
-        match self.line_starts().binary_search(&offset) {
+        match self.binary_search_line(&offset) {
             // Offset is at the start of a line
             Ok(row) => SourceLocation {
                 row: OneIndexed::from_zero_indexed(row),
@@ -100,17 +100,18 @@ impl LineIndex {
             Err(next_row) => {
                 // SAFETY: Safe because the index always contains an entry for the offset 0
                 let row = next_row - 1;
-                let mut line_start = self.line_starts()[row];
+                let mut line_start = self.line_starts()[row as usize];
 
                 let column = if self.kind().is_ascii() {
-                    usize::from(offset) - usize::from(line_start)
+                    u32::from(offset - line_start)
                 } else {
                     // Don't count the BOM character as a column.
                     if line_start == TextSize::from(0) && content.starts_with('\u{feff}') {
                         line_start = '\u{feff}'.text_len();
                     }
 
-                    content[TextRange::new(line_start, offset)].chars().count()
+                    let range = TextRange::new(line_start, offset);
+                    content[range].chars().count().try_into().unwrap()
                 };
 
                 SourceLocation {
@@ -145,7 +146,7 @@ impl LineIndex {
     ///
     /// If the offset is out of bounds.
     pub fn line_index(&self, offset: TextSize) -> OneIndexed {
-        match self.line_starts().binary_search(&offset) {
+        match self.binary_search_line(&offset) {
             // Offset is at the start of a line
             Ok(row) => OneIndexed::from_zero_indexed(row),
             Err(row) => {
@@ -157,7 +158,7 @@ impl LineIndex {
 
     /// Returns the [byte offset](TextSize) for the `line` with the given index.
     pub(crate) fn line_start(&self, line: OneIndexed, contents: &str) -> TextSize {
-        let row_index = line.to_zero_indexed();
+        let row_index = line.to_zero_indexed_usize();
         let starts = self.line_starts();
 
         // If start-of-line position after last line
@@ -171,7 +172,7 @@ impl LineIndex {
     /// Returns the [byte offset](TextSize) of the `line`'s end.
     /// The offset is the end of the line, up to and including the newline character ending the line (if any).
     pub(crate) fn line_end(&self, line: OneIndexed, contents: &str) -> TextSize {
-        let row_index = line.to_zero_indexed();
+        let row_index = line.to_zero_indexed_usize();
         let starts = self.line_starts();
 
         // If start-of-line position after last line
@@ -188,7 +189,7 @@ impl LineIndex {
     pub(crate) fn line_range(&self, line: OneIndexed, contents: &str) -> TextRange {
         let starts = self.line_starts();
 
-        if starts.len() == line.to_zero_indexed() {
+        if starts.len() == line.to_zero_indexed_usize() {
             TextRange::empty(contents.text_len())
         } else {
             TextRange::new(
@@ -201,6 +202,15 @@ impl LineIndex {
     /// Returns the [byte offsets](TextSize) for every line
     pub fn line_starts(&self) -> &[TextSize] {
         &self.inner.line_starts
+    }
+
+    #[allow(clippy::trivially_copy_pass_by_ref)] // to keep same interface as `[T]::binary_search`
+    fn binary_search_line(&self, offset: &TextSize) -> Result<u32, u32> {
+        // `try_into()` always success as long as TextSize is u32
+        match self.line_starts().binary_search(offset) {
+            Ok(index) => Ok(index.try_into().unwrap()),
+            Err(index) => Err(index.try_into().unwrap()),
+        }
     }
 }
 
@@ -238,21 +248,17 @@ impl IndexKind {
 ///
 /// Internally this is represented as a [`NonZeroU32`], this enables some
 /// memory optimizations
-///
-/// Conversion between `usize` and `OneIndexed` always specify
-/// zero-indexed or one-indexed. The internal representation is always
-/// one-indexed.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct OneIndexed(NonZeroU32);
 
 #[allow(clippy::cast_possible_truncation)] // manually checked
-const fn index_to_u32(value: usize) -> u32 {
-    assert!(
-        value <= u32::MAX as usize,
-        "Value is too large to be represented as a OneIndexed"
-    );
-    value as u32
+const fn try_to_u32(value: usize) -> Result<u32, usize> {
+    if value <= u32::MAX as usize {
+        Ok(value as u32)
+    } else {
+        Err(value)
+    }
 }
 
 impl OneIndexed {
@@ -273,12 +279,16 @@ impl OneIndexed {
     }
 
     /// Construct a new [`OneIndexed`] from a zero-indexed value
-    ///
-    /// # Panics
-    /// Panics if the given value doesn't fit in u32
-    pub const fn from_zero_indexed(value: usize) -> Self {
-        let value = index_to_u32(value);
+    pub const fn from_zero_indexed(value: u32) -> Self {
         Self(Self::ONE.saturating_add(value))
+    }
+
+    /// Construct a new [`OneIndexed`] from a zero-indexed usize value
+    pub const fn try_from_zero_indexed(value: usize) -> Result<Self, usize> {
+        match try_to_u32(value) {
+            Ok(value) => Ok(Self(Self::ONE.saturating_add(value))),
+            Err(value) => Err(value),
+        }
     }
 
     /// Returns the value as a primitive type.
@@ -286,14 +296,19 @@ impl OneIndexed {
         self.0.get()
     }
 
-    /// Return the one-indexed primitive value for this [`OneIndexed`]
-    pub const fn to_one_indexed(self) -> usize {
+    /// Return the usize value for this [`OneIndexed`]
+    pub const fn to_usize(self) -> usize {
         self.get() as _
     }
 
     /// Return the zero-indexed primitive value for this [`OneIndexed`]
-    pub const fn to_zero_indexed(self) -> usize {
-        self.0.get() as usize - 1
+    pub const fn to_zero_indexed(self) -> u32 {
+        self.0.get() - 1
+    }
+
+    /// Return the zero-indexed usize value for this [`OneIndexed`]
+    pub const fn to_zero_indexed_usize(self) -> usize {
+        self.to_zero_indexed() as _
     }
 
     /// Saturating integer addition. Computes `self + rhs`, saturating at

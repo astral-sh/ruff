@@ -55,8 +55,9 @@ impl Display for Diff<'_> {
             .map(|op| (op.old_range().start, op.new_range().start))
             .unwrap_or_default();
 
-        let digit_with =
-            calculate_print_width(OneIndexed::from_zero_indexed(largest_new.max(largest_old)));
+        let digit_with = calculate_print_width(
+            OneIndexed::try_from_zero_indexed(largest_new.max(largest_old)).unwrap(),
+        );
 
         for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
             if idx > 0 {
@@ -72,8 +73,12 @@ impl Display for Diff<'_> {
 
                     let line_style = LineStyle::from(change.tag());
 
-                    let old_index = change.old_index().map(OneIndexed::from_zero_indexed);
-                    let new_index = change.new_index().map(OneIndexed::from_zero_indexed);
+                    let old_index = change
+                        .old_index()
+                        .map(|i| OneIndexed::try_from_zero_indexed(i).unwrap());
+                    let new_index = change
+                        .new_index()
+                        .map(|i| OneIndexed::try_from_zero_indexed(i).unwrap());
 
                     write!(
                         f,
