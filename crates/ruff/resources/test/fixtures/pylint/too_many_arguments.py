@@ -22,13 +22,13 @@ def f(x=1, y=1, z=1):  # OK
     pass
 
 
-def f(x, y, z, /, u, v, w):  # OK
+def f(x, y, z, /, u, v, w):  # Too many arguments (6/5)
     pass
 
 
-def f(x, y, z, *, u, v, w):  # OK
+def f(x, y, z, *, u, v, w):  # Too many arguments (6/5)
     pass
 
 
-def f(x, y, z, a, b, c, *, u, v, w):  # Too many arguments (6/5)
+def f(x, y, z, a, b, c, *, u, v, w):  # Too many arguments (9/5)
     pass
