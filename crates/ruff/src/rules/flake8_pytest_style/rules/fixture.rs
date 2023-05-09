@@ -10,14 +10,15 @@ use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
+use ruff_python_semantic::analyze::visibility::is_abstract;
+use ruff_python_semantic::context::Context;
 
 use crate::autofix::actions::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
 use super::helpers::{
-    get_mark_decorators, is_abstractmethod_decorator, is_pytest_fixture, is_pytest_yield_fixture,
-    keyword_is_literal,
+    get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
 };
 
 #[violation]
@@ -224,16 +225,10 @@ where
     }
 }
 
-fn get_fixture_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
+fn get_fixture_decorator<'a>(context: &Context, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(decorator, checker) || is_pytest_yield_fixture(decorator, checker)
+        is_pytest_fixture(context, decorator) || is_pytest_yield_fixture(context, decorator)
     })
-}
-
-fn has_abstractmethod_decorator(decorators: &[Expr], checker: &Checker) -> bool {
-    decorators
-        .iter()
-        .any(|decorator| is_abstractmethod_decorator(decorator, checker))
 }
 
 fn pytest_fixture_parentheses(
@@ -429,7 +424,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 
 /// PT020
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
-    if is_pytest_yield_fixture(decorator, checker) {
+    if is_pytest_yield_fixture(&checker.ctx, decorator) {
         checker.diagnostics.push(Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
@@ -503,7 +498,7 @@ pub fn fixture(
     decorators: &[Expr],
     body: &[Stmt],
 ) {
-    let decorator = get_fixture_decorator(checker, decorators);
+    let decorator = get_fixture_decorator(&checker.ctx, decorators);
     if let Some(decorator) = decorator {
         if checker
             .settings
@@ -542,7 +537,7 @@ pub fn fixture(
                 .settings
                 .rules
                 .enabled(Rule::PytestUselessYieldFixture))
-            && !has_abstractmethod_decorator(decorators, checker)
+            && !is_abstract(&checker.ctx, decorators)
         {
             check_fixture_returns(checker, stmt, name, body);
         }
