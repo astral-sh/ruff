@@ -174,13 +174,6 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     } else if matches!(format, SerializationFormat::Json) {
         flags::FixMode::Generate
     } else {
-        #[cfg(feature = "ecosystem_ci")]
-        if ecosystem_ci {
-            flags::FixMode::Generate
-        } else {
-            flags::FixMode::None
-        }
-        #[cfg(not(feature = "ecosystem_ci"))]
         flags::FixMode::None
     };
     let cache = !cli.no_cache;
