@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -116,10 +116,10 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             value: capital_env_var.into(),
             kind: kind.clone(),
         });
-        diagnostic.set_fix(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(&new_env_var, checker.stylist),
             slice.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -176,7 +176,10 @@ pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(expected, expr.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            expected,
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

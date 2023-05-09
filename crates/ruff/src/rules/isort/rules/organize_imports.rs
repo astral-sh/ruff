@@ -5,7 +5,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::Stmt;
 use textwrap::indent;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{
     followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
@@ -148,10 +148,10 @@ pub fn organize_imports(
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 indent(&expected, indentation),
                 range,
-            ));
+            )));
         }
         Some(diagnostic)
     }

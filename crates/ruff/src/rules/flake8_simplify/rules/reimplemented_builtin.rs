@@ -4,7 +4,7 @@ use rustpython_parser::ast::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -227,11 +227,11 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
-                    diagnostic.set_fix(Edit::replacement(
+                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,
                         stmt.start(),
                         loop_info.terminal,
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -308,11 +308,11 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
-                    diagnostic.set_fix(Edit::replacement(
+                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,
                         stmt.start(),
                         loop_info.terminal,
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

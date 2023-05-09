@@ -203,7 +203,7 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
         }),
         stylist,
     );
-    Fix::from_iter([
+    Fix::unspecified_edits(
         Edit::insertion(
             format!(
                 "{}{}{}",
@@ -213,8 +213,11 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
             ),
             stmt.start(),
         ),
-        Edit::range_replacement(String::from("msg"), exc_arg.range()),
-    ])
+        [Edit::range_replacement(
+            String::from("msg"),
+            exc_arg.range(),
+        )],
+    )
 }
 
 /// EM101, EM102, EM103

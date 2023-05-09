@@ -189,6 +189,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::LoggingTooFewArgs,
     rules::pylint::rules::LoggingTooManyArgs,
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
+    rules::pylint::rules::NestedMinMax,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -671,6 +672,8 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
     rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
+    // flynt
+    rules::flynt::rules::StaticJoinToFString,
 );
 
 pub trait AsRule {
@@ -829,6 +832,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flynt](https://pypi.org/project/flynt/)
+    #[prefix = "FLY"]
+    Flynt,
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,

@@ -1,5 +1,6 @@
-use crate::registry::{Linter, Rule};
 use std::fmt::Formatter;
+
+use crate::registry::{Linter, Rule};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
@@ -211,6 +212,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
         (Pylint, "E0302") => Rule::UnexpectedSpecialMethodSignature,
+        (Pylint, "W3301") => Rule::NestedMinMax,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -737,6 +739,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Django, "008") => Rule::DjangoModelWithoutDunderStr,
         (Flake8Django, "012") => Rule::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => Rule::DjangoNonLeadingReceiverDecorator,
+
+        // flynt
+        // Reserved: (Flynt, "001") => Rule::StringConcatenationToFString,
+        (Flynt, "002") => Rule::StaticJoinToFString,
 
         _ => return None,
     })

@@ -14,12 +14,12 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// area = (lambda r: 3.14 * r ** 2)(radius)
+/// area = (lambda r: 3.14 * r**2)(radius)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// area = 3.14 * radius ** 2
+/// area = 3.14 * radius**2
 /// ```
 ///
 /// ## References

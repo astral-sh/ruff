@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.264'
+  rev: 'v0.0.265'
   hooks:
     - id: ruff
 ```
@@ -183,6 +183,7 @@ exclude = [
     ".direnv",
     ".eggs",
     ".git",
+    ".git-rewrite",
     ".hg",
     ".mypy_cache",
     ".nox",
@@ -281,6 +282,7 @@ quality tools, including:
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/charliermarsh/ruff/issues/2102))
 - [isort](https://pypi.org/project/isort/)
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)

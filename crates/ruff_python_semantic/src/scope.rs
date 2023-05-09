@@ -104,41 +104,6 @@ impl<'a> Scope<'a> {
     }
 }
 
-/// Id uniquely identifying a scope in a program.
-///
-/// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
-/// and it is impossible to have more scopes than characters in the file (because defining a function or class
-/// requires more than one character).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct ScopeId(u32);
-
-impl ScopeId {
-    /// Returns the ID for the global scope
-    #[inline]
-    pub const fn global() -> Self {
-        ScopeId(0)
-    }
-
-    /// Returns `true` if this is the id of the global scope
-    pub const fn is_global(&self) -> bool {
-        self.0 == 0
-    }
-}
-
-impl TryFrom<usize> for ScopeId {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(u32::try_from(value)?))
-    }
-}
-
-impl From<ScopeId> for usize {
-    fn from(value: ScopeId) -> Self {
-        value.0 as usize
-    }
-}
-
 #[derive(Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
     Class(ClassDef<'a>),
@@ -179,6 +144,41 @@ pub struct ClassDef<'a> {
 pub struct Lambda<'a> {
     pub args: &'a Arguments,
     pub body: &'a Expr,
+}
+
+/// Id uniquely identifying a scope in a program.
+///
+/// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
+/// and it is impossible to have more scopes than characters in the file (because defining a function or class
+/// requires more than one character).
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ScopeId(u32);
+
+impl ScopeId {
+    /// Returns the ID for the global scope
+    #[inline]
+    pub const fn global() -> Self {
+        ScopeId(0)
+    }
+
+    /// Returns `true` if this is the id of the global scope
+    pub const fn is_global(&self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl TryFrom<usize> for ScopeId {
+    type Error = TryFromIntError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(Self(u32::try_from(value)?))
+    }
+}
+
+impl From<ScopeId> for usize {
+    fn from(value: ScopeId) -> Self {
+        value.0 as usize
+    }
 }
 
 /// The scopes of a program indexed by [`ScopeId`]

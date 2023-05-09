@@ -4,7 +4,7 @@ use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -160,9 +160,7 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// import json
 ///
 ///
-/// foo = json.dumps({
-///     "bar": 1,
-/// }),
+/// foo = json.dumps({"bar": 1}),
 /// ```
 ///
 /// Use instead:
@@ -170,9 +168,7 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// import json
 ///
 ///
-/// foo = json.dumps({
-///     "bar": 1,
-/// })
+/// foo = json.dumps({"bar": 1})
 /// ```
 ///
 /// In the event that a tuple is intended, then use instead:
@@ -180,11 +176,7 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// import json
 ///
 ///
-/// foo = (
-///     json.dumps({
-///         "bar": 1,
-///     }),
-/// )
+/// foo = (json.dumps({"bar": 1}),)
 /// ```
 #[violation]
 pub struct TrailingCommaOnBareTuple;
@@ -333,7 +325,7 @@ pub fn trailing_commas(
             let comma = prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
             if autofix.into() && settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
-                diagnostic.set_fix(Edit::range_deletion(diagnostic.range()));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(diagnostic.range())));
             }
             diagnostics.push(diagnostic);
         }
@@ -373,10 +365,10 @@ pub fn trailing_commas(
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
                 let contents = locator.slice(missing_comma.1);
-                diagnostic.set_fix(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     format!("{contents},"),
                     missing_comma.1,
-                ));
+                )));
             }
             diagnostics.push(diagnostic);
         }

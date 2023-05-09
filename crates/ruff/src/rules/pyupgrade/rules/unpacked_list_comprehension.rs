@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -101,7 +101,10 @@ pub fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], valu
                 content.push('(');
                 content.push_str(&existing[1..existing.len() - 1]);
                 content.push(')');
-                diagnostic.set_fix(Edit::range_replacement(content, value.range()));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    content,
+                    value.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

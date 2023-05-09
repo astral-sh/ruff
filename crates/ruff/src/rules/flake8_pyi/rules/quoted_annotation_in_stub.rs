@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::TextRange;
 
@@ -23,7 +23,10 @@ impl AlwaysAutofixableViolation for QuotedAnnotationInStub {
 pub fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotationInStub, range);
     if checker.patch(Rule::QuotedAnnotationInStub) {
-        diagnostic.set_fix(Edit::range_replacement(annotation.to_string(), range));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            annotation.to_string(),
+            range,
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

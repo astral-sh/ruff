@@ -5,7 +5,7 @@ use ruff_text_size::{TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::Fix;
+use crate::{Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -24,7 +24,7 @@ pub struct DiagnosticKind {
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub range: TextRange,
-    pub fix: Fix,
+    pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
 }
 
@@ -33,21 +33,28 @@ impl Diagnostic {
         Self {
             kind: kind.into(),
             range,
-            fix: Fix::empty(),
+            fix: None,
             parent: None,
         }
     }
 
     /// Set the [`Fix`] used to fix the diagnostic.
     #[inline]
-    pub fn set_fix<T: Into<Fix>>(&mut self, fix: T) {
-        self.fix = fix.into();
+    pub fn set_fix(&mut self, fix: Fix) {
+        self.fix = Some(fix);
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    #[deprecated(note = "Use `Diagnostic::set_fix` instead.")]
+    pub fn set_fix_from_edit(&mut self, edit: Edit) {
+        self.fix = Some(Fix::unspecified(edit));
     }
 
     /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
     #[inline]
     #[must_use]
-    pub fn with_fix<T: Into<Fix>>(mut self, fix: T) -> Self {
+    pub fn with_fix(mut self, fix: Fix) -> Self {
         self.set_fix(fix);
         self
     }
@@ -55,9 +62,20 @@ impl Diagnostic {
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
     #[inline]
-    pub fn try_set_fix<T: Into<Fix>>(&mut self, func: impl FnOnce() -> Result<T>) {
+    pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Fix>) {
         match func() {
-            Ok(fix) => self.fix = fix.into(),
+            Ok(fix) => self.fix = Some(fix),
+            Err(err) => error!("Failed to create fix: {}", err),
+        }
+    }
+
+    /// Sets an [`Edit`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    #[deprecated(note = "Use Diagnostic::try_set_fix instead")]
+    pub fn try_set_fix_from_edit(&mut self, func: impl FnOnce() -> Result<Edit>) {
+        match func() {
+            Ok(edit) => self.fix = Some(Fix::unspecified(edit)),
             Err(err) => error!("Failed to create fix: {}", err),
         }
     }

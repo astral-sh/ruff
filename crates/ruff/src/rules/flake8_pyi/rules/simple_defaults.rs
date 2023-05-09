@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::context::Context;
 
@@ -298,10 +298,10 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
-                            ));
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -324,10 +324,10 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
-                            ));
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -353,10 +353,10 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
-                            ));
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -379,10 +379,10 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
-                            ));
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -410,7 +410,10 @@ pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement("...".to_string(), value.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            "...".to_string(),
+            value.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -437,7 +440,10 @@ pub fn annotated_assignment_default_in_stub(
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement("...".to_string(), value.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            "...".to_string(),
+            value.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

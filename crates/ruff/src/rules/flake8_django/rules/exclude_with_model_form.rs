@@ -17,6 +17,7 @@ use crate::rules::flake8_django::rules::helpers::is_model_form;
 /// ```python
 /// from django.forms import ModelForm
 ///
+///
 /// class PostForm(ModelForm):
 ///     class Meta:
 ///         model = Post
@@ -26,6 +27,7 @@ use crate::rules::flake8_django::rules::helpers::is_model_form;
 /// Use instead:
 /// ```python
 /// from django.forms import ModelForm
+///
 ///
 /// class PostForm(ModelForm):
 ///     class Meta:

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 
@@ -44,10 +44,10 @@ pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
         let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC { straight_import }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             if straight_import {
-                diagnostic.set_fix(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     "datetime.UTC".to_string(),
                     expr.range(),
-                ));
+                )));
             }
         }
         checker.diagnostics.push(diagnostic);

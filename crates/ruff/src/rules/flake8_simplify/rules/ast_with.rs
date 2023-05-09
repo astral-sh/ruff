@@ -3,8 +3,8 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
 use ruff_python_ast::newlines::StrExt;
@@ -111,14 +111,14 @@ pub fn multiple_with_statements(
                 checker.stylist,
                 with_stmt,
             ) {
-                Ok(fix) => {
-                    if fix
+                Ok(edit) => {
+                    if edit
                         .content()
                         .unwrap_or_default()
                         .universal_newlines()
                         .all(|line| line.width() <= checker.settings.line_length)
                     {
-                        diagnostic.set_fix(fix);
+                        diagnostic.set_fix(Fix::unspecified(edit));
                     }
                 }
                 Err(err) => error!("Failed to fix nested with: {err}"),

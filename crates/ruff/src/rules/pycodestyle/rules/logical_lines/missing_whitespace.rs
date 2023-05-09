@@ -1,7 +1,7 @@
 use super::LogicalLine;
 use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 use ruff_text_size::{TextRange, TextSize};
@@ -86,7 +86,10 @@ pub(crate) fn missing_whitespace(
                     let mut diagnostic = Diagnostic::new(kind, TextRange::empty(token.start()));
 
                     if autofix {
-                        diagnostic.set_fix(Edit::insertion(" ".to_string(), token.end()));
+                        diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                            " ".to_string(),
+                            token.end(),
+                        )));
                     }
                     context.push_diagnostic(diagnostic);
                 }

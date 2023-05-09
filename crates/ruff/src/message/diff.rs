@@ -22,14 +22,10 @@ pub(super) struct Diff<'a> {
 
 impl<'a> Diff<'a> {
     pub fn from_message(message: &'a Message) -> Option<Diff> {
-        if message.fix.is_empty() {
-            None
-        } else {
-            Some(Diff {
-                source_code: &message.file,
-                fix: &message.fix,
-            })
-        }
+        message.fix.as_ref().map(|fix| Diff {
+            source_code: &message.file,
+            fix,
+        })
     }
 }
 

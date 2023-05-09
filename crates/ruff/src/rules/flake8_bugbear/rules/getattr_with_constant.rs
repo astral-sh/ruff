@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
@@ -64,10 +64,10 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(&attribute(obj, value), checker.stylist),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

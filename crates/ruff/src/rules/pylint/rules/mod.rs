@@ -25,6 +25,7 @@ pub use load_before_global_declaration::{
 pub use logging::{logging_call, LoggingTooFewArgs, LoggingTooManyArgs};
 pub use magic_value_comparison::{magic_value_comparison, MagicValueComparison};
 pub use manual_import_from::{manual_from_import, ManualFromImport};
+pub use nested_min_max::{nested_min_max, NestedMinMax};
 pub use nonlocal_without_binding::NonlocalWithoutBinding;
 pub use property_with_parameters::{property_with_parameters, PropertyWithParameters};
 pub use redefined_loop_name::{redefined_loop_name, RedefinedLoopName};
@@ -68,6 +69,7 @@ mod load_before_global_declaration;
 mod logging;
 mod magic_value_comparison;
 mod manual_import_from;
+mod nested_min_max;
 mod nonlocal_without_binding;
 mod property_with_parameters;
 mod redefined_loop_name;

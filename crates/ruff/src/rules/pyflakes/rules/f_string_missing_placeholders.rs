@@ -2,7 +2,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -87,13 +87,13 @@ fn fix_f_string_missing_placeholders(
     prefix_range: TextRange,
     tok_range: TextRange,
     checker: &mut Checker,
-) -> Edit {
+) -> Fix {
     let content = &checker.locator.contents()[TextRange::new(prefix_range.end(), tok_range.end())];
-    Edit::replacement(
+    Fix::unspecified(Edit::replacement(
         unescape_f_string(content),
         prefix_range.start(),
         tok_range.end(),
-    )
+    ))
 }
 
 /// F541
