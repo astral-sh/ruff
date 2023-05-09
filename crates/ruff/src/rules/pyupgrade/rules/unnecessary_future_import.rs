@@ -86,8 +86,8 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
 
     if checker.patch(diagnostic.kind.rule()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.ctx.current_stmt();
-        let defined_in = checker.ctx.current_stmt_parent();
+        let defined_by = checker.ctx.stmt();
+        let defined_in = checker.ctx.stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
             .map(|alias| format!("__future__.{}", alias.node.name))

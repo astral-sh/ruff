@@ -15,7 +15,7 @@ use crate::checkers::ast::Checker;
 /// Checks for mutable default values in dataclasses without the use of
 /// `dataclasses.field`.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// Mutable default values share state across all instances of the dataclass,
 /// while not being obvious. This can lead to bugs when the attributes are
 /// changed in one instance, as those changes will unexpectedly affect all
@@ -66,7 +66,7 @@ impl Violation for MutableDataclassDefault {
 /// ## What it does
 /// Checks for function calls in dataclass defaults.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// Function calls are only performed once, at definition time. The returned
 /// value is then reused by all instances of the dataclass.
 ///

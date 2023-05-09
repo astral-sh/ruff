@@ -29,7 +29,7 @@ impl fmt::Display for DictKind {
 /// Checks for `dict` calls that take unnecessary `dict` literals or `dict`
 /// comprehensions as arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to wrap a `dict` literal or comprehension within a `dict`
 /// call, since the literal or comprehension syntax already returns a `dict`.
 ///

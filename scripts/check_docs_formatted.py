@@ -85,6 +85,17 @@ def format_file(
     with file.open() as f:
         contents = f.read()
 
+    if file.parent.name == "rules":
+        # Check contents contains "What it does" section
+        if "## What it does" not in contents:
+            print(f"Docs for `{file.name}` are missing the `What it does` section.")
+            return 1
+
+        # Check contents contains "Why is this bad?" section
+        if "## Why is this bad?" not in contents:
+            print(f"Docs for `{file.name}` are missing the `Why is this bad?` section.")
+            return 1
+
     # Remove everything before the first example
     contents = contents[contents.find("## Example") :]
 
@@ -103,8 +114,8 @@ def format_file(
     if contents != new_contents:
         rule_name = file.name.split(".")[0]
         print(
-            f"Rule `{rule_name}` docs are not formatted. This section should be "
-            f"rewritten to:",
+            f"Rule `{rule_name}` docs are not formatted. The example section "
+            f"should be rewritten to:",
         )
 
         # Add indentation so that snipped can be copied directly to docs

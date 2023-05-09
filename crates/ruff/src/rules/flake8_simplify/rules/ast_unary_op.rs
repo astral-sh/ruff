@@ -88,7 +88,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    if is_exception_check(checker.ctx.current_stmt()) {
+    if is_exception_check(checker.ctx.stmt()) {
         return;
     }
 
@@ -138,7 +138,7 @@ pub fn negation_with_not_equal_op(
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    if is_exception_check(checker.ctx.current_stmt()) {
+    if is_exception_check(checker.ctx.stmt()) {
         return;
     }
 

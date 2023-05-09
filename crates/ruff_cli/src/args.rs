@@ -240,16 +240,6 @@ pub struct CheckArgs {
     /// autofix, even if no lint violations remain.
     #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
     pub exit_non_zero_on_fix: bool,
-    /// Does nothing and will be removed in the future.
-    #[arg(
-        long,
-        overrides_with("no_update_check"),
-        help_heading = "Miscellaneous",
-        hide = true
-    )]
-    update_check: bool,
-    #[clap(long, overrides_with("update_check"), hide = true)]
-    no_update_check: bool,
     /// Show counts for every rule with at least one violation.
     #[arg(
         long,
@@ -402,7 +392,6 @@ impl CheckArgs {
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 format: self.format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
-                update_check: resolve_bool_arg(self.update_check, self.no_update_check),
             },
         )
     }
@@ -467,7 +456,6 @@ pub struct Overrides {
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
-    pub update_check: Option<bool>,
 }
 
 impl ConfigProcessor for &Overrides {
@@ -526,9 +514,6 @@ impl ConfigProcessor for &Overrides {
         }
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
-        }
-        if let Some(update_check) = &self.update_check {
-            config.update_check = Some(*update_check);
         }
     }
 }

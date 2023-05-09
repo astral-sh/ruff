@@ -25,6 +25,8 @@ pub struct Context<'a> {
     // Stack of all visited statements, along with the identifier of the current statement.
     pub stmts: Nodes<'a>,
     pub stmt_id: Option<NodeId>,
+    // Stack of current expressions.
+    pub exprs: Vec<&'a Expr>,
     // Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
@@ -34,7 +36,6 @@ pub struct Context<'a> {
     // Map from binding index to indexes of bindings that shadow it in other scopes.
     pub shadowed_bindings:
         std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
-    pub exprs: Vec<&'a Expr>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -311,10 +312,12 @@ impl<'a> Context<'a> {
         self.stmt_id = self.stmts.parent_id(node_id);
     }
 
+    /// Push an [`Expr`] onto the stack.
     pub fn push_expr(&mut self, expr: &'a Expr) {
         self.exprs.push(expr);
     }
 
+    /// Pop the current [`Expr`] off the stack.
     pub fn pop_expr(&mut self) {
         self.exprs
             .pop()
@@ -336,25 +339,25 @@ impl<'a> Context<'a> {
     }
 
     /// Return the current `Stmt`.
-    pub fn current_stmt(&self) -> &'a Stmt {
+    pub fn stmt(&self) -> &'a Stmt {
         let node_id = self.stmt_id.expect("No current statement");
         self.stmts[node_id]
     }
 
     /// Return the parent `Stmt` of the current `Stmt`, if any.
-    pub fn current_stmt_parent(&self) -> Option<&'a Stmt> {
+    pub fn stmt_parent(&self) -> Option<&'a Stmt> {
         let node_id = self.stmt_id.expect("No current statement");
         let parent_id = self.stmts.parent_id(node_id)?;
         Some(self.stmts[parent_id])
     }
 
     /// Return the parent `Expr` of the current `Expr`.
-    pub fn current_expr_parent(&self) -> Option<&'a Expr> {
+    pub fn expr_parent(&self) -> Option<&'a Expr> {
         self.exprs.iter().rev().nth(1).copied()
     }
 
     /// Return the grandparent `Expr` of the current `Expr`.
-    pub fn current_expr_grandparent(&self) -> Option<&'a Expr> {
+    pub fn expr_grandparent(&self) -> Option<&'a Expr> {
         self.exprs.iter().rev().nth(2).copied()
     }
 
@@ -364,7 +367,7 @@ impl<'a> Context<'a> {
     }
 
     /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
-    pub fn current_sibling_stmt(&self) -> Option<&'a Stmt> {
+    pub fn sibling_stmt(&self) -> Option<&'a Stmt> {
         self.body.get(self.body_index + 1)
     }
 

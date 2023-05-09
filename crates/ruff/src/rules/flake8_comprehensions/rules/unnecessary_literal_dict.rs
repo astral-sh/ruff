@@ -11,7 +11,7 @@ use super::helpers;
 /// ## What it does
 /// Checks for unnecessary `list` or `tuple` literals.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a call to `dict`.
 /// It can be rewritten as a dict literal (`{}`).
 ///

@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for multiple usage of the generator returned from
 /// `itertools.groupby()`.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// Using the generator more than once will do nothing on the second usage.
 /// If that data is needed later, it should be stored as a list.
 ///
