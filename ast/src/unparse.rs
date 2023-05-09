@@ -1,7 +1,5 @@
-use crate::{
-    Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Expr, ExprKind,
-    Operator,
-};
+use crate::ConversionFlag;
+use crate::{Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, ExprKind, Operator};
 use std::fmt;
 
 mod precedence {
@@ -452,7 +450,7 @@ impl<'a> Unparser<'a> {
     fn unparse_formatted<U>(
         &mut self,
         val: &Expr<U>,
-        conversion: usize,
+        conversion: u32,
         spec: Option<&Expr<U>>,
     ) -> fmt::Result {
         let buffered = to_string_fmt(|f| Unparser::new(f).unparse_expr(val, precedence::TEST + 1));
@@ -466,7 +464,7 @@ impl<'a> Unparser<'a> {
         self.p(&buffered)?;
         drop(buffered);
 
-        if conversion != ConversionFlag::None as usize {
+        if conversion != ConversionFlag::None as u32 {
             self.p("!")?;
             let buf = &[conversion as u8];
             let c = std::str::from_utf8(buf).unwrap();

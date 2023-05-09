@@ -10,6 +10,7 @@ use crate::{
     context::set_context,
     string::parse_strings,
     token::{self, StringKind},
+    text_size::TextSize,
 };
 use num_bigint::BigInt;
 
@@ -254,7 +255,7 @@ ImportStatement: ast::Stmt = {
     },
 };
 
-ImportFromLocation: (Option<usize>, Option<String>) = {
+ImportFromLocation: (Option<u32>, Option<String>) = {
     <dots: ImportDots*> <name:DottedName> => {
         (Some(dots.iter().sum()), Some(name))
     },
@@ -263,7 +264,7 @@ ImportFromLocation: (Option<usize>, Option<String>) = {
     },
 };
 
-ImportDots: usize = {
+ImportDots: u32 = {
     "..." => 3,
     "." => 1,
 };
@@ -1721,7 +1722,7 @@ ArgumentList: ArgumentList = {
     }
 };
 
-FunctionArgument: (Option<(crate::text_size::TextSize, crate::text_size::TextSize, Option<String>)>, ast::Expr) = {
+FunctionArgument: (Option<(TextSize, TextSize, Option<String>)>, ast::Expr) = {
     <location:@L> <e:NamedExpressionTest> <c:CompFor?> <end_location:@R> => {
         let expr = match c {
             Some(c) => ast::Expr::new(
@@ -1775,7 +1776,7 @@ Identifier: String = <s:name> => s;
 
 // Hook external lexer:
 extern {
-    type Location = crate::text_size::TextSize;
+    type Location = TextSize;
     type Error = LexicalError;
 
     enum token::Tok {

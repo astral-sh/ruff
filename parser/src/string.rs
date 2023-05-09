@@ -4,13 +4,16 @@
 // regular strings. Since the parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
 use crate::{
-    ast::{self, Constant, ConversionFlag, Expr, ExprKind},
+    ast::{self, Constant, Expr, ExprKind},
     lexer::{LexicalError, LexicalErrorType},
     parser::{parse_expression_located, LalrpopError, ParseError, ParseErrorType},
     token::{StringKind, Tok},
 };
 use itertools::Itertools;
-use rustpython_compiler_core::text_size::{TextLen, TextSize};
+use rustpython_parser_core::{
+    text_size::{TextLen, TextSize},
+    ConversionFlag,
+};
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 const MAX_UNICODE_NAME: usize = 88;

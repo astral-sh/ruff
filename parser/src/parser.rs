@@ -15,10 +15,10 @@
 use crate::{
     ast,
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
-    mode::Mode,
     python,
     text_size::TextSize,
     token::Tok,
+    Mode,
 };
 use itertools::Itertools;
 use std::iter;
@@ -187,7 +187,7 @@ pub fn parse_tokens(
     mode: Mode,
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
-    let marker_token = (mode.to_marker(), Default::default());
+    let marker_token = (Tok::start_marker(mode), Default::default());
     let lexer = iter::once(Ok(marker_token))
         .chain(lxr)
         .filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
@@ -202,7 +202,7 @@ pub fn parse_tokens(
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-pub type ParseError = rustpython_compiler_core::BaseError<ParseErrorType>;
+pub type ParseError = rustpython_parser_core::BaseError<ParseErrorType>;
 
 /// Represents the different types of errors that can occur during parsing.
 #[derive(Debug, PartialEq)]

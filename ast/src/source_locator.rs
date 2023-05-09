@@ -1,11 +1,5 @@
 use crate::attributed::Attributed;
-use crate::fold_helpers::Foldable;
-use crate::location::SourceRange;
-use rustpython_compiler_core::SourceLocator;
-
-pub fn locate<X: Foldable<(), SourceRange>>(locator: &mut SourceLocator, ast: X) -> X::Mapped {
-    ast.fold(locator).unwrap()
-}
+use rustpython_parser_core::source_code::{SourceLocator, SourceRange};
 
 impl crate::fold::Fold<()> for SourceLocator<'_> {
     type TargetU = SourceRange;

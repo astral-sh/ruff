@@ -62,4 +62,4 @@ macro_rules! simple_fold {
     };
 }
 
-simple_fold!(usize, String, bool, constant::Constant);
+simple_fold!(u32, String, bool, constant::Constant);

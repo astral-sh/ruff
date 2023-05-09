@@ -158,7 +158,7 @@ pub struct StmtAnnAssign<U = ()> {
     pub target: Box<Expr<U>>,
     pub annotation: Box<Expr<U>>,
     pub value: Option<Box<Expr<U>>>,
-    pub simple: usize,
+    pub simple: u32,
 }
 
 impl<U> From<StmtAnnAssign<U>> for StmtKind<U> {
@@ -328,7 +328,7 @@ impl<U> From<StmtImport<U>> for StmtKind<U> {
 pub struct StmtImportFrom<U = ()> {
     pub module: Option<Ident>,
     pub names: Vec<Alias<U>>,
-    pub level: Option<usize>,
+    pub level: Option<u32>,
 }
 
 impl<U> From<StmtImportFrom<U>> for StmtKind<U> {
@@ -610,7 +610,7 @@ impl<U> From<ExprCall<U>> for ExprKind<U> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprFormattedValue<U = ()> {
     pub value: Box<Expr<U>>,
-    pub conversion: usize,
+    pub conversion: u32,
     pub format_spec: Option<Box<Expr<U>>>,
 }
 
@@ -819,7 +819,7 @@ pub struct Comprehension<U = ()> {
     pub target: Expr<U>,
     pub iter: Expr<U>,
     pub ifs: Vec<Expr<U>>,
-    pub is_async: usize,
+    pub is_async: u32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -996,7 +996,7 @@ pub type Pattern<U = ()> = Attributed<PatternKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeIgnoreTypeIgnore {
-    pub lineno: usize,
+    pub lineno: u32,
     pub tag: String,
 }
 
@@ -1019,6 +1019,7 @@ pub mod fold {
         type TargetU;
         type Error;
         fn map_user(&mut self, user: U) -> Result<Self::TargetU, Self::Error>;
+
         fn map_located<T>(
             &mut self,
             located: Attributed<T, U>,
@@ -1029,6 +1030,13 @@ pub mod fold {
                 custom,
                 node: located.node,
             })
+        }
+
+        fn fold<X: Foldable<U, Self::TargetU>>(
+            &mut self,
+            node: X,
+        ) -> Result<X::Mapped, Self::Error> {
+            node.fold(self)
         }
         fn fold_mod(&mut self, node: Mod<U>) -> Result<Mod<Self::TargetU>, Self::Error> {
             fold_mod(self, node)

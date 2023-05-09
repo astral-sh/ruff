@@ -1,5 +1,7 @@
-use crate::location::{SourceLocation, SourceRange};
-use rustpython_compiler_core::text_size::{TextRange, TextSize};
+use rustpython_parser_core::{
+    source_code::{SourceLocation, SourceRange},
+    text_size::{TextRange, TextSize},
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attributed<T, U = ()> {

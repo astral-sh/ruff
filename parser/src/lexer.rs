@@ -28,11 +28,11 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 use crate::{
-    mode::Mode,
     soft_keywords::SoftKeywordTransformer,
     string::FStringErrorType,
     text_size::{TextLen, TextRange, TextSize},
     token::{StringKind, Tok},
+    Mode,
 };
 use log::trace;
 use num_bigint::BigInt;

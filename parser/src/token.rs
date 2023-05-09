@@ -4,7 +4,7 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h
-use crate::text_size::TextSize;
+use crate::{text_size::TextSize, Mode};
 use num_bigint::BigInt;
 use std::fmt;
 
@@ -194,6 +194,16 @@ pub enum Tok {
     StartModule,
     StartInteractive,
     StartExpression,
+}
+
+impl Tok {
+    pub fn start_marker(mode: Mode) -> Self {
+        match mode {
+            Mode::Module => Tok::StartModule,
+            Mode::Interactive => Tok::StartInteractive,
+            Mode::Expression => Tok::StartExpression,
+        }
+    }
 }
 
 impl fmt::Display for Tok {
@@ -404,10 +414,11 @@ impl StringKind {
     /// Returns the number of characters in the prefix.
     pub fn prefix_len(&self) -> TextSize {
         use StringKind::*;
-        match self {
-            String => TextSize::from(0),
-            RawString | FString | Unicode | Bytes => TextSize::from(1),
-            RawFString | RawBytes => TextSize::from(2),
-        }
+        let len = match self {
+            String => 0,
+            RawString | FString | Unicode | Bytes => 1,
+            RawFString | RawBytes => 2,
+        };
+        len.into()
     }
 }

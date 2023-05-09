@@ -1,5 +1,4 @@
 use num_bigint::BigInt;
-pub use rustpython_compiler_core::ConversionFlag;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Constant {
@@ -137,7 +136,7 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustpython_compiler_core::text_size::TextRange;
+    use rustpython_parser_core::text_size::TextRange;
 
     #[cfg(feature = "constant-optimization")]
     #[test]

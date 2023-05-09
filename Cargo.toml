@@ -16,11 +16,12 @@ members = [
 ]
 
 [workspace.dependencies]
+rustpython-ast = { path = "ast", version = "0.2.0" }
+rustpython-parser-core = { path = "core", version = "0.2.0" }
+rustpython-literal = { path = "literal", version = "0.2.0" }
+
 ahash = "0.7.6"
 anyhow = "1.0.45"
-ascii = "1.0"
-bitflags = "1.3.2"
-bstr = "0.2.17"
 cfg-if = "1.0"
 insta = "1.14.0"
 itertools = "0.10.3"
@@ -32,7 +33,7 @@ rand = "0.8.5"
 serde = "1.0"
 static_assertions = "1.1"
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
-ruff_python_ast = { git = "https://github.com/youknowone/ruff.git", rev = "583df5c1fa43b2732896219f8ab425116c140c80" }
+ruff_python_ast = { git = "https://github.com/youknowone/ruff.git", rev = "088958e8fda2f74f1ebf315c75db13c232409b13" }
 # ruff_python_ast = { path = "../ruff/crates/ruff_python_ast" }
 
 [profile.dev.package."*"]
