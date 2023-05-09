@@ -15,8 +15,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct InDictKeys {
-    pub key: String,
-    pub dict: String,
+    key: String,
+    dict: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {

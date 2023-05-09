@@ -18,7 +18,7 @@ pub enum Reason {
 
 #[violation]
 pub struct UnnecessaryEncodeUTF8 {
-    pub reason: Reason,
+    reason: Reason,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {

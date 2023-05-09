@@ -8,7 +8,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 #[violation]
 pub struct MissingWhitespace {
-    pub token: TokenKind,
+    token: TokenKind,
 }
 
 impl MissingWhitespace {

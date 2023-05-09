@@ -33,7 +33,7 @@ use crate::rules::pandas_vet::fixes::convert_inplace_argument_to_assignment;
 /// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[violation]
 pub struct PandasUseOfInplaceArgument {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for PandasUseOfInplaceArgument {

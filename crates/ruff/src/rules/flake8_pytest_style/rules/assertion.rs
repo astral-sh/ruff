@@ -52,7 +52,7 @@ use super::unittest_assert::UnittestAssert;
 /// ```
 #[violation]
 pub struct PytestCompositeAssertion {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for PytestCompositeAssertion {
@@ -71,7 +71,7 @@ impl Violation for PytestCompositeAssertion {
 
 #[violation]
 pub struct PytestAssertInExcept {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for PytestAssertInExcept {
@@ -96,8 +96,8 @@ impl Violation for PytestAssertAlwaysFalse {
 
 #[violation]
 pub struct PytestUnittestAssertion {
-    pub assertion: String,
-    pub fixable: bool,
+    assertion: String,
+    fixable: bool,
 }
 
 impl Violation for PytestUnittestAssertion {

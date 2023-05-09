@@ -31,7 +31,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralSet {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {

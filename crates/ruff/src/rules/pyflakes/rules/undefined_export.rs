@@ -5,7 +5,7 @@ use ruff_text_size::TextRange;
 
 #[violation]
 pub struct UndefinedExport {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for UndefinedExport {

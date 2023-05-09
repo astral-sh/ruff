@@ -33,7 +33,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryCallAroundSorted {
-    pub func: String,
+    func: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {

@@ -14,7 +14,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct SuppressibleException {
-    pub exception: String,
+    exception: String,
 }
 
 impl AlwaysAutofixableViolation for SuppressibleException {

@@ -36,7 +36,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryCollectionCall {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {

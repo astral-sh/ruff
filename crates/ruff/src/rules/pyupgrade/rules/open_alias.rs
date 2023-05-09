@@ -8,7 +8,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct OpenAlias {
-    pub fixable: bool,
+    fixable: bool,
 }
 
 impl Violation for OpenAlias {

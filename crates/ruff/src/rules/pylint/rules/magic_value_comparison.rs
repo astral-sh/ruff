@@ -10,7 +10,7 @@ use crate::rules::pylint::settings::ConstantType;
 
 #[violation]
 pub struct MagicValueComparison {
-    pub value: String,
+    value: String,
 }
 
 impl Violation for MagicValueComparison {

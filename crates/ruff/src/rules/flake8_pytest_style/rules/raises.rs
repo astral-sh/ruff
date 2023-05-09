@@ -22,7 +22,7 @@ impl Violation for PytestRaisesWithMultipleStatements {
 
 #[violation]
 pub struct PytestRaisesTooBroad {
-    pub exception: String,
+    exception: String,
 }
 
 impl Violation for PytestRaisesTooBroad {

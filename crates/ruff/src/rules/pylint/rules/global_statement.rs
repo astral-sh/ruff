@@ -40,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct GlobalStatement {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for GlobalStatement {

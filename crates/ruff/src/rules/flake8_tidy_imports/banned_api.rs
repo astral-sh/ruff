@@ -36,8 +36,8 @@ pub struct ApiBan {
 /// - `flake8-tidy-imports.banned-api`
 #[violation]
 pub struct BannedApi {
-    pub name: String,
-    pub message: String,
+    name: String,
+    message: String,
 }
 
 impl Violation for BannedApi {

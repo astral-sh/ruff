@@ -9,9 +9,9 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct ManualFromImport {
-    pub module: String,
-    pub name: String,
-    pub fixable: bool,
+    module: String,
+    name: String,
+    fixable: bool,
 }
 
 impl Violation for ManualFromImport {

@@ -9,7 +9,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct SysExitAlias {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for SysExitAlias {

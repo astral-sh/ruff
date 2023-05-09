@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::resolve_imported_module_path;
 
 #[violation]
 pub struct ImportSelf {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for ImportSelf {

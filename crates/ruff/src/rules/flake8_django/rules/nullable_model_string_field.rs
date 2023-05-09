@@ -40,7 +40,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct DjangoNullableModelStringField {
-    pub field_name: String,
+    field_name: String,
 }
 
 impl Violation for DjangoNullableModelStringField {

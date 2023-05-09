@@ -37,7 +37,7 @@ impl CallKind {
 
 #[violation]
 pub struct NonPEP604Isinstance {
-    pub kind: CallKind,
+    kind: CallKind,
 }
 
 impl AlwaysAutofixableViolation for NonPEP604Isinstance {

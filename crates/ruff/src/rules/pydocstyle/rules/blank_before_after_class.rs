@@ -9,7 +9,7 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct OneBlankLineBeforeClass {
-    pub lines: usize,
+    lines: usize,
 }
 
 impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 
 #[violation]
 pub struct OneBlankLineAfterClass {
-    pub lines: usize,
+    lines: usize,
 }
 
 impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
@@ -41,7 +41,7 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 
 #[violation]
 pub struct BlankLineBeforeClass {
-    pub lines: usize,
+    lines: usize,
 }
 
 impl AlwaysAutofixableViolation for BlankLineBeforeClass {

@@ -52,7 +52,7 @@ impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
 
 #[violation]
 pub struct NonUniqueEnums {
-    pub value: String,
+    value: String,
 }
 
 impl Violation for NonUniqueEnums {
@@ -75,7 +75,7 @@ impl Violation for UnnecessarySpread {
 
 #[violation]
 pub struct MultipleStartsEndsWith {
-    pub attr: String,
+    attr: String,
 }
 
 impl AlwaysAutofixableViolation for MultipleStartsEndsWith {

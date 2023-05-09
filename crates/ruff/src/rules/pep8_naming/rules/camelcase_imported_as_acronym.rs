@@ -34,8 +34,8 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[violation]
 pub struct CamelcaseImportedAsAcronym {
-    pub name: String,
-    pub asname: String,
+    name: String,
+    asname: String,
 }
 
 impl Violation for CamelcaseImportedAsAcronym {

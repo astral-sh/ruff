@@ -7,7 +7,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 #[violation]
 pub struct WhitespaceBeforeParameters {
-    pub bracket: TokenKind,
+    bracket: TokenKind,
 }
 
 impl WhitespaceBeforeParameters {

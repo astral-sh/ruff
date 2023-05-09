@@ -33,7 +33,7 @@ use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
 #[violation]
 pub struct InvalidModuleName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for InvalidModuleName {

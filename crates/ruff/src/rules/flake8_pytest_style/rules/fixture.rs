@@ -39,8 +39,8 @@ impl fmt::Display for Parentheses {
 
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
-    pub expected: Parentheses,
-    pub actual: Parentheses,
+    expected: Parentheses,
+    actual: Parentheses,
 }
 
 impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
@@ -61,7 +61,7 @@ impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
 
 #[violation]
 pub struct PytestFixturePositionalArgs {
-    pub function: String,
+    function: String,
 }
 
 impl Violation for PytestFixturePositionalArgs {
@@ -88,7 +88,7 @@ impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
 
 #[violation]
 pub struct PytestMissingFixtureNameUnderscore {
-    pub function: String,
+    function: String,
 }
 
 impl Violation for PytestMissingFixtureNameUnderscore {
@@ -101,7 +101,7 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 
 #[violation]
 pub struct PytestIncorrectFixtureNameUnderscore {
-    pub function: String,
+    function: String,
 }
 
 impl Violation for PytestIncorrectFixtureNameUnderscore {
@@ -114,7 +114,7 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 
 #[violation]
 pub struct PytestFixtureParamWithoutValue {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for PytestFixtureParamWithoutValue {
@@ -150,7 +150,7 @@ impl Violation for PytestFixtureFinalizerCallback {
 
 #[violation]
 pub struct PytestUselessYieldFixture {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for PytestUselessYieldFixture {

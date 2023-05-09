@@ -46,8 +46,8 @@ use super::helpers;
 /// - Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
 #[violation]
 pub struct UnnecessaryDoubleCastOrProcess {
-    pub inner: String,
-    pub outer: String,
+    inner: String,
+    outer: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryDoubleCastOrProcess {

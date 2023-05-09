@@ -195,7 +195,7 @@ impl Violation for UnnecessaryAssign {
 /// ```
 #[violation]
 pub struct SuperfluousElseReturn {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseReturn {
@@ -233,7 +233,7 @@ impl Violation for SuperfluousElseReturn {
 /// ```
 #[violation]
 pub struct SuperfluousElseRaise {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseRaise {
@@ -273,7 +273,7 @@ impl Violation for SuperfluousElseRaise {
 /// ```
 #[violation]
 pub struct SuperfluousElseContinue {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseContinue {
@@ -313,7 +313,7 @@ impl Violation for SuperfluousElseContinue {
 /// ```
 #[violation]
 pub struct SuperfluousElseBreak {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseBreak {

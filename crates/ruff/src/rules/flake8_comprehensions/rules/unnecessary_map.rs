@@ -40,7 +40,7 @@ use super::helpers;
 ///   `{v: v ** 2 for v in values}`.
 #[violation]
 pub struct UnnecessaryMap {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl Violation for UnnecessaryMap {

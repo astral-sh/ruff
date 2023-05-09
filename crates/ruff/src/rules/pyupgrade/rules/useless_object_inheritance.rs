@@ -11,7 +11,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct UselessObjectInheritance {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for UselessObjectInheritance {

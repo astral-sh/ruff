@@ -8,7 +8,7 @@ use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPa
 
 #[violation]
 pub struct Debugger {
-    pub using_type: DebuggerUsingType,
+    using_type: DebuggerUsingType,
 }
 
 impl Violation for Debugger {
