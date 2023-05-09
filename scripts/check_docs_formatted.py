@@ -103,8 +103,8 @@ def format_file(
     if contents != new_contents:
         rule_name = file.name.split(".")[0]
         print(
-            f"Rule `{rule_name}` docs are not formatted. This section should be "
-            f"rewritten to:",
+            f"Rule `{rule_name}` docs are not formatted. The example section "
+            f"should be rewritten to:",
         )
 
         # Add indentation so that snipped can be copied directly to docs
