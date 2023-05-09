@@ -18,7 +18,7 @@ impl Violation for OpenFileWithContextHandler {
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.
 fn match_async_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.current_expr_grandparent() else {
+    let Some(expr) = checker.ctx.expr_grandparent() else {
         return false;
     };
     let ExprKind::Await { value } = &expr.node else {
@@ -56,7 +56,7 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
 /// Return `true` if the current expression is nested in an
 /// `exit_stack.enter_context` call.
 fn match_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.current_expr_parent() else {
+    let Some(expr) = checker.ctx.expr_parent() else {
         return false;
     };
     let ExprKind::Call { func,  .. } = &expr.node else {
@@ -97,7 +97,7 @@ pub fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     {
         if checker.ctx.is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.ctx.current_stmt().node, StmtKind::With { .. }) {
+            if matches!(checker.ctx.stmt().node, StmtKind::With { .. }) {
                 return;
             }
 

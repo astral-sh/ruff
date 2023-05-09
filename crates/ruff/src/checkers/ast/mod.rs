@@ -1571,15 +1571,11 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.current_stmt_parent(),
+                        self.ctx.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::IfWithSameArms) {
-                    flake8_simplify::rules::if_with_same_arms(
-                        self,
-                        stmt,
-                        self.ctx.current_stmt_parent(),
-                    );
+                    flake8_simplify::rules::if_with_same_arms(self, stmt, self.ctx.stmt_parent());
                 }
                 if self.settings.rules.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
@@ -1595,14 +1591,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.current_stmt_parent(),
+                        self.ctx.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::IfElseBlockInsteadOfIfExp) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
-                        self.ctx.current_stmt_parent(),
+                        self.ctx.stmt_parent(),
                     );
                 }
                 if self
@@ -1616,7 +1612,7 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.current_stmt_parent(),
+                        self.ctx.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::TypeCheckWithoutTypeError) {
@@ -1625,7 +1621,7 @@ where
                         body,
                         test,
                         orelse,
-                        self.ctx.current_stmt_parent(),
+                        self.ctx.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::OutdatedVersionBlock) {
@@ -1683,7 +1679,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.ctx.current_stmt_parent(),
+                        self.ctx.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::RedefinedLoopName) {
@@ -1741,7 +1737,7 @@ where
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
-                            self.ctx.current_sibling_stmt(),
+                            self.ctx.sibling_stmt(),
                         );
                     }
                     if self.settings.rules.enabled(Rule::InDictKeys) {
@@ -2750,7 +2746,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_set(
                         self,
                         expr,
-                        self.ctx.current_expr_parent(),
+                        self.ctx.expr_parent(),
                         func,
                         args,
                         keywords,
@@ -2760,7 +2756,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_dict(
                         self,
                         expr,
-                        self.ctx.current_expr_parent(),
+                        self.ctx.expr_parent(),
                         func,
                         args,
                         keywords,
@@ -2865,7 +2861,7 @@ where
                     flake8_comprehensions::rules::unnecessary_map(
                         self,
                         expr,
-                        self.ctx.current_expr_parent(),
+                        self.ctx.expr_parent(),
                         func,
                         args,
                     );
@@ -3384,7 +3380,7 @@ where
                 if self.is_stub {
                     if self.settings.rules.enabled(Rule::DuplicateUnionMember)
                         && self.ctx.in_type_definition
-                        && self.ctx.current_expr_parent().map_or(true, |parent| {
+                        && self.ctx.expr_parent().map_or(true, |parent| {
                             !matches!(
                                 parent.node,
                                 ExprKind::BinOp {
@@ -4536,7 +4532,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
-        let parent = self.ctx.current_stmt();
+        let parent = self.ctx.stmt();
 
         if self.settings.rules.enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(self, id);
@@ -4878,7 +4874,7 @@ impl<'a> Checker<'a> {
                 self.ctx.stmt_id = stmt_id;
                 self.ctx.visible_scope = visibility;
 
-                match &self.ctx.current_stmt().node {
+                match &self.ctx.stmt().node {
                     StmtKind::FunctionDef { body, args, .. }
                     | StmtKind::AsyncFunctionDef { body, args, .. } => {
                         self.visit_arguments(args);
@@ -4958,7 +4954,7 @@ impl<'a> Checker<'a> {
                 self.ctx.stmt_id = stmt_id;
 
                 if let StmtKind::For { target, body, .. }
-                | StmtKind::AsyncFor { target, body, .. } = &self.ctx.current_stmt().node
+                | StmtKind::AsyncFor { target, body, .. } = &self.ctx.stmt().node
                 {
                     if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                         flake8_bugbear::rules::unused_loop_control_variable(self, target, body);

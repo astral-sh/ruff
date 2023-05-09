@@ -60,7 +60,7 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
     };
 
     // Avoid flagging on function calls (e.g., `df.values()`).
-    if let Some(parent) = checker.ctx.current_expr_parent() {
+    if let Some(parent) = checker.ctx.expr_parent() {
         if matches!(parent.node, ExprKind::Call { .. }) {
             return;
         }

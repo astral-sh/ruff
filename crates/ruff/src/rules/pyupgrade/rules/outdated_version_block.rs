@@ -161,8 +161,8 @@ fn fix_py2_block(
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.ctx.current_stmt();
-        let defined_in = checker.ctx.current_stmt_parent();
+        let defined_by = checker.ctx.stmt();
+        let defined_in = checker.ctx.stmt_parent();
         return match delete_stmt(
             defined_by,
             if block.starter == Tok::If {
