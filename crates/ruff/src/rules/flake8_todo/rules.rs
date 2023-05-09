@@ -400,45 +400,95 @@ fn check_for_static_errors(
         .ok()
         .unwrap();
     let mut comment_chars = comment.chars().skip(relative_offset).peekable();
-    // An absolute offset of the comment's author block from the start of the file.
+    // Absolute offset of the comment's author block from the start of the file.
     let mut author_range: Option<TextRange> = None;
-    // An absolute offset of the comment's colon from the start of the file.
+    // Absolute offset of the comment's colon from the start of the file.
     let mut colon_offset: Option<TextSize> = None;
 
     // An "author block" must be contained in parantheses, like "(ruff)". To check if it exists,
     // we can check the first non-whitespace character after the tag. If that first character is a
     // left parenthesis, we can say that we have an author's block.
     while let Some(char) = comment_chars.next() {
-        current_offset += 1;
+        relative_offset += 1;
         if char.is_whitespace() {
             continue;
         }
 
+        // We can guarantee that there's no author if the colon directly follows the TODO tag.
+        if char == ':' {
+            colon_offset =
+                Some(comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap());
+            break;
+        }
+
         if char == '(' {
-            has_author = true;
+            author_range = Some(TextRange::at(
+                comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap(),
+                TextSize::new(1),
+            ));
         }
 
         break;
     }
-    if has_author {
-        // Move to the end of the author block.
+
+    if let Some(range) = author_range {
+        let mut author_block_length = 0usize;
         while let Some(char) = comment_chars.next() {
-            current_offset += 1;
+            relative_offset += 1;
+            author_block_length += 1;
+
             if char == ')' {
                 break;
             }
         }
+
+        author_range = Some(range.add_end(TextSize::try_from(author_block_length).ok().unwrap()));
     } else {
         diagnostics.push(Diagnostic::new(
             MissingAuthorInTodo,
-            TextRange::at(
-                comment_range.start() + TextSize::try_from(end_of_tag_char).ok().unwrap(),
-                TextSize::new(1),
-            ),
+            TextRange::at(tag.range.end(), TextSize::new(1)),
         ));
     }
-}
 
+    // A valid colon must be the character after the author block. If the author block doesn't
+    // exist, the colon must directly follow the tag.
+    if let Some(char) = comment_chars.next() {
+        relative_offset += 1;
+
+        if char == ':' {
+            colon_offset =
+                Some(comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap());
+        }
+    }
+
+    if let Some(range) = colon_offset {
+        match comment_chars.next() {
+            Some(char) => {
+                if char == ' ' {
+                    return;
+                }
+
+                diagnostics.push(Diagnostic::new(
+                    MissingSpaceAfterColonInTodo,
+                    TextRange::at(range, TextSize::new(1)),
+                ));
+            }
+            None => {}
+        }
+    } else {
+        // Adjust where the colon should be based on the length of the author block, if it exists.
+        let adjusted_colon_position = tag.range.end()
+            + if author_range.is_some() {
+                author_range.unwrap().len()
+            } else {
+                TextSize::new(0)
+            };
+
+        diagnostics.push(Diagnostic::new(
+            MissingColonInTodo,
+            TextRange::at(adjusted_colon_position, TextSize::new(1)),
+        ))
+    }
 
     match comment_chars.next() {
         Some(_) => {}
