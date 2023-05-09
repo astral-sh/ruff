@@ -150,7 +150,6 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         fix_only,
         format,
         show_fixes,
-        update_check,
         ..
     } = pyproject_config.settings.cli;
 
@@ -309,13 +308,6 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                 let mut stdout = BufWriter::new(io::stdout().lock());
                 printer.write_once(&diagnostics, &mut stdout)?;
             }
-        }
-
-        if update_check {
-            warn_user_once!(
-                "update-check has been removed; setting it will cause an error in a future \
-                 version."
-            );
         }
 
         if !cli.exit_zero {
