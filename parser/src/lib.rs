@@ -125,7 +125,7 @@ mod string;
 mod token;
 
 pub use parser::{
-    parse, parse_expression, parse_expression_located, parse_located, parse_program, parse_tokens,
+    parse, parse_expression, parse_expression_at, parse_program, parse_starts_at, parse_tokens,
     ParseError, ParseErrorType,
 };
 pub use string::FStringErrorType;

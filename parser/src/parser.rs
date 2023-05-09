@@ -70,7 +70,7 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 ///
 /// ```
 pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
-    parse_expression_located(source, path, TextSize::default())
+    parse_expression_at(source, path, TextSize::default())
 }
 
 /// Parses a Python expression from a given location.
@@ -84,17 +84,17 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 /// somewhat silly, location:
 ///
 /// ```
-/// use rustpython_parser::{text_size::TextSize, parse_expression_located};
+/// use rustpython_parser::{text_size::TextSize, parse_expression_at};
 ///
-/// let expr = parse_expression_located("1 + 2", "<embedded>", TextSize::from(400));
+/// let expr = parse_expression_at("1 + 2", "<embedded>", TextSize::from(400));
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression_located(
+pub fn parse_expression_at(
     source: &str,
     path: &str,
     offset: TextSize,
 ) -> Result<ast::Expr, ParseError> {
-    parse_located(source, Mode::Expression, path, offset).map(|top| match top {
+    parse_starts_at(source, Mode::Expression, path, offset).map(|top| match top {
         ast::Mod::Expression(ast::ModExpression { body }) => *body,
         _ => unreachable!(),
     })
@@ -132,7 +132,7 @@ pub fn parse_expression_located(
 /// assert!(program.is_ok());
 /// ```
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
-    parse_located(source, mode, source_path, TextSize::default())
+    parse_starts_at(source, mode, source_path, TextSize::default())
 }
 
 /// Parse the given Python source code using the specified [`Mode`] and [`Location`].
@@ -143,7 +143,7 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 /// # Example
 ///
 /// ```
-/// use rustpython_parser::{text_size::TextSize, Mode, parse_located};
+/// use rustpython_parser::{text_size::TextSize, Mode, parse_starts_at};
 ///
 /// let source = r#"
 /// def fib(i):
@@ -154,16 +154,16 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 ///
 /// print(fib(42))
 /// "#;
-/// let program = parse_located(source, Mode::Module, "<embedded>", TextSize::from(0));
+/// let program = parse_starts_at(source, Mode::Module, "<embedded>", TextSize::from(0));
 /// assert!(program.is_ok());
 /// ```
-pub fn parse_located(
+pub fn parse_starts_at(
     source: &str,
     mode: Mode,
     source_path: &str,
     offset: TextSize,
 ) -> Result<ast::Mod, ParseError> {
-    let lxr = lexer::lex_located(source, mode, offset);
+    let lxr = lexer::lex_starts_at(source, mode, offset);
     parse_tokens(lxr, mode, source_path)
 }
 

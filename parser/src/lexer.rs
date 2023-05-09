@@ -203,12 +203,12 @@ pub type LexResult = Result<Spanned, LexicalError>;
 /// ```
 #[inline]
 pub fn lex(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
-    lex_located(source, mode, TextSize::default())
+    lex_starts_at(source, mode, TextSize::default())
 }
 
 /// Create a new lexer from a source string, starting at a given location.
 /// You probably want to use [`lex`] instead.
-pub fn lex_located(
+pub fn lex_starts_at(
     source: &str,
     mode: Mode,
     start_offset: TextSize,

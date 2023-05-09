@@ -7,10 +7,10 @@ impl crate::fold::Fold<()> for SourceLocator<'_> {
 
     #[cold]
     fn map_user(&mut self, _user: ()) -> Result<Self::TargetU, Self::Error> {
-        unreachable!("implemented map_located");
+        unreachable!("implemented map_attributed");
     }
 
-    fn map_located<T>(
+    fn map_attributed<T>(
         &mut self,
         node: Attributed<T, ()>,
     ) -> Result<Attributed<T, Self::TargetU>, Self::Error> {

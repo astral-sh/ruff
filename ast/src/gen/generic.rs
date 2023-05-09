@@ -1020,15 +1020,15 @@ pub mod fold {
         type Error;
         fn map_user(&mut self, user: U) -> Result<Self::TargetU, Self::Error>;
 
-        fn map_located<T>(
+        fn map_attributed<T>(
             &mut self,
-            located: Attributed<T, U>,
+            attributed: Attributed<T, U>,
         ) -> Result<Attributed<T, Self::TargetU>, Self::Error> {
-            let custom = self.map_user(located.custom)?;
+            let custom = self.map_user(attributed.custom)?;
             Ok(Attributed {
-                range: located.range,
+                range: attributed.range,
                 custom,
-                node: located.node,
+                node: attributed.node,
             })
         }
 
@@ -1114,12 +1114,12 @@ pub mod fold {
             fold_type_ignore(self, node)
         }
     }
-    fn fold_located<U, F: Fold<U> + ?Sized, T, MT>(
+    fn fold_attributed<U, F: Fold<U> + ?Sized, T, MT>(
         folder: &mut F,
         node: Attributed<T, U>,
         f: impl FnOnce(&mut F, T) -> Result<MT, F::Error>,
     ) -> Result<Attributed<MT, F::TargetU>, F::Error> {
-        let node = folder.map_located(node)?;
+        let node = folder.map_attributed(node)?;
         Ok(Attributed {
             custom: node.custom,
             range: node.range,
@@ -1171,7 +1171,7 @@ pub mod fold {
         #[allow(unused)] folder: &mut F,
         node: Stmt<U>,
     ) -> Result<Stmt<F::TargetU>, F::Error> {
-        fold_located(folder, node, |folder, node| match node {
+        fold_attributed(folder, node, |folder, node| match node {
             StmtKind::FunctionDef(StmtFunctionDef {
                 name,
                 args,
@@ -1375,7 +1375,7 @@ pub mod fold {
         #[allow(unused)] folder: &mut F,
         node: Expr<U>,
     ) -> Result<Expr<F::TargetU>, F::Error> {
-        fold_located(folder, node, |folder, node| match node {
+        fold_attributed(folder, node, |folder, node| match node {
             ExprKind::BoolOp(ExprBoolOp { op, values }) => Ok(ExprKind::BoolOp(ExprBoolOp {
                 op: Foldable::fold(op, folder)?,
                 values: Foldable::fold(values, folder)?,
@@ -1675,7 +1675,7 @@ pub mod fold {
         #[allow(unused)] folder: &mut F,
         node: Excepthandler<U>,
     ) -> Result<Excepthandler<F::TargetU>, F::Error> {
-        fold_located(folder, node, |folder, node| match node {
+        fold_attributed(folder, node, |folder, node| match node {
             ExcepthandlerKind::ExceptHandler(ExcepthandlerExceptHandler { type_, name, body }) => {
                 Ok(ExcepthandlerKind::ExceptHandler(
                     ExcepthandlerExceptHandler {
@@ -1732,7 +1732,7 @@ pub mod fold {
         #[allow(unused)] folder: &mut F,
         node: Arg<U>,
     ) -> Result<Arg<F::TargetU>, F::Error> {
-        fold_located(folder, node, |folder, node| {
+        fold_attributed(folder, node, |folder, node| {
             let ArgData {
                 arg,
                 annotation,
@@ -1758,7 +1758,7 @@ pub mod fold {
         #[allow(unused)] folder: &mut F,
         node: Keyword<U>,
     ) -> Result<Keyword<F::TargetU>, F::Error> {
-        fold_located(folder, node, |folder, node| {
+        fold_attributed(folder, node, |folder, node| {
             let KeywordData { arg, value } = node;
             Ok(KeywordData {
                 arg: Foldable::fold(arg, folder)?,
@@ -1779,7 +1779,7 @@ pub mod fold {
         #[allow(unused)] folder: &mut F,
         node: Alias<U>,
     ) -> Result<Alias<F::TargetU>, F::Error> {
-        fold_located(folder, node, |folder, node| {
+        fold_attributed(folder, node, |folder, node| {
             let AliasData { name, asname } = node;
             Ok(AliasData {
                 name: Foldable::fold(name, folder)?,
@@ -1846,7 +1846,7 @@ pub mod fold {
         #[allow(unused)] folder: &mut F,
         node: Pattern<U>,
     ) -> Result<Pattern<F::TargetU>, F::Error> {
-        fold_located(folder, node, |folder, node| match node {
+        fold_attributed(folder, node, |folder, node| match node {
             PatternKind::MatchValue(PatternMatchValue { value }) => {
                 Ok(PatternKind::MatchValue(PatternMatchValue {
                     value: Foldable::fold(value, folder)?,

@@ -391,9 +391,9 @@ class FoldTraitDefVisitor(EmitVisitor):
         )
         self.emit(
             """
-            fn map_located<T>(&mut self, located: Attributed<T, U>) -> Result<Attributed<T, Self::TargetU>, Self::Error> {
-                let custom = self.map_user(located.custom)?;
-                Ok(Attributed { range: located.range, custom, node: located.node })
+            fn map_attributed<T>(&mut self, attributed: Attributed<T, U>) -> Result<Attributed<T, Self::TargetU>, Self::Error> {
+                let custom = self.map_user(attributed.custom)?;
+                Ok(Attributed { range: attributed.range, custom, node: attributed.node })
             }""",
             depth + 1,
         )
@@ -423,11 +423,11 @@ class FoldTraitDefVisitor(EmitVisitor):
 class FoldImplVisitor(EmitVisitor):
     def visitModule(self, mod, depth):
         self.emit(
-            "fn fold_located<U, F: Fold<U> + ?Sized, T, MT>(folder: &mut F, node: Attributed<T, U>, f: impl FnOnce(&mut F, T) -> Result<MT, F::Error>) -> Result<Attributed<MT, F::TargetU>, F::Error> {",
+            "fn fold_attributed<U, F: Fold<U> + ?Sized, T, MT>(folder: &mut F, node: Attributed<T, U>, f: impl FnOnce(&mut F, T) -> Result<MT, F::Error>) -> Result<Attributed<MT, F::TargetU>, F::Error> {",
             depth,
         )
         self.emit(
-            "let node = folder.map_located(node)?; Ok(Attributed { custom: node.custom, range: node.range, node: f(folder, node.node)? })",
+            "let node = folder.map_attributed(node)?; Ok(Attributed { custom: node.custom, range: node.range, node: f(folder, node.node)? })",
             depth + 1,
         )
         self.emit("}", depth)
@@ -459,7 +459,7 @@ class FoldImplVisitor(EmitVisitor):
             depth,
         )
         if typeinfo.has_attributes:
-            self.emit("fold_located(folder, node, |folder, node| {", depth)
+            self.emit("fold_attributed(folder, node, |folder, node| {", depth)
 
         self.emit("match node {", depth + 1)
         for cons in sum.types:
@@ -501,7 +501,7 @@ class FoldImplVisitor(EmitVisitor):
             depth,
         )
         if has_attributes:
-            self.emit("fold_located(folder, node, |folder, node| {", depth)
+            self.emit("fold_attributed(folder, node, |folder, node| {", depth)
             rustname = structname + "Data"
         else:
             rustname = structname
