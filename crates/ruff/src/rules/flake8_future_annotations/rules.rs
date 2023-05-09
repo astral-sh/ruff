@@ -7,6 +7,15 @@ use ruff_python_stdlib::typing::PEP_585_SUBSCRIPT_ELIGIBLE;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for missing `from __future__ import annotations` import if a type used in the
+/// module can be rewritten using PEP 563.
+///
+/// ## Why is this bad?
+/// Pairs well with pyupgrade with the --py37-plus flag or higher, since pyupgrade only
+/// replaces type annotations with the PEP 563 rules if `from __future__ import annotations`
+/// is present.
+///
 /// ## Example
 /// ```python
 /// import typing as t
