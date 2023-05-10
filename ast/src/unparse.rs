@@ -429,7 +429,7 @@ impl<'a> Unparser<'a> {
 
     fn unparse_comp<U>(&mut self, generators: &[Comprehension<U>]) -> fmt::Result {
         for comp in generators {
-            self.p(if comp.is_async.to_bool() {
+            self.p(if comp.is_async {
                 " async for "
             } else {
                 " for "

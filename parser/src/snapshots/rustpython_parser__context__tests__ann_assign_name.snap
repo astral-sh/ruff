@@ -46,9 +46,7 @@ expression: parse_ast
                         ),
                     },
                 ),
-                simple: Int(
-                    1,
-                ),
+                simple: true,
             },
         ),
     },

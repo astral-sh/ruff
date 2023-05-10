@@ -69,9 +69,7 @@ Attributed {
                         ),
                     },
                     ifs: [],
-                    is_async: Int(
-                        0,
-                    ),
+                    is_async: false,
                 },
                 Comprehension {
                     target: Attributed {
@@ -174,9 +172,7 @@ Attributed {
                             ),
                         },
                     ],
-                    is_async: Int(
-                        0,
-                    ),
+                    is_async: false,
                 },
             ],
         },

@@ -101,9 +101,7 @@ expression: parse_ast
                                         ),
                                     },
                                     ifs: [],
-                                    is_async: Int(
-                                        0,
-                                    ),
+                                    is_async: false,
                                 },
                             ],
                         },

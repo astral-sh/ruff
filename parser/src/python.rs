@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 92f216faaf9f12c4ae180e3d5821a88e6bfa435ffe36293d4485c669f055b18e
+// sha3: 7764ff3f82c4bfb364f8e2c55698c0cf314d591d7aeacd8abf4c9dfe354d25e2
 use crate::{
     ast,
     lexer::{LexicalError, LexicalErrorType},
@@ -36926,7 +36926,7 @@ fn __action24<
                 target: Box::new(set_context(target, ast::ExprContext::Store)),
                 annotation: Box::new(annotation),
                 value: rhs.map(Box::new),
-                simple: ast::Int::new_bool(simple),
+                simple,
             }.into(),
         )
     }
@@ -39647,7 +39647,7 @@ fn __action206<
             target: set_context(target, ast::ExprContext::Store),
             iter,
             ifs,
-            is_async: ast::Int::new_bool(is_async),
+            is_async,
         }
     }
 }

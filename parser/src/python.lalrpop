@@ -132,7 +132,7 @@ ExpressionStatement: ast::Stmt = {
                 target: Box::new(set_context(target, ast::ExprContext::Store)),
                 annotation: Box::new(annotation),
                 value: rhs.map(Box::new),
-                simple: ast::Int::new_bool(simple),
+                simple,
             }.into(),
         )
     },
@@ -1707,7 +1707,7 @@ SingleForComprehension: ast::Comprehension = {
             target: set_context(target, ast::ExprContext::Store),
             iter,
             ifs,
-            is_async: ast::Int::new_bool(is_async),
+            is_async,
         }
     }
 };

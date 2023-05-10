@@ -154,7 +154,7 @@ pub struct StmtAnnAssign<U = ()> {
     pub target: Box<Expr<U>>,
     pub annotation: Box<Expr<U>>,
     pub value: Option<Box<Expr<U>>>,
-    pub simple: Int,
+    pub simple: bool,
 }
 
 impl<U> From<StmtAnnAssign<U>> for StmtKind<U> {
@@ -815,7 +815,7 @@ pub struct Comprehension<U = ()> {
     pub target: Expr<U>,
     pub iter: Expr<U>,
     pub ifs: Vec<Expr<U>>,
-    pub is_async: Int,
+    pub is_async: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
