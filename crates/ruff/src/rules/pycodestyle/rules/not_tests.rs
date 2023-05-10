@@ -22,9 +22,9 @@ use crate::rules::pycodestyle::helpers::compare;
 ///
 /// Use instead:
 /// ```python
-/// if x not in y:
+/// Z = X not in Y
+/// if X.B not in Y:
 ///     pass
-/// assert X in Y or X is Z
 /// ```
 #[violation]
 pub struct NotInTest;
@@ -55,9 +55,9 @@ impl AlwaysAutofixableViolation for NotInTest {
 ///
 /// Use instead:
 /// ```python
-/// if not (X in Y):
+/// if X is not Y:
 ///     pass
-/// zz = x is not y
+/// Z = X.B is not Y
 /// ```
 #[violation]
 pub struct NotIsTest;
