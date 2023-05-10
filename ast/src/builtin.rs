@@ -46,6 +46,9 @@ impl Int {
     pub fn to_u32(&self) -> u32 {
         self.0
     }
+    pub fn to_usize(&self) -> usize {
+        self.0 as _
+    }
     pub fn to_bool(&self) -> bool {
         self.0 > 0
     }
