@@ -65,7 +65,7 @@ pub(crate) const fn choose_quote(
         Quote::Double => (double_count, single_count),
     };
 
-    // always use primary unless we have primary but no seconday
+    // always use primary unless we have primary but no secondary
     let use_secondary = primary_count > 0 && secondary_count == 0;
     if use_secondary {
         (preferred_quote.swap(), secondary_count)
@@ -242,7 +242,7 @@ impl<'a> Escape for UnicodeEscape<'a> {
 }
 
 #[cfg(test)]
-mod unicode_escapse_tests {
+mod unicode_escape_tests {
     use super::*;
 
     #[test]

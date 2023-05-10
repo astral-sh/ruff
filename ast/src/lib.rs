@@ -32,6 +32,7 @@ pub mod fold {
 #[cfg(feature = "visitor")]
 mod visitor {
     use super::generic::*;
+
     include!("gen/visitor.rs");
 }
 

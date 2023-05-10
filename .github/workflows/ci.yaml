@@ -62,3 +62,13 @@ jobs:
         run: python -m pip install ruff
       - name: run python lint
         run: ruff --ignore=E501 ast --show-source
+
+      - name: spell checker
+        uses: streetsidesoftware/cspell-action@v2
+        with:
+          files: |
+            'ast/**/*.rs'
+            'core/**/*.rs'
+            'literal/**/*.rs'
+            'parser/**/*.rs'
+            'ast/asdl_rs.py'
