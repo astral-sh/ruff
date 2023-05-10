@@ -28,11 +28,9 @@ impl Violation for SuppressibleException {
         format!("Use `contextlib.suppress({exception})` instead of `try`-`except`-`pass`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|SuppressibleException { exception, .. }| {
-                format!("Replace with `contextlib.suppress({exception})`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let SuppressibleException { exception, .. } = self;
+        Some(format!("Replace with `contextlib.suppress({exception})`"))
     }
 }
 
