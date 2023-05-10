@@ -5,6 +5,30 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for usages of the builtin `open()` function without an associated context
+/// manager.
+///
+/// ## Why is this bad?
+/// If a file is opened without a context manager, it is not guaranteed that
+/// the file will be closed (e.g., if an exception is raised), which can cause
+/// resource leaks.
+///
+/// ## Example
+/// ```python
+/// file = open("foo.txt")
+/// ...
+/// file.close()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with open("foo.txt") as file:
+///     ...
+/// ```
+///
+/// # References
+/// - [Python documentation](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct OpenFileWithContextHandler;
 
