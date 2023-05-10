@@ -300,7 +300,14 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
                 for line in diff_str.splitlines():
                     # Find rule change for current line or construction
                     # + <rule>/<path>:<line>:<column>: <rule_code> <message>
-                    rule_code = re.findall(r": [A-Z]{1,3}[0-9]{3,4}", line)[0][2:]
+                    matches = re.findall(r": [A-Z]{1,3}[0-9]{3,4}", line)
+                    if len(matches) == 0:
+                        # Handle case where there are no regex matches e.g.
+                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001
+                        # Which was found in local testing
+                        continue
+
+                    rule_code = matches[0][2:]
 
                     # Get current additions and removals for this rule
                     current_changes = rule_changes.get(rule_code, (0, 0))
