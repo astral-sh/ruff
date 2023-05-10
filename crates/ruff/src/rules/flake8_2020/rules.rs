@@ -128,7 +128,6 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 lower: None,
                 upper: Some(upper),
                 step: None,
-                ..
             }) => {
                 if let ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Int(i),

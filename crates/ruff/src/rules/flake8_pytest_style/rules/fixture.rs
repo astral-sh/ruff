@@ -208,7 +208,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
-            StmtKind::Return(ast::StmtReturn { value, .. }) => {
+            StmtKind::Return(ast::StmtReturn { value }) => {
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
@@ -223,7 +223,7 @@ where
             ExprKind::YieldFrom(_) => {
                 self.has_yield_from = true;
             }
-            ExprKind::Yield(ast::ExprYield { value, .. }) => {
+            ExprKind::Yield(ast::ExprYield { value }) => {
                 self.yield_statements.push(expr);
                 if value.is_some() {
                     self.has_return_with_value = true;
@@ -282,7 +282,6 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
             func,
             args,
             keywords,
-            ..
         }) => {
             if checker
                 .settings
@@ -415,7 +414,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
         .enabled(Rule::PytestUselessYieldFixture)
     {
         if let Some(stmt) = body.last() {
-            if let StmtKind::Expr(ast::StmtExpr { value, .. }) = &stmt.node {
+            if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
                 if let ExprKind::Yield(_) = value.node {
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(

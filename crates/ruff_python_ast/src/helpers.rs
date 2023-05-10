@@ -1038,9 +1038,8 @@ pub fn find_names<'a, T>(
 
 /// Return the `Range` of `name` in `Excepthandler`.
 pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> Option<TextRange> {
-    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-        name, type_, body, ..
-    }) = &handler.node;
+    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { name, type_, body }) =
+        &handler.node;
 
     match (name, type_) {
         (Some(_), Some(type_)) => {
@@ -1461,7 +1460,7 @@ impl Truthiness {
                 Constant::Ellipsis => Some(true),
                 Constant::Tuple(elts) => Some(!elts.is_empty()),
             },
-            ExprKind::JoinedStr(ast::ExprJoinedStr { values, .. }) => {
+            ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {
@@ -1476,7 +1475,7 @@ impl Truthiness {
                 }
             }
             ExprKind::List(ast::ExprList { elts, .. })
-            | ExprKind::Set(ast::ExprSet { elts, .. })
+            | ExprKind::Set(ast::ExprSet { elts })
             | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => Some(!elts.is_empty()),
             ExprKind::Dict(ast::ExprDict { keys, .. }) => Some(!keys.is_empty()),
             ExprKind::Call(ast::ExprCall {

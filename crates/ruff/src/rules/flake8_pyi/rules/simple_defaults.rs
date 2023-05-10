@@ -82,14 +82,14 @@ fn is_valid_default_value_with_annotation(
     match &default.node {
         ExprKind::List(ast::ExprList { elts, .. })
         | ExprKind::Tuple(ast::ExprTuple { elts, .. })
-        | ExprKind::Set(ast::ExprSet { elts, .. }) => {
+        | ExprKind::Set(ast::ExprSet { elts }) => {
             return allow_container
                 && elts.len() <= 10
                 && elts
                     .iter()
                     .all(|e| is_valid_default_value_with_annotation(e, checker, false));
         }
-        ExprKind::Dict(ast::ExprDict { keys, values, .. }) => {
+        ExprKind::Dict(ast::ExprDict { keys, values }) => {
             return allow_container
                 && keys.len() <= 10
                 && keys.iter().zip(values).all(|(k, v)| {

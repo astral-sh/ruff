@@ -278,12 +278,10 @@ fn assignment_targets_from_expr<'a, U>(
         ExprKind::Starred(ast::ExprStarred {
             ctx: ExprContext::Store,
             value,
-            ..
         }) => Box::new(iter::once(&**value)),
         ExprKind::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,
-            ..
         }) => {
             // Ignore dummy variables.
             if dummy_variable_rgx.is_match(id) {
@@ -295,7 +293,6 @@ fn assignment_targets_from_expr<'a, U>(
         ExprKind::List(ast::ExprList {
             ctx: ExprContext::Store,
             elts,
-            ..
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
@@ -303,7 +300,6 @@ fn assignment_targets_from_expr<'a, U>(
         ExprKind::Tuple(ast::ExprTuple {
             ctx: ExprContext::Store,
             elts,
-            ..
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),

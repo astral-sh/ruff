@@ -78,7 +78,6 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &C
             func,
             args,
             keywords,
-            ..
         }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
                 && args.is_empty()

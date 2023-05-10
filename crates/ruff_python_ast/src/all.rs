@@ -61,7 +61,7 @@ where
                                 }
                                 match &args[0].node {
                                     ExprKind::List(ast::ExprList { elts, .. })
-                                    | ExprKind::Set(ast::ExprSet { elts, .. })
+                                    | ExprKind::Set(ast::ExprSet { elts })
                                     | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                                         return (Some(elts), AllNamesFlags::empty());
                                     }

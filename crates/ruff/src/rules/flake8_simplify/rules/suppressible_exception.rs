@@ -71,10 +71,7 @@ pub fn suppressible_exception(
         if matches!(node, StmtKind::Pass)
             || (matches!(
             node,
-            StmtKind::Expr(ast::StmtExpr {
-                value,
-                    ..
-                })
+            StmtKind::Expr(ast::StmtExpr { value })
             if matches!(**value, Attributed { node: ExprKind::Constant(ast::ExprConstant { value: Constant::Ellipsis, .. }), ..})
             ))
         {

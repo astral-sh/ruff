@@ -539,7 +539,7 @@ fn get_if_body_pairs<'a>(
         if orelse.len() != 1 {
             break;
         }
-        let StmtKind::If(ast::StmtIf { test, body, orelse: orelse_orelse, .. }) = &orelse[0].node else {
+        let StmtKind::If(ast::StmtIf { test, body, orelse: orelse_orelse }) = &orelse[0].node else {
             break;
         };
         pairs.push((test, body));
@@ -639,7 +639,7 @@ pub fn manual_dict_lookup(
     let ExprKind::Constant(ast::ExprConstant { value: constant, .. }) = &comparators[0].node else {
         return;
     };
-    let StmtKind::Return(ast::StmtReturn { value, .. }) = &body[0].node else {
+    let StmtKind::Return(ast::StmtReturn { value }) = &body[0].node else {
         return;
     };
     if value.as_ref().map_or(false, |value| {
@@ -711,7 +711,7 @@ pub fn manual_dict_lookup(
         let ExprKind::Constant(ast::ExprConstant { value: constant, .. } )= &comparators[0].node else {
             return;
         };
-        let StmtKind::Return(ast::StmtReturn { value, .. } )= &body[0].node else {
+        let StmtKind::Return(ast::StmtReturn { value } )= &body[0].node else {
             return;
         };
         if value.as_ref().map_or(false, |value| {

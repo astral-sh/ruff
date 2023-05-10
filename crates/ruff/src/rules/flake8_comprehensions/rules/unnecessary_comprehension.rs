@@ -86,7 +86,7 @@ pub fn unnecessary_dict_comprehension(
         return;
     }
     let generator = &generators[0];
-    if !(generator.ifs.is_empty() && !generator.is_async) {
+    if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
     let Some(key_id) = helpers::expr_name(key) else {
@@ -127,7 +127,7 @@ pub fn unnecessary_list_set_comprehension(
         return;
     }
     let generator = &generators[0];
-    if !(generator.ifs.is_empty() && !generator.is_async) {
+    if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
     let Some(elt_id) = helpers::expr_name(elt) else {

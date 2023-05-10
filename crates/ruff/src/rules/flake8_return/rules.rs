@@ -480,7 +480,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             }
         }
         StmtKind::Return(_) | StmtKind::Raise(_) | StmtKind::Try(_) | StmtKind::TryStar(_) => {}
-        StmtKind::Expr(ast::StmtExpr { value, .. })
+        StmtKind::Expr(ast::StmtExpr { value })
             if matches!(
                 &value.node,
                 ExprKind::Call(ast::ExprCall { func, ..  })

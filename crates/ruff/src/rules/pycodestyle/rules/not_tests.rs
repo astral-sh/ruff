@@ -87,7 +87,6 @@ pub fn not_tests(
             left,
             ops,
             comparators,
-            ..
         }) = &operand.node
         {
             if !matches!(&ops[..], [Cmpop::In | Cmpop::Is]) {

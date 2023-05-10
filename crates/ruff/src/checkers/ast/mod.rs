@@ -1725,14 +1725,12 @@ where
                 handlers,
                 orelse,
                 finalbody,
-                ..
             })
             | StmtKind::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-                ..
             }) => {
                 if self.settings.rules.enabled(Rule::DefaultExceptNotLast) {
                     if let Some(diagnostic) =
@@ -1923,7 +1921,7 @@ where
                     }
                 }
             }
-            StmtKind::Expr(ast::StmtExpr { value, .. }) => {
+            StmtKind::Expr(ast::StmtExpr { value }) => {
                 if self.settings.rules.enabled(Rule::UselessComparison) {
                     flake8_bugbear::rules::useless_comparison(self, value);
                 }
@@ -2022,7 +2020,6 @@ where
                 bases,
                 keywords,
                 decorator_list,
-                ..
             }) => {
                 if self.settings.rules.enabled(Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
@@ -3529,7 +3526,7 @@ where
                     pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
                 }
             }
-            ExprKind::Lambda(ast::ExprLambda { args, body, .. }) => {
+            ExprKind::Lambda(ast::ExprLambda { args, body }) => {
                 if self.settings.rules.enabled(Rule::ReimplementedListBuiltin) {
                     flake8_pie::rules::reimplemented_list_builtin(self, expr);
                 }
@@ -3902,7 +3899,6 @@ where
                 type_,
                 name,
                 body,
-                ..
             }) => {
                 let name = name.as_deref();
                 if self.settings.rules.enabled(Rule::BareExcept) {

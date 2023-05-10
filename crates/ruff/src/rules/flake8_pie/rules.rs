@@ -506,7 +506,6 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             func,
             args,
             keywords,
-            ..
         }) = &call.node else {
             continue
         };
