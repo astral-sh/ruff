@@ -11,9 +11,6 @@ pub struct BlankLineAfterSummary {
     num_lines: usize,
 }
 
-fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String {
-    "Insert single blank line".to_string()
-}
 impl Violation for BlankLineAfterSummary {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
@@ -29,12 +26,8 @@ impl Violation for BlankLineAfterSummary {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let BlankLineAfterSummary { num_lines } = self;
-        if *num_lines > 0 {
-            return Some(fmt_blank_line_after_summary_autofix_msg);
-        }
-        None
+    fn autofix_title(&self) -> Option<String> {
+        Some("Insert single blank line".to_string())
     }
 }
 

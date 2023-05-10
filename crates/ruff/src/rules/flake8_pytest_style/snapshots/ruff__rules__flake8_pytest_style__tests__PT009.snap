@@ -159,6 +159,7 @@ PT009.py:21:13: PT009 Use a regular `assert` instead of unittest-style `assertIs
 24 |             if expect_condition
 25 |             else self.assertIsNone(value)  # Error, unfixable
    |
+   = help: Replace `assertIsNotNone(...)` with `assert ...`
 
 PT009.py:23:18: PT009 Use a regular `assert` instead of unittest-style `assertIsNone`
    |
@@ -169,6 +170,7 @@ PT009.py:23:18: PT009 Use a regular `assert` instead of unittest-style `assertIs
 26 |         )
 27 |         return self.assertEqual(True,  False)  # Error, unfixable
    |
+   = help: Replace `assertIsNone(...)` with `assert ...`
 
 PT009.py:25:16: PT009 Use a regular `assert` instead of unittest-style `assertEqual`
    |
@@ -179,6 +181,7 @@ PT009.py:25:16: PT009 Use a regular `assert` instead of unittest-style `assertEq
 28 | 
 29 |     def test_assert_false(self):
    |
+   = help: Replace `assertEqual(...)` with `assert ...`
 
 PT009.py:28:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertFalse`
    |

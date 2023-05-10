@@ -56,13 +56,12 @@ impl Violation for UnnecessaryMap {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|UnnecessaryMap { obj_type }| {
-            if obj_type == "generator" {
-                format!("Replace `map` using a generator expression")
-            } else {
-                format!("Replace `map` using a `{obj_type}` comprehension")
-            }
+    fn autofix_title(&self) -> Option<String> {
+        let UnnecessaryMap { obj_type } = self;
+        Some(if obj_type == "generator" {
+            format!("Replace `map` using a generator expression")
+        } else {
+            format!("Replace `map` using a `{obj_type}` comprehension")
         })
     }
 }

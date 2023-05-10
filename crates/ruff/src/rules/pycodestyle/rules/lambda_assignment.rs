@@ -39,7 +39,6 @@ use crate::registry::AsRule;
 #[violation]
 pub struct LambdaAssignment {
     name: String,
-    fixable: bool,
 }
 
 impl Violation for LambdaAssignment {
@@ -50,9 +49,9 @@ impl Violation for LambdaAssignment {
         format!("Do not assign a `lambda` expression, use a `def`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|LambdaAssignment { name, .. }| format!("Rewrite `{name}` as a `def`"))
+    fn autofix_title(&self) -> Option<String> {
+        let LambdaAssignment { name } = self;
+        Some(format!("Rewrite `{name}` as a `def`"))
     }
 }
 
@@ -77,7 +76,6 @@ pub fn lambda_assignment(
             let mut diagnostic = Diagnostic::new(
                 LambdaAssignment {
                     name: id.to_string(),
-                    fixable,
                 },
                 stmt.range(),
             );

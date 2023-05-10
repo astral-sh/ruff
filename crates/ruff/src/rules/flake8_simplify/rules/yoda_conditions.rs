@@ -29,16 +29,11 @@ impl Violation for YodaConditions {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+    fn autofix_title(&self) -> Option<String> {
         let YodaConditions { suggestion } = self;
-        if suggestion.is_some() {
-            Some(|YodaConditions { suggestion }| {
-                let suggestion = suggestion.as_ref().unwrap();
-                format!("Replace Yoda condition with `{suggestion}`")
-            })
-        } else {
-            None
-        }
+        suggestion
+            .as_ref()
+            .map(|suggestion| format!("Replace Yoda condition with `{suggestion}`"))
     }
 }
 

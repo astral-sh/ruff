@@ -66,6 +66,7 @@ EM.py:28:24: EM101 Exception must not use a string literal, assign to variable f
 30 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
+   = help: Assign to variable; remove string literal
 
 EM.py:35:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
@@ -93,6 +94,7 @@ EM.py:42:28: EM101 Exception must not use a string literal, assign to variable f
 43 |         raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
+   = help: Assign to variable; remove string literal
 
 EM.py:47:28: EM101 [*] Exception must not use a string literal, assign to variable first
    |
@@ -164,6 +166,7 @@ EM.py:55:28: EM101 Exception must not use a string literal, assign to variable f
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
 57 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |
+   = help: Assign to variable; remove string literal
 
 EM.py:56:35: EM101 Exception must not use a string literal, assign to variable first
    |
@@ -172,5 +175,6 @@ EM.py:56:35: EM101 Exception must not use a string literal, assign to variable f
 58 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
+   = help: Assign to variable; remove string literal
 
 

@@ -14,7 +14,6 @@ use crate::registry::AsRule;
 #[violation]
 pub struct ConvertNamedTupleFunctionalToClass {
     name: String,
-    fixable: bool,
 }
 
 impl Violation for ConvertNamedTupleFunctionalToClass {
@@ -22,15 +21,14 @@ impl Violation for ConvertNamedTupleFunctionalToClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertNamedTupleFunctionalToClass { name, .. } = self;
+        let ConvertNamedTupleFunctionalToClass { name } = self;
         format!("Convert `{name}` from `NamedTuple` functional to class syntax")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|ConvertNamedTupleFunctionalToClass { name, .. }| {
-                format!("Convert `{name}` to class syntax")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let ConvertNamedTupleFunctionalToClass { name } = self;
+
+        Some(format!("Convert `{name}` to class syntax"))
     }
 }
 
@@ -197,7 +195,6 @@ pub fn convert_named_tuple_functional_to_class(
     let mut diagnostic = Diagnostic::new(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
-            fixable,
         },
         stmt.range(),
     );

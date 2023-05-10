@@ -115,6 +115,7 @@ SIM103.py:57:5: SIM103 Return the condition `a` directly
 62 | |         return True
    | |___________________^ SIM103
    |
+   = help: Replace with `return a`
 
 SIM103.py:83:5: SIM103 Return the condition `a` directly
    |
@@ -127,5 +128,6 @@ SIM103.py:83:5: SIM103 Return the condition `a` directly
 88 | |         return False
    | |____________________^ SIM103
    |
+   = help: Replace with `return a`
 
 

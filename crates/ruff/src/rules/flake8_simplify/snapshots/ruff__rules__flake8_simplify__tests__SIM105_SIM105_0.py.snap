@@ -175,5 +175,6 @@ SIM105_0.py:93:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead 
 97 | |         pass  # Trailing comment.
    | |____________^ SIM105
    |
+   = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
 

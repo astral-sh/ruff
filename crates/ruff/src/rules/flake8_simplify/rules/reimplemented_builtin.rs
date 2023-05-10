@@ -26,11 +26,9 @@ impl Violation for ReimplementedBuiltin {
         format!("Use `{repl}` instead of `for` loop")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|violation| {
-            let ReimplementedBuiltin { repl } = violation;
-            format!("Replace with `{repl}`")
-        })
+    fn autofix_title(&self) -> Option<String> {
+        let ReimplementedBuiltin { repl } = self;
+        Some(format!("Replace with `{repl}`"))
     }
 }
 

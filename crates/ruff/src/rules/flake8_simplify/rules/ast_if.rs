@@ -37,9 +37,7 @@ fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
 }
 
 #[violation]
-pub struct CollapsibleIf {
-    fixable: bool,
-}
+pub struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -49,16 +47,14 @@ impl Violation for CollapsibleIf {
         format!("Use a single `if` statement instead of nested `if` statements")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Combine `if` statements using `and`"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Combine `if` statements using `and`".to_string())
     }
 }
 
 #[violation]
 pub struct NeedlessBool {
     condition: String,
-    fixable: bool,
 }
 
 impl Violation for NeedlessBool {
@@ -66,14 +62,13 @@ impl Violation for NeedlessBool {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NeedlessBool { condition, .. } = self;
+        let NeedlessBool { condition } = self;
         format!("Return the condition `{condition}` directly")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable.then_some(|NeedlessBool { condition, .. }| {
-            format!("Replace with `return {condition}`")
-        })
+    fn autofix_title(&self) -> Option<String> {
+        let NeedlessBool { condition } = self;
+        Some(format!("Replace with `return {condition}`"))
     }
 }
 
@@ -110,7 +105,6 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
     contents: String,
-    fixable: bool,
 }
 
 impl Violation for IfElseBlockInsteadOfIfExp {
@@ -118,15 +112,13 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
+        let IfElseBlockInsteadOfIfExp { contents } = self;
         format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|IfElseBlockInsteadOfIfExp { contents, .. }| {
-                format!("Replace `if`-`else`-block with `{contents}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let IfElseBlockInsteadOfIfExp { contents } = self;
+        Some(format!("Replace `if`-`else`-block with `{contents}`"))
     }
 }
 
@@ -163,7 +155,6 @@ impl Violation for IfWithSameArms {
 #[violation]
 pub struct IfElseBlockInsteadOfDictGet {
     contents: String,
-    fixable: bool,
 }
 
 impl Violation for IfElseBlockInsteadOfDictGet {
@@ -171,15 +162,13 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfDictGet { contents, .. } = self;
+        let IfElseBlockInsteadOfDictGet { contents } = self;
         format!("Use `{contents}` instead of an `if` block")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|IfElseBlockInsteadOfDictGet { contents, .. }| {
-                format!("Replace with `{contents}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let IfElseBlockInsteadOfDictGet { contents } = self;
+        Some(format!("Replace with `{contents}`"))
     }
 }
 
@@ -289,7 +278,7 @@ pub fn nested_if_statements(
     );
 
     let mut diagnostic = Diagnostic::new(
-        CollapsibleIf { fixable },
+        CollapsibleIf,
         colon.map_or_else(
             || stmt.range(),
             |colon| TextRange::new(stmt.start(), colon.end()),
@@ -367,7 +356,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         && !has_comments(stmt, checker.locator)
         && (matches!(test.node, ExprKind::Compare { .. }) || checker.ctx.is_builtin("bool"));
 
-    let mut diagnostic = Diagnostic::new(NeedlessBool { condition, fixable }, stmt.range());
+    let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
@@ -526,7 +515,6 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
-            fixable,
         },
         stmt.range(),
     );
@@ -877,7 +865,6 @@ pub fn use_dict_get_with_default(
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
-            fixable,
         },
         stmt.range(),
     );

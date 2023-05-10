@@ -20,12 +20,8 @@ impl Violation for DatetimeTimezoneUTC {
         format!("Use `datetime.UTC` alias")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        if self.straight_import {
-            Some(|_| "Convert to `datetime.UTC` alias".to_string())
-        } else {
-            None
-        }
+    fn autofix_title(&self) -> Option<String> {
+        Some("Convert to `datetime.UTC` alias".to_string())
     }
 }
 

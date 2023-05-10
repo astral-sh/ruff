@@ -21,8 +21,9 @@ impl Violation for SysExitAlias {
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|SysExitAlias { name }| format!("Replace `{name}` with `sys.exit()`"))
+    fn autofix_title(&self) -> Option<String> {
+        let SysExitAlias { name } = self;
+        Some(format!("Replace `{name}` with `sys.exit()`"))
     }
 }
 

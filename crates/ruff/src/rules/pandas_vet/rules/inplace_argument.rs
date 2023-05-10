@@ -32,9 +32,7 @@ use crate::rules::pandas_vet::fixes::convert_inplace_argument_to_assignment;
 /// ## References
 /// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[violation]
-pub struct PandasUseOfInplaceArgument {
-    fixable: bool,
-}
+pub struct PandasUseOfInplaceArgument;
 
 impl Violation for PandasUseOfInplaceArgument {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -44,9 +42,8 @@ impl Violation for PandasUseOfInplaceArgument {
         format!("`inplace=True` should be avoided; it has inconsistent behavior")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Assign to variable; remove `inplace` arg"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Assign to variable; remove `inplace` arg".to_string())
     }
 }
 
@@ -85,8 +82,7 @@ pub fn inplace_argument(
                     && matches!(checker.ctx.stmt().node, StmtKind::Expr { .. })
                     && checker.ctx.expr_parent().is_none()
                     && !checker.ctx.scope().kind.is_lambda();
-                let mut diagnostic =
-                    Diagnostic::new(PandasUseOfInplaceArgument { fixable }, keyword.range());
+                let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Some(fix) = convert_inplace_argument_to_assignment(
                         checker.locator,

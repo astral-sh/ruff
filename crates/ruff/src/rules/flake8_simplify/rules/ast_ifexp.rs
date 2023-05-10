@@ -21,11 +21,9 @@ impl Violation for IfExprWithTrueFalse {
         format!("Use `bool({expr})` instead of `True if {expr} else False`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|violation| {
-            let IfExprWithTrueFalse { expr } = violation;
-            format!("Replace with `not {expr}")
-        })
+    fn autofix_title(&self) -> Option<String> {
+        let IfExprWithTrueFalse { expr } = self;
+        Some(format!("Replace with `not {expr}"))
     }
 }
 

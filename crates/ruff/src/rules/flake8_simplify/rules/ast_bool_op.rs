@@ -47,8 +47,7 @@ use crate::registry::AsRule;
 /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct DuplicateIsinstanceCall {
-    pub name: Option<String>,
-    fixable: bool,
+    name: Option<String>,
 }
 
 impl Violation for DuplicateIsinstanceCall {
@@ -56,7 +55,7 @@ impl Violation for DuplicateIsinstanceCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name, .. } = self;
+        let DuplicateIsinstanceCall { name } = self;
         if let Some(name) = name {
             format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
         } else {
@@ -64,15 +63,14 @@ impl Violation for DuplicateIsinstanceCall {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|DuplicateIsinstanceCall { name, .. }| {
-                if let Some(name) = name {
-                    format!("Merge `isinstance` calls for `{name}`")
-                } else {
-                    format!("Merge `isinstance` calls")
-                }
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let DuplicateIsinstanceCall { name } = self;
+
+        Some(if let Some(name) = name {
+            format!("Merge `isinstance` calls for `{name}`")
+        } else {
+            "Merge `isinstance` calls".to_string()
+        })
     }
 }
 
@@ -305,7 +303,6 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     } else {
                         None
                     },
-                    fixable,
                 },
                 expr.range(),
             );

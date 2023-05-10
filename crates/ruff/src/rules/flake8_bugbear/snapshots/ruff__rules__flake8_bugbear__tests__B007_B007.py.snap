@@ -65,6 +65,7 @@ B007.py:34:10: B007 Loop control variable `bar` may not be used within loop body
 36 |     if foo:
 37 |         print(FMT.format(**locals()))
    |
+   = help: Rename unused `bar` to `_bar`
 
 B007.py:38:10: B007 Loop control variable `bar` may not be used within loop body
    |
@@ -75,6 +76,7 @@ B007.py:38:10: B007 Loop control variable `bar` may not be used within loop body
 41 |     if foo:
 42 |         print(FMT.format(**globals()))
    |
+   = help: Rename unused `bar` to `_bar`
 
 B007.py:42:10: B007 Loop control variable `bar` may not be used within loop body
    |
@@ -85,6 +87,7 @@ B007.py:42:10: B007 Loop control variable `bar` may not be used within loop body
 45 |     if foo:
 46 |         print(FMT.format(**vars()))
    |
+   = help: Rename unused `bar` to `_bar`
 
 B007.py:46:10: B007 Loop control variable `bar` may not be used within loop body
    |
@@ -94,6 +97,7 @@ B007.py:46:10: B007 Loop control variable `bar` may not be used within loop body
    |          ^^^ B007
 49 |     print(FMT.format(foo=foo, bar=eval("bar")))
    |
+   = help: Rename unused `bar` to `_bar`
 
 B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
    |

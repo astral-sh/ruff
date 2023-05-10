@@ -51,9 +51,7 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something_else
 /// ```
 #[violation]
-pub struct PytestCompositeAssertion {
-    fixable: bool,
-}
+pub struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -63,9 +61,8 @@ impl Violation for PytestCompositeAssertion {
         format!("Assertion should be broken down into multiple parts")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Break down assertion into multiple parts"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Break down assertion into multiple parts".to_string())
     }
 }
 
@@ -97,7 +94,6 @@ impl Violation for PytestAssertAlwaysFalse {
 #[violation]
 pub struct PytestUnittestAssertion {
     assertion: String,
-    fixable: bool,
 }
 
 impl Violation for PytestUnittestAssertion {
@@ -105,15 +101,13 @@ impl Violation for PytestUnittestAssertion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestUnittestAssertion { assertion, .. } = self;
+        let PytestUnittestAssertion { assertion } = self;
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|PytestUnittestAssertion { assertion, .. }| {
-                format!("Replace `{assertion}(...)` with `assert ...`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let PytestUnittestAssertion { assertion } = self;
+        Some(format!("Replace `{assertion}(...)` with `assert ...`"))
     }
 }
 
@@ -198,7 +192,6 @@ pub fn unittest_assertion(
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {
                         assertion: unittest_assert.to_string(),
-                        fixable,
                     },
                     func.range(),
                 );
@@ -426,7 +419,7 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
         let fixable = matches!(composite, CompositionKind::Simple)
             && msg.is_none()
             && !has_comments_in(stmt.range(), checker.locator);
-        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion { fixable }, stmt.range());
+        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.try_set_fix_from_edit(|| {

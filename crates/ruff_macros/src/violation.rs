@@ -59,7 +59,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        suggestion: value.autofix_title_formatter().map(|f| f(&value)),
+                        suggestion: Violation::autofix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }
@@ -82,7 +82,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        suggestion: value.autofix_title_formatter().map(|f| f(&value)),
+                        suggestion: Violation::autofix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }
