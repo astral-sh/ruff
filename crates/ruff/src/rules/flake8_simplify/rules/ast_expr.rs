@@ -27,7 +27,7 @@ impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
 }
 
 /// ## What it does
-/// Check for `None` passed as the default value in `dict.get()`.
+/// Check for `dict.get()` calls that pass `None` as the default value.
 ///
 /// ## Why is this bad?
 /// `None` is the default value for `dict.get()`, so it is redundant to pass it
