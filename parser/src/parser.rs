@@ -70,7 +70,7 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 ///
 /// ```
 pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
-    parse_expression_at(source, path, TextSize::default())
+    parse_expression_starts_at(source, path, TextSize::default())
 }
 
 /// Parses a Python expression from a given location.
@@ -84,12 +84,12 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 /// somewhat silly, location:
 ///
 /// ```
-/// use rustpython_parser::{text_size::TextSize, parse_expression_at};
+/// use rustpython_parser::{text_size::TextSize, parse_expression_starts_at};
 ///
-/// let expr = parse_expression_at("1 + 2", "<embedded>", TextSize::from(400));
+/// let expr = parse_expression_starts_at("1 + 2", "<embedded>", TextSize::from(400));
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression_at(
+pub fn parse_expression_starts_at(
     source: &str,
     path: &str,
     offset: TextSize,

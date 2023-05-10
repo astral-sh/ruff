@@ -6,7 +6,7 @@
 use crate::{
     ast::{self, Constant, Expr, ExprKind, Int},
     lexer::{LexicalError, LexicalErrorType},
-    parser::{parse_expression_at, LalrpopError, ParseError, ParseErrorType},
+    parser::{parse_expression_starts_at, LalrpopError, ParseError, ParseErrorType},
     token::{StringKind, Tok},
 };
 use itertools::Itertools;
@@ -575,7 +575,7 @@ impl<'a> StringParser<'a> {
 fn parse_fstring_expr(source: &str, location: TextSize) -> Result<Expr, ParseError> {
     let fstring_body = format!("({source})");
     let start = location - TextSize::from(1);
-    parse_expression_at(&fstring_body, "<fstring>", start)
+    parse_expression_starts_at(&fstring_body, "<fstring>", start)
 }
 
 fn parse_string(
