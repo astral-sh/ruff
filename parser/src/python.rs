@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 7764ff3f82c4bfb364f8e2c55698c0cf314d591d7aeacd8abf4c9dfe354d25e2
+// sha3: 0198c5dceea306627c61f209b8fb7f17dffba455b06a7ba59f55447f864b84db
 use crate::{
     ast,
     lexer::{LexicalError, LexicalErrorType},
@@ -37335,7 +37335,7 @@ fn __action60<
     (_, __0, _): (TextSize, token::Tok, TextSize),
 ) -> ast::Int
 {
-    ast::Int::new(3)
+    ast::Int::new(1)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -266,7 +266,7 @@ ImportFromLocation: (Option<ast::Int>, Option<ast::Identifier>) = {
 
 ImportDots: ast::Int = {
     "..." => ast::Int::new(3),
-    "." => ast::Int::new(3),
+    "." => ast::Int::new(1),
 };
 
 ImportAsNames: Vec<ast::Alias> = {
