@@ -107,27 +107,27 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -> Fix {
+fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let contents = locator.slice(constant.range());
+    let contents = locator.slice(expr.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
-    let mut prev = None;
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, constant.start()).flatten() {
-        if matches!(tok, Tok::String { .. }) {
-            if let Some(prev) = prev {
+    let mut prev = expr.start();
+    for (tok, range) in lexer::lex_located(contents, Mode::Module, expr.start()).flatten() {
+        match tok {
+            Tok::Dot => break,
+            Tok::String { .. } => {
                 replacement.push_str(locator.slice(TextRange::new(prev, range.start())));
+                let string = locator.slice(range);
+                replacement.push_str(&format!(
+                    "b{}",
+                    &string.trim_start_matches('u').trim_start_matches('U')
+                ));
             }
-            let string = locator.slice(range);
-            replacement.push_str(&format!(
-                "b{}",
-                &string.trim_start_matches('u').trim_start_matches('U')
-            ));
-        } else {
-            if let Some(prev) = prev {
+            _ => {
                 replacement.push_str(locator.slice(TextRange::new(prev, range.end())));
             }
         }
-        prev = Some(range.end());
+        prev = range.end();
     }
     Fix::unspecified(Edit::range_replacement(replacement, expr.range()))
 }
@@ -159,11 +159,7 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.set_fix(replace_with_bytes_literal(
-                            checker.locator,
-                            expr,
-                            variable,
-                        ));
+                        diagnostic.set_fix(replace_with_bytes_literal(checker.locator, expr));
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
