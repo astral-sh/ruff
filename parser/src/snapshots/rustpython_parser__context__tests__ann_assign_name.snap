@@ -13,7 +13,9 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "x",
+                            id: Identifier(
+                                "x",
+                            ),
                             ctx: Store,
                         },
                     ),
@@ -23,7 +25,9 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "int",
+                            id: Identifier(
+                                "int",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -42,7 +46,7 @@ expression: parse_ast
                         ),
                     },
                 ),
-                simple: 1,
+                simple: true,
             },
         ),
     },

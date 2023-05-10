@@ -20,7 +20,9 @@ expression: parse_ast
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "x",
+                                                id: Identifier(
+                                                    "x",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),
@@ -35,7 +37,9 @@ expression: parse_ast
                                                     custom: (),
                                                     node: Name(
                                                         ExprName {
-                                                            id: "y",
+                                                            id: Identifier(
+                                                                "y",
+                                                            ),
                                                             ctx: Store,
                                                         },
                                                     ),

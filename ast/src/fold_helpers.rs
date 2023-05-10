@@ -1,4 +1,4 @@
-use crate::{constant, fold::Fold};
+use crate::{builtin, fold::Fold};
 
 pub trait Foldable<T, U> {
     type Mapped;
@@ -62,4 +62,10 @@ macro_rules! simple_fold {
     };
 }
 
-simple_fold!(u32, String, bool, constant::Constant);
+simple_fold!(
+    builtin::Int,
+    builtin::String,
+    builtin::Identifier,
+    bool,
+    builtin::Constant
+);

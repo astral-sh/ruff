@@ -1,12 +1,9 @@
-mod attributed;
-mod constant;
+mod builtin;
 #[cfg(feature = "fold")]
 mod fold_helpers;
 mod generic {
     #![allow(clippy::derive_partial_eq_without_eq)]
-    pub use crate::{constant::*, Attributed};
-
-    type Ident = String;
+    pub use crate::builtin::*;
 
     include!("gen/generic.rs");
 }
@@ -16,8 +13,7 @@ mod source_locator;
 #[cfg(feature = "unparse")]
 mod unparse;
 
-pub use attributed::Attributed;
-pub use constant::Constant;
+pub use builtin::*;
 pub use generic::*;
 pub use rustpython_parser_core::{text_size, ConversionFlag};
 
@@ -44,3 +40,9 @@ pub mod located {
 pub use rustpython_parser_core::source_code;
 #[cfg(feature = "visitor")]
 pub use visitor::Visitor;
+
+#[cfg(feature = "constant-optimization")]
+mod optimizer;
+
+#[cfg(feature = "constant-optimization")]
+pub use optimizer::ConstantOptimizer;

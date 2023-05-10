@@ -84,7 +84,10 @@ pub(crate) fn parse_params(
     Ok((pos_only, names, defaults))
 }
 
-type FunctionArgument = (Option<(TextSize, TextSize, Option<String>)>, ast::Expr);
+type FunctionArgument = (
+    Option<(TextSize, TextSize, Option<ast::Identifier>)>,
+    ast::Expr,
+);
 
 // Parse arguments as supplied during a function/lambda *call*.
 pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, LexicalError> {
@@ -115,7 +118,10 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
 
                 keywords.push(ast::Keyword::new(
                     start..end,
-                    ast::KeywordData { arg: name, value },
+                    ast::KeywordData {
+                        arg: name.map(ast::Identifier::new),
+                        value,
+                    },
                 ));
             }
             None => {

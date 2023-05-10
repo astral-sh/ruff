@@ -12,7 +12,9 @@ Attributed {
                 custom: (),
                 node: Name(
                     ExprName {
-                        id: "x",
+                        id: Identifier(
+                            "x",
+                        ),
                         ctx: Load,
                     },
                 ),
@@ -30,7 +32,9 @@ Attributed {
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "y",
+                                                id: Identifier(
+                                                    "y",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),
@@ -40,7 +44,9 @@ Attributed {
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "y2",
+                                                id: Identifier(
+                                                    "y2",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),
@@ -55,13 +61,15 @@ Attributed {
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "z",
+                                id: Identifier(
+                                    "z",
+                                ),
                                 ctx: Load,
                             },
                         ),
                     },
                     ifs: [],
-                    is_async: 0,
+                    is_async: false,
                 },
                 Comprehension {
                     target: Attributed {
@@ -69,7 +77,9 @@ Attributed {
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "a",
+                                id: Identifier(
+                                    "a",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -79,7 +89,9 @@ Attributed {
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "b",
+                                id: Identifier(
+                                    "b",
+                                ),
                                 ctx: Load,
                             },
                         ),
@@ -95,7 +107,9 @@ Attributed {
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "a",
+                                                id: Identifier(
+                                                    "a",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
@@ -130,7 +144,9 @@ Attributed {
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "a",
+                                                id: Identifier(
+                                                    "a",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
@@ -156,7 +172,7 @@ Attributed {
                             ),
                         },
                     ],
-                    is_async: 0,
+                    is_async: false,
                 },
             ],
         },

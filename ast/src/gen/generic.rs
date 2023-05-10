@@ -56,7 +56,7 @@ pub enum Mod<U = ()> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtFunctionDef<U = ()> {
-    pub name: Ident,
+    pub name: Identifier,
     pub args: Box<Arguments<U>>,
     pub body: Vec<Stmt<U>>,
     pub decorator_list: Vec<Expr<U>>,
@@ -72,7 +72,7 @@ impl<U> From<StmtFunctionDef<U>> for StmtKind<U> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAsyncFunctionDef<U = ()> {
-    pub name: Ident,
+    pub name: Identifier,
     pub args: Box<Arguments<U>>,
     pub body: Vec<Stmt<U>>,
     pub decorator_list: Vec<Expr<U>>,
@@ -88,7 +88,7 @@ impl<U> From<StmtAsyncFunctionDef<U>> for StmtKind<U> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtClassDef<U = ()> {
-    pub name: Ident,
+    pub name: Identifier,
     pub bases: Vec<Expr<U>>,
     pub keywords: Vec<Keyword<U>>,
     pub body: Vec<Stmt<U>>,
@@ -154,7 +154,7 @@ pub struct StmtAnnAssign<U = ()> {
     pub target: Box<Expr<U>>,
     pub annotation: Box<Expr<U>>,
     pub value: Option<Box<Expr<U>>>,
-    pub simple: u32,
+    pub simple: bool,
 }
 
 impl<U> From<StmtAnnAssign<U>> for StmtKind<U> {
@@ -322,9 +322,9 @@ impl<U> From<StmtImport<U>> for StmtKind<U> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtImportFrom<U = ()> {
-    pub module: Option<Ident>,
+    pub module: Option<Identifier>,
     pub names: Vec<Alias<U>>,
-    pub level: Option<u32>,
+    pub level: Option<Int>,
 }
 
 impl<U> From<StmtImportFrom<U>> for StmtKind<U> {
@@ -335,7 +335,7 @@ impl<U> From<StmtImportFrom<U>> for StmtKind<U> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtGlobal {
-    pub names: Vec<Ident>,
+    pub names: Vec<Identifier>,
 }
 
 impl From<StmtGlobal> for StmtKind {
@@ -346,7 +346,7 @@ impl From<StmtGlobal> for StmtKind {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtNonlocal {
-    pub names: Vec<Ident>,
+    pub names: Vec<Identifier>,
 }
 
 impl From<StmtNonlocal> for StmtKind {
@@ -606,7 +606,7 @@ impl<U> From<ExprCall<U>> for ExprKind<U> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprFormattedValue<U = ()> {
     pub value: Box<Expr<U>>,
-    pub conversion: u32,
+    pub conversion: Int,
     pub format_spec: Option<Box<Expr<U>>>,
 }
 
@@ -642,7 +642,7 @@ impl From<ExprConstant> for ExprKind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprAttribute<U = ()> {
     pub value: Box<Expr<U>>,
-    pub attr: Ident,
+    pub attr: Identifier,
     pub ctx: ExprContext,
 }
 
@@ -679,7 +679,7 @@ impl<U> From<ExprStarred<U>> for ExprKind<U> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
-    pub id: Ident,
+    pub id: Identifier,
     pub ctx: ExprContext,
 }
 
@@ -815,13 +815,13 @@ pub struct Comprehension<U = ()> {
     pub target: Expr<U>,
     pub iter: Expr<U>,
     pub ifs: Vec<Expr<U>>,
-    pub is_async: u32,
+    pub is_async: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExcepthandlerExceptHandler<U = ()> {
     pub type_: Option<Box<Expr<U>>>,
-    pub name: Option<Ident>,
+    pub name: Option<Identifier>,
     pub body: Vec<Stmt<U>>,
 }
 
@@ -850,7 +850,7 @@ pub struct Arguments<U = ()> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ArgData<U = ()> {
-    pub arg: Ident,
+    pub arg: Identifier,
     pub annotation: Option<Box<Expr<U>>>,
     pub type_comment: Option<String>,
 }
@@ -858,15 +858,15 @@ pub type Arg<U = ()> = Attributed<ArgData<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeywordData<U = ()> {
-    pub arg: Option<Ident>,
+    pub arg: Option<Identifier>,
     pub value: Expr<U>,
 }
 pub type Keyword<U = ()> = Attributed<KeywordData<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AliasData {
-    pub name: Ident,
-    pub asname: Option<Ident>,
+    pub name: Identifier,
+    pub asname: Option<Identifier>,
 }
 pub type Alias<U = ()> = Attributed<AliasData, U>;
 
@@ -920,7 +920,7 @@ impl<U> From<PatternMatchSequence<U>> for PatternKind<U> {
 pub struct PatternMatchMapping<U = ()> {
     pub keys: Vec<Expr<U>>,
     pub patterns: Vec<Pattern<U>>,
-    pub rest: Option<Ident>,
+    pub rest: Option<Identifier>,
 }
 
 impl<U> From<PatternMatchMapping<U>> for PatternKind<U> {
@@ -933,7 +933,7 @@ impl<U> From<PatternMatchMapping<U>> for PatternKind<U> {
 pub struct PatternMatchClass<U = ()> {
     pub cls: Box<Expr<U>>,
     pub patterns: Vec<Pattern<U>>,
-    pub kwd_attrs: Vec<Ident>,
+    pub kwd_attrs: Vec<Identifier>,
     pub kwd_patterns: Vec<Pattern<U>>,
 }
 
@@ -945,7 +945,7 @@ impl<U> From<PatternMatchClass<U>> for PatternKind<U> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchStar {
-    pub name: Option<Ident>,
+    pub name: Option<Identifier>,
 }
 
 impl From<PatternMatchStar> for PatternKind {
@@ -957,7 +957,7 @@ impl From<PatternMatchStar> for PatternKind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchAs<U = ()> {
     pub pattern: Option<Box<Pattern<U>>>,
-    pub name: Option<Ident>,
+    pub name: Option<Identifier>,
 }
 
 impl<U> From<PatternMatchAs<U>> for PatternKind<U> {
@@ -992,7 +992,7 @@ pub type Pattern<U = ()> = Attributed<PatternKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeIgnoreTypeIgnore {
-    pub lineno: u32,
+    pub lineno: Int,
     pub tag: String,
 }
 

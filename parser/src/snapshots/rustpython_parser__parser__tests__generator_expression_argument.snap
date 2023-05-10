@@ -24,7 +24,9 @@ Attributed {
                                 },
                             ),
                         },
-                        attr: "join",
+                        attr: Identifier(
+                            "join",
+                        ),
                         ctx: Load,
                     },
                 ),
@@ -40,7 +42,9 @@ Attributed {
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "sql",
+                                        id: Identifier(
+                                            "sql",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
@@ -52,7 +56,9 @@ Attributed {
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "sql",
+                                                id: Identifier(
+                                                    "sql",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),
@@ -73,7 +79,9 @@ Attributed {
                                                                     custom: (),
                                                                     node: Name(
                                                                         ExprName {
-                                                                            id: "limit",
+                                                                            id: Identifier(
+                                                                                "limit",
+                                                                            ),
                                                                             ctx: Load,
                                                                         },
                                                                     ),
@@ -101,7 +109,9 @@ Attributed {
                                                                                 custom: (),
                                                                                 node: Name(
                                                                                     ExprName {
-                                                                                        id: "limit",
+                                                                                        id: Identifier(
+                                                                                            "limit",
+                                                                                        ),
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
@@ -132,7 +142,9 @@ Attributed {
                                                                     custom: (),
                                                                     node: Name(
                                                                         ExprName {
-                                                                            id: "offset",
+                                                                            id: Identifier(
+                                                                                "offset",
+                                                                            ),
                                                                             ctx: Load,
                                                                         },
                                                                     ),
@@ -160,7 +172,9 @@ Attributed {
                                                                                 custom: (),
                                                                                 node: Name(
                                                                                     ExprName {
-                                                                                        id: "offset",
+                                                                                        id: Identifier(
+                                                                                            "offset",
+                                                                                        ),
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
@@ -187,7 +201,7 @@ Attributed {
                                         ),
                                     },
                                     ifs: [],
-                                    is_async: 0,
+                                    is_async: false,
                                 },
                             ],
                         },

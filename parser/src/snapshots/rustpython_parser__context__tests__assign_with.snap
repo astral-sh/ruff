@@ -28,7 +28,9 @@ expression: parse_ast
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),

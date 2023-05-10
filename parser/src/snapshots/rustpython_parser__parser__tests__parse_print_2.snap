@@ -18,7 +18,9 @@ expression: parse_ast
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "print",
+                                        id: Identifier(
+                                            "print",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),

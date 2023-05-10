@@ -17,7 +17,9 @@ Attributed {
                             custom: (),
                             node: Name(
                                 ExprName {
-                                    id: "y",
+                                    id: Identifier(
+                                        "y",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -27,7 +29,9 @@ Attributed {
                             custom: (),
                             node: Name(
                                 ExprName {
-                                    id: "x",
+                                    id: Identifier(
+                                        "x",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -37,7 +41,9 @@ Attributed {
                             custom: (),
                             node: Name(
                                 ExprName {
-                                    id: "y",
+                                    id: Identifier(
+                                        "y",
+                                    ),
                                     ctx: Load,
                                 },
                             ),
@@ -52,7 +58,9 @@ Attributed {
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "y",
+                                id: Identifier(
+                                    "y",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -62,13 +70,15 @@ Attributed {
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "z",
+                                id: Identifier(
+                                    "z",
+                                ),
                                 ctx: Load,
                             },
                         ),
                     },
                     ifs: [],
-                    is_async: 0,
+                    is_async: false,
                 },
             ],
         },
