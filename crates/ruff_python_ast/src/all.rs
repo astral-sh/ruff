@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
@@ -18,10 +18,10 @@ where
 {
     fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut AllNamesFlags) {
         for elt in elts {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
-            } = &elt.node
+            }) = &elt.node
             {
                 names.push(value);
             } else {
@@ -35,39 +35,39 @@ where
         F: Fn(&str) -> bool,
     {
         match &expr.node {
-            ExprKind::List { elts, .. } => {
+            ExprKind::List(ast::ExprList { elts, .. }) => {
                 return (Some(elts), AllNamesFlags::empty());
             }
-            ExprKind::Tuple { elts, .. } => {
+            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                 return (Some(elts), AllNamesFlags::empty());
             }
-            ExprKind::ListComp { .. } => {
+            ExprKind::ListComp(_) => {
                 // Allow comprehensions, even though we can't statically analyze them.
                 return (None, AllNamesFlags::empty());
             }
-            ExprKind::Call {
+            ExprKind::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
-                ..
-            } => {
+            }) => {
                 // Allow `tuple()` and `list()` calls.
                 if keywords.is_empty() && args.len() <= 1 {
-                    if let ExprKind::Name { id, .. } = &func.node {
+                    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+                        let id = id.as_str();
                         if id == "tuple" || id == "list" {
                             if is_builtin(id) {
                                 if args.is_empty() {
                                     return (None, AllNamesFlags::empty());
                                 }
                                 match &args[0].node {
-                                    ExprKind::List { elts, .. }
-                                    | ExprKind::Set { elts, .. }
-                                    | ExprKind::Tuple { elts, .. } => {
+                                    ExprKind::List(ast::ExprList { elts, .. })
+                                    | ExprKind::Set(ast::ExprSet { elts, .. })
+                                    | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                                         return (Some(elts), AllNamesFlags::empty());
                                     }
-                                    ExprKind::ListComp { .. }
-                                    | ExprKind::SetComp { .. }
-                                    | ExprKind::GeneratorExp { .. } => {
+                                    ExprKind::ListComp(_)
+                                    | ExprKind::SetComp(_)
+                                    | ExprKind::GeneratorExp(_) => {
                                         // Allow comprehensions, even though we can't statically analyze
                                         // them.
                                         return (None, AllNamesFlags::empty());
@@ -88,12 +88,12 @@ where
     let mut flags = AllNamesFlags::empty();
 
     if let Some(value) = match &stmt.node {
-        StmtKind::Assign { value, .. } => Some(value),
-        StmtKind::AnnAssign { value, .. } => value.as_ref(),
-        StmtKind::AugAssign { value, .. } => Some(value),
+        StmtKind::Assign(ast::StmtAssign { value, .. }) => Some(value),
+        StmtKind::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_ref(),
+        StmtKind::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),
         _ => None,
     } {
-        if let ExprKind::BinOp { left, right, .. } = &value.node {
+        if let ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) = &value.node {
             let mut current_left = left;
             let mut current_right = right;
             loop {
@@ -106,7 +106,7 @@ where
 
                 // Process the left side, which can be a "real" value or the "rest" of the
                 // binary operation.
-                if let ExprKind::BinOp { left, right, .. } = &current_left.node {
+                if let ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) = &current_left.node {
                     current_left = left;
                     current_right = right;
                 } else {

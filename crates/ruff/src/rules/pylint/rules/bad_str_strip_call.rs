@@ -1,7 +1,7 @@
 use std::fmt;
 
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -107,20 +107,20 @@ fn has_duplicates(s: &str) -> bool {
 
 /// PLE1310
 pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
-    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
         if matches!(
             value.node,
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(_) | Constant::Bytes(_),
                 ..
-            }
+            })
         ) {
             if let Some(strip) = StripKind::from_str(attr.as_str()) {
                 if let Some(arg) = args.get(0) {
-                    if let ExprKind::Constant {
+                    if let ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
-                    } = &arg.node
+                    }) = &arg.node
                     {
                         if has_duplicates(value) {
                             let removal = if checker.settings.target_version >= PythonVersion::Py39

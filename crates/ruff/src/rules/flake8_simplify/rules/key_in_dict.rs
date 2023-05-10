@@ -2,7 +2,7 @@ use anyhow::Result;
 use libcst_native::{Codegen, CodegenState};
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Expr, ExprKind};
 
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
@@ -54,18 +54,18 @@ fn get_value_content_for_key_in_dict(
 
 /// SIM118
 fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRange) {
-    let ExprKind::Call {
+    let ExprKind::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    } = &right.node else {
+    }) = &right.node else {
         return;
     };
     if !(args.is_empty() && keywords.is_empty()) {
         return;
     }
 
-    let ExprKind::Attribute { attr, .. } = &func.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node else {
         return;
     };
     if attr != "keys" {

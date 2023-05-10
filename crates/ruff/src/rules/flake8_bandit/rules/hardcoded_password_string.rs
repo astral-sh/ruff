@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -24,17 +24,17 @@ impl Violation for HardcodedPasswordString {
 fn password_target(target: &Expr) -> Option<&str> {
     let target_name = match &target.node {
         // variable = "s3cr3t"
-        ExprKind::Name { id, .. } => id,
+        ExprKind::Name(ast::ExprName { id, .. }) => id.as_str(),
         // d["password"] = "s3cr3t"
-        ExprKind::Subscript { slice, .. } => match &slice.node {
-            ExprKind::Constant {
+        ExprKind::Subscript(ast::ExprSubscript { slice, .. }) => match &slice.node {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(string),
                 ..
-            } => string,
+            }) => string,
             _ => return None,
         },
         // obj.password = "s3cr3t"
-        ExprKind::Attribute { attr, .. } => attr,
+        ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => attr,
         _ => return None,
     };
 

@@ -2,13 +2,13 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
 
 use crate::context::ASTFormatContext;
-use crate::cst::Located;
+use crate::cst::Attributed;
 use crate::format::builders::literal;
 use crate::trivia::TriviaKind;
 
 #[derive(Debug)]
 pub struct LeadingComments<'a, T> {
-    item: &'a Located<T>,
+    item: &'a Attributed<T>,
 }
 
 impl<T> Format<ASTFormatContext<'_>> for LeadingComments<'_, T> {
@@ -31,13 +31,13 @@ impl<T> Format<ASTFormatContext<'_>> for LeadingComments<'_, T> {
 }
 
 #[inline]
-pub const fn leading_comments<T>(item: &Located<T>) -> LeadingComments<'_, T> {
+pub const fn leading_comments<T>(item: &Attributed<T>) -> LeadingComments<'_, T> {
     LeadingComments { item }
 }
 
 #[derive(Debug)]
 pub struct TrailingComments<'a, T> {
-    item: &'a Located<T>,
+    item: &'a Attributed<T>,
 }
 
 impl<T> Format<ASTFormatContext<'_>> for TrailingComments<'_, T> {
@@ -60,13 +60,13 @@ impl<T> Format<ASTFormatContext<'_>> for TrailingComments<'_, T> {
 }
 
 #[inline]
-pub const fn trailing_comments<T>(item: &Located<T>) -> TrailingComments<'_, T> {
+pub const fn trailing_comments<T>(item: &Attributed<T>) -> TrailingComments<'_, T> {
     TrailingComments { item }
 }
 
 #[derive(Debug)]
 pub struct EndOfLineComments<'a, T> {
-    item: &'a Located<T>,
+    item: &'a Attributed<T>,
 }
 
 impl<T> Format<ASTFormatContext<'_>> for EndOfLineComments<'_, T> {
@@ -88,13 +88,13 @@ impl<T> Format<ASTFormatContext<'_>> for EndOfLineComments<'_, T> {
 }
 
 #[inline]
-pub const fn end_of_line_comments<T>(item: &Located<T>) -> EndOfLineComments<'_, T> {
+pub const fn end_of_line_comments<T>(item: &Attributed<T>) -> EndOfLineComments<'_, T> {
     EndOfLineComments { item }
 }
 
 #[derive(Debug)]
 pub struct DanglingComments<'a, T> {
-    item: &'a Located<T>,
+    item: &'a Attributed<T>,
 }
 
 impl<T> Format<ASTFormatContext<'_>> for DanglingComments<'_, T> {
@@ -113,6 +113,6 @@ impl<T> Format<ASTFormatContext<'_>> for DanglingComments<'_, T> {
 }
 
 #[inline]
-pub const fn dangling_comments<T>(item: &Located<T>) -> DanglingComments<'_, T> {
+pub const fn dangling_comments<T>(item: &Attributed<T>) -> DanglingComments<'_, T> {
     DanglingComments { item }
 }

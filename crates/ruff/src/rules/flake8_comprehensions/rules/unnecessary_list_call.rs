@@ -45,7 +45,7 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if !checker.ctx.is_builtin("list") {
         return;
     }
-    if !matches!(argument, ExprKind::ListComp { .. }) {
+    if !matches!(argument, ExprKind::ListComp(_)) {
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());

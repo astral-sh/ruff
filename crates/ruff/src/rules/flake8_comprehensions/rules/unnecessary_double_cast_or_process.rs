@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -84,7 +84,7 @@ pub fn unnecessary_double_cast_or_process(
     let Some(arg) = args.first() else {
         return;
     };
-    let ExprKind::Call { func, ..} = &arg.node else {
+    let ExprKind::Call(ast::ExprCall { func, ..} )= &arg.node else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {

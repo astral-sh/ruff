@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -56,10 +56,10 @@ pub fn request_with_no_cert_validation(
     }) {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(verify_arg) = call_args.keyword_argument("verify") {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Bool(false),
                 ..
-            } = &verify_arg.node
+            }) = &verify_arg.node
             {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithNoCertValidation {

@@ -19,7 +19,7 @@
 //! ```
 
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -93,7 +93,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let ExprKind::Name { id, .. } = &expr.node {
+        if let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node {
             self.names.insert(id, expr);
         }
         visitor::walk_expr(self, expr);

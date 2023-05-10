@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,11 +25,11 @@ impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
 /// UP011
 pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Expr]) {
     for expr in decorator_list.iter() {
-        let ExprKind::Call {
+        let ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        } = &expr.node else {
+        }) = &expr.node else {
             continue;
         };
 

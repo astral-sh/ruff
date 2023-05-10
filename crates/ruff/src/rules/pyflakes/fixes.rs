@@ -182,7 +182,8 @@ pub fn remove_exception_handler_assignment(
 
     // End of the token just before the `as` to the semicolon.
     let mut prev = None;
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, excepthandler.start()).flatten()
+    for (tok, range) in
+        lexer::lex_starts_at(contents, Mode::Module, excepthandler.start()).flatten()
     {
         if matches!(tok, Tok::As) {
             fix_start = prev;

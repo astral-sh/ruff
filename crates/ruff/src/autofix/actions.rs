@@ -5,7 +5,7 @@ use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, ExcepthandlerKind, Expr, Keyword, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -28,21 +28,21 @@ fn has_single_child(body: &[Stmt], deleted: &[&Stmt]) -> bool {
 /// Determine if a child is the only statement in its body.
 fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool> {
     match &parent.node {
-        StmtKind::FunctionDef { body, .. }
-        | StmtKind::AsyncFunctionDef { body, .. }
-        | StmtKind::ClassDef { body, .. }
-        | StmtKind::With { body, .. }
-        | StmtKind::AsyncWith { body, .. } => {
+        StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
+        | StmtKind::ClassDef(ast::StmtClassDef { body, .. })
+        | StmtKind::With(ast::StmtWith { body, .. })
+        | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else {
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::For { body, orelse, .. }
-        | StmtKind::AsyncFor { body, orelse, .. }
-        | StmtKind::While { body, orelse, .. }
-        | StmtKind::If { body, orelse, .. } => {
+        StmtKind::For(ast::StmtFor { body, orelse, .. })
+        | StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+        | StmtKind::While(ast::StmtWhile { body, orelse, .. })
+        | StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else if orelse.iter().contains(child) {
@@ -51,18 +51,18 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::Try {
+        StmtKind::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
-        }
-        | StmtKind::TryStar {
+        })
+        | StmtKind::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
-        } => {
+        }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else if orelse.iter().contains(child) {
@@ -70,7 +70,9 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             } else if finalbody.iter().contains(child) {
                 Ok(has_single_child(finalbody, deleted))
             } else if let Some(body) = handlers.iter().find_map(|handler| match &handler.node {
-                ExcepthandlerKind::ExceptHandler { body, .. } => {
+                ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    body, ..
+                }) => {
                     if body.iter().contains(child) {
                         Some(body)
                     } else {
@@ -83,7 +85,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::Match { cases, .. } => {
+        StmtKind::Match(ast::StmtMatch { cases, .. }) => {
             if let Some(body) = cases.iter().find_map(|case| {
                 if case.body.iter().contains(child) {
                     Some(&case.body)
@@ -350,7 +352,7 @@ pub fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -382,7 +384,7 @@ pub fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
@@ -405,7 +407,7 @@ pub fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if range.start() == expr_range.start() {
                 fix_end = Some(expr_range.end());
                 break;

@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
-    Boolop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
+    self, Boolop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -301,15 +301,15 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
         // redundant. Consider removing all `pass` statements instead.
         let docstring_stmt = &body[0];
         let pass_stmt = &body[1];
-        let StmtKind::Expr { value } = &docstring_stmt.node else {
+        let StmtKind::Expr(ast::StmtExpr { value } )= &docstring_stmt.node else {
             return;
         };
         if matches!(
             value.node,
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(..),
                 ..
-            }
+            })
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
@@ -351,18 +351,18 @@ pub fn duplicate_class_field_definition<'a, 'b>(
     for stmt in body {
         // Extract the property name from the assignment statement.
         let target = match &stmt.node {
-            StmtKind::Assign { targets, .. } => {
+            StmtKind::Assign(ast::StmtAssign { targets, .. }) => {
                 if targets.len() != 1 {
                     continue;
                 }
-                if let ExprKind::Name { id, .. } = &targets[0].node {
+                if let ExprKind::Name(ast::ExprName { id, .. }) = &targets[0].node {
                     id
                 } else {
                     continue;
                 }
             }
-            StmtKind::AnnAssign { target, .. } => {
-                if let ExprKind::Name { id, .. } = &target.node {
+            StmtKind::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+                if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
                     id
                 } else {
                     continue;
@@ -407,7 +407,7 @@ pub fn non_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, bod
 where
     'b: 'a,
 {
-    let StmtKind::ClassDef { bases, .. } = &parent.node else {
+    let StmtKind::ClassDef(ast::StmtClassDef { bases, .. }) = &parent.node else {
         return;
     };
 
@@ -422,11 +422,11 @@ where
 
     let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
     for stmt in body {
-        let StmtKind::Assign { value, .. } = &stmt.node else {
+        let StmtKind::Assign(ast::StmtAssign { value, .. }) = &stmt.node else {
             continue;
         };
 
-        if let ExprKind::Call { func, .. } = &value.node {
+        if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
             if checker
                 .ctx
                 .resolve_call_path(func)
@@ -454,7 +454,7 @@ pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: 
         if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
-            if let ExprKind::Dict { .. } = value.node {
+            if let ExprKind::Dict(_) = value.node {
                 let diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
                 checker.diagnostics.push(diagnostic);
             }
@@ -464,10 +464,10 @@ pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: 
 
 /// Return `true` if a key is a valid keyword argument name.
 fn is_valid_kwarg_name(key: &Expr) -> bool {
-    if let ExprKind::Constant {
+    if let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } = &key.node
+    }) = &key.node
     {
         is_identifier(value)
     } else {
@@ -480,7 +480,7 @@ pub fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Key
     for kw in kwargs {
         // keyword is a spread operator (indicated by None)
         if kw.node.arg.is_none() {
-            if let ExprKind::Dict { keys, .. } = &kw.node.value.node {
+            if let ExprKind::Dict(ast::ExprDict { keys, .. }) = &kw.node.value.node {
                 // ensure foo(**{"bar-bar": 1}) doesn't error
                 if keys.iter().all(|expr| expr.as_ref().map_or(false, is_valid_kwarg_name)) ||
                     // handle case of foo(**{**bar})
@@ -496,18 +496,18 @@ pub fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Key
 
 /// PIE810
 pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values }) = &expr.node else {
         return;
     };
 
     let mut duplicates = BTreeMap::new();
     for (index, call) in values.iter().enumerate() {
-        let ExprKind::Call {
+        let ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
             ..
-        } = &call.node else {
+        }) = &call.node else {
             continue
         };
 
@@ -515,20 +515,20 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             continue;
         }
 
-        let ExprKind::Attribute { value, attr, .. } = &func.node else {
+        let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. } )= &func.node else {
             continue
         };
-
+        let attr = attr.as_str();
         if attr != "startswith" && attr != "endswith" {
             continue;
         }
 
-        let ExprKind::Name { id: arg_name, .. } = &value.node else {
+        let ExprKind::Name(ast::ExprName { id: arg_name, .. } )= &value.node else {
             continue
         };
 
         duplicates
-            .entry((attr.as_str(), arg_name.as_str()))
+            .entry((attr, arg_name.as_str()))
             .or_insert_with(Vec::new)
             .push(index);
     }
@@ -547,7 +547,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let ExprKind::Call { func: _, args, keywords: _} = &expr.node else {
+                        let ExprKind::Call(ast::ExprCall { func: _, args, keywords: _}) = &expr.node else {
                             unreachable!("{}", format!("Indices should only contain `{attr_name}` calls"))
                         };
                         args.get(0)
@@ -555,20 +555,20 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     })
                     .collect();
 
-                let call = create_expr(ExprKind::Call {
-                    func: Box::new(create_expr(ExprKind::Attribute {
-                        value: Box::new(create_expr(ExprKind::Name {
-                            id: arg_name.to_string(),
+                let call = create_expr(ExprKind::Call(ast::ExprCall {
+                    func: Box::new(create_expr(ExprKind::Attribute(ast::ExprAttribute {
+                        value: Box::new(create_expr(ExprKind::Name(ast::ExprName {
+                            id: arg_name.into(),
                             ctx: ExprContext::Load,
-                        })),
-                        attr: attr_name.to_string(),
+                        }))),
+                        attr: attr_name.into(),
                         ctx: ExprContext::Load,
-                    })),
-                    args: vec![create_expr(ExprKind::Tuple {
+                    }))),
+                    args: vec![create_expr(ExprKind::Tuple(ast::ExprTuple {
                         elts: words
                             .iter()
                             .flat_map(|value| {
-                                if let ExprKind::Tuple { elts, .. } = &value.node {
+                                if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &value.node {
                                     Left(elts.iter())
                                 } else {
                                     Right(iter::once(*value))
@@ -577,13 +577,13 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                             .map(Clone::clone)
                             .collect(),
                         ctx: ExprContext::Load,
-                    })],
+                    }))],
                     keywords: vec![],
-                });
+                }));
 
                 // Generate the combined `BoolOp`.
                 let mut call = Some(call);
-                let bool_op = create_expr(ExprKind::BoolOp {
+                let bool_op = create_expr(ExprKind::BoolOp(ast::ExprBoolOp {
                     op: Boolop::Or,
                     values: values
                         .iter()
@@ -596,7 +596,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                             }
                         })
                         .collect(),
-                });
+                }));
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
@@ -610,7 +610,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
 
 /// PIE807
 pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Lambda { args, body } = &expr.node else {
+    let ExprKind::Lambda(ast::ExprLambda { args, body }) = &expr.node else {
         panic!("Expected ExprKind::Lambda");
     };
     if args.args.is_empty()
@@ -619,7 +619,7 @@ pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
         && args.vararg.is_none()
         && args.kwarg.is_none()
     {
-        if let ExprKind::List { elts, .. } = &body.node {
+        if let ExprKind::List(ast::ExprList { elts, .. }) = &body.node {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {

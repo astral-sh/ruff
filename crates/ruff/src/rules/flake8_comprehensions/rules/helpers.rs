@@ -1,7 +1,7 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 pub fn expr_name(func: &Expr) -> Option<&str> {
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         Some(id)
     } else {
         None

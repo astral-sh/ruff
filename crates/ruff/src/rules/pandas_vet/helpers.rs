@@ -5,14 +5,14 @@ use rustpython_parser::ast::{Expr, ExprKind};
 pub const fn is_dataframe_candidate(expr: &Expr) -> bool {
     !matches!(
         expr.node,
-        ExprKind::Constant { .. }
-            | ExprKind::Tuple { .. }
-            | ExprKind::List { .. }
-            | ExprKind::Set { .. }
-            | ExprKind::Dict { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::GeneratorExp { .. }
+        ExprKind::Constant(_)
+            | ExprKind::Tuple(_)
+            | ExprKind::List(_)
+            | ExprKind::Set(_)
+            | ExprKind::Dict(_)
+            | ExprKind::SetComp(_)
+            | ExprKind::ListComp(_)
+            | ExprKind::DictComp(_)
+            | ExprKind::GeneratorExp(_)
     )
 }

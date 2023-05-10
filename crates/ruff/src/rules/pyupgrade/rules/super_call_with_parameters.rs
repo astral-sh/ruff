@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ArgData, Expr, ExprKind, StmtKind};
+use rustpython_parser::ast::{self, ArgData, Expr, ExprKind, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -24,7 +24,7 @@ impl AlwaysAutofixableViolation for SuperCallWithParameters {
 
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         id == "super" && !args.is_empty()
     } else {
         false
@@ -41,7 +41,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     let scope = checker.ctx.scope();
 
     // Check: are we in a Function scope?
-    if !matches!(scope.kind, ScopeKind::Function { .. }) {
+    if !matches!(scope.kind, ScopeKind::Function(_)) {
         return;
     }
 
@@ -55,10 +55,10 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     };
 
     // Find the enclosing function definition (if any).
-    let Some(StmtKind::FunctionDef {
+    let Some(StmtKind::FunctionDef(ast::StmtFunctionDef {
         args: parent_args, ..
-    }) = parents
-        .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef { .. }))
+    })) = parents
+        .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef ( _)))
         .map(|stmt| &stmt.node) else {
         return;
     };
@@ -71,21 +71,21 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     };
 
     // Find the enclosing class definition (if any).
-    let Some(StmtKind::ClassDef {
+    let Some(StmtKind::ClassDef(ast::StmtClassDef {
         name: parent_name, ..
-    }) = parents
-        .find(|stmt| matches!(stmt.node, StmtKind::ClassDef { .. }))
+    })) = parents
+        .find(|stmt| matches!(stmt.node, StmtKind::ClassDef (_)))
         .map(|stmt| &stmt.node) else {
         return;
     };
 
     let (
-        ExprKind::Name {
+        ExprKind::Name(ast::ExprName {
             id: first_arg_id, ..
-        },
-        ExprKind::Name {
+        }),
+        ExprKind::Name(ast::ExprName {
             id: second_arg_id, ..
-        },
+        }),
     ) = (&first_arg.node, &second_arg.node) else {
         return;
     };

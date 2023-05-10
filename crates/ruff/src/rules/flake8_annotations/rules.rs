@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -420,10 +420,10 @@ fn is_none_returning(body: &[Stmt]) -> bool {
     for expr in visitor.returns.into_iter().flatten() {
         if !matches!(
             expr.node,
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::None,
                 ..
-            }
+            })
         ) {
             return false;
         }

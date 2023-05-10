@@ -56,7 +56,7 @@ pub fn unnecessary_generator_set(
     if !checker.ctx.is_builtin("set") {
         return;
     }
-    if let ExprKind::GeneratorExp { .. } = argument {
+    if let ExprKind::GeneratorExp(_) = argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]

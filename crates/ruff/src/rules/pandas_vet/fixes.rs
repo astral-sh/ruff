@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::Locator;
@@ -7,9 +7,9 @@ use ruff_python_ast::source_code::Locator;
 use crate::autofix::actions::remove_argument;
 
 fn match_name(expr: &Expr) -> Option<&str> {
-    if let ExprKind::Call { func, .. } = &expr.node {
-        if let ExprKind::Attribute { value, .. } = &func.node {
-            if let ExprKind::Name { id, .. } = &value.node {
+    if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
+        if let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &func.node {
+            if let ExprKind::Name(ast::ExprName { id, .. }) = &value.node {
                 return Some(id);
             }
         }

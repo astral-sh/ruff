@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -21,7 +21,7 @@ pub fn zip_without_explicit_strict(
     func: &Expr,
     kwargs: &[Keyword],
 ) {
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         if id == "zip"
             && checker.ctx.is_builtin("zip")
             && !kwargs.iter().any(|keyword| {

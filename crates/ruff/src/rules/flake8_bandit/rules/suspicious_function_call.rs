@@ -1,7 +1,7 @@
 //! Check for calls to suspicious functions, or calls into suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -466,7 +466,7 @@ const SUSPICIOUS_MODULES: &[SuspiciousModule] = &[
 
 /// S001
 pub fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Call { func, .. } = &expr.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
         return;
     };
 

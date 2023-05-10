@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AutofixKind, Diagnostic};
@@ -66,11 +66,11 @@ pub fn unnecessary_comprehension_any_all(
     if !keywords.is_empty() {
         return;
     }
-    let ExprKind::Name { id, .. } = &func.node  else {
+    let ExprKind::Name(ast::ExprName { id, .. } )= &func.node  else {
         return;
     };
     if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
-        let (ExprKind::ListComp { elt, .. } | ExprKind::SetComp { elt, .. }) = &args[0].node else {
+        let (ExprKind::ListComp(ast::ExprListComp { elt, .. } )| ExprKind::SetComp(ast::ExprSetComp { elt, .. })) = &args[0].node else {
             return;
         };
         if is_async_generator(elt) {
@@ -92,5 +92,5 @@ pub fn unnecessary_comprehension_any_all(
 
 /// Return `true` if the `Expr` contains an `await` expression.
 fn is_async_generator(expr: &Expr) -> bool {
-    any_over_expr(expr, &|expr| matches!(expr.node, ExprKind::Await { .. }))
+    any_over_expr(expr, &|expr| matches!(expr.node, ExprKind::Await(_)))
 }

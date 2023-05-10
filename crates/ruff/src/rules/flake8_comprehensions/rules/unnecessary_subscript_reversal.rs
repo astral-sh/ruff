@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Unaryop};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -60,10 +60,10 @@ pub fn unnecessary_subscript_reversal(
     if !checker.ctx.is_builtin(id) {
         return;
     }
-    let ExprKind::Subscript { slice, .. } = &first_arg.node else {
+    let ExprKind::Subscript(ast::ExprSubscript { slice, .. }) = &first_arg.node else {
         return;
     };
-    let ExprKind::Slice { lower, upper, step } = &slice.node else {
+    let ExprKind::Slice(ast::ExprSlice { lower, upper, step }) = &slice.node else {
             return;
         };
     if lower.is_some() || upper.is_some() {
@@ -72,16 +72,16 @@ pub fn unnecessary_subscript_reversal(
     let Some(step) = step.as_ref() else {
         return;
     };
-    let ExprKind::UnaryOp {
+    let ExprKind::UnaryOp(ast::ExprUnaryOp {
         op: Unaryop::USub,
         operand,
-    } = &step.node else {
+    }) = &step.node else {
         return;
     };
-    let ExprKind::Constant {
+    let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Int(val),
         ..
-    } = &operand.node else {
+    }) = &operand.node else {
         return;
     };
     if *val != BigInt::from(1) {

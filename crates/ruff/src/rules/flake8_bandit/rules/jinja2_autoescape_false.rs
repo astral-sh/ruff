@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -47,13 +47,13 @@ pub fn jinja2_autoescape_false(
 
         if let Some(autoescape_arg) = call_args.keyword_argument("autoescape") {
             match &autoescape_arg.node {
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Bool(true),
                     ..
-                } => (),
-                ExprKind::Call { func, .. } => {
-                    if let ExprKind::Name { id, .. } = &func.node {
-                        if id.as_str() != "select_autoescape" {
+                }) => (),
+                ExprKind::Call(ast::ExprCall { func, .. }) => {
+                    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+                        if id != "select_autoescape" {
                             checker.diagnostics.push(Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
                                 autoescape_arg.range(),

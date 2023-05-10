@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -90,7 +90,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     // If there are any starred arguments, abort.
     if args
         .iter()
-        .any(|arg| matches!(arg.node, ExprKind::Starred { .. }))
+        .any(|arg| matches!(arg.node, ExprKind::Starred(_)))
     {
         return;
     }
@@ -104,14 +104,14 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
         return;
     }
 
-    if let ExprKind::Attribute { attr, .. } = &func.node {
+    if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
         if LoggingLevel::from_attribute(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
             if let Some(msg) = call_args.argument("msg", 0) {
-                if let ExprKind::Constant {
+                if let ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Str(value),
                     ..
-                } = &msg.node
+                }) = &msg.node
                 {
                     if let Ok(summary) = CFormatSummary::try_from(value.as_str()) {
                         if summary.starred {

@@ -22,7 +22,7 @@ pub struct Import<'a> {
 pub struct ImportFrom<'a> {
     pub module: Option<&'a str>,
     pub name: Alias<'a>,
-    pub level: Option<usize>,
+    pub level: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,7 +65,7 @@ impl std::fmt::Display for ImportFrom<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "from ")?;
         if let Some(level) = self.level {
-            write!(f, "{}", ".".repeat(level))?;
+            write!(f, "{}", ".".repeat(level as usize))?;
         }
         if let Some(module) = self.module {
             write!(f, "{module}")?;

@@ -4,11 +4,11 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
+use rustpython_literal::escape::Quote as StrQuote;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use crate::newlines::{find_newline, LineEnding};
-use ruff_rustpython::vendor;
 
 use crate::source_code::Locator;
 use crate::str::leading_quote;
@@ -110,11 +110,11 @@ impl From<Quote> for char {
     }
 }
 
-impl From<Quote> for vendor::str::Quote {
+impl From<Quote> for StrQuote {
     fn from(val: Quote) -> Self {
         match val {
-            Quote::Single => vendor::str::Quote::Single,
-            Quote::Double => vendor::str::Quote::Double,
+            Quote::Single => StrQuote::Single,
+            Quote::Double => StrQuote::Double,
         }
     }
 }

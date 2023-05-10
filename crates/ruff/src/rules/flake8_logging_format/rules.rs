@@ -1,6 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
-use std::ops::Add;
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
@@ -43,7 +42,7 @@ const RESERVED_ATTRS: &[&str; 22] = &[
 fn check_msg(checker: &mut Checker, msg: &Expr) {
     match &msg.node {
         // Check for string concatenation and percent format.
-        ExprKind::BinOp { op, .. } => match op {
+        ExprKind::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
                 if checker.settings.rules.enabled(Rule::LoggingStringConcat) {
                     checker
@@ -61,7 +60,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
             _ => {}
         },
         // Check for f-strings.
-        ExprKind::JoinedStr { .. } => {
+        ExprKind::JoinedStr(_) => {
             if checker.settings.rules.enabled(Rule::LoggingFString) {
                 checker
                     .diagnostics
@@ -69,10 +68,10 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
             }
         }
         // Check for .format() calls.
-        ExprKind::Call { func, .. } => {
+        ExprKind::Call(ast::ExprCall { func, .. }) => {
             if checker.settings.rules.enabled(Rule::LoggingStringFormat) {
-                if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                    if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
+                if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
+                    if attr == "format" && matches!(value.node, ExprKind::Constant(_)) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(LoggingStringFormat, msg.range()));
@@ -87,13 +86,13 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
 /// Check contents of the `extra` argument to logging calls.
 fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     match &extra.node.value.node {
-        ExprKind::Dict { keys, .. } => {
+        ExprKind::Dict(ast::ExprDict { keys, .. }) => {
             for key in keys {
                 if let Some(key) = &key {
-                    if let ExprKind::Constant {
+                    if let ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(string),
                         ..
-                    } = &key.node
+                    }) = &key.node
                     {
                         if RESERVED_ATTRS.contains(&string.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
@@ -105,7 +104,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                 }
             }
         }
-        ExprKind::Call { func, keywords, .. } => {
+        ExprKind::Call(ast::ExprCall { func, keywords, .. }) => {
             if checker
                 .ctx
                 .resolve_call_path(func)
@@ -151,10 +150,13 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
         return;
     }
 
-    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
         if let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
-            let level_call_range = TextRange::new(value.end().add(TextSize::from(1)), func.end());
+            let level_call_range = TextRange::new(
+                value.end().checked_add(TextSize::from(1)).unwrap(),
+                func.end(),
+            );
 
             // G001 - G004
             let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
@@ -202,11 +204,13 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                     // return.
                     if !(matches!(
                         exc_info.node.value.node,
-                        ExprKind::Constant {
+                        ExprKind::Constant(ast::ExprConstant {
                             value: Constant::Bool(true),
                             ..
-                        }
-                    ) || if let ExprKind::Call { func, .. } = &exc_info.node.value.node {
+                        })
+                    ) || if let ExprKind::Call(ast::ExprCall { func, .. }) =
+                        &exc_info.node.value.node
+                    {
                         checker
                             .ctx
                             .resolve_call_path(func)

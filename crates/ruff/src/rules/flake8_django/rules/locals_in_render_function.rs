@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -86,7 +86,7 @@ pub fn locals_in_render_function(
 }
 
 fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
-    let ExprKind::Call { func, .. } = &expr.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
         return false
     };
     checker

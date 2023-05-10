@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 
 use ruff_python_ast::call_path::{from_unqualified_name, CallPath};
 use ruff_python_stdlib::typing::{
@@ -30,10 +30,7 @@ pub fn match_annotated_subscript<'a>(
     context: &Context,
     typing_modules: impl Iterator<Item = &'a str>,
 ) -> Option<SubscriptKind> {
-    if !matches!(
-        expr.node,
-        ExprKind::Name { .. } | ExprKind::Attribute { .. }
-    ) {
+    if !matches!(expr.node, ExprKind::Name(_) | ExprKind::Attribute(_)) {
         return None;
     }
 
@@ -75,7 +72,7 @@ pub fn is_pep585_builtin(expr: &Expr, context: &Context) -> bool {
 
 pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
+        ExprKind::Name(_) | ExprKind::Attribute(_) => {
             context.resolve_call_path(expr).map_or(false, |call_path| {
                 IMMUTABLE_TYPES
                     .iter()
@@ -83,7 +80,7 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
                     .any(|target| call_path.as_slice() == *target)
             })
         }
-        ExprKind::Subscript { value, slice, .. } => {
+        ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             context.resolve_call_path(value).map_or(false, |call_path| {
                 if IMMUTABLE_GENERIC_TYPES
                     .iter()
@@ -91,7 +88,7 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
                 {
                     true
                 } else if call_path.as_slice() == ["typing", "Union"] {
-                    if let ExprKind::Tuple { elts, .. } = &slice.node {
+                    if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &slice.node {
                         elts.iter().all(|elt| is_immutable_annotation(context, elt))
                     } else {
                         false
@@ -99,7 +96,7 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
                 } else if call_path.as_slice() == ["typing", "Optional"] {
                     is_immutable_annotation(context, slice)
                 } else if call_path.as_slice() == ["typing", "Annotated"] {
-                    if let ExprKind::Tuple { elts, .. } = &slice.node {
+                    if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &slice.node {
                         elts.first()
                             .map_or(false, |elt| is_immutable_annotation(context, elt))
                     } else {
@@ -110,15 +107,15 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
                 }
             })
         }
-        ExprKind::BinOp {
+        ExprKind::BinOp(ast::ExprBinOp {
             left,
             op: Operator::BitOr,
             right,
-        } => is_immutable_annotation(context, left) && is_immutable_annotation(context, right),
-        ExprKind::Constant {
+        }) => is_immutable_annotation(context, left) && is_immutable_annotation(context, right),
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::None,
             ..
-        } => true,
+        }) => true,
         _ => false,
     }
 }

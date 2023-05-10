@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -34,8 +34,8 @@ impl Violation for PrintfInGetTextFuncCall {
 
 /// Returns true if the [`Expr`] is an internationalization function call.
 pub fn is_gettext_func_call(func: &Expr, functions_names: &[String]) -> bool {
-    if let ExprKind::Name { id, .. } = &func.node {
-        functions_names.contains(id)
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+        functions_names.contains(id.as_ref())
     } else {
         false
     }
@@ -44,7 +44,7 @@ pub fn is_gettext_func_call(func: &Expr, functions_names: &[String]) -> bool {
 /// INT001
 pub fn f_string_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
     if let Some(first) = args.first() {
-        if matches!(first.node, ExprKind::JoinedStr { .. }) {
+        if matches!(first.node, ExprKind::JoinedStr(_)) {
             return Some(Diagnostic::new(FStringInGetTextFuncCall {}, first.range()));
         }
     }
@@ -54,8 +54,8 @@ pub fn f_string_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
 /// INT002
 pub fn format_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
     if let Some(first) = args.first() {
-        if let ExprKind::Call { func, .. } = &first.node {
-            if let ExprKind::Attribute { attr, .. } = &func.node {
+        if let ExprKind::Call(ast::ExprCall { func, .. }) = &first.node {
+            if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
                 if attr == "format" {
                     return Some(Diagnostic::new(FormatInGetTextFuncCall {}, first.range()));
                 }
@@ -68,16 +68,16 @@ pub fn format_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
 /// INT003
 pub fn printf_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
     if let Some(first) = args.first() {
-        if let ExprKind::BinOp {
+        if let ExprKind::BinOp(ast::ExprBinOp {
             op: Operator::Mod { .. },
             left,
             ..
-        } = &first.node
+        }) = &first.node
         {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(_),
                 ..
-            } = left.node
+            }) = left.node
             {
                 return Some(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
             }

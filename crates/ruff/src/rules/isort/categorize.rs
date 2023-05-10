@@ -65,7 +65,7 @@ enum Reason<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn categorize<'a>(
     module_name: &str,
-    level: Option<usize>,
+    level: Option<u32>,
     src: &[PathBuf],
     package: Option<&Path>,
     known_modules: &'a KnownModules,

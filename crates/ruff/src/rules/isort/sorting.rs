@@ -95,8 +95,8 @@ pub fn cmp_members(
 
 /// Compare two relative import levels.
 pub fn cmp_levels(
-    level1: Option<usize>,
-    level2: Option<usize>,
+    level1: Option<u32>,
+    level2: Option<u32>,
     relative_imports_order: RelativeImportsOrder,
 ) -> Ordering {
     match (level1, level2) {

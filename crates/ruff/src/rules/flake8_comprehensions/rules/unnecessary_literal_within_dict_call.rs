@@ -79,8 +79,8 @@ pub fn unnecessary_literal_within_dict_call(
         return;
     }
     let argument_kind = match argument {
-        ExprKind::DictComp { .. } => DictKind::Comprehension,
-        ExprKind::Dict { .. } => DictKind::Literal,
+        ExprKind::DictComp(_) => DictKind::Comprehension,
+        ExprKind::Dict(_) => DictKind::Literal,
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

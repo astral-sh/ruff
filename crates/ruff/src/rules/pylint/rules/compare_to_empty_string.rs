@@ -1,6 +1,6 @@
 use anyhow::bail;
 use itertools::Itertools;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -100,7 +100,7 @@ pub fn compare_to_empty_string(
     // Omit string comparison rules within subscripts. This is mostly commonly used within
     // DataFrame and np.ndarray indexing.
     for parent in checker.ctx.expr_ancestors() {
-        if matches!(parent.node, ExprKind::Subscript { .. }) {
+        if matches!(parent.node, ExprKind::Subscript(_)) {
             return;
         }
     }
@@ -114,7 +114,7 @@ pub fn compare_to_empty_string(
         if let Ok(op) = EmptyStringCmpop::try_from(op) {
             if std::mem::take(&mut first) {
                 // Check the left-most expression.
-                if let ExprKind::Constant { value, .. } = &lhs.node {
+                if let ExprKind::Constant(ast::ExprConstant { value, .. }) = &lhs.node {
                     if let Constant::Str(s) = value {
                         if s.is_empty() {
                             let constant = unparse_constant(value, checker.stylist);
@@ -134,7 +134,7 @@ pub fn compare_to_empty_string(
             }
 
             // Check all right-hand expressions.
-            if let ExprKind::Constant { value, .. } = &rhs.node {
+            if let ExprKind::Constant(ast::ExprConstant { value, .. }) = &rhs.node {
                 if let Constant::Str(s) = value {
                     if s.is_empty() {
                         let expr = unparse_expr(lhs, checker.stylist);

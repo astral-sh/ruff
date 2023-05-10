@@ -1,7 +1,7 @@
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,14 +70,14 @@ static PYSTAT_MAPPING: Lazy<FxHashMap<&'static str, u16>> = Lazy::new(|| {
 
 fn get_int_value(expr: &Expr) -> Option<u16> {
     match &expr.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
-        } => value.to_u16(),
-        ExprKind::Attribute { .. } => {
+        }) => value.to_u16(),
+        ExprKind::Attribute(_) => {
             compose_call_path(expr).and_then(|path| PYSTAT_MAPPING.get(path.as_str()).copied())
         }
-        ExprKind::BinOp { left, op, right } => {
+        ExprKind::BinOp(ast::ExprBinOp { left, op, right }) => {
             if let (Some(left_value), Some(right_value)) =
                 (get_int_value(left), get_int_value(right))
             {

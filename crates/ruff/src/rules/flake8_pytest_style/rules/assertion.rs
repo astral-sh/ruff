@@ -6,7 +6,8 @@ use libcst_native::{
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{
-    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
+    self, Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind,
+    Unaryop,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -135,7 +136,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
-            StmtKind::Assert { .. } => {
+            StmtKind::Assert(_) => {
                 self.current_assert = Some(stmt);
                 visitor::walk_stmt(self, stmt);
                 self.current_assert = None;
@@ -146,9 +147,9 @@ where
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match &expr.node {
-            ExprKind::Name { id, .. } => {
+            ExprKind::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
-                    if id.as_str() == self.exception_name {
+                    if id == self.exception_name {
                         self.errors.push(Diagnostic::new(
                             PytestAssertInExcept {
                                 name: id.to_string(),
@@ -181,11 +182,11 @@ pub fn unittest_assertion(
     keywords: &[Keyword],
 ) -> Option<Diagnostic> {
     match &func.node {
-        ExprKind::Attribute { attr, .. } => {
+        ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = matches!(checker.ctx.stmt().node, StmtKind::Expr { .. })
+                let fixable = matches!(checker.ctx.stmt().node, StmtKind::Expr(_))
                     && checker.ctx.expr_parent().is_none()
                     && !checker.ctx.scope().kind.is_lambda()
                     && !has_comments_in(expr.range(), checker.locator);
@@ -227,7 +228,11 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic
     handlers
         .iter()
         .flat_map(|handler| match &handler.node {
-            ExcepthandlerKind::ExceptHandler { name, body, .. } => {
+            ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                name,
+                body,
+                ..
+            }) => {
                 if let Some(name) = name {
                     check_assert_in_except(name, body)
                 } else {
@@ -255,28 +260,28 @@ enum CompositionKind {
 /// `not a and not b` by De Morgan's laws.
 fn is_composite_condition(test: &Expr) -> CompositionKind {
     match &test.node {
-        ExprKind::BoolOp {
+        ExprKind::BoolOp(ast::ExprBoolOp {
             op: Boolop::And, ..
-        } => {
+        }) => {
             return CompositionKind::Simple;
         }
-        ExprKind::UnaryOp {
+        ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::Not,
             operand,
-        } => {
-            if let ExprKind::BoolOp {
+        }) => {
+            if let ExprKind::BoolOp(ast::ExprBoolOp {
                 op: Boolop::Or,
                 values,
-            } = &operand.node
+            }) = &operand.node
             {
                 // Only split cases without mixed `and` and `or`.
                 return if values.iter().all(|expr| {
                     !matches!(
                         expr.node,
-                        ExprKind::BoolOp {
+                        ExprKind::BoolOp(ast::ExprBoolOp {
                             op: Boolop::And,
                             ..
-                        }
+                        })
                     )
                 }) {
                     CompositionKind::Simple

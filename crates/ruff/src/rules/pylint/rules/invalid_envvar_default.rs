@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -40,30 +40,27 @@ fn is_valid_default(expr: &Expr) -> bool {
     // We can't infer the types of these defaults, so assume they're valid.
     if matches!(
         expr.node,
-        ExprKind::Name { .. }
-            | ExprKind::Attribute { .. }
-            | ExprKind::Subscript { .. }
-            | ExprKind::Call { .. }
+        ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) | ExprKind::Call(_)
     ) {
         return true;
     }
 
     // Allow string concatenation.
-    if let ExprKind::BinOp {
+    if let ExprKind::BinOp(ast::ExprBinOp {
         left,
         right,
         op: Operator::Add,
-    } = &expr.node
+    }) = &expr.node
     {
         return is_valid_default(left) && is_valid_default(right);
     }
 
     // Allow string formatting.
-    if let ExprKind::BinOp {
+    if let ExprKind::BinOp(ast::ExprBinOp {
         left,
         op: Operator::Mod,
         ..
-    } = &expr.node
+    }) = &expr.node
     {
         return is_valid_default(left);
     }
@@ -71,10 +68,10 @@ fn is_valid_default(expr: &Expr) -> bool {
     // Otherwise, the default must be a string or `None`.
     matches!(
         expr.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str { .. } | Constant::None { .. },
             ..
-        } | ExprKind::JoinedStr { .. }
+        }) | ExprKind::JoinedStr(_)
     )
 }
 
@@ -94,7 +91,7 @@ pub fn invalid_envvar_default(
         let Some(expr) = args.get(1).or_else(|| {
             keywords
                 .iter()
-                .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg == "default"))
+                .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg .as_str()== "default"))
                 .map(|keyword| &keyword.node.value)
         }) else {
             return;
