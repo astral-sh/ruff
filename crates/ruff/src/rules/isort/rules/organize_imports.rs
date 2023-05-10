@@ -148,6 +148,7 @@ pub fn organize_imports(
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 indent(&expected, indentation),
                 range,

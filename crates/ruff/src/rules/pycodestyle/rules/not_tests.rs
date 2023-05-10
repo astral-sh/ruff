@@ -99,6 +99,7 @@ pub fn not_tests(
                         if check_not_in {
                             let mut diagnostic = Diagnostic::new(NotInTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
+                                #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
                                     expr.range(),
@@ -111,6 +112,7 @@ pub fn not_tests(
                         if check_not_is {
                             let mut diagnostic = Diagnostic::new(NotIsTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
+                                #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
                                     expr.range(),

@@ -79,6 +79,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
 
             if checker.patch(diagnostic.kind.rule()) {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     assignment(obj, name, value, checker.stylist),
                     expr.range(),

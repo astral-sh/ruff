@@ -129,6 +129,7 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
         }
         prev = range.end();
     }
+    #[allow(deprecated)]
     Fix::unspecified(Edit::range_replacement(replacement, expr.range()))
 }
 

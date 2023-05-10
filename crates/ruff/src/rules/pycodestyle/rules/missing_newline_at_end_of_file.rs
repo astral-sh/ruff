@@ -55,6 +55,7 @@ pub fn no_newline_at_end_of_file(
 
         let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
         if autofix {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                 stylist.line_ending().to_string(),
                 range.start(),

@@ -112,7 +112,7 @@ fn fix_banned_relative_import(
         }),
         stylist,
     );
-
+    #[allow(deprecated)]
     Some(Fix::unspecified(Edit::range_replacement(
         content,
         stmt.range(),

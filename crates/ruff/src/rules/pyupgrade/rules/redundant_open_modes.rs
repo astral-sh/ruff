@@ -116,6 +116,7 @@ fn create_check(
     );
     if patch {
         if let Some(content) = replacement_value {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 content.to_string(),
                 mode_param.range(),

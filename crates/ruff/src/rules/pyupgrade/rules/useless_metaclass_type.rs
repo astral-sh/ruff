@@ -65,6 +65,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
                 if edit.is_deletion() || edit.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(defined_by));
                 }
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => error!("Failed to fix remove metaclass type: {e}"),

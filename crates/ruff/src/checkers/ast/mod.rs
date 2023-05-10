@@ -5336,7 +5336,9 @@ impl<'a> Checker<'a> {
                         if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.start());
                         }
+
                         if let Some(edit) = &fix {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(edit.clone()));
                         }
                         diagnostics.push(diagnostic);

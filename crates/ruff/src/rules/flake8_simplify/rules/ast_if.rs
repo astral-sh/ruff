@@ -304,6 +304,7 @@ pub fn nested_if_statements(
                     .universal_newlines()
                     .all(|line| line.width() <= checker.settings.line_length)
                 {
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(edit));
                 }
             }
@@ -370,6 +371,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
@@ -382,6 +384,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         } else {
             // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
             // verified, above, that `bool` is a builtin.)
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
@@ -528,6 +531,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents,
             stmt.range(),
@@ -878,6 +882,7 @@ pub fn use_dict_get_with_default(
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents,
             stmt.range(),

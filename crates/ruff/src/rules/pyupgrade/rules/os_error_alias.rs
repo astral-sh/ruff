@@ -63,6 +63,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         target.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             "OSError".to_string(),
             target.range(),
@@ -103,11 +104,13 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         }
 
         if remaining.len() == 1 {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "OSError".to_string(),
                 target.range(),
             )));
         } else {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 format!(
                     "({})",

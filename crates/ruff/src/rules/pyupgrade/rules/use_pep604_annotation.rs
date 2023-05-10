@@ -112,6 +112,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         TypingMember::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation { fixable }, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&optional(slice), checker.stylist),
                     expr.range(),
@@ -127,6 +128,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                         // Invalid type annotation.
                     }
                     ExprKind::Tuple { elts, .. } => {
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_expr(&union(elts), checker.stylist),
                             expr.range(),
@@ -134,6 +136,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     }
                     _ => {
                         // Single argument.
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_expr(slice, checker.stylist),
                             expr.range(),

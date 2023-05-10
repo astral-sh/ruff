@@ -113,6 +113,7 @@ pub fn suppressible_exception(
                     );
                     let handler_line_begin = checker.locator.line_start(handler.start());
                     let remove_handler = Edit::deletion(handler_line_begin, handler.end());
+                    #[allow(deprecated)]
                     Ok(Fix::unspecified_edits(
                         import_edit,
                         [replace_try, remove_handler],

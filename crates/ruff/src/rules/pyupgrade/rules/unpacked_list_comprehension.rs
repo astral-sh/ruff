@@ -101,6 +101,7 @@ pub fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], valu
                 content.push('(');
                 content.push_str(&existing[1..existing.len() - 1]);
                 content.push(')');
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     content,
                     value.range(),

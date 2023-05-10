@@ -121,6 +121,7 @@ pub fn nested_min_max(
                     keywords: keywords.to_owned(),
                 },
             );
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&flattened_expr, checker.stylist),
                 expr.range(),

@@ -90,6 +90,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
                 if checker.patch(diagnostic.kind.rule()) {
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
                         TextRange::at(line.start(), line_indent.text_len()),
@@ -138,6 +139,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     } else {
                         Edit::range_replacement(new_indent, over_indented)
                     };
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(edit));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -151,6 +153,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 if checker.patch(diagnostic.kind.rule()) {
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
                         TextRange::at(last.start(), line_indent.text_len()),

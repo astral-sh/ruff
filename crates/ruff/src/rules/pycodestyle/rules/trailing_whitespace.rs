@@ -95,6 +95,7 @@ pub(crate) fn trailing_whitespace(
                 if matches!(autofix, flags::Autofix::Enabled)
                     && settings.rules.should_fix(Rule::BlankLineWithWhitespace)
                 {
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
                 }
                 return Some(diagnostic);
@@ -104,6 +105,7 @@ pub(crate) fn trailing_whitespace(
             if matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(Rule::TrailingWhitespace)
             {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
             }
             return Some(diagnostic);

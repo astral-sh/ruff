@@ -96,6 +96,7 @@ fn duplicate_handler_exceptions<'a>(
                 expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     if unique_elts.len() == 1 {
                         unparse_expr(unique_elts[0], checker.stylist)

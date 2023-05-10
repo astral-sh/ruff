@@ -180,6 +180,7 @@ pub fn check_noqa(
                                     locator,
                                 ));
                             } else {
+                                #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     *range,

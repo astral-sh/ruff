@@ -24,6 +24,7 @@ fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
     let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
     if checker.patch(diagnostic.kind.rule()) {
         let contents = checker.locator.slice(node.range());
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents.replacen("cElementTree", "ElementTree", 1),
             node.range(),

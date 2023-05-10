@@ -204,6 +204,7 @@ fn remove_unused_variable(
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
+                    #[allow(deprecated)]
                     Some((
                         DeletionKind::Partial,
                         Fix::unspecified(Edit::deletion(
@@ -224,6 +225,7 @@ fn remove_unused_variable(
                         checker.indexer,
                         checker.stylist,
                     ) {
+                        #[allow(deprecated)]
                         Ok(fix) => Some((DeletionKind::Whole, Fix::unspecified(fix))),
                         Err(err) => {
                             error!("Failed to delete unused variable: {}", err);
@@ -246,6 +248,7 @@ fn remove_unused_variable(
             return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
+                #[allow(deprecated)]
                 Some((
                     DeletionKind::Partial,
                     Fix::unspecified(Edit::deletion(
@@ -265,6 +268,7 @@ fn remove_unused_variable(
                     checker.indexer,
                     checker.stylist,
                 ) {
+                    #[allow(deprecated)]
                     Ok(edit) => Some((DeletionKind::Whole, Fix::unspecified(edit))),
                     Err(err) => {
                         error!("Failed to delete unused variable: {}", err);
@@ -282,6 +286,7 @@ fn remove_unused_variable(
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == range {
+                    #[allow(deprecated)]
                     return Some((
                         DeletionKind::Partial,
                         Fix::unspecified(Edit::deletion(

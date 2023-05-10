@@ -148,6 +148,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 format!(
                                     "({})",
@@ -181,6 +182,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
@@ -222,6 +224,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
@@ -244,6 +247,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
+                                #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     content,
                                     expr.range(),
@@ -271,6 +275,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 format!(
                                     "({})",
@@ -296,6 +301,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
+                                #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     content,
                                     expr.range(),
@@ -372,6 +378,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(&create_expr(value.node.clone()), checker.stylist),
             expr.range(),

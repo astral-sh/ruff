@@ -161,6 +161,7 @@ pub fn yoda_conditions(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 suggestion,
                 expr.range(),

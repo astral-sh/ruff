@@ -40,6 +40,6 @@ pub(super) fn convert_inplace_argument_to_assignment(
         false,
     )
     .ok()?;
-
+    #[allow(deprecated)]
     Some(Fix::unspecified_edits(insert_assignment, [remove_argument]))
 }

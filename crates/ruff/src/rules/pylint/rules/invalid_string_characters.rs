@@ -197,6 +197,7 @@ pub fn invalid_string_characters(
 
         let mut diagnostic = Diagnostic::new(rule, range);
         if autofix {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 replacement.to_string(),
                 range,

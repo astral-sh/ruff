@@ -55,6 +55,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         if fixable && checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();
             if checker.ctx.is_builtin(&binding) {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     binding,
                     expr.range(),

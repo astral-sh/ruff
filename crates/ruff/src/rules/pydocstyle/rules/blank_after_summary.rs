@@ -82,6 +82,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
                 }
 
                 // Insert one blank line after the summary (replacing any existing lines).
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                     checker.stylist.line_ending().to_string(),
                     summary_end,

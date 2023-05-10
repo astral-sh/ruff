@@ -164,6 +164,7 @@ pub fn compound_statements(
                     let mut diagnostic =
                         Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
                     if autofix.into() && settings.rules.should_fix(Rule::UselessSemicolon) {
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::deletion(start, end)));
                     };
                     diagnostics.push(diagnostic);

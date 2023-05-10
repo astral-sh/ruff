@@ -87,6 +87,7 @@ pub fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) 
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents,
             expr.range(),

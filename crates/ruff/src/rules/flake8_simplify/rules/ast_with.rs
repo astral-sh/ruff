@@ -118,6 +118,7 @@ pub fn multiple_with_statements(
                         .universal_newlines()
                         .all(|line| line.width() <= checker.settings.line_length)
                     {
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(edit));
                     }
                 }

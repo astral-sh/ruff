@@ -125,6 +125,7 @@ pub fn unnecessary_builtin_import(
                 if edit.is_deletion() || edit.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(defined_by));
                 }
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => error!("Failed to remove builtin import: {e}"),

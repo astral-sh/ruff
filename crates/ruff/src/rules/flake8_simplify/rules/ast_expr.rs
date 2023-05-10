@@ -137,6 +137,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             value: capital_env_var.into(),
             kind: kind.clone(),
         });
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(&new_env_var, checker.stylist),
             slice.range(),
@@ -197,6 +198,7 @@ pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             expected,
             expr.range(),

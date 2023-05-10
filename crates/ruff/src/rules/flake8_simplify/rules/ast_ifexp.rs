@@ -100,11 +100,13 @@ pub fn explicit_true_false_in_ifexpr(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&test.clone(), checker.stylist),
                 expr.range(),
             )));
         } else if checker.ctx.is_builtin("bool") {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {
@@ -152,6 +154,7 @@ pub fn explicit_false_true_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::UnaryOp {
@@ -200,6 +203,7 @@ pub fn twisted_arms_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::IfExp {

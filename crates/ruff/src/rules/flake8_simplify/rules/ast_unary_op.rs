@@ -107,6 +107,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
@@ -157,6 +158,7 @@ pub fn negation_with_not_equal_op(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
@@ -192,11 +194,13 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
     );
     if checker.patch(diagnostic.kind.rule()) {
         if checker.ctx.in_boolean_test {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(operand, checker.stylist),
                 expr.range(),
             )));
         } else if checker.ctx.is_builtin("bool") {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {

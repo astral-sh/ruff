@@ -108,6 +108,7 @@ mod tests {
     use crate::autofix::apply_fixes;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
+    #[allow(deprecated)]
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
         edit.into_iter()
             .map(|edit| Diagnostic {

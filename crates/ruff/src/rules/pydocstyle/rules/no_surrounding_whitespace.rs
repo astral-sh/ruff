@@ -44,6 +44,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
         // characters, avoid applying the fix.
         if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed)
         {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 trimmed.to_string(),
                 TextRange::at(body.start(), line.text_len()),
