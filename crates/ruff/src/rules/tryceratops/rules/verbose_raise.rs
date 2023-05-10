@@ -2,8 +2,7 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, S
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 use crate::checkers::ast::Checker;
 
@@ -46,7 +45,7 @@ struct RaiseStatementVisitor<'a> {
     raises: Vec<(Option<&'a Expr>, Option<&'a Expr>)>,
 }
 
-impl<'a, 'b> Visitor<'b> for RaiseStatementVisitor<'a>
+impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'a>
 where
     'b: 'a,
 {
@@ -60,10 +59,10 @@ where
                 body, finalbody, ..
             } => {
                 for stmt in body.iter().chain(finalbody.iter()) {
-                    visitor::walk_stmt(self, stmt);
+                    walk_stmt(self, stmt);
                 }
             }
-            _ => visitor::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
         }
     }
 }
@@ -80,9 +79,7 @@ pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
         {
             let raises = {
                 let mut visitor = RaiseStatementVisitor::default();
-                for stmt in body {
-                    visitor.visit_stmt(stmt);
-                }
+                visitor.visit_body(body);
                 visitor.raises
             };
             for (exc, cause) in raises {

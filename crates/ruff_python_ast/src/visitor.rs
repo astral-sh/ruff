@@ -1,9 +1,15 @@
+//! AST visitor trait and walk functions.
+
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern,
     PatternKind, Stmt, StmtKind, Unaryop, Withitem,
 };
 
+/// A trait for AST visitors. Visits all nodes in the AST recursively.
+///
+/// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
+/// statements.
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);

@@ -4,8 +4,8 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::types::RefEquality;
-use ruff_python_ast::visitor::Visitor;
 
 use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;

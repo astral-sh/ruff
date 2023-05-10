@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Excepthandler, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor::{self, Visitor};
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 use crate::checkers::ast::Checker;
 
@@ -58,7 +58,7 @@ struct RaiseStatementVisitor<'a> {
     raises: Vec<&'a Stmt>,
 }
 
-impl<'a, 'b> Visitor<'b> for RaiseStatementVisitor<'a>
+impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'a>
 where
     'b: 'a,
 {
@@ -66,7 +66,7 @@ where
         match stmt.node {
             StmtKind::Raise { .. } => self.raises.push(stmt),
             StmtKind::Try { .. } | StmtKind::TryStar { .. } => (),
-            _ => visitor::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
         }
     }
 }
@@ -79,9 +79,7 @@ pub fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[Except
 
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
-        for stmt in body {
-            visitor.visit_stmt(stmt);
-        }
+        visitor.visit_body(body);
         visitor.raises
     };
 

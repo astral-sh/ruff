@@ -10,8 +10,7 @@ use rustpython_parser::Tok;
 
 use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 /// Extract doc lines (standalone comments) from a token sequence.
 pub fn doc_lines_from_tokens<'a>(lxr: &'a [LexResult], locator: &'a Locator<'a>) -> DocLines<'a> {
@@ -75,7 +74,7 @@ struct StringLinesVisitor<'a> {
     locator: &'a Locator<'a>,
 }
 
-impl Visitor<'_> for StringLinesVisitor<'_> {
+impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         if let StmtKind::Expr { value } = &stmt.node {
             if let ExprKind::Constant {
@@ -91,7 +90,7 @@ impl Visitor<'_> for StringLinesVisitor<'_> {
                 }
             }
         }
-        visitor::walk_stmt(self, stmt);
+        walk_stmt(self, stmt);
     }
 }
 
