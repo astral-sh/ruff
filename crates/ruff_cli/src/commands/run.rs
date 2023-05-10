@@ -254,6 +254,8 @@ mod test {
             LogLevel::Default,
             FixMode::None,
             Flags::SHOW_VIOLATIONS,
+            #[cfg(feature = "ecosystem_ci")]
+            false,
         );
         let mut writer: Vec<u8> = Vec::new();
         // Mute the terminal color codes
