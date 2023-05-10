@@ -2905,7 +2905,8 @@ where
                     .enabled(Rule::PandasUseOfInplaceArgument)
                 {
                     self.diagnostics.extend(
-                        pandas_vet::rules::inplace_argument(self, expr, args, keywords).into_iter(),
+                        pandas_vet::rules::inplace_argument(self, expr, func, args, keywords)
+                            .into_iter(),
                     );
                 }
                 pandas_vet::rules::check_call(self, func);
