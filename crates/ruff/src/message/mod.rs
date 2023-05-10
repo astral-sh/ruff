@@ -189,14 +189,13 @@ def fibonacci(n):
 
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
-        #[allow(deprecated)]
         let unused_variable = Diagnostic::new(
             UnusedVariable {
                 name: "x".to_string(),
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
-        .with_fix(Fix::unspecified(Edit::deletion(
+        .with_fix(Fix::suggested(Edit::deletion(
             TextSize::from(94),
             TextSize::from(99),
         )));
