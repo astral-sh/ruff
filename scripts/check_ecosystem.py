@@ -324,10 +324,16 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
                 continue
 
         print(f"<details><summary>Rules changed: {len(rule_changes.keys())}</summary>")
-        print("| Rule | Additions | Removals |")
-        print("| ---- | --------- | -------- |")
-        for rule, (additions, removals) in rule_changes.items():
-            print(f"| {rule} | {additions} | {removals} |")
+        print("| Rule | Changes | Additions | Removals |")
+        print("| ---- | ------- | --------- | -------- |")
+        for rule, (additions, removals) in dict(
+            sorted(
+                rule_changes.items(),
+                key=lambda x: (x[1][0] + x[1][1]),
+                reverse=True,
+            ),
+        ).items():
+            print(f"| {rule} | {additions + removals} | {additions} | {removals} |")
 
         print("</details>")
 
