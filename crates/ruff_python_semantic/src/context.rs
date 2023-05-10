@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use nohash_hasher::{BuildNoHashHasher, IntMap};
@@ -34,8 +35,7 @@ pub struct Context<'a> {
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
-    pub shadowed_bindings:
-        std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
+    pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
