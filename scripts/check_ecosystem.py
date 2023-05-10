@@ -177,6 +177,7 @@ async def compare(
         location_context = tempfile.TemporaryDirectory()
 
     with location_context as checkout_dir:
+        checkout_dir = Path(checkout_dir)
         async with repo.clone(checkout_dir) as path:
             try:
                 async with asyncio.TaskGroup() as tg:
