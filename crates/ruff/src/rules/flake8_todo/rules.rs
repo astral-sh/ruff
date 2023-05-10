@@ -221,14 +221,8 @@ static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 
 // Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the length of the
 // tag that we're trying to capture.
-static PATTERN_TAG_LENGTH: Lazy<HashMap<usize, usize>> = Lazy::new(|| {
-    HashMap::from([
-        (0usize, 4usize),
-        (1usize, 3usize),
-        (2usize, 5usize),
-        (3usize, 3usize),
-    ])
-});
+static PATTERN_TAG_LENGTH: &'static [usize; 4] =
+    &["TODO".len(), "BUG".len(), "FIXME".len(), "XXX".len()];
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
@@ -293,7 +287,7 @@ fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<
         return None;
     };
 
-    let tag_length = *PATTERN_TAG_LENGTH.get(&regex_index).unwrap();
+    let tag_length = PATTERN_TAG_LENGTH[regex_index];
 
     let mut tag_start_offset = 0usize;
     for (i, char) in comment.chars().enumerate() {
@@ -305,9 +299,7 @@ fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<
     }
 
     Some(Tag {
-        content: comment
-            .get(tag_start_offset..tag_start_offset + tag_length)
-            .unwrap(),
+        content: &comment[tag_start_offset..tag_start_offset + tag_length],
         range: TextRange::at(
             comment_range.start() + TextSize::try_from(tag_start_offset).ok().unwrap(),
             TextSize::try_from(tag_length).ok().unwrap(),
@@ -323,14 +315,6 @@ fn check_for_tag_errors(
     settings: &Settings,
 ) {
     if tag.content != "TODO" {
-        // TDO-001
-        diagnostics.push(Diagnostic::new(
-            InvalidTodoTag {
-                tag: tag.content.to_string(),
-            },
-            tag.range,
-        ));
-
         if tag.content.to_uppercase() == "TODO" {
             // TDO-006
             let mut invalid_capitalization = Diagnostic::new(
@@ -341,15 +325,25 @@ fn check_for_tag_errors(
             );
 
             if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
-                invalid_capitalization.set_fix(Fix::unspecified(Edit::replacement(
+                invalid_capitalization.set_fix(Fix::unspecified(Edit::range_replacement(
                     "TODO".to_string(),
-                    tag.range.start(),
-                    tag.range.end(),
+                    tag.range,
                 )));
             }
 
             diagnostics.push(invalid_capitalization);
+
+            // Avoid pushing multiple diagnostics for the same range.
+            return;
         }
+
+        // TDO-001
+        diagnostics.push(Diagnostic::new(
+            InvalidTodoTag {
+                tag: tag.content.to_string(),
+            },
+            tag.range,
+        ));
     }
 }
 
@@ -362,9 +356,7 @@ fn check_for_static_errors(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Relative offset of the current character from the start of the comment.
-    let mut relative_offset: usize = usize::try_from(tag.range.end() - comment_range.start())
-        .ok()
-        .unwrap();
+    let mut relative_offset: usize = usize::from(tag.range.end() - comment_range.start());
     let mut comment_chars = comment.chars().skip(relative_offset).peekable();
     // Absolute offset of the comment's author block from the start of the file.
     let mut author_range: Option<TextRange> = None;
