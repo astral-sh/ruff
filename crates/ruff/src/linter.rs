@@ -163,7 +163,7 @@ pub fn check_path(
                     diagnostics.extend(import_diagnostics);
                 }
                 if use_doc_lines {
-                    doc_lines.extend(doc_lines_from_ast(&python_ast));
+                    doc_lines.extend(doc_lines_from_ast(&python_ast, locator));
                 }
             }
             Err(parse_error) => {
