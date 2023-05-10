@@ -3,7 +3,6 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::TextRange;
 
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
@@ -35,7 +34,7 @@ pub(crate) fn missing_whitespace_after_keyword(
                 || matches!(tok1_kind, TokenKind::Colon | TokenKind::Newline))
             && tok0.end() == tok1.start()
         {
-            context.push(MissingWhitespaceAfterKeyword, TextRange::empty(tok0.end()));
+            context.push(MissingWhitespaceAfterKeyword, tok0.range());
         }
     }
 }

@@ -240,8 +240,8 @@ impl<'a> LogicalLine<'a> {
             .slice(TextRange::new(first_token.start(), token.start()))
     }
 
-    /// Returns the whitespace *after* the `token`
-    pub fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> Whitespace {
+    /// Returns the whitespace *after* the `token` with the byte length
+    pub fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
         Whitespace::leading(self.text_after(token))
     }
 
@@ -358,35 +358,45 @@ pub(crate) enum Whitespace {
 }
 
 impl Whitespace {
-    fn leading(content: &str) -> Self {
+    fn leading(content: &str) -> (Self, TextSize) {
         let mut count = 0u32;
+        let mut len = TextSize::default();
+        let mut has_tabs = false;
 
         for c in content.chars() {
             if c == '\t' {
-                return Self::Tab;
+                has_tabs = true;
+                len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
                 break;
             } else if c.is_whitespace() {
                 count += 1;
+                len += c.text_len();
             } else {
                 break;
             }
         }
 
-        match count {
-            0 => Whitespace::None,
-            1 => Whitespace::Single,
-            _ => Whitespace::Many,
+        if has_tabs {
+            (Whitespace::Tab, len)
+        } else {
+            match count {
+                0 => (Whitespace::None, len),
+                1 => (Whitespace::Single, len),
+                _ => (Whitespace::Many, len),
+            }
         }
     }
 
     fn trailing(content: &str) -> (Self, TextSize) {
         let mut len = TextSize::default();
         let mut count = 0usize;
+        let mut has_tabs = false;
 
         for c in content.chars().rev() {
             if c == '\t' {
-                return (Self::Tab, len + c.text_len());
+                has_tabs = true;
+                len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
                 // Indent
                 return (Self::None, TextSize::default());
@@ -398,15 +408,19 @@ impl Whitespace {
             }
         }
 
-        match count {
-            0 => (Self::None, TextSize::default()),
-            1 => (Self::Single, len),
-            _ => {
-                if len == content.text_len() {
-                    // All whitespace up to the start of the line -> Indent
-                    (Self::None, TextSize::default())
-                } else {
-                    (Self::Many, len)
+        if has_tabs {
+            (Self::Tab, len)
+        } else {
+            match count {
+                0 => (Self::None, TextSize::default()),
+                1 => (Self::Single, len),
+                _ => {
+                    if len == content.text_len() {
+                        // All whitespace up to the start of the line -> Indent
+                        (Self::None, TextSize::default())
+                    } else {
+                        (Self::Many, len)
+                    }
                 }
             }
         }
