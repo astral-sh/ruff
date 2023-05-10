@@ -71,3 +71,4 @@ jobs:
             'core/**/*.rs'
             'literal/**/*.rs'
             'parser/**/*.rs'
+            'ast/asdl_rs.py'
