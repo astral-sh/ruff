@@ -16,7 +16,7 @@ use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, RefEquality};
-use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze;
@@ -27,7 +27,7 @@ use ruff_python_semantic::binding::{
     Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
     Importation, StarImportation, SubmoduleImportation,
 };
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::context::{Context, ContextFlags};
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
@@ -137,23 +137,33 @@ impl<'a> Checker<'a> {
     }
 }
 
+/// Visit an body of [`Stmt`] nodes within a type-checking block.
+macro_rules! visit_type_checking_block {
+    ($self:ident, $body:expr) => {{
+        let flags = $self.ctx.flags;
+        $self.ctx.flags |= ContextFlags::TYPE_CHECKING_BLOCK;
+        $self.visit_body($body);
+        $self.ctx.flags = flags;
+    }};
+}
+
 /// Visit an [`Expr`], and treat it as a type definition.
 macro_rules! visit_type_definition {
     ($self:ident, $expr:expr) => {{
-        let prev_in_type_definition = $self.ctx.in_type_definition;
-        $self.ctx.in_type_definition = true;
+        let flags = $self.ctx.flags;
+        $self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
         $self.visit_expr($expr);
-        $self.ctx.in_type_definition = prev_in_type_definition;
+        $self.ctx.flags = flags;
     }};
 }
 
 /// Visit an [`Expr`], and treat it as _not_ a type definition.
 macro_rules! visit_non_type_definition {
     ($self:ident, $expr:expr) => {{
-        let prev_in_type_definition = $self.ctx.in_type_definition;
-        $self.ctx.in_type_definition = false;
+        let flags = $self.ctx.flags;
+        $self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
         $self.visit_expr($expr);
-        $self.ctx.in_type_definition = prev_in_type_definition;
+        $self.ctx.flags = flags;
     }};
 }
 
@@ -162,10 +172,10 @@ macro_rules! visit_non_type_definition {
 /// its truthiness.
 macro_rules! visit_boolean_test {
     ($self:ident, $expr:expr) => {{
-        let prev_in_boolean_test = $self.ctx.in_boolean_test;
-        $self.ctx.in_boolean_test = true;
+        let flags = $self.ctx.flags;
+        $self.ctx.flags |= ContextFlags::BOOLEAN_TEST;
         $self.visit_expr($expr);
-        $self.ctx.in_boolean_test = prev_in_boolean_test;
+        $self.ctx.flags = flags;
     }};
 }
 
@@ -178,26 +188,29 @@ where
 
         // Track whether we've seen docstrings, non-imports, etc.
         match &stmt.node {
-            StmtKind::ImportFrom(ast::StmtImportFrom { module, .. }) => {
+            StmtKind::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
                 // Allow __future__ imports until we see a non-__future__ import.
-                if self.ctx.futures_allowed {
-                    if let Some(module) = module {
-                        if module != "__future__" {
-                            self.ctx.futures_allowed = false;
-                        }
+                if let Some("__future__") = module.as_deref() {
+                    if names
+                        .iter()
+                        .any(|alias| alias.node.name.as_str() == "annotations")
+                    {
+                        self.ctx.flags |= ContextFlags::FUTURE_ANNOTATIONS;
                     }
+                } else {
+                    self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
                 }
             }
             StmtKind::Import(_) => {
-                self.ctx.futures_allowed = false;
+                self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
             }
             _ => {
-                self.ctx.futures_allowed = false;
-                if !self.ctx.seen_import_boundary
+                self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
+                if !self.ctx.seen_import_boundary()
                     && !helpers::is_assignment_to_a_dunder(stmt)
                     && !helpers::in_nested_block(self.ctx.parents())
                 {
-                    self.ctx.seen_import_boundary = true;
+                    self.ctx.flags |= ContextFlags::IMPORT_BOUNDARY;
                 }
             }
         }
@@ -208,6 +221,8 @@ where
                 self.importer.visit_import(stmt);
             }
         }
+
+        let flags = self.ctx.flags;
 
         // Pre-visit.
         match &stmt.node {
@@ -607,6 +622,7 @@ where
                 if self.settings.rules.enabled(Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
+
                 if self.settings.rules.enabled(Rule::YieldInForLoop) {
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
@@ -833,13 +849,13 @@ where
                             },
                         );
 
-                        if self.settings.rules.enabled(Rule::LateFutureImport)
-                            && !self.ctx.futures_allowed
-                        {
-                            self.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::LateFutureImport,
-                                stmt.range(),
-                            ));
+                        if self.settings.rules.enabled(Rule::LateFutureImport) {
+                            if self.ctx.seen_futures_boundary() {
+                                self.diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::LateFutureImport,
+                                    stmt.range(),
+                                ));
+                            }
                         }
                     } else if alias.node.name.contains('.') && alias.node.asname.is_none() {
                         // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
@@ -1149,21 +1165,17 @@ where
                             },
                         );
 
-                        if &alias.node.name == "annotations" {
-                            self.ctx.annotations_future_enabled = true;
-                        }
-
                         if self.settings.rules.enabled(Rule::FutureFeatureNotDefined) {
                             pyflakes::rules::future_feature_not_defined(self, alias);
                         }
 
-                        if self.settings.rules.enabled(Rule::LateFutureImport)
-                            && !self.ctx.futures_allowed
-                        {
-                            self.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::LateFutureImport,
-                                stmt.range(),
-                            ));
+                        if self.settings.rules.enabled(Rule::LateFutureImport) {
+                            if self.ctx.seen_futures_boundary() {
+                                self.diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::LateFutureImport,
+                                    stmt.range(),
+                                ));
+                            }
                         }
                     } else if &alias.node.name == "*" {
                         self.ctx
@@ -1542,7 +1554,7 @@ where
                 }
             }
             StmtKind::Assert(ast::StmtAssert { test, msg }) => {
-                if !self.ctx.in_type_checking_block {
+                if !self.ctx.in_type_checking_block() {
                     if self.settings.rules.enabled(Rule::Assert) {
                         self.diagnostics
                             .push(flake8_bandit::rules::assert_used(stmt));
@@ -1875,7 +1887,6 @@ where
         }
 
         // Recurse.
-        let prev_in_exception_handler = self.ctx.in_exception_handler;
         match &stmt.node {
             StmtKind::FunctionDef(ast::StmtFunctionDef {
                 body,
@@ -1901,7 +1912,7 @@ where
 
                 // Function annotations are always evaluated at runtime, unless future annotations
                 // are enabled.
-                let runtime_annotation = !self.ctx.annotations_future_enabled;
+                let runtime_annotation = !self.ctx.future_annotations();
 
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
@@ -2114,11 +2125,10 @@ where
                 self.visit_body(body);
                 self.ctx.handled_exceptions.pop();
 
-                self.ctx.in_exception_handler = true;
+                self.ctx.flags |= ContextFlags::EXCEPTION_HANDLER;
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
-                self.ctx.in_exception_handler = prev_in_exception_handler;
 
                 self.visit_body(orelse);
                 self.visit_body(finalbody);
@@ -2132,7 +2142,7 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = if self.ctx.annotations_future_enabled {
+                let runtime_annotation = if self.ctx.future_annotations() {
                     if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
                         let baseclasses = &self
                             .settings
@@ -2190,10 +2200,7 @@ where
                         flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
                     }
 
-                    let prev_in_type_checking_block = self.ctx.in_type_checking_block;
-                    self.ctx.in_type_checking_block = true;
-                    self.visit_body(body);
-                    self.ctx.in_type_checking_block = prev_in_type_checking_block;
+                    visit_type_checking_block!(self, body);
                 } else {
                     self.visit_body(body);
                 }
@@ -2229,22 +2236,22 @@ where
             _ => {}
         }
 
+        self.ctx.flags = flags;
         self.ctx.pop_stmt();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
-        let prev_in_annotation = self.ctx.in_annotation;
-        self.ctx.in_annotation = true;
+        let flags = self.ctx.flags;
+        self.ctx.flags |= ContextFlags::ANNOTATION;
         visit_type_definition!(self, expr);
-        self.ctx.in_annotation = prev_in_annotation;
+        self.ctx.flags = flags;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if !self.ctx.in_f_string
-            && !self.ctx.in_deferred_type_definition
-            && self.ctx.in_deferred_string_type_definition.is_none()
-            && self.ctx.in_type_definition
-            && self.ctx.annotations_future_enabled
+        if !self.ctx.in_f_string()
+            && !self.ctx.in_deferred_type_definition()
+            && self.ctx.in_type_definition()
+            && self.ctx.future_annotations()
         {
             if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
@@ -2258,7 +2265,7 @@ where
                 ));
             } else {
                 self.deferred
-                    .type_definitions
+                    .future_type_definitions
                     .push((expr, self.ctx.snapshot()));
             }
             return;
@@ -2266,9 +2273,7 @@ where
 
         self.ctx.push_expr(expr);
 
-        let prev_in_literal = self.ctx.in_literal;
-        let prev_in_type_definition = self.ctx.in_type_definition;
-        let prev_in_boolean_test = self.ctx.in_boolean_test;
+        let flags = self.ctx.flags;
 
         // If we're in a boolean test (e.g., the `test` of a `StmtKind::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
@@ -2280,7 +2285,7 @@ where
                     ..
                 })
         ) {
-            self.ctx.in_boolean_test = false;
+            self.ctx.flags -= ContextFlags::BOOLEAN_TEST;
         }
 
         // Pre-visit.
@@ -2291,14 +2296,14 @@ where
                     && self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
-                            && self.ctx.annotations_future_enabled
-                            && self.ctx.in_annotation))
+                            && self.ctx.future_annotations()
+                            && self.ctx.in_annotation()))
                 {
                     pyupgrade::rules::use_pep604_annotation(self, expr, value, slice);
                 }
 
                 if self.ctx.match_typing_expr(value, "Literal") {
-                    self.ctx.in_literal = true;
+                    self.ctx.flags |= ContextFlags::LITERAL;
                 }
 
                 if self.settings.rules.any_enabled(&[
@@ -2354,8 +2359,8 @@ where
                             && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
-                                    && self.ctx.annotations_future_enabled
-                                    && self.ctx.in_annotation))
+                                    && self.ctx.future_annotations()
+                                    && self.ctx.in_annotation()))
                             && analyze::typing::is_pep585_builtin(expr, &self.ctx)
                         {
                             pyupgrade::rules::use_pep585_annotation(self, expr);
@@ -2405,8 +2410,8 @@ where
                     && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
-                            && self.ctx.annotations_future_enabled
-                            && self.ctx.in_annotation))
+                            && self.ctx.future_annotations()
+                            && self.ctx.in_annotation()))
                     && analyze::typing::is_pep585_builtin(expr, &self.ctx)
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
@@ -3366,7 +3371,7 @@ where
             }) => {
                 if self.is_stub {
                     if self.settings.rules.enabled(Rule::DuplicateUnionMember)
-                        && self.ctx.in_type_definition
+                        && self.ctx.in_type_definition()
                         && self.ctx.expr_parent().map_or(true, |parent| {
                             !matches!(
                                 parent.node,
@@ -3511,7 +3516,10 @@ where
                 value: Constant::Str(value),
                 kind,
             }) => {
-                if self.ctx.in_type_definition && !self.ctx.in_literal && !self.ctx.in_f_string {
+                if self.ctx.in_type_definition()
+                    && !self.ctx.in_literal()
+                    && !self.ctx.in_f_string()
+                {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
                         value,
@@ -3817,11 +3825,10 @@ where
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
                 // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
                 // the `ExprContext` at the top-level.
-                let prev_in_subscript = self.ctx.in_subscript;
-                if self.ctx.in_subscript {
+                if self.ctx.in_subscript() {
                     visitor::walk_expr(self, expr);
                 } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
-                    self.ctx.in_subscript = true;
+                    self.ctx.flags |= ContextFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
                     match analyze::typing::match_annotated_subscript(
@@ -3864,13 +3871,10 @@ where
                         None => visitor::walk_expr(self, expr),
                     }
                 }
-                self.ctx.in_subscript = prev_in_subscript;
             }
             ExprKind::JoinedStr(_) => {
-                let prev_in_f_string = self.ctx.in_f_string;
-                self.ctx.in_f_string = true;
+                self.ctx.flags |= ContextFlags::F_STRING;
                 visitor::walk_expr(self, expr);
-                self.ctx.in_f_string = prev_in_f_string;
             }
             _ => visitor::walk_expr(self, expr),
         }
@@ -3887,10 +3891,7 @@ where
             _ => {}
         };
 
-        self.ctx.in_type_definition = prev_in_type_definition;
-        self.ctx.in_literal = prev_in_literal;
-        self.ctx.in_boolean_test = prev_in_boolean_test;
-
+        self.ctx.flags = flags;
         self.ctx.pop_expr();
     }
 
@@ -4402,9 +4403,8 @@ impl<'a> Checker<'a> {
                 let context = self.ctx.execution_context();
                 self.ctx.bindings[*index].mark_used(self.ctx.scope_id, expr.range(), context);
 
-                if self.ctx.bindings[*index].kind.is_annotation()
-                    && self.ctx.in_deferred_string_type_definition.is_none()
-                    && !self.ctx.in_deferred_type_definition
+                if !self.ctx.in_deferred_type_definition()
+                    && self.ctx.bindings[*index].kind.is_annotation()
                 {
                     continue;
                 }
@@ -4783,17 +4783,17 @@ impl<'a> Checker<'a> {
         docstring.is_some()
     }
 
-    fn check_deferred_type_definitions(&mut self) {
-        while !self.deferred.type_definitions.is_empty() {
-            let type_definitions = std::mem::take(&mut self.deferred.type_definitions);
+    fn check_deferred_future_type_definitions(&mut self) {
+        while !self.deferred.future_type_definitions.is_empty() {
+            let type_definitions = std::mem::take(&mut self.deferred.future_type_definitions);
             for (expr, snapshot) in type_definitions {
                 self.ctx.restore(snapshot);
 
-                self.ctx.in_type_definition = true;
-                self.ctx.in_deferred_type_definition = true;
+                self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
+                self.ctx.flags |= ContextFlags::FUTURE_TYPE_DEFINITION;
                 self.visit_expr(expr);
-                self.ctx.in_deferred_type_definition = false;
-                self.ctx.in_type_definition = false;
+                self.ctx.flags -= ContextFlags::FUTURE_TYPE_DEFINITION;
+                self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
             }
         }
     }
@@ -4807,7 +4807,7 @@ impl<'a> Checker<'a> {
 
                     self.ctx.restore(snapshot);
 
-                    if self.ctx.in_annotation && self.ctx.annotations_future_enabled {
+                    if self.ctx.in_annotation() && self.ctx.future_annotations() {
                         if self.settings.rules.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -4818,12 +4818,17 @@ impl<'a> Checker<'a> {
                         }
                     }
 
-                    self.ctx.in_type_definition = true;
-                    self.ctx.in_deferred_string_type_definition = Some(kind);
+                    self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
+                    self.ctx.flags |= match kind {
+                        AnnotationKind::Simple => ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Complex => ContextFlags::COMPLEX_STRING_TYPE_DEFINITION,
+                    };
                     self.visit_expr(expr);
-
-                    self.ctx.in_deferred_string_type_definition = None;
-                    self.ctx.in_type_definition = false;
+                    self.ctx.flags -= match kind {
+                        AnnotationKind::Simple => ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Complex => ContextFlags::COMPLEX_STRING_TYPE_DEFINITION,
+                    };
+                    self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
                 } else {
                     if self
                         .settings
@@ -5681,7 +5686,7 @@ pub(crate) fn check_ast(
     // Check any deferred statements.
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
-    checker.check_deferred_type_definitions();
+    checker.check_deferred_future_type_definitions();
     let allocator = typed_arena::Arena::new();
     checker.check_deferred_string_type_definitions(&allocator);
     checker.check_deferred_assignments();
