@@ -20,5 +20,5 @@ serde = { version = "1.0.133", optional = true, default-features = false, featur
 lz4_flex = "0.9.2"
 
 [features]
-default = ["source-code"]
-source-code = ["ruff_source_location"]
+default = []
+location = ["ruff_source_location"]

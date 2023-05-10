@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Quote {
     Single,
     Double,
@@ -80,15 +80,21 @@ pub struct UnicodeEscape<'a> {
 }
 
 impl<'a> UnicodeEscape<'a> {
+    #[inline]
     pub fn with_forced_quote(source: &'a str, quote: Quote) -> Self {
         let layout = EscapeLayout { quote, len: None };
         Self { source, layout }
     }
-    pub fn new_repr(source: &'a str) -> Self {
-        let layout = Self::repr_layout(source, Quote::Single);
+    #[inline]
+    pub fn with_preferred_quote(source: &'a str, quote: Quote) -> Self {
+        let layout = Self::repr_layout(source, quote);
         Self { source, layout }
     }
-
+    #[inline]
+    pub fn new_repr(source: &'a str) -> Self {
+        Self::with_preferred_quote(source, Quote::Single)
+    }
+    #[inline]
     pub fn str_repr<'r>(&'a self) -> StrRepr<'r, 'a> {
         StrRepr(self)
     }
@@ -265,18 +271,25 @@ pub struct AsciiEscape<'a> {
 }
 
 impl<'a> AsciiEscape<'a> {
+    #[inline]
     pub fn new(source: &'a [u8], layout: EscapeLayout) -> Self {
         Self { source, layout }
     }
+    #[inline]
     pub fn with_forced_quote(source: &'a [u8], quote: Quote) -> Self {
         let layout = EscapeLayout { quote, len: None };
         Self { source, layout }
     }
-    pub fn new_repr(source: &'a [u8]) -> Self {
-        let layout = Self::repr_layout(source, Quote::Single);
+    #[inline]
+    pub fn with_preferred_quote(source: &'a [u8], quote: Quote) -> Self {
+        let layout = Self::repr_layout(source, quote);
         Self { source, layout }
     }
-
+    #[inline]
+    pub fn new_repr(source: &'a [u8]) -> Self {
+        Self::with_preferred_quote(source, Quote::Single)
+    }
+    #[inline]
     pub fn bytes_repr<'r>(&'a self) -> BytesRepr<'r, 'a> {
         BytesRepr(self)
     }

@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 0198c5dceea306627c61f209b8fb7f17dffba455b06a7ba59f55447f864b84db
+// sha3: 94b68331f7fbb668c2e962084095e319cfff9ba09cd78a361c735e7e60c57497
 use crate::{
     ast,
     lexer::{LexicalError, LexicalErrorType},
@@ -36842,7 +36842,7 @@ fn __action21<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtDelete { targets: targets.into_iter().map(|expr| set_context(expr, ast::ExprContext::Del)).collect() }.into()
+            ast::StmtDelete { targets: targets.into_iter().map(|expr| set_context(expr, ast::ExprContext::Del)).collect() }
         )
     }
 }
@@ -36862,7 +36862,7 @@ fn __action22<
             ast::Stmt::new(
                 location..
                 end_location,
-                ast::StmtExpr { value: Box::new(expression) }.into()
+                ast::StmtExpr { value: Box::new(expression) }
             )
         } else {
             let mut targets = vec![set_context(expression, ast::ExprContext::Store)];
@@ -36877,7 +36877,7 @@ fn __action22<
             ast::Stmt::new(
                 location..
                 end_location,
-                ast::StmtAssign { targets, value, type_comment: None }.into()
+                ast::StmtAssign { targets, value, type_comment: None }
             )
         }
     }
@@ -36901,7 +36901,7 @@ fn __action23<
                 target: Box::new(set_context(target, ast::ExprContext::Store)),
                 op,
                 value: Box::new(rhs)
-            }.into(),
+            },
         )
     }
 }
@@ -36927,7 +36927,7 @@ fn __action24<
                 annotation: Box::new(annotation),
                 value: rhs.map(Box::new),
                 simple,
-            }.into(),
+            },
         )
     }
 }
@@ -37187,7 +37187,7 @@ fn __action50<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtReturn { value: value.map(Box::new) }.into()
+            ast::StmtReturn { value: value.map(Box::new) }
         )
     }
 }
@@ -37204,7 +37204,7 @@ fn __action51<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtExpr { value: Box::new(expression) }.into()
+            ast::StmtExpr { value: Box::new(expression) }
         )
     }
 }
@@ -37230,7 +37230,7 @@ fn __action53<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtRaise { exc: None, cause: None }.into()
+            ast::StmtRaise { exc: None, cause: None }
         )
     }
 }
@@ -37249,7 +37249,7 @@ fn __action54<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(|x| Box::new(x.1)) }.into()
+            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(|x| Box::new(x.1)) }
         )
     }
 }
@@ -37267,7 +37267,7 @@ fn __action55<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtImport { names }.into()
+            ast::StmtImport { names }
         )
     }
 }
@@ -37292,7 +37292,7 @@ fn __action56<
                 level,
                 module,
                 names
-            }.into(),
+            },
         )
     }
 }
@@ -37416,7 +37416,7 @@ fn __action66<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtGlobal { names }.into()
+            ast::StmtGlobal { names }
         )
     }
 }
@@ -37434,7 +37434,7 @@ fn __action67<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtNonlocal { names }.into()
+            ast::StmtNonlocal { names }
         )
     }
 }
@@ -37456,7 +37456,7 @@ fn __action68<
             ast::StmtAssert {
                 test: Box::new(test),
                 msg: msg.map(|e| Box::new(e.1))
-            }.into()
+            }
         )
     }
 }
@@ -37560,7 +37560,7 @@ fn __action77<
             ast::StmtMatch {
                 subject: Box::new(subject),
                 cases
-            }.into()
+            }
         )
     }
 }
@@ -37593,7 +37593,7 @@ fn __action78<
             ast::StmtMatch {
                 subject: Box::new(subject),
                 cases
-            }.into()
+            }
         )
     }
 }
@@ -37634,10 +37634,10 @@ fn __action79<
                     ast::ExprTuple {
                         elts: subjects,
                         ctx: ast::ExprContext::Load,
-                    }.into(),
+                    },
                 )),
                 cases
-            }.into()
+            }
         )
     }
 }
@@ -37687,7 +37687,7 @@ fn __action82<
         end_location,
         ast::PatternMatchSequence {
             patterns: vec![pattern]
-        }.into(),
+        },
     )
 }
 
@@ -37710,7 +37710,7 @@ fn __action83<
             end_location,
             ast::PatternMatchSequence {
                 patterns
-            }.into(),
+            },
         )
     }
 }
@@ -37765,7 +37765,7 @@ fn __action87<
                 ast::PatternMatchAs {
                    pattern: Some(Box::new(pattern)),
                    name: Some(name),
-                }.into(),
+                },
             ))
         }
     }
@@ -37795,7 +37795,7 @@ fn __action89<
         ast::Pattern::new(
             location..
             end_location,
-            ast::PatternMatchOr { patterns }.into()
+            ast::PatternMatchOr { patterns }
         )
     }
 }
@@ -37993,7 +37993,7 @@ fn __action102<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprConstant { value, kind: None }.into()
+        ast::ExprConstant { value, kind: None }
     )
 }
 
@@ -38021,7 +38021,7 @@ fn __action104<
         ast::ExprUnaryOp {
             op: ast::Unaryop::USub,
             operand: Box::new(operand)
-        }.into()
+        }
     )
 }
 
@@ -38042,7 +38042,7 @@ fn __action105<
             left: Box::new(left),
             op,
             right: Box::new(right),
-        }.into()
+        }
     )
 }
 
@@ -38141,7 +38141,7 @@ fn __action113<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load }.into(),
+        ast::ExprName { id: name, ctx: ast::ExprContext::Load },
     )
 }
 
@@ -38162,7 +38162,7 @@ fn __action114<
             value: Box::new(name),
             attr,
             ctx: ast::ExprContext::Load,
-        }.into(),
+        },
     )
 }
 
@@ -38183,7 +38183,7 @@ fn __action115<
             value: Box::new(e),
             attr,
             ctx: ast::ExprContext::Load,
-        }.into(),
+        },
     )
 }
 
@@ -38239,7 +38239,7 @@ fn __action120<
         ast::ExprConstant {
             value: ast::Constant::None,
             kind: None,
-        }.into(),
+        },
     )
 }
 
@@ -38257,7 +38257,7 @@ fn __action121<
         ast::ExprConstant {
             value: true.into(),
             kind: None,
-        }.into(),
+        },
     )
 }
 
@@ -38275,7 +38275,7 @@ fn __action122<
         ast::ExprConstant {
             value: false.into(),
             kind: None,
-        }.into(),
+        },
     )
 }
 
@@ -38613,7 +38613,7 @@ fn __action138<
             let x = ast::Stmt::new(
                 i.0..
                 end_location,
-                ast::StmtIf { test: Box::new(i.2), body: i.4, orelse: last }.into()
+                ast::StmtIf { test: Box::new(i.2), body: i.4, orelse: last }
             );
             last = vec![x];
         }
@@ -38621,7 +38621,7 @@ fn __action138<
         ast::Stmt::new(
             location..
             end_location,
-            ast::StmtIf { test: Box::new(test), body, orelse: last }.into()
+            ast::StmtIf { test: Box::new(test), body, orelse: last }
         )
     }
 }
@@ -38651,7 +38651,7 @@ fn __action139<
                 test: Box::new(test),
                 body,
                 orelse
-            }.into(),
+            },
         )
     }
 }
@@ -38680,7 +38680,7 @@ fn __action140<
         let target = Box::new(set_context(target, ast::ExprContext::Store));
         let iter = Box::new(iter);
         let type_comment = None;
-        let node = if is_async.is_some() {
+        let node: ast::StmtKind = if is_async.is_some() {
             ast::StmtAsyncFor { target, iter, body, orelse, type_comment }.into()
         } else {
             ast::StmtFor { target, iter, body, orelse, type_comment }.into()
@@ -38719,7 +38719,7 @@ fn __action141<
                 handlers,
                 orelse,
                 finalbody,
-            }.into(),
+            },
         )
     }
 }
@@ -38754,7 +38754,7 @@ fn __action142<
                 handlers,
                 orelse,
                 finalbody,
-            }.into(),
+            },
         )
     }
 }
@@ -38782,7 +38782,7 @@ fn __action143<
                 handlers,
                 orelse,
                 finalbody,
-            }.into(),
+            },
         )
     }
 }
@@ -38807,7 +38807,7 @@ fn __action144<
                 type_: Some(Box::new(typ)),
                 name: None,
                 body,
-            }.into(),
+            },
         )
     }
 }
@@ -38832,7 +38832,7 @@ fn __action145<
                 type_: Some(Box::new(x.0)),
                 name: Some(x.2),
                 body,
-            }.into(),
+            },
         )
     }
 }
@@ -38856,7 +38856,7 @@ fn __action146<
                 type_: typ.map(Box::new),
                 name: None,
                 body,
-            }.into(),
+            },
         )
     }
 }
@@ -38880,7 +38880,7 @@ fn __action147<
                 type_: Some(Box::new(x.0)),
                 name: Some(x.2),
                 body,
-            }.into(),
+            },
         )
     }
 }
@@ -38899,7 +38899,7 @@ fn __action148<
     {
         let end_location = body.last().unwrap().end();
         let type_comment = None;
-        let node = if is_async.is_some() {
+        let node: ast::StmtKind = if is_async.is_some() {
             ast::StmtAsyncWith { items, body, type_comment }.into()
         } else {
             ast::StmtWith { items, body, type_comment }.into()
@@ -38987,7 +38987,7 @@ fn __action154<
         let returns = r.map(|x| Box::new(x.1));
         let end_location = body.last().unwrap().end();
         let type_comment = None;
-        let node = if is_async.is_some() {
+        let node: ast::StmtKind = if is_async.is_some() {
             ast::StmtAsyncFunctionDef { name, args, body, decorator_list, returns, type_comment }.into()
         } else {
             ast::StmtFunctionDef { name, args, body, decorator_list, returns, type_comment }.into()
@@ -39093,7 +39093,7 @@ fn __action159<
                 keywords,
                 body,
                 decorator_list,
-            }.into(),
+            },
         )
     }
 }
@@ -39124,7 +39124,7 @@ fn __action161<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprYield { value: value.map(Box::new) }.into()
+        ast::ExprYield { value: value.map(Box::new) }
     )
 }
 
@@ -39141,7 +39141,7 @@ fn __action162<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprYieldFrom { value: Box::new(e) }.into()
+        ast::ExprYieldFrom { value: Box::new(e) }
     )
 }
 
@@ -39181,10 +39181,10 @@ fn __action165<
                 target: Box::new(ast::Expr::new(
                     location..
                     end_location,
-                    ast::ExprName { id, ctx: ast::ExprContext::Store }.into(),
+                    ast::ExprName { id, ctx: ast::ExprContext::Store },
                 )),
                 value: Box::new(value),
-            }.into()
+            }
         )
     }
 }
@@ -39221,7 +39221,7 @@ fn __action166<
             ast::ExprLambda {
                 args: Box::new(p),
                 body: Box::new(body)
-            }.into()
+            }
         ))
     }
 }
@@ -39448,7 +39448,7 @@ fn __action189<
             ast::Expr::new(
                 location..
                 end_location,
-                ast::ExprTuple { elts: dims, ctx: ast::ExprContext::Load }.into(),
+                ast::ExprTuple { elts: dims, ctx: ast::ExprContext::Load },
             )
         }
     }
@@ -39481,7 +39481,7 @@ fn __action191<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprSlice { lower, upper, step }.into()
+            ast::ExprSlice { lower, upper, step }
         )
     }
 }
@@ -39615,7 +39615,7 @@ fn __action204<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprStarred { value: Box::new(e), ctx: ast::ExprContext::Load }.into(),
+        ast::ExprStarred { value: Box::new(e), ctx: ast::ExprContext::Load },
     )
 }
 
@@ -39699,7 +39699,7 @@ fn __action210<
                 ast::ExprGeneratorExp {
                     elt: Box::new(e),
                     generators: c,
-                }.into()
+                }
             ),
             None => e,
         };
@@ -39733,7 +39733,7 @@ fn __action212<
         let expr = ast::Expr::new(
             location..
             end_location,
-            ast::ExprStarred { value: Box::new(e), ctx: ast::ExprContext::Load }.into(),
+            ast::ExprStarred { value: Box::new(e), ctx: ast::ExprContext::Load },
         );
         (None, expr)
     }
@@ -39854,7 +39854,7 @@ fn __action223<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprBoolOp { op: ast::Boolop::Or, values }.into()
+            ast::ExprBoolOp { op: ast::Boolop::Or, values }
         )
     }
 }
@@ -39903,7 +39903,7 @@ fn __action227<
             ast::Expr::new(
                 location..
                 end_location,
-                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }.into()
+                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }
             )
         }
     }
@@ -39939,7 +39939,7 @@ fn __action229<
             ast::Expr::new(
                 location..
                 end_location,
-                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }.into()
+                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }
             )
         }
     }
@@ -39958,7 +39958,7 @@ fn __action230<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitOr, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitOr, right: Box::new(e2) }
     )
 }
 
@@ -41181,7 +41181,7 @@ fn __action337<
             test: Box::new(test),
             body: Box::new(body),
             orelse: Box::new(orelse),
-        }.into()
+        }
     )
 }
 
@@ -41748,7 +41748,7 @@ fn __action395<
             test: Box::new(test),
             body: Box::new(body),
             orelse: Box::new(orelse),
-        }.into()
+        }
     )
 }
 
@@ -42099,7 +42099,7 @@ fn __action423<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitXor, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitXor, right: Box::new(e2) }
     )
 }
 
@@ -42199,7 +42199,7 @@ fn __action432<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprBoolOp { op: ast::Boolop::And, values }.into()
+            ast::ExprBoolOp { op: ast::Boolop::And, values }
         )
     }
 }
@@ -42340,7 +42340,7 @@ fn __action446<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprUnaryOp { operand: Box::new(e), op: ast::Unaryop::Not }.into()
+        ast::ExprUnaryOp { operand: Box::new(e), op: ast::Unaryop::Not }
     )
 }
 
@@ -42414,7 +42414,7 @@ fn __action453<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitAnd, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitAnd, right: Box::new(e2) }
     )
 }
 
@@ -42701,7 +42701,7 @@ fn __action481<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprBoolOp { op: ast::Boolop::Or, values }.into()
+            ast::ExprBoolOp { op: ast::Boolop::Or, values }
         )
     }
 }
@@ -42882,7 +42882,7 @@ fn __action499<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprBoolOp { op: ast::Boolop::And, values }.into()
+            ast::ExprBoolOp { op: ast::Boolop::And, values }
         )
     }
 }
@@ -42947,7 +42947,7 @@ fn __action505<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op, right: Box::new(e2) }
     )
 }
 
@@ -42993,7 +42993,7 @@ fn __action509<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprCompare { left: Box::new(left), ops, comparators }.into()
+            ast::ExprCompare { left: Box::new(left), ops, comparators }
         )
     }
 }
@@ -43049,7 +43049,7 @@ fn __action514<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }.into()
+        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }
     )
 }
 
@@ -43074,7 +43074,7 @@ fn __action516<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprUnaryOp { operand: Box::new(e), op: ast::Unaryop::Not }.into()
+        ast::ExprUnaryOp { operand: Box::new(e), op: ast::Unaryop::Not }
     )
 }
 
@@ -43101,7 +43101,7 @@ fn __action518<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprCompare { left: Box::new(left), ops, comparators }.into()
+            ast::ExprCompare { left: Box::new(left), ops, comparators }
         )
     }
 }
@@ -43128,7 +43128,7 @@ fn __action520<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }.into()
+        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }
     )
 }
 
@@ -43153,7 +43153,7 @@ fn __action522<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprUnaryOp { operand: Box::new(e), op }.into()
+        ast::ExprUnaryOp { operand: Box::new(e), op }
     )
 }
 
@@ -43179,7 +43179,7 @@ fn __action524<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitOr, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitOr, right: Box::new(e2) }
     )
 }
 
@@ -43205,7 +43205,7 @@ fn __action526<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitXor, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitXor, right: Box::new(e2) }
     )
 }
 
@@ -43231,7 +43231,7 @@ fn __action528<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e), op: ast::Operator::Pow, right: Box::new(b) }.into()
+        ast::ExprBinOp { left: Box::new(e), op: ast::Operator::Pow, right: Box::new(b) }
     )
 }
 
@@ -43257,7 +43257,7 @@ fn __action530<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprAwait { value: Box::new(atom) }.into()
+            ast::ExprAwait { value: Box::new(atom) }
         )
     }
 }
@@ -43284,7 +43284,7 @@ fn __action532<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitAnd, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op: ast::Operator::BitAnd, right: Box::new(e2) }
     )
 }
 
@@ -43310,7 +43310,7 @@ fn __action534<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e1), op, right: Box::new(e2) }.into()
+        ast::ExprBinOp { left: Box::new(e1), op, right: Box::new(e2) }
     )
 }
 
@@ -43347,7 +43347,7 @@ fn __action537<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprCall { func: Box::new(f), args: a.args, keywords: a.keywords }.into()
+            ast::ExprCall { func: Box::new(f), args: a.args, keywords: a.keywords }
         )
     }
 }
@@ -43366,7 +43366,7 @@ fn __action538<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprSubscript { value: Box::new(e), slice: Box::new(s), ctx: ast::ExprContext::Load }.into()
+        ast::ExprSubscript { value: Box::new(e), slice: Box::new(s), ctx: ast::ExprContext::Load }
     )
 }
 
@@ -43383,7 +43383,7 @@ fn __action539<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprAttribute { value: Box::new(e), attr, ctx: ast::ExprContext::Load }.into()
+        ast::ExprAttribute { value: Box::new(e), attr, ctx: ast::ExprContext::Load }
     )
 }
 
@@ -43408,7 +43408,7 @@ fn __action541<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprConstant { value, kind: None }.into()
+        ast::ExprConstant { value, kind: None }
     )
 }
 
@@ -43423,7 +43423,7 @@ fn __action542<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load }.into()
+        ast::ExprName { id: name, ctx: ast::ExprContext::Load }
     )
 }
 
@@ -43442,7 +43442,7 @@ fn __action543<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprList { elts, ctx: ast::ExprContext::Load }.into()
+            ast::ExprList { elts, ctx: ast::ExprContext::Load }
         )
     }
 }
@@ -43462,7 +43462,7 @@ fn __action544<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprListComp { elt: Box::new(elt), generators }.into()
+            ast::ExprListComp { elt: Box::new(elt), generators }
         )
     }
 }
@@ -43485,7 +43485,7 @@ fn __action545<
             ast::Expr::new(
                 location..
                 end_location,
-                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }.into()
+                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }
             )
         }
     }
@@ -43518,7 +43518,7 @@ fn __action546<
             Ok(ast::Expr::new(
                 location..
                 end_location,
-                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }.into(),
+                ast::ExprTuple { elts, ctx: ast::ExprContext::Load },
             ))
         }
     }
@@ -43536,7 +43536,7 @@ fn __action547<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprTuple { elts: Vec::new(), ctx: ast::ExprContext::Load }.into()
+        ast::ExprTuple { elts: Vec::new(), ctx: ast::ExprContext::Load }
     )
 }
 
@@ -43566,7 +43566,7 @@ fn __action549<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprGeneratorExp { elt: Box::new(elt), generators }.into()
+            ast::ExprGeneratorExp { elt: Box::new(elt), generators }
         )
     }
 }
@@ -43609,7 +43609,7 @@ fn __action551<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprDict { keys, values }.into()
+            ast::ExprDict { keys, values }
         )
     }
 }
@@ -43633,7 +43633,7 @@ fn __action552<
                 key: Box::new(e1.0),
                 value: Box::new(e1.1),
                 generators,
-            }.into()
+            }
         )
     }
 }
@@ -43651,7 +43651,7 @@ fn __action553<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprSet { elts }.into()
+        ast::ExprSet { elts }
     )
 }
 
@@ -43670,7 +43670,7 @@ fn __action554<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprSetComp { elt: Box::new(elt), generators }.into()
+            ast::ExprSetComp { elt: Box::new(elt), generators }
         )
     }
 }
@@ -43683,7 +43683,7 @@ fn __action555<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: true.into(), kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: true.into(), kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -43694,7 +43694,7 @@ fn __action556<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: false.into(), kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: false.into(), kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -43705,7 +43705,7 @@ fn __action557<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::None, kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::None, kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -43716,7 +43716,7 @@ fn __action558<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::Ellipsis, kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::Ellipsis, kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -43732,7 +43732,7 @@ fn __action559<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }.into()
+        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }
     )
 }
 
@@ -43758,7 +43758,7 @@ fn __action561<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }.into()
+        ast::ExprBinOp { left: Box::new(a), op, right: Box::new(b) }
     )
 }
 
@@ -43898,7 +43898,7 @@ fn __action575<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprUnaryOp { operand: Box::new(e), op }.into()
+        ast::ExprUnaryOp { operand: Box::new(e), op }
     )
 }
 
@@ -43924,7 +43924,7 @@ fn __action577<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprBinOp { left: Box::new(e), op: ast::Operator::Pow, right: Box::new(b) }.into()
+        ast::ExprBinOp { left: Box::new(e), op: ast::Operator::Pow, right: Box::new(b) }
     )
 }
 
@@ -43950,7 +43950,7 @@ fn __action579<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprAwait { value: Box::new(atom) }.into()
+            ast::ExprAwait { value: Box::new(atom) }
         )
     }
 }
@@ -43988,7 +43988,7 @@ fn __action582<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprCall { func: Box::new(f), args: a.args, keywords: a.keywords }.into()
+            ast::ExprCall { func: Box::new(f), args: a.args, keywords: a.keywords }
         )
     }
 }
@@ -44007,7 +44007,7 @@ fn __action583<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprSubscript { value: Box::new(e), slice: Box::new(s), ctx: ast::ExprContext::Load }.into()
+        ast::ExprSubscript { value: Box::new(e), slice: Box::new(s), ctx: ast::ExprContext::Load }
     )
 }
 
@@ -44024,7 +44024,7 @@ fn __action584<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprAttribute { value: Box::new(e), attr, ctx: ast::ExprContext::Load }.into()
+        ast::ExprAttribute { value: Box::new(e), attr, ctx: ast::ExprContext::Load }
     )
 }
 
@@ -44049,7 +44049,7 @@ fn __action586<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprConstant { value, kind: None }.into()
+        ast::ExprConstant { value, kind: None }
     )
 }
 
@@ -44064,7 +44064,7 @@ fn __action587<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprName { id: name, ctx: ast::ExprContext::Load }.into()
+        ast::ExprName { id: name, ctx: ast::ExprContext::Load }
     )
 }
 
@@ -44083,7 +44083,7 @@ fn __action588<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprList { elts, ctx: ast::ExprContext::Load }.into()
+            ast::ExprList { elts, ctx: ast::ExprContext::Load }
         )
     }
 }
@@ -44103,7 +44103,7 @@ fn __action589<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprListComp { elt: Box::new(elt), generators }.into()
+            ast::ExprListComp { elt: Box::new(elt), generators }
         )
     }
 }
@@ -44135,7 +44135,7 @@ fn __action590<
             Ok(ast::Expr::new(
                 location..
                 end_location,
-                ast::ExprTuple { elts, ctx: ast::ExprContext::Load }.into(),
+                ast::ExprTuple { elts, ctx: ast::ExprContext::Load },
             ))
         }
     }
@@ -44153,7 +44153,7 @@ fn __action591<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprTuple { elts: Vec::new(), ctx: ast::ExprContext::Load }.into()
+        ast::ExprTuple { elts: Vec::new(), ctx: ast::ExprContext::Load }
     )
 }
 
@@ -44183,7 +44183,7 @@ fn __action593<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprGeneratorExp { elt: Box::new(elt), generators }.into()
+            ast::ExprGeneratorExp { elt: Box::new(elt), generators }
         )
     }
 }
@@ -44226,7 +44226,7 @@ fn __action595<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprDict { keys, values }.into()
+            ast::ExprDict { keys, values }
         )
     }
 }
@@ -44250,7 +44250,7 @@ fn __action596<
                 key: Box::new(e1.0),
                 value: Box::new(e1.1),
                 generators,
-            }.into()
+            }
         )
     }
 }
@@ -44268,7 +44268,7 @@ fn __action597<
     ast::Expr::new(
         location..
         end_location,
-        ast::ExprSet { elts }.into()
+        ast::ExprSet { elts }
     )
 }
 
@@ -44287,7 +44287,7 @@ fn __action598<
         ast::Expr::new(
             location..
             end_location,
-            ast::ExprSetComp { elt: Box::new(elt), generators }.into()
+            ast::ExprSetComp { elt: Box::new(elt), generators }
         )
     }
 }
@@ -44300,7 +44300,7 @@ fn __action599<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: true.into(), kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: true.into(), kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -44311,7 +44311,7 @@ fn __action600<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: false.into(), kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: false.into(), kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -44322,7 +44322,7 @@ fn __action601<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::None, kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::None, kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -44333,7 +44333,7 @@ fn __action602<
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Expr
 {
-    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::Ellipsis, kind: None }.into())
+    ast::Expr::new(location..end_location, ast::ExprConstant { value: ast::Constant::Ellipsis, kind: None })
 }
 
 #[allow(clippy::too_many_arguments)]

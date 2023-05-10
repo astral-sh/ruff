@@ -4,7 +4,7 @@
 mod error;
 mod format;
 pub mod mode;
-#[cfg(feature = "source-code")]
+#[cfg(feature = "location")]
 pub mod source_code;
 
 pub use error::BaseError;

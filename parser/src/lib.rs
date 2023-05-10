@@ -113,7 +113,9 @@
 #![doc(html_root_url = "https://docs.rs/rustpython-parser/")]
 
 pub use rustpython_ast as ast;
-pub use rustpython_parser_core::{source_code, text_size, Mode};
+#[cfg(feature = "location")]
+pub use rustpython_parser_core::source_code;
+pub use rustpython_parser_core::{text_size, Mode};
 
 mod function;
 // Skip flattening lexer to distinguish from full parser
