@@ -30,6 +30,7 @@ impl From<NodeId> for usize {
     }
 }
 
+/// A [`Node`] represents a statement in a program, along with a pointer to its parent (if any).
 #[derive(Debug)]
 struct Node<'a> {
     /// The statement this node represents.

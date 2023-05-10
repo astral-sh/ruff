@@ -19,6 +19,15 @@ use crate::binding::{
 use crate::node::{NodeId, Nodes};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
+/// A snapshot of the [`Context`] at a given point in the AST traversal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Snapshot {
+    scope_id: ScopeId,
+    stmt_id: Option<NodeId>,
+    in_annotation: bool,
+    in_type_checking_block: bool,
+}
+
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
@@ -434,5 +443,23 @@ impl<'a> Context<'a> {
             exceptions.insert(*exception);
         }
         exceptions
+    }
+
+    /// Generate a [`Snapshot`] of the current context.
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            scope_id: self.scope_id,
+            stmt_id: self.stmt_id,
+            in_annotation: self.in_annotation,
+            in_type_checking_block: self.in_type_checking_block,
+        }
+    }
+
+    /// Restore the context to the given [`Snapshot`].
+    pub fn restore(&mut self, snapshot: Snapshot) {
+        self.scope_id = snapshot.scope_id;
+        self.stmt_id = snapshot.stmt_id;
+        self.in_annotation = snapshot.in_annotation;
+        self.in_type_checking_block = snapshot.in_type_checking_block;
     }
 }
