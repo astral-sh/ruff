@@ -59,22 +59,22 @@ type AnnotationContext = (bool, bool);
 
 pub struct Checker<'a> {
     // Settings, static metadata, etc.
-    pub path: &'a Path,
+    path: &'a Path,
     module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
     is_stub: bool,
     noqa: flags::Noqa,
+    noqa_line_for: &'a NoqaMapping,
     pub settings: &'a Settings,
-    pub noqa_line_for: &'a NoqaMapping,
     pub locator: &'a Locator<'a>,
     pub stylist: &'a Stylist<'a>,
     pub indexer: &'a Indexer,
     pub importer: Importer<'a>,
     // Stateful fields.
     pub ctx: Context<'a>,
-    pub deferred: Deferred<'a>,
     pub diagnostics: Vec<Diagnostic>,
     pub deletions: FxHashSet<RefEquality<'a, Stmt>>,
+    deferred: Deferred<'a>,
     // Check-specific state.
     pub flake8_bugbear_seen: Vec<&'a Expr>,
 }
