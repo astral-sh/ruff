@@ -85,7 +85,7 @@ UP030_2.py:12:1: UP030 [*] Use implicit references for positional format fields
 14 14 | "{1}_{0}".format(*args)
 15 15 | 
 
-UP030_2.py:14:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:14:1: UP030 Use implicit references for positional format fields
    |
 14 | "{0}_{1}".format(1, *args)
 15 | 

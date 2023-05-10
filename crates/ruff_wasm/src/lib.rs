@@ -198,7 +198,6 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &directives,
         &settings,
         flags::Noqa::Enabled,
-        flags::Autofix::Enabled,
     );
 
     let source_code = locator.to_source_code();

@@ -11,7 +11,7 @@ use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
 use crate::registry::{AsRule, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 pub fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
@@ -19,7 +19,6 @@ pub fn check_noqa(
     comment_ranges: &[TextRange],
     noqa_line_for: &NoqaMapping,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<usize> {
     let enforce_noqa = settings.rules.enabled(Rule::UnusedNOQA);
 
@@ -101,7 +100,7 @@ pub fn check_noqa(
                     if line.matches.is_empty() {
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, *noqa_range);
-                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                        if settings.rules.should_fix(diagnostic.kind.rule()) {
                             #[allow(deprecated)]
                             diagnostic.set_fix_from_edit(delete_noqa(
                                 *leading_spaces,
@@ -170,7 +169,7 @@ pub fn check_noqa(
                             },
                             *range,
                         );
-                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                        if settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
                                 #[allow(deprecated)]
                                 diagnostic.set_fix_from_edit(delete_noqa(

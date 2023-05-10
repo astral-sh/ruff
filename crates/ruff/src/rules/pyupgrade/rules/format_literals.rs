@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
@@ -16,14 +16,16 @@ use crate::rules::pyflakes::format::FormatSummary;
 #[violation]
 pub struct FormatLiterals;
 
-impl AlwaysAutofixableViolation for FormatLiterals {
+impl Violation for FormatLiterals {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use implicit references for positional format fields")
     }
 
-    fn autofix_title(&self) -> String {
-        "Remove explicit positional indices".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|_| "Remove explicit positional indices".to_string())
     }
 }
 

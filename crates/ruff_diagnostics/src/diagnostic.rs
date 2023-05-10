@@ -16,8 +16,6 @@ pub struct DiagnosticKind {
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.
     pub suggestion: Option<String>,
-    /// Whether the diagnostic is automatically fixable.
-    pub fixable: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

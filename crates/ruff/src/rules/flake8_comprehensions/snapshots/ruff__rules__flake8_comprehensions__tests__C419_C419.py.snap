@@ -77,7 +77,7 @@ C419.py:7:5: C419 [*] Unnecessary list comprehension.
 9 9 | any({x.id for x in bar})
 10 10 | 
 
-C419.py:9:5: C419 [*] Unnecessary list comprehension.
+C419.py:9:5: C419 Unnecessary list comprehension.
    |
  9 |     [x.id for x in bar],  # second comment
 10 | )  # third comment

@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments, unparse_expr};
 use ruff_python_semantic::context::Context;
@@ -21,6 +21,8 @@ pub struct NestedMinMax {
 }
 
 impl Violation for NestedMinMax {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Nested `{}` calls can be flattened", self.func)

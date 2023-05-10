@@ -106,7 +106,7 @@ PT009.py:15:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
 17 17 |         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
 18 18 |         self.assertTrue(msg=msg, expr=expr, unexpected_arg=False)  # Error, unfixable
 
-PT009.py:16:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:16:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
    |
 16 |         self.assertTrue(expr=expr, msg=msg)  # Error
 17 |         self.assertTrue(msg=msg, expr=expr)  # Error
@@ -117,7 +117,7 @@ PT009.py:16:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
    |
    = help: Replace `assertTrue(...)` with `assert ...`
 
-PT009.py:17:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:17:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
    |
 17 |         self.assertTrue(msg=msg, expr=expr)  # Error
 18 |         self.assertTrue(*(expr, msg))  # Error, unfixable
@@ -128,7 +128,7 @@ PT009.py:17:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
    |
    = help: Replace `assertTrue(...)` with `assert ...`
 
-PT009.py:18:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:18:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
    |
 18 |         self.assertTrue(*(expr, msg))  # Error, unfixable
 19 |         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
@@ -139,7 +139,7 @@ PT009.py:18:9: PT009 [*] Use a regular `assert` instead of unittest-style `asser
    |
    = help: Replace `assertTrue(...)` with `assert ...`
 
-PT009.py:19:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:19:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
    |
 19 |         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
 20 |         self.assertTrue(msg=msg, expr=expr, unexpected_arg=False)  # Error, unfixable

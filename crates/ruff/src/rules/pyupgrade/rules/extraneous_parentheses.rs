@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 use crate::registry::Rule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 #[violation]
 pub struct ExtraneousParentheses;
@@ -121,7 +121,6 @@ pub fn extraneous_parentheses(
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     let mut i = 0;
@@ -139,7 +138,7 @@ pub fn extraneous_parentheses(
                     ExtraneousParentheses,
                     TextRange::new(start_range.start(), end_range.end()),
                 );
-                if autofix.into() && settings.rules.should_fix(Rule::ExtraneousParentheses) {
+                if settings.rules.should_fix(Rule::ExtraneousParentheses) {
                     let contents =
                         locator.slice(TextRange::new(start_range.start(), end_range.end()));
                     #[allow(deprecated)]

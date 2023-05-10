@@ -4,7 +4,7 @@ use rustpython_parser::ast::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -17,16 +17,20 @@ pub struct ReimplementedBuiltin {
     repl: String,
 }
 
-impl AlwaysAutofixableViolation for ReimplementedBuiltin {
+impl Violation for ReimplementedBuiltin {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let ReimplementedBuiltin { repl } = self;
         format!("Use `{repl}` instead of `for` loop")
     }
 
-    fn autofix_title(&self) -> String {
-        let ReimplementedBuiltin { repl } = self;
-        format!("Replace with `{repl}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|violation| {
+            let ReimplementedBuiltin { repl } = violation;
+            format!("Replace with `{repl}`")
+        })
     }
 }
 

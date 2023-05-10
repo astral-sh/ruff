@@ -5,7 +5,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::Stmt;
 use textwrap::indent;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{
     followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
@@ -14,7 +14,7 @@ use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::whitespace::leading_space;
 
 use crate::registry::AsRule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 use super::super::track::Block;
 use super::super::{comments, format_imports};
@@ -40,14 +40,16 @@ use super::super::{comments, format_imports};
 #[violation]
 pub struct UnsortedImports;
 
-impl AlwaysAutofixableViolation for UnsortedImports {
+impl Violation for UnsortedImports {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Import block is un-sorted or un-formatted")
     }
 
-    fn autofix_title(&self) -> String {
-        "Organize imports".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|_| "Organize imports".to_string())
     }
 }
 
@@ -82,7 +84,6 @@ pub fn organize_imports(
     stylist: &Stylist,
     indexer: &Indexer,
     settings: &Settings,
-    autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
@@ -147,7 +148,7 @@ pub fn organize_imports(
         None
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+        if settings.rules.should_fix(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 indent(&expected, indentation),

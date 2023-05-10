@@ -19,7 +19,7 @@ use crate::rules::pycodestyle::rules::{
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 pub fn check_physical_lines(
     path: &Path,
@@ -28,7 +28,6 @@ pub fn check_physical_lines(
     indexer: &Indexer,
     doc_lines: &[TextSize],
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let mut has_any_shebang = false;
@@ -51,10 +50,8 @@ pub fn check_physical_lines(
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
 
-    let fix_unnecessary_coding_comment =
-        autofix.into() && settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
-    let fix_shebang_whitespace =
-        autofix.into() && settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
+    let fix_unnecessary_coding_comment = settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
+    let fix_shebang_whitespace = settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
 
     let mut commented_lines_iter = indexer.comment_ranges().iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -148,7 +145,7 @@ pub fn check_physical_lines(
         }
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
-            if let Some(diagnostic) = trailing_whitespace(&line, settings, autofix) {
+            if let Some(diagnostic) = trailing_whitespace(&line, settings) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -164,7 +161,7 @@ pub fn check_physical_lines(
         if let Some(diagnostic) = no_newline_at_end_of_file(
             locator,
             stylist,
-            autofix.into() && settings.rules.should_fix(Rule::MissingNewlineAtEndOfFile),
+            settings.rules.should_fix(Rule::MissingNewlineAtEndOfFile),
         ) {
             diagnostics.push(diagnostic);
         }
@@ -188,7 +185,7 @@ mod tests {
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::registry::Rule;
-    use crate::settings::{flags, Settings};
+    use crate::settings::Settings;
 
     use super::check_physical_lines;
 
@@ -211,7 +208,6 @@ mod tests {
                     line_length,
                     ..Settings::for_rule(Rule::LineTooLong)
                 },
-                flags::Autofix::Enabled,
             )
         };
         assert_eq!(check_with_max_line_length(8), vec![]);

@@ -250,7 +250,7 @@ PT018.py:33:5: PT018 Assertion should be broken down into multiple parts
 37 |     assert (
    |
 
-PT018.py:35:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:35:5: PT018 Assertion should be broken down into multiple parts
    |
 35 |       assert not (something or something_else and something_third)
 36 |       # detected, but no autofix for parenthesized conditions

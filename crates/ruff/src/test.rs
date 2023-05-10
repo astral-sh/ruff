@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{AutofixKind, Diagnostic};
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 
@@ -16,6 +16,7 @@ use crate::directives;
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
+use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 
@@ -54,7 +55,6 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
         &directives,
         settings,
         flags::Noqa::Enabled,
-        flags::Autofix::Enabled,
     );
 
     let source_has_errors = error.is_some();
@@ -105,7 +105,6 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
-                flags::Autofix::Enabled,
             );
 
             if let Some(fixed_error) = fixed_error {
@@ -143,6 +142,24 @@ Source with applied fixes:
     Ok(diagnostics
         .into_iter()
         .map(|diagnostic| {
+            let rule = diagnostic.kind.rule();
+            let fixable = diagnostic.fix.is_some();
+
+            match (fixable, rule.autofixable()) {
+                (true, AutofixKind::Sometimes | AutofixKind::Always)
+                | (false, AutofixKind::None | AutofixKind::Sometimes) => {
+                    // Ok
+                }
+                (true, AutofixKind::None) => {
+                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::AUTOFIX` to either `AutofixKind::Sometimes` or `AutofixKind::Always`");
+                },
+                (false, AutofixKind::Always) => {
+                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::AUTOFIX` to either `AutofixKind::Sometimes` or `AutofixKind::None")
+                }
+            }
+
+            assert!(!(fixable && diagnostic.kind.suggestion.is_none()), "Diagnostic emitted by {rule:?} is fixable but `Violation::autofix_title` returns `None`.`");
+
             // Not strictly necessary but adds some coverage for this code path
             let noqa = directives.noqa_line_for.resolve(diagnostic.start());
 

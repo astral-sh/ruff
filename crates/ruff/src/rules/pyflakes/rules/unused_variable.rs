@@ -4,7 +4,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
@@ -48,16 +48,20 @@ pub struct UnusedVariable {
     pub name: String,
 }
 
-impl AlwaysAutofixableViolation for UnusedVariable {
+impl Violation for UnusedVariable {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedVariable { name } = self;
         format!("Local variable `{name}` is assigned to but never used")
     }
 
-    fn autofix_title(&self) -> String {
-        let UnusedVariable { name } = self;
-        format!("Remove assignment to unused variable `{name}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|violation| {
+            let UnusedVariable { name } = violation;
+            format!("Remove assignment to unused variable `{name}`")
+        })
     }
 }
 

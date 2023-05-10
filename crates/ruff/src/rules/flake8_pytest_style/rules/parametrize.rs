@@ -2,8 +2,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -18,16 +17,20 @@ pub struct PytestParametrizeNamesWrongType {
     pub expected: types::ParametrizeNameType,
 }
 
-impl AlwaysAutofixableViolation for PytestParametrizeNamesWrongType {
+impl Violation for PytestParametrizeNamesWrongType {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestParametrizeNamesWrongType { expected } = self;
         format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
     }
 
-    fn autofix_title(&self) -> String {
-        let PytestParametrizeNamesWrongType { expected } = self;
-        format!("Use a `{expected}` for parameter names")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|violation| {
+            let PytestParametrizeNamesWrongType { expected } = violation;
+            format!("Use a `{expected}` for parameter names")
+        })
     }
 }
 

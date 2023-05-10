@@ -10,7 +10,7 @@ use crate::rules::{
     eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, pycodestyle,
     pylint, pyupgrade, ruff,
 };
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
 
@@ -18,7 +18,6 @@ pub fn check_tokens(
     locator: &Locator,
     tokens: &[LexResult],
     settings: &Settings,
-    autofix: flags::Autofix,
     is_stub: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -85,7 +84,6 @@ pub fn check_tokens(
                         Context::Comment
                     },
                     settings,
-                    autofix,
                 ));
             }
         }
@@ -96,7 +94,7 @@ pub fn check_tokens(
         for (tok, range) in tokens.iter().flatten() {
             if matches!(tok, Tok::Comment(_)) {
                 if let Some(diagnostic) =
-                    eradicate::rules::commented_out_code(locator, *range, settings, autofix)
+                    eradicate::rules::commented_out_code(locator, *range, settings)
                 {
                     diagnostics.push(diagnostic);
                 }
@@ -111,7 +109,7 @@ pub fn check_tokens(
                 diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
                     locator,
                     *range,
-                    autofix.into() && settings.rules.should_fix(Rule::InvalidEscapeSequence),
+                    settings.rules.should_fix(Rule::InvalidEscapeSequence),
                 ));
             }
         }
@@ -121,7 +119,7 @@ pub fn check_tokens(
         for (tok, range) in tokens.iter().flatten() {
             if matches!(tok, Tok::String { .. }) {
                 diagnostics.extend(
-                    pylint::rules::invalid_string_characters(locator, *range, autofix.into())
+                    pylint::rules::invalid_string_characters(locator, *range)
                         .into_iter()
                         .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
                 );
@@ -132,7 +130,7 @@ pub fn check_tokens(
     // E701, E702, E703
     if enforce_compound_statements {
         diagnostics.extend(
-            pycodestyle::rules::compound_statements(tokens, settings, autofix)
+            pycodestyle::rules::compound_statements(tokens, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
@@ -141,7 +139,7 @@ pub fn check_tokens(
     // Q001, Q002, Q003
     if enforce_quotes {
         diagnostics.extend(
-            flake8_quotes::rules::from_tokens(tokens, locator, settings, autofix)
+            flake8_quotes::rules::from_tokens(tokens, locator, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
@@ -163,7 +161,7 @@ pub fn check_tokens(
     // COM812, COM818, COM819
     if enforce_trailing_comma {
         diagnostics.extend(
-            flake8_commas::rules::trailing_commas(tokens, locator, settings, autofix)
+            flake8_commas::rules::trailing_commas(tokens, locator, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
@@ -172,8 +170,7 @@ pub fn check_tokens(
     // UP034
     if enforce_extraneous_parenthesis {
         diagnostics.extend(
-            pyupgrade::rules::extraneous_parentheses(tokens, locator, settings, autofix)
-                .into_iter(),
+            pyupgrade::rules::extraneous_parentheses(tokens, locator, settings).into_iter(),
         );
     }
 

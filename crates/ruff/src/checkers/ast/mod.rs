@@ -63,7 +63,6 @@ pub struct Checker<'a> {
     module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
     is_stub: bool,
-    autofix: flags::Autofix,
     noqa: flags::Noqa,
     pub settings: &'a Settings,
     pub noqa_line_for: &'a NoqaMapping,
@@ -85,7 +84,6 @@ impl<'a> Checker<'a> {
     pub fn new(
         settings: &'a Settings,
         noqa_line_for: &'a NoqaMapping,
-        autofix: flags::Autofix,
         noqa: flags::Noqa,
         path: &'a Path,
         package: Option<&'a Path>,
@@ -98,7 +96,6 @@ impl<'a> Checker<'a> {
         Checker {
             settings,
             noqa_line_for,
-            autofix,
             noqa,
             path,
             package,
@@ -121,7 +118,7 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: Rule) -> bool {
-        self.autofix.into() && self.settings.rules.should_fix(code)
+        self.settings.rules.should_fix(code)
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
@@ -5674,7 +5671,6 @@ pub fn check_ast(
     indexer: &Indexer,
     noqa_line_for: &NoqaMapping,
     settings: &Settings,
-    autofix: flags::Autofix,
     noqa: flags::Noqa,
     path: &Path,
     package: Option<&Path>,
@@ -5682,7 +5678,6 @@ pub fn check_ast(
     let mut checker = Checker::new(
         settings,
         noqa_line_for,
-        autofix,
         noqa,
         path,
         package,

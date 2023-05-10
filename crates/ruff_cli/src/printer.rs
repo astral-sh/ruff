@@ -118,7 +118,7 @@ impl Printer {
                     let num_fixable = diagnostics
                         .messages
                         .iter()
-                        .filter(|message| message.kind.fixable)
+                        .filter(|message| message.fix.is_some())
                         .count();
                     if num_fixable > 0 {
                         writeln!(
@@ -236,7 +236,7 @@ impl Printer {
                 (
                     message.kind.rule(),
                     &message.kind.body,
-                    message.kind.fixable,
+                    message.fix.is_some(),
                 )
             })
             .sorted()
