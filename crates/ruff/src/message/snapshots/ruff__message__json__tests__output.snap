@@ -7,6 +7,7 @@ expression: content
     "code": "F401",
     "message": "`os` imported but unused",
     "fix": {
+      "applicability": "Suggested",
       "message": "Remove unused import: `os`",
       "edits": [
         {
@@ -37,6 +38,7 @@ expression: content
     "code": "F841",
     "message": "Local variable `x` is assigned to but never used",
     "fix": {
+      "applicability": "Suggested",
       "message": "Remove assignment to unused variable `x`",
       "edits": [
         {

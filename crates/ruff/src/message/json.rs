@@ -39,8 +39,9 @@ impl Serialize for ExpandedMessages<'_> {
 
             let fix = message.fix.as_ref().map(|fix| {
                 json!({
-                        "message": message.kind.suggestion.as_deref(),
-                        "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code },
+                    "applicability": fix.applicability(),
+                    "message": message.kind.suggestion.as_deref(),
+                    "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code },
                 })
             });
 
