@@ -323,7 +323,8 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
             else:
                 continue
 
-        print(f"<details><summary>Rules changed: {len(rule_changes.keys())}</summary>")
+        print(f"Rules changed: {len(rule_changes.keys())}")
+        print()
         print("| Rule | Changes | Additions | Removals |")
         print("| ---- | ------- | --------- | -------- |")
         for rule, (additions, removals) in dict(
@@ -334,8 +335,6 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
             ),
         ).items():
             print(f"| {rule} | {additions + removals} | {additions} | {removals} |")
-
-        print("</details>")
 
     logger.debug(f"Finished {len(repositories)} repositories")
 
