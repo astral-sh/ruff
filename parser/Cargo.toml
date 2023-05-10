@@ -10,7 +10,7 @@ edition = "2021"
 
 [features]
 default = []
-serde = ["dep:serde", "rustpython-compiler-core/serde"]
+serde = ["dep:serde", "rustpython-parser-core/serde"]
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -19,10 +19,9 @@ phf_codegen = "0.11.1"
 tiny-keccak = { version = "2", features = ["sha3"] }
 
 [dependencies]
-rustpython-ast = { path = "../ast", version = "0.2.0" }
-rustpython-compiler-core = { path = "../core", version = "0.2.0" }
+rustpython-ast = { workspace = true }
+rustpython-parser-core = { workspace = true }
 
-ahash = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 num-bigint = { workspace = true }

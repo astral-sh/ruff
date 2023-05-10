@@ -2,31 +2,13 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Located {
-    location: Location {
-        row: 1,
-        column: 0,
-    },
-    end_location: Some(
-        Location {
-            row: 1,
-            column: 14,
-        },
-    ),
+Attributed {
+    range: 0..14,
     custom: (),
     node: ListComp(
         ExprListComp {
-            elt: Located {
-                location: Location {
-                    row: 1,
-                    column: 1,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 2,
-                    },
-                ),
+            elt: Attributed {
+                range: 1..2,
                 custom: (),
                 node: Name(
                     ExprName {
@@ -37,17 +19,8 @@ Located {
             },
             generators: [
                 Comprehension {
-                    target: Located {
-                        location: Location {
-                            row: 1,
-                            column: 7,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 8,
-                            },
-                        ),
+                    target: Attributed {
+                        range: 7..8,
                         custom: (),
                         node: Name(
                             ExprName {
@@ -56,17 +29,8 @@ Located {
                             },
                         ),
                     },
-                    iter: Located {
-                        location: Location {
-                            row: 1,
-                            column: 12,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 13,
-                            },
-                        ),
+                    iter: Attributed {
+                        range: 12..13,
                         custom: (),
                         node: Name(
                             ExprName {

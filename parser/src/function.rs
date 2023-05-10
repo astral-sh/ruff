@@ -3,6 +3,7 @@
 use crate::{
     ast,
     lexer::{LexicalError, LexicalErrorType},
+    text_size::TextSize,
 };
 use rustc_hash::FxHashSet;
 
@@ -18,7 +19,7 @@ type ParameterDef = (ast::Arg, Option<ast::Expr>);
 pub(crate) fn validate_arguments(
     arguments: ast::Arguments,
 ) -> Result<ast::Arguments, LexicalError> {
-    let mut all_args: Vec<&ast::Located<ast::ArgData>> = vec![];
+    let mut all_args: Vec<&ast::Attributed<ast::ArgData>> = vec![];
 
     all_args.extend(arguments.posonlyargs.iter());
     all_args.extend(arguments.args.iter());
@@ -83,10 +84,7 @@ pub(crate) fn parse_params(
     Ok((pos_only, names, defaults))
 }
 
-type FunctionArgument = (
-    Option<(ast::Location, ast::Location, Option<String>)>,
-    ast::Expr,
-);
+type FunctionArgument = (Option<(TextSize, TextSize, Option<String>)>, ast::Expr);
 
 // Parse arguments as supplied during a function/lambda *call*.
 pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, LexicalError> {
@@ -116,8 +114,7 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
                 }
 
                 keywords.push(ast::Keyword::new(
-                    start,
-                    end,
+                    start..end,
                     ast::KeywordData { arg: name, value },
                 ));
             }

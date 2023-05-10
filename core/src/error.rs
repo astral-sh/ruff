@@ -1,11 +1,10 @@
-use crate::Location;
-use std::error::Error as StdError;
+use crate::text_size::TextSize;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BaseError<T> {
     pub error: T,
-    pub location: Location,
+    pub offset: TextSize,
     pub source_path: String,
 }
 
@@ -17,11 +16,11 @@ impl<T> std::ops::Deref for BaseError<T> {
     }
 }
 
-impl<T> StdError for BaseError<T>
+impl<T> std::error::Error for BaseError<T>
 where
-    T: StdError + 'static,
+    T: std::error::Error + 'static,
 {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&self.error)
     }
 }
@@ -31,7 +30,12 @@ where
     T: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.location.fmt_with(f, &self.error)
+        write!(
+            f,
+            "{} at byte offset {}",
+            &self.error,
+            u32::from(self.offset)
+        )
     }
 }
 
@@ -46,7 +50,7 @@ impl<T> BaseError<T> {
     {
         Self {
             error: obj.error.into(),
-            location: obj.location,
+            offset: obj.offset,
             source_path: obj.source_path,
         }
     }

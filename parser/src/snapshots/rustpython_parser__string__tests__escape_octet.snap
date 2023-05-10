@@ -3,31 +3,13 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 14,
-            },
-        ),
+    Attributed {
+        range: 0..14,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 0,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 14,
-                        },
-                    ),
+                value: Attributed {
+                    range: 0..14,
                     custom: (),
                     node: Constant(
                         ExprConstant {

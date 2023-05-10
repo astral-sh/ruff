@@ -1,27 +1,30 @@
+//! Control in the different modes by which a source file can be parsed.
+
+/// The mode argument specifies in what way code must be parsed.
 #[derive(Clone, Copy)]
 pub enum Mode {
-    Exec,
-    Eval,
-    Single,
-    BlockExpr,
+    /// The code consists of a sequence of statements.
+    Module,
+    /// The code consists of a sequence of interactive statement.
+    Interactive,
+    /// The code consists of a single expression.
+    Expression,
 }
 
 impl std::str::FromStr for Mode {
     type Err = ModeParseError;
-
-    // To support `builtins.compile()` `mode` argument
     fn from_str(s: &str) -> Result<Self, ModeParseError> {
         match s {
-            "exec" => Ok(Mode::Exec),
-            "eval" => Ok(Mode::Eval),
-            "single" => Ok(Mode::Single),
-            _ => Err(ModeParseError(())),
+            "exec" | "single" => Ok(Mode::Module),
+            "eval" => Ok(Mode::Expression),
+            _ => Err(ModeParseError),
         }
     }
 }
 
+/// Returned when a given mode is not valid.
 #[derive(Debug)]
-pub struct ModeParseError(());
+pub struct ModeParseError;
 
 impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

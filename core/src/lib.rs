@@ -1,13 +1,15 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustPython/RustPython/main/logo.png")]
-#![doc(html_root_url = "https://docs.rs/rustpython-compiler-core/")]
+#![doc(html_root_url = "https://docs.rs/rustpython-parser-core/")]
 
-mod bytecode;
 mod error;
-mod location;
-pub mod marshal;
-mod mode;
+mod format;
+pub mod mode;
+#[cfg(feature = "source-code")]
+pub mod source_code;
 
-pub use bytecode::*;
 pub use error::BaseError;
-pub use location::Location;
+pub use format::ConversionFlag;
 pub use mode::Mode;
+
+// re-export our public interface
+pub use ruff_text_size as text_size;

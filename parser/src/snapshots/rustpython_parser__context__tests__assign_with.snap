@@ -3,33 +3,15 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 17,
-            },
-        ),
+    Attributed {
+        range: 0..17,
         custom: (),
         node: With(
             StmtWith {
                 items: [
                     Withitem {
-                        context_expr: Located {
-                            location: Location {
-                                row: 1,
-                                column: 5,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 6,
-                                },
-                            ),
+                        context_expr: Attributed {
+                            range: 5..6,
                             custom: (),
                             node: Constant(
                                 ExprConstant {
@@ -41,17 +23,8 @@ expression: parse_ast
                             ),
                         },
                         optional_vars: Some(
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 10,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 11,
-                                    },
-                                ),
+                            Attributed {
+                                range: 10..11,
                                 custom: (),
                                 node: Name(
                                     ExprName {
@@ -64,17 +37,8 @@ expression: parse_ast
                     },
                 ],
                 body: [
-                    Located {
-                        location: Location {
-                            row: 1,
-                            column: 13,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 17,
-                            },
-                        ),
+                    Attributed {
+                        range: 13..17,
                         custom: (),
                         node: Pass,
                     },

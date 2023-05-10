@@ -113,20 +113,19 @@
 #![doc(html_root_url = "https://docs.rs/rustpython-parser/")]
 
 pub use rustpython_ast as ast;
+pub use rustpython_parser_core::{source_code, text_size, Mode};
 
 mod function;
 // Skip flattening lexer to distinguish from full parser
 mod context;
 pub mod lexer;
-mod mode;
 mod parser;
 mod soft_keywords;
 mod string;
 mod token;
 
-pub use mode::Mode;
 pub use parser::{
-    parse, parse_expression, parse_expression_located, parse_located, parse_program, parse_tokens,
+    parse, parse_expression, parse_expression_at, parse_program, parse_starts_at, parse_tokens,
     ParseError, ParseErrorType,
 };
 pub use string::FStringErrorType;

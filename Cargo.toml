@@ -12,14 +12,18 @@ include = ["LICENSE", "Cargo.toml", "src/**/*.rs"]
 resolver = "2"
 members = [
     "ast", "core", "literal", "parser",
+    "ruff_text_size", "ruff_source_location",
 ]
 
 [workspace.dependencies]
+rustpython-ast = { path = "ast", version = "0.2.0" }
+rustpython-parser-core = { path = "core", version = "0.2.0" }
+rustpython-literal = { path = "literal", version = "0.2.0" }
+ruff_text_size = { path = "ruff_text_size" }
+ruff_source_location = { path = "ruff_source_location" }
+
 ahash = "0.7.6"
 anyhow = "1.0.45"
-ascii = "1.0"
-bitflags = "1.3.2"
-bstr = "0.2.17"
 cfg-if = "1.0"
 insta = "1.14.0"
 itertools = "0.10.3"
@@ -30,6 +34,7 @@ num-traits = "0.2"
 rand = "0.8.5"
 serde = "1.0"
 static_assertions = "1.1"
+once_cell = "1.17.1"
 unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
 
 [profile.dev.package."*"]

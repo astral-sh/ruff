@@ -1,6 +1,6 @@
 use crate::{constant, fold::Fold};
 
-pub(crate) trait Foldable<T, U> {
+pub trait Foldable<T, U> {
     type Mapped;
     fn fold<F: Fold<T, TargetU = U> + ?Sized>(
         self,
@@ -62,4 +62,4 @@ macro_rules! simple_fold {
     };
 }
 
-simple_fold!(usize, String, bool, constant::Constant);
+simple_fold!(u32, String, bool, constant::Constant);

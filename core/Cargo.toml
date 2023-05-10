@@ -1,6 +1,6 @@
 [package]
-name = "rustpython-compiler-core"
-description = "RustPython specific bytecode."
+name = "rustpython-parser-core"
+description = "RustPython parser data types."
 version = "0.2.0"
 authors = ["RustPython Team"]
 edition = "2021"
@@ -8,11 +8,17 @@ repository = "https://github.com/RustPython/RustPython"
 license = "MIT"
 
 [dependencies]
-bitflags = { workspace = true }
-bstr = { workspace = true }
 itertools = { workspace = true }
 num-bigint = { workspace = true }
 num-complex = { workspace = true }
-serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
 
+# ruff dependency shouldn't be placed out of this crate
+ruff_text_size = { path = "../ruff_text_size" }
+ruff_source_location = { path = "../ruff_source_location", optional = true }
+
+serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
 lz4_flex = "0.9.2"
+
+[features]
+default = ["source-code"]
+source-code = ["ruff_source_location"]

@@ -3,32 +3,14 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 36,
-            },
-        ),
+    Attributed {
+        range: 0..36,
         custom: (),
         node: Assign(
             StmtAssign {
                 targets: [
-                    Located {
-                        location: Location {
-                            row: 1,
-                            column: 0,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 11,
-                            },
-                        ),
+                    Attributed {
+                        range: 0..11,
                         custom: (),
                         node: Name(
                             ExprName {
@@ -38,31 +20,13 @@ expression: parse_ast
                         ),
                     },
                 ],
-                value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 14,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 36,
-                        },
-                    ),
+                value: Attributed {
+                    range: 14..36,
                     custom: (),
                     node: Subscript(
                         ExprSubscript {
-                            value: Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 14,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 19,
-                                    },
-                                ),
+                            value: Attributed {
+                                range: 14..19,
                                 custom: (),
                                 node: Name(
                                     ExprName {
@@ -71,32 +35,14 @@ expression: parse_ast
                                     },
                                 ),
                             },
-                            slice: Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 20,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 35,
-                                    },
-                                ),
+                            slice: Attributed {
+                                range: 20..35,
                                 custom: (),
                                 node: Tuple(
                                     ExprTuple {
                                         elts: [
-                                            Located {
-                                                location: Location {
-                                                    row: 1,
-                                                    column: 20,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 1,
-                                                        column: 21,
-                                                    },
-                                                ),
+                                            Attributed {
+                                                range: 20..21,
                                                 custom: (),
                                                 node: Constant(
                                                     ExprConstant {
@@ -107,31 +53,13 @@ expression: parse_ast
                                                     },
                                                 ),
                                             },
-                                            Located {
-                                                location: Location {
-                                                    row: 1,
-                                                    column: 23,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 1,
-                                                        column: 31,
-                                                    },
-                                                ),
+                                            Attributed {
+                                                range: 23..31,
                                                 custom: (),
                                                 node: Starred(
                                                     ExprStarred {
-                                                        value: Located {
-                                                            location: Location {
-                                                                row: 1,
-                                                                column: 24,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 1,
-                                                                    column: 31,
-                                                                },
-                                                            ),
+                                                        value: Attributed {
+                                                            range: 24..31,
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
@@ -144,32 +72,14 @@ expression: parse_ast
                                                     },
                                                 ),
                                             },
-                                            Located {
-                                                location: Location {
-                                                    row: 1,
-                                                    column: 33,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 1,
-                                                        column: 35,
-                                                    },
-                                                ),
+                                            Attributed {
+                                                range: 33..35,
                                                 custom: (),
                                                 node: UnaryOp(
                                                     ExprUnaryOp {
                                                         op: USub,
-                                                        operand: Located {
-                                                            location: Location {
-                                                                row: 1,
-                                                                column: 34,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 1,
-                                                                    column: 35,
-                                                                },
-                                                            ),
+                                                        operand: Attributed {
+                                                            range: 34..35,
                                                             custom: (),
                                                             node: Constant(
                                                                 ExprConstant {
@@ -196,46 +106,19 @@ expression: parse_ast
             },
         ),
     },
-    Located {
-        location: Location {
-            row: 2,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 2,
-                column: 36,
-            },
-        ),
+    Attributed {
+        range: 37..73,
         custom: (),
         node: Assign(
             StmtAssign {
                 targets: [
-                    Located {
-                        location: Location {
-                            row: 2,
-                            column: 0,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 2,
-                                column: 22,
-                            },
-                        ),
+                    Attributed {
+                        range: 37..59,
                         custom: (),
                         node: Subscript(
                             ExprSubscript {
-                                value: Located {
-                                    location: Location {
-                                        row: 2,
-                                        column: 0,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 2,
-                                            column: 5,
-                                        },
-                                    ),
+                                value: Attributed {
+                                    range: 37..42,
                                     custom: (),
                                     node: Name(
                                         ExprName {
@@ -244,32 +127,14 @@ expression: parse_ast
                                         },
                                     ),
                                 },
-                                slice: Located {
-                                    location: Location {
-                                        row: 2,
-                                        column: 6,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 2,
-                                            column: 21,
-                                        },
-                                    ),
+                                slice: Attributed {
+                                    range: 43..58,
                                     custom: (),
                                     node: Tuple(
                                         ExprTuple {
                                             elts: [
-                                                Located {
-                                                    location: Location {
-                                                        row: 2,
-                                                        column: 6,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 2,
-                                                            column: 7,
-                                                        },
-                                                    ),
+                                                Attributed {
+                                                    range: 43..44,
                                                     custom: (),
                                                     node: Constant(
                                                         ExprConstant {
@@ -280,31 +145,13 @@ expression: parse_ast
                                                         },
                                                     ),
                                                 },
-                                                Located {
-                                                    location: Location {
-                                                        row: 2,
-                                                        column: 9,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 2,
-                                                            column: 17,
-                                                        },
-                                                    ),
+                                                Attributed {
+                                                    range: 46..54,
                                                     custom: (),
                                                     node: Starred(
                                                         ExprStarred {
-                                                            value: Located {
-                                                                location: Location {
-                                                                    row: 2,
-                                                                    column: 10,
-                                                                },
-                                                                end_location: Some(
-                                                                    Location {
-                                                                        row: 2,
-                                                                        column: 17,
-                                                                    },
-                                                                ),
+                                                            value: Attributed {
+                                                                range: 47..54,
                                                                 custom: (),
                                                                 node: Name(
                                                                     ExprName {
@@ -317,32 +164,14 @@ expression: parse_ast
                                                         },
                                                     ),
                                                 },
-                                                Located {
-                                                    location: Location {
-                                                        row: 2,
-                                                        column: 19,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 2,
-                                                            column: 21,
-                                                        },
-                                                    ),
+                                                Attributed {
+                                                    range: 56..58,
                                                     custom: (),
                                                     node: UnaryOp(
                                                         ExprUnaryOp {
                                                             op: USub,
-                                                            operand: Located {
-                                                                location: Location {
-                                                                    row: 2,
-                                                                    column: 20,
-                                                                },
-                                                                end_location: Some(
-                                                                    Location {
-                                                                        row: 2,
-                                                                        column: 21,
-                                                                    },
-                                                                ),
+                                                            operand: Attributed {
+                                                                range: 57..58,
                                                                 custom: (),
                                                                 node: Constant(
                                                                     ExprConstant {
@@ -366,17 +195,8 @@ expression: parse_ast
                         ),
                     },
                 ],
-                value: Located {
-                    location: Location {
-                        row: 2,
-                        column: 25,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 2,
-                            column: 36,
-                        },
-                    ),
+                value: Attributed {
+                    range: 62..73,
                     custom: (),
                     node: Name(
                         ExprName {
@@ -389,45 +209,18 @@ expression: parse_ast
             },
         ),
     },
-    Located {
-        location: Location {
-            row: 3,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 3,
-                column: 45,
-            },
-        ),
+    Attributed {
+        range: 74..119,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
-                    location: Location {
-                        row: 3,
-                        column: 0,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 3,
-                            column: 45,
-                        },
-                    ),
+                value: Attributed {
+                    range: 74..119,
                     custom: (),
                     node: Subscript(
                         ExprSubscript {
-                            value: Located {
-                                location: Location {
-                                    row: 3,
-                                    column: 0,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 3,
-                                        column: 5,
-                                    },
-                                ),
+                            value: Attributed {
+                                range: 74..79,
                                 custom: (),
                                 node: Name(
                                     ExprName {
@@ -436,46 +229,19 @@ expression: parse_ast
                                     },
                                 ),
                             },
-                            slice: Located {
-                                location: Location {
-                                    row: 3,
-                                    column: 6,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 3,
-                                        column: 44,
-                                    },
-                                ),
+                            slice: Attributed {
+                                range: 80..118,
                                 custom: (),
                                 node: Tuple(
                                     ExprTuple {
                                         elts: [
-                                            Located {
-                                                location: Location {
-                                                    row: 3,
-                                                    column: 6,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 3,
-                                                        column: 24,
-                                                    },
-                                                ),
+                                            Attributed {
+                                                range: 80..98,
                                                 custom: (),
                                                 node: Starred(
                                                     ExprStarred {
-                                                        value: Located {
-                                                            location: Location {
-                                                                row: 3,
-                                                                column: 7,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 3,
-                                                                    column: 24,
-                                                                },
-                                                            ),
+                                                        value: Attributed {
+                                                            range: 81..98,
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
@@ -488,31 +254,13 @@ expression: parse_ast
                                                     },
                                                 ),
                                             },
-                                            Located {
-                                                location: Location {
-                                                    row: 3,
-                                                    column: 26,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 3,
-                                                        column: 44,
-                                                    },
-                                                ),
+                                            Attributed {
+                                                range: 100..118,
                                                 custom: (),
                                                 node: Starred(
                                                     ExprStarred {
-                                                        value: Located {
-                                                            location: Location {
-                                                                row: 3,
-                                                                column: 27,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 3,
-                                                                    column: 44,
-                                                                },
-                                                            ),
+                                                        value: Attributed {
+                                                            range: 101..118,
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
@@ -537,45 +285,18 @@ expression: parse_ast
             },
         ),
     },
-    Located {
-        location: Location {
-            row: 4,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 4,
-                column: 30,
-            },
-        ),
+    Attributed {
+        range: 120..150,
         custom: (),
         node: Expr(
             StmtExpr {
-                value: Located {
-                    location: Location {
-                        row: 4,
-                        column: 0,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 4,
-                            column: 30,
-                        },
-                    ),
+                value: Attributed {
+                    range: 120..150,
                     custom: (),
                     node: Subscript(
                         ExprSubscript {
-                            value: Located {
-                                location: Location {
-                                    row: 4,
-                                    column: 0,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 4,
-                                        column: 5,
-                                    },
-                                ),
+                            value: Attributed {
+                                range: 120..125,
                                 custom: (),
                                 node: Name(
                                     ExprName {
@@ -584,47 +305,20 @@ expression: parse_ast
                                     },
                                 ),
                             },
-                            slice: Located {
-                                location: Location {
-                                    row: 4,
-                                    column: 6,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 4,
-                                        column: 29,
-                                    },
-                                ),
+                            slice: Attributed {
+                                range: 126..149,
                                 custom: (),
                                 node: Tuple(
                                     ExprTuple {
                                         elts: [
-                                            Located {
-                                                location: Location {
-                                                    row: 4,
-                                                    column: 6,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 4,
-                                                        column: 9,
-                                                    },
-                                                ),
+                                            Attributed {
+                                                range: 126..129,
                                                 custom: (),
                                                 node: Slice(
                                                     ExprSlice {
                                                         lower: Some(
-                                                            Located {
-                                                                location: Location {
-                                                                    row: 4,
-                                                                    column: 6,
-                                                                },
-                                                                end_location: Some(
-                                                                    Location {
-                                                                        row: 4,
-                                                                        column: 7,
-                                                                    },
-                                                                ),
+                                                            Attributed {
+                                                                range: 126..127,
                                                                 custom: (),
                                                                 node: Constant(
                                                                     ExprConstant {
@@ -637,17 +331,8 @@ expression: parse_ast
                                                             },
                                                         ),
                                                         upper: Some(
-                                                            Located {
-                                                                location: Location {
-                                                                    row: 4,
-                                                                    column: 8,
-                                                                },
-                                                                end_location: Some(
-                                                                    Location {
-                                                                        row: 4,
-                                                                        column: 9,
-                                                                    },
-                                                                ),
+                                                            Attributed {
+                                                                range: 128..129,
                                                                 custom: (),
                                                                 node: Constant(
                                                                     ExprConstant {
@@ -663,31 +348,13 @@ expression: parse_ast
                                                     },
                                                 ),
                                             },
-                                            Located {
-                                                location: Location {
-                                                    row: 4,
-                                                    column: 11,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 4,
-                                                        column: 29,
-                                                    },
-                                                ),
+                                            Attributed {
+                                                range: 131..149,
                                                 custom: (),
                                                 node: Starred(
                                                     ExprStarred {
-                                                        value: Located {
-                                                            location: Location {
-                                                                row: 4,
-                                                                column: 12,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 4,
-                                                                    column: 29,
-                                                                },
-                                                            ),
+                                                        value: Attributed {
+                                                            range: 132..149,
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {

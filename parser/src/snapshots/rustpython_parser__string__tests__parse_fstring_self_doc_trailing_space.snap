@@ -3,17 +3,8 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 10,
-            },
-        ),
+    Attributed {
+        range: 0..10,
         custom: (),
         node: Constant(
             ExprConstant {
@@ -24,17 +15,8 @@ expression: parse_ast
             },
         ),
     },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 10,
-            },
-        ),
+    Attributed {
+        range: 0..10,
         custom: (),
         node: Constant(
             ExprConstant {
@@ -45,31 +27,13 @@ expression: parse_ast
             },
         ),
     },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 10,
-            },
-        ),
+    Attributed {
+        range: 0..10,
         custom: (),
         node: FormattedValue(
             ExprFormattedValue {
-                value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 3,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 4,
-                        },
-                    ),
+                value: Attributed {
+                    range: 3..4,
                     custom: (),
                     node: Name(
                         ExprName {

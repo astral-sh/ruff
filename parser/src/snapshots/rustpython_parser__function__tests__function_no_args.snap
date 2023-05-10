@@ -4,17 +4,8 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
-            location: Location {
-                row: 1,
-                column: 0,
-            },
-            end_location: Some(
-                Location {
-                    row: 1,
-                    column: 13,
-                },
-            ),
+        Attributed {
+            range: 0..13,
             custom: (),
             node: FunctionDef(
                 StmtFunctionDef {
@@ -29,17 +20,8 @@ Ok(
                         defaults: [],
                     },
                     body: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 13,
-                                },
-                            ),
+                        Attributed {
+                            range: 9..13,
                             custom: (),
                             node: Pass,
                         },

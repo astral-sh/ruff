@@ -3,46 +3,19 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 7,
-            },
-        ),
+    Attributed {
+        range: 0..7,
         custom: (),
         node: Delete(
             StmtDelete {
                 targets: [
-                    Located {
-                        location: Location {
-                            row: 1,
-                            column: 4,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 7,
-                            },
-                        ),
+                    Attributed {
+                        range: 4..7,
                         custom: (),
                         node: Attribute(
                             ExprAttribute {
-                                value: Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 4,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 1,
-                                            column: 5,
-                                        },
-                                    ),
+                                value: Attributed {
+                                    range: 4..5,
                                     custom: (),
                                     node: Name(
                                         ExprName {

@@ -4,17 +4,8 @@ expression: parse_ast
 ---
 Ok(
     [
-        Located {
-            location: Location {
-                row: 1,
-                column: 0,
-            },
-            end_location: Some(
-                Location {
-                    row: 1,
-                    column: 29,
-                },
-            ),
+        Attributed {
+            range: 0..29,
             custom: (),
             node: FunctionDef(
                 StmtFunctionDef {
@@ -24,17 +15,8 @@ Ok(
                         args: [],
                         vararg: None,
                         kwonlyargs: [
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 9,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 10,
-                                    },
-                                ),
+                            Attributed {
+                                range: 9..10,
                                 custom: (),
                                 node: ArgData {
                                     arg: "a",
@@ -42,17 +24,8 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 12,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 13,
-                                    },
-                                ),
+                            Attributed {
+                                range: 12..13,
                                 custom: (),
                                 node: ArgData {
                                     arg: "b",
@@ -60,17 +33,8 @@ Ok(
                                     type_comment: None,
                                 },
                             },
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 18,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 19,
-                                    },
-                                ),
+                            Attributed {
+                                range: 18..19,
                                 custom: (),
                                 node: ArgData {
                                     arg: "c",
@@ -80,17 +44,8 @@ Ok(
                             },
                         ],
                         kw_defaults: [
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 14,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 16,
-                                    },
-                                ),
+                            Attributed {
+                                range: 14..16,
                                 custom: (),
                                 node: Constant(
                                     ExprConstant {
@@ -101,17 +56,8 @@ Ok(
                                     },
                                 ),
                             },
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 20,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 22,
-                                    },
-                                ),
+                            Attributed {
+                                range: 20..22,
                                 custom: (),
                                 node: Constant(
                                     ExprConstant {
@@ -127,17 +73,8 @@ Ok(
                         defaults: [],
                     },
                     body: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 25,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 29,
-                                },
-                            ),
+                        Attributed {
+                            range: 25..29,
                             custom: (),
                             node: Pass,
                         },

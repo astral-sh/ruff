@@ -4,12 +4,16 @@
 // regular strings. Since the parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
 use crate::{
-    ast::{self, Constant, ConversionFlag, Expr, ExprKind, Location},
+    ast::{self, Constant, Expr, ExprKind},
     lexer::{LexicalError, LexicalErrorType},
-    parser::{parse_expression_located, LalrpopError, ParseError, ParseErrorType},
+    parser::{parse_expression_at, LalrpopError, ParseError, ParseErrorType},
     token::{StringKind, Tok},
 };
 use itertools::Itertools;
+use rustpython_parser_core::{
+    text_size::{TextLen, TextSize},
+    ConversionFlag,
+};
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 const MAX_UNICODE_NAME: usize = 88;
@@ -17,9 +21,9 @@ const MAX_UNICODE_NAME: usize = 88;
 struct StringParser<'a> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
     kind: StringKind,
-    start: Location,
-    end: Location,
-    location: Location,
+    start: TextSize,
+    end: TextSize,
+    location: TextSize,
 }
 
 impl<'a> StringParser<'a> {
@@ -27,29 +31,28 @@ impl<'a> StringParser<'a> {
         source: &'a str,
         kind: StringKind,
         triple_quoted: bool,
-        start: Location,
-        end: Location,
+        start: TextSize,
+        end: TextSize,
     ) -> Self {
-        let offset = kind.prefix_len() + if triple_quoted { 3 } else { 1 };
+        let offset = kind.prefix_len()
+            + if triple_quoted {
+                TextSize::from(3)
+            } else {
+                TextSize::from(1)
+            };
         Self {
             chars: source.chars().peekable(),
             kind,
             start,
             end,
-            location: start.with_col_offset(offset),
+            location: start + offset,
         }
     }
 
     #[inline]
     fn next_char(&mut self) -> Option<char> {
-        let Some(c) = self.chars.next() else {
-            return None
-        };
-        if c == '\n' {
-            self.location.newline();
-        } else {
-            self.location.go_right();
-        }
+        let c = self.chars.next()?;
+        self.location += c.text_len();
         Some(c)
     }
 
@@ -59,13 +62,13 @@ impl<'a> StringParser<'a> {
     }
 
     #[inline]
-    fn get_pos(&self) -> Location {
+    fn get_pos(&self) -> TextSize {
         self.location
     }
 
     #[inline]
     fn expr(&self, node: ExprKind) -> Expr {
-        Expr::new(self.start, self.end, node)
+        Expr::new(self.start..self.end, node)
     }
 
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
@@ -569,23 +572,24 @@ impl<'a> StringParser<'a> {
     }
 }
 
-fn parse_fstring_expr(source: &str, location: Location) -> Result<Expr, ParseError> {
+fn parse_fstring_expr(source: &str, location: TextSize) -> Result<Expr, ParseError> {
     let fstring_body = format!("({source})");
-    parse_expression_located(&fstring_body, "<fstring>", location.with_col_offset(-1))
+    let start = location - TextSize::from(1);
+    parse_expression_at(&fstring_body, "<fstring>", start)
 }
 
 fn parse_string(
     source: &str,
     kind: StringKind,
     triple_quoted: bool,
-    start: Location,
-    end: Location,
+    start: TextSize,
+    end: TextSize,
 ) -> Result<Vec<Expr>, LexicalError> {
     StringParser::new(source, kind, triple_quoted, start, end).parse()
 }
 
 pub(crate) fn parse_strings(
-    values: Vec<(Location, (String, StringKind, bool), Location)>,
+    values: Vec<(TextSize, (String, StringKind, bool), TextSize)>,
 ) -> Result<Expr, LexicalError> {
     // Preserve the initial location and kind.
     let initial_start = values[0].0;
@@ -611,7 +615,7 @@ pub(crate) fn parse_strings(
         let mut content: Vec<u8> = vec![];
         for (start, (source, kind, triple_quoted), end) in values {
             for value in parse_string(&source, kind, triple_quoted, start, end)? {
-                match value.node {
+                match value.into_node() {
                     ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Bytes(value),
                         ..
@@ -621,8 +625,7 @@ pub(crate) fn parse_strings(
             }
         }
         return Ok(Expr::new(
-            initial_start,
-            last_end,
+            initial_start..last_end,
             ast::ExprConstant {
                 value: Constant::Bytes(content),
                 kind: None,
@@ -635,7 +638,7 @@ pub(crate) fn parse_strings(
         let mut content: Vec<String> = vec![];
         for (start, (source, kind, triple_quoted), end) in values {
             for value in parse_string(&source, kind, triple_quoted, start, end)? {
-                match value.node {
+                match value.into_node() {
                     ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
@@ -645,8 +648,7 @@ pub(crate) fn parse_strings(
             }
         }
         return Ok(Expr::new(
-            initial_start,
-            last_end,
+            initial_start..last_end,
             ast::ExprConstant {
                 value: Constant::Str(content.join("")),
                 kind: initial_kind,
@@ -661,8 +663,7 @@ pub(crate) fn parse_strings(
 
     let take_current = |current: &mut Vec<String>| -> Expr {
         Expr::new(
-            initial_start,
-            last_end,
+            initial_start..last_end,
             ast::ExprConstant {
                 value: Constant::Str(current.drain(..).join("")),
                 kind: initial_kind.clone(),
@@ -693,8 +694,7 @@ pub(crate) fn parse_strings(
     }
 
     Ok(Expr::new(
-        initial_start,
-        last_end,
+        initial_start..last_end,
         ast::ExprJoinedStr { values: deduped }.into(),
     ))
 }
@@ -706,12 +706,12 @@ struct FStringError {
     /// The type of error that occurred.
     pub error: FStringErrorType,
     /// The location of the error.
-    pub location: Location,
+    pub location: TextSize,
 }
 
 impl FStringError {
     /// Creates a new `FStringError` with the given error type and location.
-    pub fn new(error: FStringErrorType, location: Location) -> Self {
+    pub fn new(error: FStringErrorType, location: TextSize) -> Self {
         Self { error, location }
     }
 }
@@ -790,7 +790,7 @@ impl std::fmt::Display for FStringErrorType {
     }
 }
 
-impl From<FStringError> for LalrpopError<Location, Tok, LexicalError> {
+impl From<FStringError> for LalrpopError<TextSize, Tok, LexicalError> {
     fn from(err: FStringError) -> Self {
         lalrpop_util::ParseError::User {
             error: LexicalError {
@@ -811,8 +811,8 @@ mod tests {
             source,
             StringKind::FString,
             false,
-            Location::default(),
-            Location::default().with_col_offset(source.len() + 3), // 3 for prefix and quotes
+            TextSize::default(),
+            TextSize::default() + source.text_len() + TextSize::from(3), // 3 for prefix and quotes
         )
         .parse()
     }
@@ -876,8 +876,7 @@ mod tests {
                 LexicalErrorType::FStringError(e) => e,
                 e => unreachable!("Expected FStringError: {:?}", e),
             })
-            .err()
-            .expect("Expected error")
+            .expect_err("Expected error")
     }
 
     #[test]

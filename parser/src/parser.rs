@@ -13,11 +13,12 @@
 //! [`Mode`]: crate::mode
 
 use crate::{
-    ast::{self, Location},
+    ast,
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
-    mode::Mode,
     python,
+    text_size::TextSize,
     token::Tok,
+    Mode,
 };
 use itertools::Itertools;
 use std::iter;
@@ -69,7 +70,7 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 ///
 /// ```
 pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
-    parse_expression_located(source, path, Location::new(1, 0))
+    parse_expression_at(source, path, TextSize::default())
 }
 
 /// Parses a Python expression from a given location.
@@ -83,17 +84,17 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 /// somewhat silly, location:
 ///
 /// ```
-/// use rustpython_parser::{ast::Location, parse_expression_located};
+/// use rustpython_parser::{text_size::TextSize, parse_expression_at};
 ///
-/// let expr = parse_expression_located("1 + 2", "<embedded>", Location::new(5, 20));
+/// let expr = parse_expression_at("1 + 2", "<embedded>", TextSize::from(400));
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression_located(
+pub fn parse_expression_at(
     source: &str,
     path: &str,
-    location: Location,
+    offset: TextSize,
 ) -> Result<ast::Expr, ParseError> {
-    parse_located(source, Mode::Expression, path, location).map(|top| match top {
+    parse_starts_at(source, Mode::Expression, path, offset).map(|top| match top {
         ast::Mod::Expression(ast::ModExpression { body }) => *body,
         _ => unreachable!(),
     })
@@ -131,7 +132,7 @@ pub fn parse_expression_located(
 /// assert!(program.is_ok());
 /// ```
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
-    parse_located(source, mode, source_path, Location::new(1, 0))
+    parse_starts_at(source, mode, source_path, TextSize::default())
 }
 
 /// Parse the given Python source code using the specified [`Mode`] and [`Location`].
@@ -142,7 +143,7 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 /// # Example
 ///
 /// ```
-/// use rustpython_parser::{ast::Location, Mode, parse_located};
+/// use rustpython_parser::{text_size::TextSize, Mode, parse_starts_at};
 ///
 /// let source = r#"
 /// def fib(i):
@@ -153,16 +154,16 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 ///
 /// print(fib(42))
 /// "#;
-/// let program = parse_located(source, Mode::Module, "<embedded>", Location::new(1, 0));
+/// let program = parse_starts_at(source, Mode::Module, "<embedded>", TextSize::from(0));
 /// assert!(program.is_ok());
 /// ```
-pub fn parse_located(
+pub fn parse_starts_at(
     source: &str,
     mode: Mode,
     source_path: &str,
-    location: Location,
+    offset: TextSize,
 ) -> Result<ast::Mod, ParseError> {
-    let lxr = lexer::lex_located(source, mode, location);
+    let lxr = lexer::lex_starts_at(source, mode, offset);
     parse_tokens(lxr, mode, source_path)
 }
 
@@ -186,18 +187,22 @@ pub fn parse_tokens(
     mode: Mode,
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
-    let marker_token = (Default::default(), mode.to_marker(), Default::default());
+    let marker_token = (Tok::start_marker(mode), Default::default());
     let lexer = iter::once(Ok(marker_token))
         .chain(lxr)
-        .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
+        .filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
     python::TopParser::new()
-        .parse(lexer.into_iter())
+        .parse(
+            lexer
+                .into_iter()
+                .map_ok(|(t, range)| (range.start(), t, range.end())),
+        )
         .map_err(|e| parse_error_from_lalrpop(e, source_path))
 }
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-pub type ParseError = rustpython_compiler_core::BaseError<ParseErrorType>;
+pub type ParseError = rustpython_parser_core::BaseError<ParseErrorType>;
 
 /// Represents the different types of errors that can occur during parsing.
 #[derive(Debug, PartialEq)]
@@ -219,25 +224,26 @@ impl std::error::Error for ParseErrorType {}
 
 // Convert `lalrpop_util::ParseError` to our internal type
 fn parse_error_from_lalrpop(
-    err: LalrpopError<Location, Tok, LexicalError>,
+    err: LalrpopError<TextSize, Tok, LexicalError>,
     source_path: &str,
 ) -> ParseError {
     let source_path = source_path.to_owned();
+
     match err {
         // TODO: Are there cases where this isn't an EOF?
         LalrpopError::InvalidToken { location } => ParseError {
             error: ParseErrorType::Eof,
-            location,
+            offset: location,
             source_path,
         },
         LalrpopError::ExtraToken { token } => ParseError {
             error: ParseErrorType::ExtraToken(token.1),
-            location: token.0,
+            offset: token.0,
             source_path,
         },
         LalrpopError::User { error } => ParseError {
             error: ParseErrorType::Lexical(error.error),
-            location: error.location,
+            offset: error.location,
             source_path,
         },
         LalrpopError::UnrecognizedToken { token, expected } => {
@@ -246,7 +252,7 @@ fn parse_error_from_lalrpop(
             let expected = (expected.len() == 1).then(|| expected[0].clone());
             ParseError {
                 error: ParseErrorType::UnrecognizedToken(token.1, expected),
-                location: token.0.with_col_offset(1),
+                offset: token.0,
                 source_path,
             }
         }
@@ -256,13 +262,13 @@ fn parse_error_from_lalrpop(
             if indent_error {
                 ParseError {
                     error: ParseErrorType::Lexical(LexicalErrorType::IndentationError),
-                    location,
+                    offset: location,
                     source_path,
                 }
             } else {
                 ParseError {
                     error: ParseErrorType::Eof,
-                    location,
+                    offset: location,
                     source_path,
                 }
             }
@@ -576,9 +582,9 @@ except* OSError as e:
     fn test_modes() {
         let source = "a[0][1][2][3][4]";
 
-        assert!(parse(&source, Mode::Expression, "<embedded>").is_ok());
-        assert!(parse(&source, Mode::Module, "<embedded>").is_ok());
-        assert!(parse(&source, Mode::Interactive, "<embedded>").is_ok());
+        assert!(parse(source, Mode::Expression, "<embedded>").is_ok());
+        assert!(parse(source, Mode::Module, "<embedded>").is_ok());
+        assert!(parse(source, Mode::Interactive, "<embedded>").is_ok());
     }
 
     #[test]

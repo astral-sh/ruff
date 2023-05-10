@@ -1,5 +1,4 @@
 use num_bigint::BigInt;
-pub use rustpython_compiler_core::ConversionFlag;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Constant {
@@ -126,8 +125,7 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
                 Ok(crate::Expr {
                     node: expr,
                     custom: node.custom,
-                    location: node.location,
-                    end_location: node.end_location,
+                    range: node.range,
                 })
             }
             _ => crate::fold::fold_expr(self, node),
@@ -138,25 +136,24 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rustpython_parser_core::text_size::TextRange;
 
     #[cfg(feature = "constant-optimization")]
     #[test]
     fn test_constant_opt() {
         use crate::{fold::Fold, *};
 
-        let start = Default::default();
-        let end = None;
+        let range = TextRange::default();
+        #[allow(clippy::let_unit_value)]
         let custom = ();
-        let ast = Located {
-            location: start,
-            end_location: end,
+        let ast = Attributed {
+            range,
             custom,
             node: ExprTuple {
                 ctx: ExprContext::Load,
                 elts: vec![
-                    Located {
-                        location: start,
-                        end_location: end,
+                    Attributed {
+                        range,
                         custom,
                         node: ExprConstant {
                             value: BigInt::from(1).into(),
@@ -164,9 +161,8 @@ mod tests {
                         }
                         .into(),
                     },
-                    Located {
-                        location: start,
-                        end_location: end,
+                    Attributed {
+                        range,
                         custom,
                         node: ExprConstant {
                             value: BigInt::from(2).into(),
@@ -174,16 +170,14 @@ mod tests {
                         }
                         .into(),
                     },
-                    Located {
-                        location: start,
-                        end_location: end,
+                    Attributed {
+                        range,
                         custom,
                         node: ExprTuple {
                             ctx: ExprContext::Load,
                             elts: vec![
-                                Located {
-                                    location: start,
-                                    end_location: end,
+                                Attributed {
+                                    range,
                                     custom,
                                     node: ExprConstant {
                                         value: BigInt::from(3).into(),
@@ -191,9 +185,8 @@ mod tests {
                                     }
                                     .into(),
                                 },
-                                Located {
-                                    location: start,
-                                    end_location: end,
+                                Attributed {
+                                    range,
                                     custom,
                                     node: ExprConstant {
                                         value: BigInt::from(4).into(),
@@ -201,9 +194,8 @@ mod tests {
                                     }
                                     .into(),
                                 },
-                                Located {
-                                    location: start,
-                                    end_location: end,
+                                Attributed {
+                                    range,
                                     custom,
                                     node: ExprConstant {
                                         value: BigInt::from(5).into(),
@@ -224,9 +216,8 @@ mod tests {
             .unwrap_or_else(|e| match e {});
         assert_eq!(
             new_ast,
-            Located {
-                location: start,
-                end_location: end,
+            Attributed {
+                range,
                 custom,
                 node: ExprConstant {
                     value: Constant::Tuple(vec![

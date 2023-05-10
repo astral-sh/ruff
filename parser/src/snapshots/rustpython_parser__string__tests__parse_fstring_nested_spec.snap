@@ -3,31 +3,13 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 15,
-            },
-        ),
+    Attributed {
+        range: 0..15,
         custom: (),
         node: FormattedValue(
             ExprFormattedValue {
-                value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 3,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 6,
-                        },
-                    ),
+                value: Attributed {
+                    range: 3..6,
                     custom: (),
                     node: Name(
                         ExprName {
@@ -38,46 +20,19 @@ expression: parse_ast
                 },
                 conversion: 0,
                 format_spec: Some(
-                    Located {
-                        location: Location {
-                            row: 1,
-                            column: 0,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 15,
-                            },
-                        ),
+                    Attributed {
+                        range: 0..15,
                         custom: (),
                         node: JoinedStr(
                             ExprJoinedStr {
                                 values: [
-                                    Located {
-                                        location: Location {
-                                            row: 1,
-                                            column: 0,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 1,
-                                                column: 15,
-                                            },
-                                        ),
+                                    Attributed {
+                                        range: 0..15,
                                         custom: (),
                                         node: FormattedValue(
                                             ExprFormattedValue {
-                                                value: Located {
-                                                    location: Location {
-                                                        row: 1,
-                                                        column: 8,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 1,
-                                                            column: 12,
-                                                        },
-                                                    ),
+                                                value: Attributed {
+                                                    range: 8..12,
                                                     custom: (),
                                                     node: Name(
                                                         ExprName {

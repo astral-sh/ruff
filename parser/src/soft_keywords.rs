@@ -1,4 +1,4 @@
-use crate::{lexer::LexResult, mode::Mode, token::Tok};
+use crate::{lexer::LexResult, token::Tok, Mode};
 use itertools::{Itertools, MultiPeek};
 
 /// An [`Iterator`] that transforms a token stream to accommodate soft keywords (namely, `match`
@@ -42,7 +42,7 @@ where
     #[inline]
     fn next(&mut self) -> Option<LexResult> {
         let mut next = self.underlying.next();
-        if let Some(Ok((start, tok, end))) = next.as_ref() {
+        if let Some(Ok((tok, range))) = next.as_ref() {
             // If the token is a `match` or `case` token, check if it's used as an identifier.
             // We assume every `match` or `case` is an identifier unless both of the following
             // conditions are met:
@@ -54,13 +54,13 @@ where
             //    type hints.)
             if matches!(tok, Tok::Match | Tok::Case) {
                 if !self.start_of_line {
-                    next = Some(Ok((*start, soft_to_name(tok), *end)));
+                    next = Some(Ok((soft_to_name(tok), *range)));
                 } else {
                     let mut nesting = 0;
                     let mut first = true;
                     let mut seen_colon = false;
                     let mut seen_lambda = false;
-                    while let Some(Ok((_, tok, _))) = self.underlying.peek() {
+                    while let Some(Ok((tok, _))) = self.underlying.peek() {
                         match tok {
                             Tok::Newline => break,
                             Tok::Lambda if nesting == 0 => seen_lambda = true,
@@ -78,14 +78,14 @@ where
                         first = false;
                     }
                     if !seen_colon {
-                        next = Some(Ok((*start, soft_to_name(tok), *end)));
+                        next = Some(Ok((soft_to_name(tok), *range)));
                     }
                 }
             }
         }
 
         self.start_of_line = next.as_ref().map_or(false, |lex_result| {
-            lex_result.as_ref().map_or(false, |(_, tok, _)| {
+            lex_result.as_ref().map_or(false, |(tok, _)| {
                 if matches!(tok, Tok::NonLogicalNewline | Tok::Comment { .. }) {
                     self.start_of_line
                 } else {

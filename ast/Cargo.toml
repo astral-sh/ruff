@@ -8,13 +8,14 @@ repository = "https://github.com/RustPython/RustPython"
 license = "MIT"
 
 [features]
-default = ["constant-optimization", "fold"]
+default = ["constant-optimization", "fold", "source-code"]
 constant-optimization = ["fold"]
+source-code = ["fold"]
 fold = []
 unparse = ["rustpython-literal"]
 
 [dependencies]
-rustpython-compiler-core = { path = "../core", version = "0.2.0" }
-rustpython-literal = { path = "../literal", version = "0.2.0", optional = true }
+rustpython-parser-core = { workspace = true }
+rustpython-literal = { workspace = true, optional = true }
 
 num-bigint = { workspace = true }
