@@ -1,7 +1,7 @@
 // re-export our public interface
-pub use ruff_python_ast::source_code::*;
+pub use ruff_source_location::*;
 
-pub type LineNumber = ruff_python_ast::source_code::OneIndexed;
+pub type LineNumber = OneIndexed;
 
 #[derive(Debug)]
 pub struct SourceRange {
