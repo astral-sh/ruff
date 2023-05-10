@@ -20,7 +20,7 @@ use crate::node::{NodeId, Nodes};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 /// A snapshot of the [`Context`] at a given point in the AST traversal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone)]
 pub struct Snapshot {
     scope_id: ScopeId,
     stmt_id: Option<NodeId>,
@@ -457,9 +457,15 @@ impl<'a> Context<'a> {
 
     /// Restore the context to the given [`Snapshot`].
     pub fn restore(&mut self, snapshot: Snapshot) {
-        self.scope_id = snapshot.scope_id;
-        self.stmt_id = snapshot.stmt_id;
-        self.in_annotation = snapshot.in_annotation;
-        self.in_type_checking_block = snapshot.in_type_checking_block;
+        let Snapshot {
+            scope_id,
+            stmt_id,
+            in_annotation,
+            in_type_checking_block,
+        } = snapshot;
+        self.scope_id = scope_id;
+        self.stmt_id = stmt_id;
+        self.in_annotation = in_annotation;
+        self.in_type_checking_block = in_type_checking_block;
     }
 }
