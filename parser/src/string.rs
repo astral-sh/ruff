@@ -629,8 +629,7 @@ pub(crate) fn parse_strings(
             ast::ExprConstant {
                 value: Constant::Bytes(content),
                 kind: None,
-            }
-            .into(),
+            },
         ));
     }
 
@@ -652,8 +651,7 @@ pub(crate) fn parse_strings(
             ast::ExprConstant {
                 value: Constant::Str(content.join("")),
                 kind: initial_kind,
-            }
-            .into(),
+            },
         ));
     }
 
@@ -667,8 +665,7 @@ pub(crate) fn parse_strings(
             ast::ExprConstant {
                 value: Constant::Str(current.drain(..).join("")),
                 kind: initial_kind.clone(),
-            }
-            .into(),
+            },
         )
     };
 
@@ -695,7 +692,7 @@ pub(crate) fn parse_strings(
 
     Ok(Expr::new(
         initial_start..last_end,
-        ast::ExprJoinedStr { values: deduped }.into(),
+        ast::ExprJoinedStr { values: deduped },
     ))
 }
 

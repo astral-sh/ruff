@@ -13,16 +13,33 @@ impl Identifier {
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
     }
+}
+
+impl std::cmp::PartialEq<str> for Identifier {
     #[inline]
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
     }
 }
 
-impl std::string::ToString for Identifier {
+impl std::cmp::PartialEq<String> for Identifier {
     #[inline]
-    fn to_string(&self) -> String {
-        self.0.clone()
+    fn eq(&self, other: &String) -> bool {
+        &self.0 == other
+    }
+}
+
+impl std::ops::Deref for Identifier {
+    type Target = String;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -33,15 +50,26 @@ impl From<Identifier> for String {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+impl From<String> for Identifier {
+    #[inline]
+    fn from(id: String) -> Self {
+        Self(id)
+    }
+}
+
+impl<'a> From<&'a str> for Identifier {
+    #[inline]
+    fn from(id: &'a str) -> Identifier {
+        id.to_owned().into()
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Int(u32);
 
 impl Int {
     pub fn new(i: u32) -> Self {
         Self(i)
-    }
-    pub fn new_bool(i: bool) -> Self {
-        Self(i as u32)
     }
     pub fn to_u32(&self) -> u32 {
         self.0
@@ -49,8 +77,19 @@ impl Int {
     pub fn to_usize(&self) -> usize {
         self.0 as _
     }
-    pub fn to_bool(&self) -> bool {
-        self.0 > 0
+}
+
+impl std::cmp::PartialEq<u32> for Int {
+    #[inline]
+    fn eq(&self, other: &u32) -> bool {
+        self.0 == *other
+    }
+}
+
+impl std::cmp::PartialEq<usize> for Int {
+    #[inline]
+    fn eq(&self, other: &usize) -> bool {
+        self.0 as usize == *other
     }
 }
 
@@ -165,11 +204,11 @@ impl<T, U> Attributed<T, U> {
 
 impl<T> Attributed<T, ()> {
     /// Creates a new node that spans the position specified by `range`.
-    pub fn new(range: impl Into<TextRange>, node: T) -> Self {
+    pub fn new(range: impl Into<TextRange>, node: impl Into<T>) -> Self {
         Self {
             range: range.into(),
             custom: (),
-            node,
+            node: node.into(),
         }
     }
 
