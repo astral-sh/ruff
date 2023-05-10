@@ -68,11 +68,13 @@ pub fn inplace_argument(
 
         let module = call_path[0];
         is_pandas = checker.ctx.find_binding(module).map_or(false, |binding| {
-            if let BindingKind::Importation(Importation { full_name, .. }) = binding.kind {
-                full_name == "pandas"
-            } else {
-                false
-            }
+            matches!(
+                binding.kind,
+                BindingKind::Importation(Importation {
+                    full_name: "pandas",
+                    ..
+                })
+            )
         });
     }
 
@@ -119,10 +121,8 @@ pub fn inplace_argument(
 
                 // Without a static type system, only module-level functions could potentially be
                 // non-pandas calls. If they're not, `inplace` should be considered safe.
-                if is_checkable {
-                    if !is_pandas {
-                        return None;
-                    }
+                if is_checkable && !is_pandas {
+                    return None;
                 }
 
                 return Some(diagnostic);
