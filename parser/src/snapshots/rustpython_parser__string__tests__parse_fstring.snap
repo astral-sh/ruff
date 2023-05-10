@@ -13,12 +13,16 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "a",
+                            id: Identifier(
+                                "a",
+                            ),
                             ctx: Load,
                         },
                     ),
                 },
-                conversion: 0,
+                conversion: Int(
+                    0,
+                ),
                 format_spec: None,
             },
         ),
@@ -33,12 +37,16 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "b",
+                            id: Identifier(
+                                "b",
+                            ),
                             ctx: Load,
                         },
                     ),
                 },
-                conversion: 0,
+                conversion: Int(
+                    0,
+                ),
                 format_spec: None,
             },
         ),

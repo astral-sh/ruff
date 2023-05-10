@@ -4,7 +4,7 @@
 // regular strings. Since the parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
 use crate::{
-    ast::{self, Constant, Expr, ExprKind},
+    ast::{self, Constant, Expr, ExprKind, Int},
     lexer::{LexicalError, LexicalErrorType},
     parser::{parse_expression_at, LalrpopError, ParseError, ParseErrorType},
     token::{StringKind, Tok},
@@ -314,7 +314,7 @@ impl<'a> StringParser<'a> {
                                         )
                                     })?,
                                 ),
-                                conversion: conversion as _,
+                                conversion: Int::new(conversion as _),
                                 format_spec: spec,
                             }
                             .into(),
@@ -345,13 +345,13 @@ impl<'a> StringParser<'a> {
                                             )
                                         })?,
                                     ),
-                                    conversion: (if conversion == ConversionFlag::None
-                                        && spec.is_none()
-                                    {
-                                        ConversionFlag::Repr
-                                    } else {
-                                        conversion
-                                    }) as _,
+                                    conversion: ast::Int::new(
+                                        (if conversion == ConversionFlag::None && spec.is_none() {
+                                            ConversionFlag::Repr
+                                        } else {
+                                            conversion
+                                        }) as _,
+                                    ),
                                     format_spec: spec,
                                 }
                                 .into(),

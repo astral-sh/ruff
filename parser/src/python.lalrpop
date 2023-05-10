@@ -132,7 +132,7 @@ ExpressionStatement: ast::Stmt = {
                 target: Box::new(set_context(target, ast::ExprContext::Store)),
                 annotation: Box::new(annotation),
                 value: rhs.map(Box::new),
-                simple: if simple { 1 } else { 0 },
+                simple: ast::Int::new_bool(simple),
             }.into(),
         )
     },
@@ -255,18 +255,18 @@ ImportStatement: ast::Stmt = {
     },
 };
 
-ImportFromLocation: (Option<u32>, Option<String>) = {
+ImportFromLocation: (Option<ast::Int>, Option<ast::Identifier>) = {
     <dots: ImportDots*> <name:DottedName> => {
-        (Some(dots.iter().sum()), Some(name))
+        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), Some(name))
     },
     <dots: ImportDots+> => {
-        (Some(dots.iter().sum()), None)
+        (Some(ast::Int::new(dots.iter().map(ast::Int::to_u32).sum())), None)
     },
 };
 
-ImportDots: u32 = {
-    "..." => 3,
-    "." => 1,
+ImportDots: ast::Int = {
+    "..." => ast::Int::new(3),
+    "." => ast::Int::new(3),
 };
 
 ImportAsNames: Vec<ast::Alias> = {
@@ -274,7 +274,7 @@ ImportAsNames: Vec<ast::Alias> = {
     <location:@L> "(" <i:OneOrMore<ImportAsAlias<Identifier>>> ","? ")" <end_location:@R> => i,
     <location:@L> "*" <end_location:@R> => {
         // Star import all
-        vec![ast::Alias::new(location..end_location, ast::AliasData { name: "*".to_string(), asname: None })]
+        vec![ast::Alias::new(location..end_location, ast::AliasData { name: ast::Identifier::new("*"), asname: None })]
     },
 };
 
@@ -285,15 +285,15 @@ ImportAsAlias<I>: ast::Alias = {
 }
 
 // A name like abc or abc.def.ghi
-DottedName: String = {
-    <n:name> => n,
+DottedName: ast::Identifier = {
+    <n:name> => ast::Identifier::new(n),
     <n:name> <n2: ("." Identifier)+>  => {
         let mut r = n.to_string();
         for x in n2 {
-            r.push_str(".");
-            r.push_str(&x.1);
+            r.push('.');
+            r.push_str(x.1.as_str());
         }
-        r
+        ast::Identifier::new(r)
     },
 };
 
@@ -449,7 +449,7 @@ Pattern: ast::Pattern = {
 
 AsPattern: ast::Pattern = {
     <location:@L> <pattern:OrPattern> "as" <name:Identifier> <end_location:@R> =>? {
-        if name == "_" {
+        if name.as_str() == "_" {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
                 location,
@@ -538,7 +538,7 @@ SequencePattern: ast::PatternKind = {
 
 StarPattern: ast::PatternKind = {
     <location:@L> "*" <name:Identifier> <end_location:@R> => ast::PatternMatchStar {
-        name: if name == "_" { None } else { Some(name) }
+        name: if name.as_str() == "_" { None } else { Some(name) }
     }.into(),
 }
 
@@ -598,7 +598,7 @@ LiteralPattern: ast::PatternKind = {
 CapturePattern: ast::PatternKind = {
     <location:@L> <name:Identifier> <end_location:@R> => ast::PatternMatchAs {
         pattern: None,
-        name: if name == "_" { None } else { Some(name) }
+        name: if name.as_str() == "_" { None } else { Some(name) }
     }.into(),
 }
 
@@ -709,7 +709,7 @@ MappingPattern: ast::PatternKind = {
     },
 }
 
-MatchKeywordEntry: (String, ast::Pattern) = {
+MatchKeywordEntry: (ast::Identifier, ast::Pattern) = {
     <k:Identifier> "=" <v:Pattern> => (k, v),
 };
 
@@ -1707,7 +1707,7 @@ SingleForComprehension: ast::Comprehension = {
             target: set_context(target, ast::ExprContext::Store),
             iter,
             ifs,
-            is_async: if is_async { 1 } else { 0 },
+            is_async: ast::Int::new_bool(is_async),
         }
     }
 };
@@ -1722,7 +1722,7 @@ ArgumentList: ArgumentList = {
     }
 };
 
-FunctionArgument: (Option<(TextSize, TextSize, Option<String>)>, ast::Expr) = {
+FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr) = {
     <location:@L> <e:NamedExpressionTest> <c:CompFor?> <end_location:@R> => {
         let expr = match c {
             Some(c) => ast::Expr::new(
@@ -1772,7 +1772,9 @@ Constant: ast::Constant = {
     <s:complex> => ast::Constant::Complex { real: s.0, imag: s.1 },
 };
 
-Identifier: String = <s:name> => s;
+Identifier: ast::Identifier = {
+    <s:name> => ast::Identifier::new(s)
+};
 
 // Hook external lexer:
 extern {

@@ -12,7 +12,9 @@ Attributed {
                 custom: (),
                 node: Name(
                     ExprName {
-                        id: "x",
+                        id: Identifier(
+                            "x",
+                        ),
                         ctx: Load,
                     },
                 ),

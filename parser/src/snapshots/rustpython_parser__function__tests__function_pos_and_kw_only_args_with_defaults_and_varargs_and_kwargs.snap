@@ -9,7 +9,9 @@ Ok(
             custom: (),
             node: FunctionDef(
                 StmtFunctionDef {
-                    name: "f",
+                    name: Identifier(
+                        "f",
+                    ),
                     args: Arguments {
                         posonlyargs: [],
                         args: [
@@ -17,7 +19,9 @@ Ok(
                                 range: 6..7,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "a",
+                                    arg: Identifier(
+                                        "a",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -26,7 +30,9 @@ Ok(
                                 range: 9..10,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "b",
+                                    arg: Identifier(
+                                        "b",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -35,7 +41,9 @@ Ok(
                                 range: 12..13,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "c",
+                                    arg: Identifier(
+                                        "c",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -46,7 +54,9 @@ Ok(
                                 range: 16..20,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "args",
+                                    arg: Identifier(
+                                        "args",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -57,7 +67,9 @@ Ok(
                                 range: 22..23,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "d",
+                                    arg: Identifier(
+                                        "d",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -66,7 +78,9 @@ Ok(
                                 range: 25..26,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "e",
+                                    arg: Identifier(
+                                        "e",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -75,7 +89,9 @@ Ok(
                                 range: 31..32,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "f",
+                                    arg: Identifier(
+                                        "f",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },
@@ -112,7 +128,9 @@ Ok(
                                 range: 39..45,
                                 custom: (),
                                 node: ArgData {
-                                    arg: "kwargs",
+                                    arg: Identifier(
+                                        "kwargs",
+                                    ),
                                     annotation: None,
                                     type_comment: None,
                                 },

@@ -12,7 +12,9 @@ Attributed {
                 custom: (),
                 node: Name(
                     ExprName {
-                        id: "x1",
+                        id: Identifier(
+                            "x1",
+                        ),
                         ctx: Load,
                     },
                 ),
@@ -22,7 +24,9 @@ Attributed {
                 custom: (),
                 node: Name(
                     ExprName {
-                        id: "x2",
+                        id: Identifier(
+                            "x2",
+                        ),
                         ctx: Load,
                     },
                 ),
@@ -34,7 +38,9 @@ Attributed {
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "y",
+                                id: Identifier(
+                                    "y",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -44,13 +50,17 @@ Attributed {
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "z",
+                                id: Identifier(
+                                    "z",
+                                ),
                                 ctx: Load,
                             },
                         ),
                     },
                     ifs: [],
-                    is_async: 0,
+                    is_async: Int(
+                        0,
+                    ),
                 },
             ],
         },

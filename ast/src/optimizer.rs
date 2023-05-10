@@ -1,87 +1,9 @@
-use num_bigint::BigInt;
+use crate::builtin::Constant;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Constant {
-    None,
-    Bool(bool),
-    Str(String),
-    Bytes(Vec<u8>),
-    Int(BigInt),
-    Tuple(Vec<Constant>),
-    Float(f64),
-    Complex { real: f64, imag: f64 },
-    Ellipsis,
-}
-
-impl From<String> for Constant {
-    fn from(s: String) -> Constant {
-        Self::Str(s)
-    }
-}
-impl From<Vec<u8>> for Constant {
-    fn from(b: Vec<u8>) -> Constant {
-        Self::Bytes(b)
-    }
-}
-impl From<bool> for Constant {
-    fn from(b: bool) -> Constant {
-        Self::Bool(b)
-    }
-}
-impl From<BigInt> for Constant {
-    fn from(i: BigInt) -> Constant {
-        Self::Int(i)
-    }
-}
-
-#[cfg(feature = "rustpython-literal")]
-impl std::fmt::Display for Constant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Constant::None => f.pad("None"),
-            Constant::Bool(b) => f.pad(if *b { "True" } else { "False" }),
-            Constant::Str(s) => rustpython_literal::escape::UnicodeEscape::new_repr(s.as_str())
-                .str_repr()
-                .write(f),
-            Constant::Bytes(b) => {
-                let escape = rustpython_literal::escape::AsciiEscape::new_repr(b);
-                let repr = escape.bytes_repr().to_string().unwrap();
-                f.pad(&repr)
-            }
-            Constant::Int(i) => i.fmt(f),
-            Constant::Tuple(tup) => {
-                if let [elt] = &**tup {
-                    write!(f, "({elt},)")
-                } else {
-                    f.write_str("(")?;
-                    for (i, elt) in tup.iter().enumerate() {
-                        if i != 0 {
-                            f.write_str(", ")?;
-                        }
-                        elt.fmt(f)?;
-                    }
-                    f.write_str(")")
-                }
-            }
-            Constant::Float(fp) => f.pad(&rustpython_literal::float::to_string(*fp)),
-            Constant::Complex { real, imag } => {
-                if *real == 0.0 {
-                    write!(f, "{imag}j")
-                } else {
-                    write!(f, "({real}{imag:+}j)")
-                }
-            }
-            Constant::Ellipsis => f.pad("..."),
-        }
-    }
-}
-
-#[cfg(feature = "constant-optimization")]
 #[non_exhaustive]
 #[derive(Default)]
 pub struct ConstantOptimizer {}
 
-#[cfg(feature = "constant-optimization")]
 impl ConstantOptimizer {
     #[inline]
     pub fn new() -> Self {
@@ -135,7 +57,7 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use num_bigint::BigInt;
     use rustpython_parser_core::text_size::TextRange;
 
     #[cfg(feature = "constant-optimization")]

@@ -9,7 +9,9 @@ Ok(
             custom: (),
             node: FunctionDef(
                 StmtFunctionDef {
-                    name: "f",
+                    name: Identifier(
+                        "f",
+                    ),
                     args: Arguments {
                         posonlyargs: [],
                         args: [],

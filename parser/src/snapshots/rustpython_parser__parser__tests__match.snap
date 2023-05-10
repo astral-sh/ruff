@@ -56,7 +56,9 @@ expression: parse_ast
                                     keys: [],
                                     patterns: [],
                                     rest: Some(
-                                        "rest",
+                                        Identifier(
+                                            "rest",
+                                        ),
                                     ),
                                 },
                             ),
@@ -78,7 +80,9 @@ expression: parse_ast
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "print",
+                                                                id: Identifier(
+                                                                    "print",
+                                                                ),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -89,7 +93,9 @@ expression: parse_ast
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
-                                                                    id: "rest",
+                                                                    id: Identifier(
+                                                                        "rest",
+                                                                    ),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -195,7 +201,9 @@ expression: parse_ast
                                                                                         custom: (),
                                                                                         node: Name(
                                                                                             ExprName {
-                                                                                                id: "str",
+                                                                                                id: Identifier(
+                                                                                                    "str",
+                                                                                                ),
                                                                                                 ctx: Load,
                                                                                             },
                                                                                         ),
@@ -221,7 +229,9 @@ expression: parse_ast
                                                         },
                                                     ),
                                                     name: Some(
-                                                        "label",
+                                                        Identifier(
+                                                            "label",
+                                                        ),
                                                     ),
                                                 },
                                             ),
@@ -248,7 +258,9 @@ expression: parse_ast
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "print",
+                                                                id: Identifier(
+                                                                    "print",
+                                                                ),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -259,7 +271,9 @@ expression: parse_ast
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
-                                                                    id: "label",
+                                                                    id: Identifier(
+                                                                        "label",
+                                                                    ),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -288,7 +302,9 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "x",
+                            id: Identifier(
+                                "x",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -358,7 +374,9 @@ expression: parse_ast
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {
-                                                        id: "y",
+                                                        id: Identifier(
+                                                            "y",
+                                                        ),
                                                         ctx: Store,
                                                     },
                                                 ),
@@ -396,7 +414,9 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "x",
+                            id: Identifier(
+                                "x",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -466,7 +486,9 @@ expression: parse_ast
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {
-                                                        id: "y",
+                                                        id: Identifier(
+                                                            "y",
+                                                        ),
                                                         ctx: Store,
                                                     },
                                                 ),
@@ -504,7 +526,9 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "x",
+                            id: Identifier(
+                                "x",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -554,7 +578,9 @@ expression: parse_ast
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {
-                                                        id: "y",
+                                                        id: Identifier(
+                                                            "y",
+                                                        ),
                                                         ctx: Store,
                                                     },
                                                 ),

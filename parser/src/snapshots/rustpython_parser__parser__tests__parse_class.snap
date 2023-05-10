@@ -8,14 +8,18 @@ expression: "parse_program(source, \"<test>\").unwrap()"
         custom: (),
         node: ClassDef(
             StmtClassDef {
-                name: "Foo",
+                name: Identifier(
+                    "Foo",
+                ),
                 bases: [
                     Attributed {
                         range: 10..11,
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "A",
+                                id: Identifier(
+                                    "A",
+                                ),
                                 ctx: Load,
                             },
                         ),
@@ -25,7 +29,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "B",
+                                id: Identifier(
+                                    "B",
+                                ),
                                 ctx: Load,
                             },
                         ),
@@ -38,7 +44,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         custom: (),
                         node: FunctionDef(
                             StmtFunctionDef {
-                                name: "__init__",
+                                name: Identifier(
+                                    "__init__",
+                                ),
                                 args: Arguments {
                                     posonlyargs: [],
                                     args: [
@@ -46,7 +54,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             range: 31..35,
                                             custom: (),
                                             node: ArgData {
-                                                arg: "self",
+                                                arg: Identifier(
+                                                    "self",
+                                                ),
                                                 annotation: None,
                                                 type_comment: None,
                                             },
@@ -76,7 +86,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         custom: (),
                         node: FunctionDef(
                             StmtFunctionDef {
-                                name: "method_with_default",
+                                name: Identifier(
+                                    "method_with_default",
+                                ),
                                 args: Arguments {
                                     posonlyargs: [],
                                     args: [
@@ -84,7 +96,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             range: 70..74,
                                             custom: (),
                                             node: ArgData {
-                                                arg: "self",
+                                                arg: Identifier(
+                                                    "self",
+                                                ),
                                                 annotation: None,
                                                 type_comment: None,
                                             },
@@ -93,7 +107,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             range: 76..79,
                                             custom: (),
                                             node: ArgData {
-                                                arg: "arg",
+                                                arg: Identifier(
+                                                    "arg",
+                                                ),
                                                 annotation: None,
                                                 type_comment: None,
                                             },

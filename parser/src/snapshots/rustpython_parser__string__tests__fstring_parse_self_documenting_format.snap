@@ -37,12 +37,16 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "user",
+                            id: Identifier(
+                                "user",
+                            ),
                             ctx: Load,
                         },
                     ),
                 },
-                conversion: 0,
+                conversion: Int(
+                    0,
+                ),
                 format_spec: Some(
                     Attributed {
                         range: 0..14,

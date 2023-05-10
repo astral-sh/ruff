@@ -20,7 +20,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "a",
+                                                id: Identifier(
+                                                    "a",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),
@@ -30,7 +32,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "b",
+                                                id: Identifier(
+                                                    "b",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),

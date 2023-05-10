@@ -61,7 +61,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -153,7 +155,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -179,7 +183,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "y",
+                                        id: Identifier(
+                                            "y",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -320,7 +326,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -393,7 +401,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -470,7 +480,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -558,7 +570,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -673,7 +687,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -715,7 +731,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "a",
+                                                                id: Identifier(
+                                                                    "a",
+                                                                ),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -766,7 +784,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "a",
+                                                                id: Identifier(
+                                                                    "a",
+                                                                ),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -786,7 +806,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -840,7 +862,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "a",
+                                                                id: Identifier(
+                                                                    "a",
+                                                                ),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -903,7 +927,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "a",
+                                                                id: Identifier(
+                                                                    "a",
+                                                                ),
                                                                 ctx: Load,
                                                             },
                                                         ),
@@ -923,7 +949,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -959,7 +987,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "a",
+                                                id: Identifier(
+                                                    "a",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),
@@ -1010,7 +1040,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "a",
+                                                id: Identifier(
+                                                    "a",
+                                                ),
                                                 ctx: Store,
                                             },
                                         ),
@@ -1036,7 +1068,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -1078,7 +1112,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "a",
+                                                                id: Identifier(
+                                                                    "a",
+                                                                ),
                                                                 ctx: Store,
                                                             },
                                                         ),
@@ -1108,7 +1144,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "b",
+                                                                id: Identifier(
+                                                                    "b",
+                                                                ),
                                                                 ctx: Store,
                                                             },
                                                         ),
@@ -1170,7 +1208,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "a",
+                                                                id: Identifier(
+                                                                    "a",
+                                                                ),
                                                                 ctx: Store,
                                                             },
                                                         ),
@@ -1200,7 +1240,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
-                                                                id: "b",
+                                                                id: Identifier(
+                                                                    "b",
+                                                                ),
                                                                 ctx: Store,
                                                             },
                                                         ),
@@ -1231,7 +1273,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "x",
+                                        id: Identifier(
+                                            "x",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -1275,7 +1319,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "a",
+                                        id: Identifier(
+                                            "a",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -1319,7 +1365,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "a",
+                                        id: Identifier(
+                                            "a",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -1363,7 +1411,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "a",
+                                        id: Identifier(
+                                            "a",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -1389,7 +1439,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "b",
+                                        id: Identifier(
+                                            "b",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -1433,7 +1485,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "a",
+                                        id: Identifier(
+                                            "a",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),
@@ -1459,7 +1513,9 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "b",
+                                        id: Identifier(
+                                            "b",
+                                        ),
                                         ctx: Store,
                                     },
                                 ),

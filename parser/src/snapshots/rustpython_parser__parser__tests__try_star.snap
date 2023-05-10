@@ -25,7 +25,9 @@ expression: parse_ast
                                                     custom: (),
                                                     node: Name(
                                                         ExprName {
-                                                            id: "ExceptionGroup",
+                                                            id: Identifier(
+                                                                "ExceptionGroup",
+                                                            ),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -59,7 +61,9 @@ expression: parse_ast
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
-                                                                                            id: "ValueError",
+                                                                                            id: Identifier(
+                                                                                                "ValueError",
+                                                                                            ),
                                                                                             ctx: Load,
                                                                                         },
                                                                                     ),
@@ -92,7 +96,9 @@ expression: parse_ast
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
-                                                                                            id: "TypeError",
+                                                                                            id: Identifier(
+                                                                                                "TypeError",
+                                                                                            ),
                                                                                             ctx: Load,
                                                                                         },
                                                                                     ),
@@ -125,7 +131,9 @@ expression: parse_ast
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
-                                                                                            id: "OSError",
+                                                                                            id: Identifier(
+                                                                                                "OSError",
+                                                                                            ),
                                                                                             ctx: Load,
                                                                                         },
                                                                                     ),
@@ -158,7 +166,9 @@ expression: parse_ast
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
-                                                                                            id: "OSError",
+                                                                                            id: Identifier(
+                                                                                                "OSError",
+                                                                                            ),
                                                                                             ctx: Load,
                                                                                         },
                                                                                     ),
@@ -209,14 +219,18 @@ expression: parse_ast
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "TypeError",
+                                                id: Identifier(
+                                                    "TypeError",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
                                     },
                                 ),
                                 name: Some(
-                                    "e",
+                                    Identifier(
+                                        "e",
+                                    ),
                                 ),
                                 body: [
                                     Attributed {
@@ -234,7 +248,9 @@ expression: parse_ast
                                                                 custom: (),
                                                                 node: Name(
                                                                     ExprName {
-                                                                        id: "print",
+                                                                        id: Identifier(
+                                                                            "print",
+                                                                        ),
                                                                         ctx: Load,
                                                                     },
                                                                 ),
@@ -273,7 +289,9 @@ expression: parse_ast
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {
-                                                                                                                    id: "type",
+                                                                                                                    id: Identifier(
+                                                                                                                        "type",
+                                                                                                                    ),
                                                                                                                     ctx: Load,
                                                                                                                 },
                                                                                                             ),
@@ -284,7 +302,9 @@ expression: parse_ast
                                                                                                                 custom: (),
                                                                                                                 node: Name(
                                                                                                                     ExprName {
-                                                                                                                        id: "e",
+                                                                                                                        id: Identifier(
+                                                                                                                            "e",
+                                                                                                                        ),
                                                                                                                         ctx: Load,
                                                                                                                     },
                                                                                                                 ),
@@ -294,7 +314,9 @@ expression: parse_ast
                                                                                                     },
                                                                                                 ),
                                                                                             },
-                                                                                            conversion: 0,
+                                                                                            conversion: Int(
+                                                                                                0,
+                                                                                            ),
                                                                                             format_spec: None,
                                                                                         },
                                                                                     ),
@@ -326,17 +348,23 @@ expression: parse_ast
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {
-                                                                                                                    id: "e",
+                                                                                                                    id: Identifier(
+                                                                                                                        "e",
+                                                                                                                    ),
                                                                                                                     ctx: Load,
                                                                                                                 },
                                                                                                             ),
                                                                                                         },
-                                                                                                        attr: "exceptions",
+                                                                                                        attr: Identifier(
+                                                                                                            "exceptions",
+                                                                                                        ),
                                                                                                         ctx: Load,
                                                                                                     },
                                                                                                 ),
                                                                                             },
-                                                                                            conversion: 0,
+                                                                                            conversion: Int(
+                                                                                                0,
+                                                                                            ),
                                                                                             format_spec: None,
                                                                                         },
                                                                                     ),
@@ -368,14 +396,18 @@ expression: parse_ast
                                         custom: (),
                                         node: Name(
                                             ExprName {
-                                                id: "OSError",
+                                                id: Identifier(
+                                                    "OSError",
+                                                ),
                                                 ctx: Load,
                                             },
                                         ),
                                     },
                                 ),
                                 name: Some(
-                                    "e",
+                                    Identifier(
+                                        "e",
+                                    ),
                                 ),
                                 body: [
                                     Attributed {
@@ -393,7 +425,9 @@ expression: parse_ast
                                                                 custom: (),
                                                                 node: Name(
                                                                     ExprName {
-                                                                        id: "print",
+                                                                        id: Identifier(
+                                                                            "print",
+                                                                        ),
                                                                         ctx: Load,
                                                                     },
                                                                 ),
@@ -432,7 +466,9 @@ expression: parse_ast
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {
-                                                                                                                    id: "type",
+                                                                                                                    id: Identifier(
+                                                                                                                        "type",
+                                                                                                                    ),
                                                                                                                     ctx: Load,
                                                                                                                 },
                                                                                                             ),
@@ -443,7 +479,9 @@ expression: parse_ast
                                                                                                                 custom: (),
                                                                                                                 node: Name(
                                                                                                                     ExprName {
-                                                                                                                        id: "e",
+                                                                                                                        id: Identifier(
+                                                                                                                            "e",
+                                                                                                                        ),
                                                                                                                         ctx: Load,
                                                                                                                     },
                                                                                                                 ),
@@ -453,7 +491,9 @@ expression: parse_ast
                                                                                                     },
                                                                                                 ),
                                                                                             },
-                                                                                            conversion: 0,
+                                                                                            conversion: Int(
+                                                                                                0,
+                                                                                            ),
                                                                                             format_spec: None,
                                                                                         },
                                                                                     ),
@@ -485,17 +525,23 @@ expression: parse_ast
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {
-                                                                                                                    id: "e",
+                                                                                                                    id: Identifier(
+                                                                                                                        "e",
+                                                                                                                    ),
                                                                                                                     ctx: Load,
                                                                                                                 },
                                                                                                             ),
                                                                                                         },
-                                                                                                        attr: "exceptions",
+                                                                                                        attr: Identifier(
+                                                                                                            "exceptions",
+                                                                                                        ),
                                                                                                         ctx: Load,
                                                                                                     },
                                                                                                 ),
                                                                                             },
-                                                                                            conversion: 0,
+                                                                                            conversion: Int(
+                                                                                                0,
+                                                                                            ),
                                                                                             format_spec: None,
                                                                                         },
                                                                                     ),

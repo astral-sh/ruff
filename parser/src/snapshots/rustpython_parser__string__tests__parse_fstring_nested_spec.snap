@@ -13,12 +13,16 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "foo",
+                            id: Identifier(
+                                "foo",
+                            ),
                             ctx: Load,
                         },
                     ),
                 },
-                conversion: 0,
+                conversion: Int(
+                    0,
+                ),
                 format_spec: Some(
                     Attributed {
                         range: 0..15,
@@ -36,12 +40,16 @@ expression: parse_ast
                                                     custom: (),
                                                     node: Name(
                                                         ExprName {
-                                                            id: "spec",
+                                                            id: Identifier(
+                                                                "spec",
+                                                            ),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                 },
-                                                conversion: 0,
+                                                conversion: Int(
+                                                    0,
+                                                ),
                                                 format_spec: None,
                                             },
                                         ),

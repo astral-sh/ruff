@@ -56,7 +56,9 @@ Attributed {
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "c",
+                            id: Identifier(
+                                "c",
+                            ),
                             ctx: Load,
                         },
                     ),

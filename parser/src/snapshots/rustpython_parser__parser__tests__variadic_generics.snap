@@ -8,7 +8,9 @@ expression: parse_ast
         custom: (),
         node: FunctionDef(
             StmtFunctionDef {
-                name: "args_to_tuple",
+                name: Identifier(
+                    "args_to_tuple",
+                ),
                 args: Arguments {
                     posonlyargs: [],
                     args: [],
@@ -17,7 +19,9 @@ expression: parse_ast
                             range: 20..29,
                             custom: (),
                             node: ArgData {
-                                arg: "args",
+                                arg: Identifier(
+                                    "args",
+                                ),
                                 annotation: Some(
                                     Attributed {
                                         range: 26..29,
@@ -29,7 +33,9 @@ expression: parse_ast
                                                     custom: (),
                                                     node: Name(
                                                         ExprName {
-                                                            id: "Ts",
+                                                            id: Identifier(
+                                                                "Ts",
+                                                            ),
                                                             ctx: Load,
                                                         },
                                                     ),
@@ -80,7 +86,9 @@ expression: parse_ast
                                     custom: (),
                                     node: Name(
                                         ExprName {
-                                            id: "Tuple",
+                                            id: Identifier(
+                                                "Tuple",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),
@@ -95,7 +103,9 @@ expression: parse_ast
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {
-                                                        id: "Ts",
+                                                        id: Identifier(
+                                                            "Ts",
+                                                        ),
                                                         ctx: Load,
                                                     },
                                                 ),

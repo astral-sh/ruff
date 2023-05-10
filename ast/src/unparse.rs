@@ -1,5 +1,7 @@
 use crate::ConversionFlag;
-use crate::{Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, ExprKind, Operator};
+use crate::{
+    Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, ExprKind, Identifier, Operator,
+};
 use std::fmt;
 
 mod precedence {
@@ -31,6 +33,9 @@ impl<'a> Unparser<'a> {
 
     fn p(&mut self, s: &str) -> fmt::Result {
         self.f.write_str(s)
+    }
+    fn p_id(&mut self, s: &Identifier) -> fmt::Result {
+        self.f.write_str(s.as_str())
     }
     fn p_if(&mut self, cond: bool, s: &str) -> fmt::Result {
         if cond {
@@ -270,7 +275,7 @@ impl<'a> Unparser<'a> {
                     for kw in keywords {
                         self.p_delim(&mut first, ", ")?;
                         if let Some(arg) = &kw.node.arg {
-                            self.p(arg)?;
+                            self.p_id(arg)?;
                             self.p("=")?;
                         } else {
                             self.p("**")?;
@@ -284,7 +289,7 @@ impl<'a> Unparser<'a> {
                 value,
                 conversion,
                 format_spec,
-            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref())?,
+            }) => self.unparse_formatted(value, conversion.to_u32(), format_spec.as_deref())?,
             ExprKind::JoinedStr(crate::ExprJoinedStr { values }) => {
                 self.unparse_joined_str(values, false)?
             }
@@ -316,7 +321,7 @@ impl<'a> Unparser<'a> {
                     "."
                 };
                 self.p(period)?;
-                self.p(attr)?;
+                self.p_id(attr)?;
             }
             ExprKind::Subscript(crate::ExprSubscript { value, slice, .. }) => {
                 self.unparse_expr(value, precedence::ATOM)?;
@@ -337,7 +342,7 @@ impl<'a> Unparser<'a> {
                 self.p("*")?;
                 self.unparse_expr(value, precedence::EXPR)?;
             }
-            ExprKind::Name(crate::ExprName { id, .. }) => self.p(id)?,
+            ExprKind::Name(crate::ExprName { id, .. }) => self.p_id(id)?,
             ExprKind::List(crate::ExprList { elts, .. }) => {
                 self.p("[")?;
                 let mut first = true;
@@ -415,7 +420,7 @@ impl<'a> Unparser<'a> {
         Ok(())
     }
     fn unparse_arg<U>(&mut self, arg: &Arg<U>) -> fmt::Result {
-        self.p(&arg.node.arg)?;
+        self.p_id(&arg.node.arg)?;
         if let Some(ann) = &arg.node.annotation {
             write!(self, ": {}", **ann)?;
         }
@@ -424,7 +429,7 @@ impl<'a> Unparser<'a> {
 
     fn unparse_comp<U>(&mut self, generators: &[Comprehension<U>]) -> fmt::Result {
         for comp in generators {
-            self.p(if comp.is_async > 0 {
+            self.p(if comp.is_async.to_bool() {
                 " async for "
             } else {
                 " for "
@@ -497,7 +502,7 @@ impl<'a> Unparser<'a> {
                 value,
                 conversion,
                 format_spec,
-            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref()),
+            }) => self.unparse_formatted(value, conversion.to_u32(), format_spec.as_deref()),
             _ => unreachable!(),
         }
     }

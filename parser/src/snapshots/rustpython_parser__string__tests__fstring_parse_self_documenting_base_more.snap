@@ -49,12 +49,16 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "user",
+                            id: Identifier(
+                                "user",
+                            ),
                             ctx: Load,
                         },
                     ),
                 },
-                conversion: 114,
+                conversion: Int(
+                    114,
+                ),
                 format_spec: None,
             },
         ),
@@ -105,12 +109,16 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "second",
+                            id: Identifier(
+                                "second",
+                            ),
                             ctx: Load,
                         },
                     ),
                 },
-                conversion: 114,
+                conversion: Int(
+                    114,
+                ),
                 format_spec: None,
             },
         ),

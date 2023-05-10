@@ -18,7 +18,9 @@ expression: parse_ast
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "my_func",
+                                        id: Identifier(
+                                            "my_func",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
@@ -43,7 +45,9 @@ expression: parse_ast
                                     custom: (),
                                     node: KeywordData {
                                         arg: Some(
-                                            "keyword",
+                                            Identifier(
+                                                "keyword",
+                                            ),
                                         ),
                                         value: Attributed {
                                             range: 30..31,

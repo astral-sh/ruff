@@ -14,7 +14,9 @@ expression: parse_ast
                         custom: (),
                         node: Name(
                             ExprName {
-                                id: "array_slice",
+                                id: Identifier(
+                                    "array_slice",
+                                ),
                                 ctx: Store,
                             },
                         ),
@@ -30,7 +32,9 @@ expression: parse_ast
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "array",
+                                        id: Identifier(
+                                            "array",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
@@ -63,7 +67,9 @@ expression: parse_ast
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
-                                                                    id: "indexes",
+                                                                    id: Identifier(
+                                                                        "indexes",
+                                                                    ),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -122,7 +128,9 @@ expression: parse_ast
                                     custom: (),
                                     node: Name(
                                         ExprName {
-                                            id: "array",
+                                            id: Identifier(
+                                                "array",
+                                            ),
                                             ctx: Load,
                                         },
                                     ),
@@ -155,7 +163,9 @@ expression: parse_ast
                                                                 custom: (),
                                                                 node: Name(
                                                                     ExprName {
-                                                                        id: "indexes",
+                                                                        id: Identifier(
+                                                                            "indexes",
+                                                                        ),
                                                                         ctx: Load,
                                                                     },
                                                                 ),
@@ -200,7 +210,9 @@ expression: parse_ast
                     custom: (),
                     node: Name(
                         ExprName {
-                            id: "array_slice",
+                            id: Identifier(
+                                "array_slice",
+                            ),
                             ctx: Load,
                         },
                     ),
@@ -224,7 +236,9 @@ expression: parse_ast
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "array",
+                                        id: Identifier(
+                                            "array",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
@@ -245,7 +259,9 @@ expression: parse_ast
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
-                                                                    id: "indexes_to_select",
+                                                                    id: Identifier(
+                                                                        "indexes_to_select",
+                                                                    ),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -264,7 +280,9 @@ expression: parse_ast
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
-                                                                    id: "indexes_to_select",
+                                                                    id: Identifier(
+                                                                        "indexes_to_select",
+                                                                    ),
                                                                     ctx: Load,
                                                                 },
                                                             ),
@@ -300,7 +318,9 @@ expression: parse_ast
                                 custom: (),
                                 node: Name(
                                     ExprName {
-                                        id: "array",
+                                        id: Identifier(
+                                            "array",
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
@@ -358,7 +378,9 @@ expression: parse_ast
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
-                                                                    id: "indexes_to_select",
+                                                                    id: Identifier(
+                                                                        "indexes_to_select",
+                                                                    ),
                                                                     ctx: Load,
                                                                 },
                                                             ),
