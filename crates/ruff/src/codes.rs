@@ -215,6 +215,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W3301") => Rule::NestedMinMax,
         (Pylint, "E0241") => Rule::DuplicateBases,
 
+        // flake8-async
+        (Flake8Async, "100") => Rule::BlockingHttpCallInsideAsyncDef,
+        (Flake8Async, "101") => Rule::OpenSleepOrSubprocessInsideAsyncDef,
+        (Flake8Async, "102") => Rule::UnsafeOsMethodInsideAsyncDef,
+
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
         (Flake8Builtins, "002") => Rule::BuiltinArgumentShadowing,
