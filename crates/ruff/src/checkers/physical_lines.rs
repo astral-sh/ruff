@@ -118,7 +118,7 @@ pub fn check_physical_lines(
         }
 
         while doc_lines_iter
-            .next_if(|doc_line_start| line.range().contains(**doc_line_start))
+            .next_if(|doc_line_start| line.range().contains_inclusive(**doc_line_start))
             .is_some()
         {
             if enforce_doc_line_too_long {
