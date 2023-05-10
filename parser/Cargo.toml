@@ -9,7 +9,8 @@ license = "MIT"
 edition = "2021"
 
 [features]
-default = []
+default = ["location"]
+location = ["rustpython-ast/location"]
 serde = ["dep:serde", "rustpython-parser-core/serde"]
 
 [build-dependencies]

@@ -8,9 +8,9 @@ repository = "https://github.com/RustPython/RustPython"
 license = "MIT"
 
 [features]
-default = ["constant-optimization", "fold", "source-code"]
+default = ["location"]
 constant-optimization = ["fold"]
-source-code = ["fold"]
+location = ["fold", "rustpython-parser-core/location"]
 fold = []
 unparse = ["rustpython-literal"]
 visitor = []

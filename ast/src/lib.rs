@@ -8,7 +8,7 @@ mod generic {
     include!("gen/generic.rs");
 }
 mod impls;
-#[cfg(feature = "source-code")]
+#[cfg(feature = "location")]
 mod source_locator;
 #[cfg(feature = "unparse")]
 mod unparse;
@@ -32,11 +32,12 @@ mod visitor {
     include!("gen/visitor.rs");
 }
 
-#[cfg(feature = "source-code")]
+#[cfg(feature = "location")]
 pub mod located {
     include!("gen/located.rs");
 }
 
+#[cfg(feature = "location")]
 pub use rustpython_parser_core::source_code;
 #[cfg(feature = "visitor")]
 pub use visitor::Visitor;

@@ -11,7 +11,7 @@ rust-version = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_text_size = { workspace = true, features = ["serde"] }
+ruff_text_size = { path = "../ruff_text_size" }
 
 memchr = "2.5.0"
 once_cell = { workspace = true }
