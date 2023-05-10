@@ -1,3 +1,4 @@
+use ruff_python_semantic::binding::{BindingKind, Importation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, StmtKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Violation};
@@ -51,10 +52,29 @@ impl Violation for PandasUseOfInplaceArgument {
 pub fn inplace_argument(
     checker: &Checker,
     expr: &Expr,
+    func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Diagnostic> {
     let mut seen_star = false;
+    let mut is_checkable = false;
+    let mut is_pandas = false;
+
+    if let Some(call_path) = checker.ctx.resolve_call_path(func) {
+        is_checkable = true;
+
+        let module = call_path[0];
+        is_pandas = checker.ctx.find_binding(module).map_or(false, |binding| {
+            matches!(
+                binding.kind,
+                BindingKind::Importation(Importation {
+                    full_name: "pandas",
+                    ..
+                })
+            )
+        });
+    }
+
     for keyword in keywords.iter().rev() {
         let Some(arg) = &keyword.node.arg else {
             seen_star = true;
@@ -94,6 +114,13 @@ pub fn inplace_argument(
                         diagnostic.set_fix(fix);
                     }
                 }
+
+                // Without a static type system, only module-level functions could potentially be
+                // non-pandas calls. If they're not, `inplace` should be considered safe.
+                if is_checkable && !is_pandas {
+                    return None;
+                }
+
                 return Some(diagnostic);
             }
 

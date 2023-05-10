@@ -133,6 +133,8 @@ PD002.py:26:38: PD002 `inplace=True` should be avoided; it has inconsistent beha
 27 | 
 28 | x.apply(lambda x: x.sort_values('a', inplace=True))
    |                                      ^^^^^^^^^^^^ PD002
+29 | import torch
+30 | torch.m.ReLU(inplace=True) # safe because this isn't a pandas call
    |
    = help: Assign to variable; remove `inplace` arg
 
