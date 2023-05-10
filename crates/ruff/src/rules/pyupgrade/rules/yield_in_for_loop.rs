@@ -3,9 +3,10 @@ use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::types::RefEquality;
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{statement_visitor, visitor};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -59,7 +60,7 @@ struct YieldFromVisitor<'a> {
     yields: Vec<YieldFrom<'a>>,
 }
 
-impl<'a> Visitor<'a> for YieldFromVisitor<'a> {
+impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
             StmtKind::For {
@@ -97,20 +98,7 @@ impl<'a> Visitor<'a> for YieldFromVisitor<'a> {
             | StmtKind::ClassDef { .. } => {
                 // Don't recurse into anything that defines a new scope.
             }
-            _ => visitor::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::ListComp { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::GeneratorExp { .. }
-            | ExprKind::Lambda { .. } => {
-                // Don't recurse into anything that defines a new scope.
-            }
-            _ => visitor::walk_expr(self, expr),
+            _ => statement_visitor::walk_stmt(self, stmt),
         }
     }
 }

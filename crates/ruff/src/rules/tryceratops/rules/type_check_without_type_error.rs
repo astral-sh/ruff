@@ -2,8 +2,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 use crate::checkers::ast::Checker;
 
@@ -51,7 +50,7 @@ struct ControlFlowVisitor<'a> {
     continues: Vec<&'a Stmt>,
 }
 
-impl<'a, 'b> Visitor<'b> for ControlFlowVisitor<'a>
+impl<'a, 'b> StatementVisitor<'b> for ControlFlowVisitor<'a>
 where
     'b: 'a,
 {
@@ -65,19 +64,7 @@ where
             StmtKind::Return { .. } => self.returns.push(stmt),
             StmtKind::Break => self.breaks.push(stmt),
             StmtKind::Continue => self.continues.push(stmt),
-            _ => visitor::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr.node {
-            ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::GeneratorExp { .. } => {
-                // Don't recurse.
-            }
-            _ => visitor::walk_expr(self, expr),
+            _ => walk_stmt(self, stmt),
         }
     }
 }

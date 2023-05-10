@@ -18,8 +18,7 @@ use smallvec::SmallVec;
 use crate::call_path::CallPath;
 use crate::newlines::UniversalNewlineIterator;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
-use crate::visitor;
-use crate::visitor::Visitor;
+use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {
@@ -816,13 +815,13 @@ pub fn resolve_imported_module_path<'a>(
     Some(Cow::Owned(qualified_path))
 }
 
-/// A [`Visitor`] that collects all `return` statements in a function or method.
+/// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<Option<&'a Expr>>,
 }
 
-impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
+impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
 where
     'b: 'a,
 {
@@ -832,18 +831,18 @@ where
                 // Don't recurse.
             }
             StmtKind::Return { value } => self.returns.push(value.as_deref()),
-            _ => visitor::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
         }
     }
 }
 
-/// A [`Visitor`] that collects all `raise` statements in a function or method.
+/// A [`StatementVisitor`] that collects all `raise` statements in a function or method.
 #[derive(Default)]
 pub struct RaiseStatementVisitor<'a> {
     pub raises: Vec<(TextRange, Option<&'a Expr>, Option<&'a Expr>)>,
 }
 
-impl<'a, 'b> Visitor<'b> for RaiseStatementVisitor<'b>
+impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'b>
 where
     'b: 'a,
 {
@@ -859,19 +858,19 @@ where
             | StmtKind::Try { .. }
             | StmtKind::TryStar { .. } => {}
             StmtKind::If { body, orelse, .. } => {
-                visitor::walk_body(self, body);
-                visitor::walk_body(self, orelse);
+                walk_body(self, body);
+                walk_body(self, orelse);
             }
             StmtKind::While { body, .. }
             | StmtKind::With { body, .. }
             | StmtKind::AsyncWith { body, .. }
             | StmtKind::For { body, .. }
             | StmtKind::AsyncFor { body, .. } => {
-                visitor::walk_body(self, body);
+                walk_body(self, body);
             }
             StmtKind::Match { cases, .. } => {
                 for case in cases {
-                    visitor::walk_body(self, &case.body);
+                    walk_body(self, &case.body);
                 }
             }
             _ => {}
@@ -884,7 +883,7 @@ struct GlobalStatementVisitor<'a> {
     globals: FxHashMap<&'a str, &'a Stmt>,
 }
 
-impl<'a> Visitor<'a> for GlobalStatementVisitor<'a> {
+impl<'a> StatementVisitor<'a> for GlobalStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
             StmtKind::Global { names } => {
@@ -897,7 +896,7 @@ impl<'a> Visitor<'a> for GlobalStatementVisitor<'a> {
             | StmtKind::ClassDef { .. } => {
                 // Don't recurse.
             }
-            _ => visitor::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
         }
     }
 }

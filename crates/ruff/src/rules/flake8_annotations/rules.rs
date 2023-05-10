@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{cast, helpers};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::analyze::visibility::Visibility;
@@ -416,9 +416,7 @@ impl Violation for AnyType {
 
 fn is_none_returning(body: &[Stmt]) -> bool {
     let mut visitor = ReturnStatementVisitor::default();
-    for stmt in body {
-        visitor.visit_stmt(stmt);
-    }
+    visitor.visit_body(body);
     for expr in visitor.returns.into_iter().flatten() {
         if !matches!(
             expr.node,

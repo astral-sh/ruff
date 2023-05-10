@@ -8,7 +8,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_ast::imports::{ImportMap, ModuleImport};
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::directives::IsortDirectives;
