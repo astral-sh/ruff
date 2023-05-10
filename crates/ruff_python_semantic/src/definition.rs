@@ -2,11 +2,10 @@
 //! can be documented, such as a module, class, or function.
 
 use std::fmt::Debug;
-use std::iter::FusedIterator;
 use std::num::TryFromIntError;
 use std::ops::{Deref, Index};
 
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{self, Stmt, StmtKind};
 
 use crate::analyze::visibility::{
     class_visibility, function_visibility, method_visibility, ModuleSource, Visibility,
@@ -86,6 +85,17 @@ pub struct Member<'a> {
     pub stmt: &'a Stmt,
 }
 
+impl<'a> Member<'a> {
+    fn name(&self) -> &'a str {
+        match &self.stmt.node {
+            StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. }) => name,
+            StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name,
+            StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => name,
+            _ => unreachable!("Unexpected member kind: {:?}", self.kind),
+        }
+    }
+}
+
 /// A definition within a Python program.
 #[derive(Debug)]
 pub enum Definition<'a> {
@@ -125,13 +135,76 @@ impl<'a> Definitions<'a> {
         next_id
     }
 
-    /// Iterate over all definitions in a program, with their visibilities.
-    pub fn iter(&self) -> DefinitionsIter {
-        DefinitionsIter {
-            inner: self.0.iter(),
-            definitions: Vec::with_capacity(self.0.len()),
-            visibilities: Vec::with_capacity(self.0.len()),
+    /// Resolve the visibility of each definition in the collection.
+    pub fn resolve(self, exports: Option<&[&str]>) -> ContextualizedDefinitions<'a> {
+        let mut definitions: Vec<ContextualizedDefinition<'a>> = Vec::with_capacity(self.len());
+
+        for definition in self {
+            // Determine the visibility of the next definition, taking into account its parent's
+            // visibility.
+            let visibility = {
+                match &definition {
+                    Definition::Module(module) => module.source.to_visibility(),
+                    Definition::Member(member) => match member.kind {
+                        MemberKind::Class => {
+                            let parent = &definitions[usize::from(member.parent)];
+                            if parent.visibility.is_private()
+                                || exports
+                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                            {
+                                Visibility::Private
+                            } else {
+                                class_visibility(member.stmt)
+                            }
+                        }
+                        MemberKind::NestedClass => {
+                            let parent = &definitions[usize::from(member.parent)];
+                            if parent.visibility.is_private()
+                                || matches!(
+                                    parent.definition,
+                                    Definition::Member(Member {
+                                        kind: MemberKind::Function
+                                            | MemberKind::NestedFunction
+                                            | MemberKind::Method,
+                                        ..
+                                    })
+                                )
+                            {
+                                Visibility::Private
+                            } else {
+                                class_visibility(member.stmt)
+                            }
+                        }
+                        MemberKind::Function => {
+                            let parent = &definitions[usize::from(member.parent)];
+                            if parent.visibility.is_private()
+                                || exports
+                                    .map_or(false, |exports| !exports.contains(&member.name()))
+                            {
+                                Visibility::Private
+                            } else {
+                                function_visibility(member.stmt)
+                            }
+                        }
+                        MemberKind::NestedFunction => Visibility::Private,
+                        MemberKind::Method => {
+                            let parent = &definitions[usize::from(member.parent)];
+                            if parent.visibility.is_private() {
+                                Visibility::Private
+                            } else {
+                                method_visibility(member.stmt)
+                            }
+                        }
+                    },
+                }
+            };
+            definitions.push(ContextualizedDefinition {
+                definition,
+                visibility,
+            });
         }
+
+        ContextualizedDefinitions(definitions)
     }
 }
 
@@ -150,76 +223,26 @@ impl<'a> Deref for Definitions<'a> {
     }
 }
 
-pub struct DefinitionsIter<'a> {
-    inner: std::slice::Iter<'a, Definition<'a>>,
-    definitions: Vec<&'a Definition<'a>>,
-    visibilities: Vec<Visibility>,
-}
+impl<'a> IntoIterator for Definitions<'a> {
+    type Item = Definition<'a>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
-impl<'a> Iterator for DefinitionsIter<'a> {
-    type Item = (&'a Definition<'a>, Visibility);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let definition = self.inner.next()?;
-
-        // Determine the visibility of the next definition, taking into account its parent's
-        // visibility.
-        let visibility = {
-            match definition {
-                Definition::Module(module) => module.source.to_visibility(),
-                Definition::Member(member) => match member.kind {
-                    MemberKind::Class => {
-                        if self.visibilities[usize::from(member.parent)].is_private() {
-                            Visibility::Private
-                        } else {
-                            class_visibility(member.stmt)
-                        }
-                    }
-                    MemberKind::NestedClass => {
-                        if self.visibilities[usize::from(member.parent)].is_private()
-                            || matches!(
-                                self.definitions[usize::from(member.parent)],
-                                Definition::Member(Member {
-                                    kind: MemberKind::Function
-                                        | MemberKind::NestedFunction
-                                        | MemberKind::Method,
-                                    ..
-                                })
-                            )
-                        {
-                            Visibility::Private
-                        } else {
-                            class_visibility(member.stmt)
-                        }
-                    }
-                    MemberKind::Function => {
-                        if self.visibilities[usize::from(member.parent)].is_private() {
-                            Visibility::Private
-                        } else {
-                            function_visibility(member.stmt)
-                        }
-                    }
-                    MemberKind::NestedFunction => Visibility::Private,
-                    MemberKind::Method => {
-                        if self.visibilities[usize::from(member.parent)].is_private() {
-                            Visibility::Private
-                        } else {
-                            method_visibility(member.stmt)
-                        }
-                    }
-                },
-            }
-        };
-        self.definitions.push(definition);
-        self.visibilities.push(visibility);
-
-        Some((definition, visibility))
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
-impl FusedIterator for DefinitionsIter<'_> {}
-impl ExactSizeIterator for DefinitionsIter<'_> {}
+/// A [`Definition`] in a Python program with its resolved [`Visibility`].
+pub struct ContextualizedDefinition<'a> {
+    pub definition: Definition<'a>,
+    pub visibility: Visibility,
+}
+
+/// A collection of [`Definition`] structs in a Python program with resolved [`Visibility`].
+pub struct ContextualizedDefinitions<'a>(Vec<ContextualizedDefinition<'a>>);
+
+impl<'a> ContextualizedDefinitions<'a> {
+    pub fn iter(&self) -> impl Iterator<Item = &ContextualizedDefinition<'a>> {
+        self.0.iter()
+    }
+}
