@@ -329,13 +329,11 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
             print()
             print("| Rule | Changes | Additions | Removals |")
             print("| ---- | ------- | --------- | -------- |")
-            for rule, (additions, removals) in dict(
-                sorted(
-                    rule_changes.items(),
-                    key=lambda x: (x[1][0] + x[1][1]),
-                    reverse=True,
-                ),
-            ).items():
+            for rule, (additions, removals) in sorted(
+                rule_changes.items(),
+                key=lambda x: (x[1][0] + x[1][1]),
+                reverse=True,
+            ):
                 print(f"| {rule} | {additions + removals} | {additions} | {removals} |")
 
     logger.debug(f"Finished {len(repositories)} repositories")
