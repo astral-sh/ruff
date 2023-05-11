@@ -33,7 +33,6 @@ impl Violation for BlockingHttpCallInsideAsyncDef {
 /// ASY100
 // TODO: Implement
 pub fn blocking_http_call_inside_async_def(checker: &mut Checker, func: &Expr) {
-
     let diagnostic = Diagnostic::new(BlockingHttpCallInsideAsyncDef, func.range());
 
     if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
@@ -74,15 +73,12 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
 pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Call { func, .. } = &expr.node {
         if let Some(call_path) = collect_call_path(func) {
-                    if call_path.as_slice() == ["sleep"] ||
-                        call_path.as_slice() == ["open"] ||
-                        call_path.as_slice() == ["subprocess.call"]
-                    {
-                        checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, expr.range));
-                    }
-                }
+            if call_path.as_slice() == ["time", "sleep"]
+            {
+                checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, expr.range));
+            }
+        }
     }
-
 }
 
 /// ## What it does
