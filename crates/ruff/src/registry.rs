@@ -192,7 +192,6 @@ ruff_macros::register_rules!(
     rules::pylint::rules::NestedMinMax,
     rules::pylint::rules::DuplicateBases,
     // flake8-async
-    // TODO: Fix import issues
     rules::flake8_async::rules::BlockingHttpCallInsideAsyncDef,
     rules::flake8_async::rules::OpenSleepOrSubprocessInsideAsyncDef,
     rules::flake8_async::rules::UnsafeOsMethodInsideAsyncDef,

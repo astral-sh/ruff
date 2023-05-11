@@ -1,4 +1,8 @@
-use ruff_diagnostics::Violation;
+use rustpython_parser::ast::{Expr, Keyword};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::scope::FunctionDef;
+use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
 // TODO: Fix docstrings and improve messages
@@ -23,9 +27,19 @@ impl Violation for BlockingHttpCallInsideAsyncDef {
         format!("Async functions should not call a blocking HTTP method")
     }
 }
+
 /// ASY100
 // TODO: Implement
-// pub fn blocking_http_call_inside_async_def {}
+pub fn blocking_http_call_inside_async_def(checker: &mut Checker, func: &Expr) {
+
+    let diagnostic = Diagnostic::new(BlockingHttpCallInsideAsyncDef, func.range());
+
+    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
+        return;
+    }
+
+    checker.diagnostics.push(diagnostic);
+}
 
 
 /// ## What it does
@@ -55,7 +69,15 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
 
 /// ASY101
 // TODO: Implement
-// pub fn open_sleep_or_subprocess_inside_async_def {}
+pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, func: &Expr) {
+    let diagnostic = Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, func.range());
+
+    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
+        return;
+    }
+
+    checker.diagnostics.push(diagnostic);
+}
 
 /// ## What it does
 /// Checks that async functions do not contain a call to an unsafe `os` method
@@ -72,6 +94,7 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
 pub struct UnsafeOsMethodInsideAsyncDef;
 
 impl Violation for UnsafeOsMethodInsideAsyncDef {
+    #[derive_message_formats]
     fn message(&self) -> String {
         format!("Async functions should not contain a call to unsafe `os` methods")
     }
@@ -79,4 +102,12 @@ impl Violation for UnsafeOsMethodInsideAsyncDef {
 
 /// ASY102
 // TODO: Implement
-// pub fn unsafe_os_method_inside_async_def {}
+pub fn unsafe_os_method_inside_async_def(checker: &mut Checker, func: &Expr) {
+    let diagnostic = Diagnostic::new(UnsafeOsMethodInsideAsyncDef, func.range());
+
+    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
+        return;
+    }
+
+    checker.diagnostics.push(diagnostic);
+}

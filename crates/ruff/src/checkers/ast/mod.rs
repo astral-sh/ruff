@@ -2584,6 +2584,17 @@ where
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
 
+                // flake8-async
+                if self.settings.rules.enabled(Rule::BlockingHttpCallInsideAsyncDef) {
+                    flake8_async::rules::blocking_http_call_inside_async_def(self, func);
+                }
+                if self.settings.rules.enabled(Rule::OpenSleepOrSubprocessInsideAsyncDef) {
+                    flake8_async::rules::open_sleep_or_subprocess_inside_async_def(self, func);
+                }
+                if self.settings.rules.enabled(Rule::UnsafeOsMethodInsideAsyncDef) {
+                    flake8_async::rules::unsafe_os_method_inside_async_def(self, func);
+                }
+
                 // flake8-print
                 if self
                     .settings
