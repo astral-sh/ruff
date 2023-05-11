@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule};
@@ -71,11 +72,23 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
 /// ASY101
 // TODO: Implement
 pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Call { func, .. } = &expr.node {
-        if let Some(call_path) = collect_call_path(func) {
-            if call_path.as_slice() == ["time", "sleep"]
-            {
-                checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, expr.range));
+    if checker
+        .ctx
+        .scopes()
+        .find_map(|scope| {
+            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
+                Some(*async_)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(false) {
+        if let ExprKind::Call { func, .. } = &expr.node {
+            if let Some(call_path) = collect_call_path(func) {
+                if call_path.as_slice() == ["time", "sleep"]
+                {
+                    checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, expr.range));
+                }
             }
         }
     }
