@@ -307,7 +307,7 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
                         # Which was found in local testing
                         continue
 
-                    rule_code = matches[0][2:]
+                    rule_code = matches[0][2:]  # Trim leading ": "
 
                     # Get current additions and removals for this rule
                     current_changes = rule_changes.get(rule_code, (0, 0))
