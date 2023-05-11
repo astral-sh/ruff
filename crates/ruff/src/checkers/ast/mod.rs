@@ -28,7 +28,7 @@ use ruff_python_semantic::binding::{
     Importation, StarImportation, SubmoduleImportation,
 };
 use ruff_python_semantic::context::Context;
-use ruff_python_semantic::definition::{Module, ModuleKind};
+use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -5393,10 +5393,23 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let mut overloaded_name: Option<String> = None;
-
+        // Compute visibility of all definitions.
+        let global_scope = self.ctx.global_scope();
+        let exports: Option<&[&str]> = global_scope
+            .get("__all__")
+            .map(|index| &self.ctx.bindings[*index])
+            .and_then(|binding| match &binding.kind {
+                BindingKind::Export(Export { names }) => Some(names.as_slice()),
+                _ => None,
+            });
         let definitions = std::mem::take(&mut self.ctx.definitions);
-        for (definition, visibility) in definitions.iter() {
+
+        let mut overloaded_name: Option<String> = None;
+        for ContextualizedDefinition {
+            definition,
+            visibility,
+        } in definitions.resolve(exports).iter()
+        {
             let docstring = docstrings::extraction::extract_docstring(definition);
 
             // flake8-annotations
@@ -5415,7 +5428,9 @@ impl<'a> Checker<'a> {
                 }) {
                     self.diagnostics
                         .extend(flake8_annotations::rules::definition(
-                            self, definition, visibility,
+                            self,
+                            definition,
+                            *visibility,
                         ));
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, definition);
@@ -5442,7 +5457,7 @@ impl<'a> Checker<'a> {
 
                 // Extract a `Docstring` from a `Definition`.
                 let Some(expr) = docstring else {
-                    pydocstyle::rules::not_missing(self, definition, visibility);
+                    pydocstyle::rules::not_missing(self, definition, *visibility);
                     continue;
                 };
 
