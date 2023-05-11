@@ -171,6 +171,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "C0414") => Rule::UselessImportAlias,
         (Pylint, "C1901") => Rule::CompareToEmptyString,
         (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
+        (Pylint, "E1128") => Rule::AssignmentFromNone,
         (Pylint, "E0100") => Rule::YieldInInit,
         (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0116") => Rule::ContinueInFinally,

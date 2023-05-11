@@ -19,6 +19,7 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
+    #[test_case(Rule::AssignmentFromNone, Path::new("assignment_from_none.py"); "PLE1128")]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"); "PLE1142")]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"); "PLW0129")]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]

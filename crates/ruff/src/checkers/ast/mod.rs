@@ -1647,6 +1647,9 @@ where
                 if self.settings.rules.enabled(Rule::AssertOnStringLiteral) {
                     pylint::rules::assert_on_string_literal(self, test);
                 }
+                if self.settings.rules.enabled(Rule::AssignmentFromNone) {
+                    pylint::rules::assignment_from_none(self, test);
+                }
             }
             StmtKind::With { items, body, .. } => {
                 if self.settings.rules.enabled(Rule::AssertRaisesException) {
