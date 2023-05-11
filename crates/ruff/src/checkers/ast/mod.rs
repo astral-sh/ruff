@@ -697,6 +697,10 @@ where
                 if self.settings.rules.enabled(Rule::ReturnInInit) {
                     pylint::rules::return_in_init(self, stmt);
                 }
+                if self.settings.rules.enabled(Rule::AssignmentFromNone) {
+                    pylint::rules::assignment_from_none(self,
+                        stmt,);
+                }
             }
             StmtKind::ClassDef {
                 name,
@@ -1656,9 +1660,6 @@ where
                 }
                 if self.settings.rules.enabled(Rule::AssertOnStringLiteral) {
                     pylint::rules::assert_on_string_literal(self, test);
-                }
-                if self.settings.rules.enabled(Rule::AssignmentFromNone) {
-                    pylint::rules::assignment_from_none(self, test);
                 }
             }
             StmtKind::With { items, body, .. } => {

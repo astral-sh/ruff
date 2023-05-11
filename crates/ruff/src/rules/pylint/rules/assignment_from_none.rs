@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -8,8 +8,6 @@ use crate::checkers::ast::Checker;
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Kind {
     Empty,
-    NonEmpty,
-    Unknown,
 }
 
 /// ## What it does
@@ -22,7 +20,7 @@ enum Kind {
 /// ## Example
 /// ```python
 /// def func():
-/// return None
+///     return None
 ///
 /// def foo():
 ///     return func()
@@ -37,18 +35,14 @@ impl Violation for AssignmentFromNone {
     fn message(&self) -> String {
         let AssignmentFromNone { kind } = self;
         match kind {
-            Kind::Empty => format!("Asserting on an empty string literal will never pass"),
-            Kind::NonEmpty => format!("Asserting on a non-empty string literal will always pass"),
-            Kind::Unknown => format!("Asserting on a string literal may have unintended results"),
+            Kind::Empty => format!("Return statement found"),
         }
     }
 }
 /// PLE1128
-pub fn assignment_from_none(checker: &mut Checker, test: &Expr) {
-    println!("Running!");
-    println!("{:?}", &test);
-    match &test.node {
-        ExprKind::Constant { value, .. } => {checker.diagnostics.push(Diagnostic::new(AssignmentFromNone{kind: Kind::Empty}, test.range()));}
+pub fn assignment_from_none(checker: &mut Checker,body: &Stmt,) {
+    match body.node {
+        StmtKind::Return {  .. } => {checker.diagnostics.push(Diagnostic::new(AssignmentFromNone{kind: Kind::Empty}, body.range()));}
         _ => {}
     }
 }
