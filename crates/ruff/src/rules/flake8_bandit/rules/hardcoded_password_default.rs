@@ -7,26 +7,29 @@ use super::super::helpers::{matches_password_name, string_literal};
 
 #[violation]
 pub struct HardcodedPasswordDefault {
-    string: String,
+    name: String,
 }
 
 impl Violation for HardcodedPasswordDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HardcodedPasswordDefault { string } = self;
-        format!("Possible hardcoded password: \"{}\"", string.escape_debug())
+        let HardcodedPasswordDefault { name } = self;
+        format!(
+            "Possible hardcoded password assigned to function default: \"{}\"",
+            name.escape_debug()
+        )
     }
 }
 
 fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
-    let string = string_literal(default).filter(|string| !string.is_empty())?;
+    string_literal(default).filter(|string| !string.is_empty())?;
     let kwarg_name = &arg.node.arg;
     if !matches_password_name(kwarg_name) {
         return None;
     }
     Some(Diagnostic::new(
         HardcodedPasswordDefault {
-            string: string.to_string(),
+            name: kwarg_name.to_string(),
         },
         default.range(),
     ))
