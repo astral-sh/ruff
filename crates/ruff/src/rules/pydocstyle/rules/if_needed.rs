@@ -3,9 +3,10 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_semantic::analyze::visibility::is_overload;
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::docstrings::Docstring;
 
 #[violation]
 pub struct OverloadWithDocstring;
@@ -19,12 +20,12 @@ impl Violation for OverloadWithDocstring {
 
 /// D418
 pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {
-    let (
-        DefinitionKind::Function(stmt)
-        | DefinitionKind::NestedFunction(stmt)
-        | DefinitionKind::Method(stmt)
-    ) = docstring.kind else {
-        return
+    let Definition::Member(Member {
+        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
+        stmt,
+        ..
+    }) = docstring.definition else {
+        return;
     };
     if !is_overload(&checker.ctx, cast::decorator_list(stmt)) {
         return;

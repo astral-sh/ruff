@@ -9,9 +9,10 @@ use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::cast;
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
@@ -22,23 +23,26 @@ pub fn non_imperative_mood(
     docstring: &Docstring,
     property_decorators: &BTreeSet<String>,
 ) {
-    let (
-        DefinitionKind::Function(parent)
-        | DefinitionKind::NestedFunction(parent)
-        | DefinitionKind::Method(parent)
-    ) = &docstring.kind else {
+    let Definition::Member(Member { kind, stmt, .. }) = &docstring.definition else {
         return;
     };
+
+    if !matches!(
+        kind,
+        MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
+    ) {
+        return;
+    }
 
     let property_decorators = property_decorators
         .iter()
         .map(|decorator| from_qualified_name(decorator))
         .collect::<Vec<CallPath>>();
 
-    if is_test(cast::name(parent))
+    if is_test(cast::name(stmt))
         || is_property(
             &checker.ctx,
-            cast::decorator_list(parent),
+            cast::decorator_list(stmt),
             &property_decorators,
         )
     {

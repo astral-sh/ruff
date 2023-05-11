@@ -4,7 +4,7 @@ use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
