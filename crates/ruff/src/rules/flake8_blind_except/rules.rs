@@ -59,9 +59,8 @@ pub fn blind_except(
                 if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
                     if let ExprKind::Call(ast::ExprCall { func, keywords, .. }) = &value.node {
                         if logging::is_logger_candidate(&checker.ctx, func) {
-                            if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node
-                            {
-                                let attr = attr.as_str();
+                            if let Some(attribute) = func.node.as_attribute_expr() {
+                                let attr = attribute.attr.as_str();
                                 if attr == "exception" {
                                     return true;
                                 }
