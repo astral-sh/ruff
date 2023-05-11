@@ -50,3 +50,11 @@ bindings = "bin"
 manifest-path = "crates/ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true
+
+[tool.black]
+force-exclude = '''
+/(
+  | crates/ruff/resources
+  | crates/ruff_python_formatter/resources
+)/
+'''
