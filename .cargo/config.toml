@@ -33,4 +33,5 @@ rustflags = [
   "-Wclippy::rc_buffer",
   "-Wclippy::rc_mutex",
   "-Wclippy::rest_pat_in_fully_bound_structs",
+  "-Wunreachable_pub"
 ]
