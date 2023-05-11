@@ -14,7 +14,7 @@ impl Violation for ExecBuiltin {
 }
 
 /// S102
-pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
+pub(crate) fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
     let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return None;
     };

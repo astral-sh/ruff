@@ -25,7 +25,12 @@ impl Violation for RepeatedIsinstanceCalls {
 }
 
 /// PLR1701
-pub fn repeated_isinstance_calls(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {
+pub(crate) fn repeated_isinstance_calls(
+    checker: &mut Checker,
+    expr: &Expr,
+    op: &Boolop,
+    values: &[Expr],
+) {
     if !matches!(op, Boolop::Or) || !checker.ctx.is_builtin("isinstance") {
         return;
     }

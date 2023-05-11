@@ -38,7 +38,12 @@ impl AlwaysAutofixableViolation for UnnecessaryListCall {
 }
 
 /// C411
-pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn unnecessary_list_call(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };

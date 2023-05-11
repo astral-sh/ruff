@@ -25,7 +25,7 @@ const MUTABLE_FUNCS: &[&[&str]] = &[
     &["collections", "deque"],
 ];
 
-pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
+pub(crate) fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
     checker
         .ctx
         .resolve_call_path(func)
@@ -50,7 +50,7 @@ fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
 }
 
 /// B006
-pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Scan in reverse order to right-align zip().
     for (arg, default) in arguments
         .kwonlyargs

@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum AssertionKind {
+pub(crate) enum AssertionKind {
     AssertRaises,
     PytestRaises,
 }
@@ -50,7 +50,7 @@ impl Violation for AssertRaisesException {
 }
 
 /// B017
-pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[Withitem]) {
+pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[Withitem]) {
     let Some(item) = items.first() else {
         return;
     };

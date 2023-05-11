@@ -1,7 +1,7 @@
 #[derive(Default, Debug)]
 pub(crate) struct PanicError {
-    pub info: String,
-    pub backtrace: Option<std::backtrace::Backtrace>,
+    pub(crate) info: String,
+    pub(crate) backtrace: Option<std::backtrace::Backtrace>,
 }
 
 impl std::fmt::Display for PanicError {

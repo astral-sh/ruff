@@ -9,7 +9,7 @@ use ruff_python_semantic::context::Context;
 use crate::{checkers::ast::Checker, registry::AsRule};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MinMax {
+pub(crate) enum MinMax {
     Min,
     Max,
 }
@@ -87,7 +87,7 @@ fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec
 }
 
 /// W3301
-pub fn nested_min_max(
+pub(crate) fn nested_min_max(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

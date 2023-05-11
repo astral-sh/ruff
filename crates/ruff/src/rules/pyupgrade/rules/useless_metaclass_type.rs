@@ -44,7 +44,12 @@ fn rule(targets: &[Expr], value: &Expr, location: TextRange) -> Option<Diagnosti
 }
 
 /// UP001
-pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
+pub(crate) fn useless_metaclass_type(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    value: &Expr,
+    targets: &[Expr],
+) {
     let Some(mut diagnostic) =
         rule(targets, value, stmt.range()) else {
             return;

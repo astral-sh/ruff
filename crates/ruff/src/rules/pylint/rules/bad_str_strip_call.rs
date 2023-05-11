@@ -30,14 +30,14 @@ impl Violation for BadStrStripCall {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum StripKind {
+pub(crate) enum StripKind {
     Strip,
     LStrip,
     RStrip,
 }
 
 impl StripKind {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub(crate) fn from_str(s: &str) -> Option<Self> {
         match s {
             "strip" => Some(Self::Strip),
             "lstrip" => Some(Self::LStrip),
@@ -59,13 +59,13 @@ impl fmt::Display for StripKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum RemovalKind {
+pub(crate) enum RemovalKind {
     RemovePrefix,
     RemoveSuffix,
 }
 
 impl RemovalKind {
-    pub fn for_strip(s: StripKind) -> Option<Self> {
+    pub(crate) fn for_strip(s: StripKind) -> Option<Self> {
         match s {
             StripKind::Strip => None,
             StripKind::LStrip => Some(Self::RemovePrefix),
@@ -106,7 +106,7 @@ fn has_duplicates(s: &str) -> bool {
 }
 
 /// PLE1310
-pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
         if matches!(
             value.node,

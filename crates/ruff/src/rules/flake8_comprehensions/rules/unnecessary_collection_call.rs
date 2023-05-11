@@ -52,7 +52,7 @@ impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
 }
 
 /// C408
-pub fn unnecessary_collection_call(
+pub(crate) fn unnecessary_collection_call(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

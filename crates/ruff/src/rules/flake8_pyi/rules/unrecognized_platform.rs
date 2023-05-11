@@ -89,7 +89,7 @@ impl Violation for UnrecognizedPlatformName {
 }
 
 /// PYI007, PYI008
-pub fn unrecognized_platform(
+pub(crate) fn unrecognized_platform(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,

@@ -1,16 +1,16 @@
-pub use assignment_to_df::{assignment_to_df, PandasDfVariableName};
-pub use check_attr::{
+pub(crate) use assignment_to_df::{assignment_to_df, PandasDfVariableName};
+pub(crate) use check_attr::{
     check_attr, PandasUseOfDotAt, PandasUseOfDotIat, PandasUseOfDotIx, PandasUseOfDotValues,
 };
-pub use check_call::{
+pub(crate) use check_call::{
     check_call, PandasUseOfDotIsNull, PandasUseOfDotNotNull, PandasUseOfDotPivotOrUnstack,
     PandasUseOfDotReadTable, PandasUseOfDotStack,
 };
-pub use inplace_argument::{inplace_argument, PandasUseOfInplaceArgument};
-pub use pd_merge::{use_of_pd_merge, PandasUseOfPdMerge};
+pub(crate) use inplace_argument::{inplace_argument, PandasUseOfInplaceArgument};
+pub(crate) use pd_merge::{use_of_pd_merge, PandasUseOfPdMerge};
 
-pub mod assignment_to_df;
-pub mod check_attr;
-pub mod check_call;
-pub mod inplace_argument;
-pub mod pd_merge;
+pub(crate) mod assignment_to_df;
+pub(crate) mod check_attr;
+pub(crate) mod check_call;
+pub(crate) mod inplace_argument;
+pub(crate) mod pd_merge;

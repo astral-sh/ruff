@@ -34,7 +34,7 @@ fn add_check_for_node<T>(checker: &mut Checker, node: &Attributed<T>) {
 }
 
 /// UP023
-pub fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import(ast::StmtImport { names }) => {
             // Ex) `import xml.etree.cElementTree as ET`

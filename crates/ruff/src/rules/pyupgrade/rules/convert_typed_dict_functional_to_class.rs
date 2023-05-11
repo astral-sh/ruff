@@ -221,7 +221,7 @@ fn convert_to_class(
 }
 
 /// UP013
-pub fn convert_typed_dict_functional_to_class(
+pub(crate) fn convert_typed_dict_functional_to_class(
     checker: &mut Checker,
     stmt: &Stmt,
     targets: &[Expr],

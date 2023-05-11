@@ -46,7 +46,7 @@ impl AlwaysAutofixableViolation for UselessReturn {
 }
 
 /// PLR1711
-pub fn useless_return<'a>(
+pub(crate) fn useless_return<'a>(
     checker: &mut Checker<'a>,
     stmt: &'a Stmt,
     body: &'a [Stmt],

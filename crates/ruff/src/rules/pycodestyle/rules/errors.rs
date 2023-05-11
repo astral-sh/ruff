@@ -34,7 +34,7 @@ impl Violation for SyntaxError {
 }
 
 /// E901
-pub fn syntax_error(
+pub(crate) fn syntax_error(
     diagnostics: &mut Vec<Diagnostic>,
     parse_error: &ParseError,
     locator: &Locator,

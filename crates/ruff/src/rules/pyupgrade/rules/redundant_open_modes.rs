@@ -170,7 +170,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
 }
 
 /// UP015
-pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
     if !checker.ctx.is_builtin(OPEN_FUNC_NAME) {
         return;

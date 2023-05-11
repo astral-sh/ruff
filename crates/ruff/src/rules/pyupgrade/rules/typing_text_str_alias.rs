@@ -21,7 +21,7 @@ impl AlwaysAutofixableViolation for TypingTextStrAlias {
 }
 
 /// UP019
-pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
     if checker
         .ctx
         .resolve_call_path(expr)

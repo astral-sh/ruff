@@ -136,7 +136,7 @@ fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn categorize_imports<'a>(
+pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
     package: Option<&Path>,

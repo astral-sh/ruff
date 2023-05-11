@@ -40,7 +40,7 @@ impl AlwaysAutofixableViolation for UnnecessaryListComprehensionSet {
 }
 
 /// C403 (`set([...])`)
-pub fn unnecessary_list_comprehension_set(
+pub(crate) fn unnecessary_list_comprehension_set(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

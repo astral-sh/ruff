@@ -46,7 +46,7 @@ fn is_standalone_comment(line: &str) -> bool {
 }
 
 /// ERA001
-pub fn commented_out_code(
+pub(crate) fn commented_out_code(
     locator: &Locator,
     range: TextRange,
     settings: &Settings,

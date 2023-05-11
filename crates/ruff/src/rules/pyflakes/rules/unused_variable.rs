@@ -310,7 +310,7 @@ fn remove_unused_variable(
 }
 
 /// F841
-pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
+pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
     let scope = &checker.ctx.scopes[scope];
     if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
         return;

@@ -89,7 +89,11 @@ fn check_patch_call(
     None
 }
 
-pub fn patch_with_lambda(call: &Expr, args: &[Expr], keywords: &[Keyword]) -> Option<Diagnostic> {
+pub(crate) fn patch_with_lambda(
+    call: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) -> Option<Diagnostic> {
     if let Some(call_path) = compose_call_path(call) {
         if PATCH_NAMES.contains(&call_path.as_str()) {
             check_patch_call(call, args, keywords, 1)

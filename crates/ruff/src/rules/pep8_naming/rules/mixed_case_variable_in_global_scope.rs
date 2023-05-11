@@ -60,7 +60,7 @@ impl Violation for MixedCaseVariableInGlobalScope {
 }
 
 /// N816
-pub fn mixed_case_variable_in_global_scope(
+pub(crate) fn mixed_case_variable_in_global_scope(
     checker: &mut Checker,
     expr: &Expr,
     stmt: &Stmt,

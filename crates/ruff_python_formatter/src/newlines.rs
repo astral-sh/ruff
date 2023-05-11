@@ -353,7 +353,7 @@ impl<'a> Visitor<'a> for ExprNormalizer {
     }
 }
 
-pub fn normalize_newlines(python_cst: &mut [Stmt]) {
+pub(crate) fn normalize_newlines(python_cst: &mut [Stmt]) {
     let mut normalizer = StmtNormalizer {
         depth: Depth::TopLevel,
         trailer: Trailer::None,

@@ -69,7 +69,7 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 
 /// B024
 /// B027
-pub fn abstract_base_class(
+pub(crate) fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,

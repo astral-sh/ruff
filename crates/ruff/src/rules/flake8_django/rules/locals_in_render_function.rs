@@ -43,7 +43,7 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-pub fn locals_in_render_function(
+pub(crate) fn locals_in_render_function(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

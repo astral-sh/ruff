@@ -119,7 +119,11 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC001, ISC002
-pub fn implicit(tokens: &[LexResult], settings: &Settings, locator: &Locator) -> Vec<Diagnostic> {
+pub(crate) fn implicit(
+    tokens: &[LexResult],
+    settings: &Settings,
+    locator: &Locator,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
@@ -148,7 +152,7 @@ pub fn implicit(tokens: &[LexResult], settings: &Settings, locator: &Locator) ->
 }
 
 /// ISC003
-pub fn explicit(expr: &Expr) -> Option<Diagnostic> {
+pub(crate) fn explicit(expr: &Expr) -> Option<Diagnostic> {
     if let ExprKind::BinOp(ast::ExprBinOp { left, op, right }) = &expr.node {
         if matches!(op, Operator::Add) {
             if matches!(

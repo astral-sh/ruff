@@ -47,7 +47,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub fn unnecessary_literal_set(
+pub(crate) fn unnecessary_literal_set(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

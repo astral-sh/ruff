@@ -171,7 +171,7 @@ impl AlwaysAutofixableViolation for InvalidCharacterZeroWidthSpace {
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
-pub fn invalid_string_characters(locator: &Locator, range: TextRange) -> Vec<Diagnostic> {
+pub(crate) fn invalid_string_characters(locator: &Locator, range: TextRange) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     let text = locator.slice(range);
 

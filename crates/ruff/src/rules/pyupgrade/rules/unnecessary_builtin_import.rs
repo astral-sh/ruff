@@ -65,7 +65,7 @@ const SIX: &[&str] = &["callable", "next"];
 const SIX_MOVES: &[&str] = &["filter", "input", "map", "range", "zip"];
 
 /// UP029
-pub fn unnecessary_builtin_import(
+pub(crate) fn unnecessary_builtin_import(
     checker: &mut Checker,
     stmt: &Stmt,
     module: &str,

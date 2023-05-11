@@ -45,7 +45,7 @@ impl Violation for BareExcept {
 }
 
 /// E722
-pub fn bare_except(
+pub(crate) fn bare_except(
     type_: Option<&Expr>,
     body: &[Stmt],
     handler: &Excepthandler,

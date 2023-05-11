@@ -49,7 +49,7 @@ impl Violation for PandasUseOfDotValues {
     }
 }
 
-pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &Expr) {
+pub(crate) fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &Expr) {
     let rules = &checker.settings.rules;
     let violation: DiagnosticKind = match attr {
         "ix" if rules.enabled(Rule::PandasUseOfDotIx) => PandasUseOfDotIx.into(),

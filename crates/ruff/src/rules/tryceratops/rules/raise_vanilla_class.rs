@@ -61,7 +61,7 @@ impl Violation for RaiseVanillaClass {
 }
 
 /// TRY002
-pub fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
     if checker
         .ctx
         .resolve_call_path(

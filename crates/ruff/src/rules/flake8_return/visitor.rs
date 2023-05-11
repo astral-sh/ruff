@@ -6,21 +6,21 @@ use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 #[derive(Default)]
-pub struct Stack<'a> {
-    pub returns: Vec<(&'a Stmt, Option<&'a Expr>)>,
-    pub yields: Vec<&'a Expr>,
-    pub elses: Vec<&'a Stmt>,
-    pub elifs: Vec<&'a Stmt>,
-    pub references: FxHashMap<&'a str, Vec<TextSize>>,
-    pub non_locals: FxHashSet<&'a str>,
-    pub assignments: FxHashMap<&'a str, Vec<TextSize>>,
-    pub loops: Vec<TextRange>,
-    pub tries: Vec<TextRange>,
+pub(crate) struct Stack<'a> {
+    pub(crate) returns: Vec<(&'a Stmt, Option<&'a Expr>)>,
+    pub(crate) yields: Vec<&'a Expr>,
+    pub(crate) elses: Vec<&'a Stmt>,
+    pub(crate) elifs: Vec<&'a Stmt>,
+    pub(crate) references: FxHashMap<&'a str, Vec<TextSize>>,
+    pub(crate) non_locals: FxHashSet<&'a str>,
+    pub(crate) assignments: FxHashMap<&'a str, Vec<TextSize>>,
+    pub(crate) loops: Vec<TextRange>,
+    pub(crate) tries: Vec<TextRange>,
 }
 
 #[derive(Default)]
-pub struct ReturnVisitor<'a> {
-    pub stack: Stack<'a>,
+pub(crate) struct ReturnVisitor<'a> {
+    pub(crate) stack: Stack<'a>,
     parents: Vec<&'a Stmt>,
 }
 

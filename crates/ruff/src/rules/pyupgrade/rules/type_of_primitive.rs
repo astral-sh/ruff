@@ -27,7 +27,7 @@ impl AlwaysAutofixableViolation for TypeOfPrimitive {
 }
 
 /// UP003
-pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if args.len() != 1 {
         return;
     }

@@ -11,7 +11,7 @@ use crate::rules::flake8_use_pathlib::violations::{
 use crate::settings::types::PythonVersion;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 
-pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
     if let Some(diagnostic_kind) =
         checker
             .ctx

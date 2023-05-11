@@ -16,7 +16,7 @@ impl Violation for ShebangNotFirstLine {
 }
 
 /// EXE005
-pub fn shebang_newline(
+pub(crate) fn shebang_newline(
     range: TextRange,
     shebang: &ShebangDirective,
     first_line: bool,

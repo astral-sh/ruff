@@ -145,7 +145,12 @@ impl LoggingCallType {
 }
 
 /// Check logging calls for violations.
-pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+pub(crate) fn logging_call(
+    checker: &mut Checker,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     if !logging::is_logger_candidate(&checker.ctx, func) {
         return;
     }

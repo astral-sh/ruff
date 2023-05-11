@@ -16,7 +16,7 @@ impl Violation for CannotRaiseLiteral {
 }
 
 /// B016
-pub fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Constant ( _) = &expr.node else {
         return;
     };

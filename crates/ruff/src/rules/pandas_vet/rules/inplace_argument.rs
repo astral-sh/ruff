@@ -49,7 +49,7 @@ impl Violation for PandasUseOfInplaceArgument {
 }
 
 /// PD002
-pub fn inplace_argument(
+pub(crate) fn inplace_argument(
     checker: &Checker,
     expr: &Expr,
     func: &Expr,

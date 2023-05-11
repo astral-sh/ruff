@@ -14,7 +14,7 @@ impl Violation for PandasDfVariableName {
 }
 
 /// PD901
-pub fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
+pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     if targets.len() != 1 {
         return None;
     }

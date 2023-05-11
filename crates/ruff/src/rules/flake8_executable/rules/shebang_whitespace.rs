@@ -20,7 +20,7 @@ impl AlwaysAutofixableViolation for ShebangLeadingWhitespace {
 }
 
 /// EXE004
-pub fn shebang_whitespace(
+pub(crate) fn shebang_whitespace(
     range: TextRange,
     shebang: &ShebangDirective,
     autofix: bool,

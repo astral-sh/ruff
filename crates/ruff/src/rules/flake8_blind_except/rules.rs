@@ -21,7 +21,7 @@ impl Violation for BlindExcept {
 }
 
 /// BLE001
-pub fn blind_except(
+pub(crate) fn blind_except(
     checker: &mut Checker,
     type_: Option<&Expr>,
     name: Option<&str>,

@@ -130,7 +130,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
 }
 
 /// UP024
-pub fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
             &handler.node;
@@ -161,14 +161,14 @@ pub fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]
 }
 
 /// UP024
-pub fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
     if is_alias(&checker.ctx, func) {
         atom_diagnostic(checker, func);
     }
 }
 
 /// UP024
-pub fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
     if matches!(expr.node, ExprKind::Name(_) | ExprKind::Attribute(_)) {
         if is_alias(&checker.ctx, expr) {
             atom_diagnostic(checker, expr);

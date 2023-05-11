@@ -16,7 +16,7 @@ fn compose_call_path_inner<'a>(expr: &'a Expression, parts: &mut Vec<&'a str>) {
     }
 }
 
-pub fn compose_call_path(expr: &Expression) -> Option<String> {
+pub(crate) fn compose_call_path(expr: &Expression) -> Option<String> {
     let mut segments = vec![];
     compose_call_path_inner(expr, &mut segments);
     if segments.is_empty() {
@@ -26,7 +26,7 @@ pub fn compose_call_path(expr: &Expression) -> Option<String> {
     }
 }
 
-pub fn compose_module_path(module: &NameOrAttribute) -> String {
+pub(crate) fn compose_module_path(module: &NameOrAttribute) -> String {
     match module {
         NameOrAttribute::N(name) => name.value.to_string(),
         NameOrAttribute::A(attr) => {

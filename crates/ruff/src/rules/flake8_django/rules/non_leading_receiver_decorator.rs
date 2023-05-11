@@ -48,7 +48,7 @@ impl Violation for DjangoNonLeadingReceiverDecorator {
 }
 
 /// DJ013
-pub fn non_leading_receiver_decorator<'a, F>(
+pub(crate) fn non_leading_receiver_decorator<'a, F>(
     decorator_list: &'a [Expr],
     resolve_call_path: F,
 ) -> Vec<Diagnostic>

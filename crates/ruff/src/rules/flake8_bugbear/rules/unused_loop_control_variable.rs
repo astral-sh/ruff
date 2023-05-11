@@ -101,7 +101,7 @@ where
 }
 
 /// B007
-pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
     let control_names = {
         let mut finder = NameFinder::new();
         finder.visit_expr(target);

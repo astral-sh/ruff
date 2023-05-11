@@ -26,7 +26,7 @@ impl AlwaysAutofixableViolation for EndsInPeriod {
 }
 
 /// D400
-pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if let Some(first_line) = body.trim().universal_newlines().next() {

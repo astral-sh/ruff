@@ -27,7 +27,7 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
 #[derive(Debug)]
-pub enum Directive<'a> {
+pub(crate) enum Directive<'a> {
     None,
     // (leading spaces, noqa_range, trailing_spaces)
     All(TextSize, TextRange, TextSize),
@@ -36,7 +36,7 @@ pub enum Directive<'a> {
 }
 
 /// Extract the noqa `Directive` from a line of Python source code.
-pub fn extract_noqa_directive<'a>(range: TextRange, locator: &'a Locator) -> Directive<'a> {
+pub(crate) fn extract_noqa_directive<'a>(range: TextRange, locator: &'a Locator) -> Directive<'a> {
     let text = &locator.contents()[range];
     match NOQA_LINE_REGEX.captures(text) {
         Some(caps) => match (
@@ -123,7 +123,7 @@ fn parse_file_exemption(line: &str) -> ParsedExemption {
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
-pub fn includes(needle: Rule, haystack: &[&str]) -> bool {
+pub(crate) fn includes(needle: Rule, haystack: &[&str]) -> bool {
     let needle = needle.noqa_code();
     haystack
         .iter()
@@ -131,7 +131,7 @@ pub fn includes(needle: Rule, haystack: &[&str]) -> bool {
 }
 
 /// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
-pub fn rule_is_ignored(
+pub(crate) fn rule_is_ignored(
     code: Rule,
     offset: TextSize,
     noqa_line_for: &NoqaMapping,
@@ -146,7 +146,7 @@ pub fn rule_is_ignored(
     }
 }
 
-pub enum FileExemption {
+pub(crate) enum FileExemption {
     None,
     All,
     Codes(Vec<NoqaCode>),
@@ -154,7 +154,7 @@ pub enum FileExemption {
 
 /// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
 /// globally ignored within the file.
-pub fn file_exemption(contents: &str, comment_ranges: &[TextRange]) -> FileExemption {
+pub(crate) fn file_exemption(contents: &str, comment_ranges: &[TextRange]) -> FileExemption {
     let mut exempt_codes: Vec<NoqaCode> = vec![];
 
     for range in comment_ranges {
@@ -184,7 +184,7 @@ pub fn file_exemption(contents: &str, comment_ranges: &[TextRange]) -> FileExemp
 }
 
 /// Adds noqa comments to suppress all diagnostics of a file.
-pub fn add_noqa(
+pub(crate) fn add_noqa(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -368,9 +368,9 @@ fn push_codes<I: Display>(str: &mut String, codes: impl Iterator<Item = I>) {
 #[derive(Debug)]
 pub(crate) struct NoqaDirectiveLine<'a> {
     // The range of the text line for which the noqa directive applies.
-    pub range: TextRange,
-    pub directive: Directive<'a>,
-    pub matches: Vec<NoqaCode>,
+    pub(crate) range: TextRange,
+    pub(crate) directive: Directive<'a>,
+    pub(crate) matches: Vec<NoqaCode>,
 }
 
 #[derive(Debug, Default)]
@@ -379,7 +379,10 @@ pub(crate) struct NoqaDirectives<'a> {
 }
 
 impl<'a> NoqaDirectives<'a> {
-    pub fn from_commented_ranges(comment_ranges: &[TextRange], locator: &'a Locator<'a>) -> Self {
+    pub(crate) fn from_commented_ranges(
+        comment_ranges: &[TextRange],
+        locator: &'a Locator<'a>,
+    ) -> Self {
         let mut directives = Vec::new();
 
         for comment_range in comment_ranges {
@@ -409,11 +412,11 @@ impl<'a> NoqaDirectives<'a> {
         Self { inner: directives }
     }
 
-    pub fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine> {
+    pub(crate) fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine> {
         self.find_line_index(offset).map(|index| &self.inner[index])
     }
 
-    pub fn find_line_with_directive_mut(
+    pub(crate) fn find_line_with_directive_mut(
         &mut self,
         offset: TextSize,
     ) -> Option<&mut NoqaDirectiveLine<'a>> {
@@ -438,7 +441,7 @@ impl<'a> NoqaDirectives<'a> {
             .ok()
     }
 
-    pub fn lines(&self) -> &[NoqaDirectiveLine] {
+    pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
         &self.inner
     }
 }

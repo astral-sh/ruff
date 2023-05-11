@@ -72,7 +72,7 @@ where
 }
 
 /// TRY301
-pub fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[Excepthandler]) {
+pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[Excepthandler]) {
     if handlers.is_empty() {
         return;
     }

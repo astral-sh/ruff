@@ -53,7 +53,7 @@ fn generate_fix(
 }
 
 /// UP022
-pub fn replace_stdout_stderr(
+pub(crate) fn replace_stdout_stderr(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

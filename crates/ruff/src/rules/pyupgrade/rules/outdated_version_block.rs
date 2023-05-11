@@ -303,7 +303,7 @@ fn fix_py3_block(
 }
 
 /// UP036
-pub fn outdated_version_block(
+pub(crate) fn outdated_version_block(
     checker: &mut Checker,
     stmt: &Stmt,
     test: &Expr,

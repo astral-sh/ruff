@@ -45,7 +45,11 @@ impl Violation for InvalidArgumentName {
 }
 
 /// N803
-pub fn invalid_argument_name(name: &str, arg: &Arg, ignore_names: &[String]) -> Option<Diagnostic> {
+pub(crate) fn invalid_argument_name(
+    name: &str,
+    arg: &Arg,
+    ignore_names: &[String],
+) -> Option<Diagnostic> {
     if ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return None;
     }

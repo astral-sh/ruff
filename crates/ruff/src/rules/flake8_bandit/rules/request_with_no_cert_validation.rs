@@ -37,7 +37,7 @@ const HTTPX_METHODS: [&str; 11] = [
 ];
 
 /// S501
-pub fn request_with_no_cert_validation(
+pub(crate) fn request_with_no_cert_validation(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

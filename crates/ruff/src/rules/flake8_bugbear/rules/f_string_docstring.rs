@@ -19,7 +19,7 @@ impl Violation for FStringDocstring {
 }
 
 /// B021
-pub fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let Some(stmt) = body.first() else {
         return;
     };

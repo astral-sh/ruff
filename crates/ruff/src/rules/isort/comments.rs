@@ -26,7 +26,7 @@ impl Comment<'_> {
 }
 
 /// Collect all comments in an import block.
-pub fn collect_comments<'a>(range: TextRange, locator: &'a Locator) -> Vec<Comment<'a>> {
+pub(crate) fn collect_comments<'a>(range: TextRange, locator: &'a Locator) -> Vec<Comment<'a>> {
     let contents = locator.slice(range);
     lexer::lex_starts_at(contents, Mode::Module, range.start())
         .flatten()

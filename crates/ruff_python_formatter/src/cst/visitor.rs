@@ -6,7 +6,7 @@ use crate::cst::{
     SliceIndexKind, Stmt, StmtKind, UnaryOp, Withitem,
 };
 
-pub trait Visitor<'a> {
+pub(crate) trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a mut Stmt) {
         walk_stmt(self, stmt);
     }
@@ -72,13 +72,13 @@ pub trait Visitor<'a> {
     }
 }
 
-pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a mut Body) {
+pub(crate) fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a mut Body) {
     for stmt in &mut body.node {
         visitor.visit_stmt(stmt);
     }
 }
 
-pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stmt) {
+pub(crate) fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stmt) {
     match &mut stmt.node {
         StmtKind::FunctionDef {
             args,
@@ -292,7 +292,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
     }
 }
 
-pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Expr) {
+pub(crate) fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Expr) {
     match &mut expr.node {
         ExprKind::BoolOp { ops, values } => {
             for op in ops {
@@ -451,7 +451,10 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Exp
     }
 }
 
-pub fn walk_constant<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, constant: &'a mut Constant) {
+pub(crate) fn walk_constant<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    constant: &'a mut Constant,
+) {
     if let Constant::Tuple(constants) = constant {
         for constant in constants {
             visitor.visit_constant(constant);
@@ -459,7 +462,7 @@ pub fn walk_constant<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, constant: &'a
     }
 }
 
-pub fn walk_comprehension<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_comprehension<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     comprehension: &'a mut Comprehension,
 ) {
@@ -470,7 +473,7 @@ pub fn walk_comprehension<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     excepthandler: &'a mut Excepthandler,
 ) {
@@ -484,7 +487,7 @@ pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_slice_index<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_slice_index<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     slice_index: &'a mut SliceIndex,
 ) {
@@ -496,7 +499,10 @@ pub fn walk_slice_index<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a mut Arguments) {
+pub(crate) fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    arguments: &'a mut Arguments,
+) {
     for arg in &mut arguments.posonlyargs {
         visitor.visit_arg(arg);
     }
@@ -520,24 +526,27 @@ pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &
     }
 }
 
-pub fn walk_arg<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arg: &'a mut Arg) {
+pub(crate) fn walk_arg<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arg: &'a mut Arg) {
     if let Some(expr) = &mut arg.node.annotation {
         visitor.visit_annotation(expr);
     }
 }
 
-pub fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a mut Keyword) {
+pub(crate) fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a mut Keyword) {
     visitor.visit_expr(&mut keyword.node.value);
 }
 
-pub fn walk_withitem<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, withitem: &'a mut Withitem) {
+pub(crate) fn walk_withitem<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    withitem: &'a mut Withitem,
+) {
     visitor.visit_expr(&mut withitem.context_expr);
     if let Some(expr) = &mut withitem.optional_vars {
         visitor.visit_expr(expr);
     }
 }
 
-pub fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     match_case: &'a mut MatchCase,
 ) {
@@ -548,7 +557,7 @@ pub fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(
     visitor.visit_body(&mut match_case.body);
 }
 
-pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a mut Pattern) {
+pub(crate) fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a mut Pattern) {
     match &mut pattern.node {
         PatternKind::MatchValue { value } => visitor.visit_expr(value),
         PatternKind::MatchSingleton { value } => visitor.visit_constant(value),
@@ -595,23 +604,31 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a m
 }
 
 #[allow(unused_variables)]
-pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
+pub(crate) fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     expr_context: &'a mut ExprContext,
 ) {
 }
 
 #[allow(unused_variables)]
-pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a mut BoolOp) {}
+pub(crate) fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a mut BoolOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a mut Operator) {}
+pub(crate) fn walk_operator<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    operator: &'a mut Operator,
+) {
+}
 
 #[allow(unused_variables)]
-pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unary_op: &'a mut UnaryOp) {}
+pub(crate) fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    unary_op: &'a mut UnaryOp,
+) {
+}
 
 #[allow(unused_variables)]
-pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a mut CmpOp) {}
+pub(crate) fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a mut CmpOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a mut Alias) {}
+pub(crate) fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a mut Alias) {}

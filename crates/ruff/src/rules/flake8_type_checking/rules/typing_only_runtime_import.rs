@@ -240,7 +240,7 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// TCH001
-pub fn typing_only_runtime_import(
+pub(crate) fn typing_only_runtime_import(
     binding: &Binding,
     runtime_imports: &[&Binding],
     package: Option<&Path>,

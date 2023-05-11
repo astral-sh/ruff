@@ -8,13 +8,13 @@ use anyhow::Result;
 use rustpython_parser::{lexer, Mode};
 
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Python file for which to generate the AST.
     #[arg(required = true)]
     file: PathBuf,
 }
 
-pub fn main(args: &Args) -> Result<()> {
+pub(crate) fn main(args: &Args) -> Result<()> {
     let contents = fs::read_to_string(&args.file)?;
     for (tok, range) in lexer::lex(&contents, Mode::Module).flatten() {
         println!(

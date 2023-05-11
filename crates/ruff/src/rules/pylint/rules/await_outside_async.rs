@@ -17,7 +17,7 @@ impl Violation for AwaitOutsideAsync {
 }
 
 /// PLE1142
-pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn await_outside_async(checker: &mut Checker, expr: &Expr) {
     if !checker
         .ctx
         .scopes()

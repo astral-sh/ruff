@@ -25,17 +25,17 @@ use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use crate::cache;
 
 #[derive(Debug, Default, PartialEq)]
-pub struct Diagnostics {
-    pub messages: Vec<Message>,
-    pub fixed: FxHashMap<String, FixTable>,
-    pub imports: ImportMap,
+pub(crate) struct Diagnostics {
+    pub(crate) messages: Vec<Message>,
+    pub(crate) fixed: FxHashMap<String, FixTable>,
+    pub(crate) imports: ImportMap,
     /// Jupyter notebook indexing table for each input file that is a jupyter notebook
     /// so we can rewrite the diagnostics in the end
-    pub jupyter_index: FxHashMap<String, JupyterIndex>,
+    pub(crate) jupyter_index: FxHashMap<String, JupyterIndex>,
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
+    pub(crate) fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
@@ -100,7 +100,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
 }
 
 /// Lint the source code at the given `Path`.
-pub fn lint_path(
+pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
@@ -226,7 +226,7 @@ pub fn lint_path(
 
 /// Generate `Diagnostic`s from source code content derived from
 /// stdin.
-pub fn lint_stdin(
+pub(crate) fn lint_stdin(
     path: Option<&Path>,
     package: Option<&Path>,
     contents: &str,

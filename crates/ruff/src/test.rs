@@ -20,13 +20,13 @@ use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 
-pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after 10 iterations.
-pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
+pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
     static MAX_ITERATIONS: usize = 10;
 
     let path = test_resource_path("fixtures").join(path);

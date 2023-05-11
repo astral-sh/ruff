@@ -113,8 +113,8 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub message: &'a Message,
-    pub show_fix_status: bool,
+    pub(crate) message: &'a Message,
+    pub(crate) show_fix_status: bool,
 }
 
 impl Display for RuleCodeAndBody<'_> {
@@ -141,7 +141,7 @@ impl Display for RuleCodeAndBody<'_> {
 }
 
 pub(super) struct MessageCodeFrame<'a> {
-    pub message: &'a Message,
+    pub(crate) message: &'a Message,
 }
 
 impl Display for MessageCodeFrame<'_> {

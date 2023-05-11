@@ -47,7 +47,7 @@ impl Violation for ReraiseNoCause {
 }
 
 /// TRY200
-pub fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
         visitor.visit_body(body);

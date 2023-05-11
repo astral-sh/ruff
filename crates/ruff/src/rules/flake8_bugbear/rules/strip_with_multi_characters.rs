@@ -17,7 +17,12 @@ impl Violation for StripWithMultiCharacters {
 }
 
 /// B005
-pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn strip_with_multi_characters(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node else {
         return;
     };

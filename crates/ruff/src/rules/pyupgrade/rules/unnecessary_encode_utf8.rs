@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Reason {
+pub(crate) enum Reason {
     BytesLiteral,
     DefaultArgument,
 }
@@ -134,7 +134,7 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
 }
 
 /// UP012
-pub fn unnecessary_encode_utf8(
+pub(crate) fn unnecessary_encode_utf8(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

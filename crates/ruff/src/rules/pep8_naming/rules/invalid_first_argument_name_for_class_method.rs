@@ -55,7 +55,7 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
 }
 
 /// N804
-pub fn invalid_first_argument_name_for_class_method(
+pub(crate) fn invalid_first_argument_name_for_class_method(
     checker: &Checker,
     scope: &Scope,
     name: &str,

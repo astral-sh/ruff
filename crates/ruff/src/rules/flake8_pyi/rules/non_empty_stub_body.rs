@@ -16,7 +16,7 @@ impl Violation for NonEmptyStubBody {
 }
 
 /// PYI010
-pub fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
     if body.len() != 1 {
         return;
     }

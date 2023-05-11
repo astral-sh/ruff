@@ -15,7 +15,7 @@ impl Violation for TripleSingleQuotes {
 }
 
 /// D300
-pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let leading_quote = docstring.leading_quote().to_ascii_lowercase();

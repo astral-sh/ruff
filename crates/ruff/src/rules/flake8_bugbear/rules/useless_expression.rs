@@ -7,7 +7,7 @@ use ruff_python_ast::helpers::contains_effect;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Kind {
+pub(crate) enum Kind {
     Expression,
     Attribute,
 }
@@ -34,7 +34,7 @@ impl Violation for UselessExpression {
 }
 
 /// B018
-pub fn useless_expression(checker: &mut Checker, value: &Expr) {
+pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
     if matches!(value.node, ExprKind::Compare(_)) {
         return;

@@ -42,7 +42,10 @@ fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
 }
 
 /// B030
-pub fn except_with_non_exception_classes(checker: &mut Checker, excepthandler: &Excepthandler) {
+pub(crate) fn except_with_non_exception_classes(
+    checker: &mut Checker,
+    excepthandler: &Excepthandler,
+) {
     let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
         &excepthandler.node;
     let Some(type_) = type_ else {

@@ -16,7 +16,7 @@ impl Violation for DocstringStartsWithThis {
 }
 
 /// D404
-pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let trimmed = body.trim();

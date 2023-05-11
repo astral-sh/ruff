@@ -270,7 +270,11 @@ impl AlwaysAutofixableViolation for BlankLinesBetweenHeaderAndContent {
 
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
-pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option<&Convention>) {
+pub(crate) fn sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    convention: Option<&Convention>,
+) {
     match convention {
         Some(Convention::Google) => {
             parse_google_sections(

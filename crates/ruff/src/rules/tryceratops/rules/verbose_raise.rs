@@ -72,7 +72,7 @@ where
 }
 
 /// TRY201
-pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
         if let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {

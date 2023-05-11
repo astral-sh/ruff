@@ -36,6 +36,6 @@ impl Violation for Assert {
 }
 
 /// S101
-pub fn assert_used(stmt: &Stmt) -> Diagnostic {
+pub(crate) fn assert_used(stmt: &Stmt) -> Diagnostic {
     Diagnostic::new(Assert, TextRange::at(stmt.start(), "assert".text_len()))
 }

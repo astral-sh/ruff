@@ -74,7 +74,7 @@ impl AlwaysAutofixableViolation for NotIsTest {
 }
 
 /// E713, E714
-pub fn not_tests(
+pub(crate) fn not_tests(
     checker: &mut Checker,
     expr: &Expr,
     op: &Unaryop,

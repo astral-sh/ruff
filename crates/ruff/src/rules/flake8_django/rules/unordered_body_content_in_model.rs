@@ -75,7 +75,7 @@ impl Violation for DjangoUnorderedBodyContentInModel {
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-pub enum ContentType {
+pub(crate) enum ContentType {
     FieldDeclaration,
     ManagerDeclaration,
     MetaClass,
@@ -137,7 +137,11 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
 }
 
 /// DJ012
-pub fn unordered_body_content_in_model(checker: &mut Checker, bases: &[Expr], body: &[Stmt]) {
+pub(crate) fn unordered_body_content_in_model(
+    checker: &mut Checker,
+    bases: &[Expr],
+    body: &[Stmt],
+) {
     if !bases
         .iter()
         .any(|base| helpers::is_model(&checker.ctx, base))

@@ -19,7 +19,12 @@ impl Violation for UnreliableCallableCheck {
 }
 
 /// B004
-pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn unreliable_callable_check(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };

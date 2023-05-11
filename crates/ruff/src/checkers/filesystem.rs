@@ -7,7 +7,7 @@ use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
 use crate::rules::pep8_naming::rules::invalid_module_name;
 use crate::settings::Settings;
 
-pub fn check_file_path(
+pub(crate) fn check_file_path(
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,

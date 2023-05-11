@@ -16,7 +16,7 @@ impl Violation for EmptyDocstring {
 }
 
 /// D419
-pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
+pub(crate) fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     if !docstring.body().trim().is_empty() {
         return true;
     }

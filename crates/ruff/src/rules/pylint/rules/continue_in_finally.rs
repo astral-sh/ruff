@@ -75,6 +75,6 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// PLE0116
-pub fn continue_in_finally(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn continue_in_finally(checker: &mut Checker, body: &[Stmt]) {
     traverse_body(checker, body);
 }

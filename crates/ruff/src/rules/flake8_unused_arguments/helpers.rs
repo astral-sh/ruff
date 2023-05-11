@@ -38,7 +38,7 @@ fn is_empty_stmt(stmt: &Stmt) -> bool {
     false
 }
 
-pub fn is_empty(body: &[Stmt]) -> bool {
+pub(crate) fn is_empty(body: &[Stmt]) -> bool {
     match &body {
         [] => true,
         [stmt] => is_docstring_stmt(stmt) || is_empty_stmt(stmt),

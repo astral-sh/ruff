@@ -55,7 +55,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Optio
 }
 
 /// UP004
-pub fn useless_object_inheritance(
+pub(crate) fn useless_object_inheritance(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,

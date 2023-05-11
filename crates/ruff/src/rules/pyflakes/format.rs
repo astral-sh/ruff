@@ -22,11 +22,11 @@ pub(crate) fn error_to_string(err: &FormatParseError) -> String {
 
 #[derive(Debug)]
 pub(crate) struct FormatSummary {
-    pub autos: Vec<usize>,
-    pub indices: Vec<usize>,
-    pub keywords: Vec<String>,
-    pub has_nested_parts: bool,
-    pub format_string: FormatString,
+    pub(crate) autos: Vec<usize>,
+    pub(crate) indices: Vec<usize>,
+    pub(crate) keywords: Vec<String>,
+    pub(crate) has_nested_parts: bool,
+    pub(crate) format_string: FormatString,
 }
 
 impl TryFrom<&str> for FormatSummary {

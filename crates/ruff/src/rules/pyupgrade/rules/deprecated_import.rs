@@ -505,7 +505,7 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub fn deprecated_import(
+pub(crate) fn deprecated_import(
     checker: &mut Checker,
     stmt: &Stmt,
     names: &[Alias],

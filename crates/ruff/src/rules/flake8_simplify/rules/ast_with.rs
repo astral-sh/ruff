@@ -66,7 +66,7 @@ fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
 }
 
 /// SIM117
-pub fn multiple_with_statements(
+pub(crate) fn multiple_with_statements(
     checker: &mut Checker,
     with_stmt: &Stmt,
     with_body: &[Stmt],

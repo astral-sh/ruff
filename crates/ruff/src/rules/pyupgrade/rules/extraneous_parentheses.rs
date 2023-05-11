@@ -117,7 +117,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
 }
 
 /// UP034
-pub fn extraneous_parentheses(
+pub(crate) fn extraneous_parentheses(
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,

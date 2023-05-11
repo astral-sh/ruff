@@ -42,7 +42,7 @@ impl Violation for LowercaseImportedAsNonLowercase {
 }
 
 /// N812
-pub fn lowercase_imported_as_non_lowercase(
+pub(crate) fn lowercase_imported_as_non_lowercase(
     name: &str,
     asname: &str,
     alias: &Alias,

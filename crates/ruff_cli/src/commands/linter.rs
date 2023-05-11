@@ -25,7 +25,7 @@ struct LinterCategoryInfo {
     name: &'static str,
 }
 
-pub fn linter(format: HelpFormat) -> Result<()> {
+pub(crate) fn linter(format: HelpFormat) -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     let mut output = String::new();
 

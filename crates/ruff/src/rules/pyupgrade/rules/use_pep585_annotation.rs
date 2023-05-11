@@ -32,7 +32,7 @@ impl Violation for NonPEP585Annotation {
 }
 
 /// UP006
-pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
     if let Some(binding) = checker
         .ctx
         .resolve_call_path(expr)

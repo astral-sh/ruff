@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
+pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
     if checker
         .ctx
         .resolve_call_path(func)

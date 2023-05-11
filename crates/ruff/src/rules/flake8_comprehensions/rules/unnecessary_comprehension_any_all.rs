@@ -56,7 +56,7 @@ impl Violation for UnnecessaryComprehensionAnyAll {
 }
 
 /// C419
-pub fn unnecessary_comprehension_any_all(
+pub(crate) fn unnecessary_comprehension_any_all(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

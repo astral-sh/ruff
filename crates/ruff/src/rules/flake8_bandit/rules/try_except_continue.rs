@@ -17,7 +17,7 @@ impl Violation for TryExceptContinue {
 }
 
 /// S112
-pub fn try_except_continue(
+pub(crate) fn try_except_continue(
     checker: &mut Checker,
     excepthandler: &Excepthandler,
     type_: Option<&Expr>,

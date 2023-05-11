@@ -14,7 +14,7 @@ impl Violation for ContinueOutsideLoop {
 }
 
 /// F702
-pub fn continue_outside_loop<'a>(
+pub(crate) fn continue_outside_loop<'a>(
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
 ) -> Option<Diagnostic> {

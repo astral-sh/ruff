@@ -23,7 +23,7 @@ struct SliceInfo {
 }
 
 impl SliceInfo {
-    pub fn new(arg_name: String, slice_start: Option<i64>) -> Self {
+    pub(crate) fn new(arg_name: String, slice_start: Option<i64>) -> Self {
         Self {
             arg_name,
             slice_start,
@@ -87,7 +87,7 @@ fn to_bound(expr: &Expr) -> Option<i64> {
 }
 
 /// RUF007
-pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };

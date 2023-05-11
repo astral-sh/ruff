@@ -18,7 +18,7 @@ impl Violation for SnmpInsecureVersion {
 }
 
 /// S508
-pub fn snmp_insecure_version(
+pub(crate) fn snmp_insecure_version(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

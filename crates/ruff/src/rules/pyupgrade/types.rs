@@ -2,7 +2,7 @@ use rustpython_parser::ast::Constant;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Primitive {
+pub(crate) enum Primitive {
     Bool,
     Str,
     Bytes,
@@ -12,7 +12,7 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub const fn from_constant(constant: &Constant) -> Option<Self> {
+    pub(crate) const fn from_constant(constant: &Constant) -> Option<Self> {
         match constant {
             Constant::Bool(_) => Some(Self::Bool),
             Constant::Str(_) => Some(Self::Str),
@@ -24,7 +24,7 @@ impl Primitive {
         }
     }
 
-    pub fn builtin(self) -> String {
+    pub(crate) fn builtin(self) -> String {
         match self {
             Self::Bool => "bool".to_string(),
             Self::Str => "str".to_string(),

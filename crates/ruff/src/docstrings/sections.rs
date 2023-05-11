@@ -137,7 +137,7 @@ pub(crate) struct SectionContexts<'a> {
 
 impl<'a> SectionContexts<'a> {
     /// Extract all `SectionContext` values from a docstring.
-    pub fn from_docstring(docstring: &'a Docstring<'a>, style: SectionStyle) -> Self {
+    pub(crate) fn from_docstring(docstring: &'a Docstring<'a>, style: SectionStyle) -> Self {
         let contents = docstring.body();
 
         let mut contexts = Vec::new();
@@ -190,11 +190,11 @@ impl<'a> SectionContexts<'a> {
         }
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.contexts.len()
     }
 
-    pub fn iter(&self) -> SectionContextsIter {
+    pub(crate) fn iter(&self) -> SectionContextsIter {
         SectionContextsIter {
             docstring_body: self.docstring.body(),
             inner: self.contexts.iter(),

@@ -286,7 +286,7 @@ fn is_special_assignment(context: &Context, target: &Expr) -> bool {
 }
 
 /// PYI011
-pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
+pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
     if !args.defaults.is_empty() {
         let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
         for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
@@ -343,7 +343,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PYI014
-pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
+pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
     if !args.defaults.is_empty() {
         let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
         for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
@@ -400,7 +400,7 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PYI015
-pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
     if targets.len() == 1 && is_special_assignment(&checker.ctx, &targets[0]) {
         return;
     }
@@ -426,7 +426,7 @@ pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value
 }
 
 /// PYI015
-pub fn annotated_assignment_default_in_stub(
+pub(crate) fn annotated_assignment_default_in_stub(
     checker: &mut Checker,
     target: &Expr,
     value: &Expr,

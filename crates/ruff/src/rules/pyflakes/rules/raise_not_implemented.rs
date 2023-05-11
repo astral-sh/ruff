@@ -40,7 +40,7 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 }
 
 /// F901
-pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };

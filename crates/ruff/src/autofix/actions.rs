@@ -168,7 +168,7 @@ fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
 ///   remove the entire start and end lines.
 /// - If the `Stmt` is the last statement in its parent body, replace it with a
 ///   `pass` instead.
-pub fn delete_stmt(
+pub(crate) fn delete_stmt(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
@@ -205,7 +205,7 @@ pub fn delete_stmt(
 }
 
 /// Generate a `Fix` to remove any unused imports from an `import` statement.
-pub fn remove_unused_imports<'a>(
+pub(crate) fn remove_unused_imports<'a>(
     unused_imports: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
@@ -330,7 +330,7 @@ pub fn remove_unused_imports<'a>(
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
 /// For this behavior, set `remove_parentheses` to `true`.
-pub fn remove_argument(
+pub(crate) fn remove_argument(
     locator: &Locator,
     call_at: TextSize,
     expr_range: TextRange,
@@ -434,7 +434,7 @@ pub fn remove_argument(
 /// name on which the `lru_cache` symbol would be made available (`"functools.lru_cache"`).
 ///
 /// Attempts to reuse existing imports when possible.
-pub fn get_or_import_symbol(
+pub(crate) fn get_or_import_symbol(
     module: &str,
     member: &str,
     at: TextSize,

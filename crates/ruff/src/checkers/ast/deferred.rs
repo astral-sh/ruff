@@ -7,11 +7,11 @@ use ruff_python_semantic::context::Snapshot;
 /// Used to, e.g., store functions, whose bodies shouldn't be analyzed until all
 /// module-level definitions have been analyzed.
 #[derive(Default)]
-pub struct Deferred<'a> {
-    pub string_type_definitions: Vec<(TextRange, &'a str, Snapshot)>,
-    pub type_definitions: Vec<(&'a Expr, Snapshot)>,
-    pub functions: Vec<Snapshot>,
-    pub lambdas: Vec<(&'a Expr, Snapshot)>,
-    pub for_loops: Vec<Snapshot>,
-    pub assignments: Vec<Snapshot>,
+pub(crate) struct Deferred<'a> {
+    pub(crate) string_type_definitions: Vec<(TextRange, &'a str, Snapshot)>,
+    pub(crate) type_definitions: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) functions: Vec<Snapshot>,
+    pub(crate) lambdas: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) for_loops: Vec<Snapshot>,
+    pub(crate) assignments: Vec<Snapshot>,
 }

@@ -62,7 +62,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
 }
 
 /// B012
-pub fn jump_statement_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
+pub(crate) fn jump_statement_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
     walk_stmt(checker, finalbody, |stmt| {
         matches!(
             stmt.node,

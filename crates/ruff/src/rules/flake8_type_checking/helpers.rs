@@ -8,7 +8,7 @@ use ruff_python_semantic::context::Context;
 use ruff_python_semantic::scope::ScopeKind;
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
-pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
+pub(crate) fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
     // Ex) `if False:`
     if matches!(
         test.node,
@@ -41,7 +41,7 @@ pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
     false
 }
 
-pub const fn is_valid_runtime_import(binding: &Binding) -> bool {
+pub(crate) const fn is_valid_runtime_import(binding: &Binding) -> bool {
     if matches!(
         binding.kind,
         BindingKind::Importation(..)
@@ -54,7 +54,7 @@ pub const fn is_valid_runtime_import(binding: &Binding) -> bool {
     }
 }
 
-pub fn runtime_evaluated(
+pub(crate) fn runtime_evaluated(
     context: &Context,
     base_classes: &[String],
     decorators: &[String],

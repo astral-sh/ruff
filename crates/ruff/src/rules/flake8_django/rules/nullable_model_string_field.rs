@@ -61,7 +61,7 @@ const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
 ];
 
 /// DJ001
-pub fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
+pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     for statement in body.iter() {
         let StmtKind::Assign(ast::StmtAssign {value, ..}) = &statement.node else {

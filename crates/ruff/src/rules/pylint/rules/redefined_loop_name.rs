@@ -14,7 +14,7 @@ use ruff_python_semantic::context::Context;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum OuterBindingKind {
+pub(crate) enum OuterBindingKind {
     For,
     With,
 }
@@ -29,7 +29,7 @@ impl fmt::Display for OuterBindingKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum InnerBindingKind {
+pub(crate) enum InnerBindingKind {
     For,
     With,
     Assignment,
@@ -332,7 +332,7 @@ fn assignment_targets_from_assign_targets<'a, U>(
 }
 
 /// PLW2901
-pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>) {
+pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>) {
     let (outer_assignment_targets, inner_assignment_targets) = match node {
         Node::Stmt(stmt) => match &stmt.node {
             // With.

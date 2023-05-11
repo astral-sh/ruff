@@ -56,7 +56,7 @@ fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
 }
 
 /// SIM107
-pub fn return_in_try_except_finally(
+pub(crate) fn return_in_try_except_finally(
     checker: &mut Checker,
     body: &[Stmt],
     handlers: &[Excepthandler],

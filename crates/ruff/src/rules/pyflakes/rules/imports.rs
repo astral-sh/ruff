@@ -135,7 +135,7 @@ impl Violation for FutureFeatureNotDefined {
     }
 }
 
-pub fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
     if !ALL_FEATURE_NAMES.contains(&alias.node.name.as_str()) {
         checker.diagnostics.push(Diagnostic::new(
             FutureFeatureNotDefined {

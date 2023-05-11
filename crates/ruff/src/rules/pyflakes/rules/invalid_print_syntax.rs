@@ -16,7 +16,7 @@ impl Violation for InvalidPrintSyntax {
 }
 
 /// F633
-pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
+pub(crate) fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     let ExprKind::Name(ast::ExprName { id, .. }) = &left.node else {
         return;
     };

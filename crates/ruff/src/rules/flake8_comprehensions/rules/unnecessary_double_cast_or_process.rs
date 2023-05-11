@@ -64,7 +64,7 @@ impl AlwaysAutofixableViolation for UnnecessaryDoubleCastOrProcess {
 }
 
 /// C414
-pub fn unnecessary_double_cast_or_process(
+pub(crate) fn unnecessary_double_cast_or_process(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

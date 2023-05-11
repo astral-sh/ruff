@@ -129,7 +129,7 @@ fn add_required_import(
 }
 
 /// I002
-pub fn add_required_imports(
+pub(crate) fn add_required_imports(
     blocks: &[&Block],
     python_ast: &Suite,
     locator: &Locator,

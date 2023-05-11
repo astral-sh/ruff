@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum LiteralType {
+pub(crate) enum LiteralType {
     Str,
     Bytes,
 }
@@ -43,7 +43,7 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 }
 
 /// UP018
-pub fn native_literals(
+pub(crate) fn native_literals(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

@@ -35,7 +35,7 @@ impl Violation for SuppressibleException {
 }
 
 /// SIM105
-pub fn suppressible_exception(
+pub(crate) fn suppressible_exception(
     checker: &mut Checker,
     stmt: &Stmt,
     try_body: &[Stmt],

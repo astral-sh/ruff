@@ -16,7 +16,7 @@ impl Violation for AssertTuple {
 }
 
 /// F631
-pub fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &test.node {
         if !elts.is_empty() {
             checker

@@ -65,7 +65,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
-pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(checker, func) {
         if checker
             .settings
@@ -97,7 +97,12 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
     }
 }
 
-pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], body: &[Stmt]) {
+pub(crate) fn complex_raises(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    items: &[Withitem],
+    body: &[Stmt],
+) {
     let mut is_too_complex = false;
 
     let raises_called = items.iter().any(|item| match &item.context_expr.node {

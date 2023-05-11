@@ -42,7 +42,7 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub fn unnecessary_subscript_reversal(
+pub(crate) fn unnecessary_subscript_reversal(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

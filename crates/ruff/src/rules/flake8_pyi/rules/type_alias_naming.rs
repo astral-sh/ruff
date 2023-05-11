@@ -59,7 +59,7 @@ fn is_t_suffixed_type_alias(name: &str) -> bool {
 }
 
 /// PYI042
-pub fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
+pub(crate) fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
     if let ExprKind::Name(ast::ExprName { id, .. }) = target.node() {
         if !is_snake_case_type_alias(id) {
             return;
@@ -75,7 +75,7 @@ pub fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
 }
 
 /// PYI043
-pub fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
+pub(crate) fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
     if let ExprKind::Name(ast::ExprName { id, .. }) = target.node() {
         if !is_t_suffixed_type_alias(id) {
             return;

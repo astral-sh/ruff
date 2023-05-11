@@ -39,7 +39,7 @@ impl Violation for Eval {
 }
 
 /// PGH001
-pub fn no_eval(checker: &mut Checker, func: &Expr) {
+pub(crate) fn no_eval(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };
