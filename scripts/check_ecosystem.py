@@ -80,26 +80,24 @@ class Repository(NamedTuple):
 
 # We only check the fixes for the not-select-ALL cases
 REPOSITORIES = {
-    "airflow": Repository("apache", "airflow", "main", select="ALL", show_fixes=False),
-    "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL", show_fixes=False),
-    "build": Repository("pypa", "build", "main", show_fixes=True),
-    "cibuildwheel": Repository("pypa", "cibuildwheel", "main", show_fixes=True),
-    "disnake": Repository("DisnakeDev", "disnake", "master", show_fixes=True),
-    "scikit-build": Repository("scikit-build", "scikit-build", "main", show_fixes=True),
+    "airflow": Repository("apache", "airflow", "main", select="ALL"),
+    "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
+    "build": Repository("pypa", "build", "main"),
+    "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
+    "disnake": Repository("DisnakeDev", "disnake", "master"),
+    "scikit-build": Repository("scikit-build", "scikit-build", "main"),
     "scikit-build-core": Repository(
         "scikit-build",
         "scikit-build-core",
         "main",
-        show_fixes=True,
     ),
     "typeshed": Repository(
         "python",
         "typeshed",
         "main",
         select="PYI",
-        show_fixes=True,
     ),
-    "zulip": Repository("zulip", "zulip", "main", select="ALL", show_fixes=False),
+    "zulip": Repository("zulip", "zulip", "main", select="ALL"),
 }
 
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
@@ -130,8 +128,6 @@ async def check(
         ruff_args.extend(["--exclude", exclude])
     if show_fixes:
         ruff_args.extend(["--show-fixes", "--ecosystem-ci"])
-
-    print(path, ruff_args)
 
     start = time.time()
     proc = await create_subprocess_exec(
