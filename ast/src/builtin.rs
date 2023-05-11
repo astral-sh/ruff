@@ -15,6 +15,13 @@ impl Identifier {
     }
 }
 
+impl Identifier {
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl std::cmp::PartialEq<str> for Identifier {
     #[inline]
     fn eq(&self, other: &str) -> bool {
@@ -30,9 +37,23 @@ impl std::cmp::PartialEq<String> for Identifier {
 }
 
 impl std::ops::Deref for Identifier {
-    type Target = String;
+    type Target = str;
     #[inline]
     fn deref(&self) -> &Self::Target {
+        self.0.as_str()
+    }
+}
+
+impl AsRef<str> for Identifier {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl AsRef<String> for Identifier {
+    #[inline]
+    fn as_ref(&self) -> &String {
         &self.0
     }
 }
