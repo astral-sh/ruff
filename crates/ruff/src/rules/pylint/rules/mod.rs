@@ -1,5 +1,5 @@
-pub use assignment_from_none::{assignment_from_none, AssignmentFromNone};
 pub use assert_on_string_literal::{assert_on_string_literal, AssertOnStringLiteral};
+pub use assignment_from_none::{assignment_from_none, AssignmentFromNone};
 pub use await_outside_async::{await_outside_async, AwaitOutsideAsync};
 pub use bad_str_strip_call::{bad_str_strip_call, BadStrStripCall};
 pub use bad_string_format_type::{bad_string_format_type, BadStringFormatType};
@@ -48,8 +48,8 @@ pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
 pub use useless_return::{useless_return, UselessReturn};
 pub use yield_in_init::{yield_in_init, YieldInInit};
 
-mod assignment_from_none;
 mod assert_on_string_literal;
+mod assignment_from_none;
 mod await_outside_async;
 mod bad_str_strip_call;
 mod bad_string_format_type;

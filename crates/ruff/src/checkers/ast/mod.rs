@@ -698,8 +698,7 @@ where
                     pylint::rules::return_in_init(self, stmt);
                 }
                 if self.settings.rules.enabled(Rule::AssignmentFromNone) {
-                    pylint::rules::assignment_from_none(self,
-                        stmt,);
+                    pylint::rules::assignment_from_none(self, stmt);
                 }
             }
             StmtKind::ClassDef {

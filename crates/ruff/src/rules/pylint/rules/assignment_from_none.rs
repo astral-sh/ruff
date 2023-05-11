@@ -11,7 +11,7 @@ enum Kind {
 }
 
 /// ## What it does
-/// Checks for assigning result of a function call, where the function returns None 
+/// Checks for assigning result of a function call, where the function returns None
 /// Used when an assignment is done on a function call but the inferred function returns nothing but None argument.
 ///
 /// ## Why is this bad?
@@ -40,9 +40,14 @@ impl Violation for AssignmentFromNone {
     }
 }
 /// PLE1128
-pub fn assignment_from_none(checker: &mut Checker,body: &Stmt,) {
+pub fn assignment_from_none(checker: &mut Checker, body: &Stmt) {
     match body.node {
-        StmtKind::Return {  .. } => {checker.diagnostics.push(Diagnostic::new(AssignmentFromNone{kind: Kind::Empty}, body.range()));}
+        StmtKind::Return { .. } => {
+            checker.diagnostics.push(Diagnostic::new(
+                AssignmentFromNone { kind: Kind::Empty },
+                body.range(),
+            ));
+        }
         _ => {}
     }
 }
