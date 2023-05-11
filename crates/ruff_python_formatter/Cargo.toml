@@ -17,7 +17,6 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
-rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 
 [dev-dependencies]

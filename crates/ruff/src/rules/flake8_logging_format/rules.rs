@@ -153,10 +153,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
         if let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
-            let level_call_range = TextRange::new(
-                value.end().checked_add(TextSize::from(1)).unwrap(),
-                func.end(),
-            );
+            let level_call_range = TextRange::new(value.end() + TextSize::from(1), func.end());
 
             // G001 - G004
             let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));

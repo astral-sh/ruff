@@ -2057,7 +2057,6 @@ dependencies = [
  "num-traits",
  "once_cell",
  "regex",
- "ruff_rustpython",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-literal 0.2.0 (git+https://github.com/RustPython/Parser.git?rev=2af98056629fbe75ccc0d90c4ee05dfeb403d666)",
@@ -2082,7 +2081,6 @@ dependencies = [
  "ruff_testing_macros",
  "ruff_text_size",
  "rustc-hash",
- "rustpython-common",
  "rustpython-parser",
  "similar",
  "test-case",
@@ -2116,8 +2114,6 @@ name = "ruff_rustpython"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "once_cell",
- "rustpython-common",
  "rustpython-parser",
 ]
 

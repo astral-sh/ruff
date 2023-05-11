@@ -51,7 +51,6 @@ pub fn native_literals(
     keywords: &[Keyword],
 ) {
     let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else { return; };
-    let id = id.as_str();
 
     if !keywords.is_empty() || args.len() > 1 {
         return;

@@ -496,8 +496,8 @@ impl<'a> ImportReplacer<'a> {
         let full_names: String = names
             .iter()
             .map(|name| match &name.asname {
-                Some(asname) => format!("{} as {}", name.name.as_str(), asname.as_str()),
-                None => format!("{}", name.name.as_str()),
+                Some(asname) => format!("{} as {}", name.name, asname),
+                None => format!("{}", name.name),
             })
             .join(", ");
         format!("from {module} import {full_names}")

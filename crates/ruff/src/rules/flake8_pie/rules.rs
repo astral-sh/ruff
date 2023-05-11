@@ -517,7 +517,6 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
         let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. } )= &func.node else {
             continue
         };
-        let attr = attr.as_str();
         if attr != "startswith" && attr != "endswith" {
             continue;
         }
@@ -527,7 +526,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
         };
 
         duplicates
-            .entry((attr, arg_name.as_str()))
+            .entry((attr.as_str(), arg_name.as_str()))
             .or_insert_with(Vec::new)
             .push(index);
     }
