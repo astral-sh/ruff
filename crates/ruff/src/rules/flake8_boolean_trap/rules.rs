@@ -120,7 +120,7 @@ pub fn check_positional_boolean_in_def(
 
         // check for both bool (python class) and 'bool' (string annotation)
         let hint = match &expr.node {
-            ExprKind::Name(ast::ExprName { id, .. }) => id == "bool",
+            ExprKind::Name(name) => &name.id == "bool",
             ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..

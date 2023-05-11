@@ -65,10 +65,7 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
             value: Constant::Str(string),
             ..
         }) => string.is_empty(),
-        ExprKind::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        }) => true,
+        ExprKind::Constant(constant) if constant.value.is_none() => true,
         ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
             values.iter().all(is_empty_or_null_string)
         }
