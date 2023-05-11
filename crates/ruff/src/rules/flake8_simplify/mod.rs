@@ -19,6 +19,7 @@ mod tests {
     #[test_case(Rule::SuppressibleException, Path::new("SIM105_0.py"); "SIM105_0")]
     #[test_case(Rule::SuppressibleException, Path::new("SIM105_1.py"); "SIM105_1")]
     #[test_case(Rule::SuppressibleException, Path::new("SIM105_2.py"); "SIM105_2")]
+    #[test_case(Rule::SuppressibleException, Path::new("SIM105_3.py"); "SIM105_3")]
     #[test_case(Rule::ReturnInTryExceptFinally, Path::new("SIM107.py"); "SIM107")]
     #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"); "SIM108")]
     #[test_case(Rule::CompareWithTuple, Path::new("SIM109.py"); "SIM109")]

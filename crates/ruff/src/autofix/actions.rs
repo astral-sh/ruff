@@ -444,8 +444,19 @@ pub fn get_or_import_symbol(
 ) -> Result<(Edit, String)> {
     if let Some((source, binding)) = context.resolve_qualified_import_name(module, member) {
         // If the symbol is already available in the current scope, use it.
-        //
-        // We also add a no-nop edit to force conflicts with any other fixes that might try to
+
+        // The exception: the symbol source (i.e., the import statement) comes after the current
+        // location. For example, we could be generating an edit within a function, and the import
+        // could be defined in the module scope, but after the function definition. In this case,
+        // it's unclear whether we can use the symbol (the function could be called between the
+        // import and the current location, and thus the symbol would not be available). It's also
+        // unclear whether should add an import statement at the top of the file, since it could
+        // be shadowed between the import and the current location.
+        if source.start() > at {
+            bail!("Unable to use existing symbol `{binding}` due to late-import");
+        }
+
+        // We also add a no-op edit to force conflicts with any other fixes that might try to
         // remove the import. Consider:
         //
         // ```py
@@ -476,10 +487,7 @@ pub fn get_or_import_symbol(
                 let import_edit = importer.add_member(stmt, member)?;
                 Ok((import_edit, member.to_string()))
             } else {
-                bail!(
-                    "Unable to insert `{}` into scope due to name conflict",
-                    member
-                )
+                bail!("Unable to insert `{member}` into scope due to name conflict")
             }
         } else {
             // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
@@ -492,10 +500,7 @@ pub fn get_or_import_symbol(
                     importer.add_import(&AnyImport::Import(Import::module(module)), at);
                 Ok((import_edit, format!("{module}.{member}")))
             } else {
-                bail!(
-                    "Unable to insert `{}` into scope due to name conflict",
-                    module
-                )
+                bail!("Unable to insert `{module}` into scope due to name conflict")
             }
         }
     }
