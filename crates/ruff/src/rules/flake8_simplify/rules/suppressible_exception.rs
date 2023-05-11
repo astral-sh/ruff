@@ -93,9 +93,6 @@ pub fn suppressible_exception(
                 stmt.range(),
             );
 
-            println!("stmt: {:?}", stmt);
-            println!("handler: {:?}", handler);
-
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 diagnostic.try_set_fix(|| {
                     let (import_edit, binding) = get_or_import_symbol(
@@ -106,7 +103,6 @@ pub fn suppressible_exception(
                         &checker.importer,
                         checker.locator,
                     )?;
-                    println!("binding: {:?}", binding);
                     let replace_try = Edit::range_replacement(
                         format!("with {binding}({exception})"),
                         TextRange::at(stmt.start(), "try".text_len()),
