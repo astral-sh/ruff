@@ -12,8 +12,8 @@ pub struct Block<'a> {
     body: &'a Body,
 }
 
-impl Format<ASTFormatContext<'_>> for Block<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for Block<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for (i, stmt) in self.body.node.iter().enumerate() {
             if i > 0 {
                 write!(f, [hard_line_break()])?;
@@ -49,8 +49,8 @@ pub struct Statements<'a> {
     suite: &'a [Stmt],
 }
 
-impl Format<ASTFormatContext<'_>> for Statements<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for Statements<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for (i, stmt) in self.suite.iter().enumerate() {
             if i > 0 {
                 write!(f, [hard_line_break()])?;
@@ -70,8 +70,8 @@ pub struct Literal {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for Literal {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for Literal {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let text = f.context().contents();
 
         f.write_element(FormatElement::StaticTextSlice {

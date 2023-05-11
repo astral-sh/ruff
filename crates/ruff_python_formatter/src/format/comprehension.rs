@@ -9,7 +9,7 @@ pub struct FormatComprehension<'a> {
     item: &'a Comprehension,
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Comprehension {
+impl AsFormat<ASTFormatContext> for Comprehension {
     type Format<'a> = FormatComprehension<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -17,8 +17,8 @@ impl AsFormat<ASTFormatContext<'_>> for Comprehension {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatComprehension<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for FormatComprehension<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let comprehension = self.item;
 
         write!(f, [soft_line_break_or_space()])?;

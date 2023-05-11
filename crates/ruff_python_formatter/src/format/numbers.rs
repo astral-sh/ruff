@@ -12,8 +12,8 @@ struct FloatAtom {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for FloatAtom {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for FloatAtom {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
         let content = &contents[self.range];
@@ -68,8 +68,8 @@ pub struct FloatLiteral {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for FloatLiteral {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for FloatLiteral {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
         let content = &contents[self.range];
@@ -118,8 +118,8 @@ pub struct IntLiteral {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for IntLiteral {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for IntLiteral {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
         for prefix in ["0b", "0B", "0o", "0O", "0x", "0X"] {
@@ -165,8 +165,8 @@ pub struct ComplexLiteral {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for ComplexLiteral {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for ComplexLiteral {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
         let content = &contents[self.range];
 
