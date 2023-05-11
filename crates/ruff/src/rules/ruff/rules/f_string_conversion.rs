@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for FStringConversion {
 pub(crate) fn f_string_conversion(
     checker: &mut Checker,
     expr: &Expr,
-    formatted_value: &Box<Expr>,
+    formatted_value: &Expr,
     conversion: ast::Int,
 ) {
     // Make sure we're in an f-string
@@ -41,7 +41,7 @@ pub(crate) fn f_string_conversion(
         keywords,
     }) = &formatted_value.node
     {
-        if args.len() != 1 || keywords.len() > 0 {
+        if args.len() != 1 || !keywords.is_empty() {
             // Can't be a conversion otherwise
             return;
         }
