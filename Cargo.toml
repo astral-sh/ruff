@@ -11,7 +11,7 @@ authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.69" }
-bitflags = { version = "2.1.0" }
+bitflags = { version = "2.2.1" }
 chrono = { version = "0.4.23", default-features = false, features = ["clock"] }
 clap = { version = "4.1.8", features = ["derive"] }
 colored = { version = "2.0.0" }
@@ -30,10 +30,11 @@ path-absolutize = { version = "3.0.14" }
 proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
-ruff_text_size = { git = "https://github.com/charliermarsh/RustPython.git", rev = "c3147d2c1524ebd0e90cf1c2938d770314fd5a5a" }
+ruff_text_size = { git = "https://github.com/RustPython/Parser.git", rev = "2af98056629fbe75ccc0d90c4ee05dfeb403d666" }
 rustc-hash = { version = "1.1.0" }
-rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "c3147d2c1524ebd0e90cf1c2938d770314fd5a5a" }
-rustpython-parser = { git = "https://github.com/charliermarsh/RustPython.git", rev = "c3147d2c1524ebd0e90cf1c2938d770314fd5a5a" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "f3e4d3409253660bd4fa7f3d24d3db747e7dca61" }
+rustpython-literal = { git = "https://github.com/RustPython/Parser.git", rev = "2af98056629fbe75ccc0d90c4ee05dfeb403d666" }
+rustpython-parser = { git = "https://github.com/RustPython/Parser.git", rev = "2af98056629fbe75ccc0d90c4ee05dfeb403d666" , default-features = false}
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }

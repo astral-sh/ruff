@@ -1,7 +1,7 @@
-use ruff_text_size::TextSize;
+use ruff_text_size::TextRange;
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -56,9 +56,8 @@ fn union(elts: &[Expr]) -> Expr {
         elts[0].clone()
     } else {
         Expr::new(
-            TextSize::default(),
-            TextSize::default(),
-            ExprKind::BinOp {
+            TextRange::default(),
+            ast::ExprBinOp {
                 left: Box::new(union(&elts[..elts.len() - 1])),
                 op: Operator::BitOr,
                 right: Box::new(elts[elts.len() - 1].clone()),
@@ -69,7 +68,7 @@ fn union(elts: &[Expr]) -> Expr {
 
 /// UP038
 pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
@@ -77,7 +76,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
             return;
         };
         if let Some(types) = args.get(1) {
-            if let ExprKind::Tuple { elts, .. } = &types.node {
+            if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &types.node {
                 // Ex) `()`
                 if elts.is_empty() {
                     return;
@@ -86,7 +85,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                 // Ex) `(*args,)`
                 if elts
                     .iter()
-                    .any(|elt| matches!(elt.node, ExprKind::Starred { .. }))
+                    .any(|elt| matches!(elt.node, ExprKind::Starred(_)))
                 {
                     return;
                 }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,9 +53,9 @@ pub fn unnecessary_generator_dict(
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
         return;
     };
-    if let ExprKind::GeneratorExp { elt, .. } = argument {
+    if let ExprKind::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument {
         match &elt.node {
-            ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+            ExprKind::Tuple(ast::ExprTuple { elts, .. }) if elts.len() == 2 => {
                 let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]

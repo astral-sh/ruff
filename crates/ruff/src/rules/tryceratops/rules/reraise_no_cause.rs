@@ -55,7 +55,9 @@ pub fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     };
 
     for (range, exc, cause) in raises {
-        if exc.map_or(false, |expr| matches!(expr.node, ExprKind::Call { .. })) && cause.is_none() {
+        if exc.map_or(false, |expr| {
+            matches!(expr.node, ExprKind::Call(_)) && cause.is_none()
+        }) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(ReraiseNoCause, range));

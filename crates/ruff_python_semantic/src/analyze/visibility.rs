@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rustpython_parser::ast::{Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Stmt, StmtKind};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
@@ -162,7 +162,8 @@ pub fn module_visibility(module_path: Option<&[String]>, path: &Path) -> Visibil
 
 pub fn function_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
-        StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
+        StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private
             } else {
@@ -175,16 +176,16 @@ pub fn function_visibility(stmt: &Stmt) -> Visibility {
 
 pub fn method_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
-        StmtKind::FunctionDef {
+        StmtKind::FunctionDef(ast::StmtFunctionDef {
             name,
             decorator_list,
             ..
-        }
-        | StmtKind::AsyncFunctionDef {
+        })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             name,
             decorator_list,
             ..
-        } => {
+        }) => {
             // Is this a setter or deleter?
             if decorator_list.iter().any(|expr| {
                 collect_call_path(expr).map_or(false, |call_path| {
@@ -213,7 +214,7 @@ pub fn method_visibility(stmt: &Stmt) -> Visibility {
 
 pub fn class_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
-        StmtKind::ClassDef { name, .. } => {
+        StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private
             } else {

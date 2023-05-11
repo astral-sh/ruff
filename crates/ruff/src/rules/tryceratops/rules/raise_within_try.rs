@@ -64,8 +64,8 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt.node {
-            StmtKind::Raise { .. } => self.raises.push(stmt),
-            StmtKind::Try { .. } | StmtKind::TryStar { .. } => (),
+            StmtKind::Raise(_) => self.raises.push(stmt),
+            StmtKind::Try(_) | StmtKind::TryStar(_) => (),
             _ => walk_stmt(self, stmt),
         }
     }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,8 +48,8 @@ pub fn unsafe_yaml_load(checker: &mut Checker, func: &Expr, args: &[Expr], keywo
                 })
             {
                 let loader = match &loader_arg.node {
-                    ExprKind::Attribute { attr, .. } => Some(attr.to_string()),
-                    ExprKind::Name { id, .. } => Some(id.to_string()),
+                    ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => Some(attr.to_string()),
+                    ExprKind::Name(ast::ExprName { id, .. }) => Some(id.to_string()),
                     _ => None,
                 };
                 checker.diagnostics.push(Diagnostic::new(

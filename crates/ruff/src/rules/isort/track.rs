@@ -1,5 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
@@ -72,14 +72,14 @@ impl<'a> ImportTracker<'a> {
             // sibling (i.e., as if the comment is the next statement, as
             // opposed to the class or function).
             match &stmt.node {
-                StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
                         Trailer::FunctionDef
                     }
                 }
-                StmtKind::ClassDef { .. } => {
+                StmtKind::ClassDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
@@ -134,11 +134,7 @@ where
         }
 
         // Track imports.
-        if matches!(
-            stmt.node,
-            StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
-        ) && !is_excluded
-        {
+        if matches!(stmt.node, StmtKind::Import(_) | StmtKind::ImportFrom(_)) && !is_excluded {
             self.track_import(stmt);
         } else {
             self.finalize(self.trailer_for(stmt));
@@ -148,36 +144,25 @@ where
         let prev_nested = self.nested;
         self.nested = true;
         match &stmt.node {
-            StmtKind::FunctionDef { body, .. } => {
+            StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::AsyncFunctionDef { body, .. } => {
+            StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::ClassDef { body, .. } => {
+            StmtKind::ClassDef(ast::StmtClassDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::For { body, orelse, .. } => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
-            StmtKind::AsyncFor { body, orelse, .. } => {
+            StmtKind::For(ast::StmtFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -188,7 +173,7 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::While { body, orelse, .. } => {
+            StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -199,7 +184,7 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::If { body, orelse, .. } => {
+            StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -210,35 +195,46 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::With { body, .. } => {
+            StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+                for stmt in body {
+                    self.visit_stmt(stmt);
+                }
+                self.finalize(None);
+
+                for stmt in orelse {
+                    self.visit_stmt(stmt);
+                }
+                self.finalize(None);
+            }
+            StmtKind::With(ast::StmtWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::AsyncWith { body, .. } => {
+            StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::Match { cases, .. } => {
+            StmtKind::Match(ast::StmtMatch { cases, .. }) => {
                 for match_case in cases {
                     self.visit_match_case(match_case);
                 }
             }
-            StmtKind::Try {
+            StmtKind::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            }
-            | StmtKind::TryStar {
+            })
+            | StmtKind::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => {
+            }) => {
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
@@ -267,7 +263,8 @@ where
         let prev_nested = self.nested;
         self.nested = true;
 
-        let ExcepthandlerKind::ExceptHandler { body, .. } = &excepthandler.node;
+        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+            &excepthandler.node;
         for stmt in body {
             self.visit_stmt(stmt);
         }

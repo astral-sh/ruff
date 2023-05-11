@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Located;
+use rustpython_parser::ast::Attributed;
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -170,7 +170,7 @@ impl Violation for BuiltinAttributeShadowing {
 /// Check builtin name shadowing.
 pub fn builtin_shadowing<T>(
     name: &str,
-    located: &Located<T>,
+    located: &Attributed<T>,
     node_type: ShadowingType,
     ignorelist: &[String],
 ) -> Option<Diagnostic> {

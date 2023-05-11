@@ -1,5 +1,5 @@
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,11 +45,11 @@ fn traverse_union<'a>(
     //
     // So we have to traverse both branches in order (left, then right), to report duplicates
     // in the order they appear in the source code.
-    if let ExprKind::BinOp {
+    if let ExprKind::BinOp(ast::ExprBinOp {
         op: Operator::BitOr,
         left,
         right,
-    } = &expr.node
+    }) = &expr.node
     {
         // Traverse left subtree, then the right subtree, propagating the previous node.
         traverse_union(seen_nodes, checker, left, Some(expr));
@@ -72,7 +72,7 @@ fn traverse_union<'a>(
             let parent = parent.expect("Parent node must exist");
 
             // SAFETY: Parent node must have been a `BinOp` in order for us to have traversed it.
-            let ExprKind::BinOp { left, right, .. } = &parent.node else {
+            let ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) = &parent.node else {
                 panic!("Parent node must be a BinOp");
             };
 

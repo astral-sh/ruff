@@ -17,7 +17,7 @@
 //! n += 1
 //! ```
 
-use rustpython_parser::ast::{Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Expr, ExprKind, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,7 +39,7 @@ pub fn unary_prefix_increment(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(op, Unaryop::UAdd) {
         return;
     }
-    let ExprKind::UnaryOp { op, .. } = &operand.node else {
+    let ExprKind::UnaryOp(ast::ExprUnaryOp { op, .. })= &operand.node else {
             return;
         };
     if !matches!(op, Unaryop::UAdd) {

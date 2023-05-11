@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Arguments, Expr, Stmt, StmtKind};
 
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility;
@@ -8,20 +8,20 @@ use crate::docstrings::definition::{Definition, DefinitionKind};
 
 pub(super) fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, Option<&Expr>, &Vec<Stmt>) {
     match &stmt.node {
-        StmtKind::FunctionDef {
+        StmtKind::FunctionDef(ast::StmtFunctionDef {
             name,
             args,
             returns,
             body,
             ..
-        }
-        | StmtKind::AsyncFunctionDef {
+        })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             name,
             args,
             returns,
             body,
             ..
-        } => (name, args, returns.as_ref().map(|expr| &**expr), body),
+        }) => (name, args, returns.as_ref().map(|expr| &**expr), body),
         _ => panic!("Found non-FunctionDef in match_name"),
     }
 }

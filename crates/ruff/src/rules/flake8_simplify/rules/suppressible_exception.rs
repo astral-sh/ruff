@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{
-    Constant, Excepthandler, ExcepthandlerKind, ExprKind, Located, Stmt, StmtKind,
+    self, Attributed, Constant, Excepthandler, ExcepthandlerKind, ExprKind, Stmt, StmtKind,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -45,15 +45,15 @@ pub fn suppressible_exception(
 ) {
     if !matches!(
         try_body,
-        [Located {
-            node: StmtKind::Delete { .. }
-                | StmtKind::Assign { .. }
-                | StmtKind::AugAssign { .. }
-                | StmtKind::AnnAssign { .. }
-                | StmtKind::Assert { .. }
-                | StmtKind::Import { .. }
-                | StmtKind::ImportFrom { .. }
-                | StmtKind::Expr { .. }
+        [Attributed {
+            node: StmtKind::Delete(_)
+                | StmtKind::Assign(_)
+                | StmtKind::AugAssign(_)
+                | StmtKind::AnnAssign(_)
+                | StmtKind::Assert(_)
+                | StmtKind::Import(_)
+                | StmtKind::ImportFrom(_)
+                | StmtKind::Expr(_)
                 | StmtKind::Pass,
             ..
         }]
@@ -64,17 +64,15 @@ pub fn suppressible_exception(
         return;
     }
     let handler = &handlers[0];
-    let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
+    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+        &handler.node;
     if body.len() == 1 {
         let node = &body[0].node;
         if matches!(node, StmtKind::Pass)
             || (matches!(
             node,
-            StmtKind::Expr {
-                value,
-                    ..
-                }
-            if matches!(**value, Located { node: ExprKind::Constant { value: Constant::Ellipsis, .. }, ..})
+            StmtKind::Expr(ast::StmtExpr { value })
+            if matches!(**value, Attributed { node: ExprKind::Constant(ast::ExprConstant { value: Constant::Ellipsis, .. }), ..})
             ))
         {
             let handler_names: Vec<String> = helpers::extract_handled_exceptions(handlers)

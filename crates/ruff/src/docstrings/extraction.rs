@@ -1,6 +1,6 @@
 //! Extract docstrings from an AST.
 
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_python_semantic::analyze::visibility;
 
@@ -10,16 +10,16 @@ use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
     let stmt = suite.first()?;
     // Require the docstring to be a standalone expression.
-    let StmtKind::Expr { value } = &stmt.node else {
+    let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node else {
         return None;
     };
     // Only match strings.
     if !matches!(
         &value.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
-        }
+        })
     ) {
         return None;
     }

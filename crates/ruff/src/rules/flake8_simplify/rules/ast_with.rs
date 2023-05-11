@@ -1,6 +1,6 @@
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{self, Attributed, Stmt, StmtKind, Withitem};
 use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Violation};
@@ -61,7 +61,7 @@ impl Violation for MultipleWithStatements {
 }
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
-    let [Located { node: StmtKind::With { items, body, .. }, ..}] = body else { return None };
+    let [Attributed { node: StmtKind::With(ast::StmtWith { items, body, .. }), ..}] = body else { return None };
     find_last_with(body).or(Some((items, body)))
 }
 
@@ -73,7 +73,7 @@ pub fn multiple_with_statements(
     with_parent: Option<&Stmt>,
 ) {
     if let Some(parent) = with_parent {
-        if let StmtKind::With { body, .. } = &parent.node {
+        if let StmtKind::With(ast::StmtWith { body, .. }) = &parent.node {
             if body.len() == 1 {
                 return;
             }

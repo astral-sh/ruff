@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -67,11 +67,11 @@ const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
 fn allow_boolean_trap(func: &Expr) -> bool {
-    if let ExprKind::Attribute { attr, .. } = &func.node {
+    if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&attr.as_ref());
     }
 
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&id.as_ref());
     }
 
@@ -81,10 +81,10 @@ fn allow_boolean_trap(func: &Expr) -> bool {
 const fn is_boolean_arg(arg: &Expr) -> bool {
     matches!(
         &arg.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Bool(_),
             ..
-        }
+        })
     )
 }
 
@@ -120,11 +120,11 @@ pub fn check_positional_boolean_in_def(
 
         // check for both bool (python class) and 'bool' (string annotation)
         let hint = match &expr.node {
-            ExprKind::Name { id, .. } => id == "bool",
-            ExprKind::Constant {
+            ExprKind::Name(ast::ExprName { id, .. }) => id == "bool",
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
-            } => value == "bool",
+            }) => value == "bool",
             _ => false,
         };
         if !hint {

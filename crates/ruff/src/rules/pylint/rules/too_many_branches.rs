@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, ExcepthandlerKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,26 +27,26 @@ fn num_branches(stmts: &[Stmt]) -> usize {
         .iter()
         .map(|stmt| {
             match &stmt.node {
-                StmtKind::If { body, orelse, .. } => {
+                StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
                     1 + num_branches(body)
                         + (if let Some(stmt) = orelse.first() {
                             // `elif:` and `else: if:` have the same AST representation.
                             // Avoid treating `elif:` as two statements.
-                            usize::from(!matches!(stmt.node, StmtKind::If { .. }))
+                            usize::from(!matches!(stmt.node, StmtKind::If(_)))
                         } else {
                             0
                         })
                         + num_branches(orelse)
                 }
-                StmtKind::Match { cases, .. } => {
+                StmtKind::Match(ast::StmtMatch { cases, .. }) => {
                     1 + cases
                         .iter()
                         .map(|case| num_branches(&case.body))
                         .sum::<usize>()
                 }
-                StmtKind::For { body, orelse, .. }
-                | StmtKind::AsyncFor { body, orelse, .. }
-                | StmtKind::While { body, orelse, .. } => {
+                StmtKind::For(ast::StmtFor { body, orelse, .. })
+                | StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+                | StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
                     1 + num_branches(body)
                         + (if orelse.is_empty() {
                             0
@@ -54,18 +54,18 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                             1 + num_branches(orelse)
                         })
                 }
-                StmtKind::Try {
+                StmtKind::Try(ast::StmtTry {
                     body,
                     handlers,
                     orelse,
                     finalbody,
-                }
-                | StmtKind::TryStar {
+                })
+                | StmtKind::TryStar(ast::StmtTryStar {
                     body,
                     handlers,
                     orelse,
                     finalbody,
-                } => {
+                }) => {
                     1 + num_branches(body)
                         + (if orelse.is_empty() {
                             0
@@ -81,8 +81,9 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                             .iter()
                             .map(|handler| {
                                 1 + {
-                                    let ExcepthandlerKind::ExceptHandler { body, .. } =
-                                        &handler.node;
+                                    let ExcepthandlerKind::ExceptHandler(
+                                        ast::ExcepthandlerExceptHandler { body, .. },
+                                    ) = &handler.node;
                                     num_branches(body)
                                 }
                             })

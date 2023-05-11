@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -60,15 +60,14 @@ pub fn unnecessary_literal_dict(
         return;
     }
     let (kind, elts) = match argument {
-        ExprKind::Tuple { elts, .. } => ("tuple", elts),
-        ExprKind::List { elts, .. } => ("list", elts),
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => ("tuple", elts),
+        ExprKind::List(ast::ExprList { elts, .. }) => ("list", elts),
         _ => return,
     };
     // Accept `dict((1, 2), ...))` `dict([(1, 2), ...])`.
-    if !elts
-        .iter()
-        .all(|elt| matches!(&elt.node, ExprKind::Tuple { elts, .. } if elts.len() == 2))
-    {
+    if !elts.iter().all(
+        |elt| matches!(&elt.node, ExprKind::Tuple(ast::ExprTuple { elts, .. } )if elts.len() == 2),
+    ) {
         return;
     }
     let mut diagnostic = Diagnostic::new(

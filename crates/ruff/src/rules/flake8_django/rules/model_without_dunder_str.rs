@@ -1,5 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, StmtKind};
-use rustpython_parser::ast::{ExprKind, Stmt};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,7 +69,7 @@ pub fn model_without_dunder_str(
 
 fn has_dunder_method(body: &[Stmt]) -> bool {
     body.iter().any(|val| match &val.node {
-        StmtKind::FunctionDef { name, .. } => {
+        StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
             if name == "__str__" {
                 return true;
             }
@@ -95,24 +94,24 @@ fn checker_applies(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> bool {
 /// Check if class is abstract, in terms of Django model inheritance.
 fn is_model_abstract(body: &[Stmt]) -> bool {
     for element in body.iter() {
-        let StmtKind::ClassDef {name, body, ..} = &element.node else {
+        let StmtKind::ClassDef(ast::StmtClassDef {name, body, ..}) = &element.node else {
             continue
         };
         if name != "Meta" {
             continue;
         }
         for element in body.iter() {
-            let StmtKind::Assign {targets, value, ..} = &element.node else {
+            let StmtKind::Assign(ast::StmtAssign {targets, value, ..}) = &element.node else {
                 continue;
             };
             for target in targets.iter() {
-                let ExprKind::Name {id , ..} = &target.node else {
+                let ExprKind::Name(ast::ExprName {id , ..}) = &target.node else {
                     continue;
                 };
                 if id != "abstract" {
                     continue;
                 }
-                let ExprKind::Constant{value: Constant::Bool(true), ..} = &value.node else {
+                let ExprKind::Constant(ast::ExprConstant{value: Constant::Bool(true), ..}) = &value.node else {
                     continue;
                 };
                 return true;

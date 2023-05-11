@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,13 +20,13 @@ pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
         return;
     }
     let target = &targets[0];
-    let ExprKind::Attribute { value, attr, .. } = &target.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &target.node else {
         return;
     };
     if attr != "environ" {
         return;
     }
-    let ExprKind::Name { id, .. } = &value.node else {
+    let ExprKind::Name(ast::ExprName { id, .. } )= &value.node else {
                     return;
                 };
     if id != "os" {

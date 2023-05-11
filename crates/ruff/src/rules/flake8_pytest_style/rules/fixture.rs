@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind};
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -208,28 +208,28 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
-            StmtKind::Return { value, .. } => {
+            StmtKind::Return(ast::StmtReturn { value }) => {
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {}
+            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {}
             _ => visitor::walk_stmt(self, stmt),
         }
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
-            ExprKind::YieldFrom { .. } => {
+            ExprKind::YieldFrom(_) => {
                 self.has_yield_from = true;
             }
-            ExprKind::Yield { value, .. } => {
+            ExprKind::Yield(ast::ExprYield { value }) => {
                 self.yield_statements.push(expr);
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            ExprKind::Call { func, .. } => {
+            ExprKind::Call(ast::ExprCall { func, .. }) => {
                 if collect_call_path(func).map_or(false, |call_path| {
                     call_path.as_slice() == ["request", "addfinalizer"]
                 }) {
@@ -278,12 +278,11 @@ pub fn fix_extraneous_scope_function(
 /// PT001, PT002, PT003
 fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Expr) {
     match &decorator.node {
-        ExprKind::Call {
+        ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-            ..
-        } => {
+        }) => {
             if checker
                 .settings
                 .rules
@@ -415,8 +414,8 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
         .enabled(Rule::PytestUselessYieldFixture)
     {
         if let Some(stmt) = body.last() {
-            if let StmtKind::Expr { value, .. } = &stmt.node {
-                if let ExprKind::Yield { .. } = value.node {
+            if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
+                if let ExprKind::Yield(_) = value.node {
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(
                             PytestUselessYieldFixture {

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -15,7 +15,7 @@ impl Violation for ExecBuiltin {
 
 /// S102
 pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
-    let ExprKind::Name { id, .. } = &func.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return None;
     };
     if id != "exec" {

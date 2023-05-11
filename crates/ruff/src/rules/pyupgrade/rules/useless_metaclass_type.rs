@@ -1,6 +1,6 @@
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -28,13 +28,13 @@ fn rule(targets: &[Expr], value: &Expr, location: TextRange) -> Option<Diagnosti
     if targets.len() != 1 {
         return None;
     }
-    let ExprKind::Name { id, .. } = targets.first().map(|expr| &expr.node).unwrap() else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = targets.first().map(|expr| &expr.node).unwrap() else {
         return None;
     };
     if id != "__metaclass__" {
         return None;
     }
-    let ExprKind::Name { id, .. } = &value.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &value.node else {
         return None;
     };
     if id != "type" {

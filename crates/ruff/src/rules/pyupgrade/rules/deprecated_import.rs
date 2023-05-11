@@ -293,7 +293,7 @@ impl<'a> ImportReplacer<'a> {
             if self.version >= PythonVersion::Py39 {
                 for member in self.members {
                     if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
-                        if member.name == *name {
+                        if &member.name == *name {
                             Some(*target)
                         } else {
                             None
@@ -496,7 +496,7 @@ impl<'a> ImportReplacer<'a> {
         let full_names: String = names
             .iter()
             .map(|name| match &name.asname {
-                Some(asname) => format!("{} as {asname}", name.name),
+                Some(asname) => format!("{} as {}", name.name, asname),
                 None => format!("{}", name.name),
             })
             .join(", ");
@@ -510,13 +510,13 @@ pub fn deprecated_import(
     stmt: &Stmt,
     names: &[Alias],
     module: Option<&str>,
-    level: Option<usize>,
+    level: Option<u32>,
 ) {
     // Avoid relative and star imports.
     if level.map_or(false, |level| level > 0) {
         return;
     }
-    if names.first().map_or(false, |name| name.node.name == "*") {
+    if names.first().map_or(false, |name| &name.node.name == "*") {
         return;
     }
     let Some(module) = module else {

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -81,13 +81,13 @@ pub fn explicit_true_false_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::Constant { value, .. } = &body.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &body.node else {
         return;
     };
     if !matches!(value, Constant::Bool(true)) {
         return;
     }
-    let ExprKind::Constant { value, .. } = &orelse.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &orelse.node else {
         return;
     };
     if !matches!(value, Constant::Bool(false)) {
@@ -101,7 +101,7 @@ pub fn explicit_true_false_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if matches!(test.node, ExprKind::Compare { .. }) {
+        if matches!(test.node, ExprKind::Compare(_)) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&test.clone(), checker.stylist),
@@ -111,9 +111,9 @@ pub fn explicit_true_false_in_ifexpr(
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
-                    &create_expr(ExprKind::Call {
-                        func: Box::new(create_expr(ExprKind::Name {
-                            id: "bool".to_string(),
+                    &create_expr(ast::ExprCall {
+                        func: Box::new(create_expr(ast::ExprName {
+                            id: "bool".into(),
                             ctx: ExprContext::Load,
                         })),
                         args: vec![test.clone()],
@@ -136,13 +136,13 @@ pub fn explicit_false_true_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::Constant { value, .. } = &body.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. }) = &body.node else {
         return;
     };
     if !matches!(value, Constant::Bool(false)) {
         return;
     }
-    let ExprKind::Constant { value, .. } = &orelse.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. }) = &orelse.node else {
         return;
     };
     if !matches!(value, Constant::Bool(true)) {
@@ -159,7 +159,7 @@ pub fn explicit_false_true_in_ifexpr(
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::UnaryOp {
+                &create_expr(ast::ExprUnaryOp {
                     op: Unaryop::Not,
                     operand: Box::new(create_expr(test.node.clone())),
                 }),
@@ -179,7 +179,7 @@ pub fn twisted_arms_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::UnaryOp { op, operand: test_operand } = &test.node else {
+    let ExprKind::UnaryOp(ast::ExprUnaryOp { op, operand: test_operand } )= &test.node else {
         return;
     };
     if !matches!(op, Unaryop::Not) {
@@ -187,10 +187,10 @@ pub fn twisted_arms_in_ifexpr(
     }
 
     // Check if the test operand and else branch use the same variable.
-    let ExprKind::Name { id: test_id, .. } = &test_operand.node else {
+    let ExprKind::Name(ast::ExprName { id: test_id, .. } )= &test_operand.node else {
         return;
     };
-    let ExprKind::Name {id: orelse_id, ..} = &orelse.node else {
+    let ExprKind::Name(ast::ExprName {id: orelse_id, ..}) = &orelse.node else {
         return;
     };
     if !test_id.eq(orelse_id) {
@@ -208,7 +208,7 @@ pub fn twisted_arms_in_ifexpr(
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::IfExp {
+                &create_expr(ast::ExprIfExp {
                     test: Box::new(create_expr(orelse.node.clone())),
                     body: Box::new(create_expr(orelse.node.clone())),
                     orelse: Box::new(create_expr(body.node.clone())),

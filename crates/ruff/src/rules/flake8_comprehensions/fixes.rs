@@ -116,7 +116,7 @@ pub fn fix_unnecessary_generator_set(
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
     if let Some(parent_element) = parent {
-        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
             content = format!(" {content} ");
         }
     }
@@ -186,7 +186,7 @@ pub fn fix_unnecessary_generator_dict(
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
     if let Some(parent_element) = parent {
-        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
             content = format!(" {content} ");
         }
     }
@@ -1101,9 +1101,7 @@ pub fn fix_unnecessary_map(
         // syntax errors.
         if kind == "set" || kind == "dict" {
             if let Some(parent_element) = parent {
-                if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } =
-                    &parent_element.node
-                {
+                if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
                     content = format!(" {content} ");
                 }
             }

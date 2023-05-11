@@ -642,7 +642,7 @@ fn format_import_from(
     stmt: &Stmt,
     module: Option<&str>,
     names: &[Alias],
-    level: Option<usize>,
+    level: Option<u32>,
 ) -> FormatResult<()> {
     write!(f, [text("from")])?;
     write!(f, [space()])?;

@@ -34,7 +34,7 @@ pub fn starred_expressions(
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;
     for (index, elt) in elts.iter().enumerate() {
-        if matches!(elt.node, ExprKind::Starred { .. }) {
+        if matches!(elt.node, ExprKind::Starred(_)) {
             if has_starred && check_two_starred_expressions {
                 return Some(Diagnostic::new(MultipleStarredExpressions, location));
             }

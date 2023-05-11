@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
@@ -48,10 +48,10 @@ pub(super) fn is_pytest_parametrize(context: &Context, decorator: &Expr) -> bool
 }
 
 pub(super) fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
-    if let ExprKind::Constant {
+    if let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(string),
         ..
-    } = &kw.node.value.node
+    }) = &kw.node.value.node
     {
         string == literal
     } else {
@@ -61,15 +61,17 @@ pub(super) fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
 
 pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(string),
             ..
-        } => string.is_empty(),
-        ExprKind::Constant {
+        }) => string.is_empty(),
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::None,
             ..
-        } => true,
-        ExprKind::JoinedStr { values } => values.iter().all(is_empty_or_null_string),
+        }) => true,
+        ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
+            values.iter().all(is_empty_or_null_string)
+        }
         _ => false,
     }
 }

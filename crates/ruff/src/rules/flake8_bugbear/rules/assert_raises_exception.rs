@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ExprKind, Stmt, Withitem};
+use rustpython_parser::ast::{self, ExprKind, Stmt, Withitem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,7 +55,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     };
     let item_context = &item.context_expr;
-    let ExprKind::Call { func, args, keywords } = &item_context.node else {
+    let ExprKind::Call(ast::ExprCall { func, args, keywords }) = &item_context.node else {
         return;
     };
     if args.len() != 1 {
@@ -74,7 +74,8 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
     }
 
     let kind = {
-        if matches!(&func.node, ExprKind::Attribute { attr, .. } if attr == "assertRaises") {
+        if matches!(&func.node, ExprKind::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
+        {
             AssertionKind::AssertRaises
         } else if checker
             .ctx

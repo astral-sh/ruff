@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Expr, Located};
+use rustpython_parser::ast::{Attributed, Expr};
 use serde::{Deserialize, Serialize};
 
 use crate::checkers::ast::Checker;
@@ -49,7 +49,7 @@ impl Violation for BannedApi {
 }
 
 /// TID251
-pub fn name_is_banned<T>(checker: &mut Checker, name: String, located: &Located<T>) {
+pub fn name_is_banned<T>(checker: &mut Checker, name: String, located: &Attributed<T>) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if let Some(ban) = banned_api.get(&name) {
         checker.diagnostics.push(Diagnostic::new(
@@ -63,7 +63,7 @@ pub fn name_is_banned<T>(checker: &mut Checker, name: String, located: &Located<
 }
 
 /// TID251
-pub fn name_or_parent_is_banned<T>(checker: &mut Checker, name: &str, located: &Located<T>) {
+pub fn name_or_parent_is_banned<T>(checker: &mut Checker, name: &str, located: &Attributed<T>) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     let mut name = name;
     loop {

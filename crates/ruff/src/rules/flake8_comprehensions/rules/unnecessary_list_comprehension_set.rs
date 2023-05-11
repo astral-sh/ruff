@@ -53,7 +53,7 @@ pub fn unnecessary_list_comprehension_set(
     if !checker.ctx.is_builtin("set") {
         return;
     }
-    if let ExprKind::ListComp { .. } = &argument {
+    if let ExprKind::ListComp(_) = &argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]

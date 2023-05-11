@@ -44,9 +44,9 @@ pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         let keyword = match expr.node {
-            ExprKind::Yield { .. } => DeferralKeyword::Yield,
-            ExprKind::YieldFrom { .. } => DeferralKeyword::YieldFrom,
-            ExprKind::Await { .. } => DeferralKeyword::Await,
+            ExprKind::Yield(_) => DeferralKeyword::Yield,
+            ExprKind::YieldFrom(_) => DeferralKeyword::YieldFrom,
+            ExprKind::Await(_) => DeferralKeyword::Await,
             _ => panic!("Expected ExprKind::Yield | ExprKind::YieldFrom | ExprKind::Await"),
         };
         checker.diagnostics.push(Diagnostic::new(

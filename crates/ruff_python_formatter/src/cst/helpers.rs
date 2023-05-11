@@ -17,7 +17,7 @@ pub fn find_tok(
     locator: &Locator,
     f: impl Fn(rustpython_parser::Tok) -> bool,
 ) -> TextRange {
-    for (tok, tok_range) in rustpython_parser::lexer::lex_located(
+    for (tok, tok_range) in rustpython_parser::lexer::lex_starts_at(
         &locator.contents()[range],
         rustpython_parser::Mode::Module,
         range.start(),
@@ -45,7 +45,7 @@ pub fn expand_indented_block(
     // Find the colon, which indicates the end of the header.
     let mut nesting = 0;
     let mut colon = None;
-    for (tok, tok_range) in rustpython_parser::lexer::lex_located(
+    for (tok, tok_range) in rustpython_parser::lexer::lex_starts_at(
         &contents[TextRange::new(location, end_location)],
         rustpython_parser::Mode::Module,
         location,
@@ -69,7 +69,7 @@ pub fn expand_indented_block(
     let colon_location = colon.unwrap();
 
     // From here, we have two options: simple statement or compound statement.
-    let indent = rustpython_parser::lexer::lex_located(
+    let indent = rustpython_parser::lexer::lex_starts_at(
         &contents[TextRange::new(colon_location, end_location)],
         rustpython_parser::Mode::Module,
         colon_location,

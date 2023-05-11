@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -38,13 +38,13 @@ pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
 
 fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::List { .. }
-        | ExprKind::Dict { .. }
-        | ExprKind::Set { .. }
-        | ExprKind::ListComp { .. }
-        | ExprKind::DictComp { .. }
-        | ExprKind::SetComp { .. } => true,
-        ExprKind::Call { func, .. } => is_mutable_func(checker, func),
+        ExprKind::List(_)
+        | ExprKind::Dict(_)
+        | ExprKind::Set(_)
+        | ExprKind::ListComp(_)
+        | ExprKind::DictComp(_)
+        | ExprKind::SetComp(_) => true,
+        ExprKind::Call(ast::ExprCall { func, .. }) => is_mutable_func(checker, func),
         _ => false,
     }
 }

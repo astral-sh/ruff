@@ -61,8 +61,8 @@ pub fn unnecessary_literal_set(
         return;
     }
     let kind = match argument {
-        ExprKind::List { .. } => "list",
-        ExprKind::Tuple { .. } => "tuple",
+        ExprKind::List(_) => "list",
+        ExprKind::Tuple(_) => "tuple",
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

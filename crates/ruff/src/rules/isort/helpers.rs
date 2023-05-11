@@ -12,7 +12,7 @@ pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice(stmt.range());
     let mut count: usize = 0;
     let mut trailing_comma = TrailingComma::Absent;
-    for (tok, _) in lexer::lex_located(contents, Mode::Module, stmt.start()).flatten() {
+    for (tok, _) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
         if matches!(tok, Tok::Lpar) {
             count += 1;
         }

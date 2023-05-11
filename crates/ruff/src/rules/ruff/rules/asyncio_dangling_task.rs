@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -82,7 +82,7 @@ pub fn asyncio_dangling_task<'a, F>(expr: &'a Expr, resolve_call_path: F) -> Opt
 where
     F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
 {
-    if let ExprKind::Call { func, .. } = &expr.node {
+    if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
         match resolve_call_path(func).as_deref() {
             Some(["asyncio", "create_task"]) => Some(Diagnostic::new(
                 AsyncioDanglingTask {

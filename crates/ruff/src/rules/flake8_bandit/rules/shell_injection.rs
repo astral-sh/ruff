@@ -2,7 +2,7 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -159,17 +159,17 @@ fn find_shell_keyword<'a>(ctx: &Context, keywords: &'a [Keyword]) -> Option<Shel
 fn shell_call_seems_safe(arg: &Expr) -> bool {
     matches!(
         arg.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
-        }
+        })
     )
 }
 
 /// Return the [`Expr`] as a string literal, if it's a string or a list of strings.
 fn try_string_literal(expr: &Expr) -> Option<&str> {
     match &expr.node {
-        ExprKind::List { elts, .. } => {
+        ExprKind::List(ast::ExprList { elts, .. }) => {
             if elts.is_empty() {
                 None
             } else {

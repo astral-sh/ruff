@@ -35,7 +35,7 @@ pub fn parse_type_annotation(
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
         let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = parser::parse_expression_located(
+        let expr = parser::parse_expression_starts_at(
             value,
             "<filename>",
             range.start() + leading_quote.text_len(),

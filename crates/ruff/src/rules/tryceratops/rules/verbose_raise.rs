@@ -1,4 +1,6 @@
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{
+    self, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind,
+};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,13 +53,15 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
-            StmtKind::Raise { exc, cause } => self.raises.push((exc.as_deref(), cause.as_deref())),
-            StmtKind::Try {
-                body, finalbody, ..
+            StmtKind::Raise(ast::StmtRaise { exc, cause }) => {
+                self.raises.push((exc.as_deref(), cause.as_deref()));
             }
-            | StmtKind::TryStar {
+            StmtKind::Try(ast::StmtTry {
                 body, finalbody, ..
-            } => {
+            })
+            | StmtKind::TryStar(ast::StmtTryStar {
+                body, finalbody, ..
+            }) => {
                 for stmt in body.iter().chain(finalbody.iter()) {
                     walk_stmt(self, stmt);
                 }
@@ -71,11 +75,11 @@ where
 pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
-        if let ExcepthandlerKind::ExceptHandler {
+        if let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
             name: Some(exception_name),
             body,
             ..
-        } = &handler.node
+        }) = &handler.node
         {
             let raises = {
                 let mut visitor = RaiseStatementVisitor::default();
@@ -88,7 +92,7 @@ pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
                 }
                 if let Some(exc) = exc {
                     // ...and the raised object is bound to the same name...
-                    if let ExprKind::Name { id, .. } = &exc.node {
+                    if let ExprKind::Name(ast::ExprName { id, .. }) = &exc.node {
                         if id == exception_name {
                             checker
                                 .diagnostics
