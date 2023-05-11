@@ -17,7 +17,7 @@ impl Violation for LoggingConfigInsecureListen {
 }
 
 /// S612
-pub fn logging_config_insecure_listen(
+pub(crate) fn logging_config_insecure_listen(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

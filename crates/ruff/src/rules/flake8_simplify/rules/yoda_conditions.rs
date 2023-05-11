@@ -126,7 +126,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
 }
 
 /// SIM300
-pub fn yoda_conditions(
+pub(crate) fn yoda_conditions(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,

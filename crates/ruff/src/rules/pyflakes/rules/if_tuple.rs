@@ -16,7 +16,7 @@ impl Violation for IfTuple {
 }
 
 /// F634
-pub fn if_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn if_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &test.node {
         if !elts.is_empty() {
             checker

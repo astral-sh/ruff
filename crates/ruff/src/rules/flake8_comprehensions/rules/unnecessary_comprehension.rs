@@ -75,7 +75,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
 }
 
 /// C416
-pub fn unnecessary_dict_comprehension(
+pub(crate) fn unnecessary_dict_comprehension(
     checker: &mut Checker,
     expr: &Expr,
     key: &Expr,
@@ -117,7 +117,7 @@ pub fn unnecessary_dict_comprehension(
 }
 
 /// C416
-pub fn unnecessary_list_set_comprehension(
+pub(crate) fn unnecessary_list_set_comprehension(
     checker: &mut Checker,
     expr: &Expr,
     elt: &Expr,

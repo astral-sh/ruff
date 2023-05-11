@@ -56,7 +56,7 @@ impl Violation for LambdaAssignment {
 }
 
 /// E731
-pub fn lambda_assignment(
+pub(crate) fn lambda_assignment(
     checker: &mut Checker,
     target: &Expr,
     value: &Expr,

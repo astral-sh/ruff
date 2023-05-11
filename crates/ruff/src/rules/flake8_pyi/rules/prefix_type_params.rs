@@ -8,7 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum VarKind {
+pub(crate) enum VarKind {
     TypeVar,
     ParamSpec,
     TypeVarTuple,
@@ -59,7 +59,7 @@ impl Violation for UnprefixedTypeParam {
 }
 
 /// PYI001
-pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
     if targets.len() != 1 {
         return;
     }

@@ -139,7 +139,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
 }
 
 /// UP028
-pub fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
     // Intentionally omit async functions.
     if let StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. }) = &stmt.node {
         let yields = {

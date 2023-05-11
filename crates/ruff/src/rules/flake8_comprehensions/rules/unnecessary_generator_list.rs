@@ -42,7 +42,7 @@ impl AlwaysAutofixableViolation for UnnecessaryGeneratorList {
 }
 
 /// C400 (`list(generator)`)
-pub fn unnecessary_generator_list(
+pub(crate) fn unnecessary_generator_list(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

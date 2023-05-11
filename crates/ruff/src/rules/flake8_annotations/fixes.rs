@@ -6,7 +6,11 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::Locator;
 
 /// ANN204
-pub fn add_return_annotation(locator: &Locator, stmt: &Stmt, annotation: &str) -> Result<Edit> {
+pub(crate) fn add_return_annotation(
+    locator: &Locator,
+    stmt: &Stmt,
+    annotation: &str,
+) -> Result<Edit> {
     let contents = &locator.contents()[stmt.range()];
 
     // Find the colon (following the `def` keyword).

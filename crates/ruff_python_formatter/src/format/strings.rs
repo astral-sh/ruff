@@ -9,7 +9,7 @@ use crate::context::ASTFormatContext;
 use crate::cst::Expr;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct StringLiteralPart {
+pub(crate) struct StringLiteralPart {
     range: TextRange,
 }
 
@@ -110,12 +110,12 @@ impl Format<ASTFormatContext> for StringLiteralPart {
 }
 
 #[inline]
-pub const fn string_literal_part(range: TextRange) -> StringLiteralPart {
+pub(crate) const fn string_literal_part(range: TextRange) -> StringLiteralPart {
     StringLiteralPart { range }
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct StringLiteral<'a> {
+pub(crate) struct StringLiteral<'a> {
     expr: &'a Expr,
 }
 
@@ -159,7 +159,7 @@ impl Format<ASTFormatContext> for StringLiteral<'_> {
 }
 
 #[inline]
-pub const fn string_literal(expr: &Expr) -> StringLiteral {
+pub(crate) const fn string_literal(expr: &Expr) -> StringLiteral {
     StringLiteral { expr }
 }
 

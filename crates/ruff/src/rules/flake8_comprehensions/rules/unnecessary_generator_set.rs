@@ -42,7 +42,7 @@ impl AlwaysAutofixableViolation for UnnecessaryGeneratorSet {
 }
 
 /// C401 (`set(generator)`)
-pub fn unnecessary_generator_set(
+pub(crate) fn unnecessary_generator_set(
     checker: &mut Checker,
     expr: &Expr,
     parent: Option<&Expr>,

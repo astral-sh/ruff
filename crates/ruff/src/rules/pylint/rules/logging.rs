@@ -86,7 +86,12 @@ impl Violation for LoggingTooManyArgs {
 
 /// PLE1205
 /// PLE1206
-pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+pub(crate) fn logging_call(
+    checker: &mut Checker,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     // If there are any starred arguments, abort.
     if args
         .iter()

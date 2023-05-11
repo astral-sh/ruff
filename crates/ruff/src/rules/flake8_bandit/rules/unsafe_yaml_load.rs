@@ -31,7 +31,12 @@ impl Violation for UnsafeYAMLLoad {
 }
 
 /// S506
-pub fn unsafe_yaml_load(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+pub(crate) fn unsafe_yaml_load(
+    checker: &mut Checker,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     if checker
         .ctx
         .resolve_call_path(func)

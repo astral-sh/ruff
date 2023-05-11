@@ -50,7 +50,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
 }
 
 /// B011
-pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Bool(false),
         ..

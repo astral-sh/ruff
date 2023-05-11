@@ -219,7 +219,7 @@ impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
 }
 
 /// COM812, COM818, COM819
-pub fn trailing_commas(
+pub(crate) fn trailing_commas(
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,

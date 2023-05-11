@@ -57,7 +57,7 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
 ];
 
 /// UP010
-pub fn unnecessary_future_import(
+pub(crate) fn unnecessary_future_import(
     checker: &mut Checker,
     stmt: &Stmt,
     names: &[Attributed<AliasData>],

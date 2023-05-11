@@ -22,7 +22,7 @@ impl AlwaysAutofixableViolation for UnnecessaryParenOnRaiseException {
 }
 
 /// RSE102
-pub fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Call(ast::ExprCall {
         func,
         args,

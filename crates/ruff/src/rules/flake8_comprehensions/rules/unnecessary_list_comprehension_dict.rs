@@ -39,7 +39,7 @@ impl AlwaysAutofixableViolation for UnnecessaryListComprehensionDict {
 }
 
 /// C404 (`dict([...])`)
-pub fn unnecessary_list_comprehension_dict(
+pub(crate) fn unnecessary_list_comprehension_dict(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

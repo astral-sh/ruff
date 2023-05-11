@@ -162,7 +162,7 @@ fn cache_key(
 
 #[allow(dead_code)]
 /// Initialize the cache at the specified `Path`.
-pub fn init(path: &Path) -> Result<()> {
+pub(crate) fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     fs::create_dir_all(path.join(content_dir()))?;
 
@@ -197,7 +197,7 @@ fn del_sync(cache_dir: &Path, key: u64) -> Result<(), std::io::Error> {
 }
 
 /// Get a value from the cache.
-pub fn get(
+pub(crate) fn get(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
@@ -246,7 +246,7 @@ pub fn get(
 }
 
 /// Set a value in the cache.
-pub fn set(
+pub(crate) fn set(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
@@ -265,7 +265,12 @@ pub fn set(
 }
 
 /// Delete a value from the cache.
-pub fn del(path: &Path, package: Option<&Path>, metadata: &fs::Metadata, settings: &AllSettings) {
+pub(crate) fn del(
+    path: &Path,
+    package: Option<&Path>,
+    metadata: &fs::Metadata,
+    settings: &AllSettings,
+) {
     drop(del_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib),

@@ -78,7 +78,12 @@ fn is_exception_check(stmt: &Stmt) -> bool {
 }
 
 /// SIM201
-pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub(crate) fn negation_with_equal_op(
+    checker: &mut Checker,
+    expr: &Expr,
+    op: &Unaryop,
+    operand: &Expr,
+) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
@@ -124,7 +129,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
 }
 
 /// SIM202
-pub fn negation_with_not_equal_op(
+pub(crate) fn negation_with_not_equal_op(
     checker: &mut Checker,
     expr: &Expr,
     op: &Unaryop,
@@ -175,7 +180,7 @@ pub fn negation_with_not_equal_op(
 }
 
 /// SIM208
-pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
     if !matches!(op, Unaryop::Not) {
         return;
     }

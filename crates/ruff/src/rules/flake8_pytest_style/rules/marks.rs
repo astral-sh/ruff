@@ -123,7 +123,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
     }
 }
 
-pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
+pub(crate) fn marks(checker: &mut Checker, decorators: &[Expr]) {
     let enforce_parentheses = checker
         .settings
         .rules

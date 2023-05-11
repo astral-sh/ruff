@@ -37,7 +37,12 @@ impl Violation for TypeComparison {
 }
 
 /// E721
-pub fn type_comparison(checker: &mut Checker, expr: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
+pub(crate) fn type_comparison(
+    checker: &mut Checker,
+    expr: &Expr,
+    ops: &[Cmpop],
+    comparators: &[Expr],
+) {
     for (op, right) in izip!(ops, comparators) {
         if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
             continue;

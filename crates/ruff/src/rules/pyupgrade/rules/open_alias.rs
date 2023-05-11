@@ -23,7 +23,7 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if checker
         .ctx
         .resolve_call_path(func)

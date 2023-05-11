@@ -25,7 +25,7 @@ impl Violation for MultipleStarredExpressions {
 }
 
 /// F621, F622
-pub fn starred_expressions(
+pub(crate) fn starred_expressions(
     elts: &[Expr],
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,

@@ -15,7 +15,7 @@ impl Violation for ZipWithoutExplicitStrict {
 }
 
 /// B905
-pub fn zip_without_explicit_strict(
+pub(crate) fn zip_without_explicit_strict(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

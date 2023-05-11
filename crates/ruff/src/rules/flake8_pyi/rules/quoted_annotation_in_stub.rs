@@ -20,7 +20,7 @@ impl AlwaysAutofixableViolation for QuotedAnnotationInStub {
 }
 
 /// PYI020
-pub fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str, range: TextRange) {
+pub(crate) fn quoted_annotation_in_stub(checker: &mut Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotationInStub, range);
     if checker.patch(Rule::QuotedAnnotationInStub) {
         #[allow(deprecated)]

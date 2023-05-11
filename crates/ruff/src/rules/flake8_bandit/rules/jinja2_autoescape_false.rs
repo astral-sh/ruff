@@ -30,7 +30,7 @@ impl Violation for Jinja2AutoescapeFalse {
 }
 
 /// S701
-pub fn jinja2_autoescape_false(
+pub(crate) fn jinja2_autoescape_false(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

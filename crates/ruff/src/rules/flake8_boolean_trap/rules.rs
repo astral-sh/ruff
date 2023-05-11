@@ -94,7 +94,7 @@ fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     }
 }
 
-pub fn check_positional_boolean_in_def(
+pub(crate) fn check_positional_boolean_in_def(
     checker: &mut Checker,
     name: &str,
     decorator_list: &[Expr],
@@ -137,7 +137,7 @@ pub fn check_positional_boolean_in_def(
     }
 }
 
-pub fn check_boolean_default_value_in_function_definition(
+pub(crate) fn check_boolean_default_value_in_function_definition(
     checker: &mut Checker,
     name: &str,
     decorator_list: &[Expr],
@@ -158,7 +158,7 @@ pub fn check_boolean_default_value_in_function_definition(
     }
 }
 
-pub fn check_boolean_positional_value_in_function_call(
+pub(crate) fn check_boolean_positional_value_in_function_call(
     checker: &mut Checker,
     args: &[Expr],
     func: &Expr,

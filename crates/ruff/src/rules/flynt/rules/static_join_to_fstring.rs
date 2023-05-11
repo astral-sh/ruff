@@ -51,7 +51,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     }))
 }
 
-pub fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
+pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
     let ExprKind::Call(ast::ExprCall {
         args,
         keywords,

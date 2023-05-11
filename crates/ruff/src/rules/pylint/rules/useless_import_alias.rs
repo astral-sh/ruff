@@ -36,7 +36,7 @@ impl AlwaysAutofixableViolation for UselessImportAlias {
 }
 
 /// PLC0414
-pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     let Some(asname) = &alias.node.asname else {
         return;
     };

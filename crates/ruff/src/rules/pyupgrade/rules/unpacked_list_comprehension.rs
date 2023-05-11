@@ -93,7 +93,7 @@ fn contains_await(expr: &Expr) -> bool {
 }
 
 /// UP027
-pub fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
     let Some(target) = targets.get(0) else {
         return;
     };

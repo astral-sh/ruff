@@ -76,7 +76,12 @@ enum TypingMember {
 }
 
 /// UP007
-pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
+pub(crate) fn use_pep604_annotation(
+    checker: &mut Checker,
+    expr: &Expr,
+    value: &Expr,
+    slice: &Expr,
+) {
     // If any of the _arguments_ are forward references, we can't use PEP 604.
     // Ex) `Union["str", "int"]` can't be converted to `"str" | "int"`.
     if any_arg_is_str(slice) {

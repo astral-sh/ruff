@@ -99,7 +99,7 @@ impl AlwaysAutofixableViolation for UselessSemicolon {
 }
 
 /// E701, E702, E703
-pub fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Track the last seen instance of a variety of tokens.

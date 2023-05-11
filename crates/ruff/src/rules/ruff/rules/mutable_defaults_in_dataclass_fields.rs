@@ -179,7 +179,7 @@ fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
 }
 
 /// RUF009
-pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt]) {
     let extend_immutable_calls: Vec<CallPath> = checker
         .settings
         .flake8_bugbear
@@ -215,7 +215,7 @@ pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt])
 }
 
 /// RUF008
-pub fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     for statement in body {
         match &statement.node {
             StmtKind::AnnAssign(ast::StmtAnnAssign {
@@ -244,7 +244,7 @@ pub fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-pub fn is_dataclass(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub(crate) fn is_dataclass(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|decorator| {
         checker
             .ctx

@@ -22,7 +22,7 @@ impl Violation for HardcodedPasswordFuncArg {
 }
 
 /// S106
-pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnostic> {
+pub(crate) fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnostic> {
     keywords
         .iter()
         .filter_map(|keyword| {

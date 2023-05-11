@@ -21,7 +21,7 @@ pub struct Block<'a> {
     pub trailer: Option<Trailer>,
 }
 
-pub struct ImportTracker<'a> {
+pub(crate) struct ImportTracker<'a> {
     locator: &'a Locator<'a>,
     is_stub: bool,
     blocks: Vec<Block<'a>>,
@@ -31,7 +31,11 @@ pub struct ImportTracker<'a> {
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(locator: &'a Locator<'a>, directives: &'a IsortDirectives, is_stub: bool) -> Self {
+    pub(crate) fn new(
+        locator: &'a Locator<'a>,
+        directives: &'a IsortDirectives,
+        is_stub: bool,
+    ) -> Self {
         Self {
             locator,
             is_stub,
@@ -99,7 +103,7 @@ impl<'a> ImportTracker<'a> {
         }
     }
 
-    pub fn iter<'b>(&'a self) -> impl Iterator<Item = &'b Block<'a>>
+    pub(crate) fn iter<'b>(&'a self) -> impl Iterator<Item = &'b Block<'a>>
     where
         'a: 'b,
     {

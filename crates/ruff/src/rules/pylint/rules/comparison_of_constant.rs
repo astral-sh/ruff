@@ -10,7 +10,7 @@ use ruff_python_ast::helpers::unparse_constant;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum ViolationsCmpop {
+pub(crate) enum ViolationsCmpop {
     Eq,
     NotEq,
     Lt,
@@ -82,7 +82,7 @@ impl Violation for ComparisonOfConstant {
 }
 
 /// PLR0133
-pub fn comparison_of_constant(
+pub(crate) fn comparison_of_constant(
     checker: &mut Checker,
     left: &Expr,
     ops: &[Cmpop],

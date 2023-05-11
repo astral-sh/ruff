@@ -127,7 +127,7 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ContentAround {
+pub(crate) enum ContentAround {
     Before,
     After,
     Both,
@@ -252,7 +252,7 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 }
 
 /// SIM101
-pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values } )= &expr.node else {
         return;
     };
@@ -402,7 +402,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
 }
 
 /// SIM109
-pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values }) = &expr.node else {
         return;
     };
@@ -484,7 +484,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM220
-pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::And, values, }) = &expr.node else {
         return;
     };
@@ -538,7 +538,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM221
-pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, }) = &expr.node else {
         return;
     };
@@ -591,7 +591,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub fn get_short_circuit_edit(
+pub(crate) fn get_short_circuit_edit(
     expr: &Expr,
     range: TextRange,
     truthiness: Truthiness,
@@ -692,7 +692,7 @@ fn is_short_circuit(
 }
 
 /// SIM222
-pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
     if let Some((edit, remove)) = is_short_circuit(expr, &Boolop::Or, &checker.ctx, checker.stylist)
     {
         let mut diagnostic = Diagnostic::new(
@@ -711,7 +711,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM223
-pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
     if let Some((edit, remove)) =
         is_short_circuit(expr, &Boolop::And, &checker.ctx, checker.stylist)
     {

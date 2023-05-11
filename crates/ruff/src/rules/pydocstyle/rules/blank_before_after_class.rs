@@ -57,7 +57,7 @@ impl AlwaysAutofixableViolation for BlankLineBeforeClass {
 }
 
 /// D203, D204, D211
-pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     let Definition::Member(Member {
         kind: MemberKind::Class | MemberKind::NestedClass ,
         stmt,

@@ -61,7 +61,7 @@ impl Violation for PandasUseOfDotStack {
     }
 }
 
-pub fn check_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn check_call(checker: &mut Checker, func: &Expr) {
     let rules = &checker.settings.rules;
     let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. } )= &func.node else {return};
     let violation: DiagnosticKind = match attr.as_str() {

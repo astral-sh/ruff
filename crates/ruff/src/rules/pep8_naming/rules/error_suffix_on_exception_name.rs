@@ -42,7 +42,7 @@ impl Violation for ErrorSuffixOnExceptionName {
 }
 
 /// N818
-pub fn error_suffix_on_exception_name(
+pub(crate) fn error_suffix_on_exception_name(
     class_def: &Stmt,
     bases: &[Expr],
     name: &str,

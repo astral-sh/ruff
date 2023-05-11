@@ -47,7 +47,12 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String
 }
 
 /// B010
-pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn setattr_with_constant(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };

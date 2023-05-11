@@ -73,7 +73,7 @@ fn is_valid_key(expr: &Expr) -> bool {
 }
 
 /// PLE1507
-pub fn invalid_envvar_value(
+pub(crate) fn invalid_envvar_value(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

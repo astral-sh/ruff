@@ -15,7 +15,7 @@ impl Violation for CollapsibleElseIf {
 }
 
 /// PLR5501
-pub fn collapsible_else_if(orelse: &[Stmt], locator: &Locator) -> Option<Diagnostic> {
+pub(crate) fn collapsible_else_if(orelse: &[Stmt], locator: &Locator) -> Option<Diagnostic> {
     if orelse.len() == 1 {
         let first = &orelse[0];
         if matches!(first.node, StmtKind::If(_)) {

@@ -52,7 +52,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 }
 
 /// N805
-pub fn invalid_first_argument_name_for_method(
+pub(crate) fn invalid_first_argument_name_for_method(
     checker: &Checker,
     scope: &Scope,
     name: &str,

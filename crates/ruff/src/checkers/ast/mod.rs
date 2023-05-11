@@ -5628,7 +5628,7 @@ impl<'a> Checker<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_ast(
+pub(crate) fn check_ast(
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,

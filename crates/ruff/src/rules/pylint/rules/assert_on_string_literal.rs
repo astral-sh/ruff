@@ -42,7 +42,7 @@ impl Violation for AssertOnStringLiteral {
 }
 
 /// PLW0129
-pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
+pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
     match &test.node {
         ExprKind::Constant(ast::ExprConstant { value, .. }) => match value {
             Constant::Str(value, ..) => {

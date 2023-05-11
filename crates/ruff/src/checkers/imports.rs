@@ -73,7 +73,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_imports(
+pub(crate) fn check_imports(
     python_ast: &Suite,
     locator: &Locator,
     indexer: &Indexer,

@@ -32,7 +32,12 @@ fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 }
 
 /// UP008
-pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn super_call_with_parameters(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
     if !is_super_call_with_arguments(func, args) {

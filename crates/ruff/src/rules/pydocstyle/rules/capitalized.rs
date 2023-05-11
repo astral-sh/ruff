@@ -32,7 +32,7 @@ impl AlwaysAutofixableViolation for FirstLineCapitalized {
 }
 
 /// D403
-pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if !matches!(
         docstring.definition,
         Definition::Member(Member {

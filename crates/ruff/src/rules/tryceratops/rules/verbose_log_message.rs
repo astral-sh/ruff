@@ -63,7 +63,7 @@ where
 }
 
 /// TRY401
-pub fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
             name, body, ..

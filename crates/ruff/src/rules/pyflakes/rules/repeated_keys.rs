@@ -83,7 +83,7 @@ fn into_dictionary_key(expr: &Expr) -> Option<DictionaryKey> {
 }
 
 /// F601, F602
-pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<DictionaryKey, FxHashSet<ComparableExpr>> =
         FxHashMap::with_capacity_and_hasher(keys.len(), BuildHasherDefault::default());

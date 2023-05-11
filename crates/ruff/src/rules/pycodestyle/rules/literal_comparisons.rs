@@ -131,7 +131,7 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
 }
 
 /// E711, E712
-pub fn literal_comparisons(
+pub(crate) fn literal_comparisons(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,

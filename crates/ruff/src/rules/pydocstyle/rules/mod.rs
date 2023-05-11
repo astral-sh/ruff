@@ -1,39 +1,41 @@
-pub use backslashes::{backslashes, EscapeSequenceInDocstring};
-pub use blank_after_summary::{blank_after_summary, BlankLineAfterSummary};
-pub use blank_before_after_class::{
+pub(crate) use backslashes::{backslashes, EscapeSequenceInDocstring};
+pub(crate) use blank_after_summary::{blank_after_summary, BlankLineAfterSummary};
+pub(crate) use blank_before_after_class::{
     blank_before_after_class, BlankLineBeforeClass, OneBlankLineAfterClass, OneBlankLineBeforeClass,
 };
-pub use blank_before_after_function::{
+pub(crate) use blank_before_after_function::{
     blank_before_after_function, NoBlankLineAfterFunction, NoBlankLineBeforeFunction,
 };
-pub use capitalized::{capitalized, FirstLineCapitalized};
-pub use ends_with_period::{ends_with_period, EndsInPeriod};
-pub use ends_with_punctuation::{ends_with_punctuation, EndsInPunctuation};
-pub use if_needed::{if_needed, OverloadWithDocstring};
-pub use indent::{indent, IndentWithSpaces, OverIndentation, UnderIndentation};
-pub use multi_line_summary_start::{
+pub(crate) use capitalized::{capitalized, FirstLineCapitalized};
+pub(crate) use ends_with_period::{ends_with_period, EndsInPeriod};
+pub(crate) use ends_with_punctuation::{ends_with_punctuation, EndsInPunctuation};
+pub(crate) use if_needed::{if_needed, OverloadWithDocstring};
+pub(crate) use indent::{indent, IndentWithSpaces, OverIndentation, UnderIndentation};
+pub(crate) use multi_line_summary_start::{
     multi_line_summary_start, MultiLineSummaryFirstLine, MultiLineSummarySecondLine,
 };
-pub use newline_after_last_paragraph::{newline_after_last_paragraph, NewLineAfterLastParagraph};
-pub use no_signature::{no_signature, NoSignature};
-pub use no_surrounding_whitespace::{no_surrounding_whitespace, SurroundingWhitespace};
-pub use non_imperative_mood::{non_imperative_mood, NonImperativeMood};
-pub use not_empty::{not_empty, EmptyDocstring};
-pub use not_missing::{
+pub(crate) use newline_after_last_paragraph::{
+    newline_after_last_paragraph, NewLineAfterLastParagraph,
+};
+pub(crate) use no_signature::{no_signature, NoSignature};
+pub(crate) use no_surrounding_whitespace::{no_surrounding_whitespace, SurroundingWhitespace};
+pub(crate) use non_imperative_mood::{non_imperative_mood, NonImperativeMood};
+pub(crate) use not_empty::{not_empty, EmptyDocstring};
+pub(crate) use not_missing::{
     not_missing, UndocumentedMagicMethod, UndocumentedPublicClass, UndocumentedPublicFunction,
     UndocumentedPublicInit, UndocumentedPublicMethod, UndocumentedPublicModule,
     UndocumentedPublicNestedClass, UndocumentedPublicPackage,
 };
-pub use one_liner::{one_liner, FitsOnOneLine};
-pub use sections::{
+pub(crate) use one_liner::{one_liner, FitsOnOneLine};
+pub(crate) use sections::{
     sections, BlankLineAfterLastSection, BlankLinesBetweenHeaderAndContent, CapitalizeSectionName,
     DashedUnderlineAfterSection, EmptyDocstringSection, NewLineAfterSectionName,
     NoBlankLineAfterSection, NoBlankLineBeforeSection, SectionNameEndsInColon,
     SectionNotOverIndented, SectionUnderlineAfterName, SectionUnderlineMatchesSectionLength,
     SectionUnderlineNotOverIndented, UndocumentedParam,
 };
-pub use starts_with_this::{starts_with_this, DocstringStartsWithThis};
-pub use triple_quotes::{triple_quotes, TripleSingleQuotes};
+pub(crate) use starts_with_this::{starts_with_this, DocstringStartsWithThis};
+pub(crate) use triple_quotes::{triple_quotes, TripleSingleQuotes};
 
 mod backslashes;
 mod blank_after_summary;

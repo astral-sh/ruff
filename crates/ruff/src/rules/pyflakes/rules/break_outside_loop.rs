@@ -14,7 +14,7 @@ impl Violation for BreakOutsideLoop {
 }
 
 /// F701
-pub fn break_outside_loop<'a>(
+pub(crate) fn break_outside_loop<'a>(
     stmt: &'a Stmt,
     parents: &mut impl Iterator<Item = &'a Stmt>,
 ) -> Option<Diagnostic> {

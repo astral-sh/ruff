@@ -45,7 +45,7 @@ impl Violation for DjangoExcludeWithModelForm {
 }
 
 /// DJ006
-pub fn exclude_with_model_form(
+pub(crate) fn exclude_with_model_form(
     checker: &Checker,
     bases: &[Expr],
     body: &[Stmt],

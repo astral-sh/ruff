@@ -48,7 +48,7 @@ impl Violation for InvalidFunctionName {
 }
 
 /// N802
-pub fn invalid_function_name(
+pub(crate) fn invalid_function_name(
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Expr],

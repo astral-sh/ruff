@@ -39,7 +39,7 @@ impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
 }
 
 /// D212, D213
-pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 

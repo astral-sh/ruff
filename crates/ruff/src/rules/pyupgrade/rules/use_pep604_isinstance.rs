@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum CallKind {
+pub(crate) enum CallKind {
     Isinstance,
     Issubclass,
 }
@@ -26,7 +26,7 @@ impl fmt::Display for CallKind {
 }
 
 impl CallKind {
-    pub fn from_name(name: &str) -> Option<Self> {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
         match name {
             "isinstance" => Some(CallKind::Isinstance),
             "issubclass" => Some(CallKind::Issubclass),
@@ -67,7 +67,12 @@ fn union(elts: &[Expr]) -> Expr {
 }
 
 /// UP038
-pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn use_pep604_isinstance(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         let Some(kind) = CallKind::from_name(id) else {
             return;

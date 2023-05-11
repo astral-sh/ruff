@@ -14,6 +14,6 @@ impl Violation for InvalidAllFormat {
 }
 
 /// PLE0605
-pub fn invalid_all_format(expr: &Expr) -> Diagnostic {
+pub(crate) fn invalid_all_format(expr: &Expr) -> Diagnostic {
     Diagnostic::new(InvalidAllFormat, expr.range())
 }

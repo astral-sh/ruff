@@ -23,7 +23,7 @@ use super::helpers::{
 };
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Parentheses {
+pub(crate) enum Parentheses {
     None,
     Empty,
 }
@@ -265,7 +265,7 @@ fn pytest_fixture_parentheses(
     checker.diagnostics.push(diagnostic);
 }
 
-pub fn fix_extraneous_scope_function(
+pub(crate) fn fix_extraneous_scope_function(
     locator: &Locator,
     stmt_at: TextSize,
     expr_range: TextRange,
@@ -523,7 +523,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
     }
 }
 
-pub fn fixture(
+pub(crate) fn fixture(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,

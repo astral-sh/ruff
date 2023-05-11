@@ -295,7 +295,7 @@ impl AlwaysAutofixableViolation for ReimplementedListBuiltin {
 }
 
 /// PIE790
-pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
     if body.len() > 1 {
         // This only catches the case in which a docstring makes a `pass` statement
         // redundant. Consider removing all `pass` statements instead.
@@ -340,7 +340,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// PIE794
-pub fn duplicate_class_field_definition<'a, 'b>(
+pub(crate) fn duplicate_class_field_definition<'a, 'b>(
     checker: &mut Checker<'a>,
     parent: &'b Stmt,
     body: &'b [Stmt],
@@ -403,8 +403,11 @@ pub fn duplicate_class_field_definition<'a, 'b>(
 }
 
 /// PIE796
-pub fn non_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, body: &'b [Stmt])
-where
+pub(crate) fn non_unique_enums<'a, 'b>(
+    checker: &mut Checker<'a>,
+    parent: &'b Stmt,
+    body: &'b [Stmt],
+) where
     'b: 'a,
 {
     let StmtKind::ClassDef(ast::StmtClassDef { bases, .. }) = &parent.node else {
@@ -449,7 +452,7 @@ where
 }
 
 /// PIE800
-pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+pub(crate) fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     for item in keys.iter().zip(values.iter()) {
         if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**`
@@ -476,7 +479,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
 }
 
 /// PIE804
-pub fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
+pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     for kw in kwargs {
         // keyword is a spread operator (indicated by None)
         if kw.node.arg.is_none() {
@@ -495,7 +498,7 @@ pub fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Key
 }
 
 /// PIE810
-pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values }) = &expr.node else {
         return;
     };
@@ -607,7 +610,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PIE807
-pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda(ast::ExprLambda { args, body }) = &expr.node else {
         panic!("Expected ExprKind::Lambda");
     };

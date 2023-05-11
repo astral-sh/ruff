@@ -74,7 +74,7 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
 }
 
 /// SIM210
-pub fn explicit_true_false_in_ifexpr(
+pub(crate) fn explicit_true_false_in_ifexpr(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
@@ -129,7 +129,7 @@ pub fn explicit_true_false_in_ifexpr(
 }
 
 /// SIM211
-pub fn explicit_false_true_in_ifexpr(
+pub(crate) fn explicit_false_true_in_ifexpr(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
@@ -172,7 +172,7 @@ pub fn explicit_false_true_in_ifexpr(
 }
 
 /// SIM212
-pub fn twisted_arms_in_ifexpr(
+pub(crate) fn twisted_arms_in_ifexpr(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,

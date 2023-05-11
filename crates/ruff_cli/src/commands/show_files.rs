@@ -10,7 +10,7 @@ use ruff::{resolver, warn_user_once};
 use crate::args::Overrides;
 
 /// Show the list of files to be checked based on current settings.
-pub fn show_files(
+pub(crate) fn show_files(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,

@@ -41,7 +41,7 @@ const DEBUGGERS: &[&[&str]] = &[
 ];
 
 /// Checks for the presence of a debugger call.
-pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let Some(target) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         DEBUGGERS
             .iter()
@@ -57,7 +57,7 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
 }
 
 /// Checks for the presence of a debugger import.
-pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
+pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
     // Special-case: allow `import builtins`, which is far more general than (e.g.)
     // `import celery.contrib.rdb`).
     if module.is_none() && name == "builtins" {

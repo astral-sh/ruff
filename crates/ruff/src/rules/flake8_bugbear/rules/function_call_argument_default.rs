@@ -129,7 +129,7 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
 }
 
 /// B008
-pub fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<CallPath> = checker
         .settings

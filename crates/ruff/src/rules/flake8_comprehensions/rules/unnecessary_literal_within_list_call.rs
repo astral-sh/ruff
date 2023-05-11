@@ -65,7 +65,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub fn unnecessary_literal_within_list_call(
+pub(crate) fn unnecessary_literal_within_list_call(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

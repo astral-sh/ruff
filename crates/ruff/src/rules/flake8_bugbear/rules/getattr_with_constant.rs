@@ -37,7 +37,12 @@ fn attribute(value: &Expr, attr: &str) -> Expr {
 }
 
 /// B009
-pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn getattr_with_constant(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     let ExprKind::Name(ast::ExprName { id, .. } )= &func.node else {
         return;
     };

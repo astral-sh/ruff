@@ -687,7 +687,7 @@ fn superfluous_else(checker: &mut Checker, stack: &Stack) {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
+pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.

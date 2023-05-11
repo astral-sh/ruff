@@ -50,7 +50,7 @@ impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
 }
 
 /// C413
-pub fn unnecessary_call_around_sorted(
+pub(crate) fn unnecessary_call_around_sorted(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

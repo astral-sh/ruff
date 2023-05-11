@@ -174,7 +174,7 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
 }
 
 /// PT009
-pub fn unittest_assertion(
+pub(crate) fn unittest_assertion(
     checker: &Checker,
     expr: &Expr,
     func: &Expr,
@@ -215,7 +215,7 @@ pub fn unittest_assertion(
 }
 
 /// PT015
-pub fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     if Truthiness::from_expr(test, |id| checker.ctx.is_builtin(id)).is_falsey() {
         checker
             .diagnostics
@@ -224,7 +224,7 @@ pub fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
+pub(crate) fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
     handlers
         .iter()
         .flat_map(|handler| match &handler.node {
@@ -418,7 +418,12 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 }
 
 /// PT018
-pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub(crate) fn composite_condition(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    msg: Option<&Expr>,
+) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let fixable = matches!(composite, CompositionKind::Simple)

@@ -76,7 +76,7 @@ fn is_valid_default(expr: &Expr) -> bool {
 }
 
 /// PLW1508
-pub fn invalid_envvar_default(
+pub(crate) fn invalid_envvar_default(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

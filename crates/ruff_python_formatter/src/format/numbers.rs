@@ -64,7 +64,7 @@ const fn float_atom(range: TextRange) -> FloatAtom {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct FloatLiteral {
+pub(crate) struct FloatLiteral {
     range: TextRange,
 }
 
@@ -109,12 +109,12 @@ impl Format<ASTFormatContext> for FloatLiteral {
 }
 
 #[inline]
-pub const fn float_literal(range: TextRange) -> FloatLiteral {
+pub(crate) const fn float_literal(range: TextRange) -> FloatLiteral {
     FloatLiteral { range }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct IntLiteral {
+pub(crate) struct IntLiteral {
     range: TextRange,
 }
 
@@ -156,12 +156,12 @@ impl Format<ASTFormatContext> for IntLiteral {
 }
 
 #[inline]
-pub const fn int_literal(range: TextRange) -> IntLiteral {
+pub(crate) const fn int_literal(range: TextRange) -> IntLiteral {
     IntLiteral { range }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ComplexLiteral {
+pub(crate) struct ComplexLiteral {
     range: TextRange,
 }
 
@@ -190,6 +190,6 @@ impl Format<ASTFormatContext> for ComplexLiteral {
 }
 
 #[inline]
-pub const fn complex_literal(range: TextRange) -> ComplexLiteral {
+pub(crate) const fn complex_literal(range: TextRange) -> ComplexLiteral {
     ComplexLiteral { range }
 }

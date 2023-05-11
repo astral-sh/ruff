@@ -235,7 +235,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
 }
 
 /// B023
-pub fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &Node<'a>) {
+pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &Node<'a>) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {

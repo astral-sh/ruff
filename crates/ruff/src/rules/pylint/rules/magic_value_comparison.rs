@@ -61,7 +61,7 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
 }
 
 /// PLR2004
-pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
+pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
     for (left, right) in std::iter::once(left)
         .chain(comparators.iter())
         .tuple_windows()

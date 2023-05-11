@@ -103,7 +103,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
 }
 
 /// PLR0915
-pub fn too_many_statements(
+pub(crate) fn too_many_statements(
     stmt: &Stmt,
     body: &[Stmt],
     max_statements: usize,

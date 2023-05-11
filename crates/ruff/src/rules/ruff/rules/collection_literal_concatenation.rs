@@ -54,7 +54,7 @@ enum Kind {
 /// RUF005
 /// This suggestion could be unsafe if the non-literal expression in the
 /// expression has overridden the `__add__` (or `__radd__`) magic methods.
-pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BinOp(ast::ExprBinOp { left, op: Operator::Add, right }) = &expr.node else {
         return;
     };

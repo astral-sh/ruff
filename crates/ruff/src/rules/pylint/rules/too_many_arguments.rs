@@ -21,7 +21,7 @@ impl Violation for TooManyArguments {
 }
 
 /// PLR0913
-pub fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
+pub(crate) fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
     let num_args = args
         .args
         .iter()

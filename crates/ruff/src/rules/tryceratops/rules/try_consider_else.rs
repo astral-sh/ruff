@@ -56,7 +56,7 @@ impl Violation for TryConsiderElse {
 }
 
 /// TRY300
-pub fn try_consider_else(
+pub(crate) fn try_consider_else(
     checker: &mut Checker,
     body: &[Stmt],
     orelse: &[Stmt],

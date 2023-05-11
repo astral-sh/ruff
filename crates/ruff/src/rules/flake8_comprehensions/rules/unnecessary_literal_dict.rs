@@ -46,7 +46,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralDict {
 }
 
 /// C406 (`dict([(1, 2)])`)
-pub fn unnecessary_literal_dict(
+pub(crate) fn unnecessary_literal_dict(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

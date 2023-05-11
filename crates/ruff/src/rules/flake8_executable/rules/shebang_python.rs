@@ -16,7 +16,7 @@ impl Violation for ShebangMissingPython {
 }
 
 /// EXE003
-pub fn shebang_python(range: TextRange, shebang: &ShebangDirective) -> Option<Diagnostic> {
+pub(crate) fn shebang_python(range: TextRange, shebang: &ShebangDirective) -> Option<Diagnostic> {
     if let ShebangDirective::Match(_, start, content) = shebang {
         if content.contains("python") || content.contains("pytest") {
             None

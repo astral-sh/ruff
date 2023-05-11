@@ -20,7 +20,7 @@ impl Violation for EscapeSequenceInDocstring {
 static BACKSLASH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\[^(\r\n|\n)uN]").unwrap());
 
 /// D301
-pub fn backslashes(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
 
     // Docstring is already raw.

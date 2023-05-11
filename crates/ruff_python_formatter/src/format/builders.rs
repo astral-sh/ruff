@@ -8,7 +8,7 @@ use crate::shared_traits::AsFormat;
 use crate::trivia::{Relationship, TriviaKind};
 
 #[derive(Copy, Clone)]
-pub struct Block<'a> {
+pub(crate) struct Block<'a> {
     body: &'a Body,
 }
 
@@ -40,12 +40,12 @@ impl Format<ASTFormatContext> for Block<'_> {
 }
 
 #[inline]
-pub fn block(body: &Body) -> Block {
+pub(crate) fn block(body: &Body) -> Block {
     Block { body }
 }
 
 #[derive(Copy, Clone)]
-pub struct Statements<'a> {
+pub(crate) struct Statements<'a> {
     suite: &'a [Stmt],
 }
 
@@ -61,12 +61,12 @@ impl Format<ASTFormatContext> for Statements<'_> {
     }
 }
 
-pub fn statements(suite: &[Stmt]) -> Statements {
+pub(crate) fn statements(suite: &[Stmt]) -> Statements {
     Statements { suite }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Literal {
+pub(crate) struct Literal {
     range: TextRange,
 }
 
@@ -82,7 +82,7 @@ impl Format<ASTFormatContext> for Literal {
 }
 
 #[inline]
-pub const fn literal(range: TextRange) -> Literal {
+pub(crate) const fn literal(range: TextRange) -> Literal {
     Literal { range }
 }
 

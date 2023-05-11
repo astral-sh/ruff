@@ -13,8 +13,8 @@ use ruff_python_ast::source_code::Locator;
 use crate::cst::helpers::{expand_indented_block, find_tok, is_elif};
 use crate::trivia::{Parenthesize, Trivia};
 
-pub mod helpers;
-pub mod visitor;
+pub(crate) mod helpers;
+pub(crate) mod visitor;
 
 type Ident = String;
 
@@ -96,7 +96,7 @@ impl From<&rustpython_parser::ast::Boolop> for BoolOpKind {
     }
 }
 
-pub type BoolOp = Attributed<BoolOpKind>;
+pub(crate) type BoolOp = Attributed<BoolOpKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum OperatorKind {
@@ -115,7 +115,7 @@ pub enum OperatorKind {
     FloorDiv,
 }
 
-pub type Operator = Attributed<OperatorKind>;
+pub(crate) type Operator = Attributed<OperatorKind>;
 
 impl From<&rustpython_parser::ast::Operator> for OperatorKind {
     fn from(op: &rustpython_parser::ast::Operator) -> Self {
@@ -145,7 +145,7 @@ pub enum UnaryOpKind {
     USub,
 }
 
-pub type UnaryOp = Attributed<UnaryOpKind>;
+pub(crate) type UnaryOp = Attributed<UnaryOpKind>;
 
 impl From<&rustpython_parser::ast::Unaryop> for UnaryOpKind {
     fn from(op: &rustpython_parser::ast::Unaryop) -> Self {
@@ -172,7 +172,7 @@ pub enum CmpOpKind {
     NotIn,
 }
 
-pub type CmpOp = Attributed<CmpOpKind>;
+pub(crate) type CmpOp = Attributed<CmpOpKind>;
 
 impl From<&rustpython_parser::ast::Cmpop> for CmpOpKind {
     fn from(op: &rustpython_parser::ast::Cmpop) -> Self {
@@ -191,7 +191,7 @@ impl From<&rustpython_parser::ast::Cmpop> for CmpOpKind {
     }
 }
 
-pub type Body = Attributed<Vec<Stmt>>;
+pub(crate) type Body = Attributed<Vec<Stmt>>;
 
 impl From<(Vec<rustpython_parser::ast::Stmt>, &Locator<'_>)> for Body {
     fn from((body, locator): (Vec<rustpython_parser::ast::Stmt>, &Locator)) -> Self {
@@ -335,7 +335,7 @@ pub enum StmtKind {
     Continue,
 }
 
-pub type Stmt = Attributed<StmtKind>;
+pub(crate) type Stmt = Attributed<StmtKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind {
@@ -453,7 +453,7 @@ pub enum ExprKind {
     },
 }
 
-pub type Expr = Attributed<ExprKind>;
+pub(crate) type Expr = Attributed<ExprKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comprehension {
@@ -472,7 +472,7 @@ pub enum ExcepthandlerKind {
     },
 }
 
-pub type Excepthandler = Attributed<ExcepthandlerKind>;
+pub(crate) type Excepthandler = Attributed<ExcepthandlerKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SliceIndexKind {
@@ -482,7 +482,7 @@ pub enum SliceIndexKind {
     Index { value: Box<Expr> },
 }
 
-pub type SliceIndex = Attributed<SliceIndexKind>;
+pub(crate) type SliceIndex = Attributed<SliceIndexKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
@@ -502,7 +502,7 @@ pub struct ArgData {
     pub type_comment: Option<String>,
 }
 
-pub type Arg = Attributed<ArgData>;
+pub(crate) type Arg = Attributed<ArgData>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeywordData {
@@ -510,7 +510,7 @@ pub struct KeywordData {
     pub value: Expr,
 }
 
-pub type Keyword = Attributed<KeywordData>;
+pub(crate) type Keyword = Attributed<KeywordData>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AliasData {
@@ -518,7 +518,7 @@ pub struct AliasData {
     pub asname: Option<Ident>,
 }
 
-pub type Alias = Attributed<AliasData>;
+pub(crate) type Alias = Attributed<AliasData>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Withitem {
@@ -568,7 +568,7 @@ pub enum PatternKind {
     },
 }
 
-pub type Pattern = Attributed<PatternKind>;
+pub(crate) type Pattern = Attributed<PatternKind>;
 
 impl From<(rustpython_parser::ast::Alias, &Locator<'_>)> for Alias {
     fn from((alias, _locator): (rustpython_parser::ast::Alias, &Locator)) -> Self {

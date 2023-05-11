@@ -69,7 +69,7 @@ impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
 }
 
 /// SIM112
-pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     // Ex) `os.environ['foo']`
     if let ExprKind::Subscript(_) = &expr.node {
         check_os_environ_subscript(checker, expr);
@@ -154,7 +154,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM910
-pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Call(ast::ExprCall { func, args, keywords }) = &expr.node else {
         return;
     };

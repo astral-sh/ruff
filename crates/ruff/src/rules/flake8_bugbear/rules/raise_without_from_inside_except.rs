@@ -22,7 +22,7 @@ impl Violation for RaiseWithoutFromInsideExcept {
 }
 
 /// B904
-pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
         visitor.visit_body(body);

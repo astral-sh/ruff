@@ -241,7 +241,7 @@ fn is_valid_dict(
 }
 
 /// PLE1307
-pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
+pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator.slice(expr.range());
     let mut strings: Vec<TextRange> = vec![];

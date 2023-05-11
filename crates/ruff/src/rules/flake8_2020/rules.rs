@@ -121,7 +121,7 @@ fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
     if is_sys(checker, value, "version") {
         match &slice.node {
             ExprKind::Slice(ast::ExprSlice {
@@ -172,7 +172,7 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
+pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
     match &left.node {
         ExprKind::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(checker, value, "version_info") =>
@@ -285,7 +285,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
 }
 
 /// YTT202
-pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if checker
         .ctx
         .resolve_call_path(expr)

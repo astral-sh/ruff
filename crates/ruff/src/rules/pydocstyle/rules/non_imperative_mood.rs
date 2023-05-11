@@ -18,7 +18,7 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
 /// D401
-pub fn non_imperative_mood(
+pub(crate) fn non_imperative_mood(
     checker: &mut Checker,
     docstring: &Docstring,
     property_decorators: &BTreeSet<String>,

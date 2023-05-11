@@ -26,7 +26,7 @@ impl Violation for DatetimeTimezoneUTC {
 }
 
 /// UP017
-pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
     if checker
         .ctx
         .resolve_call_path(expr)

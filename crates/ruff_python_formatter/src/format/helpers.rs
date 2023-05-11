@@ -1,6 +1,6 @@
 use crate::cst::{Expr, ExprKind, UnaryOpKind};
 
-pub fn is_self_closing(expr: &Expr) -> bool {
+pub(crate) fn is_self_closing(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Tuple { .. }
         | ExprKind::List { .. }
@@ -53,7 +53,7 @@ pub fn is_self_closing(expr: &Expr) -> bool {
 
 /// Return `true` if an [`Expr`] adheres to Black's definition of a non-complex
 /// expression, in the context of a slice operation.
-pub fn is_simple_slice(expr: &Expr) -> bool {
+pub(crate) fn is_simple_slice(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::UnaryOp { op, operand } => {
             if matches!(op.node, UnaryOpKind::Not) {
@@ -70,7 +70,7 @@ pub fn is_simple_slice(expr: &Expr) -> bool {
 
 /// Return `true` if an [`Expr`] adheres to Black's definition of a non-complex
 /// expression, in the context of a power operation.
-pub fn is_simple_power(expr: &Expr) -> bool {
+pub(crate) fn is_simple_power(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::UnaryOp { op, operand } => {
             if matches!(op.node, UnaryOpKind::Not) {

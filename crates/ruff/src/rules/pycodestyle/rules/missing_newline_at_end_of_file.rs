@@ -35,7 +35,7 @@ impl AlwaysAutofixableViolation for MissingNewlineAtEndOfFile {
 }
 
 /// W292
-pub fn no_newline_at_end_of_file(
+pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
     autofix: bool,

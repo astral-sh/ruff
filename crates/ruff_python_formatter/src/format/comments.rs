@@ -7,7 +7,7 @@ use crate::format::builders::literal;
 use crate::trivia::TriviaKind;
 
 #[derive(Debug)]
-pub struct LeadingComments<'a, T> {
+pub(crate) struct LeadingComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
@@ -31,12 +31,12 @@ impl<T> Format<ASTFormatContext> for LeadingComments<'_, T> {
 }
 
 #[inline]
-pub const fn leading_comments<T>(item: &Attributed<T>) -> LeadingComments<'_, T> {
+pub(crate) const fn leading_comments<T>(item: &Attributed<T>) -> LeadingComments<'_, T> {
     LeadingComments { item }
 }
 
 #[derive(Debug)]
-pub struct TrailingComments<'a, T> {
+pub(crate) struct TrailingComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
@@ -60,12 +60,12 @@ impl<T> Format<ASTFormatContext> for TrailingComments<'_, T> {
 }
 
 #[inline]
-pub const fn trailing_comments<T>(item: &Attributed<T>) -> TrailingComments<'_, T> {
+pub(crate) const fn trailing_comments<T>(item: &Attributed<T>) -> TrailingComments<'_, T> {
     TrailingComments { item }
 }
 
 #[derive(Debug)]
-pub struct EndOfLineComments<'a, T> {
+pub(crate) struct EndOfLineComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
@@ -88,12 +88,12 @@ impl<T> Format<ASTFormatContext> for EndOfLineComments<'_, T> {
 }
 
 #[inline]
-pub const fn end_of_line_comments<T>(item: &Attributed<T>) -> EndOfLineComments<'_, T> {
+pub(crate) const fn end_of_line_comments<T>(item: &Attributed<T>) -> EndOfLineComments<'_, T> {
     EndOfLineComments { item }
 }
 
 #[derive(Debug)]
-pub struct DanglingComments<'a, T> {
+pub(crate) struct DanglingComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
@@ -113,6 +113,6 @@ impl<T> Format<ASTFormatContext> for DanglingComments<'_, T> {
 }
 
 #[inline]
-pub const fn dangling_comments<T>(item: &Attributed<T>) -> DanglingComments<'_, T> {
+pub(crate) const fn dangling_comments<T>(item: &Attributed<T>) -> DanglingComments<'_, T> {
     DanglingComments { item }
 }

@@ -184,7 +184,7 @@ fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// TRY004
-pub fn type_check_without_type_error(
+pub(crate) fn type_check_without_type_error(
     checker: &mut Checker,
     body: &[Stmt],
     test: &Expr,

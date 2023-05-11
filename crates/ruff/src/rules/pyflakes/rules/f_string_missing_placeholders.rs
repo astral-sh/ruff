@@ -98,7 +98,7 @@ fn fix_f_string_missing_placeholders(
 }
 
 /// F541
-pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
+pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
         .iter()
         .any(|value| matches!(value.node, ExprKind::FormattedValue(_)))

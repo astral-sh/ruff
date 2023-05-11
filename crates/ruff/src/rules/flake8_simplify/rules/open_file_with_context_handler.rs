@@ -113,7 +113,7 @@ fn match_exit_stack(checker: &Checker) -> bool {
 }
 
 /// SIM115
-pub fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
+pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     if checker
         .ctx
         .resolve_call_path(func)

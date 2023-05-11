@@ -136,7 +136,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
     complexity
 }
 
-pub fn function_is_too_complex(
+pub(crate) fn function_is_too_complex(
     stmt: &Stmt,
     name: &str,
     body: &[Stmt],

@@ -27,7 +27,7 @@ pub(super) fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, Option<&Expr
 }
 
 /// Return the name of the function, if it's overloaded.
-pub fn overloaded_name(checker: &Checker, definition: &Definition) -> Option<String> {
+pub(crate) fn overloaded_name(checker: &Checker, definition: &Definition) -> Option<String> {
     if let Definition::Member(Member {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,
@@ -47,7 +47,11 @@ pub fn overloaded_name(checker: &Checker, definition: &Definition) -> Option<Str
 
 /// Return `true` if the definition is the implementation for an overloaded
 /// function.
-pub fn is_overload_impl(checker: &Checker, definition: &Definition, overloaded_name: &str) -> bool {
+pub(crate) fn is_overload_impl(
+    checker: &Checker,
+    definition: &Definition,
+    overloaded_name: &str,
+) -> bool {
     if let Definition::Member(Member {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,

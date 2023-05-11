@@ -302,7 +302,7 @@ where
 }
 
 /// B031
-pub fn reuse_of_groupby_generator(
+pub(crate) fn reuse_of_groupby_generator(
     checker: &mut Checker,
     target: &Expr,
     body: &[Stmt],

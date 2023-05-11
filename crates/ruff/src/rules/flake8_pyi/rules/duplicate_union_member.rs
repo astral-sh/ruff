@@ -26,7 +26,7 @@ impl AlwaysAutofixableViolation for DuplicateUnionMember {
 }
 
 /// PYI016
-pub fn duplicate_union_member(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn duplicate_union_member(checker: &mut Checker, expr: &Expr) {
     let mut seen_nodes = FxHashSet::default();
     traverse_union(&mut seen_nodes, checker, expr, None);
 }

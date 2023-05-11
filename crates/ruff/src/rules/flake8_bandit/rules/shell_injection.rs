@@ -181,7 +181,12 @@ fn try_string_literal(expr: &Expr) -> Option<&str> {
 }
 
 /// S602, S603, S604, S605, S606, S607
-pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+pub(crate) fn shell_injection(
+    checker: &mut Checker,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     let call_kind = get_call_kind(func, &checker.ctx);
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {

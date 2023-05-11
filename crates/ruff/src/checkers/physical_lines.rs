@@ -21,7 +21,7 @@ use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::Settings;
 
-pub fn check_physical_lines(
+pub(crate) fn check_physical_lines(
     path: &Path,
     locator: &Locator,
     stylist: &Stylist,

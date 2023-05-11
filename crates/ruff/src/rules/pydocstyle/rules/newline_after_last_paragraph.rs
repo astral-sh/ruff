@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for NewLineAfterLastParagraph {
 }
 
 /// D209
-pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 

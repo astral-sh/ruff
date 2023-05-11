@@ -16,7 +16,7 @@ impl Violation for DefaultExceptNotLast {
 }
 
 /// F707
-pub fn default_except_not_last(
+pub(crate) fn default_except_not_last(
     handlers: &[Excepthandler],
     locator: &Locator,
 ) -> Option<Diagnostic> {

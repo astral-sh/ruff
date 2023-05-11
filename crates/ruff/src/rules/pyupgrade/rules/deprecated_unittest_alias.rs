@@ -48,7 +48,7 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
 });
 
 /// UP005
-pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &expr.node else {
         return;
     };

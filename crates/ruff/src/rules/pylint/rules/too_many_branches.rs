@@ -96,7 +96,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
 }
 
 /// PLR0912
-pub fn too_many_branches(
+pub(crate) fn too_many_branches(
     stmt: &Stmt,
     body: &[Stmt],
     max_branches: usize,

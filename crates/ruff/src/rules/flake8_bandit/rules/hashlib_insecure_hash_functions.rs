@@ -42,7 +42,7 @@ enum HashlibCall {
 }
 
 /// S324
-pub fn hashlib_insecure_hash_functions(
+pub(crate) fn hashlib_insecure_hash_functions(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

@@ -2,7 +2,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
-pub fn is_radix_literal(content: &str) -> bool {
+pub(crate) fn is_radix_literal(content: &str) -> bool {
     content.starts_with("0b")
         || content.starts_with("0o")
         || content.starts_with("0x")
@@ -12,7 +12,7 @@ pub fn is_radix_literal(content: &str) -> bool {
 }
 
 /// Find the first token in the given range that satisfies the given predicate.
-pub fn find_tok(
+pub(crate) fn find_tok(
     range: TextRange,
     locator: &Locator,
     f: impl Fn(rustpython_parser::Tok) -> bool,
@@ -35,7 +35,7 @@ pub fn find_tok(
 ///
 /// `location` is the start of the compound statement (e.g., the `if` in `if x:`).
 /// `end_location` is the end of the last statement in the body.
-pub fn expand_indented_block(
+pub(crate) fn expand_indented_block(
     location: TextSize,
     end_location: TextSize,
     locator: &Locator,
@@ -126,7 +126,7 @@ pub fn expand_indented_block(
 }
 
 /// Return true if the `orelse` block of an `if` statement is an `elif` statement.
-pub fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
+pub(crate) fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
     if orelse.len() == 1 && matches!(orelse[0].node, rustpython_parser::ast::StmtKind::If { .. }) {
         let contents = locator.after(orelse[0].start());
         if contents.starts_with("elif") {

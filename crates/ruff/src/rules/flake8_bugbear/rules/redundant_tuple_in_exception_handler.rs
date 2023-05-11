@@ -29,7 +29,10 @@ impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
 }
 
 /// B013
-pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn redundant_tuple_in_exception_handler(
+    checker: &mut Checker,
+    handlers: &[Excepthandler],
+) {
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = &handler.node else {
             continue;

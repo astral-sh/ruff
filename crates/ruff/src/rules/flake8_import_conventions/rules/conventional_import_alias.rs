@@ -40,7 +40,7 @@ impl Violation for UnconventionalImportAlias {
 }
 
 /// ICN001
-pub fn conventional_import_alias(
+pub(crate) fn conventional_import_alias(
     stmt: &Stmt,
     name: &str,
     asname: Option<&str>,

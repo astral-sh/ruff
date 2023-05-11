@@ -30,7 +30,7 @@ fn expand_indent(line: &str) -> usize {
     indent
 }
 
-pub fn check_logical_lines(
+pub(crate) fn check_logical_lines(
     tokens: &[LexResult],
     locator: &Locator,
     stylist: &Stylist,
@@ -136,7 +136,7 @@ impl<'a> LogicalLinesContext<'a> {
         }
     }
 
-    pub fn push<K: Into<DiagnosticKind>>(&mut self, kind: K, range: TextRange) {
+    pub(crate) fn push<K: Into<DiagnosticKind>>(&mut self, kind: K, range: TextRange) {
         let kind = kind.into();
         if self.settings.rules.enabled(kind.rule()) {
             self.diagnostics.push(Diagnostic {
@@ -148,7 +148,7 @@ impl<'a> LogicalLinesContext<'a> {
         }
     }
 
-    pub fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
+    pub(crate) fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
         if self.settings.rules.enabled(diagnostic.kind.rule()) {
             self.diagnostics.push(diagnostic);
         }

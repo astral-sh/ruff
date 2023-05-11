@@ -19,7 +19,7 @@ impl Violation for OverloadWithDocstring {
 }
 
 /// D418
-pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     let Definition::Member(Member {
         kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
         stmt,

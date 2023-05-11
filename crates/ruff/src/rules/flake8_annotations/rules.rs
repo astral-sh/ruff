@@ -446,7 +446,7 @@ fn check_dynamically_typed<F>(
 }
 
 /// Generate flake8-annotation checks for a given `Definition`.
-pub fn definition(
+pub(crate) fn definition(
     checker: &Checker,
     definition: &Definition,
     visibility: Visibility,

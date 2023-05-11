@@ -9,7 +9,7 @@ use super::settings::RelativeImportsOrder;
 use super::sorting::{cmp_import_from, cmp_members, cmp_modules};
 use super::types::{AliasData, CommentSet, ImportBlock, OrderedImportBlock};
 
-pub fn order_imports<'a>(
+pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,

@@ -13,7 +13,7 @@ use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::Settings;
 
-pub fn check_noqa(
+pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     comment_ranges: &[TextRange],

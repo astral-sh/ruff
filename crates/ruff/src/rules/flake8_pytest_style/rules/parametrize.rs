@@ -425,7 +425,7 @@ fn handle_value_rows(
     }
 }
 
-pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
+pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     for decorator in decorators {
         if is_pytest_parametrize(&checker.ctx, decorator) {
             if let ExprKind::Call(ast::ExprCall { args, .. }) = &decorator.node {

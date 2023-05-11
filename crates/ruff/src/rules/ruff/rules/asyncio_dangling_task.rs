@@ -63,7 +63,7 @@ impl Violation for AsyncioDanglingTask {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Method {
+pub(crate) enum Method {
     CreateTask,
     EnsureFuture,
 }
@@ -78,7 +78,10 @@ impl fmt::Display for Method {
 }
 
 /// RUF006
-pub fn asyncio_dangling_task<'a, F>(expr: &'a Expr, resolve_call_path: F) -> Option<Diagnostic>
+pub(crate) fn asyncio_dangling_task<'a, F>(
+    expr: &'a Expr,
+    resolve_call_path: F,
+) -> Option<Diagnostic>
 where
     F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
 {

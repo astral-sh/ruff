@@ -11,7 +11,7 @@ use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum ExpectedParams {
+pub(crate) enum ExpectedParams {
     Fixed(usize),
     Range(usize, usize),
 }
@@ -100,7 +100,7 @@ impl Violation for UnexpectedSpecialMethodSignature {
 }
 
 /// PLE0302
-pub fn unexpected_special_method_signature(
+pub(crate) fn unexpected_special_method_signature(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,

@@ -221,7 +221,7 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<(&Expr, &Stmt)> {
 }
 
 /// SIM102
-pub fn nested_if_statements(
+pub(crate) fn nested_if_statements(
     checker: &mut Checker,
     stmt: &Stmt,
     test: &Expr,
@@ -336,7 +336,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 }
 
 /// SIM103
-pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let StmtKind::If(ast::StmtIf { test, body, orelse }) = &stmt.node else {
         return;
     };
@@ -416,7 +416,7 @@ fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
 }
 
 /// SIM108
-pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
     let StmtKind::If(ast::StmtIf { test, body, orelse } )= &stmt.node else {
         return;
     };
@@ -549,7 +549,7 @@ fn get_if_body_pairs<'a>(
 }
 
 /// SIM114
-pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
     let StmtKind::If(ast::StmtIf { test, body, orelse }) = &stmt.node else {
         return;
     };
@@ -601,7 +601,7 @@ pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stm
 }
 
 /// SIM116
-pub fn manual_dict_lookup(
+pub(crate) fn manual_dict_lookup(
     checker: &mut Checker,
     stmt: &Stmt,
     test: &Expr,
@@ -747,7 +747,7 @@ pub fn manual_dict_lookup(
 }
 
 /// SIM401
-pub fn use_dict_get_with_default(
+pub(crate) fn use_dict_get_with_default(
     checker: &mut Checker,
     stmt: &Stmt,
     test: &Expr,

@@ -49,7 +49,7 @@ impl Violation for DjangoModelWithoutDunderStr {
 }
 
 /// DJ008
-pub fn model_without_dunder_str(
+pub(crate) fn model_without_dunder_str(
     checker: &Checker,
     bases: &[Expr],
     body: &[Stmt],

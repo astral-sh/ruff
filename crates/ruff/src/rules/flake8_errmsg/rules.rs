@@ -213,7 +213,7 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
 }
 
 /// EM101, EM102, EM103
-pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
+pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
     if let ExprKind::Call(ast::ExprCall { args, .. }) = &exc.node {
         if let Some(first) = args.first() {
             match &first.node {

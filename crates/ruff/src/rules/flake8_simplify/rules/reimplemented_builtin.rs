@@ -196,7 +196,11 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Styl
 }
 
 /// SIM110, SIM111
-pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: Option<&Stmt>) {
+pub(crate) fn convert_for_loop_to_any_all(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    sibling: Option<&Stmt>,
+) {
     // There are two cases to consider:
     // - `for` loop with an `else: return True` or `else: return False`.
     // - `for` loop followed by `return True` or `return False`

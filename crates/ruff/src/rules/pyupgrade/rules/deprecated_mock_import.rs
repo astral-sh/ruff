@@ -17,7 +17,7 @@ use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum MockReference {
+pub(crate) enum MockReference {
     Import,
     Attribute,
 }
@@ -245,7 +245,7 @@ fn format_import_from(
 }
 
 /// UP026
-pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &expr.node {
         if collect_call_path(value)
             .map_or(false, |call_path| call_path.as_slice() == ["mock", "mock"])
@@ -269,7 +269,7 @@ pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
 }
 
 /// UP026
-pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import(ast::StmtImport { names }) => {
             // Find all `mock` imports.

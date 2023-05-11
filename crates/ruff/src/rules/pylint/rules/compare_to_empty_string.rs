@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::{unparse_constant, unparse_expr};
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum EmptyStringCmpop {
+pub(crate) enum EmptyStringCmpop {
     Is,
     IsNot,
     Eq,
@@ -31,7 +31,7 @@ impl TryFrom<&Cmpop> for EmptyStringCmpop {
 }
 
 impl EmptyStringCmpop {
-    pub fn into_unary(self) -> &'static str {
+    pub(crate) fn into_unary(self) -> &'static str {
         match self {
             Self::Is | Self::Eq => "not ",
             Self::IsNot | Self::NotEq => "",
@@ -91,7 +91,7 @@ impl Violation for CompareToEmptyString {
     }
 }
 
-pub fn compare_to_empty_string(
+pub(crate) fn compare_to_empty_string(
     checker: &mut Checker,
     left: &Expr,
     ops: &[Cmpop],

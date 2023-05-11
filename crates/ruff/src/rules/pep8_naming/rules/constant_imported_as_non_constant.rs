@@ -43,7 +43,7 @@ impl Violation for ConstantImportedAsNonConstant {
 }
 
 /// N811
-pub fn constant_imported_as_non_constant(
+pub(crate) fn constant_imported_as_non_constant(
     name: &str,
     asname: &str,
     alias: &Alias,

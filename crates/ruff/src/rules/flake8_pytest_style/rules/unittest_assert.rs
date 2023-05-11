@@ -12,7 +12,7 @@ use ruff_python_ast::helpers::{create_expr, create_stmt};
 /// `unittest` module. Note: any variants that can't be replaced with plain
 /// `assert` statements are commented out.
 #[derive(Copy, Clone)]
-pub enum UnittestAssert {
+pub(crate) enum UnittestAssert {
     AlmostEqual,
     AlmostEquals,
     CountEqual,
@@ -201,7 +201,7 @@ impl UnittestAssert {
     }
 
     /// Create a map from argument name to value.
-    pub fn args_map<'a>(
+    pub(crate) fn args_map<'a>(
         &'a self,
         args: &'a [Expr],
         keywords: &'a [Keyword],
@@ -259,7 +259,7 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+    pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
         let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True | UnittestAssert::False => {

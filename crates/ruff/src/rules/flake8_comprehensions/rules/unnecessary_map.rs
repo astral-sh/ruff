@@ -67,7 +67,7 @@ impl Violation for UnnecessaryMap {
 }
 
 /// C417
-pub fn unnecessary_map(
+pub(crate) fn unnecessary_map(
     checker: &mut Checker,
     expr: &Expr,
     parent: Option<&Expr>,

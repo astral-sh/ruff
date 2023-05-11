@@ -43,7 +43,7 @@ impl Violation for ReturnInInit {
 }
 
 /// PLE0101
-pub fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
     if let StmtKind::Return(ast::StmtReturn { value }) = &stmt.node {
         if let Some(expr) = value {
             if matches!(

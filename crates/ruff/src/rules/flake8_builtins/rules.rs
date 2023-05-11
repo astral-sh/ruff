@@ -172,7 +172,7 @@ fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
 }
 
 /// A001
-pub fn builtin_variable_shadowing<T>(
+pub(crate) fn builtin_variable_shadowing<T>(
     checker: &mut Checker,
     name: &str,
     attributed: &Attributed<T>,
@@ -188,7 +188,7 @@ pub fn builtin_variable_shadowing<T>(
 }
 
 /// A002
-pub fn builtin_argument_shadowing<T>(
+pub(crate) fn builtin_argument_shadowing<T>(
     checker: &mut Checker,
     name: &str,
     attributed: &Attributed<T>,
@@ -204,7 +204,7 @@ pub fn builtin_argument_shadowing<T>(
 }
 
 /// A003
-pub fn builtin_attribute_shadowing<T>(
+pub(crate) fn builtin_attribute_shadowing<T>(
     checker: &mut Checker,
     name: &str,
     attributed: &Attributed<T>,

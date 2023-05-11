@@ -8,7 +8,7 @@ use super::helpers::trailing_comma;
 use super::types::{AliasData, TrailingComma};
 use super::{AnnotatedAliasData, AnnotatedImport};
 
-pub fn annotate_imports<'a>(
+pub(crate) fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
     locator: &Locator,

@@ -76,7 +76,7 @@ where
 }
 
 /// TRY003
-pub fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Call(ast::ExprCall { args, .. }) = &expr.node {
         if let Some(arg) = args.first() {
             if any_string(arg, |part| part.chars().any(char::is_whitespace)) {

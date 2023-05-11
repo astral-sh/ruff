@@ -7,7 +7,7 @@ use syn::{
     Fields, Lit, LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
 };
 
-pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
+pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 
     match data {

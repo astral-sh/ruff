@@ -21,7 +21,7 @@ impl Violation for LoadBeforeGlobalDeclaration {
     }
 }
 /// PLE0118
-pub fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
+pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
     let globals = match &checker.ctx.scope().kind {
         ScopeKind::Class(class_def) => &class_def.globals,
         ScopeKind::Function(function_def) => &function_def.globals,

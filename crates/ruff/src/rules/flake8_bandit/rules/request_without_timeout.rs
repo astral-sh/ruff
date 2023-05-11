@@ -27,7 +27,7 @@ impl Violation for RequestWithoutTimeout {
 const HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];
 
 /// S113
-pub fn request_without_timeout(
+pub(crate) fn request_without_timeout(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

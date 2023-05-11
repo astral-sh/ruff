@@ -28,7 +28,7 @@ impl Violation for SysExitAlias {
 }
 
 /// PLR1722
-pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
+pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };

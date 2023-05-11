@@ -32,7 +32,7 @@ impl Violation for BlankLineAfterSummary {
 }
 
 /// D205
-pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines_count: usize = 1;

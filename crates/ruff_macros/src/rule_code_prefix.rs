@@ -4,7 +4,7 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::{Attribute, Ident};
 
-pub fn get_prefix_ident(prefix: &str) -> Ident {
+pub(crate) fn get_prefix_ident(prefix: &str) -> Ident {
     let prefix = if prefix.as_bytes()[0].is_ascii_digit() {
         // Identifiers in Rust may not start with a number.
         format!("_{prefix}")
@@ -14,7 +14,7 @@ pub fn get_prefix_ident(prefix: &str) -> Ident {
     Ident::new(&prefix, Span::call_site())
 }
 
-pub fn expand<'a>(
+pub(crate) fn expand<'a>(
     prefix_ident: &Ident,
     variants: impl Iterator<Item = (&'a str, &'a Vec<Attribute>)>,
 ) -> proc_macro2::TokenStream {
@@ -106,7 +106,7 @@ fn attributes_for_prefix(
 
 /// If all values in an iterator are the same, return that value. Otherwise,
 /// return `None`.
-pub fn if_all_same<T: PartialEq>(iter: impl Iterator<Item = T>) -> Option<T> {
+pub(crate) fn if_all_same<T: PartialEq>(iter: impl Iterator<Item = T>) -> Option<T> {
     let mut iter = iter.peekable();
     let first = iter.next()?;
     if iter.all(|x| x == first) {

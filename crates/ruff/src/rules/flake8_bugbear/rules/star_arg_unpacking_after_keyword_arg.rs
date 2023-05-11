@@ -25,7 +25,7 @@ impl Violation for StarArgUnpackingAfterKeywordArg {
 }
 
 /// B026
-pub fn star_arg_unpacking_after_keyword_arg(
+pub(crate) fn star_arg_unpacking_after_keyword_arg(
     checker: &mut Checker,
     args: &[Expr],
     keywords: &[Keyword],

@@ -101,7 +101,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
 }
 
 /// SIM118 in a for loop
-pub fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
     key_in_dict(
         checker,
         target,
@@ -111,7 +111,7 @@ pub fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
 }
 
 /// SIM118 in a comparison
-pub fn key_in_dict_compare(
+pub(crate) fn key_in_dict_compare(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
