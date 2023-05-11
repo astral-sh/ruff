@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -13,8 +13,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct ConvertTypedDictFunctionalToClass {
-    pub name: String,
-    pub fixable: bool,
+    name: String,
+    fixable: bool,
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {
@@ -26,11 +26,9 @@ impl Violation for ConvertTypedDictFunctionalToClass {
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|ConvertTypedDictFunctionalToClass { name, .. }| {
-                format!("Convert `{name}` to class syntax")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let ConvertTypedDictFunctionalToClass { name, .. } = self;
+        Some(format!("Convert `{name}` to class syntax"))
     }
 }
 
@@ -209,14 +207,15 @@ fn convert_to_class(
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
     stylist: &Stylist,
-) -> Edit {
-    Edit::range_replacement(
+) -> Fix {
+    #[allow(deprecated)]
+    Fix::unspecified(Edit::range_replacement(
         unparse_stmt(
             &create_class_def_stmt(class_name, body, total_keyword, base_class),
             stylist,
         ),
         stmt.range(),
-    )
+    ))
 }
 
 /// UP013

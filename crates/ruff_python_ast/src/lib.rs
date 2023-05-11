@@ -1,5 +1,4 @@
 pub mod all;
-pub mod branch_detection;
 pub mod call_path;
 pub mod cast;
 pub mod comparable;
@@ -9,6 +8,7 @@ pub mod imports;
 pub mod newlines;
 pub mod relocate;
 pub mod source_code;
+pub mod statement_visitor;
 pub mod str;
 pub mod token_kind;
 pub mod types;

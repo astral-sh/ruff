@@ -62,7 +62,7 @@ D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
 301 301 |     This is the end.
 302 302 |     """
 
-D.py:581:5: D210 [*] No whitespaces allowed surrounding docstring text
+D.py:581:5: D210 No whitespaces allowed surrounding docstring text
     |
 581 |         "or exclamation point (not '\"')")
 582 | def endswith_quote():

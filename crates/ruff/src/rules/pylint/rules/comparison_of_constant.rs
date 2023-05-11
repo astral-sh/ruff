@@ -60,9 +60,9 @@ impl fmt::Display for ViolationsCmpop {
 
 #[violation]
 pub struct ComparisonOfConstant {
-    pub left_constant: String,
-    pub op: ViolationsCmpop,
-    pub right_constant: String,
+    left_constant: String,
+    op: ViolationsCmpop,
+    right_constant: String,
 }
 
 impl Violation for ComparisonOfConstant {

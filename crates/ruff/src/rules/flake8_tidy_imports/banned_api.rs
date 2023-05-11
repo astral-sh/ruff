@@ -1,6 +1,5 @@
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Located};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::checkers::ast::Checker;
@@ -10,8 +9,9 @@ use ruff_python_ast::call_path::from_qualified_name;
 
 pub type Settings = FxHashMap<String, ApiBan>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ApiBan {
     /// The message to display when the API is used.
     pub msg: String,
@@ -36,8 +36,8 @@ pub struct ApiBan {
 /// - `flake8-tidy-imports.banned-api`
 #[violation]
 pub struct BannedApi {
-    pub name: String,
-    pub message: String,
+    name: String,
+    message: String,
 }
 
 impl Violation for BannedApi {

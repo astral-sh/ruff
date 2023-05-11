@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -10,8 +10,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct DeprecatedUnittestAlias {
-    pub alias: String,
-    pub target: String,
+    alias: String,
+    target: String,
 }
 
 impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {
@@ -69,10 +69,11 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             format!("self.{target}"),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

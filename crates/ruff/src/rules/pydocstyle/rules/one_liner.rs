@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
@@ -10,14 +10,16 @@ use crate::registry::AsRule;
 #[violation]
 pub struct FitsOnOneLine;
 
-impl AlwaysAutofixableViolation for FitsOnOneLine {
+impl Violation for FitsOnOneLine {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("One-line docstring should fit on one line")
     }
 
-    fn autofix_title(&self) -> String {
-        "Reformat to one line".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Reformat to one line".to_string())
     }
 }
 
@@ -49,10 +51,11 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 if !trimmed.ends_with(trailing.chars().last().unwrap())
                     && !trimmed.starts_with(leading.chars().last().unwrap())
                 {
-                    diagnostic.set_fix(Edit::range_replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         format!("{leading}{trimmed}{trailing}"),
                         docstring.range(),
-                    ));
+                    )));
                 }
             }
         }

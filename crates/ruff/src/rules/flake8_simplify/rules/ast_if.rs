@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
@@ -37,9 +37,7 @@ fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
 }
 
 #[violation]
-pub struct CollapsibleIf {
-    pub fixable: bool,
-}
+pub struct CollapsibleIf;
 
 impl Violation for CollapsibleIf {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -49,16 +47,14 @@ impl Violation for CollapsibleIf {
         format!("Use a single `if` statement instead of nested `if` statements")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Combine `if` statements using `and`"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Combine `if` statements using `and`".to_string())
     }
 }
 
 #[violation]
 pub struct NeedlessBool {
-    pub condition: String,
-    pub fixable: bool,
+    condition: String,
 }
 
 impl Violation for NeedlessBool {
@@ -66,14 +62,13 @@ impl Violation for NeedlessBool {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NeedlessBool { condition, .. } = self;
+        let NeedlessBool { condition } = self;
         format!("Return the condition `{condition}` directly")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable.then_some(|NeedlessBool { condition, .. }| {
-            format!("Replace with `return {condition}`")
-        })
+    fn autofix_title(&self) -> Option<String> {
+        let NeedlessBool { condition } = self;
+        Some(format!("Replace with `return {condition}`"))
     }
 }
 
@@ -109,8 +104,7 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
 
 #[violation]
 pub struct IfElseBlockInsteadOfIfExp {
-    pub contents: String,
-    pub fixable: bool,
+    contents: String,
 }
 
 impl Violation for IfElseBlockInsteadOfIfExp {
@@ -118,15 +112,13 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
+        let IfElseBlockInsteadOfIfExp { contents } = self;
         format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|IfElseBlockInsteadOfIfExp { contents, .. }| {
-                format!("Replace `if`-`else`-block with `{contents}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let IfElseBlockInsteadOfIfExp { contents } = self;
+        Some(format!("Replace `if`-`else`-block with `{contents}`"))
     }
 }
 
@@ -162,8 +154,7 @@ impl Violation for IfWithSameArms {
 
 #[violation]
 pub struct IfElseBlockInsteadOfDictGet {
-    pub contents: String,
-    pub fixable: bool,
+    contents: String,
 }
 
 impl Violation for IfElseBlockInsteadOfDictGet {
@@ -171,15 +162,13 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfDictGet { contents, .. } = self;
+        let IfElseBlockInsteadOfDictGet { contents } = self;
         format!("Use `{contents}` instead of an `if` block")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|IfElseBlockInsteadOfDictGet { contents, .. }| {
-                format!("Replace with `{contents}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let IfElseBlockInsteadOfDictGet { contents } = self;
+        Some(format!("Replace with `{contents}`"))
     }
 }
 
@@ -289,7 +278,7 @@ pub fn nested_if_statements(
     );
 
     let mut diagnostic = Diagnostic::new(
-        CollapsibleIf { fixable },
+        CollapsibleIf,
         colon.map_or_else(
             || stmt.range(),
             |colon| TextRange::new(stmt.start(), colon.end()),
@@ -297,14 +286,15 @@ pub fn nested_if_statements(
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
-            Ok(fix) => {
-                if fix
+            Ok(edit) => {
+                if edit
                     .content()
                     .unwrap_or_default()
                     .universal_newlines()
                     .all(|line| line.width() <= checker.settings.line_length)
                 {
-                    diagnostic.set_fix(fix);
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(edit));
                 }
             }
             Err(err) => error!("Failed to fix nested if: {err}"),
@@ -366,11 +356,12 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         && !has_comments(stmt, checker.locator)
         && (matches!(test.node, ExprKind::Compare { .. }) || checker.ctx.is_builtin("bool"));
 
-    let mut diagnostic = Diagnostic::new(NeedlessBool { condition, fixable }, stmt.range());
+    let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(test.clone()),
@@ -378,11 +369,12 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     checker.stylist,
                 ),
                 stmt.range(),
-            ));
+            )));
         } else {
             // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
             // verified, above, that `bool` is a builtin.)
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(Box::new(create_expr(ExprKind::Call {
@@ -397,7 +389,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     checker.stylist,
                 ),
                 stmt.range(),
-            ));
+            )));
         };
     }
     checker.diagnostics.push(diagnostic);
@@ -523,12 +515,15 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
-            fixable,
         },
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -870,12 +865,15 @@ pub fn use_dict_get_with_default(
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
-            fixable,
         },
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

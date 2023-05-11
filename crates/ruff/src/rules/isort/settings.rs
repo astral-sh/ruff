@@ -4,7 +4,6 @@ use std::collections::BTreeSet;
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -16,8 +15,9 @@ use crate::warn_user_once;
 
 use super::categorize::ImportSection;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
@@ -33,14 +33,13 @@ impl Default for RelativeImportsOrder {
     }
 }
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "IsortOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"false"#,
@@ -272,7 +271,7 @@ pub struct Options {
     /// in the order specified.
     pub forced_separate: Option<Vec<String>>,
     #[option(
-        default = r#"[]"#,
+        default = r#"["future", "standard-library", "third-party", "first-party", "local-folder"]"#,
         value_type = r#"list["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str]"#,
         example = r#"
             section-order = ["future", "standard-library", "first-party", "local-folder", "third-party"]

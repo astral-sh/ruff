@@ -2,7 +2,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -18,12 +18,12 @@ use ruff_python_ast::source_code::Locator;
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\b'
+/// x = "\b"
 /// ```
 #[violation]
 pub struct InvalidCharacterBackspace;
@@ -51,12 +51,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterBackspace {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\x1A'
+/// x = "\x1A"
 /// ```
 #[violation]
 pub struct InvalidCharacterSub;
@@ -84,12 +84,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterSub {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\x1B'
+/// x = "\x1B"
 /// ```
 #[violation]
 pub struct InvalidCharacterEsc;
@@ -117,12 +117,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterEsc {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\0'
+/// x = "\0"
 /// ```
 #[violation]
 pub struct InvalidCharacterNul;
@@ -149,12 +149,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterNul {
 ///
 /// ## Example
 /// ```python
-/// x = 'Dear Sir/Madam'
+/// x = "Dear Sir/Madam"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = 'Dear Sir\u200B/\u200BMadam'  # zero width space
+/// x = "Dear Sir\u200B/\u200BMadam"  # zero width space
 /// ```
 #[violation]
 pub struct InvalidCharacterZeroWidthSpace;
@@ -171,11 +171,7 @@ impl AlwaysAutofixableViolation for InvalidCharacterZeroWidthSpace {
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
-pub fn invalid_string_characters(
-    locator: &Locator,
-    range: TextRange,
-    autofix: bool,
-) -> Vec<Diagnostic> {
+pub fn invalid_string_characters(locator: &Locator, range: TextRange) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     let text = locator.slice(range);
 
@@ -195,11 +191,10 @@ pub fn invalid_string_characters(
         let location = range.start() + TextSize::try_from(column).unwrap();
         let range = TextRange::at(location, c.text_len());
 
-        let mut diagnostic = Diagnostic::new(rule, range);
-        if autofix {
-            diagnostic.set_fix(Edit::range_replacement(replacement.to_string(), range));
-        }
-        diagnostics.push(diagnostic);
+        #[allow(deprecated)]
+        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::unspecified(
+            Edit::range_replacement(replacement.to_string(), range),
+        )));
     }
 
     diagnostics

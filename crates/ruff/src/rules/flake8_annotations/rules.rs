@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{cast, helpers};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::analyze::visibility::Visibility;
@@ -37,7 +37,7 @@ use super::helpers::match_function_def;
 /// ```
 #[violation]
 pub struct MissingTypeFunctionArgument {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingTypeFunctionArgument {
@@ -69,7 +69,7 @@ impl Violation for MissingTypeFunctionArgument {
 /// ```
 #[violation]
 pub struct MissingTypeArgs {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingTypeArgs {
@@ -101,7 +101,7 @@ impl Violation for MissingTypeArgs {
 /// ```
 #[violation]
 pub struct MissingTypeKwargs {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingTypeKwargs {
@@ -138,7 +138,7 @@ impl Violation for MissingTypeKwargs {
 /// ```
 #[violation]
 pub struct MissingTypeSelf {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingTypeSelf {
@@ -177,7 +177,7 @@ impl Violation for MissingTypeSelf {
 /// ```
 #[violation]
 pub struct MissingTypeCls {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingTypeCls {
@@ -209,7 +209,7 @@ impl Violation for MissingTypeCls {
 /// ```
 #[violation]
 pub struct MissingReturnTypeUndocumentedPublicFunction {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingReturnTypeUndocumentedPublicFunction {
@@ -241,7 +241,7 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 /// ```
 #[violation]
 pub struct MissingReturnTypePrivateFunction {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingReturnTypePrivateFunction {
@@ -286,7 +286,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 /// ```
 #[violation]
 pub struct MissingReturnTypeSpecialMethod {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
@@ -326,7 +326,7 @@ impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
 /// ```
 #[violation]
 pub struct MissingReturnTypeStaticMethod {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingReturnTypeStaticMethod {
@@ -362,7 +362,7 @@ impl Violation for MissingReturnTypeStaticMethod {
 /// ```
 #[violation]
 pub struct MissingReturnTypeClassMethod {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MissingReturnTypeClassMethod {
@@ -403,7 +403,7 @@ impl Violation for MissingReturnTypeClassMethod {
 /// - [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[violation]
 pub struct AnyType {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for AnyType {
@@ -416,9 +416,7 @@ impl Violation for AnyType {
 
 fn is_none_returning(body: &[Stmt]) -> bool {
     let mut visitor = ReturnStatementVisitor::default();
-    for stmt in body {
-        visitor.visit_stmt(stmt);
-    }
+    visitor.visit_body(body);
     for expr in visitor.returns.into_iter().flatten() {
         if !matches!(
             expr.node,
@@ -666,7 +664,8 @@ pub fn definition(
                             helpers::identifier_range(stmt, checker.locator),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_set_fix(|| {
+                            #[allow(deprecated)]
+                            diagnostic.try_set_fix_from_edit(|| {
                                 fixes::add_return_annotation(checker.locator, stmt, "None")
                             });
                         }
@@ -688,7 +687,8 @@ pub fn definition(
                     let return_type = SIMPLE_MAGIC_RETURN_TYPES.get(name);
                     if let Some(return_type) = return_type {
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_set_fix(|| {
+                            #[allow(deprecated)]
+                            diagnostic.try_set_fix_from_edit(|| {
                                 fixes::add_return_annotation(checker.locator, stmt, return_type)
                             });
                         }

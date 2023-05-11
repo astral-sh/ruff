@@ -1,7 +1,7 @@
 use ruff_text_size::TextLen;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
 
@@ -64,10 +64,11 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
                 && !trimmed.ends_with(':')
                 && !trimmed.ends_with(';')
             {
-                diagnostic.set_fix(Edit::insertion(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         };

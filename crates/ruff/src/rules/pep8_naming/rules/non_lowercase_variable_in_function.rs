@@ -37,7 +37,7 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[violation]
 pub struct NonLowercaseVariableInFunction {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for NonLowercaseVariableInFunction {

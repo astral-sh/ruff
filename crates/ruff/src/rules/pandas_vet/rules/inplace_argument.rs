@@ -1,3 +1,4 @@
+use ruff_python_semantic::binding::{BindingKind, Importation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, StmtKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Violation};
@@ -32,9 +33,7 @@ use crate::rules::pandas_vet::fixes::convert_inplace_argument_to_assignment;
 /// ## References
 /// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[violation]
-pub struct PandasUseOfInplaceArgument {
-    pub fixable: bool,
-}
+pub struct PandasUseOfInplaceArgument;
 
 impl Violation for PandasUseOfInplaceArgument {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -44,9 +43,8 @@ impl Violation for PandasUseOfInplaceArgument {
         format!("`inplace=True` should be avoided; it has inconsistent behavior")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Assign to variable; remove `inplace` arg"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Assign to variable; remove `inplace` arg".to_string())
     }
 }
 
@@ -54,10 +52,29 @@ impl Violation for PandasUseOfInplaceArgument {
 pub fn inplace_argument(
     checker: &Checker,
     expr: &Expr,
+    func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Diagnostic> {
     let mut seen_star = false;
+    let mut is_checkable = false;
+    let mut is_pandas = false;
+
+    if let Some(call_path) = checker.ctx.resolve_call_path(func) {
+        is_checkable = true;
+
+        let module = call_path[0];
+        is_pandas = checker.ctx.find_binding(module).map_or(false, |binding| {
+            matches!(
+                binding.kind,
+                BindingKind::Importation(Importation {
+                    full_name: "pandas",
+                    ..
+                })
+            )
+        });
+    }
+
     for keyword in keywords.iter().rev() {
         let Some(arg) = &keyword.node.arg else {
             seen_star = true;
@@ -77,11 +94,15 @@ pub fn inplace_argument(
                 //    the star argument _doesn't_ contain an override).
                 // 2. The call is part of a larger expression (we're converting an expression to a
                 //    statement, and expressions can't contain statements).
+                // 3. The call is in a lambda (we can't assign to a variable in a lambda). This
+                //    should be unnecessary, as lambdas are expressions, and so (2) should apply,
+                //    but we don't currently restore expression stacks when parsing deferred nodes,
+                //    and so the parent is lost.
                 let fixable = !seen_star
-                    && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
-                    && checker.ctx.current_expr_parent().is_none();
-                let mut diagnostic =
-                    Diagnostic::new(PandasUseOfInplaceArgument { fixable }, keyword.range());
+                    && matches!(checker.ctx.stmt().node, StmtKind::Expr { .. })
+                    && checker.ctx.expr_parent().is_none()
+                    && !checker.ctx.scope().kind.is_lambda();
+                let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Some(fix) = convert_inplace_argument_to_assignment(
                         checker.locator,
@@ -93,6 +114,13 @@ pub fn inplace_argument(
                         diagnostic.set_fix(fix);
                     }
                 }
+
+                // Without a static type system, only module-level functions could potentially be
+                // non-pandas calls. If they're not, `inplace` should be considered safe.
+                if is_checkable && !is_pandas {
+                    return None;
+                }
+
                 return Some(diagnostic);
             }
 

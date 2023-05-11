@@ -29,7 +29,7 @@ impl fmt::Display for DictKind {
 /// Checks for `dict` calls that take unnecessary `dict` literals or `dict`
 /// comprehensions as arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to wrap a `dict` literal or comprehension within a `dict`
 /// call, since the literal or comprehension syntax already returns a `dict`.
 ///
@@ -46,7 +46,7 @@ impl fmt::Display for DictKind {
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralWithinDictCall {
-    pub kind: DictKind,
+    kind: DictKind,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinDictCall {
@@ -90,7 +90,8 @@ pub fn unnecessary_literal_within_dict_call(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_literal_within_dict_call(checker.locator, checker.stylist, expr)
         });
     }

@@ -9,7 +9,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct SysExitAlias {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for SysExitAlias {
@@ -21,8 +21,9 @@ impl Violation for SysExitAlias {
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|SysExitAlias { name }| format!("Replace `{name}` with `sys.exit()`"))
+    fn autofix_title(&self) -> Option<String> {
+        let SysExitAlias { name } = self;
+        Some(format!("Replace `{name}` with `sys.exit()`"))
     }
 }
 
@@ -49,12 +50,14 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                 let (import_edit, binding) = get_or_import_symbol(
                     "sys",
                     "exit",
+                    func.start(),
                     &checker.ctx,
                     &checker.importer,
                     checker.locator,
                 )?;
                 let reference_edit = Edit::range_replacement(binding, func.range());
-                Ok(Fix::from_iter([import_edit, reference_edit]))
+                #[allow(deprecated)]
+                Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
             });
         }
         checker.diagnostics.push(diagnostic);

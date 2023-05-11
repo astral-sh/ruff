@@ -327,7 +327,7 @@ pub fn call_datetime_strptime_without_zone(
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (checker.ctx.current_expr_grandparent(), checker.ctx.current_expr_parent()) else {
+    let (Some(grandparent), Some(parent)) = (checker.ctx.expr_grandparent(), checker.ctx.expr_parent()) else {
         checker.diagnostics.push(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone,
             location,

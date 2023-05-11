@@ -2,8 +2,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -18,16 +17,18 @@ pub struct PytestParametrizeNamesWrongType {
     pub expected: types::ParametrizeNameType,
 }
 
-impl AlwaysAutofixableViolation for PytestParametrizeNamesWrongType {
+impl Violation for PytestParametrizeNamesWrongType {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestParametrizeNamesWrongType { expected } = self;
         format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let PytestParametrizeNamesWrongType { expected } = self;
-        format!("Use a `{expected}` for parameter names")
+        Some(format!("Use a `{expected}` for parameter names"))
     }
 }
 
@@ -148,7 +149,8 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 format!(
                                     "({})",
                                     unparse_expr(
@@ -168,7 +170,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                     )
                                 ),
                                 name_range,
-                            ));
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -181,7 +183,8 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
                                         elts: names
@@ -198,7 +201,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                     checker.stylist,
                                 ),
                                 name_range,
-                            ));
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -222,7 +225,8 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
                                         elts: elts.clone(),
@@ -231,7 +235,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                     checker.stylist,
                                 ),
                                 expr.range(),
-                            ));
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -244,7 +248,11 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                diagnostic.set_fix(Edit::range_replacement(content, expr.range()));
+                                #[allow(deprecated)]
+                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                    content,
+                                    expr.range(),
+                                )));
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -268,7 +276,8 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::range_replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 format!(
                                     "({})",
                                     unparse_expr(
@@ -280,7 +289,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                     )
                                 ),
                                 expr.range(),
-                            ));
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -293,7 +302,11 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                diagnostic.set_fix(Edit::range_replacement(content, expr.range()));
+                                #[allow(deprecated)]
+                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                    content,
+                                    expr.range(),
+                                )));
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -366,10 +379,11 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(&create_expr(value.node.clone()), checker.stylist),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -411,7 +425,7 @@ fn handle_value_rows(
 
 pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     for decorator in decorators {
-        if is_pytest_parametrize(decorator, checker) {
+        if is_pytest_parametrize(&checker.ctx, decorator) {
             if let ExprKind::Call { args, .. } = &decorator.node {
                 if checker
                     .settings

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -46,10 +46,11 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     };
     let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             "NotImplementedError".to_string(),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

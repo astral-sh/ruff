@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_stmt;
 use ruff_python_ast::source_code::Stylist;
@@ -74,15 +74,16 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `StmtKind::Expr`).
-    if let StmtKind::Expr { value: child } = &checker.ctx.current_stmt().node {
+    if let StmtKind::Expr { value: child } = &checker.ctx.stmt().node {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
 
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::range_replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     assignment(obj, name, value, checker.stylist),
                     expr.range(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

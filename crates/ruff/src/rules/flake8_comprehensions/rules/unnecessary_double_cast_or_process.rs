@@ -46,8 +46,8 @@ use super::helpers;
 /// - Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
 #[violation]
 pub struct UnnecessaryDoubleCastOrProcess {
-    pub inner: String,
-    pub outer: String,
+    inner: String,
+    outer: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryDoubleCastOrProcess {
@@ -110,7 +110,8 @@ pub fn unnecessary_double_cast_or_process(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
+            #[allow(deprecated)]
+            diagnostic.try_set_fix_from_edit(|| {
                 fixes::fix_unnecessary_double_cast_or_process(
                     checker.locator,
                     checker.stylist,

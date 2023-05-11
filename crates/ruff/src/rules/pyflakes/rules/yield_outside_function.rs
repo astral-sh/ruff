@@ -27,7 +27,7 @@ impl fmt::Display for DeferralKeyword {
 
 #[violation]
 pub struct YieldOutsideFunction {
-    pub keyword: DeferralKeyword,
+    keyword: DeferralKeyword,
 }
 
 impl Violation for YieldOutsideFunction {

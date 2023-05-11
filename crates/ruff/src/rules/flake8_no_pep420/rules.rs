@@ -26,7 +26,7 @@ use crate::fs;
 /// - `namespace-packages`
 #[violation]
 pub struct ImplicitNamespacePackage {
-    pub filename: String,
+    filename: String,
 }
 
 impl Violation for ImplicitNamespacePackage {

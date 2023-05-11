@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Alias, AliasData, Stmt};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace::indentation;
@@ -62,14 +62,9 @@ impl Violation for DeprecatedImport {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        if let Deprecation::WithoutRename(WithoutRename { fixable, .. }) = self.deprecation {
-            fixable.then_some(|DeprecatedImport { deprecation }| {
-                let Deprecation::WithoutRename(WithoutRename { target, .. }) = deprecation else {
-                    unreachable!();
-                };
-                format!("Import from `{target}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        if let Deprecation::WithoutRename(WithoutRename { target, .. }) = &self.deprecation {
+            Some(format!("Import from `{target}`"))
         } else {
             None
         }
@@ -551,7 +546,11 @@ pub fn deprecated_import(
         );
         if checker.patch(Rule::DeprecatedImport) {
             if let Some(content) = fix {
-                diagnostic.set_fix(Edit::range_replacement(content, stmt.range()));
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    content,
+                    stmt.range(),
+                )));
             }
         }
         checker.diagnostics.push(diagnostic);

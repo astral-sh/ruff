@@ -11,7 +11,7 @@ use super::helpers;
 /// ## What it does
 /// Checks for unnecessary `list` calls around list comprehensions.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It is redundant to use a `list` call around a list comprehension.
 ///
 /// ## Examples
@@ -50,7 +50,8 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_list_call(checker.locator, checker.stylist, expr)
         });
     }

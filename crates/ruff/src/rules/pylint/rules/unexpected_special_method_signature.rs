@@ -77,9 +77,9 @@ impl ExpectedParams {
 
 #[violation]
 pub struct UnexpectedSpecialMethodSignature {
-    pub method_name: String,
-    pub expected_params: ExpectedParams,
-    pub actual_params: usize,
+    method_name: String,
+    expected_params: ExpectedParams,
+    actual_params: usize,
 }
 
 impl Violation for UnexpectedSpecialMethodSignature {

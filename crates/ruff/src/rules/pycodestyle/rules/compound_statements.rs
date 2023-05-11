@@ -3,11 +3,11 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::registry::Rule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 /// ## What it does
 /// Checks for compound statements (multiple statements on the same line).
@@ -17,12 +17,12 @@ use crate::settings::{flags, Settings};
 ///
 /// ## Example
 /// ```python
-/// if foo == 'blah': do_blah_thing()
+/// if foo == "blah": do_blah_thing()
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if foo == 'blah':
+/// if foo == "blah":
 ///     do_blah_thing()
 /// ```
 ///
@@ -99,11 +99,7 @@ impl AlwaysAutofixableViolation for UselessSemicolon {
 }
 
 /// E701, E702, E703
-pub fn compound_statements(
-    lxr: &[LexResult],
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Vec<Diagnostic> {
+pub fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Track the last seen instance of a variety of tokens.
@@ -163,8 +159,9 @@ pub fn compound_statements(
                 if let Some((start, end)) = semi {
                     let mut diagnostic =
                         Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
-                    if autofix.into() && settings.rules.should_fix(Rule::UselessSemicolon) {
-                        diagnostic.set_fix(Edit::deletion(start, end));
+                    if settings.rules.should_fix(Rule::UselessSemicolon) {
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::deletion(start, end)));
                     };
                     diagnostics.push(diagnostic);
                 }

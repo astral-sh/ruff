@@ -3,7 +3,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
@@ -150,16 +150,12 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
 /// ```python
 /// def foo():
 ///     bar = 1
-///     # some code that not using `bar`
-///     print('test')
 ///     return bar
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def foo():
-///     # some code that not using `bar`
-///     print('test')
 ///     return 1
 /// ```
 #[violation]
@@ -199,7 +195,7 @@ impl Violation for UnnecessaryAssign {
 /// ```
 #[violation]
 pub struct SuperfluousElseReturn {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseReturn {
@@ -237,7 +233,7 @@ impl Violation for SuperfluousElseReturn {
 /// ```
 #[violation]
 pub struct SuperfluousElseRaise {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseRaise {
@@ -259,12 +255,12 @@ impl Violation for SuperfluousElseRaise {
 ///
 /// ## Example
 /// ```python
-///def foo(bar, baz):
-///    for i in bar:
-///        if i < baz:
-///            continue
-///        else:
-///            x = 0
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i < baz:
+///             continue
+///         else:
+///             x = 0
 /// ```
 ///
 /// Use instead:
@@ -277,7 +273,7 @@ impl Violation for SuperfluousElseRaise {
 /// ```
 #[violation]
 pub struct SuperfluousElseContinue {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseContinue {
@@ -317,7 +313,7 @@ impl Violation for SuperfluousElseContinue {
 /// ```
 #[violation]
 pub struct SuperfluousElseBreak {
-    pub branch: Branch,
+    branch: Branch,
 }
 
 impl Violation for SuperfluousElseBreak {
@@ -345,7 +341,11 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::range_replacement("return".to_string(), stmt.range()));
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                "return".to_string(),
+                stmt.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -359,10 +359,11 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "return None".to_string(),
                 stmt.range(),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -416,10 +417,11 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.set_fix(Edit::insertion(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                             content,
                             end_of_last_statement(stmt, checker.locator),
-                        ));
+                        )));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -454,10 +456,11 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.set_fix(Edit::insertion(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                             content,
                             end_of_last_statement(stmt, checker.locator),
-                        ));
+                        )));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -493,10 +496,11 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     content.push_str(checker.stylist.line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    diagnostic.set_fix(Edit::insertion(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                         content,
                         end_of_last_statement(stmt, checker.locator),
-                    ));
+                    )));
                 }
             }
             checker.diagnostics.push(diagnostic);

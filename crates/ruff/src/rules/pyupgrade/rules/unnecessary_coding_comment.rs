@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
@@ -30,7 +30,11 @@ pub(crate) fn unnecessary_coding_comment(line: &Line, autofix: bool) -> Option<D
     if CODING_COMMENT_REGEX.is_match(line.as_str()) {
         let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, line.full_range());
         if autofix {
-            diagnostic.set_fix(Edit::deletion(line.start(), line.full_end()));
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::deletion(
+                line.start(),
+                line.full_end(),
+            )));
         }
         Some(diagnostic)
     } else {

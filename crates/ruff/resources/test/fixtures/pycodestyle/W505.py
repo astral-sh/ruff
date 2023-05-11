@@ -2,7 +2,7 @@
 """Here's a top-level docstring that's over the limit."""
 
 
-def f():
+def f1():
     """Here's a docstring that's also over the limit."""
 
     x = 1  # Here's a comment that's over the limit, but it's not standalone.
@@ -16,3 +16,16 @@ def f():
 
 
 "This is also considered a docstring, and is over the limit."
+
+
+def f2():
+    """Here's a multi-line docstring.
+
+    It's over the limit on this line, which isn't the first line in the docstring.
+    """
+
+
+def f3():
+    """Here's a multi-line docstring.
+
+    It's over the limit on this line, which isn't the first line in the docstring."""

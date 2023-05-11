@@ -43,7 +43,7 @@ impl Violation for MultipleImportsOnOneLine {
 ///
 /// ## Example
 /// ```python
-/// 'One string'
+/// "One string"
 /// "Two string"
 /// a = 1
 /// import os
@@ -54,7 +54,8 @@ impl Violation for MultipleImportsOnOneLine {
 /// ```python
 /// import os
 /// from sys import x
-/// 'One string'
+///
+/// "One string"
 /// "Two string"
 /// a = 1
 /// ```

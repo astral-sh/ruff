@@ -3,7 +3,7 @@ use std::hash::{BuildHasherDefault, Hash};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
 use ruff_python_ast::helpers::unparse_expr;
@@ -13,8 +13,8 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
-    pub name: String,
-    pub repeated_value: bool,
+    name: String,
+    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
@@ -26,12 +26,13 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         format!("Dictionary key literal `{name}` repeated")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyLiteral { repeated_value, .. } = self;
+    fn autofix_title(&self) -> Option<String> {
+        let MultiValueRepeatedKeyLiteral {
+            repeated_value,
+            name,
+        } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyLiteral { name, .. }| {
-                format!("Remove repeated key literal `{name}`")
-            })
+            Some(format!("Remove repeated key literal `{name}`"))
         } else {
             None
         }
@@ -39,8 +40,8 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 }
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
-    pub name: String,
-    pub repeated_value: bool,
+    name: String,
+    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyVariable {
@@ -52,12 +53,13 @@ impl Violation for MultiValueRepeatedKeyVariable {
         format!("Dictionary key `{name}` repeated")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyVariable { repeated_value, .. } = self;
+    fn autofix_title(&self) -> Option<String> {
+        let MultiValueRepeatedKeyVariable {
+            repeated_value,
+            name,
+        } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyVariable { name, .. }| {
-                format!("Remove repeated key `{name}`")
-            })
+            Some(format!("Remove repeated key `{name}`"))
         } else {
             None
         }
@@ -109,10 +111,11 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(Edit::deletion(
+                                    #[allow(deprecated)]
+                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
-                                    ));
+                                    )));
                                 }
                             } else {
                                 seen_values.insert(comparable_value);
@@ -137,10 +140,11 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
-                                    diagnostic.set_fix(Edit::deletion(
+                                    #[allow(deprecated)]
+                                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
-                                    ));
+                                    )));
                                 }
                             } else {
                                 seen_values.insert(comparable_value);

@@ -1,12 +1,8 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
-    ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
-    Unaryop, Withitem,
-};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
 
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::directives::IsortDirectives;
 use crate::rules::isort::helpers;
@@ -111,7 +107,7 @@ impl<'a> ImportTracker<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for ImportTracker<'a>
+impl<'a, 'b> StatementVisitor<'b> for ImportTracker<'a>
 where
     'b: 'a,
 {
@@ -226,8 +222,7 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::Match { subject, cases } => {
-                self.visit_expr(subject);
+            StmtKind::Match { cases, .. } => {
                 for match_case in cases {
                     self.visit_match_case(match_case);
                 }
@@ -268,24 +263,6 @@ where
         self.nested = prev_nested;
     }
 
-    fn visit_annotation(&mut self, _: &'b Expr) {}
-
-    fn visit_expr(&mut self, _: &'b Expr) {}
-
-    fn visit_constant(&mut self, _: &'b Constant) {}
-
-    fn visit_expr_context(&mut self, _: &'b ExprContext) {}
-
-    fn visit_boolop(&mut self, _: &'b Boolop) {}
-
-    fn visit_operator(&mut self, _: &'b Operator) {}
-
-    fn visit_unaryop(&mut self, _: &'b Unaryop) {}
-
-    fn visit_cmpop(&mut self, _: &'b Cmpop) {}
-
-    fn visit_comprehension(&mut self, _: &'b Comprehension) {}
-
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         let prev_nested = self.nested;
         self.nested = true;
@@ -299,22 +276,10 @@ where
         self.nested = prev_nested;
     }
 
-    fn visit_arguments(&mut self, _: &'b Arguments) {}
-
-    fn visit_arg(&mut self, _: &'b Arg) {}
-
-    fn visit_keyword(&mut self, _: &'b Keyword) {}
-
-    fn visit_alias(&mut self, _: &'b Alias) {}
-
-    fn visit_withitem(&mut self, _: &'b Withitem) {}
-
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         for stmt in &match_case.body {
             self.visit_stmt(stmt);
         }
         self.finalize(None);
     }
-
-    fn visit_pattern(&mut self, _: &'b Pattern) {}
 }

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -9,25 +9,27 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct IfExprWithTrueFalse {
-    pub expr: String,
+    expr: String,
 }
 
-impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
+impl Violation for IfExprWithTrueFalse {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let IfExprWithTrueFalse { expr } = self;
         format!("Use `bool({expr})` instead of `True if {expr} else False`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let IfExprWithTrueFalse { expr } = self;
-        format!("Replace with `not {expr}")
+        Some(format!("Replace with `not {expr}"))
     }
 }
 
 #[violation]
 pub struct IfExprWithFalseTrue {
-    pub expr: String,
+    expr: String,
 }
 
 impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
@@ -45,8 +47,8 @@ impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
 
 #[violation]
 pub struct IfExprWithTwistedArms {
-    pub expr_body: String,
-    pub expr_else: String,
+    expr_body: String,
+    expr_else: String,
 }
 
 impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
@@ -100,12 +102,14 @@ pub fn explicit_true_false_in_ifexpr(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&test.clone(), checker.stylist),
                 expr.range(),
-            ));
+            )));
         } else if checker.ctx.is_builtin("bool") {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {
                         func: Box::new(create_expr(ExprKind::Name {
@@ -118,7 +122,7 @@ pub fn explicit_true_false_in_ifexpr(
                     checker.stylist,
                 ),
                 expr.range(),
-            ));
+            )));
         };
     }
     checker.diagnostics.push(diagnostic);
@@ -152,7 +156,8 @@ pub fn explicit_false_true_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::UnaryOp {
                     op: Unaryop::Not,
@@ -161,7 +166,7 @@ pub fn explicit_false_true_in_ifexpr(
                 checker.stylist,
             ),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -200,7 +205,8 @@ pub fn twisted_arms_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::IfExp {
                     test: Box::new(create_expr(orelse.node.clone())),
@@ -210,7 +216,7 @@ pub fn twisted_arms_in_ifexpr(
                 checker.stylist,
             ),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -2,7 +2,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
 use std::ops::Add;
 
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -171,10 +171,11 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         "warning".to_string(),
                         level_call_range,
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

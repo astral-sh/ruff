@@ -7,9 +7,8 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::types::Node;
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -94,9 +93,9 @@ impl PartialEq<InnerBindingKind> for OuterBindingKind {
 /// ```
 #[violation]
 pub struct RedefinedLoopName {
-    pub name: String,
-    pub outer_kind: OuterBindingKind,
-    pub inner_kind: InnerBindingKind,
+    name: String,
+    outer_kind: OuterBindingKind,
+    inner_kind: InnerBindingKind,
 }
 
 impl Violation for RedefinedLoopName {
@@ -146,7 +145,7 @@ struct InnerForWithAssignTargetsVisitor<'a> {
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
-impl<'a, 'b> Visitor<'b> for InnerForWithAssignTargetsVisitor<'a>
+impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a>
 where
     'b: 'a,
 {
@@ -225,7 +224,7 @@ where
             StmtKind::FunctionDef { .. } => {}
             // Otherwise, do recurse.
             _ => {
-                visitor::walk_stmt(self, stmt);
+                walk_stmt(self, stmt);
             }
         }
     }

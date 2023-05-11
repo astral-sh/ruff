@@ -70,6 +70,9 @@ pub(crate) struct Printer {
     log_level: LogLevel,
     autofix_level: flags::FixMode,
     flags: Flags,
+    /// Dev-only argument to show fixes
+    #[cfg(feature = "ecosystem_ci")]
+    ecosystem_ci: bool,
 }
 
 impl Printer {
@@ -78,12 +81,15 @@ impl Printer {
         log_level: LogLevel,
         autofix_level: flags::FixMode,
         flags: Flags,
+        #[cfg(feature = "ecosystem_ci")] ecosystem_ci: bool,
     ) -> Self {
         Self {
             format,
             log_level,
             autofix_level,
             flags,
+            #[cfg(feature = "ecosystem_ci")]
+            ecosystem_ci,
         }
     }
 
@@ -118,7 +124,7 @@ impl Printer {
                     let num_fixable = diagnostics
                         .messages
                         .iter()
-                        .filter(|message| message.kind.fixable)
+                        .filter(|message| message.fix.is_some())
                         .count();
                     if num_fixable > 0 {
                         writeln!(
@@ -179,8 +185,14 @@ impl Printer {
                 JunitEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Text => {
+                #[cfg(feature = "ecosystem_ci")]
+                let show_fixes = self.ecosystem_ci && self.flags.contains(Flags::SHOW_FIXES);
+                #[cfg(not(feature = "ecosystem_ci"))]
+                let show_fixes = false;
+
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.autofix_level))
+                    .with_show_fix(show_fixes)
                     .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
 
@@ -236,7 +248,7 @@ impl Printer {
                 (
                     message.kind.rule(),
                     &message.kind.body,
-                    message.kind.fixable,
+                    message.fix.is_some(),
                 )
             })
             .sorted()

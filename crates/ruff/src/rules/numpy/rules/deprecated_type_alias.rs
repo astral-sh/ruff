@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -30,7 +30,7 @@ use crate::registry::AsRule;
 /// ```
 #[violation]
 pub struct NumpyDeprecatedTypeAlias {
-    pub type_name: String,
+    type_name: String,
 }
 
 impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
@@ -70,7 +70,8 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 match type_name {
                     "unicode" => "str",
                     "long" => "int",
@@ -78,7 +79,7 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
                 }
                 .to_string(),
                 expr.range(),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

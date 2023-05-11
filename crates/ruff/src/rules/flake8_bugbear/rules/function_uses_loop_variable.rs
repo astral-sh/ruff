@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct FunctionUsesLoopVariable {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for FunctionUsesLoopVariable {

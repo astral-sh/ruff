@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
 
@@ -21,7 +21,7 @@ use crate::registry::AsRule;
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///    pass
+///     pass
 ///
 /// print("Hello, world!")
 /// ```
@@ -60,11 +60,7 @@ pub fn empty_type_checking_block<'a, 'b>(
 
         // Delete the entire type-checking block.
         if checker.patch(diagnostic.kind.rule()) {
-            let parent = checker
-                .ctx
-                .child_to_parent
-                .get(&RefEquality(stmt))
-                .map(Into::into);
+            let parent = checker.ctx.stmts.parent(stmt);
             let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
             match delete_stmt(
                 stmt,
@@ -74,11 +70,12 @@ pub fn empty_type_checking_block<'a, 'b>(
                 checker.indexer,
                 checker.stylist,
             ) {
-                Ok(fix) => {
-                    if fix.is_deletion() || fix.content() == Some("pass") {
+                Ok(edit) => {
+                    if edit.is_deletion() || edit.content() == Some("pass") {
                         checker.deletions.insert(RefEquality(stmt));
                     }
-                    diagnostic.set_fix(fix);
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(edit));
                 }
                 Err(e) => error!("Failed to remove empty type-checking block: {e}"),
             }

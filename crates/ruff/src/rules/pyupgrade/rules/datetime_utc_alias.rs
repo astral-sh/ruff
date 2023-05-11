@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 
@@ -9,7 +9,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct DatetimeTimezoneUTC {
-    pub straight_import: bool,
+    straight_import: bool,
 }
 
 impl Violation for DatetimeTimezoneUTC {
@@ -20,12 +20,8 @@ impl Violation for DatetimeTimezoneUTC {
         format!("Use `datetime.UTC` alias")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        if self.straight_import {
-            Some(|_| "Convert to `datetime.UTC` alias".to_string())
-        } else {
-            None
-        }
+    fn autofix_title(&self) -> Option<String> {
+        Some("Convert to `datetime.UTC` alias".to_string())
     }
 }
 
@@ -44,10 +40,11 @@ pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
         let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC { straight_import }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             if straight_import {
-                diagnostic.set_fix(Edit::range_replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     "datetime.UTC".to_string(),
                     expr.range(),
-                ));
+                )));
             }
         }
         checker.diagnostics.push(diagnostic);

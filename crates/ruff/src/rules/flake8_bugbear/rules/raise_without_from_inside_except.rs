@@ -3,7 +3,7 @@ use rustpython_parser::ast::{ExprKind, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
-use ruff_python_ast::visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_stdlib::str::is_lower;
 
 use crate::checkers::ast::Checker;
@@ -25,7 +25,7 @@ impl Violation for RaiseWithoutFromInsideExcept {
 pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
-        visitor::walk_body(&mut visitor, body);
+        visitor.visit_body(body);
         visitor.raises
     };
 

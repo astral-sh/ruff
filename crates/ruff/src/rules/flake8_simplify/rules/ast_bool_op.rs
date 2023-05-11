@@ -7,7 +7,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{
@@ -47,8 +47,7 @@ use crate::registry::AsRule;
 /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct DuplicateIsinstanceCall {
-    pub name: Option<String>,
-    pub fixable: bool,
+    name: Option<String>,
 }
 
 impl Violation for DuplicateIsinstanceCall {
@@ -56,7 +55,7 @@ impl Violation for DuplicateIsinstanceCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name, .. } = self;
+        let DuplicateIsinstanceCall { name } = self;
         if let Some(name) = name {
             format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
         } else {
@@ -64,21 +63,20 @@ impl Violation for DuplicateIsinstanceCall {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|DuplicateIsinstanceCall { name, .. }| {
-                if let Some(name) = name {
-                    format!("Merge `isinstance` calls for `{name}`")
-                } else {
-                    format!("Merge `isinstance` calls")
-                }
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let DuplicateIsinstanceCall { name } = self;
+
+        Some(if let Some(name) = name {
+            format!("Merge `isinstance` calls for `{name}`")
+        } else {
+            "Merge `isinstance` calls".to_string()
+        })
     }
 }
 
 #[violation]
 pub struct CompareWithTuple {
-    pub replacement: String,
+    replacement: String,
 }
 
 impl AlwaysAutofixableViolation for CompareWithTuple {
@@ -96,7 +94,7 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
 
 #[violation]
 pub struct ExprAndNotExpr {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for ExprAndNotExpr {
@@ -113,7 +111,7 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
 
 #[violation]
 pub struct ExprOrNotExpr {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for ExprOrNotExpr {
@@ -165,8 +163,8 @@ pub enum ContentAround {
 /// ```
 #[violation]
 pub struct ExprOrTrue {
-    pub expr: String,
-    pub remove: ContentAround,
+    expr: String,
+    remove: ContentAround,
 }
 
 impl AlwaysAutofixableViolation for ExprOrTrue {
@@ -217,8 +215,8 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 /// ```
 #[violation]
 pub struct ExprAndFalse {
-    pub expr: String,
-    pub remove: ContentAround,
+    expr: String,
+    remove: ContentAround,
 }
 
 impl AlwaysAutofixableViolation for ExprAndFalse {
@@ -305,7 +303,6 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     } else {
                         None
                     },
-                    fixable,
                 },
                 expr.range(),
             );
@@ -366,10 +363,11 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
-                diagnostic.set_fix(Edit::range_replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
                     expr.range(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -468,10 +466,11 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                     values: iter::once(in_expr).chain(unmatched).collect(),
                 })
             };
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&in_expr, checker.stylist),
                 expr.range(),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -519,7 +518,11 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement("False".to_string(), expr.range()));
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        "False".to_string(),
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -569,7 +572,11 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement("True".to_string(), expr.range()));
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        "True".to_string(),
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -689,7 +696,8 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(edit);
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(edit));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -708,7 +716,8 @@ pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             edit.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(edit);
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(edit));
         }
         checker.diagnostics.push(diagnostic);
     }

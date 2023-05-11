@@ -5,6 +5,30 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for usages of the builtin `open()` function without an associated context
+/// manager.
+///
+/// ## Why is this bad?
+/// If a file is opened without a context manager, it is not guaranteed that
+/// the file will be closed (e.g., if an exception is raised), which can cause
+/// resource leaks.
+///
+/// ## Example
+/// ```python
+/// file = open("foo.txt")
+/// ...
+/// file.close()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with open("foo.txt") as file:
+///     ...
+/// ```
+///
+/// # References
+/// - [Python documentation](https://docs.python.org/3/library/functions.html#open)
 #[violation]
 pub struct OpenFileWithContextHandler;
 
@@ -18,7 +42,7 @@ impl Violation for OpenFileWithContextHandler {
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.
 fn match_async_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.current_expr_grandparent() else {
+    let Some(expr) = checker.ctx.expr_grandparent() else {
         return false;
     };
     let ExprKind::Await { value } = &expr.node else {
@@ -33,7 +57,7 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_async_context" {
         return false;
     }
-    for parent in &checker.ctx.parents {
+    for parent in checker.ctx.parents() {
         if let StmtKind::With { items, .. } = &parent.node {
             for item in items {
                 if let ExprKind::Call { func, .. } = &item.context_expr.node {
@@ -56,7 +80,7 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
 /// Return `true` if the current expression is nested in an
 /// `exit_stack.enter_context` call.
 fn match_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.current_expr_parent() else {
+    let Some(expr) = checker.ctx.expr_parent() else {
         return false;
     };
     let ExprKind::Call { func,  .. } = &expr.node else {
@@ -68,7 +92,7 @@ fn match_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_context" {
         return false;
     }
-    for parent in &checker.ctx.parents {
+    for parent in checker.ctx.parents() {
         if let StmtKind::With { items, .. } = &parent.node {
             for item in items {
                 if let ExprKind::Call { func, .. } = &item.context_expr.node {
@@ -97,7 +121,7 @@ pub fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     {
         if checker.ctx.is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.ctx.current_stmt().node, StmtKind::With { .. }) {
+            if matches!(checker.ctx.stmt().node, StmtKind::With { .. }) {
                 return;
             }
 

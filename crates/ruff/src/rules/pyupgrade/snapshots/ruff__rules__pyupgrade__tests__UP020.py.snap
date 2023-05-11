@@ -28,5 +28,6 @@ UP020.py:8:6: UP020 Use builtin `open`
    |      ^^^^^^^^^^^^^ UP020
 11 |     print(f.read())
    |
+   = help: Replace with builtin `open`
 
 

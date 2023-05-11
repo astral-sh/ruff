@@ -16,7 +16,7 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// ## What it does
 /// Checks for function calls in default function arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// Any function call that's used in a default argument will only be performed
 /// once, at definition time. The returned value will then be reused by all
 /// calls to the function, which can lead to unexpected behaviour.
@@ -28,6 +28,7 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// ```python
 /// def create_list() -> list[int]:
 ///     return [1, 2, 3]
+///
 ///
 /// def mutable_default(arg: list[int] = create_list()) -> list[int]:
 ///     arg.append(4)
@@ -48,6 +49,7 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// assigning to a module-level variable:
 /// ```python
 /// I_KNOW_THIS_IS_SHARED_STATE = create_list()
+///
 ///
 /// def mutable_default(arg: list[int] = I_KNOW_THIS_IS_SHARED_STATE) -> list[int]:
 ///     arg.append(4)

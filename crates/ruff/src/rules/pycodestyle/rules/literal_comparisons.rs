@@ -2,7 +2,7 @@ use itertools::izip;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 
@@ -36,12 +36,15 @@ impl From<&Cmpop> for EqCmpop {
 /// ## Example
 /// ```python
 /// if arg != None:
+///     pass
 /// if None == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is not None:
+///     pass
 /// ```
 ///
 /// ## References
@@ -78,13 +81,17 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// ## Example
 /// ```python
 /// if arg == True:
+///     pass
 /// if False == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is True:
+///     pass
 /// if arg is False:
+///     pass
 /// ```
 ///
 /// ## References
@@ -270,7 +277,11 @@ pub fn literal_comparisons(
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Edit::range_replacement(content.to_string(), expr.range()));
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                content.to_string(),
+                expr.range(),
+            )));
         }
     }
 

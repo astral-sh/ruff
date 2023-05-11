@@ -531,13 +531,6 @@
       "items": {
         "$ref": "#/definitions/RuleSelector"
       }
-    },
-    "update-check": {
-      "description": "Enable or disable automatic update checks (overridden by the `--update-check` and `--no-update-check` command-line flags).",
-      "type": [
-        "boolean",
-        "null"
-      ]
     }
   },
   "additionalProperties": false,
@@ -1829,6 +1822,10 @@
         "FBT001",
         "FBT002",
         "FBT003",
+        "FLY",
+        "FLY0",
+        "FLY00",
+        "FLY002",
         "G",
         "G0",
         "G00",
@@ -2035,6 +2032,9 @@
         "PLW012",
         "PLW0120",
         "PLW0129",
+        "PLW04",
+        "PLW040",
+        "PLW0406",
         "PLW06",
         "PLW060",
         "PLW0602",
@@ -2050,6 +2050,10 @@
         "PLW29",
         "PLW290",
         "PLW2901",
+        "PLW3",
+        "PLW33",
+        "PLW330",
+        "PLW3301",
         "PT",
         "PT0",
         "PT00",
@@ -2126,9 +2130,13 @@
         "PYI015",
         "PYI016",
         "PYI02",
+        "PYI020",
         "PYI021",
         "PYI03",
         "PYI033",
+        "PYI04",
+        "PYI042",
+        "PYI043",
         "Q",
         "Q0",
         "Q00",

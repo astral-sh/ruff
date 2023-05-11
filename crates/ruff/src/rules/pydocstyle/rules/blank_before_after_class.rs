@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
 use ruff_text_size::{TextLen, TextRange};
@@ -9,7 +9,7 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct OneBlankLineBeforeClass {
-    pub lines: usize,
+    lines: usize,
 }
 
 impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
 
 #[violation]
 pub struct OneBlankLineAfterClass {
-    pub lines: usize,
+    lines: usize,
 }
 
 impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
@@ -41,7 +41,7 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 
 #[violation]
 pub struct BlankLineBeforeClass {
-    pub lines: usize,
+    lines: usize,
 }
 
 impl AlwaysAutofixableViolation for BlankLineBeforeClass {
@@ -94,10 +94,11 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete the blank line before the class.
-                    diagnostic.set_fix(Edit::deletion(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                         blank_lines_start,
                         docstring.start() - docstring.indentation.text_len(),
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -116,11 +117,12 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Insert one blank line before the class.
-                    diagnostic.set_fix(Edit::replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         checker.stylist.line_ending().to_string(),
                         blank_lines_start,
                         docstring.start() - docstring.indentation.text_len(),
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -163,11 +165,12 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Insert a blank line before the class (replacing any existing lines).
-                diagnostic.set_fix(Edit::replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                     checker.stylist.line_ending().to_string(),
                     first_line_start,
                     blank_lines_end,
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

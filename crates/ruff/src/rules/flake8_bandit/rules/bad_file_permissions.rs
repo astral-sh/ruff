@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct BadFilePermissions {
-    pub mask: u16,
+    mask: u16,
 }
 
 impl Violation for BadFilePermissions {

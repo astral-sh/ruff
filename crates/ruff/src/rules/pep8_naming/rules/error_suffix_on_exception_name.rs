@@ -30,7 +30,7 @@ use ruff_python_ast::source_code::Locator;
 /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
 #[violation]
 pub struct ErrorSuffixOnExceptionName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for ErrorSuffixOnExceptionName {

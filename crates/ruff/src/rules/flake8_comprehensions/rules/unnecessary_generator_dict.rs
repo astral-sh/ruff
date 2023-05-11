@@ -58,7 +58,8 @@ pub fn unnecessary_generator_dict(
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
                 let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
+                    #[allow(deprecated)]
+                    diagnostic.try_set_fix_from_edit(|| {
                         fixes::fix_unnecessary_generator_dict(
                             checker.locator,
                             checker.stylist,

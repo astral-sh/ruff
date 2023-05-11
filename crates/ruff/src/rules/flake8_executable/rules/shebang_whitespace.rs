@@ -1,6 +1,6 @@
 use ruff_text_size::{TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::flake8_executable::helpers::ShebangDirective;
@@ -32,10 +32,11 @@ pub fn shebang_whitespace(
                 TextRange::at(range.start(), *n_spaces),
             );
             if autofix {
-                diagnostic.set_fix(Edit::range_deletion(TextRange::at(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::at(
                     range.start(),
                     *n_spaces,
-                )));
+                ))));
             }
             Some(diagnostic)
         } else {

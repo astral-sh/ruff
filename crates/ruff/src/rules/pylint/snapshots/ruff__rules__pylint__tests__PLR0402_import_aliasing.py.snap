@@ -52,5 +52,6 @@ import_aliasing.py:12:8: PLR0402 Use `from foo.bar import foobar` in lieu of ali
 15 | import os
 16 | import os as OS
    |
+   = help: Replace with `from foo.bar import foobar`
 
 

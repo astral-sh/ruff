@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -16,15 +16,15 @@ use crate::rules::pycodestyle::helpers::compare;
 /// ## Example
 /// ```python
 /// Z = not X in Y
-/// if not X.B in Y:\n    pass
-///
+/// if not X.B in Y:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if x not in y:\n    pass
-/// assert (X in Y or X is Z)
-///
+/// Z = X not in Y
+/// if X.B not in Y:
+///     pass
 /// ```
 #[violation]
 pub struct NotInTest;
@@ -55,9 +55,9 @@ impl AlwaysAutofixableViolation for NotInTest {
 ///
 /// Use instead:
 /// ```python
-/// if not (X in Y):
+/// if X is not Y:
 ///     pass
-/// zz = x is not y
+/// Z = X.B is not Y
 /// ```
 #[violation]
 pub struct NotIsTest;
@@ -99,10 +99,11 @@ pub fn not_tests(
                         if check_not_in {
                             let mut diagnostic = Diagnostic::new(NotInTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Edit::range_replacement(
+                                #[allow(deprecated)]
+                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
                                     expr.range(),
-                                ));
+                                )));
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -111,10 +112,11 @@ pub fn not_tests(
                         if check_not_is {
                             let mut diagnostic = Diagnostic::new(NotIsTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Edit::range_replacement(
+                                #[allow(deprecated)]
+                                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
                                     expr.range(),
-                                ));
+                                )));
                             }
                             checker.diagnostics.push(diagnostic);
                         }

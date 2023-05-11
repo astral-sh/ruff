@@ -8,8 +8,8 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct TooManyArguments {
-    pub c_args: usize,
-    pub max_args: usize,
+    c_args: usize,
+    max_args: usize,
 }
 
 impl Violation for TooManyArguments {
@@ -25,6 +25,8 @@ pub fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: &Stmt) 
     let num_args = args
         .args
         .iter()
+        .chain(args.kwonlyargs.iter())
+        .chain(args.posonlyargs.iter())
         .filter(|arg| !checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
         .count();
     if num_args > checker.settings.pylint.max_args {

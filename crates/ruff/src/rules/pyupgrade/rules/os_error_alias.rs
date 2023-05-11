@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
@@ -63,10 +63,11 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         target.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             "OSError".to_string(),
             target.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -103,12 +104,14 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         }
 
         if remaining.len() == 1 {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "OSError".to_string(),
                 target.range(),
-            ));
+            )));
         } else {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 format!(
                     "({})",
                     unparse_expr(
@@ -120,7 +123,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                     )
                 ),
                 target.range(),
-            ));
+            )));
         }
     }
     checker.diagnostics.push(diagnostic);

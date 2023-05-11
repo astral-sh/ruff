@@ -5,7 +5,7 @@ E25.py:2:12: E251 Unexpected spaces around keyword / parameter equals
   |
 2 | #: E251 E251
 3 | def foo(bar = False):
-  |             E251
+  |            ^ E251
 4 |     '''Test function with an error in declaration'''
 5 |     pass
   |
@@ -14,7 +14,7 @@ E25.py:2:14: E251 Unexpected spaces around keyword / parameter equals
   |
 2 | #: E251 E251
 3 | def foo(bar = False):
-  |               E251
+  |              ^ E251
 4 |     '''Test function with an error in declaration'''
 5 |     pass
   |
@@ -24,7 +24,7 @@ E25.py:6:9: E251 Unexpected spaces around keyword / parameter equals
  6 |     pass
  7 | #: E251
  8 | foo(bar= True)
-   |          E251
+   |         ^ E251
  9 | #: E251
 10 | foo(bar =True)
    |
@@ -34,7 +34,7 @@ E25.py:8:8: E251 Unexpected spaces around keyword / parameter equals
  8 | foo(bar= True)
  9 | #: E251
 10 | foo(bar =True)
-   |         E251
+   |        ^ E251
 11 | #: E251 E251
 12 | foo(bar = True)
    |
@@ -44,7 +44,7 @@ E25.py:10:8: E251 Unexpected spaces around keyword / parameter equals
 10 | foo(bar =True)
 11 | #: E251 E251
 12 | foo(bar = True)
-   |         E251
+   |        ^ E251
 13 | #: E251
 14 | y = bar(root= "sdasd")
    |
@@ -54,7 +54,7 @@ E25.py:10:10: E251 Unexpected spaces around keyword / parameter equals
 10 | foo(bar =True)
 11 | #: E251 E251
 12 | foo(bar = True)
-   |           E251
+   |          ^ E251
 13 | #: E251
 14 | y = bar(root= "sdasd")
    |
@@ -64,29 +64,33 @@ E25.py:12:14: E251 Unexpected spaces around keyword / parameter equals
 12 | foo(bar = True)
 13 | #: E251
 14 | y = bar(root= "sdasd")
-   |               E251
+   |              ^ E251
 15 | #: E251:2:29
 16 | parser.add_argument('--long-option',
    |
 
 E25.py:15:29: E251 Unexpected spaces around keyword / parameter equals
    |
-15 | #: E251:2:29
-16 | parser.add_argument('--long-option',
-17 |                     default=
-   |                              E251
-18 |                     "/rather/long/filesystem/path/here/blah/blah/blah")
-19 | #: E251:1:45
+15 |   #: E251:2:29
+16 |   parser.add_argument('--long-option',
+17 |                       default=
+   |  _____________________________^
+18 | |                     "/rather/long/filesystem/path/here/blah/blah/blah")
+   | |____________________^ E251
+19 |   #: E251:1:45
+20 |   parser.add_argument('--long-option', default
    |
 
 E25.py:18:45: E251 Unexpected spaces around keyword / parameter equals
    |
-18 |                     "/rather/long/filesystem/path/here/blah/blah/blah")
-19 | #: E251:1:45
-20 | parser.add_argument('--long-option', default
-   |                                              E251
-21 |                     ="/rather/long/filesystem/path/here/blah/blah/blah")
-22 | #: E251:3:8 E251:3:10
+18 |                       "/rather/long/filesystem/path/here/blah/blah/blah")
+19 |   #: E251:1:45
+20 |   parser.add_argument('--long-option', default
+   |  _____________________________________________^
+21 | |                     ="/rather/long/filesystem/path/here/blah/blah/blah")
+   | |____________________^ E251
+22 |   #: E251:3:8 E251:3:10
+23 |   foo(True,
    |
 
 E25.py:23:8: E251 Unexpected spaces around keyword / parameter equals
@@ -94,7 +98,7 @@ E25.py:23:8: E251 Unexpected spaces around keyword / parameter equals
 23 | foo(True,
 24 |     baz=(1, 2),
 25 |     biz = 'foo'
-   |         E251
+   |        ^ E251
 26 |     )
 27 | #: Okay
    |
@@ -104,7 +108,7 @@ E25.py:23:10: E251 Unexpected spaces around keyword / parameter equals
 23 | foo(True,
 24 |     baz=(1, 2),
 25 |     biz = 'foo'
-   |           E251
+   |          ^ E251
 26 |     )
 27 | #: Okay
    |

@@ -21,19 +21,19 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## Example
 /// ```python
 /// def MY_FUNCTION():
-///    pass
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def my_function():
-///    pass
+///     pass
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
 pub struct InvalidArgumentName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for InvalidArgumentName {

@@ -209,6 +209,7 @@ UP007.py:48:9: UP007 Use `X | Y` for type annotations
 51 | 
 52 |     x = Union[str, int]
    |
+   = help: Convert to `X | Y`
 
 UP007.py:50:9: UP007 Use `X | Y` for type annotations
    |
@@ -219,6 +220,7 @@ UP007.py:50:9: UP007 Use `X | Y` for type annotations
 53 |     x = Union["str", "int"]
 54 |     x: Union[str, int]
    |
+   = help: Convert to `X | Y`
 
 UP007.py:52:8: UP007 [*] Use `X | Y` for type annotations
    |

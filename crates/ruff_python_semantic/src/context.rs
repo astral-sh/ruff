@@ -1,13 +1,12 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use nohash_hasher::{BuildNoHashHasher, IntMap};
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::typing::AnnotationKind;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
@@ -17,26 +16,35 @@ use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
+use crate::node::{NodeId, Nodes};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
+
+/// A snapshot of the [`Context`] at a given point in the AST traversal.
+#[derive(Debug, Copy, Clone)]
+pub struct Snapshot {
+    scope_id: ScopeId,
+    stmt_id: Option<NodeId>,
+    in_annotation: bool,
+    in_type_checking_block: bool,
+}
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
     pub module_path: Option<Vec<String>>,
-    // Retain all scopes and parent nodes, along with a stack of indices to track which are active
-    // at various points in time.
-    pub parents: Vec<RefEquality<'a, Stmt>>,
-    pub depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
-    pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
-    // A stack of all bindings created in any scope, at any point in execution.
-    pub bindings: Bindings<'a>,
-    // Map from binding index to indexes of bindings that shadow it in other scopes.
-    pub shadowed_bindings:
-        std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
-    pub exprs: Vec<RefEquality<'a, Expr>>,
+    // Stack of all visited statements, along with the identifier of the current statement.
+    pub stmts: Nodes<'a>,
+    pub stmt_id: Option<NodeId>,
+    // Stack of current expressions.
+    pub exprs: Vec<&'a Expr>,
+    // Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
     pub dead_scopes: Vec<ScopeId>,
+    // A stack of all bindings created in any scope, at any point in execution.
+    pub bindings: Bindings<'a>,
+    // Map from binding index to indexes of bindings that shadow it in other scopes.
+    pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -68,15 +76,14 @@ impl<'a> Context<'a> {
         Self {
             typing_modules,
             module_path,
-            parents: Vec::default(),
-            depths: FxHashMap::default(),
-            child_to_parent: FxHashMap::default(),
-            bindings: Bindings::default(),
-            shadowed_bindings: IntMap::default(),
-            exprs: Vec::default(),
+            stmts: Nodes::default(),
+            stmt_id: None,
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
             dead_scopes: Vec::default(),
+            bindings: Bindings::default(),
+            shadowed_bindings: IntMap::default(),
+            exprs: Vec::default(),
             body: &[],
             body_index: 0,
             visible_scope: VisibleScope {
@@ -254,10 +261,9 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some((
-                                    binding.source.as_ref().unwrap().into(),
-                                    format!("{name}.{member}"),
-                                ));
+                                if let Some(source) = binding.source {
+                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                }
                             }
                         }
                     }
@@ -273,10 +279,9 @@ impl<'a> Context<'a> {
                                     .take(scope_index)
                                     .all(|scope| scope.get(name).is_none())
                                 {
-                                    return Some((
-                                        binding.source.as_ref().unwrap().into(),
-                                        (*name).to_string(),
-                                    ));
+                                    if let Some(source) = binding.source {
+                                        return Some((self.stmts[source], (*name).to_string()));
+                                    }
                                 }
                             }
                         }
@@ -291,10 +296,9 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some((
-                                    binding.source.as_ref().unwrap().into(),
-                                    format!("{name}.{member}"),
-                                ));
+                                if let Some(source) = binding.source {
+                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                }
                             }
                         }
                     }
@@ -306,24 +310,23 @@ impl<'a> Context<'a> {
         })
     }
 
-    pub fn push_parent(&mut self, parent: &'a Stmt) {
-        let num_existing = self.parents.len();
-        self.parents.push(RefEquality(parent));
-        self.depths.insert(self.parents[num_existing], num_existing);
-        if num_existing > 0 {
-            self.child_to_parent
-                .insert(self.parents[num_existing], self.parents[num_existing - 1]);
-        }
+    /// Push a [`Stmt`] onto the stack.
+    pub fn push_stmt(&mut self, stmt: &'a Stmt) {
+        self.stmt_id = Some(self.stmts.insert(stmt, self.stmt_id));
     }
 
-    pub fn pop_parent(&mut self) {
-        self.parents.pop().expect("Attempted to pop without parent");
+    /// Pop the current [`Stmt`] off the stack.
+    pub fn pop_stmt(&mut self) {
+        let node_id = self.stmt_id.expect("Attempted to pop without statement");
+        self.stmt_id = self.stmts.parent_id(node_id);
     }
 
+    /// Push an [`Expr`] onto the stack.
     pub fn push_expr(&mut self, expr: &'a Expr) {
-        self.exprs.push(RefEquality(expr));
+        self.exprs.push(expr);
     }
 
+    /// Pop the current [`Expr`] off the stack.
     pub fn pop_expr(&mut self) {
         self.exprs
             .pop()
@@ -345,32 +348,35 @@ impl<'a> Context<'a> {
     }
 
     /// Return the current `Stmt`.
-    pub fn current_stmt(&self) -> &RefEquality<'a, Stmt> {
-        self.parents.iter().rev().next().expect("No parent found")
+    pub fn stmt(&self) -> &'a Stmt {
+        let node_id = self.stmt_id.expect("No current statement");
+        self.stmts[node_id]
     }
 
     /// Return the parent `Stmt` of the current `Stmt`, if any.
-    pub fn current_stmt_parent(&self) -> Option<&RefEquality<'a, Stmt>> {
-        self.parents.iter().rev().nth(1)
+    pub fn stmt_parent(&self) -> Option<&'a Stmt> {
+        let node_id = self.stmt_id.expect("No current statement");
+        let parent_id = self.stmts.parent_id(node_id)?;
+        Some(self.stmts[parent_id])
     }
 
     /// Return the parent `Expr` of the current `Expr`.
-    pub fn current_expr_parent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(1)
+    pub fn expr_parent(&self) -> Option<&'a Expr> {
+        self.exprs.iter().rev().nth(1).copied()
     }
 
     /// Return the grandparent `Expr` of the current `Expr`.
-    pub fn current_expr_grandparent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(2)
+    pub fn expr_grandparent(&self) -> Option<&'a Expr> {
+        self.exprs.iter().rev().nth(2).copied()
     }
 
     /// Return an [`Iterator`] over the current `Expr` parents.
-    pub fn expr_ancestors(&self) -> impl Iterator<Item = &RefEquality<'a, Expr>> {
+    pub fn expr_ancestors(&self) -> impl Iterator<Item = &&Expr> {
         self.exprs.iter().rev().skip(1)
     }
 
     /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
-    pub fn current_sibling_stmt(&self) -> Option<&'a Stmt> {
+    pub fn sibling_stmt(&self) -> Option<&'a Stmt> {
         self.body.get(self.body_index + 1)
     }
 
@@ -399,6 +405,20 @@ impl<'a> Context<'a> {
         self.scopes.ancestors(self.scope_id)
     }
 
+    pub fn parents(&self) -> impl Iterator<Item = &Stmt> + '_ {
+        let node_id = self.stmt_id.expect("No current statement");
+        self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
+    }
+
+    /// Return `true` if the context is at the top level of the module (i.e., in the module scope,
+    /// and not nested within any statements).
+    pub fn at_top_level(&self) -> bool {
+        self.scope_id.is_global()
+            && self
+                .stmt_id
+                .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
+    }
+
     /// Returns `true` if the context is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.in_exception_handler
@@ -423,5 +443,29 @@ impl<'a> Context<'a> {
             exceptions.insert(*exception);
         }
         exceptions
+    }
+
+    /// Generate a [`Snapshot`] of the current context.
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            scope_id: self.scope_id,
+            stmt_id: self.stmt_id,
+            in_annotation: self.in_annotation,
+            in_type_checking_block: self.in_type_checking_block,
+        }
+    }
+
+    /// Restore the context to the given [`Snapshot`].
+    pub fn restore(&mut self, snapshot: Snapshot) {
+        let Snapshot {
+            scope_id,
+            stmt_id,
+            in_annotation,
+            in_type_checking_block,
+        } = snapshot;
+        self.scope_id = scope_id;
+        self.stmt_id = stmt_id;
+        self.in_annotation = in_annotation;
+        self.in_type_checking_block = in_type_checking_block;
     }
 }

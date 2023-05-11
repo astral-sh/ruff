@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -9,8 +9,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct FirstLineCapitalized {
-    pub first_word: String,
-    pub capitalized_word: String,
+    first_word: String,
+    capitalized_word: String,
 }
 
 impl AlwaysAutofixableViolation for FirstLineCapitalized {
@@ -40,27 +40,27 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     }
 
     let body = docstring.body();
-
     let Some(first_word) = body.split(' ').next() else {
         return
     };
-    if first_word == first_word.to_uppercase() {
-        return;
-    }
+
+    // Like pydocstyle, we only support ASCII for now.
     for char in first_word.chars() {
         if !char.is_ascii_alphabetic() && char != '\'' {
             return;
         }
     }
+
     let mut first_word_chars = first_word.chars();
     let Some(first_char) = first_word_chars.next() else {
         return;
     };
-    if first_char.is_uppercase() {
+    let uppercase_first_char = first_char.to_ascii_uppercase();
+    if first_char == uppercase_first_char {
         return;
-    };
+    }
 
-    let capitalized_word = first_char.to_uppercase().to_string() + first_word_chars.as_str();
+    let capitalized_word = uppercase_first_char.to_string() + first_word_chars.as_str();
 
     let mut diagnostic = Diagnostic::new(
         FirstLineCapitalized {
@@ -71,10 +71,11 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             capitalized_word,
             TextRange::at(body.start(), first_word.text_len()),
-        ));
+        )));
     }
 
     checker.diagnostics.push(diagnostic);

@@ -3,13 +3,14 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 #[violation]
 pub struct AbstractBaseClassWithoutAbstractMethod {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
@@ -21,7 +22,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 }
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for EmptyMethodWithoutAbstractDecorator {
@@ -34,22 +35,20 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(checker: &Checker, bases: &[Expr], keywords: &[Keyword]) -> bool {
+fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool {
     keywords.iter().any(|keyword| {
         keyword
             .node
             .arg
             .as_ref()
             .map_or(false, |arg| arg == "metaclass")
-            && checker
-                .ctx
+            && context
                 .resolve_call_path(&keyword.node.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["abc", "ABCMeta"]
                 })
     }) || bases.iter().any(|base| {
-        checker
-            .ctx
+        context
             .resolve_call_path(base)
             .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
@@ -68,6 +67,8 @@ fn is_empty_body(body: &[Stmt]) -> bool {
     })
 }
 
+/// B024
+/// B027
 pub fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
@@ -79,7 +80,7 @@ pub fn abstract_base_class(
     if bases.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(checker, bases, keywords) {
+    if !is_abc_class(&checker.ctx, bases, keywords) {
         return;
     }
 

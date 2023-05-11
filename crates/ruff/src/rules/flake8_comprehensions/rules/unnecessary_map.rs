@@ -40,7 +40,7 @@ use super::helpers;
 ///   `{v: v ** 2 for v in values}`.
 #[violation]
 pub struct UnnecessaryMap {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl Violation for UnnecessaryMap {
@@ -56,13 +56,12 @@ impl Violation for UnnecessaryMap {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|UnnecessaryMap { obj_type }| {
-            if obj_type == "generator" {
-                format!("Replace `map` using a generator expression")
-            } else {
-                format!("Replace `map` using a `{obj_type}` comprehension")
-            }
+    fn autofix_title(&self) -> Option<String> {
+        let UnnecessaryMap { obj_type } = self;
+        Some(if obj_type == "generator" {
+            format!("Replace `map` using a generator expression")
+        } else {
+            format!("Replace `map` using a `{obj_type}` comprehension")
         })
     }
 }
@@ -107,7 +106,8 @@ pub fn unnecessary_map(
             if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda { .. }) {
                 let mut diagnostic = create_diagnostic("generator", expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
+                    #[allow(deprecated)]
+                    diagnostic.try_set_fix_from_edit(|| {
                         fixes::fix_unnecessary_map(
                             checker.locator,
                             checker.stylist,
@@ -136,7 +136,8 @@ pub fn unnecessary_map(
                     if let ExprKind::Lambda { .. } = argument {
                         let mut diagnostic = create_diagnostic(id, expr.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_set_fix(|| {
+                            #[allow(deprecated)]
+                            diagnostic.try_set_fix_from_edit(|| {
                                 fixes::fix_unnecessary_map(
                                     checker.locator,
                                     checker.stylist,
@@ -166,7 +167,8 @@ pub fn unnecessary_map(
                         {
                             let mut diagnostic = create_diagnostic(id, expr.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.try_set_fix(|| {
+                                #[allow(deprecated)]
+                                diagnostic.try_set_fix_from_edit(|| {
                                     fixes::fix_unnecessary_map(
                                         checker.locator,
                                         checker.stylist,

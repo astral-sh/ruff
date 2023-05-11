@@ -12,6 +12,7 @@ D.py:200:5: D205 1 blank line required between summary line and description
 205 | |     """
     | |_______^ D205
     |
+    = help: Insert single blank line
 
 D.py:210:5: D205 [*] 1 blank line required between summary line and description (found 2)
     |

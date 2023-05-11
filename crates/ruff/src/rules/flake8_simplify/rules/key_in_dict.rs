@@ -5,7 +5,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
@@ -15,8 +15,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct InDictKeys {
-    pub key: String,
-    pub dict: String,
+    key: String,
+    dict: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {
@@ -91,7 +91,11 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
         range,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(value_content, right.range()));
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            value_content,
+            right.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

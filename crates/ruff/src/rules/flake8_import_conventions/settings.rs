@@ -1,7 +1,6 @@
 //! Settings for import conventions.
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
@@ -21,14 +20,13 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("pyarrow", "pa"),
 ];
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Flake8ImportConventionsOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,

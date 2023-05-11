@@ -12,7 +12,7 @@ use super::helpers;
 /// Checks for `set` calls that take unnecessary `list` or `tuple` literals
 /// as arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a call to `set`.
 /// Instead, the expression can be rewritten as a set literal.
 ///
@@ -31,7 +31,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralSet {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
@@ -72,7 +72,8 @@ pub fn unnecessary_literal_set(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_literal_set(checker.locator, checker.stylist, expr)
         });
     }

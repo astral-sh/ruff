@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct UnusedAnnotation {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for UnusedAnnotation {

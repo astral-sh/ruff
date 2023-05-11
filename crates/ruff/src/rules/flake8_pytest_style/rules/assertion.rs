@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
     Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, unparse_stmt, Truthiness};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -51,9 +51,7 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something_else
 /// ```
 #[violation]
-pub struct PytestCompositeAssertion {
-    pub fixable: bool,
-}
+pub struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -63,15 +61,14 @@ impl Violation for PytestCompositeAssertion {
         format!("Assertion should be broken down into multiple parts")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Break down assertion into multiple parts"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Break down assertion into multiple parts".to_string())
     }
 }
 
 #[violation]
 pub struct PytestAssertInExcept {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for PytestAssertInExcept {
@@ -96,8 +93,7 @@ impl Violation for PytestAssertAlwaysFalse {
 
 #[violation]
 pub struct PytestUnittestAssertion {
-    pub assertion: String,
-    pub fixable: bool,
+    assertion: String,
 }
 
 impl Violation for PytestUnittestAssertion {
@@ -105,15 +101,13 @@ impl Violation for PytestUnittestAssertion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestUnittestAssertion { assertion, .. } = self;
+        let PytestUnittestAssertion { assertion } = self;
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|PytestUnittestAssertion { assertion, .. }| {
-                format!("Replace `{assertion}(...)` with `assert ...`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let PytestUnittestAssertion { assertion } = self;
+        Some(format!("Replace `{assertion}(...)` with `assert ...`"))
     }
 }
 
@@ -191,22 +185,23 @@ pub fn unittest_assertion(
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = checker.ctx.current_expr_parent().is_none()
-                    && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
+                let fixable = matches!(checker.ctx.stmt().node, StmtKind::Expr { .. })
+                    && checker.ctx.expr_parent().is_none()
+                    && !checker.ctx.scope().kind.is_lambda()
                     && !has_comments_in(expr.range(), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {
                         assertion: unittest_assert.to_string(),
-                        fixable,
                     },
                     func.range(),
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        diagnostic.set_fix(Edit::range_replacement(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_stmt(&stmt, checker.stylist),
                             expr.range(),
-                        ));
+                        )));
                     }
                 }
                 Some(diagnostic)
@@ -424,10 +419,12 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
         let fixable = matches!(composite, CompositionKind::Simple)
             && msg.is_none()
             && !has_comments_in(stmt.range(), checker.locator);
-        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion { fixable }, stmt.range());
+        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            diagnostic
-                .try_set_fix(|| fix_composite_condition(stmt, checker.locator, checker.stylist));
+            #[allow(deprecated)]
+            diagnostic.try_set_fix_from_edit(|| {
+                fix_composite_condition(stmt, checker.locator, checker.stylist)
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

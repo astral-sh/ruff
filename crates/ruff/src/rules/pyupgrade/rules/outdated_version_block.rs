@@ -6,7 +6,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::RefEquality;
@@ -155,18 +155,18 @@ fn fix_py2_block(
     body: &[Stmt],
     orelse: &[Stmt],
     block: &BlockMetadata,
-) -> Option<Edit> {
+) -> Option<Fix> {
     if orelse.is_empty() {
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.ctx.current_stmt();
-        let defined_in = checker.ctx.current_stmt_parent();
+        let defined_by = checker.ctx.stmt();
+        let defined_in = checker.ctx.stmt_parent();
         return match delete_stmt(
-            defined_by.into(),
+            defined_by,
             if block.starter == Tok::If {
-                defined_in.map(Into::into)
+                defined_in
             } else {
                 None
             },
@@ -175,9 +175,10 @@ fn fix_py2_block(
             checker.indexer,
             checker.stylist,
         ) {
-            Ok(fix) => {
-                checker.deletions.insert(RefEquality(defined_by.into()));
-                Some(fix)
+            Ok(edit) => {
+                checker.deletions.insert(RefEquality(defined_by));
+                #[allow(deprecated)]
+                Some(Fix::unspecified(edit))
             }
             Err(err) => {
                 error!("Failed to remove block: {}", err);
@@ -193,13 +194,14 @@ fn fix_py2_block(
 
         if indentation(checker.locator, start).is_none() {
             // Inline `else` block (e.g., `else: x = 1`).
-            Some(Edit::range_replacement(
+            #[allow(deprecated)]
+            Some(Fix::unspecified(Edit::range_replacement(
                 checker
                     .locator
                     .slice(TextRange::new(start.start(), end.end()))
                     .to_string(),
                 stmt.range(),
-            ))
+            )))
         } else {
             indentation(checker.locator, stmt)
                 .and_then(|indentation| {
@@ -212,11 +214,12 @@ fn fix_py2_block(
                     .ok()
                 })
                 .map(|contents| {
-                    Edit::replacement(
+                    #[allow(deprecated)]
+                    Fix::unspecified(Edit::replacement(
                         contents,
                         checker.locator.line_start(stmt.start()),
                         stmt.end(),
-                    )
+                    ))
                 })
         }
     } else {
@@ -233,7 +236,8 @@ fn fix_py2_block(
                 end_location = body.last().unwrap().end();
             }
         }
-        Some(Edit::deletion(stmt.start(), end_location))
+        #[allow(deprecated)]
+        Some(Fix::unspecified(Edit::deletion(stmt.start(), end_location)))
     }
 }
 
@@ -244,7 +248,7 @@ fn fix_py3_block(
     test: &Expr,
     body: &[Stmt],
     block: &BlockMetadata,
-) -> Option<Edit> {
+) -> Option<Fix> {
     match block.starter {
         Tok::If => {
             // If the first statement is an if, use the body of this statement, and ignore
@@ -254,13 +258,14 @@ fn fix_py3_block(
 
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
-                Some(Edit::range_replacement(
+                #[allow(deprecated)]
+                Some(Fix::unspecified(Edit::range_replacement(
                     checker
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
                     stmt.range(),
-                ))
+                )))
             } else {
                 indentation(checker.locator, stmt)
                     .and_then(|indentation| {
@@ -273,11 +278,12 @@ fn fix_py3_block(
                         .ok()
                     })
                     .map(|contents| {
-                        Edit::replacement(
+                        #[allow(deprecated)]
+                        Fix::unspecified(Edit::replacement(
                             contents,
                             checker.locator.line_start(stmt.start()),
                             stmt.end(),
-                        )
+                        ))
                     })
             }
         }
@@ -286,7 +292,11 @@ fn fix_py3_block(
             // the rest.
             let end = body.last().unwrap();
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
-            Some(Edit::range_replacement(format!("else{text}"), stmt.range()))
+            #[allow(deprecated)]
+            Some(Fix::unspecified(Edit::range_replacement(
+                format!("else{text}"),
+                stmt.range(),
+            )))
         }
         _ => None,
     }

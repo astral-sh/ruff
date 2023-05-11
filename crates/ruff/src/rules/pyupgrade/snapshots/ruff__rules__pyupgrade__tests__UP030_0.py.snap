@@ -197,7 +197,7 @@ UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
 24 24 | '{' '0}'.format(1)
 25 25 | 
 
-UP030_0.py:24:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:24:1: UP030 Use implicit references for positional format fields
    |
 24 | "\N{snowman} {0}".format(1)
 25 | 
@@ -208,7 +208,7 @@ UP030_0.py:24:1: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-UP030_0.py:29:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:29:5: UP030 Use implicit references for positional format fields
    |
 29 |   # https://github.com/Instagram/LibCST/issues/846
 30 |   print(
@@ -220,7 +220,7 @@ UP030_0.py:29:5: UP030 [*] Use implicit references for positional format fields
    |
    = help: Remove explicit positional indices
 
-UP030_0.py:34:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:34:5: UP030 Use implicit references for positional format fields
    |
 34 |   print(
 35 |       'foo{0}'  # ohai\n"

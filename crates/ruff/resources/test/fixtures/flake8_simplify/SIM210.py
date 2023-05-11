@@ -6,6 +6,7 @@ a = True if b + c else False  # SIM210
 
 a = False if b else True  # OK
 
+
 def f():
     # OK
     def bool():

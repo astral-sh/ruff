@@ -16,7 +16,8 @@ use ruff_python_semantic::binding::{
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///    import foo
+///     import foo
+///
 ///
 /// def bar() -> None:
 ///     foo.bar()  # raises NameError: name 'foo' is not defined
@@ -26,15 +27,16 @@ use ruff_python_semantic::binding::{
 /// ```python
 /// import foo
 ///
+///
 /// def bar() -> None:
-///    foo.bar()
+///     foo.bar()
 /// ```
 ///
 /// ## References
 /// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
-    pub full_name: String,
+    full_name: String,
 }
 
 impl Violation for RuntimeImportInTypeCheckingBlock {

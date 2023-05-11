@@ -3,7 +3,7 @@ use std::fmt;
 
 use rustpython_parser::ast::{Expr, ExprKind, Operator};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 
@@ -37,7 +37,7 @@ impl CallKind {
 
 #[violation]
 pub struct NonPEP604Isinstance {
-    pub kind: CallKind,
+    kind: CallKind,
 }
 
 impl AlwaysAutofixableViolation for NonPEP604Isinstance {
@@ -93,10 +93,11 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         unparse_expr(&union(elts), checker.stylist),
                         types.range(),
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

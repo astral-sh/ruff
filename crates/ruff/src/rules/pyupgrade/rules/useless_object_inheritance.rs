@@ -11,7 +11,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct UselessObjectInheritance {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for UselessObjectInheritance {
@@ -65,7 +65,8 @@ pub fn useless_object_inheritance(
     if let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) {
         if checker.patch(diagnostic.kind.rule()) {
             let expr_range = diagnostic.range();
-            diagnostic.try_set_fix(|| {
+            #[allow(deprecated)]
+            diagnostic.try_set_fix_from_edit(|| {
                 remove_argument(
                     checker.locator,
                     stmt.start(),

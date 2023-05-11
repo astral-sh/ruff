@@ -24,6 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import logging
 ///
+///
 /// def foo():
 ///     logging.warning("Something happened")
 /// ```

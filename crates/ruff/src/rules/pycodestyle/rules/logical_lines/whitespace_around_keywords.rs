@@ -118,13 +118,13 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
-                        context.push(TabBeforeKeyword, TextRange::empty(start - offset));
+                        context.push(TabBeforeKeyword, TextRange::at(start - offset, offset));
                     }
                     (Whitespace::Many, offset) => {
                         let start = token.start();
                         context.push(
                             MultipleSpacesBeforeKeyword,
-                            TextRange::empty(start - offset),
+                            TextRange::at(start - offset, offset),
                         );
                     }
                     _ => {}
@@ -132,13 +132,11 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
             }
 
             match line.trailing_whitespace(token) {
-                Whitespace::Tab => {
-                    let end = token.end();
-                    context.push(TabAfterKeyword, TextRange::empty(end));
+                (Whitespace::Tab, len) => {
+                    context.push(TabAfterKeyword, TextRange::at(token.end(), len));
                 }
-                Whitespace::Many => {
-                    let end = token.end();
-                    context.push(MultipleSpacesAfterKeyword, TextRange::empty(end));
+                (Whitespace::Many, len) => {
+                    context.push(MultipleSpacesAfterKeyword, TextRange::at(token.end(), len));
                 }
                 _ => {}
             }

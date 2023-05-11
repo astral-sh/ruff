@@ -127,7 +127,6 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         task_tags: None,
         typing_modules: None,
         unfixable: None,
-        update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
         flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
@@ -199,7 +198,6 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &directives,
         &settings,
         flags::Noqa::Enabled,
-        flags::Autofix::Enabled,
     );
 
     let source_code = locator.to_source_code();
@@ -215,14 +213,10 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
                 message: message.kind.body,
                 location: start_location,
                 end_location,
-                fix: if message.fix.is_empty() {
-                    None
-                } else {
-                    Some(ExpandedFix {
-                        message: message.kind.suggestion,
-                        edits: message.fix.into_edits(),
-                    })
-                },
+                fix: message.fix.map(|fix| ExpandedFix {
+                    message: message.kind.suggestion,
+                    edits: fix.into_edits(),
+                }),
             }
         })
         .collect();

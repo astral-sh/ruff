@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Expr, ExprKind, Operator};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::unparse_expr;
@@ -11,7 +11,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct DuplicateUnionMember {
-    pub duplicate_name: String,
+    duplicate_name: String,
 }
 
 impl AlwaysAutofixableViolation for DuplicateUnionMember {
@@ -77,13 +77,14 @@ fn traverse_union<'a>(
             };
 
             // Replace the parent with its non-duplicate child.
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
                     if expr.node == left.node { right } else { left },
                     checker.stylist,
                 ),
                 parent.range(),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

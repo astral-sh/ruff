@@ -55,6 +55,34 @@ G001.py:9:17: G001 Logging statement uses `string.format()`
 10 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
 11 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
+12 | 
+13 | # Flask support
+   |
+
+G001.py:16:31: G001 Logging statement uses `string.format()`
+   |
+16 | from flask import current_app as app
+17 | 
+18 | flask.current_app.logger.info("Hello {}".format("World!"))
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
+19 | current_app.logger.info("Hello {}".format("World!"))
+20 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
+   |
+
+G001.py:17:25: G001 Logging statement uses `string.format()`
+   |
+17 | flask.current_app.logger.info("Hello {}".format("World!"))
+18 | current_app.logger.info("Hello {}".format("World!"))
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
+19 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
+   |
+
+G001.py:18:30: G001 Logging statement uses `string.format()`
+   |
+18 | flask.current_app.logger.info("Hello {}".format("World!"))
+19 | current_app.logger.info("Hello {}".format("World!"))
+20 | app.logger.log(logging.INFO, "Hello {}".format("World!"))
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ G001
    |
 
 

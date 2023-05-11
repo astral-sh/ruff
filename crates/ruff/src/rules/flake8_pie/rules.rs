@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{create_expr, trailing_comment_start_offset, unparse_expr};
@@ -20,6 +20,30 @@ use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for unnecessary `pass` statements in class and function bodies.
+/// where it is not needed syntactically (e.g., when an indented docstring is
+/// present).
+///
+/// ## Why is this bad?
+/// When a function or class definition contains a docstring, an additional
+/// `pass` statement is redundant.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     """Placeholder docstring."""
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     """Placeholder docstring."""
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
 #[violation]
 pub struct UnnecessaryPass;
 
@@ -34,6 +58,27 @@ impl AlwaysAutofixableViolation for UnnecessaryPass {
     }
 }
 
+/// ## What it does
+/// Checks for duplicate field definitions in classes.
+///
+/// ## Why is this bad?
+/// Defining a field multiple times in a class body is redundant and likely a
+/// mistake.
+///
+/// ## Example
+/// ```python
+/// class Person:
+///     name = Tom
+///     ...
+///     name = Ben
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Person:
+///     name = Tom
+///     ...
+/// ```
 #[violation]
 pub struct DuplicateClassFieldDefinition(pub String);
 
@@ -50,9 +95,40 @@ impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
     }
 }
 
+/// ## What it does
+/// Checks for enums that contain duplicate values.
+///
+/// ## Why is this bad?
+/// Enum values should be unique. Non-unique values are redundant and likely a
+/// mistake.
+///
+/// ## Example
+/// ```python
+/// from enum import Enum
+///
+///
+/// class Foo(Enum):
+///     A = 1
+///     B = 2
+///     C = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from enum import Enum
+///
+///
+/// class Foo(Enum):
+///     A = 1
+///     B = 2
+///     C = 3
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/enum.html#enum.Enum)
 #[violation]
 pub struct NonUniqueEnums {
-    pub value: String,
+    value: String,
 }
 
 impl Violation for NonUniqueEnums {
@@ -63,6 +139,27 @@ impl Violation for NonUniqueEnums {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary dictionary unpacking operators (`**`).
+///
+/// ## Why is this bad?
+/// Unpacking a dictionary into another dictionary is redundant. The unpacking
+/// operator can be removed, making the code more readable.
+///
+/// ## Example
+/// ```python
+/// foo = {"A": 1, "B": 2}
+/// bar = {**foo, **{"C": 3}}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = {"A": 1, "B": 2}
+/// bar = {**foo, "C": 3}
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 #[violation]
 pub struct UnnecessarySpread;
 
@@ -73,9 +170,35 @@ impl Violation for UnnecessarySpread {
     }
 }
 
+/// ## What it does
+/// Checks for `startswith` or `endswith` calls on the same value with
+/// different prefixes or suffixes.
+///
+/// ## Why is this bad?
+/// The `startswith` and `endswith` methods accept tuples of prefixes or
+/// suffixes respectively. Passing a tuple of prefixes or suffixes is more
+/// more efficient and readable than calling the method multiple times.
+///
+/// ## Example
+/// ```python
+/// msg = "Hello, world!"
+/// if msg.startswith("Hello") or msg.startswith("Hi"):
+///     print("Greetings!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// msg = "Hello, world!"
+/// if msg.startswith(("Hello", "Hi")):
+///     print("Greetings!")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.startswith)
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.endswith)
 #[violation]
 pub struct MultipleStartsEndsWith {
-    pub attr: String,
+    attr: String,
 }
 
 impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
@@ -91,6 +214,34 @@ impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
     }
 }
 
+/// ## What it does
+/// Checks for unnecessary `dict` kwargs.
+///
+/// ## Why is this bad?
+/// If the `dict` keys are valid identifiers, they can be passed as keyword
+/// arguments directly.
+///
+/// ## Example
+/// ```python
+/// def foo(bar):
+///     return bar + 1
+///
+///
+/// print(foo(**{"bar": 2}))  # prints 3
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar):
+///     return bar + 1
+///
+///
+/// print(foo(bar=2))  # prints 3
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
 #[violation]
 pub struct UnnecessaryDictKwargs;
 
@@ -101,6 +252,34 @@ impl Violation for UnnecessaryDictKwargs {
     }
 }
 
+/// ## What it does
+/// Checks for lambdas that can be replaced with the `list` builtin.
+///
+/// ## Why is this bad?
+/// Using `list` builtin is more readable.
+///
+/// ## Example
+/// ```python
+/// from dataclasses import dataclass, field
+///
+///
+/// @dataclass
+/// class Foo:
+///     bar: list[int] = field(default_factory=lambda: [])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from dataclasses import dataclass, field
+///
+///
+/// @dataclass
+/// class Foo:
+///     bar: list[int] = field(default_factory=list)
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/functions.html#func-list)
 #[violation]
 pub struct ReimplementedListBuiltin;
 
@@ -136,9 +315,13 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
-                        diagnostic.set_fix(Edit::range_deletion(pass_stmt.range().add_end(index)));
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                            pass_stmt.range().add_end(index),
+                        )));
                     } else {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             delete_stmt(
                                 pass_stmt,
                                 None,
@@ -206,7 +389,8 @@ pub fn duplicate_class_field_definition<'a, 'b>(
                 ) {
                     Ok(fix) => {
                         checker.deletions.insert(RefEquality(stmt));
-                        diagnostic.set_fix(fix);
+                        #[allow(deprecated)]
+                        diagnostic.set_fix_from_edit(fix);
                     }
                     Err(err) => {
                         error!("Failed to remove duplicate class definition: {}", err);
@@ -413,11 +597,11 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                         })
                         .collect(),
                 });
-
-                diagnostic.set_fix(Edit::range_replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
                     expr.range(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -439,7 +623,11 @@ pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement("list".to_string(), expr.range()));
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        "list".to_string(),
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -47,7 +47,7 @@ use super::types::ShadowingType;
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[violation]
 pub struct BuiltinVariableShadowing {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for BuiltinVariableShadowing {
@@ -101,7 +101,7 @@ impl Violation for BuiltinVariableShadowing {
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[violation]
 pub struct BuiltinArgumentShadowing {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for BuiltinArgumentShadowing {
@@ -156,7 +156,7 @@ impl Violation for BuiltinArgumentShadowing {
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[violation]
 pub struct BuiltinAttributeShadowing {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for BuiltinAttributeShadowing {

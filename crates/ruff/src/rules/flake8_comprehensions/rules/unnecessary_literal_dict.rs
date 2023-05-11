@@ -11,7 +11,7 @@ use super::helpers;
 /// ## What it does
 /// Checks for unnecessary `list` or `tuple` literals.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a call to `dict`.
 /// It can be rewritten as a dict literal (`{}`).
 ///
@@ -30,7 +30,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralDict {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralDict {
@@ -78,7 +78,8 @@ pub fn unnecessary_literal_dict(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_literal_dict(checker.locator, checker.stylist, expr)
         });
     }

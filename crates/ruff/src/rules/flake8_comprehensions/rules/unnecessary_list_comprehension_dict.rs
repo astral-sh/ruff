@@ -11,7 +11,7 @@ use super::helpers;
 /// ## What it does
 /// Checks for unnecessary list comprehensions.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list comprehension inside a call to `dict`,
 /// since there is an equivalent comprehension for this type.
 ///
@@ -63,7 +63,8 @@ pub fn unnecessary_list_comprehension_dict(
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)
         });
     }

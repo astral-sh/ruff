@@ -1,11 +1,26 @@
 use rustpython_parser::ast::Alias;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for import aliases that do not rename the original package.
+///
+/// ## Why is this bad?
+/// The import alias is redundant and should be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// import numpy as numpy
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import numpy as np
+/// ```
 #[violation]
 pub struct UselessImportAlias;
 
@@ -34,7 +49,11 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(asname.to_string(), alias.range()));
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            asname.to_string(),
+            alias.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -70,3 +70,15 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
         r.0
     }
 }
+
+impl<'a> From<RefEquality<'a, Stmt>> for &'a Stmt {
+    fn from(r: RefEquality<'a, Stmt>) -> Self {
+        r.0
+    }
+}
+
+impl<'a> From<RefEquality<'a, Expr>> for &'a Expr {
+    fn from(r: RefEquality<'a, Expr>) -> Self {
+        r.0
+    }
+}

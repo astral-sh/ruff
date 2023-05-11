@@ -1,5 +1,6 @@
-use crate::registry::{Linter, Rule};
 use std::fmt::Formatter;
+
+use crate::registry::{Linter, Rule};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
@@ -205,12 +206,14 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "W0120") => Rule::UselessElseOnLoop,
         (Pylint, "W0129") => Rule::AssertOnStringLiteral,
+        (Pylint, "W0406") => Rule::ImportSelf,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
         (Pylint, "W0603") => Rule::GlobalStatement,
         (Pylint, "W0711") => Rule::BinaryOpException,
         (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
         (Pylint, "E0302") => Rule::UnexpectedSpecialMethodSignature,
+        (Pylint, "W3301") => Rule::NestedMinMax,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -593,8 +596,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "014") => Rule::ArgumentDefaultInStub,
         (Flake8Pyi, "015") => Rule::AssignmentDefaultInStub,
         (Flake8Pyi, "016") => Rule::DuplicateUnionMember,
+        (Flake8Pyi, "020") => Rule::QuotedAnnotationInStub,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
+        (Flake8Pyi, "042") => Rule::SnakeCaseTypeAlias,
+        (Flake8Pyi, "043") => Rule::TSuffixedTypeAlias,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::PytestFixtureIncorrectParenthesesStyle,
@@ -731,6 +737,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Django, "008") => Rule::DjangoModelWithoutDunderStr,
         (Flake8Django, "012") => Rule::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => Rule::DjangoNonLeadingReceiverDecorator,
+
+        // flynt
+        // Reserved: (Flynt, "001") => Rule::StringConcatenationToFString,
+        (Flynt, "002") => Rule::StaticJoinToFString,
 
         _ => return None,
     })
