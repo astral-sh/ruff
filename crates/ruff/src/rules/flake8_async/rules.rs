@@ -1,9 +1,11 @@
-use rustpython_parser::ast::{Expr, Keyword};
+use rustpython_parser::ast::{Expr, ExprKind};
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::scope::FunctionDef;
+use ruff_python_ast::call_path::collect_call_path;
+
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule};
 
 // TODO: Fix docstrings and improve messages
 
@@ -69,14 +71,18 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
 
 /// ASY101
 // TODO: Implement
-pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, func: &Expr) {
-    let diagnostic = Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, func.range());
-
-    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
-        return;
+pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, expr: &Expr) {
+    if let ExprKind::Call { func, .. } = &expr.node {
+        if let Some(call_path) = collect_call_path(func) {
+                    if call_path.as_slice() == ["sleep"] ||
+                        call_path.as_slice() == ["open"] ||
+                        call_path.as_slice() == ["subprocess.call"]
+                    {
+                        checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, expr.range));
+                    }
+                }
     }
 
-    checker.diagnostics.push(diagnostic);
 }
 
 /// ## What it does
