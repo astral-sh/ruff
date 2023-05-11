@@ -255,6 +255,7 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
     if total_removed == 0 and total_added == 0 and errors == 0:
         print("\u2705 ecosystem check detected no changes.")
     else:
+        rule_changes: dict[str, tuple[int, int]] = {}
         changes = f"(+{total_added}, -{total_removed}, {errors} error(s))"
 
         print(f"\u2139\ufe0f ecosystem check **detected changes**. {changes}")
@@ -294,8 +295,46 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
                 print()
                 print("</p>")
                 print("</details>")
+
+                # Count rule changes
+                for line in diff_str.splitlines():
+                    # Find rule change for current line or construction
+                    # + <rule>/<path>:<line>:<column>: <rule_code> <message>
+                    matches = re.search(r": ([A-Z]{1,3}[0-9]{3,4})", line)
+
+                    if matches is None:
+                        # Handle case where there are no regex matches e.g.
+                        # +                 "?application=AIRFLOW&authenticator=TEST_AUTH&role=TEST_ROLE&warehouse=TEST_WAREHOUSE" # noqa: E501, ERA001
+                        # Which was found in local testing
+                        continue
+
+                    rule_code = matches.group(1)
+
+                    # Get current additions and removals for this rule
+                    current_changes = rule_changes.get(rule_code, (0, 0))
+
+                    # Check if addition or removal depending on the first character
+                    if line[0] == "+":
+                        current_changes = (current_changes[0] + 1, current_changes[1])
+                    elif line[0] == "-":
+                        current_changes = (current_changes[0], current_changes[1] + 1)
+
+                    rule_changes[rule_code] = current_changes
+
             else:
                 continue
+
+        if len(rule_changes.keys()) > 0:
+            print(f"Rules changed: {len(rule_changes.keys())}")
+            print()
+            print("| Rule | Changes | Additions | Removals |")
+            print("| ---- | ------- | --------- | -------- |")
+            for rule, (additions, removals) in sorted(
+                rule_changes.items(),
+                key=lambda x: (x[1][0] + x[1][1]),
+                reverse=True,
+            ):
+                print(f"| {rule} | {additions + removals} | {additions} | {removals} |")
 
     logger.debug(f"Finished {len(repositories)} repositories")
 
