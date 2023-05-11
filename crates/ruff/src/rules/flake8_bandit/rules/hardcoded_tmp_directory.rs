@@ -20,7 +20,7 @@ impl Violation for HardcodedTempFile {
 }
 
 /// S108
-pub fn hardcoded_tmp_directory(
+pub(crate) fn hardcoded_tmp_directory(
     expr: &Expr,
     value: &str,
     prefixes: &[String],

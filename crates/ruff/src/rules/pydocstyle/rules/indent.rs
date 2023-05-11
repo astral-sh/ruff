@@ -6,7 +6,7 @@ use ruff_python_ast::whitespace;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
@@ -48,7 +48,7 @@ impl AlwaysAutofixableViolation for OverIndentation {
 }
 
 /// D206, D207, D208
-pub fn indent(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     // Split the docstring into lines.

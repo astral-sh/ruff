@@ -467,7 +467,11 @@ fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Ve
 }
 
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub fn from_tokens(lxr: &[LexResult], locator: &Locator, settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn from_tokens(
+    lxr: &[LexResult],
+    locator: &Locator,
+    settings: &Settings,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Keep track of sequences of strings, which represent implicit string

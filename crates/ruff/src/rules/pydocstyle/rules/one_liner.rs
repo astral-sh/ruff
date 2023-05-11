@@ -4,7 +4,7 @@ use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 #[violation]
@@ -24,7 +24,7 @@ impl Violation for FitsOnOneLine {
 }
 
 /// D200
-pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     let mut line_count = 0;
     let mut non_empty_line_count = 0;
     for line in NewlineWithTrailingNewline::from(docstring.body().as_str()) {

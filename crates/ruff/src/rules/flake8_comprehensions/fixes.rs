@@ -30,7 +30,7 @@ fn match_arg<'a, 'b>(call: &'a Call<'b>) -> Result<&'a Arg<'b>> {
 }
 
 /// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
-pub fn fix_unnecessary_generator_list(
+pub(crate) fn fix_unnecessary_generator_list(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -72,7 +72,7 @@ pub fn fix_unnecessary_generator_list(
 }
 
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
-pub fn fix_unnecessary_generator_set(
+pub(crate) fn fix_unnecessary_generator_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -116,7 +116,7 @@ pub fn fix_unnecessary_generator_set(
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
     if let Some(parent_element) = parent {
-        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
             content = format!(" {content} ");
         }
     }
@@ -126,7 +126,7 @@ pub fn fix_unnecessary_generator_set(
 
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
 /// range(3)}`.
-pub fn fix_unnecessary_generator_dict(
+pub(crate) fn fix_unnecessary_generator_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -186,7 +186,7 @@ pub fn fix_unnecessary_generator_dict(
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
     if let Some(parent_element) = parent {
-        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
             content = format!(" {content} ");
         }
     }
@@ -195,7 +195,7 @@ pub fn fix_unnecessary_generator_dict(
 }
 
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
-pub fn fix_unnecessary_list_comprehension_set(
+pub(crate) fn fix_unnecessary_list_comprehension_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -237,7 +237,7 @@ pub fn fix_unnecessary_list_comprehension_set(
 
 /// (C404) Convert `dict([(i, i) for i in range(3)])` to `{i: i for i in
 /// range(3)}`.
-pub fn fix_unnecessary_list_comprehension_dict(
+pub(crate) fn fix_unnecessary_list_comprehension_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -331,7 +331,7 @@ fn drop_trailing_comma<'a>(
 }
 
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
-pub fn fix_unnecessary_literal_set(
+pub(crate) fn fix_unnecessary_literal_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -378,7 +378,7 @@ pub fn fix_unnecessary_literal_set(
 }
 
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
-pub fn fix_unnecessary_literal_dict(
+pub(crate) fn fix_unnecessary_literal_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -447,7 +447,7 @@ pub fn fix_unnecessary_literal_dict(
 }
 
 /// (C408)
-pub fn fix_unnecessary_collection_call(
+pub(crate) fn fix_unnecessary_collection_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -559,7 +559,7 @@ pub fn fix_unnecessary_collection_call(
 }
 
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
-pub fn fix_unnecessary_literal_within_tuple_call(
+pub(crate) fn fix_unnecessary_literal_within_tuple_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -614,7 +614,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
 }
 
 /// (C410) Convert `list([1, 2])` to `[1, 2]`
-pub fn fix_unnecessary_literal_within_list_call(
+pub(crate) fn fix_unnecessary_literal_within_list_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -671,7 +671,7 @@ pub fn fix_unnecessary_literal_within_list_call(
 }
 
 /// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
-pub fn fix_unnecessary_list_call(
+pub(crate) fn fix_unnecessary_list_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -698,7 +698,7 @@ pub fn fix_unnecessary_list_call(
 /// (C413) Convert `list(sorted([2, 3, 1]))` to `sorted([2, 3, 1])`.
 /// (C413) Convert `reversed(sorted([2, 3, 1]))` to `sorted([2, 3, 1],
 /// reverse=True)`.
-pub fn fix_unnecessary_call_around_sorted(
+pub(crate) fn fix_unnecessary_call_around_sorted(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -821,7 +821,7 @@ pub fn fix_unnecessary_call_around_sorted(
 }
 
 /// (C414) Convert `sorted(list(foo))` to `sorted(foo)`
-pub fn fix_unnecessary_double_cast_or_process(
+pub(crate) fn fix_unnecessary_double_cast_or_process(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -858,7 +858,7 @@ pub fn fix_unnecessary_double_cast_or_process(
 }
 
 /// (C416) Convert `[i for i in x]` to `list(x)`.
-pub fn fix_unnecessary_comprehension(
+pub(crate) fn fix_unnecessary_comprehension(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -950,7 +950,7 @@ pub fn fix_unnecessary_comprehension(
 }
 
 /// (C417) Convert `map(lambda x: x * 2, bar)` to `(x * 2 for x in bar)`.
-pub fn fix_unnecessary_map(
+pub(crate) fn fix_unnecessary_map(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -1101,9 +1101,7 @@ pub fn fix_unnecessary_map(
         // syntax errors.
         if kind == "set" || kind == "dict" {
             if let Some(parent_element) = parent {
-                if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } =
-                    &parent_element.node
-                {
+                if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
                     content = format!(" {content} ");
                 }
             }
@@ -1116,7 +1114,7 @@ pub fn fix_unnecessary_map(
 }
 
 /// (C418) Convert `dict({"a": 1})` to `{"a": 1}`
-pub fn fix_unnecessary_literal_within_dict_call(
+pub(crate) fn fix_unnecessary_literal_within_dict_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
@@ -1140,7 +1138,7 @@ pub fn fix_unnecessary_literal_within_dict_call(
 }
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`
-pub fn fix_unnecessary_comprehension_any_all(
+pub(crate) fn fix_unnecessary_comprehension_any_all(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,

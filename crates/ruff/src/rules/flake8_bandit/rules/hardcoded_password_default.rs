@@ -36,7 +36,7 @@ fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
 }
 
 /// S107
-pub fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
+pub(crate) fn hardcoded_password_default(arguments: &Arguments) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     let defaults_start =

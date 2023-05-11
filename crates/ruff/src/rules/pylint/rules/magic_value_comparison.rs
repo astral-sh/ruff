@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -26,12 +26,12 @@ impl Violation for MagicValueComparison {
 /// If an [`Expr`] is a constant (or unary operation on a constant), return the [`Constant`].
 fn as_constant(expr: &Expr) -> Option<&Constant> {
     match &expr.node {
-        ExprKind::Constant { value, .. } => Some(value),
-        ExprKind::UnaryOp {
+        ExprKind::Constant(ast::ExprConstant { value, .. }) => Some(value),
+        ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
             operand,
-        } => match &operand.node {
-            ExprKind::Constant { value, .. } => Some(value),
+        }) => match &operand.node {
+            ExprKind::Constant(ast::ExprConstant { value, .. }) => Some(value),
             _ => None,
         },
         _ => None,
@@ -61,7 +61,7 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
 }
 
 /// PLR2004
-pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
+pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &[Expr]) {
     for (left, right) in std::iter::once(left)
         .chain(comparators.iter())
         .tuple_windows()

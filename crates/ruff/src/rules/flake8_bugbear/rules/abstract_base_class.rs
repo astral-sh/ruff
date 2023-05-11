@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,8 +57,8 @@ fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match &stmt.node {
         StmtKind::Pass => true,
-        StmtKind::Expr { value } => match &value.node {
-            ExprKind::Constant { value, .. } => {
+        StmtKind::Expr(ast::StmtExpr { value }) => match &value.node {
+            ExprKind::Constant(ast::ExprConstant { value, .. }) => {
                 matches!(value, Constant::Str(..) | Constant::Ellipsis)
             }
             _ => false,
@@ -69,7 +69,7 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 
 /// B024
 /// B027
-pub fn abstract_base_class(
+pub(crate) fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
@@ -88,23 +88,23 @@ pub fn abstract_base_class(
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
         // Ignore abc's that declares a class attribute that must be set
-        if let StmtKind::AnnAssign { .. } | StmtKind::Assign { .. } = &stmt.node {
+        if let StmtKind::AnnAssign(_) | StmtKind::Assign(_) = &stmt.node {
             has_abstract_method = true;
             continue;
         }
 
         let (
-            StmtKind::FunctionDef {
+            StmtKind::FunctionDef(ast::StmtFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
-            } | StmtKind::AsyncFunctionDef {
+            }) | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
-            }
+            })
         ) = &stmt.node else {
             continue;
         };

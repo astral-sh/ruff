@@ -17,7 +17,7 @@ impl Violation for TryExceptPass {
 }
 
 /// S110
-pub fn try_except_pass(
+pub(crate) fn try_except_pass(
     checker: &mut Checker,
     excepthandler: &Excepthandler,
     type_: Option<&Expr>,

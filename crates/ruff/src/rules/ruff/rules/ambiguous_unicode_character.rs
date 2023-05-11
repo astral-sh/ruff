@@ -93,7 +93,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
     }
 }
 
-pub fn ambiguous_unicode_character(
+pub(crate) fn ambiguous_unicode_character(
     locator: &Locator,
     range: TextRange,
     context: Context,

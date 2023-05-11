@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Cmpop, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop};
+use rustpython_parser::ast::{self, Cmpop, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -65,24 +65,29 @@ impl AlwaysAutofixableViolation for DoubleNegation {
 const DUNDER_METHODS: &[&str] = &["__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"];
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let StmtKind::If {test: _, body, orelse: _} = &stmt.node else {
+    let StmtKind::If(ast::StmtIf {test: _, body, orelse: _ })= &stmt.node else {
         return false;
     };
     if body.len() != 1 {
         return false;
     }
-    if matches!(body[0].node, StmtKind::Raise { .. }) {
+    if matches!(body[0].node, StmtKind::Raise(_)) {
         return true;
     }
     false
 }
 
 /// SIM201
-pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub(crate) fn negation_with_equal_op(
+    checker: &mut Checker,
+    expr: &Expr,
+    op: &Unaryop,
+    operand: &Expr,
+) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::Compare{ left, ops, comparators} = &operand.node else {
+    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators}) = &operand.node else {
         return;
     };
     if !matches!(&ops[..], [Cmpop::Eq]) {
@@ -110,7 +115,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::Compare {
+                &create_expr(ast::ExprCompare {
                     left: left.clone(),
                     ops: vec![Cmpop::NotEq],
                     comparators: comparators.clone(),
@@ -124,7 +129,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
 }
 
 /// SIM202
-pub fn negation_with_not_equal_op(
+pub(crate) fn negation_with_not_equal_op(
     checker: &mut Checker,
     expr: &Expr,
     op: &Unaryop,
@@ -133,7 +138,7 @@ pub fn negation_with_not_equal_op(
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::Compare{ left, ops, comparators} = &operand.node else {
+    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators}) = &operand.node else {
         return;
     };
     if !matches!(&ops[..], [Cmpop::NotEq]) {
@@ -161,7 +166,7 @@ pub fn negation_with_not_equal_op(
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::Compare {
+                &create_expr(ast::ExprCompare {
                     left: left.clone(),
                     ops: vec![Cmpop::Eq],
                     comparators: comparators.clone(),
@@ -175,11 +180,11 @@ pub fn negation_with_not_equal_op(
 }
 
 /// SIM208
-pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::UnaryOp { op: operand_op, operand } = &operand.node else {
+    let ExprKind::UnaryOp(ast::ExprUnaryOp { op: operand_op, operand }) = &operand.node else {
         return;
     };
     if !matches!(operand_op, Unaryop::Not) {
@@ -203,9 +208,9 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
-                    &create_expr(ExprKind::Call {
-                        func: Box::new(create_expr(ExprKind::Name {
-                            id: "bool".to_string(),
+                    &create_expr(ast::ExprCall {
+                        func: Box::new(create_expr(ast::ExprName {
+                            id: "bool".into(),
                             ctx: ExprContext::Load,
                         })),
                         args: vec![*operand.clone()],

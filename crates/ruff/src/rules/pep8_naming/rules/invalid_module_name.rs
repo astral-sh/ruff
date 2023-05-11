@@ -45,7 +45,7 @@ impl Violation for InvalidModuleName {
 }
 
 /// N999
-pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
+pub(crate) fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
     if !path
         .extension()
         .map_or(false, |ext| ext == "py" || ext == "pyi")

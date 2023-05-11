@@ -31,7 +31,7 @@ fn num_returns(body: &[Stmt]) -> usize {
 }
 
 /// PLR0911
-pub fn too_many_return_statements(
+pub(crate) fn too_many_return_statements(
     stmt: &Stmt,
     body: &[Stmt],
     max_returns: usize,

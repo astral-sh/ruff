@@ -18,7 +18,7 @@ impl Violation for ImportSelf {
 }
 
 /// PLW0406
-pub fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
+pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
     let Some(module_path) = module_path else {
         return None;
     };
@@ -26,7 +26,7 @@ pub fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diag
     if alias.node.name.split('.').eq(module_path) {
         return Some(Diagnostic::new(
             ImportSelf {
-                name: alias.node.name.clone(),
+                name: alias.node.name.to_string(),
             },
             alias.range(),
         ));
@@ -36,8 +36,8 @@ pub fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diag
 }
 
 /// PLW0406
-pub fn import_from_self(
-    level: Option<usize>,
+pub(crate) fn import_from_self(
+    level: Option<u32>,
     module: Option<&str>,
     names: &[Alias],
     module_path: Option<&[String]>,

@@ -14,7 +14,7 @@ use crate::settings::Settings;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
 
-pub fn check_tokens(
+pub(crate) fn check_tokens(
     locator: &Locator,
     tokens: &[LexResult],
     settings: &Settings,

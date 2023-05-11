@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -184,14 +184,14 @@ impl Violation for DotFormatInException {
 /// 2. Replace the exception argument with the variable name.
 fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &str) -> Fix {
     let assignment = unparse_stmt(
-        &create_stmt(StmtKind::Assign {
-            targets: vec![create_expr(ExprKind::Name {
-                id: String::from("msg"),
+        &create_stmt(StmtKind::Assign(ast::StmtAssign {
+            targets: vec![create_expr(ExprKind::Name(ast::ExprName {
+                id: "msg".into(),
                 ctx: ExprContext::Store,
-            })],
+            }))],
             value: Box::new(exc_arg.clone()),
             type_comment: None,
-        }),
+        })),
         stylist,
     );
     #[allow(deprecated)]
@@ -213,15 +213,15 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
 }
 
 /// EM101, EM102, EM103
-pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
-    if let ExprKind::Call { args, .. } = &exc.node {
+pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
+    if let ExprKind::Call(ast::ExprCall { args, .. }) = &exc.node {
         if let Some(first) = args.first() {
             match &first.node {
                 // Check for string literals
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Str(string),
                     ..
-                } => {
+                }) => {
                     if checker.settings.rules.enabled(Rule::RawStringInException) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
                             let indentation = whitespace::indentation(checker.locator, stmt)
@@ -249,7 +249,7 @@ pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
                     }
                 }
                 // Check for f-strings
-                ExprKind::JoinedStr { .. } => {
+                ExprKind::JoinedStr(_) => {
                     if checker.settings.rules.enabled(Rule::FStringInException) {
                         let indentation = whitespace::indentation(checker.locator, stmt).and_then(
                             |indentation| {
@@ -275,10 +275,12 @@ pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
                     }
                 }
                 // Check for .format() calls
-                ExprKind::Call { func, .. } => {
+                ExprKind::Call(ast::ExprCall { func, .. }) => {
                     if checker.settings.rules.enabled(Rule::DotFormatInException) {
-                        if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                            if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
+                        if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) =
+                            &func.node
+                        {
+                            if attr == "format" && matches!(value.node, ExprKind::Constant(_)) {
                                 let indentation = whitespace::indentation(checker.locator, stmt)
                                     .and_then(|indentation| {
                                         if checker.ctx.find_binding("msg").is_none() {

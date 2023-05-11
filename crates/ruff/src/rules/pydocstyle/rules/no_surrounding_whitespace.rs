@@ -4,7 +4,7 @@ use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
@@ -25,7 +25,7 @@ impl Violation for SurroundingWhitespace {
 }
 
 /// D210
-pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines = NewlineWithTrailingNewline::from(body.as_str());

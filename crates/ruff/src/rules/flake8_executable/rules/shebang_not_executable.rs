@@ -23,7 +23,7 @@ impl Violation for ShebangNotExecutable {
 
 /// EXE001
 #[cfg(target_family = "unix")]
-pub fn shebang_not_executable(
+pub(crate) fn shebang_not_executable(
     filepath: &Path,
     range: TextRange,
     shebang: &ShebangDirective,
@@ -41,7 +41,7 @@ pub fn shebang_not_executable(
 }
 
 #[cfg(not(target_family = "unix"))]
-pub fn shebang_not_executable(
+pub(crate) fn shebang_not_executable(
     _filepath: &Path,
     _range: TextRange,
     _shebang: &ShebangDirective,

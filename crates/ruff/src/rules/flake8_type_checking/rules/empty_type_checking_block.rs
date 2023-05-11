@@ -48,7 +48,7 @@ impl AlwaysAutofixableViolation for EmptyTypeCheckingBlock {
 }
 
 /// TCH005
-pub fn empty_type_checking_block<'a, 'b>(
+pub(crate) fn empty_type_checking_block<'a, 'b>(
     checker: &mut Checker<'a>,
     stmt: &'a Stmt,
     body: &'a [Stmt],

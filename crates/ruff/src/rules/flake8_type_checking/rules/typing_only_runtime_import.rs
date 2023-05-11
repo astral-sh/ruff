@@ -240,7 +240,7 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// TCH001
-pub fn typing_only_runtime_import(
+pub(crate) fn typing_only_runtime_import(
     binding: &Binding,
     runtime_imports: &[&Binding],
     package: Option<&Path>,
@@ -283,7 +283,12 @@ pub fn typing_only_runtime_import(
         // Extract the module base and level from the full name.
         // Ex) `foo.bar.baz` -> `foo`, `0`
         // Ex) `.foo.bar.baz` -> `foo`, `1`
-        let level = full_name.chars().take_while(|c| *c == '.').count();
+        let level = full_name
+            .chars()
+            .take_while(|c| *c == '.')
+            .count()
+            .try_into()
+            .unwrap();
 
         // Categorize the import.
         match categorize(

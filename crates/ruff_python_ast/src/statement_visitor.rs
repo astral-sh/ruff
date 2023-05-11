@@ -1,6 +1,6 @@
 //! Specialized AST visitor trait and walk functions that only visit statements.
 
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
 
 /// A trait for AST visitors that only need to visit statements.
 pub trait StatementVisitor<'a> {
@@ -26,48 +26,48 @@ pub fn walk_body<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, body: &'
 
 pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     match &stmt.node {
-        StmtKind::FunctionDef { body, .. } => {
+        StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
             visitor.visit_body(body);
         }
-        StmtKind::AsyncFunctionDef { body, .. } => {
+        StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
             visitor.visit_body(body);
         }
-        StmtKind::For { body, orelse, .. } => {
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
-        }
-        StmtKind::ClassDef { body, .. } => {
-            visitor.visit_body(body);
-        }
-        StmtKind::AsyncFor { body, orelse, .. } => {
+        StmtKind::For(ast::StmtFor { body, orelse, .. }) => {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        StmtKind::While { body, orelse, .. } => {
+        StmtKind::ClassDef(ast::StmtClassDef { body, .. }) => {
+            visitor.visit_body(body);
+        }
+        StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        StmtKind::If { body, orelse, .. } => {
+        StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        StmtKind::With { body, .. } => {
+        StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+            visitor.visit_body(body);
+            visitor.visit_body(orelse);
+        }
+        StmtKind::With(ast::StmtWith { body, .. }) => {
             visitor.visit_body(body);
         }
-        StmtKind::AsyncWith { body, .. } => {
+        StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
             visitor.visit_body(body);
         }
-        StmtKind::Match { cases, .. } => {
+        StmtKind::Match(ast::StmtMatch { cases, .. }) => {
             for match_case in cases {
                 visitor.visit_match_case(match_case);
             }
         }
-        StmtKind::Try {
+        StmtKind::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
-        } => {
+        }) => {
             visitor.visit_body(body);
             for excepthandler in handlers {
                 visitor.visit_excepthandler(excepthandler);
@@ -75,12 +75,12 @@ pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);
         }
-        StmtKind::TryStar {
+        StmtKind::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
-        } => {
+        }) => {
             visitor.visit_body(body);
             for excepthandler in handlers {
                 visitor.visit_excepthandler(excepthandler);
@@ -97,7 +97,7 @@ pub fn walk_excepthandler<'a, V: StatementVisitor<'a> + ?Sized>(
     excepthandler: &'a Excepthandler,
 ) {
     match &excepthandler.node {
-        ExcepthandlerKind::ExceptHandler { body, .. } => {
+        ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) => {
             visitor.visit_body(body);
         }
     }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,8 +27,7 @@ impl AlwaysAutofixableViolation for StaticJoinToFString {
 }
 
 fn is_static_length(elts: &[Expr]) -> bool {
-    elts.iter()
-        .all(|e| !matches!(e.node, ExprKind::Starred { .. }))
+    elts.iter().all(|e| !matches!(e.node, ExprKind::Starred(_)))
 }
 
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
@@ -36,7 +35,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let mut first = true;
 
     for expr in joinees {
-        if matches!(expr.node, ExprKind::JoinedStr { .. }) {
+        if matches!(expr.node, ExprKind::JoinedStr(_)) {
             // Oops, already an f-string. We don't know how to handle those
             // gracefully right now.
             return None;
@@ -47,17 +46,17 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         fstring_elems.push(helpers::to_fstring_elem(expr)?);
     }
 
-    Some(create_expr(ExprKind::JoinedStr {
+    Some(create_expr(ast::ExprJoinedStr {
         values: fstring_elems,
     }))
 }
 
-pub fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
-    let ExprKind::Call {
+pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
+    let ExprKind::Call(ast::ExprCall {
         args,
         keywords,
         ..
-    } = &expr.node else {
+    })= &expr.node else {
         return;
     };
 
@@ -69,8 +68,8 @@ pub fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) 
 
     // Get the elements to join; skip (e.g.) generators, sets, etc.
     let joinees = match &args[0].node {
-        ExprKind::List { elts, .. } if is_static_length(elts) => elts,
-        ExprKind::Tuple { elts, .. } if is_static_length(elts) => elts,
+        ExprKind::List(ast::ExprList { elts, .. }) if is_static_length(elts) => elts,
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) if is_static_length(elts) => elts,
         _ => return,
     };
 

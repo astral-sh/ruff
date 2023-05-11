@@ -3,7 +3,7 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Stmt, StmtKind, Suite};
+use rustpython_parser::ast::{self, Stmt, StmtKind, Suite};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -79,13 +79,13 @@ impl<'a> Importer<'a> {
             if stmt.start() >= at {
                 break;
             }
-            if let StmtKind::ImportFrom {
+            if let StmtKind::ImportFrom(ast::StmtImportFrom {
                 module: name,
                 level,
                 ..
-            } = &stmt.node
+            }) = &stmt.node
             {
-                if level.map_or(true, |level| level == 0)
+                if level.map_or(true, |level| level.to_u32() == 0)
                     && name.as_ref().map_or(false, |name| name == module)
                 {
                     import_from = Some(*stmt);
@@ -178,7 +178,8 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 /// along with a trailing newline suffix.
 fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Insertion {
     let location = stmt.end();
-    let mut tokens = lexer::lex_located(locator.after(location), Mode::Module, location).flatten();
+    let mut tokens =
+        lexer::lex_starts_at(locator.after(location), Mode::Module, location).flatten();
     if let Some((Tok::Semi, range)) = tokens.next() {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
@@ -211,7 +212,7 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
     let mut location = if let Some(location) = match_docstring_end(body) {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
-        let first_token = lexer::lex_located(locator.after(location), Mode::Module, location)
+        let first_token = lexer::lex_starts_at(locator.after(location), Mode::Module, location)
             .flatten()
             .next();
         if let Some((Tok::Semi, range)) = first_token {
@@ -226,7 +227,7 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
 
     // Skip over any comments and empty lines.
     for (tok, range) in
-        lexer::lex_located(locator.after(location), Mode::Module, location).flatten()
+        lexer::lex_starts_at(locator.after(location), Mode::Module, location).flatten()
     {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             location = locator.full_line_end(range.end());

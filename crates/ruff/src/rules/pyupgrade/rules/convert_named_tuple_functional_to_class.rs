@@ -1,6 +1,8 @@
 use anyhow::{bail, Result};
 use log::debug;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{
+    self, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,14 +41,14 @@ fn match_named_tuple_assign<'a>(
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
-    let ExprKind::Name { id: typename, .. } = &target.node else {
+    let ExprKind::Name(ast::ExprName { id: typename, .. }) = &target.node else {
         return None;
     };
-    let ExprKind::Call {
+    let ExprKind::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    } = &value.node else {
+    }) = &value.node else {
         return None;
     };
     if !checker
@@ -68,14 +70,14 @@ fn create_property_assignment_stmt(
     annotation: &Expr,
     value: Option<&Expr>,
 ) -> Stmt {
-    create_stmt(StmtKind::AnnAssign {
-        target: Box::new(create_expr(ExprKind::Name {
-            id: property.to_string(),
+    create_stmt(ast::StmtAnnAssign {
+        target: Box::new(create_expr(ast::ExprName {
+            id: property.into(),
             ctx: ExprContext::Load,
         })),
         annotation: Box::new(annotation.clone()),
         value: value.map(|value| Box::new(value.clone())),
-        simple: 1,
+        simple: true,
     })
 }
 
@@ -83,15 +85,15 @@ fn create_property_assignment_stmt(
 fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
     let defaults = keywords.iter().find(|keyword| {
         if let Some(arg) = &keyword.node.arg {
-            arg.as_str() == "defaults"
+            arg == "defaults"
         } else {
             false
         }
     });
     match defaults {
         Some(defaults) => match &defaults.node.value.node {
-            ExprKind::List { elts, .. } => Ok(elts),
-            ExprKind::Tuple { elts, .. } => Ok(elts),
+            ExprKind::List(ast::ExprList { elts, .. }) => Ok(elts),
+            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => Ok(elts),
             _ => bail!("Expected defaults to be `ExprKind::List` | `ExprKind::Tuple`"),
         },
         None => Ok(&[]),
@@ -103,7 +105,7 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
     let Some(fields) = args.get(1) else {
         return Ok(vec![create_stmt(StmtKind::Pass)]);
     };
-    let ExprKind::List { elts, .. } = &fields.node else {
+    let ExprKind::List(ast::ExprList { elts, .. } )= &fields.node else {
         bail!("Expected argument to be `ExprKind::List`");
     };
     if elts.is_empty() {
@@ -119,16 +121,16 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
     elts.iter()
         .zip(padded_defaults)
         .map(|(field, default)| {
-            let ExprKind::Tuple { elts, .. } = &field.node else {
+            let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &field.node else {
                 bail!("Expected `field` to be `ExprKind::Tuple`")
             };
             let [field_name, annotation] = elts.as_slice() else {
                 bail!("Expected `elts` to have exactly two elements")
             };
-            let ExprKind::Constant {
+            let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(property),
                 ..
-            } = &field_name.node else {
+            }) = &field_name.node else {
                 bail!("Expected `field_name` to be `Constant::Str`")
             };
             if !is_identifier(property) {
@@ -144,8 +146,8 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
-    create_stmt(StmtKind::ClassDef {
-        name: typename.to_string(),
+    create_stmt(ast::StmtClassDef {
+        name: typename.into(),
         bases: vec![base_class.clone()],
         keywords: vec![],
         body,
@@ -169,7 +171,7 @@ fn convert_to_class(
 }
 
 /// UP014
-pub fn convert_named_tuple_functional_to_class(
+pub(crate) fn convert_named_tuple_functional_to_class(
     checker: &mut Checker,
     stmt: &Stmt,
     targets: &[Expr],

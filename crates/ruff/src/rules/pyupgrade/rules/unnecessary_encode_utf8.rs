@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Reason {
+pub(crate) enum Reason {
     BytesLiteral,
     DefaultArgument,
 }
@@ -38,11 +38,11 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
 fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
-    let ExprKind::Attribute {
+    let ExprKind::Attribute(ast::ExprAttribute {
         value: variable,
         attr,
         ..
-    } = &func.node else {
+    }) = &func.node else {
         return None;
     };
     if attr != "encode" {
@@ -52,10 +52,10 @@ fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
 }
 
 fn is_utf8_encoding_arg(arg: &Expr) -> bool {
-    if let ExprKind::Constant {
+    if let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } = &arg.node
+    }) = &arg.node
     {
         UTF8_LITERALS.contains(&value.to_lowercase().as_str())
     } else {
@@ -112,7 +112,7 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
     let contents = locator.slice(expr.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
     let mut prev = expr.start();
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, expr.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, expr.start()).flatten() {
         match tok {
             Tok::Dot => break,
             Tok::String { .. } => {
@@ -134,7 +134,7 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
 }
 
 /// UP012
-pub fn unnecessary_encode_utf8(
+pub(crate) fn unnecessary_encode_utf8(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -145,10 +145,10 @@ pub fn unnecessary_encode_utf8(
         return;
     };
     match &variable.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(literal),
             ..
-        } => {
+        }) => {
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
             if let Some(encoding_arg) = match_encoding_arg(args, kwargs) {
                 if literal.is_ascii() {
@@ -212,7 +212,7 @@ pub fn unnecessary_encode_utf8(
             }
         }
         // Ex) `f"foo{bar}".encode("utf-8")`
-        ExprKind::JoinedStr { .. } => {
+        ExprKind::JoinedStr(_) => {
             if let Some(encoding_arg) = match_encoding_arg(args, kwargs) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to

@@ -47,7 +47,7 @@ impl Violation for ReraiseNoCause {
 }
 
 /// TRY200
-pub fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
         visitor.visit_body(body);
@@ -55,7 +55,9 @@ pub fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     };
 
     for (range, exc, cause) in raises {
-        if exc.map_or(false, |expr| matches!(expr.node, ExprKind::Call { .. })) && cause.is_none() {
+        if exc.map_or(false, |expr| {
+            matches!(expr.node, ExprKind::Call(_)) && cause.is_none()
+        }) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(ReraiseNoCause, range));

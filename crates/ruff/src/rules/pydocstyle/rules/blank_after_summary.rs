@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 #[violation]
@@ -32,7 +32,7 @@ impl Violation for BlankLineAfterSummary {
 }
 
 /// D205
-pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines_count: usize = 1;

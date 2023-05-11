@@ -64,15 +64,15 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt.node {
-            StmtKind::Raise { .. } => self.raises.push(stmt),
-            StmtKind::Try { .. } | StmtKind::TryStar { .. } => (),
+            StmtKind::Raise(_) => self.raises.push(stmt),
+            StmtKind::Try(_) | StmtKind::TryStar(_) => (),
             _ => walk_stmt(self, stmt),
         }
     }
 }
 
 /// TRY301
-pub fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[Excepthandler]) {
+pub(crate) fn raise_within_try(checker: &mut Checker, body: &[Stmt], handlers: &[Excepthandler]) {
     if handlers.is_empty() {
         return;
     }

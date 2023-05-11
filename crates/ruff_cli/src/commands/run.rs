@@ -25,7 +25,7 @@ use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
-pub fn run(
+pub(crate) fn run(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,

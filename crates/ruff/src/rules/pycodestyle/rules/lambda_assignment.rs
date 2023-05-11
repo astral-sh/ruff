@@ -6,8 +6,8 @@ use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::whitespace::leading_space;
 use ruff_python_semantic::context::Context;
 use ruff_python_semantic::scope::ScopeKind;
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Arg, ArgData, Arguments, Constant, Expr, ExprKind, Stmt, StmtKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Arg, ArgData, Arguments, Constant, Expr, ExprKind, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -56,15 +56,15 @@ impl Violation for LambdaAssignment {
 }
 
 /// E731
-pub fn lambda_assignment(
+pub(crate) fn lambda_assignment(
     checker: &mut Checker,
     target: &Expr,
     value: &Expr,
     annotation: Option<&Expr>,
     stmt: &Stmt,
 ) {
-    if let ExprKind::Name { id, .. } = &target.node {
-        if let ExprKind::Lambda { args, body } = &value.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+        if let ExprKind::Lambda(ast::ExprLambda { args, body }) = &value.node {
             // If the assignment is in a class body, it might not be safe
             // to replace it because the assignment might be
             // carrying a type annotation that will be used by some
@@ -118,10 +118,10 @@ pub fn lambda_assignment(
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
 fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
-    let ExprKind::Subscript { value, slice, .. } = &annotation.node else {
+    let ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation.node else {
         return None;
     };
-    let ExprKind::Tuple { elts, .. } = &slice.node else {
+    let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &slice.node else {
         return None;
     };
     if elts.len() != 2 {
@@ -138,11 +138,11 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
     // The first argument to `Callable` must be a list of types, parameter
     // specification, or ellipsis.
     let args = match &elts[0].node {
-        ExprKind::List { elts, .. } => elts.clone(),
-        ExprKind::Constant {
+        ExprKind::List(ast::ExprList { elts, .. }) => elts.clone(),
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Ellipsis,
             ..
-        } => vec![],
+        }) => vec![],
         _ => return None,
     };
 
@@ -161,9 +161,8 @@ fn function(
     stylist: &Stylist,
 ) -> String {
     let body = Stmt::new(
-        TextSize::default(),
-        TextSize::default(),
-        StmtKind::Return {
+        TextRange::default(),
+        ast::StmtReturn {
             value: Some(Box::new(body.clone())),
         },
     );
@@ -176,14 +175,14 @@ fn function(
                 .iter()
                 .enumerate()
                 .map(|(idx, arg)| {
-                    Arg::with_range(
+                    Arg::new(
+                        TextRange::default(),
                         ArgData {
                             annotation: arg_types
                                 .get(idx)
                                 .map(|arg_type| Box::new(arg_type.clone())),
                             ..arg.node.clone()
                         },
-                        TextRange::default(),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -192,20 +191,21 @@ fn function(
                 .iter()
                 .enumerate()
                 .map(|(idx, arg)| {
-                    Arg::with_range(
+                    Arg::new(
+                        TextRange::default(),
                         ArgData {
                             annotation: arg_types
                                 .get(idx + new_posonlyargs.len())
                                 .map(|arg_type| Box::new(arg_type.clone())),
                             ..arg.node.clone()
                         },
-                        TextRange::default(),
                     )
                 })
                 .collect::<Vec<_>>();
-            let func = Stmt::with_range(
-                StmtKind::FunctionDef {
-                    name: name.to_string(),
+            let func = Stmt::new(
+                TextRange::default(),
+                ast::StmtFunctionDef {
+                    name: name.into(),
                     args: Box::new(Arguments {
                         posonlyargs: new_posonlyargs,
                         args: new_args,
@@ -216,16 +216,14 @@ fn function(
                     returns: Some(Box::new(return_type)),
                     type_comment: None,
                 },
-                TextRange::default(),
             );
             return unparse_stmt(&func, stylist);
         }
     }
     let func = Stmt::new(
-        TextSize::default(),
-        TextSize::default(),
-        StmtKind::FunctionDef {
-            name: name.to_string(),
+        TextRange::default(),
+        ast::StmtFunctionDef {
+            name: name.into(),
             args: Box::new(args.clone()),
             body: vec![body],
             decorator_list: vec![],

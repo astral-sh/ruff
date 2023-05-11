@@ -4,7 +4,7 @@
 use std::iter::FusedIterator;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
+use rustpython_parser::ast::{self, Constant, ExprKind, Stmt, StmtKind, Suite};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -13,11 +13,14 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub fn doc_lines_from_tokens<'a>(lxr: &'a [LexResult], locator: &'a Locator<'a>) -> DocLines<'a> {
+pub(crate) fn doc_lines_from_tokens<'a>(
+    lxr: &'a [LexResult],
+    locator: &'a Locator<'a>,
+) -> DocLines<'a> {
     DocLines::new(lxr, locator)
 }
 
-pub struct DocLines<'a> {
+pub(crate) struct DocLines<'a> {
     inner: std::iter::Flatten<core::slice::Iter<'a, LexResult>>,
     locator: &'a Locator<'a>,
     prev: TextSize,
@@ -76,11 +79,11 @@ struct StringLinesVisitor<'a> {
 
 impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let StmtKind::Expr { value } = &stmt.node {
-            if let ExprKind::Constant {
+        if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(..),
                 ..
-            } = &value.node
+            }) = &value.node
             {
                 for line in UniversalNewlineIterator::with_offset(
                     self.locator.slice(value.range()),
@@ -104,7 +107,7 @@ impl<'a> StringLinesVisitor<'a> {
 }
 
 /// Extract doc lines (standalone strings) start positions from an AST.
-pub fn doc_lines_from_ast(python_ast: &Suite, locator: &Locator) -> Vec<TextSize> {
+pub(crate) fn doc_lines_from_ast(python_ast: &Suite, locator: &Locator) -> Vec<TextSize> {
     let mut visitor = StringLinesVisitor::new(locator);
     visitor.visit_body(python_ast);
     visitor.string_lines

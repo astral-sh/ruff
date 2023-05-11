@@ -13,7 +13,7 @@ static COMMA_SEPARATED_LIST_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").
 
 /// Parse a comma-separated list of `RuleSelector` values (e.g.,
 /// "F401,E501").
-pub fn parse_prefix_codes(value: &str) -> Vec<RuleSelector> {
+pub(crate) fn parse_prefix_codes(value: &str) -> Vec<RuleSelector> {
     let mut codes: Vec<RuleSelector> = vec![];
     for code in COMMA_SEPARATED_LIST_RE.split(value) {
         let code = code.trim();
@@ -30,7 +30,7 @@ pub fn parse_prefix_codes(value: &str) -> Vec<RuleSelector> {
 }
 
 /// Parse a comma-separated list of strings (e.g., "__init__.py,__main__.py").
-pub fn parse_strings(value: &str) -> Vec<String> {
+pub(crate) fn parse_strings(value: &str) -> Vec<String> {
     COMMA_SEPARATED_LIST_RE
         .split(value)
         .map(str::trim)
@@ -40,7 +40,7 @@ pub fn parse_strings(value: &str) -> Vec<String> {
 }
 
 /// Parse a boolean.
-pub fn parse_bool(value: &str) -> Result<bool> {
+pub(crate) fn parse_bool(value: &str) -> Result<bool> {
     match value.trim() {
         "true" => Ok(true),
         "false" => Ok(false),
@@ -138,7 +138,7 @@ fn tokenize_files_to_codes_mapping(value: &str) -> Vec<Token> {
 
 /// Parse a 'files-to-codes' mapping, mimicking Flake8's internal logic.
 /// See: <https://github.com/PyCQA/flake8/blob/7dfe99616fc2f07c0017df2ba5fa884158f3ea8a/src/flake8/utils.py#L45>
-pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair>> {
+pub(crate) fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair>> {
     if value.trim().is_empty() {
         return Ok(vec![]);
     }
@@ -178,7 +178,7 @@ pub fn parse_files_to_codes_mapping(value: &str) -> Result<Vec<PatternPrefixPair
 }
 
 /// Collect a list of `PatternPrefixPair` structs as a `BTreeMap`.
-pub fn collect_per_file_ignores(
+pub(crate) fn collect_per_file_ignores(
     pairs: Vec<PatternPrefixPair>,
 ) -> FxHashMap<String, Vec<RuleSelector>> {
     let mut per_file_ignores: FxHashMap<String, Vec<RuleSelector>> = FxHashMap::default();

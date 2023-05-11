@@ -277,7 +277,7 @@ fn call<'a>(
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
-pub fn unused_arguments(
+pub(crate) fn unused_arguments(
     checker: &Checker,
     parent: &Scope,
     scope: &Scope,

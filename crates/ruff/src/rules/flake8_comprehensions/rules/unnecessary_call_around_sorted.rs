@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -50,7 +50,7 @@ impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
 }
 
 /// C413
-pub fn unnecessary_call_around_sorted(
+pub(crate) fn unnecessary_call_around_sorted(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -65,7 +65,7 @@ pub fn unnecessary_call_around_sorted(
     let Some(arg) = args.first() else {
         return;
     };
-    let ExprKind::Call { func, .. } = &arg.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &arg.node else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {

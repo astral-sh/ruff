@@ -5,7 +5,7 @@ use ruff_python_ast::whitespace;
 use ruff_text_size::{TextLen, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 #[violation]
@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for NewLineAfterLastParagraph {
 }
 
 /// D209
-pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 

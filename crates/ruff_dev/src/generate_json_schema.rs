@@ -12,13 +12,13 @@ use schemars::schema_for;
 use crate::ROOT_DIR;
 
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Write the generated table to stdout (rather than to `ruff.schema.json`).
     #[arg(long, default_value_t, value_enum)]
     pub(crate) mode: Mode,
 }
 
-pub fn main(args: &Args) -> Result<()> {
+pub(crate) fn main(args: &Args) -> Result<()> {
     let schema = schema_for!(Options);
     let schema_string = serde_json::to_string_pretty(&schema).unwrap();
     let filename = "ruff.schema.json";

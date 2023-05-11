@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::StmtKind;
+use rustpython_parser::ast::{self, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -12,11 +12,12 @@ use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::{cast, whitespace};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pydocstyle::settings::Convention;
 
@@ -269,7 +270,11 @@ impl AlwaysAutofixableViolation for BlankLinesBetweenHeaderAndContent {
 
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
-pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option<&Convention>) {
+pub(crate) fn sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    convention: Option<&Convention>,
+) {
     match convention {
         Some(Convention::Google) => {
             parse_google_sections(
@@ -725,21 +730,22 @@ fn common_section(
 }
 
 fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
-    let (
-        DefinitionKind::Function(parent)
-        | DefinitionKind::NestedFunction(parent)
-        | DefinitionKind::Method(parent)
-    ) = docstring.kind else {
+    let Definition::Member(Member {
+        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
+        stmt,
+        ..
+    }) = docstring.definition else {
         return;
     };
+
     let (
-        StmtKind::FunctionDef {
+        StmtKind::FunctionDef(ast::StmtFunctionDef {
             args: arguments, ..
-        }
-        | StmtKind::AsyncFunctionDef {
+        })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             args: arguments, ..
-        }
-    ) = &parent.node else {
+        })
+    ) = &stmt.node else {
         return;
     };
 
@@ -753,12 +759,12 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
-                matches!(docstring.kind, DefinitionKind::Method(_))
-                    && !is_staticmethod(&checker.ctx, cast::decorator_list(parent)),
+                docstring.definition.is_method()
+                    && !is_staticmethod(&checker.ctx, cast::decorator_list(stmt)),
             ),
         )
     {
-        let arg_name = &arg.node.arg;
+        let arg_name = arg.node.arg.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -767,7 +773,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if let Some(arg) = &arguments.vararg {
-        let arg_name = &arg.node.arg;
+        let arg_name = arg.node.arg.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -777,7 +783,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         }
     }
     if let Some(arg) = &arguments.kwarg {
-        let arg_name = &arg.node.arg;
+        let arg_name = arg.node.arg.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -791,7 +797,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
             UndocumentedParam { names },
-            identifier_range(parent, checker.locator),
+            identifier_range(stmt, checker.locator),
         ));
     }
 }

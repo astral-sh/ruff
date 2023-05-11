@@ -2,7 +2,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use rustpython_parser::ast::{StmtKind, Suite};
+use rustpython_parser::ast::{self, StmtKind, Suite};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers::to_module_path;
@@ -29,20 +29,21 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
     let mut module_imports = Vec::with_capacity(num_imports);
     for stmt in blocks.iter().flat_map(|block| &block.imports) {
         match &stmt.node {
-            StmtKind::Import { names } => {
+            StmtKind::Import(ast::StmtImport { names }) => {
                 module_imports.extend(
                     names
                         .iter()
-                        .map(|name| ModuleImport::new(name.node.name.clone(), stmt.range())),
+                        .map(|name| ModuleImport::new(name.node.name.to_string(), stmt.range())),
                 );
             }
-            StmtKind::ImportFrom {
+            StmtKind::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
-            } => {
-                let level = level.unwrap_or(0);
+            }) => {
+                let level = level.map_or(0, |level| level.to_usize());
                 let module = if let Some(module) = module {
+                    let module: &String = module.as_ref();
                     if level == 0 {
                         Cow::Borrowed(module)
                     } else {
@@ -72,7 +73,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_imports(
+pub(crate) fn check_imports(
     python_ast: &Suite,
     locator: &Locator,
     indexer: &Indexer,

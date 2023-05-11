@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Comprehension, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Comprehension, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -84,7 +84,7 @@ impl<'a> GroupNameFinder<'a> {
     }
 
     fn name_matches(&self, expr: &Expr) -> bool {
-        if let ExprKind::Name { id, .. } = &expr.node {
+        if let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node {
             id == self.group_name
         } else {
             false
@@ -113,9 +113,9 @@ where
             return;
         }
         match &stmt.node {
-            StmtKind::For {
+            StmtKind::For(ast::StmtFor {
                 target, iter, body, ..
-            } => {
+            }) => {
                 if self.name_matches(target) {
                     self.overridden = true;
                 } else {
@@ -138,15 +138,15 @@ where
                     self.nested = false;
                 }
             }
-            StmtKind::While { body, .. } => {
+            StmtKind::While(ast::StmtWhile { body, .. }) => {
                 self.nested = true;
                 visitor::walk_body(self, body);
                 self.nested = false;
             }
-            StmtKind::If { test, body, orelse } => {
+            StmtKind::If(ast::StmtIf { test, body, orelse }) => {
                 // Determine whether we're on an `if` arm (as opposed to an `elif`).
                 let is_if_arm = !self.parent_ifs.iter().any(|parent| {
-                    if let StmtKind::If { orelse, .. } = &parent.node {
+                    if let StmtKind::If(ast::StmtIf { orelse, .. }) = &parent.node {
                         orelse.len() == 1 && &orelse[0] == stmt
                     } else {
                         false
@@ -166,7 +166,7 @@ where
 
                 let has_else = orelse
                     .first()
-                    .map_or(false, |expr| !matches!(expr.node, StmtKind::If { .. }));
+                    .map_or(false, |expr| !matches!(expr.node, StmtKind::If(_)));
 
                 self.parent_ifs.push(stmt);
                 if has_else {
@@ -193,7 +193,7 @@ where
                     }
                 }
             }
-            StmtKind::Match { subject, cases } => {
+            StmtKind::Match(ast::StmtMatch { subject, cases }) => {
                 self.counter_stack.push(Vec::with_capacity(cases.len()));
                 self.visit_expr(subject);
                 for match_case in cases {
@@ -207,14 +207,14 @@ where
                     self.increment_usage_count(max_count);
                 }
             }
-            StmtKind::Assign { targets, value, .. } => {
+            StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
                 if targets.iter().any(|target| self.name_matches(target)) {
                     self.overridden = true;
                 } else {
                     self.visit_expr(value);
                 }
             }
-            StmtKind::AnnAssign { target, value, .. } => {
+            StmtKind::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 if self.name_matches(target) {
                     self.overridden = true;
                 } else if let Some(expr) = value {
@@ -241,7 +241,7 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let ExprKind::NamedExpr { target, .. } = &expr.node {
+        if let ExprKind::NamedExpr(ast::ExprNamedExpr { target, .. }) = &expr.node {
             if self.name_matches(target) {
                 self.overridden = true;
             }
@@ -251,7 +251,8 @@ where
         }
 
         match &expr.node {
-            ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
+            ExprKind::ListComp(ast::ExprListComp { elt, generators })
+            | ExprKind::SetComp(ast::ExprSetComp { elt, generators }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
                 }
@@ -261,11 +262,11 @@ where
                     self.nested = false;
                 }
             }
-            ExprKind::DictComp {
+            ExprKind::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
-            } => {
+            }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
                 }
@@ -301,16 +302,16 @@ where
 }
 
 /// B031
-pub fn reuse_of_groupby_generator(
+pub(crate) fn reuse_of_groupby_generator(
     checker: &mut Checker,
     target: &Expr,
     body: &[Stmt],
     iter: &Expr,
 ) {
-    let ExprKind::Call { func, .. } = &iter.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &iter.node else {
         return;
     };
-    let ExprKind::Tuple { elts, .. } = &target.node else {
+    let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &target.node else {
         // Ignore any `groupby()` invocation that isn't unpacked
         return;
     };
@@ -318,7 +319,7 @@ pub fn reuse_of_groupby_generator(
         return;
     }
     // We have an invocation of groupby which is a simple unpacking
-    let ExprKind::Name { id: group_name, .. } = &elts[1].node else {
+    let ExprKind::Name(ast::ExprName { id: group_name, .. }) = &elts[1].node else {
         return;
     };
     // Check if the function call is `itertools.groupby`

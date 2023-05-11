@@ -11,11 +11,11 @@ use ruff_python_ast::typing::AnnotationKind;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
-use crate::analyze::visibility::{module_visibility, Modifier, VisibleScope};
 use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
+use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::node::{NodeId, Nodes};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
@@ -24,6 +24,7 @@ use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 pub struct Snapshot {
     scope_id: ScopeId,
     stmt_id: Option<NodeId>,
+    definition_id: DefinitionId,
     in_annotation: bool,
     in_type_checking_block: bool,
 }
@@ -31,7 +32,7 @@ pub struct Snapshot {
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
-    pub module_path: Option<Vec<String>>,
+    pub module_path: Option<&'a [String]>,
     // Stack of all visited statements, along with the identifier of the current statement.
     pub stmts: Nodes<'a>,
     pub stmt_id: Option<NodeId>,
@@ -41,6 +42,10 @@ pub struct Context<'a> {
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
     pub dead_scopes: Vec<ScopeId>,
+    // Stack of all definitions created in any scope, at any point in execution, along with the
+    // identifier of the current definition.
+    pub definitions: Definitions<'a>,
+    pub definition_id: DefinitionId,
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
@@ -49,7 +54,6 @@ pub struct Context<'a> {
     pub body: &'a [Stmt],
     pub body_index: usize,
     // Internal, derivative state.
-    pub visible_scope: VisibleScope,
     pub in_annotation: bool,
     pub in_type_definition: bool,
     pub in_deferred_string_type_definition: Option<AnnotationKind>,
@@ -67,29 +71,22 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    pub fn new(
-        typing_modules: &'a [String],
-        path: &'a Path,
-        module_path: Option<Vec<String>>,
-    ) -> Self {
-        let visibility = module_visibility(module_path.as_deref(), path);
+    pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
-            module_path,
+            module_path: module.path(),
             stmts: Nodes::default(),
             stmt_id: None,
+            exprs: Vec::default(),
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
             dead_scopes: Vec::default(),
+            definitions: Definitions::for_module(module),
+            definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
             shadowed_bindings: IntMap::default(),
-            exprs: Vec::default(),
             body: &[],
             body_index: 0,
-            visible_scope: VisibleScope {
-                modifier: Modifier::Module,
-                visibility,
-            },
             in_annotation: false,
             in_type_definition: false,
             in_deferred_string_type_definition: None,
@@ -347,6 +344,19 @@ impl<'a> Context<'a> {
             .expect("Attempted to pop without scope");
     }
 
+    /// Push a [`Member`] onto the stack.
+    pub fn push_definition(&mut self, definition: Member<'a>) {
+        self.definition_id = self.definitions.push_member(definition);
+    }
+
+    /// Pop the current [`Member`] off the stack.
+    pub fn pop_definition(&mut self) {
+        let Definition::Member(member) = &self.definitions[self.definition_id] else {
+            panic!("Attempted to pop without member definition");
+        };
+        self.definition_id = member.parent;
+    }
+
     /// Return the current `Stmt`.
     pub fn stmt(&self) -> &'a Stmt {
         let node_id = self.stmt_id.expect("No current statement");
@@ -450,6 +460,7 @@ impl<'a> Context<'a> {
         Snapshot {
             scope_id: self.scope_id,
             stmt_id: self.stmt_id,
+            definition_id: self.definition_id,
             in_annotation: self.in_annotation,
             in_type_checking_block: self.in_type_checking_block,
         }
@@ -460,11 +471,13 @@ impl<'a> Context<'a> {
         let Snapshot {
             scope_id,
             stmt_id,
+            definition_id,
             in_annotation,
             in_type_checking_block,
         } = snapshot;
         self.scope_id = scope_id;
         self.stmt_id = stmt_id;
+        self.definition_id = definition_id;
         self.in_annotation = in_annotation;
         self.in_type_checking_block = in_type_checking_block;
     }

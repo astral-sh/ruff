@@ -16,7 +16,7 @@ use crate::cst::matchers::{
 };
 
 /// Generate a [`Edit`] to remove unused keys from format dict.
-pub fn remove_unused_format_arguments_from_dict(
+pub(crate) fn remove_unused_format_arguments_from_dict(
     unused_arguments: &[&str],
     stmt: &Expr,
     locator: &Locator,
@@ -44,7 +44,7 @@ pub fn remove_unused_format_arguments_from_dict(
 }
 
 /// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
-pub fn remove_unused_keyword_arguments_from_format_call(
+pub(crate) fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[&str],
     location: TextRange,
     locator: &Locator,
@@ -126,7 +126,7 @@ fn update_field_types(format_string: &FormatString, min_unused: usize) -> String
 }
 
 /// Generate a [`Edit`] to remove unused positional arguments from a `format` call.
-pub fn remove_unused_positional_arguments_from_format_call(
+pub(crate) fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
     location: TextRange,
     locator: &Locator,
@@ -172,7 +172,7 @@ pub fn remove_unused_positional_arguments_from_format_call(
 }
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.
-pub fn remove_exception_handler_assignment(
+pub(crate) fn remove_exception_handler_assignment(
     excepthandler: &Excepthandler,
     locator: &Locator,
 ) -> Result<Edit> {
@@ -182,7 +182,8 @@ pub fn remove_exception_handler_assignment(
 
     // End of the token just before the `as` to the semicolon.
     let mut prev = None;
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, excepthandler.start()).flatten()
+    for (tok, range) in
+        lexer::lex_starts_at(contents, Mode::Module, excepthandler.start()).flatten()
     {
         if matches!(tok, Tok::As) {
             fix_start = prev;

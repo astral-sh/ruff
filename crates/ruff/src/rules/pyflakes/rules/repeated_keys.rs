@@ -1,7 +1,7 @@
 use std::hash::{BuildHasherDefault, Hash};
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -74,14 +74,16 @@ enum DictionaryKey<'a> {
 
 fn into_dictionary_key(expr: &Expr) -> Option<DictionaryKey> {
     match &expr.node {
-        ExprKind::Constant { value, .. } => Some(DictionaryKey::Constant(value.into())),
-        ExprKind::Name { id, .. } => Some(DictionaryKey::Variable(id)),
+        ExprKind::Constant(ast::ExprConstant { value, .. }) => {
+            Some(DictionaryKey::Constant(value.into()))
+        }
+        ExprKind::Name(ast::ExprName { id, .. }) => Some(DictionaryKey::Variable(id)),
         _ => None,
     }
 }
 
 /// F601, F602
-pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<DictionaryKey, FxHashSet<ComparableExpr>> =
         FxHashMap::with_capacity_and_hasher(keys.len(), BuildHasherDefault::default());

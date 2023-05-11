@@ -6,14 +6,18 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::Locator;
 
 /// ANN204
-pub fn add_return_annotation(locator: &Locator, stmt: &Stmt, annotation: &str) -> Result<Edit> {
+pub(crate) fn add_return_annotation(
+    locator: &Locator,
+    stmt: &Stmt,
+    annotation: &str,
+) -> Result<Edit> {
     let contents = &locator.contents()[stmt.range()];
 
     // Find the colon (following the `def` keyword).
     let mut seen_lpar = false;
     let mut seen_rpar = false;
     let mut count: usize = 0;
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, stmt.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
                 return Ok(Edit::insertion(format!(" -> {annotation}"), range.start()));

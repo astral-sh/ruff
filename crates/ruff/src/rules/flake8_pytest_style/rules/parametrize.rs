@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -50,10 +50,10 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
     let all_literals = elts.iter().all(|e| {
         matches!(
             e.node,
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(_),
                 ..
-            }
+            })
         )
     });
 
@@ -62,12 +62,12 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
     }
 
     Some(unparse_expr(
-        &create_expr(ExprKind::Constant {
+        &create_expr(ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(elts.iter().fold(String::new(), |mut acc, elt| {
-                if let ExprKind::Constant {
+                if let ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Str(ref s),
                     ..
-                } = elt.node
+                }) = elt.node
                 {
                     if !acc.is_empty() {
                         acc.push(',');
@@ -77,7 +77,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
                 acc
             })),
             kind: None,
-        }),
+        })),
         checker.stylist,
     ))
 }
@@ -101,7 +101,7 @@ fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) 
 
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
-    for (tok, range) in lexer::lex_located(
+    for (tok, range) in lexer::lex_starts_at(
         checker.locator.slice(decorator.range()),
         Mode::Module,
         decorator.start(),
@@ -133,10 +133,10 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match &expr.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(string),
             ..
-        } => {
+        }) => {
             let names = split_names(string);
             if names.len() > 1 {
                 match names_type {
@@ -154,18 +154,20 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                 format!(
                                     "({})",
                                     unparse_expr(
-                                        &create_expr(ExprKind::Tuple {
+                                        &create_expr(ExprKind::Tuple(ast::ExprTuple {
                                             elts: names
                                                 .iter()
                                                 .map(|&name| {
-                                                    create_expr(ExprKind::Constant {
-                                                        value: Constant::Str(name.to_string()),
-                                                        kind: None,
-                                                    })
+                                                    create_expr(ExprKind::Constant(
+                                                        ast::ExprConstant {
+                                                            value: Constant::Str(name.to_string()),
+                                                            kind: None,
+                                                        },
+                                                    ))
                                                 })
                                                 .collect(),
                                             ctx: ExprContext::Load,
-                                        }),
+                                        })),
                                         checker.stylist,
                                     )
                                 ),
@@ -186,18 +188,18 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 unparse_expr(
-                                    &create_expr(ExprKind::List {
+                                    &create_expr(ExprKind::List(ast::ExprList {
                                         elts: names
                                             .iter()
                                             .map(|&name| {
-                                                create_expr(ExprKind::Constant {
+                                                create_expr(ExprKind::Constant(ast::ExprConstant {
                                                     value: Constant::Str(name.to_string()),
                                                     kind: None,
-                                                })
+                                                }))
                                             })
                                             .collect(),
                                         ctx: ExprContext::Load,
-                                    }),
+                                    })),
                                     checker.stylist,
                                 ),
                                 name_range,
@@ -209,7 +211,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                 }
             }
         }
-        ExprKind::Tuple { elts, .. } => {
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
             if elts.len() == 1 {
                 if let Some(first) = elts.first() {
                     handle_single_name(checker, expr, first);
@@ -228,10 +230,10 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 unparse_expr(
-                                    &create_expr(ExprKind::List {
+                                    &create_expr(ExprKind::List(ast::ExprList {
                                         elts: elts.clone(),
                                         ctx: ExprContext::Load,
-                                    }),
+                                    })),
                                     checker.stylist,
                                 ),
                                 expr.range(),
@@ -260,7 +262,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                 }
             };
         }
-        ExprKind::List { elts, .. } => {
+        ExprKind::List(ast::ExprList { elts, .. }) => {
             if elts.len() == 1 {
                 if let Some(first) = elts.first() {
                     handle_single_name(checker, expr, first);
@@ -281,10 +283,10 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                 format!(
                                     "({})",
                                     unparse_expr(
-                                        &create_expr(ExprKind::Tuple {
+                                        &create_expr(ExprKind::Tuple(ast::ExprTuple {
                                             elts: elts.clone(),
                                             ctx: ExprContext::Load,
-                                        }),
+                                        })),
                                         checker.stylist,
                                     )
                                 ),
@@ -327,10 +329,10 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    let is_multi_named = if let ExprKind::Constant {
+    let is_multi_named = if let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(string),
         ..
-    } = &names.node
+    }) = &names.node
     {
         split_names(string).len() > 1
     } else {
@@ -338,7 +340,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
     };
 
     match &values.node {
-        ExprKind::List { elts, .. } => {
+        ExprKind::List(ast::ExprList { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::List {
                 checker.diagnostics.push(Diagnostic::new(
                     PytestParametrizeValuesWrongType {
@@ -352,7 +354,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
         }
-        ExprKind::Tuple { elts, .. } => {
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::Tuple {
                 checker.diagnostics.push(Diagnostic::new(
                     PytestParametrizeValuesWrongType {
@@ -396,7 +398,7 @@ fn handle_value_rows(
 ) {
     for elt in elts {
         match &elt.node {
-            ExprKind::Tuple { .. } => {
+            ExprKind::Tuple(_) => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
                     checker.diagnostics.push(Diagnostic::new(
                         PytestParametrizeValuesWrongType {
@@ -407,7 +409,7 @@ fn handle_value_rows(
                     ));
                 }
             }
-            ExprKind::List { .. } => {
+            ExprKind::List(_) => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
                     checker.diagnostics.push(Diagnostic::new(
                         PytestParametrizeValuesWrongType {
@@ -423,10 +425,10 @@ fn handle_value_rows(
     }
 }
 
-pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
+pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     for decorator in decorators {
         if is_pytest_parametrize(&checker.ctx, decorator) {
-            if let ExprKind::Call { args, .. } = &decorator.node {
+            if let ExprKind::Call(ast::ExprCall { args, .. }) = &decorator.node {
                 if checker
                     .settings
                     .rules

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -89,7 +89,7 @@ impl Violation for UnrecognizedPlatformName {
 }
 
 /// PYI007, PYI008
-pub fn unrecognized_platform(
+pub(crate) fn unrecognized_platform(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -126,10 +126,10 @@ pub fn unrecognized_platform(
     }
 
     match &right.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(value),
             ..
-        } => {
+        }) => {
             // Other values are possible but we don't need them right now.
             // This protects against typos.
             if !["linux", "win32", "cygwin", "darwin"].contains(&value.as_str())

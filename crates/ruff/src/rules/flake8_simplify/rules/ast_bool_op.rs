@@ -5,7 +5,7 @@ use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -127,7 +127,7 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ContentAround {
+pub(crate) enum ContentAround {
     Before,
     After,
     Both,
@@ -239,7 +239,11 @@ impl AlwaysAutofixableViolation for ExprAndFalse {
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
-    if let (ExprKind::Name { id: a, .. }, ExprKind::Name { id: b, .. }) = (&a.node, &b.node) {
+    if let (
+        ExprKind::Name(ast::ExprName { id: a, .. }),
+        ExprKind::Name(ast::ExprName { id: b, .. }),
+    ) = (&a.node, &b.node)
+    {
         if a == b {
             return Some(a);
         }
@@ -248,8 +252,8 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 }
 
 /// SIM101
-pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
+pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values } )= &expr.node else {
         return;
     };
 
@@ -258,7 +262,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
-        let ExprKind::Call { func, args, keywords } = &call.node else {
+        let ExprKind::Call(ast::ExprCall { func, args, keywords }) = &call.node else {
             continue;
         };
         if args.len() != 2 {
@@ -267,7 +271,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if !keywords.is_empty() {
             continue;
         }
-        let ExprKind::Name { id: func_name, .. } = &func.node else {
+        let ExprKind::Name(ast::ExprName { id: func_name, .. }) = &func.node else {
             continue;
         };
         if func_name != "isinstance" {
@@ -290,15 +294,16 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let ExprKind::Call { args, .. } = &values[indices[0]].node {
-                args.get(0).expect("`isinstance` should have two arguments")
-            } else {
-                unreachable!("Indices should only contain `isinstance` calls")
-            };
+            let target =
+                if let ExprKind::Call(ast::ExprCall { args, .. }) = &values[indices[0]].node {
+                    args.get(0).expect("`isinstance` should have two arguments")
+                } else {
+                    unreachable!("Indices should only contain `isinstance` calls")
+                };
             let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
-                    name: if let ExprKind::Name { id, .. } = &target.node {
+                    name: if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
                         Some(id.to_string())
                     } else {
                         None
@@ -313,7 +318,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let ExprKind::Call { args, ..} = &expr.node else {
+                        let ExprKind::Call(ast::ExprCall { args, ..}) = &expr.node else {
                             unreachable!("Indices should only contain `isinstance` calls")
                         };
                         args.get(1).expect("`isinstance` should have two arguments")
@@ -321,19 +326,21 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     .collect();
 
                 // Generate a single `isinstance` call.
-                let call = create_expr(ExprKind::Call {
-                    func: Box::new(create_expr(ExprKind::Name {
-                        id: "isinstance".to_string(),
+                let call = create_expr(ast::ExprCall {
+                    func: Box::new(create_expr(ast::ExprName {
+                        id: "isinstance".into(),
                         ctx: ExprContext::Load,
                     })),
                     args: vec![
                         target.clone(),
-                        create_expr(ExprKind::Tuple {
+                        create_expr(ast::ExprTuple {
                             // Flatten all the types used across the `isinstance` calls.
                             elts: types
                                 .iter()
                                 .flat_map(|value| {
-                                    if let ExprKind::Tuple { elts, .. } = &value.node {
+                                    if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) =
+                                        &value.node
+                                    {
                                         Left(elts.iter())
                                     } else {
                                         Right(iter::once(*value))
@@ -348,7 +355,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 });
 
                 // Generate the combined `BoolOp`.
-                let bool_op = create_expr(ExprKind::BoolOp {
+                let bool_op = create_expr(ast::ExprBoolOp {
                     op: Boolop::Or,
                     values: iter::once(call)
                         .chain(
@@ -375,7 +382,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 }
 
 fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
-    let ExprKind::Compare { left, ops, comparators } = &expr.node else {
+    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators } )= &expr.node else {
         return None;
     };
     if ops.len() != 1 || comparators.len() != 1 {
@@ -384,19 +391,19 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     if !matches!(&ops[0], Cmpop::Eq) {
         return None;
     }
-    let ExprKind::Name { id, .. } = &left.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &left.node else {
         return None;
     };
     let comparator = &comparators[0];
-    if !matches!(&comparator.node, ExprKind::Name { .. }) {
+    if !matches!(&comparator.node, ExprKind::Name(_)) {
         return None;
     }
     Some((id, comparator))
 }
 
 /// SIM109
-pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
+pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values }) = &expr.node else {
         return;
     };
 
@@ -433,13 +440,13 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
 
         // Create a `x in (a, b)` expression.
-        let in_expr = create_expr(ExprKind::Compare {
-            left: Box::new(create_expr(ExprKind::Name {
-                id: id.to_string(),
+        let in_expr = create_expr(ast::ExprCompare {
+            left: Box::new(create_expr(ast::ExprName {
+                id: id.into(),
                 ctx: ExprContext::Load,
             })),
             ops: vec![Cmpop::In],
-            comparators: vec![create_expr(ExprKind::Tuple {
+            comparators: vec![create_expr(ast::ExprTuple {
                 elts: comparators.into_iter().map(Clone::clone).collect(),
                 ctx: ExprContext::Load,
             })],
@@ -461,7 +468,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                 in_expr
             } else {
                 // Wrap in a `x in (a, b) or ...` boolean operation.
-                create_expr(ExprKind::BoolOp {
+                create_expr(ast::ExprBoolOp {
                     op: Boolop::Or,
                     values: iter::once(in_expr).chain(unmatched).collect(),
                 })
@@ -477,8 +484,8 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM220
-pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
+pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::And, values, }) = &expr.node else {
         return;
     };
     if values.len() < 2 {
@@ -489,10 +496,10 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
     let mut negated_expr = vec![];
     let mut non_negated_expr = vec![];
     for expr in values {
-        if let ExprKind::UnaryOp {
+        if let ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::Not,
             operand,
-        } = &expr.node
+        }) = &expr.node
         {
             negated_expr.push(operand);
         } else {
@@ -531,8 +538,8 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM221
-pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
+pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, }) = &expr.node else {
         return;
     };
     if values.len() < 2 {
@@ -543,10 +550,10 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     let mut negated_expr = vec![];
     let mut non_negated_expr = vec![];
     for expr in values {
-        if let ExprKind::UnaryOp {
+        if let ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::Not,
             operand,
-        } = &expr.node
+        }) = &expr.node
         {
             negated_expr.push(operand);
         } else {
@@ -584,7 +591,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub fn get_short_circuit_edit(
+pub(crate) fn get_short_circuit_edit(
     expr: &Expr,
     range: TextRange,
     truthiness: Truthiness,
@@ -611,7 +618,7 @@ fn is_short_circuit(
     context: &Context,
     stylist: &Stylist,
 ) -> Option<(Edit, ContentAround)> {
-    let ExprKind::BoolOp { op, values, } = &expr.node else {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op, values, }) = &expr.node else {
         return None;
     };
     if op != expected_op {
@@ -685,7 +692,7 @@ fn is_short_circuit(
 }
 
 /// SIM222
-pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
     if let Some((edit, remove)) = is_short_circuit(expr, &Boolop::Or, &checker.ctx, checker.stylist)
     {
         let mut diagnostic = Diagnostic::new(
@@ -704,7 +711,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM223
-pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
     if let Some((edit, remove)) =
         is_short_circuit(expr, &Boolop::And, &checker.ctx, checker.stylist)
     {

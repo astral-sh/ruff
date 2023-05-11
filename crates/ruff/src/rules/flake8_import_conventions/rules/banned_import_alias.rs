@@ -41,7 +41,7 @@ impl Violation for BannedImportAlias {
 }
 
 /// ICN002
-pub fn banned_import_alias(
+pub(crate) fn banned_import_alias(
     stmt: &Stmt,
     name: &str,
     asname: &str,

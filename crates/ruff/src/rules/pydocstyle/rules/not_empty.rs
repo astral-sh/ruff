@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::Rule;
 
 #[violation]
@@ -16,7 +16,7 @@ impl Violation for EmptyDocstring {
 }
 
 /// D419
-pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
+pub(crate) fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     if !docstring.body().trim().is_empty() {
         return true;
     }

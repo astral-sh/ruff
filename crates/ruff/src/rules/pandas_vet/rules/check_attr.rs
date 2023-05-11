@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -49,7 +49,7 @@ impl Violation for PandasUseOfDotValues {
     }
 }
 
-pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &Expr) {
+pub(crate) fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &Expr) {
     let rules = &checker.settings.rules;
     let violation: DiagnosticKind = match attr {
         "ix" if rules.enabled(Rule::PandasUseOfDotIx) => PandasUseOfDotIx.into(),
@@ -61,7 +61,7 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
 
     // Avoid flagging on function calls (e.g., `df.values()`).
     if let Some(parent) = checker.ctx.expr_parent() {
-        if matches!(parent.node, ExprKind::Call { .. }) {
+        if matches!(parent.node, ExprKind::Call(_)) {
             return;
         }
     }
@@ -72,7 +72,7 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
 
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like imports).
-    if let ExprKind::Name { id, .. } = &value.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &value.node {
         if checker.ctx.find_binding(id).map_or(true, |binding| {
             matches!(
                 binding.kind,

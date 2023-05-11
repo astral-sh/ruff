@@ -11,7 +11,7 @@ pub struct FormatKeyword<'a> {
     item: &'a Keyword,
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Keyword {
+impl AsFormat<ASTFormatContext> for Keyword {
     type Format<'a> = FormatKeyword<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -19,7 +19,7 @@ impl AsFormat<ASTFormatContext<'_>> for Keyword {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatKeyword<'_> {
+impl Format<ASTFormatContext> for FormatKeyword<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let keyword = self.item;
 

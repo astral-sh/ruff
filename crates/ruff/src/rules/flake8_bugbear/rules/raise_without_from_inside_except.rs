@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ExprKind, Stmt};
+use rustpython_parser::ast::{self, ExprKind, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -22,7 +22,7 @@ impl Violation for RaiseWithoutFromInsideExcept {
 }
 
 /// B904
-pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
         visitor.visit_body(body);
@@ -33,7 +33,7 @@ pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
         if cause.is_none() {
             if let Some(exc) = exc {
                 match &exc.node {
-                    ExprKind::Name { id, .. } if is_lower(id) => {}
+                    ExprKind::Name(ast::ExprName { id, .. }) if is_lower(id) => {}
                     _ => {
                         checker
                             .diagnostics

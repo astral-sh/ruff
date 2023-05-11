@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -69,21 +69,21 @@ impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
 }
 
 /// SIM112
-pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     // Ex) `os.environ['foo']`
-    if let ExprKind::Subscript { .. } = &expr.node {
+    if let ExprKind::Subscript(_) = &expr.node {
         check_os_environ_subscript(checker, expr);
         return;
     }
 
     // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
-    let ExprKind::Call { func, args, .. } = &expr.node else {
+    let ExprKind::Call(ast::ExprCall { func, args, .. }) = &expr.node else {
         return;
     };
     let Some(arg) = args.get(0) else {
         return;
     };
-    let ExprKind::Constant { value: Constant::Str(env_var), .. } = &arg.node else {
+    let ExprKind::Constant(ast::ExprConstant { value: Constant::Str(env_var), .. }) = &arg.node else {
         return;
     };
     if !checker
@@ -112,19 +112,19 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
 }
 
 fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Subscript { value, slice, .. } = &expr.node else {
+    let ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) = &expr.node else {
         return;
     };
-    let ExprKind::Attribute { value: attr_value, attr, .. } = &value.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { value: attr_value, attr, .. }) = &value.node else {
         return;
     };
-    let ExprKind::Name { id, .. } = &attr_value.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &attr_value.node else {
         return;
     };
     if id != "os" || attr != "environ" {
         return;
     }
-    let ExprKind::Constant { value: Constant::Str(env_var), kind } = &slice.node else {
+    let ExprKind::Constant(ast::ExprConstant { value: Constant::Str(env_var), kind }) = &slice.node else {
         return;
     };
     let capital_env_var = env_var.to_ascii_uppercase();
@@ -140,7 +140,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         slice.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        let new_env_var = create_expr(ExprKind::Constant {
+        let new_env_var = create_expr(ast::ExprConstant {
             value: capital_env_var.into(),
             kind: kind.clone(),
         });
@@ -154,17 +154,17 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM910
-pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Call { func, args, keywords } = &expr.node else {
+pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::Call(ast::ExprCall { func, args, keywords }) = &expr.node else {
         return;
     };
     if !keywords.is_empty() {
         return;
     }
-    let ExprKind::Attribute { value, attr, .. } = &func.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. } )= &func.node else {
         return;
     };
-    if !matches!(value.node, ExprKind::Dict { .. }) {
+    if !matches!(value.node, ExprKind::Dict(_)) {
         return;
     }
     if attr != "get" {
@@ -173,7 +173,7 @@ pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Some(key) = args.get(0) else {
         return;
     };
-    if !matches!(key.node, ExprKind::Constant { .. } | ExprKind::Name { .. }) {
+    if !matches!(key.node, ExprKind::Constant(_) | ExprKind::Name(_)) {
         return;
     }
     let Some(default) = args.get(1) else {
@@ -181,10 +181,10 @@ pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     };
     if !matches!(
         default.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::None,
             ..
-        }
+        })
     ) {
         return;
     };

@@ -76,7 +76,7 @@ pub(crate) struct Printer {
 }
 
 impl Printer {
-    pub const fn new(
+    pub(crate) const fn new(
         format: SerializationFormat,
         log_level: LogLevel,
         autofix_level: flags::FixMode,
@@ -93,7 +93,7 @@ impl Printer {
         }
     }
 
-    pub fn write_to_user(&self, message: &str) {
+    pub(crate) fn write_to_user(&self, message: &str) {
         if self.log_level >= LogLevel::Default {
             notify_user!("{}", message);
         }
@@ -153,7 +153,11 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_once(&self, diagnostics: &Diagnostics, writer: &mut impl Write) -> Result<()> {
+    pub(crate) fn write_once(
+        &self,
+        diagnostics: &Diagnostics,
+        writer: &mut impl Write,
+    ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -240,7 +244,7 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub(crate) fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
@@ -335,7 +339,7 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub(crate) fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -369,7 +373,7 @@ impl Printer {
         Ok(())
     }
 
-    pub fn clear_screen() -> Result<()> {
+    pub(crate) fn clear_screen() -> Result<()> {
         #[cfg(not(target_family = "wasm"))]
         clearscreen::clear()?;
         Ok(())

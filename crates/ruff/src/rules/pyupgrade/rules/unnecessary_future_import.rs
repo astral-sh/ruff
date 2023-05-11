@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use log::error;
-use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
+use rustpython_parser::ast::{Alias, AliasData, Attributed, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,7 +57,11 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
 ];
 
 /// UP010
-pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Located<AliasData>]) {
+pub(crate) fn unnecessary_future_import(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    names: &[Attributed<AliasData>],
+) {
     let mut unused_imports: Vec<&Alias> = vec![];
     for alias in names {
         if alias.node.asname.is_some() {

@@ -1,5 +1,5 @@
-use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,15 +27,13 @@ impl Violation for NonPEP604Annotation {
 
 fn optional(expr: &Expr) -> Expr {
     Expr::new(
-        TextSize::default(),
-        TextSize::default(),
-        ExprKind::BinOp {
+        TextRange::default(),
+        ast::ExprBinOp {
             left: Box::new(expr.clone()),
             op: Operator::BitOr,
             right: Box::new(Expr::new(
-                TextSize::default(),
-                TextSize::default(),
-                ExprKind::Constant {
+                TextRange::default(),
+                ast::ExprConstant {
                     value: Constant::None,
                     kind: None,
                 },
@@ -49,9 +47,8 @@ fn union(elts: &[Expr]) -> Expr {
         elts[0].clone()
     } else {
         Expr::new(
-            TextSize::default(),
-            TextSize::default(),
-            ExprKind::BinOp {
+            TextRange::default(),
+            ast::ExprBinOp {
                 left: Box::new(union(&elts[..elts.len() - 1])),
                 op: Operator::BitOr,
                 right: Box::new(elts[elts.len() - 1].clone()),
@@ -63,11 +60,11 @@ fn union(elts: &[Expr]) -> Expr {
 /// Returns `true` if any argument in the slice is a string.
 fn any_arg_is_str(slice: &Expr) -> bool {
     match &slice.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
-        } => true,
-        ExprKind::Tuple { elts, .. } => elts.iter().any(any_arg_is_str),
+        }) => true,
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(any_arg_is_str),
         _ => false,
     }
 }
@@ -79,7 +76,12 @@ enum TypingMember {
 }
 
 /// UP007
-pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
+pub(crate) fn use_pep604_annotation(
+    checker: &mut Checker,
+    expr: &Expr,
+    value: &Expr,
+    slice: &Expr,
+) {
     // If any of the _arguments_ are forward references, we can't use PEP 604.
     // Ex) `Union["str", "int"]` can't be converted to `"str" | "int"`.
     if any_arg_is_str(slice) {
@@ -122,10 +124,10 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
-                    ExprKind::Slice { .. } => {
+                    ExprKind::Slice(_) => {
                         // Invalid type annotation.
                     }
-                    ExprKind::Tuple { elts, .. } => {
+                    ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_expr(&union(elts), checker.stylist),

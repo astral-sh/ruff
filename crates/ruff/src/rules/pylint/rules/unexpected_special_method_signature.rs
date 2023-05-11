@@ -7,12 +7,11 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
-use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum ExpectedParams {
+pub(crate) enum ExpectedParams {
     Fixed(usize),
     Range(usize, usize),
 }
@@ -101,7 +100,7 @@ impl Violation for UnexpectedSpecialMethodSignature {
 }
 
 /// PLE0302
-pub fn unexpected_special_method_signature(
+pub(crate) fn unexpected_special_method_signature(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
@@ -109,7 +108,12 @@ pub fn unexpected_special_method_signature(
     args: &Arguments,
     locator: &Locator,
 ) {
-    if !matches!(checker.ctx.scope().kind, ScopeKind::Class(_)) {
+    if !checker.ctx.scope().kind.is_class() {
+        return;
+    }
+
+    // Ignore methods with positional-only or keyword-only parameters, or variadic parameters.
+    if !args.posonlyargs.is_empty() || !args.kwonlyargs.is_empty() || args.kwarg.is_some() {
         return;
     }
 
@@ -126,18 +130,22 @@ pub fn unexpected_special_method_signature(
         return;
     };
 
-    let emit = match expected_params {
-        ExpectedParams::Range(min, max) => !(min..=max).contains(&actual_params),
-        ExpectedParams::Fixed(expected) => match expected.cmp(&mandatory_params) {
-            Ordering::Less => true,
-            Ordering::Greater => {
-                args.vararg.is_none() && optional_params < (expected - mandatory_params)
+    let valid_signature = match expected_params {
+        ExpectedParams::Range(min, max) => {
+            if mandatory_params >= min {
+                mandatory_params <= max
+            } else {
+                args.vararg.is_some() || actual_params <= max
             }
-            Ordering::Equal => false,
+        }
+        ExpectedParams::Fixed(expected) => match expected.cmp(&mandatory_params) {
+            Ordering::Less => false,
+            Ordering::Greater => args.vararg.is_some() || actual_params >= expected,
+            Ordering::Equal => true,
         },
     };
 
-    if emit {
+    if !valid_signature {
         checker.diagnostics.push(Diagnostic::new(
             UnexpectedSpecialMethodSignature {
                 method_name: name.to_owned(),

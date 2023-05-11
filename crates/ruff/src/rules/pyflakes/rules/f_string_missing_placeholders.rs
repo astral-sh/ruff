@@ -54,7 +54,7 @@ fn find_useless_f_strings<'a>(
     locator: &'a Locator,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
     let contents = locator.slice(expr.range());
-    lexer::lex_located(contents, Mode::Module, expr.start())
+    lexer::lex_starts_at(contents, Mode::Module, expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {
             Tok::String {
@@ -98,10 +98,10 @@ fn fix_f_string_missing_placeholders(
 }
 
 /// F541
-pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
+pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
         .iter()
-        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+        .any(|value| matches!(value.node, ExprKind::FormattedValue(_)))
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);

@@ -66,7 +66,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub fn unnecessary_literal_within_tuple_call(
+pub(crate) fn unnecessary_literal_within_tuple_call(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -83,8 +83,8 @@ pub fn unnecessary_literal_within_tuple_call(
         return;
     }
     let argument_kind = match argument {
-        ExprKind::Tuple { .. } => "tuple",
-        ExprKind::List { .. } => "list",
+        ExprKind::Tuple(_) => "tuple",
+        ExprKind::List(_) => "list",
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

@@ -145,7 +145,7 @@ impl<'a> DisplayParseError<'a> {
 
 impl Display for DisplayParseError<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let source_location = self.source_code.source_location(self.error.location);
+        let source_location = self.source_code.source_location(self.error.offset);
 
         write!(
             f,

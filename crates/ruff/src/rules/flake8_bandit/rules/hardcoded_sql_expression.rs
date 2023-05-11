@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -56,10 +56,10 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
     match &expr.node {
         // "select * from table where val = " + "str" + ...
         // "select * from table where val = %s" % ...
-        ExprKind::BinOp {
+        ExprKind::BinOp(ast::ExprBinOp {
             op: Operator::Add | Operator::Mod,
             ..
-        } => {
+        }) => {
             let Some(parent) = checker.ctx.expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
                     return Some(unparse_expr(expr, checker.stylist));
@@ -67,7 +67,7 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
                 return None;
             };
             // Only evaluate the full BinOp, not the nested components.
-            let ExprKind::BinOp { .. } = &parent.node else {
+            let ExprKind::BinOp(_ )= &parent.node else {
                 if any_over_expr(expr, &has_string_literal) {
                     return Some(unparse_expr(expr, checker.stylist));
                 }
@@ -75,8 +75,8 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             };
             None
         }
-        ExprKind::Call { func, .. } => {
-            let ExprKind::Attribute{ attr, value, .. } = &func.node else {
+        ExprKind::Call(ast::ExprCall { func, .. }) => {
+            let ExprKind::Attribute(ast::ExprAttribute { attr, value, .. }) = &func.node else {
                 return None;
             };
             // "select * from table where val = {}".format(...)
@@ -86,13 +86,13 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             None
         }
         // f"select * from table where val = {val}"
-        ExprKind::JoinedStr { .. } => Some(unparse_expr(expr, checker.stylist)),
+        ExprKind::JoinedStr(_) => Some(unparse_expr(expr, checker.stylist)),
         _ => None,
     }
 }
 
 /// S608
-pub fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
     match unparse_string_format_expression(checker, expr) {
         Some(string) if matches_sql_statement(&string) => {
             checker

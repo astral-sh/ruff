@@ -4,7 +4,7 @@ use libcst_native::{
     ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,7 +17,7 @@ use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum MockReference {
+pub(crate) enum MockReference {
     Import,
     Attribute,
 }
@@ -245,8 +245,8 @@ fn format_import_from(
 }
 
 /// UP026
-pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Attribute { value, .. } = &expr.node {
+pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
+    if let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &expr.node {
         if collect_call_path(value)
             .map_or(false, |call_path| call_path.as_slice() == ["mock", "mock"])
         {
@@ -269,13 +269,13 @@ pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
 }
 
 /// UP026
-pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
-        StmtKind::Import { names } => {
+        StmtKind::Import(ast::StmtImport { names }) => {
             // Find all `mock` imports.
             if names
                 .iter()
-                .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
+                .any(|name| &name.node.name == "mock" || &name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
                 let content = if checker.patch(Rule::DeprecatedMockImport) {
@@ -296,7 +296,7 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
 
                 // Add a `Diagnostic` for each `mock` import.
                 for name in names {
-                    if name.node.name == "mock" || name.node.name == "mock.mock" {
+                    if &name.node.name == "mock" || &name.node.name == "mock.mock" {
                         let mut diagnostic = Diagnostic::new(
                             DeprecatedMockImport {
                                 reference_type: MockReference::Import,
@@ -315,12 +315,12 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        StmtKind::ImportFrom {
+        StmtKind::ImportFrom(ast::StmtImportFrom {
             module: Some(module),
             level,
             ..
-        } => {
-            if level.map_or(false, |level| level > 0) {
+        }) => {
+            if level.map_or(false, |level| level.to_u32() > 0) {
                 return;
             }
 

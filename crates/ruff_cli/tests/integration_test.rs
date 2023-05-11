@@ -196,7 +196,15 @@ fn explain_status_codes() -> Result<()> {
 fn show_statistics() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text", "--select", "F401", "--statistics"])
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--select",
+            "F401",
+            "--statistics",
+            "--isolated",
+        ])
         .write_stdin("import sys\nimport os\n\nprint(os.getuid())\n")
         .assert()
         .failure();

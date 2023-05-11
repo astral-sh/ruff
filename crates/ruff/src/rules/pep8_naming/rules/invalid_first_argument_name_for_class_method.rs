@@ -55,7 +55,7 @@ impl Violation for InvalidFirstArgumentNameForClassMethod {
 }
 
 /// N804
-pub fn invalid_first_argument_name_for_class_method(
+pub(crate) fn invalid_first_argument_name_for_class_method(
     checker: &Checker,
     scope: &Scope,
     name: &str,
@@ -76,7 +76,7 @@ pub fn invalid_first_argument_name_for_class_method(
         return None;
     }
     if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
-        if arg.node.arg != "cls" {
+        if &arg.node.arg != "cls" {
             if checker
                 .settings
                 .pep8_naming

@@ -1,5 +1,5 @@
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -74,12 +74,11 @@ fn pytest_mark_parentheses(
 
 fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &CallPath) {
     match &decorator.node {
-        ExprKind::Call {
+        ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-            ..
-        } => {
+        }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
                 && args.is_empty()
                 && keywords.is_empty()
@@ -106,7 +105,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
 
     let mut has_parameters = false;
 
-    if let ExprKind::Call { args, keywords, .. } = &decorator.node {
+    if let ExprKind::Call(ast::ExprCall { args, keywords, .. }) = &decorator.node {
         if !args.is_empty() || !keywords.is_empty() {
             has_parameters = true;
         }
@@ -124,7 +123,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
     }
 }
 
-pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
+pub(crate) fn marks(checker: &mut Checker, decorators: &[Expr]) {
     let enforce_parentheses = checker
         .settings
         .rules

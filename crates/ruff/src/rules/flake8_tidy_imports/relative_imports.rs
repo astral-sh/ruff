@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{self, Int, Stmt, StmtKind};
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -86,7 +86,7 @@ impl Violation for RelativeImports {
 
 fn fix_banned_relative_import(
     stmt: &Stmt,
-    level: Option<usize>,
+    level: Option<u32>,
     module: Option<&str>,
     module_path: Option<&[String]>,
     stylist: &Stylist,
@@ -102,14 +102,14 @@ fn fix_banned_relative_import(
         return None;
     }
 
-    let StmtKind::ImportFrom { names, .. } = &stmt.node else {
+    let StmtKind::ImportFrom(ast::StmtImportFrom { names, .. }) = &stmt.node else {
         panic!("Expected StmtKind::ImportFrom");
     };
     let content = unparse_stmt(
-        &create_stmt(StmtKind::ImportFrom {
-            module: Some(module_path.to_string()),
+        &create_stmt(ast::StmtImportFrom {
+            module: Some(module_path.to_string().into()),
             names: names.clone(),
-            level: Some(0),
+            level: Some(Int::new(0)),
         }),
         stylist,
     );
@@ -124,7 +124,7 @@ fn fix_banned_relative_import(
 pub fn banned_relative_import(
     checker: &Checker,
     stmt: &Stmt,
-    level: Option<usize>,
+    level: Option<u32>,
     module: Option<&str>,
     module_path: Option<&[String]>,
     strictness: &Strictness,

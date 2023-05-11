@@ -497,8 +497,8 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
 
 #[allow(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Diagnostic]) {
+    let codes = collect_rule_codes(diagnostics.iter().map(|diagnostic| diagnostic.kind.rule()));
     if cfg!(debug_assertions) {
-        let codes = collect_rule_codes(diagnostics.iter().map(|diagnostic| diagnostic.kind.rule()));
         eprintln!(
             "{}: Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
             "debug error".red().bold(),
@@ -516,13 +516,14 @@ This indicates a bug in `{}`. If you could open an issue at:
 
     {}/issues/new?title=%5BInfinite%20loop%5D
 
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
             MAX_ITERATIONS,
             CARGO_PKG_NAME,
             CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
+            codes
         );
     }
 }
@@ -534,8 +535,8 @@ fn report_autofix_syntax_error(
     error: &ParseError,
     rules: impl IntoIterator<Item = Rule>,
 ) {
+    let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
-        let codes = collect_rule_codes(rules);
         eprintln!(
             "{}: Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
             "error".red().bold(),
@@ -553,12 +554,13 @@ This indicates a bug in `{}`. If you could open an issue at:
 
     {}/issues/new?title=%5BAutofix%20error%5D
 
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
             CARGO_PKG_NAME,
             CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
+            codes,
         );
     }
 }

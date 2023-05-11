@@ -47,7 +47,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub fn unnecessary_literal_set(
+pub(crate) fn unnecessary_literal_set(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -61,8 +61,8 @@ pub fn unnecessary_literal_set(
         return;
     }
     let kind = match argument {
-        ExprKind::List { .. } => "list",
-        ExprKind::Tuple { .. } => "tuple",
+        ExprKind::List(_) => "list",
+        ExprKind::Tuple(_) => "tuple",
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

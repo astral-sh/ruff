@@ -44,7 +44,7 @@ impl Violation for CamelcaseImportedAsConstant {
 }
 
 /// N814
-pub fn camelcase_imported_as_constant(
+pub(crate) fn camelcase_imported_as_constant(
     name: &str,
     asname: &str,
     alias: &Alias,

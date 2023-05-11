@@ -5,10 +5,11 @@ use ruff_python_ast::helpers::identifier_range;
 use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
 };
+use ruff_python_semantic::definition::{Definition, Member, MemberKind, Module, ModuleKind};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{Definition, DefinitionKind};
+
 use crate::registry::Rule;
 
 #[violation]
@@ -92,13 +93,20 @@ impl Violation for UndocumentedPublicInit {
 }
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
-pub fn not_missing(checker: &mut Checker, definition: &Definition, visibility: Visibility) -> bool {
-    if matches!(visibility, Visibility::Private) {
+pub(crate) fn not_missing(
+    checker: &mut Checker,
+    definition: &Definition,
+    visibility: Visibility,
+) -> bool {
+    if visibility.is_private() {
         return true;
     }
 
-    match definition.kind {
-        DefinitionKind::Module => {
+    match definition {
+        Definition::Module(Module {
+            kind: ModuleKind::Module,
+            ..
+        }) => {
             if checker
                 .settings
                 .rules
@@ -111,7 +119,10 @@ pub fn not_missing(checker: &mut Checker, definition: &Definition, visibility: V
             }
             false
         }
-        DefinitionKind::Package => {
+        Definition::Module(Module {
+            kind: ModuleKind::Package,
+            ..
+        }) => {
             if checker
                 .settings
                 .rules
@@ -124,7 +135,11 @@ pub fn not_missing(checker: &mut Checker, definition: &Definition, visibility: V
             }
             false
         }
-        DefinitionKind::Class(stmt) => {
+        Definition::Member(Member {
+            kind: MemberKind::Class,
+            stmt,
+            ..
+        }) => {
             if checker
                 .settings
                 .rules
@@ -137,7 +152,11 @@ pub fn not_missing(checker: &mut Checker, definition: &Definition, visibility: V
             }
             false
         }
-        DefinitionKind::NestedClass(stmt) => {
+        Definition::Member(Member {
+            kind: MemberKind::NestedClass,
+            stmt,
+            ..
+        }) => {
             if checker
                 .settings
                 .rules
@@ -150,7 +169,11 @@ pub fn not_missing(checker: &mut Checker, definition: &Definition, visibility: V
             }
             false
         }
-        DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
+        Definition::Member(Member {
+            kind: MemberKind::Function | MemberKind::NestedFunction,
+            stmt,
+            ..
+        }) => {
             if is_overload(&checker.ctx, cast::decorator_list(stmt)) {
                 true
             } else {
@@ -167,7 +190,11 @@ pub fn not_missing(checker: &mut Checker, definition: &Definition, visibility: V
                 false
             }
         }
-        DefinitionKind::Method(stmt) => {
+        Definition::Member(Member {
+            kind: MemberKind::Method,
+            stmt,
+            ..
+        }) => {
             if is_overload(&checker.ctx, cast::decorator_list(stmt))
                 || is_override(&checker.ctx, cast::decorator_list(stmt))
             {

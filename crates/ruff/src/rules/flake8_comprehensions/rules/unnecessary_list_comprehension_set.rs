@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Expr, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -40,7 +40,7 @@ impl AlwaysAutofixableViolation for UnnecessaryListComprehensionSet {
 }
 
 /// C403 (`set([...])`)
-pub fn unnecessary_list_comprehension_set(
+pub(crate) fn unnecessary_list_comprehension_set(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -53,7 +53,7 @@ pub fn unnecessary_list_comprehension_set(
     if !checker.ctx.is_builtin("set") {
         return;
     }
-    if let ExprKind::ListComp { .. } = &argument {
+    if argument.is_list_comp_expr() {
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]

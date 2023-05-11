@@ -55,7 +55,7 @@ fn extract_quote(text: &str) -> Result<&str> {
 }
 
 /// W605
-pub fn invalid_escape_sequence(
+pub(crate) fn invalid_escape_sequence(
     locator: &Locator,
     range: TextRange,
     autofix: bool,
