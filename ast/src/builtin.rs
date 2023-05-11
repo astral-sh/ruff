@@ -114,7 +114,7 @@ impl std::cmp::PartialEq<usize> for Int {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Constant {
     None,
     Bool(bool),
@@ -125,6 +125,21 @@ pub enum Constant {
     Float(f64),
     Complex { real: f64, imag: f64 },
     Ellipsis,
+}
+
+impl Constant {
+    pub fn is_true(self) -> bool {
+        self.bool().map_or(false, |b| b)
+    }
+    pub fn is_false(self) -> bool {
+        self.bool().map_or(false, |b| !b)
+    }
+    pub fn complex(self) -> Option<(f64, f64)> {
+        match self {
+            Constant::Complex { real, imag } => Some((real, imag)),
+            _ => None,
+        }
+    }
 }
 
 impl From<String> for Constant {
@@ -245,5 +260,16 @@ impl<T, U> std::ops::Deref for Attributed<T, U> {
 
     fn deref(&self) -> &Self::Target {
         &self.node
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_is_macro() {
+        let none = Constant::None;
+        assert!(none.is_none());
+        assert!(!none.is_bool());
     }
 }

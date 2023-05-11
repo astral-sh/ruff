@@ -46,7 +46,7 @@ impl<U> From<ModFunctionType<U>> for Mod<U> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Mod<U = ()> {
     Module(ModModule<U>),
     Interactive(ModInteractive<U>),
@@ -366,34 +366,61 @@ impl<U> From<StmtExpr<U>> for StmtKind<U> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum StmtKind<U = ()> {
+    #[is(name = "function_def_stmt")]
     FunctionDef(StmtFunctionDef<U>),
+    #[is(name = "async_function_def_stmt")]
     AsyncFunctionDef(StmtAsyncFunctionDef<U>),
+    #[is(name = "class_def_stmt")]
     ClassDef(StmtClassDef<U>),
+    #[is(name = "return_stmt")]
     Return(StmtReturn<U>),
+    #[is(name = "delete_stmt")]
     Delete(StmtDelete<U>),
+    #[is(name = "assign_stmt")]
     Assign(StmtAssign<U>),
+    #[is(name = "aug_assign_stmt")]
     AugAssign(StmtAugAssign<U>),
+    #[is(name = "ann_assign_stmt")]
     AnnAssign(StmtAnnAssign<U>),
+    #[is(name = "for_stmt")]
     For(StmtFor<U>),
+    #[is(name = "async_for_stmt")]
     AsyncFor(StmtAsyncFor<U>),
+    #[is(name = "while_stmt")]
     While(StmtWhile<U>),
+    #[is(name = "if_stmt")]
     If(StmtIf<U>),
+    #[is(name = "with_stmt")]
     With(StmtWith<U>),
+    #[is(name = "async_with_stmt")]
     AsyncWith(StmtAsyncWith<U>),
+    #[is(name = "match_stmt")]
     Match(StmtMatch<U>),
+    #[is(name = "raise_stmt")]
     Raise(StmtRaise<U>),
+    #[is(name = "try_stmt")]
     Try(StmtTry<U>),
+    #[is(name = "try_star_stmt")]
     TryStar(StmtTryStar<U>),
+    #[is(name = "assert_stmt")]
     Assert(StmtAssert<U>),
+    #[is(name = "import_stmt")]
     Import(StmtImport<U>),
+    #[is(name = "import_from_stmt")]
     ImportFrom(StmtImportFrom<U>),
+    #[is(name = "global_stmt")]
     Global(StmtGlobal),
+    #[is(name = "nonlocal_stmt")]
     Nonlocal(StmtNonlocal),
+    #[is(name = "expr_stmt")]
     Expr(StmtExpr<U>),
+    #[is(name = "pass_stmt")]
     Pass,
+    #[is(name = "break_stmt")]
     Break,
+    #[is(name = "continue_stmt")]
     Continue,
 }
 pub type Stmt<U = ()> = Attributed<StmtKind<U>, U>;
@@ -726,52 +753,79 @@ impl<U> From<ExprSlice<U>> for ExprKind<U> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum ExprKind<U = ()> {
+    #[is(name = "bool_op_expr")]
     BoolOp(ExprBoolOp<U>),
+    #[is(name = "named_expr_expr")]
     NamedExpr(ExprNamedExpr<U>),
+    #[is(name = "bin_op_expr")]
     BinOp(ExprBinOp<U>),
+    #[is(name = "unary_op_expr")]
     UnaryOp(ExprUnaryOp<U>),
+    #[is(name = "lambda_expr")]
     Lambda(ExprLambda<U>),
+    #[is(name = "if_exp_expr")]
     IfExp(ExprIfExp<U>),
+    #[is(name = "dict_expr")]
     Dict(ExprDict<U>),
+    #[is(name = "set_expr")]
     Set(ExprSet<U>),
+    #[is(name = "list_comp_expr")]
     ListComp(ExprListComp<U>),
+    #[is(name = "set_comp_expr")]
     SetComp(ExprSetComp<U>),
+    #[is(name = "dict_comp_expr")]
     DictComp(ExprDictComp<U>),
+    #[is(name = "generator_exp_expr")]
     GeneratorExp(ExprGeneratorExp<U>),
+    #[is(name = "await_expr")]
     Await(ExprAwait<U>),
+    #[is(name = "yield_expr")]
     Yield(ExprYield<U>),
+    #[is(name = "yield_from_expr")]
     YieldFrom(ExprYieldFrom<U>),
+    #[is(name = "compare_expr")]
     Compare(ExprCompare<U>),
+    #[is(name = "call_expr")]
     Call(ExprCall<U>),
+    #[is(name = "formatted_value_expr")]
     FormattedValue(ExprFormattedValue<U>),
+    #[is(name = "joined_str_expr")]
     JoinedStr(ExprJoinedStr<U>),
+    #[is(name = "constant_expr")]
     Constant(ExprConstant),
+    #[is(name = "attribute_expr")]
     Attribute(ExprAttribute<U>),
+    #[is(name = "subscript_expr")]
     Subscript(ExprSubscript<U>),
+    #[is(name = "starred_expr")]
     Starred(ExprStarred<U>),
+    #[is(name = "name_expr")]
     Name(ExprName),
+    #[is(name = "list_expr")]
     List(ExprList<U>),
+    #[is(name = "tuple_expr")]
     Tuple(ExprTuple<U>),
+    #[is(name = "slice_expr")]
     Slice(ExprSlice<U>),
 }
 pub type Expr<U = ()> = Attributed<ExprKind<U>, U>;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum ExprContext {
     Load,
     Store,
     Del,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Boolop {
     And,
     Or,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Operator {
     Add,
     Sub,
@@ -788,7 +842,7 @@ pub enum Operator {
     FloorDiv,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Unaryop {
     Invert,
     Not,
@@ -796,7 +850,7 @@ pub enum Unaryop {
     USub,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Cmpop {
     Eq,
     NotEq,
@@ -831,7 +885,7 @@ impl<U> From<ExcepthandlerExceptHandler<U>> for ExcepthandlerKind<U> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum ExcepthandlerKind<U = ()> {
     ExceptHandler(ExcepthandlerExceptHandler<U>),
 }
@@ -977,7 +1031,7 @@ impl<U> From<PatternMatchOr<U>> for PatternKind<U> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum PatternKind<U = ()> {
     MatchValue(PatternMatchValue<U>),
     MatchSingleton(PatternMatchSingleton),
@@ -1002,7 +1056,7 @@ impl From<TypeIgnoreTypeIgnore> for TypeIgnore {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum TypeIgnore {
     TypeIgnore(TypeIgnoreTypeIgnore),
 }

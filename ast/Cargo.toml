@@ -19,4 +19,5 @@ visitor = []
 rustpython-parser-core = { workspace = true }
 rustpython-literal = { workspace = true, optional = true }
 
+is-macro = { workspace = true }
 num-bigint = { workspace = true }
