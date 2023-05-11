@@ -300,7 +300,7 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
                 for line in diff_str.splitlines():
                     # Find rule change for current line or construction
                     # + <rule>/<path>:<line>:<column>: <rule_code> <message>
-                    matches = re.search(r": [A-Z]{1,3}[0-9]{3,4}", line)
+                    matches = re.search(r": ([A-Z]{1,3}[0-9]{3,4})", line)
 
                     if matches is None:
                         # Handle case where there are no regex matches e.g.
@@ -308,7 +308,7 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
                         # Which was found in local testing
                         continue
 
-                    rule_code = matches.group(0)[2:]  # Trim leading ": "
+                    rule_code = matches.group(1)
 
                     # Get current additions and removals for this rule
                     current_changes = rule_changes.get(rule_code, (0, 0))
