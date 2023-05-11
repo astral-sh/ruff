@@ -563,6 +563,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (PygrepHooks, "002") => Rule::DeprecatedLogWarn,
         (PygrepHooks, "003") => Rule::BlanketTypeIgnore,
         (PygrepHooks, "004") => Rule::BlanketNOQA,
+        (PygrepHooks, "005") => Rule::InvalidMockAccess,
 
         // pandas-vet
         (PandasVet, "002") => Rule::PandasUseOfInplaceArgument,

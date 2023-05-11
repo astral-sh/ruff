@@ -1657,6 +1657,9 @@ where
                 if self.settings.rules.enabled(Rule::AssertOnStringLiteral) {
                     pylint::rules::assert_on_string_literal(self, test);
                 }
+                if self.settings.rules.enabled(Rule::InvalidMockAccess) {
+                    pygrep_hooks::rules::non_existent_mock_method(self, test);
+                }
             }
             StmtKind::With { items, body, .. } => {
                 if self.settings.rules.enabled(Rule::AssertRaisesException) {
@@ -1947,6 +1950,9 @@ where
                 }
                 if self.settings.rules.enabled(Rule::UselessExpression) {
                     flake8_bugbear::rules::useless_expression(self, value);
+                }
+                if self.settings.rules.enabled(Rule::InvalidMockAccess) {
+                    pygrep_hooks::rules::uncalled_mock_method(self, value);
                 }
                 if self.settings.rules.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
