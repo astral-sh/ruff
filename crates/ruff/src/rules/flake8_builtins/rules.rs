@@ -1,11 +1,11 @@
 use rustpython_parser::ast::Attributed;
 
+use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::builtins::BUILTINS;
 
-use super::types::ShadowingType;
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for variable (and function) assignments that use the same name
@@ -54,7 +54,7 @@ impl Violation for BuiltinVariableShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinVariableShadowing { name } = self;
-        format!("Variable `{name}` is shadowing a python builtin")
+        format!("Variable `{name}` is shadowing a Python builtin")
     }
 }
 
@@ -108,7 +108,7 @@ impl Violation for BuiltinArgumentShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinArgumentShadowing { name } = self;
-        format!("Argument `{name}` is shadowing a python builtin")
+        format!("Argument `{name}` is shadowing a Python builtin")
     }
 }
 
@@ -163,36 +163,58 @@ impl Violation for BuiltinAttributeShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BuiltinAttributeShadowing { name } = self;
-        format!("Class attribute `{name}` is shadowing a python builtin")
+        format!("Class attribute `{name}` is shadowing a Python builtin")
     }
 }
 
-/// Check builtin name shadowing.
-pub fn builtin_shadowing<T>(
+fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
+    BUILTINS.contains(&name) && ignorelist.iter().all(|ignore| ignore != name)
+}
+
+/// A001
+pub fn builtin_variable_shadowing<T>(
+    checker: &mut Checker,
     name: &str,
-    located: &Attributed<T>,
-    node_type: ShadowingType,
-    ignorelist: &[String],
-) -> Option<Diagnostic> {
-    if BUILTINS.contains(&name) && !ignorelist.contains(&name.to_string()) {
-        Some(Diagnostic::new::<DiagnosticKind>(
-            match node_type {
-                ShadowingType::Variable => BuiltinVariableShadowing {
-                    name: name.to_string(),
-                }
-                .into(),
-                ShadowingType::Argument => BuiltinArgumentShadowing {
-                    name: name.to_string(),
-                }
-                .into(),
-                ShadowingType::Attribute => BuiltinAttributeShadowing {
-                    name: name.to_string(),
-                }
-                .into(),
+    attributed: &Attributed<T>,
+) {
+    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+        checker.diagnostics.push(Diagnostic::new(
+            BuiltinVariableShadowing {
+                name: name.to_string(),
             },
-            located.range(),
-        ))
-    } else {
-        None
+            attributed.range(),
+        ));
+    }
+}
+
+/// A002
+pub fn builtin_argument_shadowing<T>(
+    checker: &mut Checker,
+    name: &str,
+    attributed: &Attributed<T>,
+) {
+    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+        checker.diagnostics.push(Diagnostic::new(
+            BuiltinArgumentShadowing {
+                name: name.to_string(),
+            },
+            attributed.range(),
+        ));
+    }
+}
+
+/// A003
+pub fn builtin_attribute_shadowing<T>(
+    checker: &mut Checker,
+    name: &str,
+    attributed: &Attributed<T>,
+) {
+    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+        checker.diagnostics.push(Diagnostic::new(
+            BuiltinAttributeShadowing {
+                name: name.to_string(),
+            },
+            attributed.range(),
+        ));
     }
 }
