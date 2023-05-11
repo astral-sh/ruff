@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -41,13 +41,18 @@ impl Violation for AssignmentFromNone {
 }
 /// PLE1128
 pub fn assignment_from_none(checker: &mut Checker, body: &Stmt) {
-    match body.node {
-        StmtKind::Return { .. } => {
-            checker.diagnostics.push(Diagnostic::new(
-                AssignmentFromNone { kind: Kind::Empty },
-                body.range(),
-            ));
+    // if return statement
+    if let StmtKind::Return { value } = body.node() {
+        // if something on that return statement
+        if let Some(expr) = value {
+            // if function call
+            if let ExprKind::Call { func, .. } = expr.node() {
+                println!("{:?}", func);
+                checker.diagnostics.push(Diagnostic::new(
+                    AssignmentFromNone { kind: Kind::Empty },
+                    body.range(),
+                ));
+            }
         }
-        _ => {}
     }
 }
