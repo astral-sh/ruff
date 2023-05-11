@@ -10,9 +10,13 @@ use crate::args::HelpFormat;
 
 #[derive(Serialize)]
 struct Explanation<'a> {
+    name: &'a str,
     code: &'a str,
     linter: &'a str,
     summary: &'a str,
+    message_formats: &'a [&'a str],
+    autofix: &'a str,
+    explanation: Option<&'a str>,
 }
 
 /// Explain a `Rule` to the user.
@@ -51,9 +55,13 @@ pub(crate) fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
         }
         HelpFormat::Json => {
             output.push_str(&serde_json::to_string_pretty(&Explanation {
+                name: rule.as_ref(),
                 code: &rule.noqa_code().to_string(),
                 linter: linter.name(),
                 summary: rule.message_formats()[0],
+                message_formats: rule.message_formats(),
+                autofix: &rule.autofixable().to_string(),
+                explanation: rule.explanation(),
             })?);
         }
     };
