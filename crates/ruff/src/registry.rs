@@ -530,6 +530,7 @@ ruff_macros::register_rules!(
     // flake8-pyi
     rules::flake8_pyi::rules::ArgumentDefaultInStub,
     rules::flake8_pyi::rules::AssignmentDefaultInStub,
+    rules::flake8_pyi::rules::UnannotatedAssignmentInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
     rules::flake8_pyi::rules::NonEmptyStubBody,

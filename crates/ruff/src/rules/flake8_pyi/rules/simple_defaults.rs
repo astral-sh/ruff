@@ -424,10 +424,23 @@ pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value
     if is_type_var_like_call(&checker.ctx, value) {
         return;
     }
+
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if is_valid_default_value_with_annotation(value, checker, true) {
+
+    let inside_non_enum_class = is_inside_class(&checker.ctx, &targets[0]) && !is_inside_enum_class(&checker.ctx, &targets[0]);
+    if inside_non_enum_class && is_valid_default_value_with_annotation(value, checker, true) {
+        let mut diagnostic = Diagnostic::new(UnannotatedAssignmentInStub, value.range()); 
+
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                "...".to_string(),
+                value.range(),
+            )));
+        }
+
+        checker.diagnostics.push(diagnostic);
         return;
     }
 
@@ -469,44 +482,4 @@ pub fn annotated_assignment_default_in_stub(
         )));
     }
     checker.diagnostics.push(diagnostic);
-}
-
-// PYI052
-pub fn assignment_default_in_async_stub(
-    checker: &mut Checker,
-    targets: &[Expr],
-    value: &Expr,
-    annotation: Option<&Expr>,
-) {
-    if is_valid_default_value_without_annotation(value) {
-        return;
-    }
-
-    if let Some(annotation) = annotation {
-        if is_valid_default_value_with_annotation(value, checker, true) {
-            // Annoying special-casing to exclude enums from Y052
-            // Check if you're inside a class and if the class is not an enum class
-            let inside_non_enum_class = is_inside_class(&checker.ctx, &targets[0]) && !is_inside_enum_class(&checker.ctx, &targets[0]);
-
-            if inside_non_enum_class {
-                let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range()); // Make sure AssignmentDefaultInAsyncStub is defined in your code
-
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                        "...".to_string(),
-                        value.range(),
-                    )));
-                }
-
-                checker.diagnostics.push(diagnostic);
-                return;
-            }
-        }
-
-        // Call annotated_assignment_default_in_stub when necessary
-        annotated_assignment_default_in_stub(checker, &targets[0], value, annotation);
-    } else {
-        // Call assignment_default_in_stub when necessary
-        assignment_default_in_stub(checker, targets, value);
-    }
 }
