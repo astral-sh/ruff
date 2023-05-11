@@ -6,9 +6,9 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    self, Arg, Arguments, Attributed, Comprehension, Constant, Excepthandler, ExcepthandlerKind,
-    Expr, ExprContext, ExprKind, KeywordData, Operator, Pattern, PatternKind, Stmt, StmtKind,
-    Suite, Unaryop,
+    self, Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr,
+    ExprContext, ExprKind, KeywordData, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite,
+    Unaryop,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix};
@@ -611,7 +611,15 @@ where
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
 
-                self.check_builtin_shadowing(name, stmt, true);
+                if self.ctx.scope().kind.is_class() {
+                    if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
+                        flake8_builtins::rules::builtin_attribute_shadowing(self, name, stmt);
+                    }
+                } else {
+                    if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
+                        flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                    }
+                }
             }
             StmtKind::Return(_) => {
                 if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
@@ -774,7 +782,9 @@ where
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
 
-                self.check_builtin_shadowing(name, stmt, false);
+                if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
+                    flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                }
             }
             StmtKind::Import(ast::StmtImport { names }) => {
                 if self.settings.rules.enabled(Rule::MultipleImportsOnOneLine) {
@@ -882,7 +892,11 @@ where
                         );
 
                         if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(asname, stmt, false);
+                            if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
+                                flake8_builtins::rules::builtin_variable_shadowing(
+                                    self, asname, stmt,
+                                );
+                            }
                         }
                     }
 
@@ -1186,7 +1200,11 @@ where
                         }
                     } else {
                         if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(asname, stmt, false);
+                            if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
+                                flake8_builtins::rules::builtin_variable_shadowing(
+                                    self, asname, stmt,
+                                );
+                            }
                         }
 
                         // Treat explicit re-export as usage (e.g., `from .applications
@@ -2354,7 +2372,15 @@ where
                             }
                         }
 
-                        self.check_builtin_shadowing(id, expr, true);
+                        if self.ctx.scope().kind.is_class() {
+                            if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
+                                flake8_builtins::rules::builtin_attribute_shadowing(self, id, expr);
+                            }
+                        } else {
+                            if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
+                                flake8_builtins::rules::builtin_variable_shadowing(self, id, expr);
+                            }
+                        }
 
                         self.handle_node_store(id, expr);
                     }
@@ -3960,7 +3986,13 @@ where
                             }
                         }
 
-                        self.check_builtin_shadowing(name, excepthandler, false);
+                        if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
+                            flake8_builtins::rules::builtin_variable_shadowing(
+                                self,
+                                name,
+                                excepthandler,
+                            );
+                        }
 
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
@@ -4119,7 +4151,9 @@ where
             }
         }
 
-        self.check_builtin_arg_shadowing(&arg.node.arg, arg);
+        if self.settings.rules.enabled(Rule::BuiltinArgumentShadowing) {
+            flake8_builtins::rules::builtin_argument_shadowing(self, &arg.node.arg, arg);
+        }
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
@@ -5588,50 +5622,6 @@ impl<'a> Checker<'a> {
                         self.settings.pydocstyle.convention.as_ref(),
                     );
                 }
-            }
-        }
-    }
-
-    fn check_builtin_shadowing<T>(
-        &mut self,
-        name: &str,
-        located: &Attributed<T>,
-        is_attribute: bool,
-    ) {
-        if is_attribute && matches!(self.ctx.scope().kind, ScopeKind::Class(_)) {
-            if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
-                if let Some(diagnostic) = flake8_builtins::rules::builtin_shadowing(
-                    name,
-                    located,
-                    flake8_builtins::types::ShadowingType::Attribute,
-                    &self.settings.flake8_builtins.builtins_ignorelist,
-                ) {
-                    self.diagnostics.push(diagnostic);
-                }
-            }
-        } else {
-            if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                if let Some(diagnostic) = flake8_builtins::rules::builtin_shadowing(
-                    name,
-                    located,
-                    flake8_builtins::types::ShadowingType::Variable,
-                    &self.settings.flake8_builtins.builtins_ignorelist,
-                ) {
-                    self.diagnostics.push(diagnostic);
-                }
-            }
-        }
-    }
-
-    fn check_builtin_arg_shadowing(&mut self, name: &str, arg: &Arg) {
-        if self.settings.rules.enabled(Rule::BuiltinArgumentShadowing) {
-            if let Some(diagnostic) = flake8_builtins::rules::builtin_shadowing(
-                name,
-                arg,
-                flake8_builtins::types::ShadowingType::Argument,
-                &self.settings.flake8_builtins.builtins_ignorelist,
-            ) {
-                self.diagnostics.push(diagnostic);
             }
         }
     }

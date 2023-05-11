@@ -1,17 +1,15 @@
 //! Rules from [flake8-builtins](https://pypi.org/project/flake8-builtins/).
 pub(crate) mod rules;
 pub mod settings;
-pub(crate) mod types;
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
