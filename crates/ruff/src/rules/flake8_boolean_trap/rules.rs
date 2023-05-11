@@ -38,11 +38,13 @@ impl Violation for BooleanPositionalValueInFunctionCall {
 }
 
 const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
+    "append",
     "assertEqual",
     "assertEquals",
     "assertNotEqual",
     "assertNotEquals",
     "bytes",
+    "count",
     "failIfEqual",
     "failUnlessEqual",
     "float",
@@ -53,9 +55,11 @@ const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "getfloat",
     "getint",
     "index",
+    "insert",
     "int",
     "param",
     "pop",
+    "remove",
     "setattr",
     "setdefault",
     "str",
