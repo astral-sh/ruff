@@ -604,90 +604,14 @@ where
                     );
                 }
 
+                if self.settings.rules.enabled(Rule::FStringDocstring) {
+                    flake8_bugbear::rules::f_string_docstring(self, body);
+                }
+                if self.settings.rules.enabled(Rule::YieldInForLoop) {
+                    pyupgrade::rules::yield_in_for_loop(self, stmt);
+                }
+
                 self.check_builtin_shadowing(name, stmt, true);
-
-                // Visit the decorators and arguments, but avoid the body, which will be
-                // deferred.
-                for expr in decorator_list {
-                    self.visit_expr(expr);
-                }
-
-                // Function annotations are always evaluated at runtime, unless future annotations
-                // are enabled.
-                let runtime_annotation = !self.ctx.annotations_future_enabled;
-
-                for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        if runtime_annotation {
-                            visit_type_definition!(self, expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                for arg in &args.args {
-                    if let Some(expr) = &arg.node.annotation {
-                        if runtime_annotation {
-                            visit_type_definition!(self, expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.node.annotation {
-                        if runtime_annotation {
-                            visit_type_definition!(self, expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                for arg in &args.kwonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        if runtime_annotation {
-                            visit_type_definition!(self, expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                if let Some(arg) = &args.kwarg {
-                    if let Some(expr) = &arg.node.annotation {
-                        if runtime_annotation {
-                            visit_type_definition!(self, expr);
-                        } else {
-                            self.visit_annotation(expr);
-                        };
-                    }
-                }
-                for expr in returns {
-                    if runtime_annotation {
-                        visit_type_definition!(self, expr);
-                    } else {
-                        self.visit_annotation(expr);
-                    };
-                }
-                for expr in &args.kw_defaults {
-                    self.visit_expr(expr);
-                }
-                for expr in &args.defaults {
-                    self.visit_expr(expr);
-                }
-
-                self.add_binding(
-                    name,
-                    Binding {
-                        kind: BindingKind::FunctionDefinition,
-                        runtime_usage: None,
-                        synthetic_usage: None,
-                        typing_usage: None,
-                        range: stmt.range(),
-                        source: self.ctx.stmt_id,
-                        context: self.ctx.execution_context(),
-                        exceptions: self.ctx.exceptions(),
-                    },
-                );
             }
             StmtKind::Return(_) => {
                 if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
@@ -846,17 +770,11 @@ where
                     }
                 }
 
-                self.check_builtin_shadowing(name, stmt, false);
+                if self.settings.rules.enabled(Rule::FStringDocstring) {
+                    flake8_bugbear::rules::f_string_docstring(self, body);
+                }
 
-                for expr in bases {
-                    self.visit_expr(expr);
-                }
-                for keyword in keywords {
-                    self.visit_keyword(keyword);
-                }
-                for expr in decorator_list {
-                    self.visit_expr(expr);
-                }
+                self.check_builtin_shadowing(name, stmt, false);
             }
             StmtKind::Import(ast::StmtImport { names }) => {
                 if self.settings.rules.enabled(Rule::MultipleImportsOnOneLine) {
@@ -1946,6 +1864,7 @@ where
                 name,
                 args,
                 decorator_list,
+                returns,
                 ..
             })
             | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -1953,14 +1872,91 @@ where
                 name,
                 args,
                 decorator_list,
+                returns,
                 ..
             }) => {
-                if self.settings.rules.enabled(Rule::FStringDocstring) {
-                    flake8_bugbear::rules::f_string_docstring(self, body);
+                // Visit the decorators and arguments, but avoid the body, which will be
+                // deferred.
+                for expr in decorator_list {
+                    self.visit_expr(expr);
                 }
-                if self.settings.rules.enabled(Rule::YieldInForLoop) {
-                    pyupgrade::rules::yield_in_for_loop(self, stmt);
+
+                // Function annotations are always evaluated at runtime, unless future annotations
+                // are enabled.
+                let runtime_annotation = !self.ctx.annotations_future_enabled;
+
+                for arg in &args.posonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
                 }
+                for arg in &args.args {
+                    if let Some(expr) = &arg.node.annotation {
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
+                }
+                if let Some(arg) = &args.vararg {
+                    if let Some(expr) = &arg.node.annotation {
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
+                }
+                for arg in &args.kwonlyargs {
+                    if let Some(expr) = &arg.node.annotation {
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
+                }
+                if let Some(arg) = &args.kwarg {
+                    if let Some(expr) = &arg.node.annotation {
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
+                    }
+                }
+                for expr in returns {
+                    if runtime_annotation {
+                        visit_type_definition!(self, expr);
+                    } else {
+                        self.visit_annotation(expr);
+                    };
+                }
+                for expr in &args.kw_defaults {
+                    self.visit_expr(expr);
+                }
+                for expr in &args.defaults {
+                    self.visit_expr(expr);
+                }
+
+                self.add_binding(
+                    name,
+                    Binding {
+                        kind: BindingKind::FunctionDefinition,
+                        runtime_usage: None,
+                        synthetic_usage: None,
+                        typing_usage: None,
+                        range: stmt.range(),
+                        source: self.ctx.stmt_id,
+                        context: self.ctx.execution_context(),
+                        exceptions: self.ctx.exceptions(),
+                    },
+                );
 
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = helpers::extract_globals(body);
@@ -2011,8 +2007,14 @@ where
                 keywords,
                 decorator_list,
             }) => {
-                if self.settings.rules.enabled(Rule::FStringDocstring) {
-                    flake8_bugbear::rules::f_string_docstring(self, body);
+                for expr in bases {
+                    self.visit_expr(expr);
+                }
+                for keyword in keywords {
+                    self.visit_keyword(keyword);
+                }
+                for expr in decorator_list {
+                    self.visit_expr(expr);
                 }
 
                 // If any global bindings don't already exist in the global scope, add it.
