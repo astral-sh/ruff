@@ -14,26 +14,26 @@ use crate::format::comments::{end_of_line_comments, leading_comments, trailing_c
 use crate::format::helpers::is_self_closing;
 use crate::shared_traits::AsFormat;
 
-fn format_break(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+fn format_break(f: &mut Formatter<ASTFormatContext>, stmt: &Stmt) -> FormatResult<()> {
     write!(f, [text("break")])?;
     write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
-fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+fn format_pass(f: &mut Formatter<ASTFormatContext>, stmt: &Stmt) -> FormatResult<()> {
     write!(f, [text("pass")])?;
     write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
-fn format_continue(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+fn format_continue(f: &mut Formatter<ASTFormatContext>, stmt: &Stmt) -> FormatResult<()> {
     write!(f, [text("continue")])?;
     write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
 fn format_global(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     names: &[String],
 ) -> FormatResult<()> {
@@ -46,7 +46,7 @@ fn format_global(
 }
 
 fn format_nonlocal(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     names: &[String],
 ) -> FormatResult<()> {
@@ -59,7 +59,7 @@ fn format_nonlocal(
 }
 
 fn format_delete(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     targets: &[Expr],
 ) -> FormatResult<()> {
@@ -97,7 +97,7 @@ fn format_delete(
 }
 
 fn format_class_def(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     name: &str,
     bases: &[Expr],
     keywords: &[Keyword],
@@ -157,7 +157,7 @@ fn format_class_def(
 }
 
 fn format_func_def(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     name: &str,
     args: &Arguments,
@@ -204,7 +204,7 @@ fn format_func_def(
 }
 
 fn format_assign(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     targets: &[Expr],
     value: &Expr,
@@ -236,7 +236,7 @@ fn format_assign(
 }
 
 fn format_aug_assign(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     target: &Expr,
     op: &Operator,
@@ -264,7 +264,7 @@ fn format_aug_assign(
 }
 
 fn format_ann_assign(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     target: &Expr,
     annotation: &Expr,
@@ -301,7 +301,7 @@ fn format_ann_assign(
 }
 
 fn format_for(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     target: &Expr,
     iter: &Expr,
@@ -342,7 +342,7 @@ fn format_for(
 }
 
 fn format_while(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     test: &Expr,
     body: &Body,
@@ -383,7 +383,7 @@ fn format_while(
 }
 
 fn format_if(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     test: &Expr,
     body: &Body,
     orelse: Option<&Body>,
@@ -449,7 +449,7 @@ fn format_if(
 }
 
 fn format_match(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     subject: &Expr,
     cases: &[MatchCase],
@@ -471,7 +471,7 @@ fn format_match(
 }
 
 fn format_raise(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     exc: Option<&Expr>,
     cause: Option<&Expr>,
@@ -487,7 +487,7 @@ fn format_raise(
 }
 
 fn format_return(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     value: Option<&Expr>,
 ) -> FormatResult<()> {
@@ -502,7 +502,7 @@ fn format_return(
 }
 
 fn format_try(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     body: &Body,
     handlers: &[Excepthandler],
@@ -534,7 +534,7 @@ fn format_try(
 }
 
 fn format_try_star(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     body: &Body,
     handlers: &[Excepthandler],
@@ -577,7 +577,7 @@ fn format_try_star(
 }
 
 fn format_assert(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     test: &Expr,
     msg: Option<&Expr>,
@@ -609,7 +609,7 @@ fn format_assert(
 }
 
 fn format_import(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     names: &[Alias],
 ) -> FormatResult<()> {
@@ -638,7 +638,7 @@ fn format_import(
 }
 
 fn format_import_from(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     module: Option<&str>,
     names: &[Alias],
@@ -693,11 +693,7 @@ fn format_import_from(
     Ok(())
 }
 
-fn format_expr(
-    f: &mut Formatter<ASTFormatContext<'_>>,
-    stmt: &Stmt,
-    expr: &Expr,
-) -> FormatResult<()> {
+fn format_expr(f: &mut Formatter<ASTFormatContext>, stmt: &Stmt, expr: &Expr) -> FormatResult<()> {
     if stmt.parentheses.is_always() {
         write!(
             f,
@@ -726,7 +722,7 @@ fn format_expr(
 }
 
 fn format_with_(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     stmt: &Stmt,
     items: &[Withitem],
     body: &Body,
@@ -768,8 +764,8 @@ pub struct FormatStmt<'a> {
     item: &'a Stmt,
 }
 
-impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for FormatStmt<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         write!(f, [leading_comments(self.item)])?;
 
         match &self.item.node {
@@ -951,7 +947,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
     }
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Stmt {
+impl AsFormat<ASTFormatContext> for Stmt {
     type Format<'a> = FormatStmt<'a>;
 
     fn format(&self) -> Self::Format<'_> {

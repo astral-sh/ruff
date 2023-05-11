@@ -50,7 +50,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
                 indent_style: IndentStyle::Space(4),
                 line_width: 88.try_into().unwrap(),
             },
-            locator,
+            locator.contents(),
         ),
         [format::builders::statements(&python_cst)]
     )

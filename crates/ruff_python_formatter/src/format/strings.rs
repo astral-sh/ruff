@@ -13,8 +13,8 @@ pub struct StringLiteralPart {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for StringLiteralPart {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for StringLiteralPart {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
         // Extract leading and trailing quotes.
@@ -119,8 +119,8 @@ pub struct StringLiteral<'a> {
     expr: &'a Expr,
 }
 
-impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for StringLiteral<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let expr = self.expr;
 
         // TODO(charlie): This tokenization needs to happen earlier, so that we can attach

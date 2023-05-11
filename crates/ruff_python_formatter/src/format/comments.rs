@@ -11,8 +11,8 @@ pub struct LeadingComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
-impl<T> Format<ASTFormatContext<'_>> for LeadingComments<'_, T> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl<T> Format<ASTFormatContext> for LeadingComments<'_, T> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for trivia in &self.item.trivia {
             if trivia.relationship.is_leading() {
                 match trivia.kind {
@@ -40,8 +40,8 @@ pub struct TrailingComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
-impl<T> Format<ASTFormatContext<'_>> for TrailingComments<'_, T> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl<T> Format<ASTFormatContext> for TrailingComments<'_, T> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for trivia in &self.item.trivia {
             if trivia.relationship.is_trailing() {
                 match trivia.kind {
@@ -69,8 +69,8 @@ pub struct EndOfLineComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
-impl<T> Format<ASTFormatContext<'_>> for EndOfLineComments<'_, T> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl<T> Format<ASTFormatContext> for EndOfLineComments<'_, T> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let mut first = true;
         for range in self
             .item
@@ -97,8 +97,8 @@ pub struct DanglingComments<'a, T> {
     item: &'a Attributed<T>,
 }
 
-impl<T> Format<ASTFormatContext<'_>> for DanglingComments<'_, T> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl<T> Format<ASTFormatContext> for DanglingComments<'_, T> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for trivia in &self.item.trivia {
             if trivia.relationship.is_dangling() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
