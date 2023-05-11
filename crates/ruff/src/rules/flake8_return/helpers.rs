@@ -1,5 +1,5 @@
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
@@ -11,10 +11,7 @@ pub fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
         expr.map(|expr| {
             !matches!(
                 expr.node,
-                ExprKind::Constant(ast::ExprConstant {
-                    value: Constant::None,
-                    ..
-                })
+                ExprKind::Constant(ref constant) if constant.value.is_none()
             )
         })
         .unwrap_or(false)

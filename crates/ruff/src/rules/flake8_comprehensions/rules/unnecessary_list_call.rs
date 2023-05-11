@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::Expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -45,7 +45,7 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if !checker.ctx.is_builtin("list") {
         return;
     }
-    if !matches!(argument, ExprKind::ListComp(_)) {
+    if !argument.is_list_comp_expr() {
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());
