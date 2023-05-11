@@ -445,7 +445,7 @@ pub fn get_or_import_symbol(
     if let Some((source, binding)) = context.resolve_qualified_import_name(module, member) {
         // If the symbol is already available in the current scope, use it.
         //
-        // We also add a no-nop edit to force conflicts with any other fixes that might try to
+        // We also add a no-op edit to force conflicts with any other fixes that might try to
         // remove the import. Consider:
         //
         // ```py
