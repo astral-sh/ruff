@@ -397,30 +397,27 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [meson-python](https://github.com/mesonbuild/meson-python)
 - [nox](https://github.com/wntrblm/nox)
 
-### Want to show you're using Ruff too?
+### Show Your Support
 
-You can use this badge in your project's README.md:
+If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 
 ```md
-[![linting: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json&label=linting)](https://github.com/charliermarsh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/charliermarsh/ruff)
 ```
 
-or in your project's README.rst:
+...or `README.rst`:
 
 ```rst
-.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json&label=linting
+.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json
     :target: https://github.com/charliermarsh/ruff
     :alt: Ruff
 ```
 
-or as HTML:
+...or, as HTML:
 
 ```html
-<a href="https://github.com/charliermarsh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json&label=linting" alt="Ruff" style="max-width:100%;"></a>
+<a href="https://github.com/charliermarsh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
 ```
-
-Which will look like this:
-[![linting: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json&label=linting)](https://github.com/charliermarsh/ruff)
 
 ## License
 
