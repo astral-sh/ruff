@@ -139,19 +139,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "ascii"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d92bec98840b8f03a5ff5413de5293bfcd8bf96467cf5452609f939ec6f5de16"
-
-[[package]]
 name = "assert_cmd"
 version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86d6b683edf8d1119fe420a94f8a7e389239666aa72e65495d91c00462510151"
 dependencies = [
  "anstyle",
- "bstr 1.4.0",
+ "bstr",
  "doc-comment",
  "predicates",
  "predicates-core",
@@ -202,17 +196,6 @@ name = "bitflags"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24a6904aef64d73cf10ab17ebace7befb918b82164785cb89907993be7f83813"
-
-[[package]]
-name = "bstr"
-version = "0.2.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3569f383e8f1598449f1a423e72e99569137b47740b1da11ef19af3d5c3223"
-dependencies = [
- "lazy_static",
- "memchr",
- "regex-automata",
-]
 
 [[package]]
 name = "bstr"
@@ -858,7 +841,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "029d74589adefde59de1a0c4f4732695c32805624aec7b68d91503d4dba79afc"
 dependencies = [
  "aho-corasick 0.7.20",
- "bstr 1.4.0",
+ "bstr",
  "fnv",
  "log",
  "regex",
@@ -1212,31 +1195,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b085a4f2cde5781fc4b1717f2e86c62f5cda49de7ba99a7c2eae02b61c9064c"
 
 [[package]]
-name = "lock_api"
-version = "0.4.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "435011366fe56583b16cf956f9df0095b405b82d76425bc8981c0e22e60ec4df"
-dependencies = [
- "autocfg",
- "scopeguard",
-]
-
-[[package]]
 name = "log"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "lz4_flex"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a8cbbb2831780bc3b9c15a41f5b49222ef756b6730a95f3decfdd15903eb5a3"
-dependencies = [
- "twox-hash",
 ]
 
 [[package]]
@@ -1362,15 +1326,6 @@ checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
 dependencies = [
  "autocfg",
  "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-complex"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02e0d21255c828d6f128a1e41534206671e8c3ea0c62f32291e808dc82cff17d"
-dependencies = [
  "num-traits",
 ]
 
@@ -1593,12 +1548,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ppv-lite86"
-version = "0.2.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
-
-[[package]]
 name = "predicates"
 version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1704,29 +1653,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "radium"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
-
-[[package]]
 name = "rand"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
- "libc",
- "rand_chacha",
- "rand_core",
-]
-
-[[package]]
-name = "rand_chacha"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
-dependencies = [
- "ppv-lite86",
  "rand_core",
 ]
 
@@ -1735,9 +1666,6 @@ name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
-dependencies = [
- "getrandom",
-]
 
 [[package]]
 name = "rayon"
@@ -1892,7 +1820,7 @@ dependencies = [
  "ruff_rustpython",
  "ruff_text_size",
  "rustc-hash",
- "rustpython-common",
+ "rustpython-format",
  "rustpython-parser",
  "schemars",
  "semver",
@@ -1999,7 +1927,7 @@ dependencies = [
  "ruff",
  "ruff_cli",
  "ruff_diagnostics",
- "rustpython-common",
+ "rustpython-format",
  "rustpython-parser",
  "schemars",
  "serde_json",
@@ -2059,7 +1987,7 @@ dependencies = [
  "regex",
  "ruff_text_size",
  "rustc-hash",
- "rustpython-literal 0.2.0 (git+https://github.com/RustPython/Parser.git?rev=947fb53d0b41fec465db3d8e725bdb2eec1299ec)",
+ "rustpython-literal",
  "rustpython-parser",
  "serde",
  "smallvec",
@@ -2130,7 +2058,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=947fb53d0b41fec465db3d8e725bdb2eec1299ec#947fb53d0b41fec465db3d8e725bdb2eec1299ec"
+source = "git+https://github.com/RustPython/Parser.git?rev=a983f4383fb1ad8c1c66acb1d5b0016e59f95a49#a983f4383fb1ad8c1c66acb1d5b0016e59f95a49"
 dependencies = [
  "schemars",
  "serde",
@@ -2201,7 +2129,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=947fb53d0b41fec465db3d8e725bdb2eec1299ec#947fb53d0b41fec465db3d8e725bdb2eec1299ec"
+source = "git+https://github.com/RustPython/Parser.git?rev=a983f4383fb1ad8c1c66acb1d5b0016e59f95a49#a983f4383fb1ad8c1c66acb1d5b0016e59f95a49"
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -2209,44 +2137,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustpython-common"
+name = "rustpython-format"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=f3e4d3409253660bd4fa7f3d24d3db747e7dca61#f3e4d3409253660bd4fa7f3d24d3db747e7dca61"
+source = "git+https://github.com/RustPython/Parser.git?rev=a983f4383fb1ad8c1c66acb1d5b0016e59f95a49#a983f4383fb1ad8c1c66acb1d5b0016e59f95a49"
 dependencies = [
- "ascii",
  "bitflags 2.2.1",
- "bstr 0.2.17",
- "cfg-if",
  "itertools",
- "libc",
- "lock_api",
  "num-bigint",
- "num-complex",
  "num-traits",
- "once_cell",
- "radium",
- "rand",
- "rustpython-literal 0.2.0 (git+https://github.com/youknowone/RustPython-parser.git?rev=5b2af304a2baa53598e594097824165d4ac7a119)",
- "siphasher",
- "volatile",
- "widestring",
+ "rustpython-literal",
 ]
 
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-source = "git+https://github.com/youknowone/RustPython-parser.git?rev=5b2af304a2baa53598e594097824165d4ac7a119#5b2af304a2baa53598e594097824165d4ac7a119"
-dependencies = [
- "hexf-parse",
- "lexical-parse-float",
- "num-traits",
- "unic-ucd-category",
-]
-
-[[package]]
-name = "rustpython-literal"
-version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=947fb53d0b41fec465db3d8e725bdb2eec1299ec#947fb53d0b41fec465db3d8e725bdb2eec1299ec"
+source = "git+https://github.com/RustPython/Parser.git?rev=a983f4383fb1ad8c1c66acb1d5b0016e59f95a49#a983f4383fb1ad8c1c66acb1d5b0016e59f95a49"
 dependencies = [
  "hexf-parse",
  "lexical-parse-float",
@@ -2257,7 +2162,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=947fb53d0b41fec465db3d8e725bdb2eec1299ec#947fb53d0b41fec465db3d8e725bdb2eec1299ec"
+source = "git+https://github.com/RustPython/Parser.git?rev=a983f4383fb1ad8c1c66acb1d5b0016e59f95a49#a983f4383fb1ad8c1c66acb1d5b0016e59f95a49"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2279,12 +2184,8 @@ dependencies = [
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=947fb53d0b41fec465db3d8e725bdb2eec1299ec#947fb53d0b41fec465db3d8e725bdb2eec1299ec"
+source = "git+https://github.com/RustPython/Parser.git?rev=a983f4383fb1ad8c1c66acb1d5b0016e59f95a49#a983f4383fb1ad8c1c66acb1d5b0016e59f95a49"
 dependencies = [
- "itertools",
- "lz4_flex",
- "num-bigint",
- "num-complex",
  "ruff_text_size",
 ]
 
@@ -2783,16 +2684,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "twox-hash"
-version = "1.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
-dependencies = [
- "cfg-if",
- "static_assertions",
-]
-
-[[package]]
 name = "typed-arena"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2959,12 +2850,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
-name = "volatile"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8e76fae08f03f96e166d2dfda232190638c10e0383841252416f9cfe2ae60e6"
-
-[[package]]
 name = "wait-timeout"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3124,12 +3009,6 @@ dependencies = [
  "libc",
  "once_cell",
 ]
-
-[[package]]
-name = "widestring"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17882f045410753661207383517a6f62ec3dbeb6a4ed2acce01f0728238d1983"
 
 [[package]]
 name = "wild"

@@ -2,7 +2,7 @@ use ruff_text_size::TextRange;
 use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
-use rustpython_common::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
+use rustpython_format::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 use rustpython_parser::{lexer, Mode, Tok};
 

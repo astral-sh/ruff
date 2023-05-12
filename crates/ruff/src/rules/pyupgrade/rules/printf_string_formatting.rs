@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 use std::str::FromStr;
 
-use rustpython_common::cformat::{
+use rustpython_format::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
