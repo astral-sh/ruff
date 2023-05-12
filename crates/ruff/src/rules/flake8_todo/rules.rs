@@ -1,5 +1,3 @@
-
-
 use once_cell::sync::Lazy;
 
 use regex::RegexSet;
@@ -9,10 +7,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::{
-    registry::Rule,
-    settings::{flags, Settings},
-};
+use crate::{registry::Rule, settings::Settings};
 
 /// ## What it does
 /// Checks that a TODO comment is actually labelled with "TODO".
@@ -240,11 +235,7 @@ struct Tag<'a> {
     content: &'a str,
 }
 
-pub fn check_todos(
-    tokens: &[LexResult],
-    autofix: flags::Autofix,
-    settings: &Settings,
-) -> Vec<Diagnostic> {
+pub(crate) fn check_todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let mut iter = tokens.iter().flatten().peekable();
@@ -258,7 +249,7 @@ pub fn check_todos(
             continue;
         };
 
-        check_for_tag_errors(&tag, &mut diagnostics, autofix, settings);
+        check_for_tag_errors(&tag, &mut diagnostics, settings);
         check_for_static_errors(comment, *token_range, &tag, &mut diagnostics);
 
         // TD-003
@@ -306,12 +297,7 @@ fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<
 }
 
 /// Check that the tag is valid. This function modifies `diagnostics` in-place.
-fn check_for_tag_errors(
-    tag: &Tag,
-    diagnostics: &mut Vec<Diagnostic>,
-    autofix: flags::Autofix,
-    settings: &Settings,
-) {
+fn check_for_tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: &Settings) {
     if tag.content == "TODO" {
         return;
     }
@@ -325,8 +311,8 @@ fn check_for_tag_errors(
             tag.range,
         );
 
-        if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
-            invalid_capitalization.set_fix(Fix::unspecified(Edit::range_replacement(
+        if settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
+            invalid_capitalization.set_fix(Fix::automatic(Edit::range_replacement(
                 "TODO".to_string(),
                 tag.range,
             )));
@@ -352,110 +338,40 @@ fn check_for_static_errors(
     tag: &Tag,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    // Relative offset of the current character from the start of the comment.
-    let mut relative_offset: usize = usize::from(tag.range.end() - comment_range.start());
-    let mut comment_chars = comment.chars().skip(relative_offset).peekable();
-    // Absolute offset of the comment's author block from the start of the file.
-    let mut author_range: Option<TextRange> = None;
-    // Absolute offset of the comment's colon from the start of the file.
-    let mut colon_offset: Option<TextSize> = None;
+    let post_tag = &comment[usize::from(tag.range.end() - comment_range.start())..];
+    let trimmed = post_tag.trim_start();
+    let content_offset = post_tag.text_len() - trimmed.text_len();
 
-    let comment_rest = &comment[usize::from(relative_offset)..];
-    let trimmed_start = comment_rest.trim_start();
-    // Relative offset from the end of the tag to the start of the rest of the comment
-    let whitespace_offset = comment_rest.text_len();
-
-    // An "author block" must be contained in parentheses, like "(ruff)". To check if it exists,
-    // we can check the first non-whitespace character after the tag. If that first character is a
-    // left parenthesis, we can say that we have an author's block.
-    for char in comment_chars.by_ref() {
-        relative_offset += 1;
-        if char.is_whitespace() {
-            continue;
-        }
-
-        // We can guarantee that there's no author if the colon directly follows the TODO tag.
-        if char == ':' {
-            colon_offset =
-                Some(comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap());
-            break;
-        }
-
-        if char == '(' {
-            author_range = Some(TextRange::at(
-                comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap(),
-                TextSize::new(1),
-            ));
-        }
-
-        break;
-    }
-
-    if let Some(range) = author_range {
-        let mut author_block_length = 0usize;
-        for char in comment_chars.by_ref() {
-            relative_offset += 1;
-            author_block_length += 1;
-
-            if char == ')' {
-                break;
-            }
-        }
-
-        author_range = Some(range.add_end(TextSize::try_from(author_block_length).ok().unwrap()));
-    } else {
-        diagnostics.push(Diagnostic::new(
-            MissingAuthorInTodo,
-            TextRange::at(tag.range.end(), TextSize::new(1)),
-        ));
-    }
-
-    // A valid colon must be the character after the author block (or after the tag, if the author
-    // block doesn't exist).
-    if colon_offset.is_none() {
-        if let Some(char) = comment_chars.next() {
-            relative_offset += 1;
-
-            if char == ':' {
-                colon_offset =
-                    Some(comment_range.start() + TextSize::try_from(relative_offset).ok().unwrap());
-            }
-        }
-    }
-
-    if let Some(range) = colon_offset {
-        if let Some(char) = comment_chars.next() {
-            if char == ' ' {
-                return;
-            }
-
-            diagnostics.push(Diagnostic::new(
-                MissingSpaceAfterColonInTodo,
-                TextRange::at(range, TextSize::new(1)),
-            ));
-        }
-    } else {
-        // Adjust where the colon should be based on the length of the author block, if it exists.
-        let adjusted_colon_position = tag.range.end()
-            + if let Some(author_range) = author_range {
-                author_range.len()
+    let author_end = content_offset
+        + if trimmed.starts_with('(') {
+            if let Some(end_index) = trimmed.find(')') {
+                TextSize::try_from(end_index + 1).unwrap()
             } else {
-                TextSize::new(0)
-            };
+                trimmed.text_len()
+            }
+        } else {
+            diagnostics.push(Diagnostic::new(MissingAuthorInTodo, tag.range));
 
-        diagnostics.push(Diagnostic::new(
-            MissingColonInTodo,
-            TextRange::at(adjusted_colon_position, TextSize::new(1)),
-        ));
-    }
+            TextSize::new(0)
+        };
 
-    match comment_chars.next() {
-        Some(_) => {}
-        None => diagnostics.push(Diagnostic::new(
-            MissingTextInTodo,
-            TextRange::at(comment_range.end(), TextSize::new(1)),
-        )),
+    let post_author = &post_tag[usize::from(author_end)..];
+
+    let post_colon = if let Some((_colon, after_colon)) = post_author.split_once(':') {
+        if let Some(stripped) = after_colon.strip_prefix(' ') {
+            stripped
+        } else {
+            diagnostics.push(Diagnostic::new(MissingSpaceAfterColonInTodo, tag.range));
+            after_colon
+        }
+    } else {
+        diagnostics.push(Diagnostic::new(MissingColonInTodo, tag.range));
+        ""
     };
+
+    if post_colon.is_empty() {
+        diagnostics.push(Diagnostic::new(MissingTextInTodo, tag.range));
+    }
 }
 
 #[cfg(test)]

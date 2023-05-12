@@ -1,31 +1,31 @@
 ---
 source: crates/ruff/src/rules/flake8_todo/mod.rs
 ---
-TD004.py:4:7: TD004 Missing colon in TODO. Try: # TODO: ...
+TD004.py:4:3: TD004 Missing colon in TODO. Try: # TODO: ...
   |
 4 | # TODO(evanrittenhouse): this has a colon
 5 | # T004 - errors
 6 | # TODO this has no colon
-  |       ^ TD004
-7 | # TODO(evanrittenhouse) this has no colon
+  |   ^^^^ TD004
+7 | # TODO(evanrittenhouse 😀) this has no colon
 8 | # FIXME add a colon
   |
 
-TD004.py:5:24: TD004 Missing colon in TODO. Try: # TODO: ...
+TD004.py:5:3: TD004 Missing colon in TODO. Try: # TODO: ...
   |
 5 | # T004 - errors
 6 | # TODO this has no colon
-7 | # TODO(evanrittenhouse) this has no colon
-  |                        ^ TD004
+7 | # TODO(evanrittenhouse 😀) this has no colon
+  |   ^^^^ TD004
 8 | # FIXME add a colon
   |
 
-TD004.py:6:8: TD004 Missing colon in TODO. Try: # TODO: ...
+TD004.py:6:3: TD004 Missing colon in TODO. Try: # TODO: ...
   |
 6 | # TODO this has no colon
-7 | # TODO(evanrittenhouse) this has no colon
+7 | # TODO(evanrittenhouse 😀) this has no colon
 8 | # FIXME add a colon
-  |        ^ TD004
+  |   ^^^^^ TD004
   |
 
 

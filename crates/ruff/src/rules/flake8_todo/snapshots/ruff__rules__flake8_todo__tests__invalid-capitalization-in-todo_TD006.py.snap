@@ -11,7 +11,7 @@ TD006.py:4:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
   |
   = help: Replace `ToDo` with `TODO`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | # TDO006 - accepted
 2 2 | # TODO (evanrittenhouse): this is a valid TODO
 3 3 | # TDO006 - error
@@ -28,7 +28,7 @@ TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
   |
   = help: Replace `todo` with `TODO`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | # TODO (evanrittenhouse): this is a valid TODO
 3 3 | # TDO006 - error
 4 4 | # ToDo (evanrittenhouse): invalid capitalization

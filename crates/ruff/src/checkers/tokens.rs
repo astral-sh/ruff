@@ -191,7 +191,7 @@ pub(crate) fn check_tokens(
     // T001, T002, T003, T004, T005, T006, T007
     if enforce_todos {
         diagnostics.extend(
-            flake8_todo::rules::check_todos(tokens, autofix, settings)
+            flake8_todo::rules::check_todos(tokens, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
