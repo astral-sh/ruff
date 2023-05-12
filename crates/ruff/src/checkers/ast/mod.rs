@@ -3646,8 +3646,12 @@ where
             ExprKind::FormattedValue(ast::ExprFormattedValue {
                 value, conversion, ..
             }) => {
-                if self.settings.rules.enabled(Rule::FStringConversion) {
-                    ruff::rules::f_string_conversion(self, expr, value, *conversion);
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::ExplicitFStringTypeConversion)
+                {
+                    ruff::rules::explicit_f_string_type_conversion(self, expr, value, *conversion);
                 }
             }
             _ => {}

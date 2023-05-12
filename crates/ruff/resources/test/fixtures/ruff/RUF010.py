@@ -1,19 +1,23 @@
 bla = b"bla"
 
+
 def foo(one_arg):
     pass
 
-f"Error: {str(bla)}, {repr(bla)}, {ascii(bla)}"
 
-f"Ok: {foo(bla)}"
+f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 
-f"Ok: {str(bla, 'ascii')}, {str(bla, encoding='cp1255')}"
+f"{foo(bla)}"  # OK
 
-f"Ok: {bla!s} {[]!r} {'bar'!a}"
+f"{str(bla, 'ascii')}, {str(bla, encoding='cp1255')}"  # OK
 
-"Ok: Not an f-string {str(bla)}, {repr(bla)}, {ascii(bla)}"
+f"{bla!s} {[]!r} {'bar'!a}"  # OK
+
+"Not an f-string {str(bla)}, {repr(bla)}, {ascii(bla)}"  # OK
+
 
 def ascii(arg):
     pass
 
-f"Ok: Not the builtin {ascii(bla)}"
+
+f"{ascii(bla)}"  # OK

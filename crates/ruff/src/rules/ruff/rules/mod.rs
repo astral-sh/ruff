@@ -2,7 +2,7 @@ mod ambiguous_unicode_character;
 mod asyncio_dangling_task;
 mod collection_literal_concatenation;
 mod confusables;
-mod f_string_conversion;
+mod explicit_f_string_type_conversion;
 mod mutable_defaults_in_dataclass_fields;
 mod pairwise_over_zipped;
 mod unused_noqa;
@@ -22,7 +22,9 @@ pub(crate) use mutable_defaults_in_dataclass_fields::{
 pub(crate) use pairwise_over_zipped::{pairwise_over_zipped, PairwiseOverZipped};
 pub(crate) use unused_noqa::{UnusedCodes, UnusedNOQA};
 
-pub(crate) use f_string_conversion::{f_string_conversion, FStringConversion};
+pub(crate) use explicit_f_string_type_conversion::{
+    explicit_f_string_type_conversion, ExplicitFStringTypeConversion,
+};
 
 #[derive(Clone, Copy)]
 pub(crate) enum Context {
