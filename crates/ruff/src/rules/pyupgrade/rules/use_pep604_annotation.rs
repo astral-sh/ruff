@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::typing::AnnotationKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -101,12 +100,8 @@ pub(crate) fn use_pep604_annotation(
     };
 
     // Avoid fixing forward references, or types not in an annotation.
-    let fixable = checker.ctx.in_type_definition
-        && checker
-            .ctx
-            .in_deferred_string_type_definition
-            .as_ref()
-            .map_or(true, AnnotationKind::is_simple);
+    let fixable =
+        checker.ctx.in_type_definition() && !checker.ctx.in_complex_string_type_definition();
 
     match typing_member {
         TypingMember::Optional => {

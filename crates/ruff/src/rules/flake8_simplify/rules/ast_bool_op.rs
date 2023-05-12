@@ -640,7 +640,7 @@ fn is_short_circuit(
 
         // Keep track of the location of the furthest-right, non-effectful expression.
         if value_truthiness.is_unknown()
-            && (!context.in_boolean_test || contains_effect(value, |id| context.is_builtin(id)))
+            && (!context.in_boolean_test() || contains_effect(value, |id| context.is_builtin(id)))
         {
             location = next_value.start();
             continue;
@@ -660,7 +660,7 @@ fn is_short_circuit(
                 value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                context.in_boolean_test,
+                context.in_boolean_test(),
                 stylist,
             ));
             break;
@@ -678,7 +678,7 @@ fn is_short_circuit(
                 next_value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                context.in_boolean_test,
+                context.in_boolean_test(),
                 stylist,
             ));
             break;
