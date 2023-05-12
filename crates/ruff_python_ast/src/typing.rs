@@ -1,11 +1,11 @@
 use anyhow::Result;
+use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser as parser;
-use rustpython_parser::ast::{Expr, Location};
+use rustpython_parser::ast::Expr;
 
 use crate::relocate::relocate_expr;
 use crate::source_code::Locator;
 use crate::str;
-use crate::types::Range;
 
 #[derive(is_macro::Is, Copy, Clone)]
 pub enum AnnotationKind {
@@ -24,23 +24,21 @@ pub enum AnnotationKind {
 /// Parse a type annotation from a string.
 pub fn parse_type_annotation(
     value: &str,
-    range: Range,
+    range: TextRange,
     locator: &Locator,
 ) -> Result<(Expr, AnnotationKind)> {
-    let expression = locator.slice(range);
+    let expression = &locator.contents()[range];
+
     if str::raw_contents(expression).map_or(false, |body| body == value) {
         // The annotation is considered "simple" if and only if the raw representation (e.g.,
         // `List[int]` within "List[int]") exactly matches the parsed representation. This
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
         let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = parser::parse_expression_located(
+        let expr = parser::parse_expression_starts_at(
             value,
             "<filename>",
-            Location::new(
-                range.location.row(),
-                range.location.column() + leading_quote.len(),
-            ),
+            range.start() + leading_quote.text_len(),
         )?;
         Ok((expr, AnnotationKind::Simple))
     } else {

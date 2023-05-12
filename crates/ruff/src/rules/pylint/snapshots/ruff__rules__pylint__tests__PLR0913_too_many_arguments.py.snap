@@ -15,9 +15,23 @@ too_many_arguments.py:17:5: PLR0913 Too many arguments to function call (6 > 5)
 18 |     pass
    |
 
-too_many_arguments.py:33:5: PLR0913 Too many arguments to function call (6 > 5)
+too_many_arguments.py:25:5: PLR0913 Too many arguments to function call (6 > 5)
    |
-33 | def f(x, y, z, a, b, c, *, u, v, w):  # Too many arguments (6/5)
+25 | def f(x, y, z, /, u, v, w):  # Too many arguments (6/5)
+   |     ^ PLR0913
+26 |     pass
+   |
+
+too_many_arguments.py:29:5: PLR0913 Too many arguments to function call (6 > 5)
+   |
+29 | def f(x, y, z, *, u, v, w):  # Too many arguments (6/5)
+   |     ^ PLR0913
+30 |     pass
+   |
+
+too_many_arguments.py:33:5: PLR0913 Too many arguments to function call (9 > 5)
+   |
+33 | def f(x, y, z, a, b, c, *, u, v, w):  # Too many arguments (9/5)
    |     ^ PLR0913
 34 |     pass
    |

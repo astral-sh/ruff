@@ -1,11 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::scope::Scope;
+use ruff_text_size::TextRange;
 
 #[violation]
 pub struct UndefinedExport {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for UndefinedExport {
@@ -17,7 +17,7 @@ impl Violation for UndefinedExport {
 }
 
 /// F822
-pub fn undefined_export(names: &[&str], range: &Range, scope: &Scope) -> Vec<Diagnostic> {
+pub(crate) fn undefined_export(names: &[&str], range: TextRange, scope: &Scope) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     if !scope.uses_star_imports() {
         for name in names {
@@ -26,7 +26,7 @@ pub fn undefined_export(names: &[&str], range: &Range, scope: &Scope) -> Vec<Dia
                     UndefinedExport {
                         name: (*name).to_string(),
                     },
-                    *range,
+                    range,
                 ));
             }
         }

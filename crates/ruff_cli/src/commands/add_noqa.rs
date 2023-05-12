@@ -7,20 +7,20 @@ use log::{debug, error};
 use rayon::prelude::*;
 
 use ruff::linter::add_noqa_to_path;
-use ruff::resolver::PyprojectDiscovery;
+use ruff::resolver::PyprojectConfig;
 use ruff::{packaging, resolver, warn_user_once};
 
 use crate::args::Overrides;
 
 /// Add `noqa` directives to a collection of files.
-pub fn add_noqa(
+pub(crate) fn add_noqa(
     files: &[PathBuf],
-    pyproject_strategy: &PyprojectDiscovery,
+    pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -37,7 +37,7 @@ pub fn add_noqa(
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
         &resolver,
-        pyproject_strategy,
+        pyproject_config,
     );
 
     let start = Instant::now();
@@ -50,7 +50,7 @@ pub fn add_noqa(
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
-            let settings = resolver.resolve(path, pyproject_strategy);
+            let settings = resolver.resolve(path, pyproject_config);
             match add_noqa_to_path(path, package, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {

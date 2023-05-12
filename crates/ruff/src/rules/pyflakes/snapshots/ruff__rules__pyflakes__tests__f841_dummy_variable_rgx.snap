@@ -38,7 +38,7 @@ F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
 22 21 | 
 23 22 |     bar = (1, 2)
 
-F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
+F841_0.py:21:6: F841 Local variable `a` is assigned to but never used
    |
 21 | def f():
 22 |     foo = (1, 2)
@@ -49,7 +49,7 @@ F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
    |
    = help: Remove assignment to unused variable `a`
 
-F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
+F841_0.py:21:9: F841 Local variable `b` is assigned to but never used
    |
 21 | def f():
 22 |     foo = (1, 2)
@@ -238,7 +238,7 @@ F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
 117 117 |     match x:
 118 118 |         case (Foo.A):
 
-F841_0.py:122:14: F841 [*] Local variable `y` is assigned to but never used
+F841_0.py:122:14: F841 Local variable `y` is assigned to but never used
     |
 122 |         case [Bar.A, *_]:
 123 |             print("A")
@@ -247,5 +247,14 @@ F841_0.py:122:14: F841 [*] Local variable `y` is assigned to but never used
 125 |             pass
     |
     = help: Remove assignment to unused variable `y`
+
+F841_0.py:127:21: F841 Local variable `value` is assigned to but never used
+    |
+127 | def f():
+128 |     if any((key := (value := x)) for x in ["ok"]):
+    |                     ^^^^^ F841
+129 |         print(key)
+    |
+    = help: Remove assignment to unused variable `value`
 
 

@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
@@ -38,7 +37,7 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[violation]
 pub struct NonLowercaseVariableInFunction {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for NonLowercaseVariableInFunction {
@@ -50,7 +49,7 @@ impl Violation for NonLowercaseVariableInFunction {
 }
 
 /// N806
-pub fn non_lowercase_variable_in_function(
+pub(crate) fn non_lowercase_variable_in_function(
     checker: &mut Checker,
     expr: &Expr,
     stmt: &Stmt,
@@ -67,15 +66,15 @@ pub fn non_lowercase_variable_in_function(
     }
 
     if name.to_lowercase() != name
-        && !helpers::is_namedtuple_assignment(checker, stmt)
-        && !helpers::is_typeddict_assignment(checker, stmt)
-        && !helpers::is_type_var_assignment(checker, stmt)
+        && !helpers::is_named_tuple_assignment(&checker.ctx, stmt)
+        && !helpers::is_typed_dict_assignment(&checker.ctx, stmt)
+        && !helpers::is_type_var_assignment(&checker.ctx, stmt)
     {
         checker.diagnostics.push(Diagnostic::new(
             NonLowercaseVariableInFunction {
                 name: name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

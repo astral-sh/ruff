@@ -1,9 +1,8 @@
 use num_bigint::BigInt;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located};
+use rustpython_parser::ast::{self, Attributed, Cmpop, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -122,49 +121,48 @@ fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
     if is_sys(checker, value, "version") {
         match &slice.node {
-            ExprKind::Slice {
+            ExprKind::Slice(ast::ExprSlice {
                 lower: None,
                 upper: Some(upper),
                 step: None,
-                ..
-            } => {
-                if let ExprKind::Constant {
+            }) => {
+                if let ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Int(i),
                     ..
-                } = &upper.node
+                }) = &upper.node
                 {
                     if *i == BigInt::from(1)
                         && checker.settings.rules.enabled(Rule::SysVersionSlice1)
                     {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice1, Range::from(value)));
+                            .push(Diagnostic::new(SysVersionSlice1, value.range()));
                     } else if *i == BigInt::from(3)
                         && checker.settings.rules.enabled(Rule::SysVersionSlice3)
                     {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice3, Range::from(value)));
+                            .push(Diagnostic::new(SysVersionSlice3, value.range()));
                     }
                 }
             }
 
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Int(i),
                 ..
-            } => {
+            }) => {
                 if *i == BigInt::from(2) && checker.settings.rules.enabled(Rule::SysVersion2) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SysVersion2, Range::from(value)));
+                        .push(Diagnostic::new(SysVersion2, value.range()));
                 } else if *i == BigInt::from(0) && checker.settings.rules.enabled(Rule::SysVersion0)
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SysVersion0, Range::from(value)));
+                        .push(Diagnostic::new(SysVersion0, value.range()));
                 }
             }
 
@@ -174,23 +172,25 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
+pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
     match &left.node {
-        ExprKind::Subscript { value, slice, .. } if is_sys(checker, value, "version_info") => {
-            if let ExprKind::Constant {
+        ExprKind::Subscript(ast::ExprSubscript { value, slice, .. })
+            if is_sys(checker, value, "version_info") =>
+        {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Int(i),
                 ..
-            } = &slice.node
+            }) = &slice.node
             {
                 if *i == BigInt::from(0) {
                     if let (
                         [Cmpop::Eq | Cmpop::NotEq],
-                        [Located {
+                        [Attributed {
                             node:
-                                ExprKind::Constant {
+                                ExprKind::Constant(ast::ExprConstant {
                                     value: Constant::Int(n),
                                     ..
-                                },
+                                }),
                             ..
                         }],
                     ) = (ops, comparators)
@@ -200,18 +200,18 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo0Eq3, Range::from(left)));
+                                .push(Diagnostic::new(SysVersionInfo0Eq3, left.range()));
                         }
                     }
                 } else if *i == BigInt::from(1) {
                     if let (
                         [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
-                        [Located {
+                        [Attributed {
                             node:
-                                ExprKind::Constant {
+                                ExprKind::Constant(ast::ExprConstant {
                                     value: Constant::Int(_),
                                     ..
-                                },
+                                }),
                             ..
                         }],
                     ) = (ops, comparators)
@@ -219,24 +219,24 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         if checker.settings.rules.enabled(Rule::SysVersionInfo1CmpInt) {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo1CmpInt, Range::from(left)));
+                                .push(Diagnostic::new(SysVersionInfo1CmpInt, left.range()));
                         }
                     }
                 }
             }
         }
 
-        ExprKind::Attribute { value, attr, .. }
+        ExprKind::Attribute(ast::ExprAttribute { value, attr, .. })
             if is_sys(checker, value, "version_info") && attr == "minor" =>
         {
             if let (
                 [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
-                [Located {
+                [Attributed {
                     node:
-                        ExprKind::Constant {
+                        ExprKind::Constant(ast::ExprConstant {
                             value: Constant::Int(_),
                             ..
-                        },
+                        }),
                     ..
                 }],
             ) = (ops, comparators)
@@ -246,10 +246,9 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     .rules
                     .enabled(Rule::SysVersionInfoMinorCmpInt)
                 {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SysVersionInfoMinorCmpInt,
-                        Range::from(left),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(SysVersionInfoMinorCmpInt, left.range()));
                 }
             }
         }
@@ -260,12 +259,12 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
     if is_sys(checker, left, "version") {
         if let (
             [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
-            [Located {
+            [Attributed {
                 node:
-                    ExprKind::Constant {
+                    ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(s),
                         ..
-                    },
+                    }),
                 ..
             }],
         ) = (ops, comparators)
@@ -274,19 +273,19 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                 if checker.settings.rules.enabled(Rule::SysVersionCmpStr10) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SysVersionCmpStr10, Range::from(left)));
+                        .push(Diagnostic::new(SysVersionCmpStr10, left.range()));
                 }
             } else if checker.settings.rules.enabled(Rule::SysVersionCmpStr3) {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(SysVersionCmpStr3, Range::from(left)));
+                    .push(Diagnostic::new(SysVersionCmpStr3, left.range()));
             }
         }
     }
 }
 
 /// YTT202
-pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if checker
         .ctx
         .resolve_call_path(expr)
@@ -294,6 +293,6 @@ pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(SixPY3, Range::from(expr)));
+            .push(Diagnostic::new(SixPY3, expr.range()));
     }
 }

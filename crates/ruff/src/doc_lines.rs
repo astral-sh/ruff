@@ -3,84 +3,112 @@
 
 use std::iter::FusedIterator;
 
-use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{self, Constant, ExprKind, Stmt, StmtKind, Suite};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {
-    DocLines::new(lxr)
+pub(crate) fn doc_lines_from_tokens<'a>(
+    lxr: &'a [LexResult],
+    locator: &'a Locator<'a>,
+) -> DocLines<'a> {
+    DocLines::new(lxr, locator)
 }
 
-pub struct DocLines<'a> {
+pub(crate) struct DocLines<'a> {
     inner: std::iter::Flatten<core::slice::Iter<'a, LexResult>>,
-    prev: Option<usize>,
+    locator: &'a Locator<'a>,
+    prev: TextSize,
 }
 
 impl<'a> DocLines<'a> {
-    fn new(lxr: &'a [LexResult]) -> Self {
+    fn new(lxr: &'a [LexResult], locator: &'a Locator) -> Self {
         Self {
             inner: lxr.iter().flatten(),
-            prev: None,
+            locator,
+            prev: TextSize::default(),
         }
     }
 }
 
 impl Iterator for DocLines<'_> {
-    type Item = usize;
+    type Item = TextSize;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let mut at_start_of_line = true;
         loop {
-            let (start, tok, end) = self.inner.next()?;
+            let (tok, range) = self.inner.next()?;
 
             match tok {
-                Tok::Indent | Tok::Dedent | Tok::Newline => continue,
                 Tok::Comment(..) => {
-                    if let Some(prev) = self.prev {
-                        if start.row() > prev {
-                            break Some(start.row());
-                        }
-                    } else {
-                        break Some(start.row());
+                    if at_start_of_line
+                        || self
+                            .locator
+                            .contains_line_break(TextRange::new(self.prev, range.start()))
+                    {
+                        break Some(range.start());
                     }
                 }
-                _ => {}
+                Tok::Newline => {
+                    at_start_of_line = true;
+                }
+                Tok::Indent | Tok::Dedent => {
+                    // ignore
+                }
+                _ => {
+                    at_start_of_line = false;
+                }
             }
 
-            self.prev = Some(end.row());
+            self.prev = range.end();
         }
     }
 }
 
 impl FusedIterator for DocLines<'_> {}
 
-#[derive(Default)]
-struct StringLinesVisitor {
-    string_lines: Vec<usize>,
+struct StringLinesVisitor<'a> {
+    string_lines: Vec<TextSize>,
+    locator: &'a Locator<'a>,
 }
 
-impl Visitor<'_> for StringLinesVisitor {
+impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let StmtKind::Expr { value } = &stmt.node {
-            if let ExprKind::Constant {
+        if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(..),
                 ..
-            } = &value.node
+            }) = &value.node
             {
-                self.string_lines
-                    .extend(value.location.row()..=value.end_location.unwrap().row());
+                for line in UniversalNewlineIterator::with_offset(
+                    self.locator.slice(value.range()),
+                    value.start(),
+                ) {
+                    self.string_lines.push(line.start());
+                }
             }
         }
-        visitor::walk_stmt(self, stmt);
+        walk_stmt(self, stmt);
     }
 }
 
-/// Extract doc lines (standalone strings) from an AST.
-pub fn doc_lines_from_ast(python_ast: &Suite) -> Vec<usize> {
-    let mut visitor = StringLinesVisitor::default();
+impl<'a> StringLinesVisitor<'a> {
+    fn new(locator: &'a Locator<'a>) -> Self {
+        Self {
+            string_lines: Vec::new(),
+            locator,
+        }
+    }
+}
+
+/// Extract doc lines (standalone strings) start positions from an AST.
+pub(crate) fn doc_lines_from_ast(python_ast: &Suite, locator: &Locator) -> Vec<TextSize> {
+    let mut visitor = StringLinesVisitor::new(locator);
     visitor.visit_body(python_ast);
     visitor.string_lines
 }

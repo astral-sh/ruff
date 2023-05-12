@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks that Django's `@receiver` decorator is listed first, prior to
@@ -49,7 +48,7 @@ impl Violation for DjangoNonLeadingReceiverDecorator {
 }
 
 /// DJ013
-pub fn non_leading_receiver_decorator<'a, F>(
+pub(crate) fn non_leading_receiver_decorator<'a, F>(
     decorator_list: &'a [Expr],
     resolve_call_path: F,
 ) -> Vec<Diagnostic>
@@ -60,15 +59,16 @@ where
     let mut seen_receiver = false;
     for (i, decorator) in decorator_list.iter().enumerate() {
         let is_receiver = match &decorator.node {
-            ExprKind::Call { func, .. } => resolve_call_path(func).map_or(false, |call_path| {
-                call_path.as_slice() == ["django", "dispatch", "receiver"]
-            }),
+            ExprKind::Call(ast::ExprCall { func, .. }) => resolve_call_path(func)
+                .map_or(false, |call_path| {
+                    call_path.as_slice() == ["django", "dispatch", "receiver"]
+                }),
             _ => false,
         };
         if i > 0 && is_receiver && !seen_receiver {
             diagnostics.push(Diagnostic::new(
                 DjangoNonLeadingReceiverDecorator,
-                Range::from(decorator),
+                decorator.range(),
             ));
         }
         if !is_receiver && seen_receiver {

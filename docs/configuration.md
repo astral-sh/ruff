@@ -25,6 +25,7 @@ exclude = [
     ".direnv",
     ".eggs",
     ".git",
+    ".git-rewrite",
     ".hg",
     ".mypy_cache",
     ".nox",
@@ -201,7 +202,7 @@ Options:
       --show-fixes
           Show an enumeration of all autofixed lint violations
       --diff
-          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
+          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only
@@ -303,7 +304,7 @@ extend = "../pyproject.toml"
 line-length = 100
 ```
 
-All of the above rules apply equivalently to `ruff.toml` and `.ruff.toml`  files. If Ruff detects
+All of the above rules apply equivalently to `ruff.toml` and `.ruff.toml` files. If Ruff detects
 multiple configuration files in the same directory, the `.ruff.toml` file will take precedence over
 the `ruff.toml` file, and the `ruff.toml` file will take precedence over the `pyproject.toml` file.
 

@@ -3,11 +3,11 @@ use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
-    AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, Field, Fields, Lit,
-    LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
+    AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, ExprLit, Field,
+    Fields, Lit, LitStr, Path, PathArguments, PathSegment, Token, Type, TypePath,
 };
 
-pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
+pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let DeriveInput { ident, data, .. } = input;
 
     match data {
@@ -21,7 +21,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 let docs: Vec<&Attribute> = field
                     .attrs
                     .iter()
-                    .filter(|attr| attr.path.is_ident("doc"))
+                    .filter(|attr| attr.path().is_ident("doc"))
                     .collect();
 
                 if docs.is_empty() {
@@ -31,14 +31,18 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                     ));
                 }
 
-                if let Some(attr) = field.attrs.iter().find(|attr| attr.path.is_ident("option")) {
+                if let Some(attr) = field
+                    .attrs
+                    .iter()
+                    .find(|attr| attr.path().is_ident("option"))
+                {
                     output.push(handle_option(field, attr, docs)?);
                 };
 
                 if field
                     .attrs
                     .iter()
-                    .any(|attr| attr.path.is_ident("option_group"))
+                    .any(|attr| attr.path().is_ident("option_group"))
                 {
                     output.push(handle_option_group(field)?);
                 };
@@ -101,13 +105,13 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
 
 /// Parse a `doc` attribute into it a string literal.
 fn parse_doc(doc: &Attribute) -> syn::Result<String> {
-    let doc = doc
-        .parse_meta()
-        .map_err(|e| syn::Error::new(doc.span(), e))?;
-
-    match doc {
+    match &doc.meta {
         syn::Meta::NameValue(syn::MetaNameValue {
-            lit: Lit::Str(lit_str),
+            value:
+                syn::Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }),
             ..
         }) => Ok(lit_str.value()),
         _ => Err(syn::Error::new(doc.span(), "Expected doc attribute.")),

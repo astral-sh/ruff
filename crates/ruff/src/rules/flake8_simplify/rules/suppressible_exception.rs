@@ -1,12 +1,13 @@
+use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{
-    Constant, Excepthandler, ExcepthandlerKind, ExprKind, Located, Location, Stmt, StmtKind,
+    self, Attributed, Constant, Excepthandler, ExcepthandlerKind, ExprKind, Stmt, StmtKind,
 };
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
-use ruff_python_ast::types::Range;
+use ruff_python_ast::helpers::has_comments;
 
 use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
@@ -14,24 +15,27 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct SuppressibleException {
-    pub exception: String,
+    exception: String,
+    fixable: bool,
 }
 
-impl AlwaysAutofixableViolation for SuppressibleException {
+impl Violation for SuppressibleException {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuppressibleException { exception } = self;
+        let SuppressibleException { exception, .. } = self;
         format!("Use `contextlib.suppress({exception})` instead of `try`-`except`-`pass`")
     }
 
-    fn autofix_title(&self) -> String {
-        let SuppressibleException { exception } = self;
-        format!("Replace with `contextlib.suppress({exception})`")
+    fn autofix_title(&self) -> Option<String> {
+        let SuppressibleException { exception, .. } = self;
+        Some(format!("Replace with `contextlib.suppress({exception})`"))
     }
 }
 
 /// SIM105
-pub fn suppressible_exception(
+pub(crate) fn suppressible_exception(
     checker: &mut Checker,
     stmt: &Stmt,
     try_body: &[Stmt],
@@ -41,15 +45,15 @@ pub fn suppressible_exception(
 ) {
     if !matches!(
         try_body,
-        [Located {
-            node: StmtKind::Delete { .. }
-                | StmtKind::Assign { .. }
-                | StmtKind::AugAssign { .. }
-                | StmtKind::AnnAssign { .. }
-                | StmtKind::Assert { .. }
-                | StmtKind::Import { .. }
-                | StmtKind::ImportFrom { .. }
-                | StmtKind::Expr { .. }
+        [Attributed {
+            node: StmtKind::Delete(_)
+                | StmtKind::Assign(_)
+                | StmtKind::AugAssign(_)
+                | StmtKind::AnnAssign(_)
+                | StmtKind::Assert(_)
+                | StmtKind::Import(_)
+                | StmtKind::ImportFrom(_)
+                | StmtKind::Expr(_)
                 | StmtKind::Pass,
             ..
         }]
@@ -60,17 +64,15 @@ pub fn suppressible_exception(
         return;
     }
     let handler = &handlers[0];
-    let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
+    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+        &handler.node;
     if body.len() == 1 {
         let node = &body[0].node;
         if matches!(node, StmtKind::Pass)
             || (matches!(
             node,
-            StmtKind::Expr {
-                value,
-                    ..
-                }
-            if matches!(**value, Located { node: ExprKind::Constant { value: Constant::Ellipsis, .. }, ..})
+            StmtKind::Expr(ast::StmtExpr { value })
+            if matches!(**value, Attributed { node: ExprKind::Constant(ast::ExprConstant { value: Constant::Ellipsis, .. }), ..})
             ))
         {
             let handler_names: Vec<String> = helpers::extract_handled_exceptions(handlers)
@@ -82,32 +84,36 @@ pub fn suppressible_exception(
             } else {
                 handler_names.join(", ")
             };
+            let fixable = !has_comments(stmt, checker.locator);
             let mut diagnostic = Diagnostic::new(
                 SuppressibleException {
                     exception: exception.clone(),
+                    fixable,
                 },
-                Range::from(stmt),
+                stmt.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
+            if fixable && checker.patch(diagnostic.kind.rule()) {
                 diagnostic.try_set_fix(|| {
                     let (import_edit, binding) = get_or_import_symbol(
                         "contextlib",
                         "suppress",
+                        stmt.start(),
                         &checker.ctx,
                         &checker.importer,
                         checker.locator,
                     )?;
-                    let try_ending = stmt.location.with_col_offset(3); // size of "try"
-                    let replace_try = Edit::replacement(
+                    let replace_try = Edit::range_replacement(
                         format!("with {binding}({exception})"),
-                        stmt.location,
-                        try_ending,
+                        TextRange::at(stmt.start(), "try".text_len()),
                     );
-                    let handler_line_begin = Location::new(handler.location.row(), 0);
-                    let remove_handler =
-                        Edit::deletion(handler_line_begin, handler.end_location.unwrap());
-                    Ok(Fix::from_iter([import_edit, replace_try, remove_handler]))
+                    let handler_line_begin = checker.locator.line_start(handler.start());
+                    let remove_handler = Edit::deletion(handler_line_begin, handler.end());
+                    #[allow(deprecated)]
+                    Ok(Fix::unspecified_edits(
+                        import_edit,
+                        [replace_try, remove_handler],
+                    ))
                 });
             }
 

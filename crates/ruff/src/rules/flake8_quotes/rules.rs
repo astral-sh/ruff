@@ -1,15 +1,14 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::Rule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 use super::settings::Quote;
 
@@ -35,7 +34,7 @@ use super::settings::Quote;
 /// ```
 #[violation]
 pub struct BadQuotesInlineString {
-    pub quote: Quote,
+    quote: Quote,
 }
 
 impl AlwaysAutofixableViolation for BadQuotesInlineString {
@@ -84,7 +83,7 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 /// ```
 #[violation]
 pub struct BadQuotesMultilineString {
-    pub quote: Quote,
+    quote: Quote,
 }
 
 impl AlwaysAutofixableViolation for BadQuotesMultilineString {
@@ -132,7 +131,7 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 /// ```
 #[violation]
 pub struct BadQuotesDocstring {
-    pub quote: Quote,
+    quote: Quote,
 }
 
 impl AlwaysAutofixableViolation for BadQuotesDocstring {
@@ -256,16 +255,10 @@ impl<'a> From<&'a str> for Trivia<'a> {
 }
 
 /// Q003
-fn docstring(
-    locator: &Locator,
-    start: Location,
-    end: Location,
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Option<Diagnostic> {
+fn docstring(locator: &Locator, range: TextRange, settings: &Settings) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
-    let text = locator.slice(Range::new(start, end));
+    let text = locator.slice(range);
     let trivia: Trivia = text.into();
 
     if trivia
@@ -279,9 +272,9 @@ fn docstring(
         BadQuotesDocstring {
             quote: quotes_settings.docstring_quotes,
         },
-        Range::new(start, end),
+        range,
     );
-    if autofix.into() && settings.rules.should_fix(Rule::BadQuotesDocstring) {
+    if settings.rules.should_fix(Rule::BadQuotesDocstring) {
         let quote_count = if trivia.is_multiline { 3 } else { 1 };
         let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
         let quote = good_docstring(quotes_settings.docstring_quotes).repeat(quote_count);
@@ -291,26 +284,25 @@ fn docstring(
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        diagnostic.set_fix(Edit::replacement(fixed_contents, start, end));
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            fixed_contents,
+            range,
+        )));
     }
     Some(diagnostic)
 }
 
 /// Q001, Q002
-fn strings(
-    locator: &Locator,
-    sequence: &[(Location, Location)],
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Vec<Diagnostic> {
+fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     let quotes_settings = &settings.flake8_quotes;
 
     let trivia = sequence
         .iter()
-        .map(|(start, end)| {
-            let text = locator.slice(Range::new(*start, *end));
+        .map(|range| {
+            let text = locator.slice(*range);
             let trivia: Trivia = text.into();
             trivia
         })
@@ -331,7 +323,7 @@ fn strings(
         string_contents.contains(good_single(quotes_settings.inline_quotes))
     });
 
-    for ((start, end), trivia) in sequence.iter().zip(trivia.into_iter()) {
+    for (range, trivia) in sequence.iter().zip(trivia.into_iter()) {
         if trivia.is_multiline {
             // If our string is or contains a known good string, ignore it.
             if trivia
@@ -353,10 +345,10 @@ fn strings(
                 BadQuotesMultilineString {
                     quote: quotes_settings.multiline_quotes,
                 },
-                Range::new(*start, *end),
+                *range,
             );
 
-            if autofix.into() && settings.rules.should_fix(Rule::BadQuotesMultilineString) {
+            if settings.rules.should_fix(Rule::BadQuotesMultilineString) {
                 let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
                 let quote = good_multiline(quotes_settings.multiline_quotes);
                 let mut fixed_contents = String::with_capacity(
@@ -366,7 +358,11 @@ fn strings(
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    fixed_contents,
+                    *range,
+                )));
             }
             diagnostics.push(diagnostic);
         } else {
@@ -384,9 +380,8 @@ fn strings(
                 if string_contents.contains(good_single(quotes_settings.inline_quotes))
                     && !string_contents.contains(bad_single(quotes_settings.inline_quotes))
                 {
-                    let mut diagnostic =
-                        Diagnostic::new(AvoidableEscapedQuote, Range::new(*start, *end));
-                    if autofix.into() && settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
+                    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, *range);
+                    if settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
                         let quote = bad_single(quotes_settings.inline_quotes);
 
                         let mut fixed_contents =
@@ -430,7 +425,11 @@ fn strings(
 
                         fixed_contents.push(quote);
 
-                        diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            fixed_contents,
+                            *range,
+                        )));
                     }
                     diagnostics.push(diagnostic);
                 }
@@ -443,9 +442,9 @@ fn strings(
                     BadQuotesInlineString {
                         quote: quotes_settings.inline_quotes,
                     },
-                    Range::new(*start, *end),
+                    *range,
                 );
-                if autofix.into() && settings.rules.should_fix(Rule::BadQuotesInlineString) {
+                if settings.rules.should_fix(Rule::BadQuotesInlineString) {
                     let quote = good_single(quotes_settings.inline_quotes);
                     let mut fixed_contents =
                         String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
@@ -453,7 +452,11 @@ fn strings(
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
-                    diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        fixed_contents,
+                        *range,
+                    )));
                 }
                 diagnostics.push(diagnostic);
             }
@@ -464,11 +467,10 @@ fn strings(
 }
 
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub fn from_tokens(
+pub(crate) fn from_tokens(
     lxr: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -476,27 +478,27 @@ pub fn from_tokens(
     // concatenation, and should thus be handled as a single unit.
     let mut sequence = vec![];
     let mut state_machine = StateMachine::default();
-    for &(start, ref tok, end) in lxr.iter().flatten() {
+    for &(ref tok, range) in lxr.iter().flatten() {
         let is_docstring = state_machine.consume(tok);
 
         // If this is a docstring, consume the existing sequence, then consume the
         // docstring, then move on.
         if is_docstring {
             if !sequence.is_empty() {
-                diagnostics.extend(strings(locator, &sequence, settings, autofix));
+                diagnostics.extend(strings(locator, &sequence, settings));
                 sequence.clear();
             }
-            if let Some(diagnostic) = docstring(locator, start, end, settings, autofix) {
+            if let Some(diagnostic) = docstring(locator, range, settings) {
                 diagnostics.push(diagnostic);
             }
         } else {
             if matches!(tok, Tok::String { .. }) {
                 // If this is a string, add it to the sequence.
-                sequence.push((start, end));
+                sequence.push(range);
             } else if !matches!(tok, Tok::Comment(..) | Tok::NonLogicalNewline) {
                 // Otherwise, consume the sequence.
                 if !sequence.is_empty() {
-                    diagnostics.extend(strings(locator, &sequence, settings, autofix));
+                    diagnostics.extend(strings(locator, &sequence, settings));
                     sequence.clear();
                 }
             }
@@ -505,7 +507,7 @@ pub fn from_tokens(
 
     // If we have an unterminated sequence, consume it.
     if !sequence.is_empty() {
-        diagnostics.extend(strings(locator, &sequence, settings, autofix));
+        diagnostics.extend(strings(locator, &sequence, settings));
         sequence.clear();
     }
 

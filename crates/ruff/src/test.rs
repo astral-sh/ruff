@@ -5,6 +5,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
+use ruff_diagnostics::{AutofixKind, Diagnostic};
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 
@@ -15,31 +16,38 @@ use crate::directives;
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
+use crate::registry::AsRule;
+use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 
-pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after 10 iterations.
-pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
+pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
+    static MAX_ITERATIONS: usize = 10;
+
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
-    let indexer: Indexer = tokens.as_slice().into();
-    let directives =
-        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let directives = directives::extract_directives(
+        &tokens,
+        directives::Flags::from_settings(settings),
+        &locator,
+        &indexer,
+    );
     let LinterResult {
         data: (diagnostics, _imports),
-        ..
+        error,
     } = check_path(
         &path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
-        &contents,
         tokens,
         &locator,
         &stylist,
@@ -47,33 +55,49 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
         &directives,
         settings,
         flags::Noqa::Enabled,
-        flags::Autofix::Enabled,
     );
 
+    let source_has_errors = error.is_some();
+
     // Detect autofixes that don't converge after multiple iterations.
+    let mut iterations = 0;
+
     if diagnostics
         .iter()
-        .any(|diagnostic| !diagnostic.fix.is_empty())
+        .any(|diagnostic| diagnostic.fix.is_some())
     {
-        let max_iterations = 10;
-
+        let mut diagnostics = diagnostics.clone();
         let mut contents = contents.clone();
-        let mut iterations = 0;
 
-        loop {
-            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
-            let locator = Locator::new(&contents);
+        while let Some((fixed_contents, _)) = fix_file(&diagnostics, &Locator::new(&contents)) {
+            if iterations < MAX_ITERATIONS {
+                iterations += 1;
+            } else {
+                let output = print_diagnostics(diagnostics, &path, &contents);
+
+                panic!(
+                        "Failed to converge after {MAX_ITERATIONS} iterations. This likely \
+                         indicates a bug in the implementation of the fix. Last diagnostics:\n{output}"
+                    );
+            }
+
+            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&fixed_contents);
+            let locator = Locator::new(&fixed_contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
-            let indexer: Indexer = tokens.as_slice().into();
-            let directives =
-                directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+            let indexer = Indexer::from_tokens(&tokens, &locator);
+            let directives = directives::extract_directives(
+                &tokens,
+                directives::Flags::from_settings(settings),
+                &locator,
+                &indexer,
+            );
+
             let LinterResult {
-                data: (diagnostics, _imports),
-                ..
+                data: (fixed_diagnostics, _),
+                error: fixed_error,
             } = check_path(
                 &path,
                 None,
-                &contents,
                 tokens,
                 &locator,
                 &stylist,
@@ -81,33 +105,87 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
-                flags::Autofix::Enabled,
             );
-            if let Some((fixed_contents, _)) = fix_file(&diagnostics, &locator) {
-                if iterations < max_iterations {
-                    iterations += 1;
-                    contents = fixed_contents.to_string();
-                } else {
+
+            if let Some(fixed_error) = fixed_error {
+                if !source_has_errors {
+                    // Previous fix introduced a syntax error, abort
+                    let fixes = print_diagnostics(diagnostics, &path, &contents);
+
+                    let mut syntax_diagnostics = Vec::new();
+                    syntax_error(&mut syntax_diagnostics, &fixed_error, &locator);
+                    let syntax_errors =
+                        print_diagnostics(syntax_diagnostics, &path, &fixed_contents);
+
                     panic!(
-                        "Failed to converge after {max_iterations} iterations. This likely \
-                         indicates a bug in the implementation of the fix."
+                        r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
+{syntax_errors}
+Last generated fixes:
+{fixes}
+Source with applied fixes:
+{fixed_contents}"#
                     );
                 }
-            } else {
-                break;
             }
+
+            diagnostics = fixed_diagnostics;
+            contents = fixed_contents.to_string();
         }
     }
 
-    let source_code = SourceFileBuilder::new(&path.file_name().unwrap().to_string_lossy())
-        .source_text_string(contents)
-        .finish();
+    let source_code = SourceFileBuilder::new(
+        path.file_name().unwrap().to_string_lossy().as_ref(),
+        contents,
+    )
+    .finish();
 
     Ok(diagnostics
         .into_iter()
-        .map(|diagnostic| Message::from_diagnostic(diagnostic, source_code.clone(), 1))
+        .map(|diagnostic| {
+            let rule = diagnostic.kind.rule();
+            let fixable = diagnostic.fix.is_some();
+
+            match (fixable, rule.autofixable()) {
+                (true, AutofixKind::Sometimes | AutofixKind::Always)
+                | (false, AutofixKind::None | AutofixKind::Sometimes) => {
+                    // Ok
+                }
+                (true, AutofixKind::None) => {
+                    panic!("Rule {rule:?} is marked as non-fixable but it created a fix. Change the `Violation::AUTOFIX` to either `AutofixKind::Sometimes` or `AutofixKind::Always`");
+                },
+                (false, AutofixKind::Always) => {
+                    panic!("Rule {rule:?} is marked to always-fixable but the diagnostic has no fix. Either ensure you always emit a fix or change `Violation::AUTOFIX` to either `AutofixKind::Sometimes` or `AutofixKind::None")
+                }
+            }
+
+            assert!(!(fixable && diagnostic.kind.suggestion.is_none()), "Diagnostic emitted by {rule:?} is fixable but `Violation::autofix_title` returns `None`.`");
+
+            // Not strictly necessary but adds some coverage for this code path
+            let noqa = directives.noqa_line_for.resolve(diagnostic.start());
+
+            Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
+        })
         .sorted()
         .collect())
+}
+
+fn print_diagnostics(diagnostics: Vec<Diagnostic>, file_path: &Path, source: &str) -> String {
+    let source_file = SourceFileBuilder::new(
+        file_path.file_name().unwrap().to_string_lossy().as_ref(),
+        source,
+    )
+    .finish();
+
+    let messages: Vec<_> = diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            let noqa_start = diagnostic.start();
+
+            Message::from_diagnostic(diagnostic, source_file.clone(), noqa_start)
+        })
+        .collect();
+
+    print_messages(&messages)
 }
 
 pub(crate) fn print_messages(messages: &[Message]) -> String {
@@ -116,6 +194,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
     TextEmitter::default()
         .with_show_fix_status(true)
         .with_show_fix(true)
+        .with_show_source(true)
         .emit(
             &mut output,
             messages,

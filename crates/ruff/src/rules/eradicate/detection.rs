@@ -31,9 +31,9 @@ static PARTIAL_DICTIONARY_REGEX: Lazy<Regex> =
 static PRINT_RETURN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(print|return)\b\s*").unwrap());
 
 /// Returns `true` if a comment contains Python code.
-pub fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
+pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     let line = if let Some(line) = line.trim().strip_prefix('#') {
-        line.trim()
+        line.trim_start_matches([' ', '#'])
     } else {
         return false;
     };
@@ -105,6 +105,7 @@ mod tests {
     #[test]
     fn comment_contains_code_basic() {
         assert!(comment_contains_code("# x = 1", &[]));
+        assert!(comment_contains_code("# # x = 1", &[]));
         assert!(comment_contains_code("#from foo import eradicate", &[]));
         assert!(comment_contains_code("#import eradicate", &[]));
         assert!(comment_contains_code(r#"#"key": value,"#, &[]));
@@ -117,6 +118,7 @@ mod tests {
 
         assert!(!comment_contains_code("#", &[]));
         assert!(!comment_contains_code("# This is a (real) comment.", &[]));
+        assert!(!comment_contains_code("# # A (nested) comment.", &[]));
         assert!(!comment_contains_code("# 123", &[]));
         assert!(!comment_contains_code("# 123.1", &[]));
         assert!(!comment_contains_code("# 1, 2, 3", &[]));

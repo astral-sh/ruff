@@ -1,9 +1,9 @@
+use ruff_text_size::TextRange;
 use std::ffi::OsStr;
 use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 
 /// ## What it does
@@ -33,7 +33,7 @@ use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
 #[violation]
 pub struct InvalidModuleName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for InvalidModuleName {
@@ -45,7 +45,7 @@ impl Violation for InvalidModuleName {
 }
 
 /// N999
-pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
+pub(crate) fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
     if !path
         .extension()
         .map_or(false, |ext| ext == "py" || ext == "pyi")
@@ -73,7 +73,7 @@ pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagno
                 InvalidModuleName {
                     name: module_name.to_string(),
                 },
-                Range::default(),
+                TextRange::default(),
             ));
         }
     }

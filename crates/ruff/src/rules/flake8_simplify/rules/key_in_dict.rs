@@ -1,13 +1,13 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState};
 use log::error;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Cmpop, Expr, ExprKind};
 
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_attribute, match_call, match_expression};
@@ -15,8 +15,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct InDictKeys {
-    pub key: String,
-    pub dict: String,
+    key: String,
+    dict: String,
 }
 
 impl AlwaysAutofixableViolation for InDictKeys {
@@ -37,7 +37,7 @@ fn get_value_content_for_key_in_dict(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<String> {
-    let content = locator.slice(expr);
+    let content = locator.slice(expr.range());
     let mut expression = match_expression(content)?;
     let call = match_call(&mut expression)?;
     let attribute = match_attribute(&mut call.func)?;
@@ -53,19 +53,19 @@ fn get_value_content_for_key_in_dict(
 }
 
 /// SIM118
-fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
-    let ExprKind::Call {
+fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRange) {
+    let ExprKind::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    } = &right.node else {
+    }) = &right.node else {
         return;
     };
     if !(args.is_empty() && keywords.is_empty()) {
         return;
     }
 
-    let ExprKind::Attribute { attr, .. } = &func.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node else {
         return;
     };
     if attr != "keys" {
@@ -73,7 +73,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
     }
 
     // Slice exact content to preserve formatting.
-    let left_content = checker.locator.slice(left);
+    let left_content = checker.locator.slice(left.range());
     let value_content =
         match get_value_content_for_key_in_dict(checker.locator, checker.stylist, right) {
             Ok(value_content) => value_content,
@@ -91,27 +91,27 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         range,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             value_content,
-            right.location,
-            right.end_location.unwrap(),
-        ));
+            right.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
 
 /// SIM118 in a for loop
-pub fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn key_in_dict_for(checker: &mut Checker, target: &Expr, iter: &Expr) {
     key_in_dict(
         checker,
         target,
         iter,
-        Range::new(target.location, iter.end_location.unwrap()),
+        TextRange::new(target.start(), iter.end()),
     );
 }
 
 /// SIM118 in a comparison
-pub fn key_in_dict_compare(
+pub(crate) fn key_in_dict_compare(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -127,5 +127,5 @@ pub fn key_in_dict_compare(
     }
     let right = comparators.first().unwrap();
 
-    key_in_dict(checker, left, right, Range::from(expr));
+    key_in_dict(checker, left, right, expr.range());
 }

@@ -1,10 +1,8 @@
 use rustpython_parser::ast::{Cmpop, Expr};
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for usages of comparators other than `<` and `>=` for
@@ -58,7 +56,7 @@ impl Violation for BadVersionInfoComparison {
 }
 
 /// PYI006
-pub fn bad_version_info_comparison(
+pub(crate) fn bad_version_info_comparison(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -80,7 +78,7 @@ pub fn bad_version_info_comparison(
     }
 
     if !matches!(op, Cmpop::Lt | Cmpop::GtE) {
-        let diagnostic = Diagnostic::new(BadVersionInfoComparison, Range::from(expr));
+        let diagnostic = Diagnostic::new(BadVersionInfoComparison, expr.range());
         checker.diagnostics.push(diagnostic);
     }
 }

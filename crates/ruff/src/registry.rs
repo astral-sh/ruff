@@ -156,6 +156,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BinaryOpException,
+    rules::pylint::rules::ImportSelf,
     rules::pylint::rules::InvalidCharacterBackspace,
     rules::pylint::rules::InvalidCharacterSub,
     rules::pylint::rules::InvalidCharacterEsc,
@@ -187,6 +188,8 @@ ruff_macros::register_rules!(
     rules::pylint::rules::RedefinedLoopName,
     rules::pylint::rules::LoggingTooFewArgs,
     rules::pylint::rules::LoggingTooManyArgs,
+    rules::pylint::rules::UnexpectedSpecialMethodSignature,
+    rules::pylint::rules::NestedMinMax,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -228,22 +231,24 @@ ruff_macros::register_rules!(
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
     // flake8-comprehensions
+    rules::flake8_comprehensions::rules::UnnecessaryCallAroundSorted,
+    rules::flake8_comprehensions::rules::UnnecessaryCollectionCall,
+    rules::flake8_comprehensions::rules::UnnecessaryComprehension,
+    rules::flake8_comprehensions::rules::UnnecessaryComprehensionAnyAll,
+    rules::flake8_comprehensions::rules::UnnecessaryDoubleCastOrProcess,
+    rules::flake8_comprehensions::rules::UnnecessaryGeneratorDict,
     rules::flake8_comprehensions::rules::UnnecessaryGeneratorList,
     rules::flake8_comprehensions::rules::UnnecessaryGeneratorSet,
-    rules::flake8_comprehensions::rules::UnnecessaryGeneratorDict,
-    rules::flake8_comprehensions::rules::UnnecessaryListComprehensionSet,
-    rules::flake8_comprehensions::rules::UnnecessaryListComprehensionDict,
-    rules::flake8_comprehensions::rules::UnnecessaryLiteralSet,
-    rules::flake8_comprehensions::rules::UnnecessaryLiteralDict,
-    rules::flake8_comprehensions::rules::UnnecessaryCollectionCall,
-    rules::flake8_comprehensions::rules::UnnecessaryLiteralWithinTupleCall,
-    rules::flake8_comprehensions::rules::UnnecessaryLiteralWithinListCall,
     rules::flake8_comprehensions::rules::UnnecessaryListCall,
-    rules::flake8_comprehensions::rules::UnnecessaryCallAroundSorted,
-    rules::flake8_comprehensions::rules::UnnecessaryDoubleCastOrProcess,
-    rules::flake8_comprehensions::rules::UnnecessarySubscriptReversal,
-    rules::flake8_comprehensions::rules::UnnecessaryComprehension,
+    rules::flake8_comprehensions::rules::UnnecessaryListComprehensionDict,
+    rules::flake8_comprehensions::rules::UnnecessaryListComprehensionSet,
+    rules::flake8_comprehensions::rules::UnnecessaryLiteralDict,
+    rules::flake8_comprehensions::rules::UnnecessaryLiteralSet,
+    rules::flake8_comprehensions::rules::UnnecessaryLiteralWithinDictCall,
+    rules::flake8_comprehensions::rules::UnnecessaryLiteralWithinListCall,
+    rules::flake8_comprehensions::rules::UnnecessaryLiteralWithinTupleCall,
     rules::flake8_comprehensions::rules::UnnecessaryMap,
+    rules::flake8_comprehensions::rules::UnnecessarySubscriptReversal,
     // flake8-debugger
     rules::flake8_debugger::rules::Debugger,
     // mccabe
@@ -446,6 +451,12 @@ ruff_macros::register_rules!(
     rules::flake8_bandit::rules::RequestWithoutTimeout,
     rules::flake8_bandit::rules::SnmpInsecureVersion,
     rules::flake8_bandit::rules::SnmpWeakCryptography,
+    rules::flake8_bandit::rules::SubprocessPopenWithShellEqualsTrue,
+    rules::flake8_bandit::rules::SubprocessWithoutShellEqualsTrue,
+    rules::flake8_bandit::rules::CallWithShellEqualsTrue,
+    rules::flake8_bandit::rules::StartProcessWithAShell,
+    rules::flake8_bandit::rules::StartProcessWithNoShell,
+    rules::flake8_bandit::rules::StartProcessWithPartialPath,
     rules::flake8_bandit::rules::SuspiciousEvalUsage,
     rules::flake8_bandit::rules::SuspiciousFTPLibUsage,
     rules::flake8_bandit::rules::SuspiciousInsecureCipherUsage,
@@ -482,6 +493,8 @@ ruff_macros::register_rules!(
     rules::flake8_unused_arguments::rules::UnusedLambdaArgument,
     // flake8-import-conventions
     rules::flake8_import_conventions::rules::UnconventionalImportAlias,
+    rules::flake8_import_conventions::rules::BannedImportAlias,
+    rules::flake8_import_conventions::rules::BannedImportFrom,
     // flake8-datetimez
     rules::flake8_datetimez::rules::CallDatetimeWithoutTzinfo,
     rules::flake8_datetimez::rules::CallDatetimeToday,
@@ -493,10 +506,11 @@ ruff_macros::register_rules!(
     rules::flake8_datetimez::rules::CallDateToday,
     rules::flake8_datetimez::rules::CallDateFromtimestamp,
     // pygrep-hooks
-    rules::pygrep_hooks::rules::Eval,
-    rules::pygrep_hooks::rules::DeprecatedLogWarn,
-    rules::pygrep_hooks::rules::BlanketTypeIgnore,
     rules::pygrep_hooks::rules::BlanketNOQA,
+    rules::pygrep_hooks::rules::BlanketTypeIgnore,
+    rules::pygrep_hooks::rules::DeprecatedLogWarn,
+    rules::pygrep_hooks::rules::Eval,
+    rules::pygrep_hooks::rules::InvalidMockAccess,
     // pandas-vet
     rules::pandas_vet::rules::PandasUseOfInplaceArgument,
     rules::pandas_vet::rules::PandasUseOfDotIsNull,
@@ -527,6 +541,10 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
     rules::flake8_pyi::rules::PassInClassBody,
+    rules::flake8_pyi::rules::DuplicateUnionMember,
+    rules::flake8_pyi::rules::QuotedAnnotationInStub,
+    rules::flake8_pyi::rules::SnakeCaseTypeAlias,
+    rules::flake8_pyi::rules::TSuffixedTypeAlias,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,
@@ -561,7 +579,6 @@ ruff_macros::register_rules!(
     rules::flake8_pie::rules::UnnecessaryDictKwargs,
     rules::flake8_pie::rules::ReimplementedListBuiltin,
     rules::flake8_pie::rules::MultipleStartsEndsWith,
-    rules::flake8_pie::rules::UnnecessaryComprehensionAnyAll,
     // flake8-commas
     rules::flake8_commas::rules::MissingTrailingComma,
     rules::flake8_commas::rules::TrailingCommaOnBareTuple,
@@ -654,6 +671,8 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
     rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
+    // flynt
+    rules::flynt::rules::StaticJoinToFString,
 );
 
 pub trait AsRule {
@@ -809,6 +828,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flynt](https://pypi.org/project/flynt/)
+    #[prefix = "FLY"]
+    Flynt,
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,

@@ -1,23 +1,25 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
-pub mod actions;
+pub(crate) mod actions;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {
+pub(crate) fn fix_file(
+    diagnostics: &[Diagnostic],
+    locator: &Locator,
+) -> Option<(String, FixTable)> {
     let mut with_fixes = diagnostics
         .iter()
-        .filter(|diag| !diag.fix.is_empty())
+        .filter(|diag| diag.fix.is_some())
         .peekable();
 
     if with_fixes.peek().is_none() {
@@ -33,17 +35,16 @@ fn apply_fixes<'a>(
     locator: &'a Locator<'a>,
 ) -> (String, FixTable) {
     let mut output = String::with_capacity(locator.len());
-    let mut last_pos: Option<Location> = None;
+    let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
     let mut fixed = FxHashMap::default();
 
     for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
-            if diagnostic.fix.is_empty() {
-                None
-            } else {
-                Some((diagnostic.kind.rule(), &diagnostic.fix))
-            }
+            diagnostic
+                .fix
+                .as_ref()
+                .map(|fix| (diagnostic.kind.rule(), fix))
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
@@ -57,7 +58,7 @@ fn apply_fixes<'a>(
         // Best-effort approach: if this fix overlaps with a fix we've already applied,
         // skip it.
         if last_pos.map_or(false, |last_pos| {
-            fix.min_location()
+            fix.min_start()
                 .map_or(false, |fix_location| last_pos >= fix_location)
         }) {
             continue;
@@ -65,14 +66,14 @@ fn apply_fixes<'a>(
 
         for edit in fix.edits() {
             // Add all contents from `last_pos` to `fix.location`.
-            let slice = locator.slice(Range::new(last_pos.unwrap_or_default(), edit.location()));
+            let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
 
             // Add the patch itself.
             output.push_str(edit.content().unwrap_or_default());
 
             // Track that the edit was applied.
-            last_pos = Some(edit.end_location());
+            last_pos = Some(edit.end());
             applied.insert(edit);
         }
 
@@ -88,8 +89,8 @@ fn apply_fixes<'a>(
 
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
-    fix1.min_location()
-        .cmp(&fix2.min_location())
+    fix1.min_start()
+        .cmp(&fix2.min_start())
         .then_with(|| match (&rule1, &rule2) {
             // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
             (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
@@ -100,23 +101,24 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::ast::Location;
+    use ruff_text_size::TextSize;
 
     use ruff_diagnostics::Diagnostic;
     use ruff_diagnostics::Edit;
+    use ruff_diagnostics::Fix;
     use ruff_python_ast::source_code::Locator;
 
     use crate::autofix::apply_fixes;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
+    #[allow(deprecated)]
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
         edit.into_iter()
             .map(|edit| Diagnostic {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
-                location: edit.location(),
-                end_location: edit.end_location(),
-                fix: edit.into(),
+                range: edit.range(),
+                fix: Some(Fix::unspecified(edit)),
                 parent: None,
             })
             .collect()
@@ -142,8 +144,8 @@ class A(object):
         );
         let diagnostics = create_diagnostics([Edit::replacement(
             "Bar".to_string(),
-            Location::new(1, 8),
-            Location::new(1, 14),
+            TextSize::new(8),
+            TextSize::new(14),
         )]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
@@ -166,8 +168,7 @@ class A(object):
 "#
             .trim(),
         );
-        let diagnostics =
-            create_diagnostics([Edit::deletion(Location::new(1, 7), Location::new(1, 15))]);
+        let diagnostics = create_diagnostics([Edit::deletion(TextSize::new(7), TextSize::new(15))]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
@@ -190,8 +191,8 @@ class A(object, object, object):
             .trim(),
         );
         let diagnostics = create_diagnostics([
-            Edit::deletion(Location::new(1, 8), Location::new(1, 16)),
-            Edit::deletion(Location::new(1, 22), Location::new(1, 30)),
+            Edit::deletion(TextSize::from(8), TextSize::from(16)),
+            Edit::deletion(TextSize::from(22), TextSize::from(30)),
         ]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
 
@@ -216,12 +217,8 @@ class A(object):
             .trim(),
         );
         let diagnostics = create_diagnostics([
-            Edit::deletion(Location::new(1, 7), Location::new(1, 15)),
-            Edit::replacement(
-                "ignored".to_string(),
-                Location::new(1, 9),
-                Location::new(1, 11),
-            ),
+            Edit::deletion(TextSize::from(7), TextSize::from(15)),
+            Edit::replacement("ignored".to_string(), TextSize::from(9), TextSize::from(11)),
         ]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(

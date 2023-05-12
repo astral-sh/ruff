@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location, Operator};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Operator};
 
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 
@@ -42,39 +42,39 @@ const RESERVED_ATTRS: &[&str; 22] = &[
 fn check_msg(checker: &mut Checker, msg: &Expr) {
     match &msg.node {
         // Check for string concatenation and percent format.
-        ExprKind::BinOp { op, .. } => match op {
+        ExprKind::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
                 if checker.settings.rules.enabled(Rule::LoggingStringConcat) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(LoggingStringConcat, Range::from(msg)));
+                        .push(Diagnostic::new(LoggingStringConcat, msg.range()));
                 }
             }
             Operator::Mod => {
                 if checker.settings.rules.enabled(Rule::LoggingPercentFormat) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(LoggingPercentFormat, Range::from(msg)));
+                        .push(Diagnostic::new(LoggingPercentFormat, msg.range()));
                 }
             }
             _ => {}
         },
         // Check for f-strings.
-        ExprKind::JoinedStr { .. } => {
+        ExprKind::JoinedStr(_) => {
             if checker.settings.rules.enabled(Rule::LoggingFString) {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(LoggingFString, Range::from(msg)));
+                    .push(Diagnostic::new(LoggingFString, msg.range()));
             }
         }
         // Check for .format() calls.
-        ExprKind::Call { func, .. } => {
+        ExprKind::Call(ast::ExprCall { func, .. }) => {
             if checker.settings.rules.enabled(Rule::LoggingStringFormat) {
-                if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                    if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
+                if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
+                    if attr == "format" && matches!(value.node, ExprKind::Constant(_)) {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(LoggingStringFormat, Range::from(msg)));
+                            .push(Diagnostic::new(LoggingStringFormat, msg.range()));
                     }
                 }
             }
@@ -86,25 +86,25 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
 /// Check contents of the `extra` argument to logging calls.
 fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     match &extra.node.value.node {
-        ExprKind::Dict { keys, .. } => {
+        ExprKind::Dict(ast::ExprDict { keys, .. }) => {
             for key in keys {
                 if let Some(key) = &key {
-                    if let ExprKind::Constant {
+                    if let ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(string),
                         ..
-                    } = &key.node
+                    }) = &key.node
                     {
                         if RESERVED_ATTRS.contains(&string.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
                                 LoggingExtraAttrClash(string.to_string()),
-                                Range::from(key),
+                                key.range(),
                             ));
                         }
                     }
                 }
             }
         }
-        ExprKind::Call { func, keywords, .. } => {
+        ExprKind::Call(ast::ExprCall { func, keywords, .. }) => {
             if checker
                 .ctx
                 .resolve_call_path(func)
@@ -115,7 +115,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                         if RESERVED_ATTRS.contains(&key.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
                                 LoggingExtraAttrClash(key.to_string()),
-                                Range::from(keyword),
+                                keyword.range(),
                             ));
                         }
                     }
@@ -145,24 +145,20 @@ impl LoggingCallType {
 }
 
 /// Check logging calls for violations.
-pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+pub(crate) fn logging_call(
+    checker: &mut Checker,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     if !logging::is_logger_candidate(&checker.ctx, func) {
         return;
     }
 
-    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
         if let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
-            let level_call_range = Range::new(
-                Location::new(
-                    func.location.row(),
-                    value.end_location.unwrap().column() + 1,
-                ),
-                Location::new(
-                    func.end_location.unwrap().row(),
-                    func.end_location.unwrap().column(),
-                ),
-            );
+            let level_call_range = TextRange::new(value.end() + TextSize::from(1), func.end());
 
             // G001 - G004
             let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
@@ -179,11 +175,11 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         "warning".to_string(),
-                        level_call_range.location,
-                        level_call_range.end_location,
-                    ));
+                        level_call_range,
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -210,11 +206,13 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                     // return.
                     if !(matches!(
                         exc_info.node.value.node,
-                        ExprKind::Constant {
+                        ExprKind::Constant(ast::ExprConstant {
                             value: Constant::Bool(true),
                             ..
-                        }
-                    ) || if let ExprKind::Call { func, .. } = &exc_info.node.value.node {
+                        })
+                    ) || if let ExprKind::Call(ast::ExprCall { func, .. }) =
+                        &exc_info.node.value.node
+                    {
                         checker
                             .ctx
                             .resolve_call_path(func)
@@ -244,7 +242,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                                 {
                                     checker.diagnostics.push(Diagnostic::new(
                                         LoggingRedundantExcInfo,
-                                        Range::from(exc_info),
+                                        exc_info.range(),
                                     ));
                                 }
                             }

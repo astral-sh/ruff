@@ -5,7 +5,6 @@ use rustpython_parser::Tok;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
@@ -18,7 +17,7 @@ use ruff_python_ast::types::Range;
 ///
 /// ## Example
 /// ```python
-/// x = 1 # type: int
+/// x = 1  # type: int
 /// ```
 ///
 /// Use instead:
@@ -35,28 +34,23 @@ impl Violation for TypeCommentInStub {
     }
 }
 
-static TYPE_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
-static TYPE_IGNORE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());
-
 /// PYI033
-pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
+pub(crate) fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     for token in tokens.iter().flatten() {
-        if let (location, Tok::Comment(comment), end_location) = token {
+        if let (Tok::Comment(comment), range) = token {
             if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-                diagnostics.push(Diagnostic::new(
-                    TypeCommentInStub,
-                    Range {
-                        location: *location,
-                        end_location: *end_location,
-                    },
-                ));
+                diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));
             }
         }
     }
 
     diagnostics
 }
+
+static TYPE_COMMENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
+
+static TYPE_IGNORE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());

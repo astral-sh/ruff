@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -11,7 +10,7 @@ use super::super::types::Primitive;
 
 #[violation]
 pub struct TypeOfPrimitive {
-    pub primitive: Primitive,
+    primitive: Primitive,
 }
 
 impl AlwaysAutofixableViolation for TypeOfPrimitive {
@@ -28,7 +27,7 @@ impl AlwaysAutofixableViolation for TypeOfPrimitive {
 }
 
 /// UP003
-pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if args.len() != 1 {
         return;
     }
@@ -39,19 +38,19 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
     {
         return;
     }
-    let ExprKind::Constant { value, .. } = &args[0].node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &args[0].node else {
         return;
     };
     let Some(primitive) = Primitive::from_constant(value) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, Range::from(expr));
+    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             primitive.builtin(),
-            expr.location,
-            expr.end_location.unwrap(),
-        ));
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

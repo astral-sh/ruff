@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_init;
@@ -44,15 +43,15 @@ impl Violation for ReturnInInit {
 }
 
 /// PLE0101
-pub fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
-    if let StmtKind::Return { value } = &stmt.node {
+pub(crate) fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
+    if let StmtKind::Return(ast::StmtReturn { value }) = &stmt.node {
         if let Some(expr) = value {
             if matches!(
                 expr.node,
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::None,
                     ..
-                }
+                })
             ) {
                 // Explicit `return None`.
                 return;
@@ -66,6 +65,6 @@ pub fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
     if in_dunder_init(checker) {
         checker
             .diagnostics
-            .push(Diagnostic::new(ReturnInInit, Range::from(stmt)));
+            .push(Diagnostic::new(ReturnInInit, stmt.range()));
     }
 }

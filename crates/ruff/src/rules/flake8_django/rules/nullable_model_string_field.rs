@@ -1,9 +1,8 @@
 use rustpython_parser::ast::Constant::Bool;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -41,7 +40,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct DjangoNullableModelStringField {
-    pub field_name: String,
+    field_name: String,
 }
 
 impl Violation for DjangoNullableModelStringField {
@@ -62,10 +61,10 @@ const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
 ];
 
 /// DJ001
-pub fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
+pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     for statement in body.iter() {
-        let StmtKind::Assign {value, ..} = &statement.node else {
+        let StmtKind::Assign(ast::StmtAssign {value, ..}) = &statement.node else {
             continue
         };
         if let Some(field_name) = is_nullable_field(checker, value) {
@@ -73,7 +72,7 @@ pub fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diag
                 DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
                 },
-                Range::from(value),
+                value.range(),
             ));
         }
     }
@@ -81,7 +80,7 @@ pub fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diag
 }
 
 fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
-    let ExprKind::Call {func, keywords, ..} = &value.node else {
+    let ExprKind::Call(ast::ExprCall {func, keywords, ..}) = &value.node else {
         return None;
     };
 
@@ -97,7 +96,7 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
     let mut blank_key = false;
     let mut unique_key = false;
     for keyword in keywords.iter() {
-        let ExprKind::Constant {value: Bool(true), ..} = &keyword.node.value.node else {
+        let ExprKind::Constant(ast::ExprConstant {value: Bool(true), ..}) = &keyword.node.value.node else {
             continue
         };
         let Some(argument) = &keyword.node.arg else {

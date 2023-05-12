@@ -1,8 +1,7 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
@@ -17,19 +16,20 @@ impl Violation for ShebangNotFirstLine {
 }
 
 /// EXE005
-pub fn shebang_newline(lineno: usize, shebang: &ShebangDirective) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, end, _) = shebang {
-        if lineno > 1 {
+pub(crate) fn shebang_newline(
+    range: TextRange,
+    shebang: &ShebangDirective,
+    first_line: bool,
+) -> Option<Diagnostic> {
+    if let ShebangDirective::Match(_, start, content) = shebang {
+        if first_line {
+            None
+        } else {
             let diagnostic = Diagnostic::new(
                 ShebangNotFirstLine,
-                Range::new(
-                    Location::new(lineno + 1, *start),
-                    Location::new(lineno + 1, *end),
-                ),
+                TextRange::at(range.start() + start, content.text_len()),
             );
             Some(diagnostic)
-        } else {
-            None
         }
     } else {
         None

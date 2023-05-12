@@ -144,5 +144,6 @@ SIM101.py:22:4: SIM101 Multiple `isinstance` calls for expression, merge into a 
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
 25 |     pass
    |
+   = help: Merge `isinstance` calls
 
 

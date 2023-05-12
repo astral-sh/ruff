@@ -1,11 +1,12 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::source_code::Locator;
 
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
 
@@ -118,33 +119,31 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC001, ISC002
-pub fn implicit(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn implicit(
+    tokens: &[LexResult],
+    settings: &Settings,
+    locator: &Locator,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
-    for ((a_start, a_tok, a_end), (b_start, b_tok, b_end)) in tokens
+    for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
         .flatten()
-        .filter(|(_, tok, _)| {
+        .filter(|(tok, _)| {
             !matches!(tok, Tok::Comment(..))
                 && (settings.allow_multiline || !matches!(tok, Tok::NonLogicalNewline))
         })
         .tuple_windows()
     {
         if matches!(a_tok, Tok::String { .. }) && matches!(b_tok, Tok::String { .. }) {
-            if a_end.row() == b_start.row() {
+            if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
                 diagnostics.push(Diagnostic::new(
-                    SingleLineImplicitStringConcatenation,
-                    Range {
-                        location: *a_start,
-                        end_location: *b_end,
-                    },
+                    MultiLineImplicitStringConcatenation,
+                    TextRange::new(a_range.start(), b_range.end()),
                 ));
             } else {
                 diagnostics.push(Diagnostic::new(
-                    MultiLineImplicitStringConcatenation,
-                    Range {
-                        location: *a_start,
-                        end_location: *b_end,
-                    },
+                    SingleLineImplicitStringConcatenation,
+                    TextRange::new(a_range.start(), b_range.end()),
                 ));
             }
         }
@@ -153,28 +152,25 @@ pub fn implicit(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
 }
 
 /// ISC003
-pub fn explicit(expr: &Expr) -> Option<Diagnostic> {
-    if let ExprKind::BinOp { left, op, right } = &expr.node {
+pub(crate) fn explicit(expr: &Expr) -> Option<Diagnostic> {
+    if let ExprKind::BinOp(ast::ExprBinOp { left, op, right }) = &expr.node {
         if matches!(op, Operator::Add) {
             if matches!(
                 left.node,
-                ExprKind::JoinedStr { .. }
-                    | ExprKind::Constant {
+                ExprKind::JoinedStr(_)
+                    | ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..
-                    }
+                    })
             ) && matches!(
                 right.node,
-                ExprKind::JoinedStr { .. }
-                    | ExprKind::Constant {
+                ExprKind::JoinedStr(_)
+                    | ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..
-                    }
+                    })
             ) {
-                return Some(Diagnostic::new(
-                    ExplicitStringConcatenation,
-                    Range::from(expr),
-                ));
+                return Some(Diagnostic::new(ExplicitStringConcatenation, expr.range()));
             }
         }
     }

@@ -26,6 +26,8 @@ pub(crate) static GOOGLE_SECTIONS: &[SectionKind] = &[
     SectionKind::KeywordArguments,
     SectionKind::Note,
     SectionKind::Notes,
+    SectionKind::OtherArgs,
+    SectionKind::OtherArguments,
     SectionKind::Return,
     SectionKind::Tip,
     SectionKind::Todo,

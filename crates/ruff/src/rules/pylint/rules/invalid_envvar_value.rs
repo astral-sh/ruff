@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -38,30 +37,27 @@ fn is_valid_key(expr: &Expr) -> bool {
     // We can't infer the types of these defaults, so assume they're valid.
     if matches!(
         expr.node,
-        ExprKind::Name { .. }
-            | ExprKind::Attribute { .. }
-            | ExprKind::Subscript { .. }
-            | ExprKind::Call { .. }
+        ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) | ExprKind::Call(_)
     ) {
         return true;
     }
 
     // Allow string concatenation.
-    if let ExprKind::BinOp {
+    if let ExprKind::BinOp(ast::ExprBinOp {
         left,
         right,
         op: Operator::Add,
-    } = &expr.node
+    }) = &expr.node
     {
         return is_valid_key(left) && is_valid_key(right);
     }
 
     // Allow string formatting.
-    if let ExprKind::BinOp {
+    if let ExprKind::BinOp(ast::ExprBinOp {
         left,
         op: Operator::Mod,
         ..
-    } = &expr.node
+    }) = &expr.node
     {
         return is_valid_key(left);
     }
@@ -69,15 +65,15 @@ fn is_valid_key(expr: &Expr) -> bool {
     // Otherwise, the default must be a string.
     matches!(
         expr.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str { .. },
             ..
-        } | ExprKind::JoinedStr { .. }
+        }) | ExprKind::JoinedStr(_)
     )
 }
 
 /// PLE1507
-pub fn invalid_envvar_value(
+pub(crate) fn invalid_envvar_value(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
@@ -101,7 +97,7 @@ pub fn invalid_envvar_value(
         if !is_valid_key(expr) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(InvalidEnvvarValue, Range::from(expr)));
+                .push(Diagnostic::new(InvalidEnvvarValue, expr.range()));
         }
     }
 }

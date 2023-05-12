@@ -1,8 +1,8 @@
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::Location;
-use serde::{Deserialize, Serialize};
 
-use crate::types::Range;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// A representation of an individual name imported via any import statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,7 +22,7 @@ pub struct Import<'a> {
 pub struct ImportFrom<'a> {
     pub module: Option<&'a str>,
     pub name: Alias<'a>,
-    pub level: Option<usize>,
+    pub level: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,7 +65,7 @@ impl std::fmt::Display for ImportFrom<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "from ")?;
         if let Some(level) = self.level {
-            write!(f, "{}", ".".repeat(level))?;
+            write!(f, "{}", ".".repeat(level as usize))?;
         }
         if let Some(module) = self.module {
             write!(f, "{module}")?;
@@ -75,32 +75,55 @@ impl std::fmt::Display for ImportFrom<'_> {
     }
 }
 
-/// A representation of a module reference in an import statement.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ModuleImport {
-    module: String,
-    location: Location,
-    end_location: Location,
+pub trait FutureImport {
+    /// Returns `true` if this import is from the `__future__` module.
+    fn is_future_import(&self) -> bool;
 }
 
-impl ModuleImport {
-    pub fn new(module: String, location: Location, end_location: Location) -> Self {
-        Self {
-            module,
-            location,
-            end_location,
+impl FutureImport for Import<'_> {
+    fn is_future_import(&self) -> bool {
+        self.name.name == "__future__"
+    }
+}
+
+impl FutureImport for ImportFrom<'_> {
+    fn is_future_import(&self) -> bool {
+        self.module == Some("__future__")
+    }
+}
+
+impl FutureImport for AnyImport<'_> {
+    fn is_future_import(&self) -> bool {
+        match self {
+            AnyImport::Import(import) => import.is_future_import(),
+            AnyImport::ImportFrom(import_from) => import_from.is_future_import(),
         }
     }
 }
 
-impl From<&ModuleImport> for Range {
-    fn from(import: &ModuleImport) -> Range {
-        Range::new(import.location, import.end_location)
+/// A representation of a module reference in an import statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ModuleImport {
+    module: String,
+    range: TextRange,
+}
+
+impl ModuleImport {
+    pub fn new(module: String, range: TextRange) -> Self {
+        Self { module, range }
+    }
+}
+
+impl From<&ModuleImport> for TextRange {
+    fn from(import: &ModuleImport) -> TextRange {
+        import.range
     }
 }
 
 /// A representation of the import dependencies between modules.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ImportMap {
     /// A map from dot-delimited module name to the list of imports in that module.
     module_to_imports: FxHashMap<String, Vec<ModuleImport>>,

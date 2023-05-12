@@ -66,6 +66,16 @@
         "type": "string"
       }
     },
+    "extend-include": {
+      "description": "A list of file patterns to include when linting, in addition to those specified by `include`.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
@@ -310,6 +320,16 @@
         "null"
       ]
     },
+    "include": {
+      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "isort": {
       "description": "Options for the `isort` plugin.",
       "anyOf": [
@@ -511,13 +531,6 @@
       "items": {
         "$ref": "#/definitions/RuleSelector"
       }
-    },
-    "update-check": {
-      "description": "Enable or disable automatic update checks (overridden by the `--update-check` and `--no-update-check` command-line flags).",
-      "type": [
-        "boolean",
-        "null"
-      ]
     }
   },
   "additionalProperties": false,
@@ -649,7 +662,7 @@
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
-          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`).",
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`) or `no-function-call-in-dataclass-defaults` rule (`RUF009`).",
           "type": [
             "array",
             "null"
@@ -755,8 +768,32 @@
             "type": "string"
           }
         },
+        "banned-aliases": {
+          "description": "A mapping from module to its banned import aliases.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "banned-from": {
+          "description": "A list of modules that are allowed to be imported from",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "extend-aliases": {
-          "description": "A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.",
+          "description": "A mapping from module to conventional import alias. These aliases will be added to the `aliases` mapping.",
           "type": [
             "object",
             "null"
@@ -986,6 +1023,16 @@
       },
       "additionalProperties": false
     },
+    "ImportSection": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ImportType"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
     "ImportType": {
       "type": "string",
       "enum": [
@@ -1131,7 +1178,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/ImportType"
+            "$ref": "#/definitions/ImportSection"
           }
         },
         "order-by-type": {
@@ -1160,6 +1207,29 @@
           ],
           "items": {
             "type": "string"
+          }
+        },
+        "section-order": {
+          "description": "Override in which order the sections should be output. Can be used to move custom sections.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ImportSection"
+          }
+        },
+        "sections": {
+          "description": "A list of mappings from section names to modules. By default custom sections are output last, but this can be overridden with `section-order`.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "single-line-exclusions": {
@@ -1538,6 +1608,8 @@
         "C415",
         "C416",
         "C417",
+        "C418",
+        "C419",
         "C9",
         "C90",
         "C901",
@@ -1750,6 +1822,10 @@
         "FBT001",
         "FBT002",
         "FBT003",
+        "FLY",
+        "FLY0",
+        "FLY00",
+        "FLY002",
         "G",
         "G0",
         "G00",
@@ -1775,6 +1851,8 @@
         "ICN0",
         "ICN00",
         "ICN001",
+        "ICN002",
+        "ICN003",
         "INP",
         "INP0",
         "INP00",
@@ -1843,6 +1921,7 @@
         "PGH002",
         "PGH003",
         "PGH004",
+        "PGH005",
         "PIE",
         "PIE7",
         "PIE79",
@@ -1852,7 +1931,6 @@
         "PIE8",
         "PIE80",
         "PIE800",
-        "PIE802",
         "PIE804",
         "PIE807",
         "PIE81",
@@ -1881,6 +1959,9 @@
         "PLE0116",
         "PLE0117",
         "PLE0118",
+        "PLE03",
+        "PLE030",
+        "PLE0302",
         "PLE06",
         "PLE060",
         "PLE0604",
@@ -1950,6 +2031,9 @@
         "PLW012",
         "PLW0120",
         "PLW0129",
+        "PLW04",
+        "PLW040",
+        "PLW0406",
         "PLW06",
         "PLW060",
         "PLW0602",
@@ -1965,6 +2049,10 @@
         "PLW29",
         "PLW290",
         "PLW2901",
+        "PLW3",
+        "PLW33",
+        "PLW330",
+        "PLW3301",
         "PT",
         "PT0",
         "PT00",
@@ -2039,10 +2127,15 @@
         "PYI012",
         "PYI014",
         "PYI015",
+        "PYI016",
         "PYI02",
+        "PYI020",
         "PYI021",
         "PYI03",
         "PYI033",
+        "PYI04",
+        "PYI042",
+        "PYI043",
         "Q",
         "Q0",
         "Q00",
@@ -2128,6 +2221,12 @@
         "S509",
         "S6",
         "S60",
+        "S602",
+        "S603",
+        "S604",
+        "S605",
+        "S606",
+        "S607",
         "S608",
         "S61",
         "S612",

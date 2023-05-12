@@ -1,14 +1,13 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Kind {
+pub(crate) enum Kind {
     Expression,
     Attribute,
 }
@@ -35,20 +34,20 @@ impl Violation for UselessExpression {
 }
 
 /// B018
-pub fn useless_expression(checker: &mut Checker, value: &Expr) {
+pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
-    if matches!(value.node, ExprKind::Compare { .. }) {
+    if matches!(value.node, ExprKind::Compare(_)) {
         return;
     }
 
     // Ignore strings, to avoid false positives with docstrings.
     if matches!(
         value.node,
-        ExprKind::JoinedStr { .. }
-            | ExprKind::Constant {
+        ExprKind::JoinedStr(_)
+            | ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(..) | Constant::Ellipsis,
                 ..
-            }
+            })
     ) {
         return;
     }
@@ -57,12 +56,12 @@ pub fn useless_expression(checker: &mut Checker, value: &Expr) {
     if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
-        if matches!(value.node, ExprKind::Attribute { .. }) {
+        if matches!(value.node, ExprKind::Attribute(_)) {
             checker.diagnostics.push(Diagnostic::new(
                 UselessExpression {
                     kind: Kind::Attribute,
                 },
-                Range::from(value),
+                value.range(),
             ));
         }
         return;
@@ -72,6 +71,6 @@ pub fn useless_expression(checker: &mut Checker, value: &Expr) {
         UselessExpression {
             kind: Kind::Expression,
         },
-        Range::from(value),
+        value.range(),
     ));
 }

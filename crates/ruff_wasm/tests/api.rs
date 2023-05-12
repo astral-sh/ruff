@@ -1,11 +1,10 @@
 #![cfg(target_arch = "wasm32")]
 
-use js_sys;
-use rustpython_parser::ast::Location;
-use wasm_bindgen_test::*;
+use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff::registry::Rule;
-use ruff_wasm::*;
+use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+use ruff_wasm::{check, ExpandedMessage};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
@@ -28,8 +27,14 @@ fn empty_config() {
         [ExpandedMessage {
             code: Rule::IfTuple.noqa_code().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
-            location: Location::new(1, 0),
-            end_location: Location::new(2, 8),
+            location: SourceLocation {
+                row: OneIndexed::from_zero_indexed(0),
+                column: OneIndexed::from_zero_indexed(0)
+            },
+            end_location: SourceLocation {
+                row: OneIndexed::from_zero_indexed(1),
+                column: OneIndexed::from_zero_indexed(8)
+            },
             fix: None,
         }]
     );

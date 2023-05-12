@@ -1,12 +1,10 @@
 use anyhow::{bail, Result};
 use log::error;
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -16,12 +14,12 @@ use ruff_python_ast::types::Range;
 ///
 /// ## Example
 /// ```python
-/// regex = '\.png$'
+/// regex = "\.png$"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// regex = r'\.png$'
+/// regex = r"\.png$"
 /// ```
 #[violation]
 pub struct InvalidEscapeSequence(pub char);
@@ -57,15 +55,14 @@ fn extract_quote(text: &str) -> Result<&str> {
 }
 
 /// W605
-pub fn invalid_escape_sequence(
+pub(crate) fn invalid_escape_sequence(
     locator: &Locator,
-    start: Location,
-    end: Location,
+    range: TextRange,
     autofix: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice(Range::new(start, end));
+    let text = locator.slice(range);
 
     // Determine whether the string is single- or triple-quoted.
     let Ok(quote) = extract_quote(text) else {
@@ -74,53 +71,50 @@ pub fn invalid_escape_sequence(
     };
     let quote_pos = text.find(quote).unwrap();
     let prefix = text[..quote_pos].to_lowercase();
-    let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];
+    let body = &text[quote_pos + quote.len()..text.len() - quote.len()];
 
     if !prefix.contains('r') {
-        for (row_offset, line) in body.universal_newlines().enumerate() {
-            let chars: Vec<char> = line.chars().collect();
-            for col_offset in 0..chars.len() {
-                if chars[col_offset] != '\\' {
-                    continue;
-                }
+        let start_offset =
+            range.start() + TextSize::try_from(quote_pos).unwrap() + quote.text_len();
 
-                // If the previous character was also a backslash, skip.
-                if col_offset > 0 && chars[col_offset - 1] == '\\' {
-                    continue;
-                }
+        let mut chars_iter = body.char_indices().peekable();
 
-                // If we're at the end of the line, skip.
-                if col_offset == chars.len() - 1 {
-                    continue;
-                }
-
-                // If the next character is a valid escape sequence, skip.
-                let next_char = chars[col_offset + 1];
-                if VALID_ESCAPE_SEQUENCES.contains(&next_char) {
-                    continue;
-                }
-
-                // Compute the location of the escape sequence by offsetting the location of the
-                // string token by the characters we've seen thus far.
-                let col = if row_offset == 0 {
-                    start.column() + prefix.len() + quote.len() + col_offset
-                } else {
-                    col_offset
-                };
-                let location = Location::new(start.row() + row_offset, col);
-                let end_location = Location::new(location.row(), location.column() + 2);
-                let mut diagnostic = Diagnostic::new(
-                    InvalidEscapeSequence(next_char),
-                    Range::new(location, end_location),
-                );
-                if autofix {
-                    diagnostic.set_fix(Edit::insertion(
-                        r"\".to_string(),
-                        Location::new(location.row(), location.column() + 1),
-                    ));
-                }
-                diagnostics.push(diagnostic);
+        while let Some((i, c)) = chars_iter.next() {
+            if c != '\\' {
+                continue;
             }
+
+            // If the previous character was also a backslash, skip.
+            if i > 0 && body.as_bytes()[i - 1] == b'\\' {
+                continue;
+            }
+
+            // If we're at the end of the file, skip.
+            let Some((_, next_char)) = chars_iter.peek() else {
+                continue;
+            };
+
+            // If we're at the end of the line, skip
+            if matches!(next_char, '\n' | '\r') {
+                continue;
+            }
+
+            // If the next character is a valid escape sequence, skip.
+            if VALID_ESCAPE_SEQUENCES.contains(next_char) {
+                continue;
+            }
+
+            let location = start_offset + TextSize::try_from(i).unwrap();
+            let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
+            let mut diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
+            if autofix {
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                    r"\".to_string(),
+                    range.start() + TextSize::from(1),
+                )));
+            }
+            diagnostics.push(diagnostic);
         }
     }
 

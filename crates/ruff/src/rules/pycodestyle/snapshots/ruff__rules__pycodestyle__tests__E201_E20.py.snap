@@ -5,7 +5,7 @@ E20.py:2:6: E201 Whitespace after '('
   |
 2 | #: E201:1:6
 3 | spam( ham[1], {eggs: 2})
-  |       E201
+  |      ^ E201
 4 | #: E201:1:10
 5 | spam(ham[ 1], {eggs: 2})
   |
@@ -15,7 +15,7 @@ E20.py:4:10: E201 Whitespace after '('
 4 | spam( ham[1], {eggs: 2})
 5 | #: E201:1:10
 6 | spam(ham[ 1], {eggs: 2})
-  |           E201
+  |          ^ E201
 7 | #: E201:1:15
 8 | spam(ham[1], { eggs: 2})
   |
@@ -25,37 +25,37 @@ E20.py:6:15: E201 Whitespace after '('
  6 | spam(ham[ 1], {eggs: 2})
  7 | #: E201:1:15
  8 | spam(ham[1], { eggs: 2})
-   |                E201
+   |               ^ E201
  9 | #: E201:1:6
-10 | spam(	ham[1], {eggs: 2})
+10 | spam(   ham[1], {eggs: 2})
    |
 
 E20.py:8:6: E201 Whitespace after '('
    |
  8 | spam(ham[1], { eggs: 2})
  9 | #: E201:1:6
-10 | spam(	ham[1], {eggs: 2})
-   |       E201
+10 | spam(   ham[1], {eggs: 2})
+   |      ^^^ E201
 11 | #: E201:1:10
-12 | spam(ham[	1], {eggs: 2})
+12 | spam(ham[   1], {eggs: 2})
    |
 
 E20.py:10:10: E201 Whitespace after '('
    |
-10 | spam(	ham[1], {eggs: 2})
+10 | spam(   ham[1], {eggs: 2})
 11 | #: E201:1:10
-12 | spam(ham[	1], {eggs: 2})
-   |           E201
+12 | spam(ham[   1], {eggs: 2})
+   |          ^^^ E201
 13 | #: E201:1:15
-14 | spam(ham[1], {	eggs: 2})
+14 | spam(ham[1], {  eggs: 2})
    |
 
 E20.py:12:15: E201 Whitespace after '('
    |
-12 | spam(ham[	1], {eggs: 2})
+12 | spam(ham[   1], {eggs: 2})
 13 | #: E201:1:15
-14 | spam(ham[1], {	eggs: 2})
-   |                E201
+14 | spam(ham[1], {  eggs: 2})
+   |               ^^ E201
 15 | #: Okay
 16 | spam(ham[1], {eggs: 2})
    |

@@ -1,19 +1,18 @@
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers::SimpleCallArgs;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct BadFilePermissions {
-    pub mask: u16,
+    mask: u16,
 }
 
 impl Violation for BadFilePermissions {
@@ -71,14 +70,14 @@ static PYSTAT_MAPPING: Lazy<FxHashMap<&'static str, u16>> = Lazy::new(|| {
 
 fn get_int_value(expr: &Expr) -> Option<u16> {
     match &expr.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
-        } => value.to_u16(),
-        ExprKind::Attribute { .. } => {
+        }) => value.to_u16(),
+        ExprKind::Attribute(_) => {
             compose_call_path(expr).and_then(|path| PYSTAT_MAPPING.get(path.as_str()).copied())
         }
-        ExprKind::BinOp { left, op, right } => {
+        ExprKind::BinOp(ast::ExprBinOp { left, op, right }) => {
             if let (Some(left_value), Some(right_value)) =
                 (get_int_value(left), get_int_value(right))
             {
@@ -97,7 +96,7 @@ fn get_int_value(expr: &Expr) -> Option<u16> {
 }
 
 /// S103
-pub fn bad_file_permissions(
+pub(crate) fn bad_file_permissions(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
@@ -114,7 +113,7 @@ pub fn bad_file_permissions(
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
                         BadFilePermissions { mask: int_value },
-                        Range::from(mode_arg),
+                        mode_arg.range(),
                     ));
                 }
             }

@@ -2,7 +2,6 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use rustpython_parser::ast::Location;
 
 use super::LogicalLine;
 
@@ -28,7 +27,7 @@ use super::LogicalLine;
 /// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct IndentationWithInvalidMultiple {
-    pub indent_size: usize,
+    indent_size: usize,
 }
 
 impl Violation for IndentationWithInvalidMultiple {
@@ -61,7 +60,7 @@ impl Violation for IndentationWithInvalidMultiple {
 /// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct IndentationWithInvalidMultipleComment {
-    pub indent_size: usize,
+    indent_size: usize,
 }
 
 impl Violation for IndentationWithInvalidMultipleComment {
@@ -237,51 +236,40 @@ pub(crate) fn indentation(
     indent_level: usize,
     prev_indent_level: Option<usize>,
     indent_size: usize,
-) -> Vec<(Location, DiagnosticKind)> {
+) -> Vec<DiagnosticKind> {
     let mut diagnostics = vec![];
 
-    let location = logical_line.first_token_location().unwrap();
-
     if indent_level % indent_size != 0 {
-        diagnostics.push((
-            location,
-            if logical_line.is_comment_only() {
-                IndentationWithInvalidMultipleComment { indent_size }.into()
-            } else {
-                IndentationWithInvalidMultiple { indent_size }.into()
-            },
-        ));
+        diagnostics.push(if logical_line.is_comment_only() {
+            DiagnosticKind::from(IndentationWithInvalidMultipleComment { indent_size })
+        } else {
+            DiagnosticKind::from(IndentationWithInvalidMultiple { indent_size })
+        });
     }
     let indent_expect = prev_logical_line
         .and_then(|prev_logical_line| prev_logical_line.tokens_trimmed().last())
         .map_or(false, |t| t.kind() == TokenKind::Colon);
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
-        diagnostics.push((
-            location,
-            if logical_line.is_comment_only() {
-                NoIndentedBlockComment.into()
-            } else {
-                NoIndentedBlock.into()
-            },
-        ));
+        diagnostics.push(if logical_line.is_comment_only() {
+            DiagnosticKind::from(NoIndentedBlockComment)
+        } else {
+            DiagnosticKind::from(NoIndentedBlock)
+        });
     } else if !indent_expect
         && prev_indent_level.map_or(false, |prev_indent_level| indent_level > prev_indent_level)
     {
-        diagnostics.push((
-            location,
-            if logical_line.is_comment_only() {
-                UnexpectedIndentationComment.into()
-            } else {
-                UnexpectedIndentation.into()
-            },
-        ));
+        diagnostics.push(if logical_line.is_comment_only() {
+            DiagnosticKind::from(UnexpectedIndentationComment)
+        } else {
+            DiagnosticKind::from(UnexpectedIndentation)
+        });
     }
     if indent_expect {
         let expected_indent_amount = if indent_char == '\t' { 8 } else { 4 };
         let expected_indent_level = prev_indent_level.unwrap_or(0) + expected_indent_amount;
         if indent_level > expected_indent_level {
-            diagnostics.push((location, OverIndented.into()));
+            diagnostics.push(OverIndented.into());
         }
     }
 

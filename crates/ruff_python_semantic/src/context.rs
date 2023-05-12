@@ -1,15 +1,13 @@
+use std::collections::HashMap;
 use std::path::Path;
 
+use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
-use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
-use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::types::RefEquality;
-use ruff_python_ast::typing::AnnotationKind;
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
-use crate::analyze::visibility::{module_visibility, Modifier, VisibleScope};
+use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
@@ -17,83 +15,57 @@ use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
-use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
+use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
+use crate::node::{NodeId, Nodes};
+use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
-    pub module_path: Option<Vec<String>>,
-    // Retain all scopes and parent nodes, along with a stack of indices to track which are active
-    // at various points in time.
-    pub parents: Vec<RefEquality<'a, Stmt>>,
-    pub depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
-    pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
+    pub module_path: Option<&'a [String]>,
+    // Stack of all visited statements, along with the identifier of the current statement.
+    pub stmts: Nodes<'a>,
+    pub stmt_id: Option<NodeId>,
+    // Stack of current expressions.
+    pub exprs: Vec<&'a Expr>,
+    // Stack of all scopes, along with the identifier of the current scope.
+    pub scopes: Scopes<'a>,
+    pub scope_id: ScopeId,
+    pub dead_scopes: Vec<ScopeId>,
+    // Stack of all definitions created in any scope, at any point in execution, along with the
+    // identifier of the current definition.
+    pub definitions: Definitions<'a>,
+    pub definition_id: DefinitionId,
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
-    pub shadowed_bindings:
-        std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
-    pub exprs: Vec<RefEquality<'a, Expr>>,
-    pub scopes: Scopes<'a>,
-    pub scope_stack: ScopeStack,
-    pub dead_scopes: Vec<(ScopeId, ScopeStack)>,
+    pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
     // Internal, derivative state.
-    pub visible_scope: VisibleScope,
-    pub in_annotation: bool,
-    pub in_type_definition: bool,
-    pub in_deferred_string_type_definition: Option<AnnotationKind>,
-    pub in_deferred_type_definition: bool,
-    pub in_exception_handler: bool,
-    pub in_f_string: bool,
-    pub in_literal: bool,
-    pub in_subscript: bool,
-    pub in_type_checking_block: bool,
-    pub seen_import_boundary: bool,
-    pub futures_allowed: bool,
-    pub annotations_future_enabled: bool,
+    pub flags: ContextFlags,
     pub handled_exceptions: Vec<Exceptions>,
 }
 
 impl<'a> Context<'a> {
-    pub fn new(
-        typing_modules: &'a [String],
-        path: &'a Path,
-        module_path: Option<Vec<String>>,
-    ) -> Self {
-        let visibility = module_visibility(module_path.as_deref(), path);
+    pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
-            module_path,
-            parents: Vec::default(),
-            depths: FxHashMap::default(),
-            child_to_parent: FxHashMap::default(),
-            bindings: Bindings::default(),
-            shadowed_bindings: IntMap::default(),
+            module_path: module.path(),
+            stmts: Nodes::default(),
+            stmt_id: None,
             exprs: Vec::default(),
             scopes: Scopes::default(),
-            scope_stack: ScopeStack::default(),
+            scope_id: ScopeId::global(),
             dead_scopes: Vec::default(),
+            definitions: Definitions::for_module(module),
+            definition_id: DefinitionId::module(),
+            bindings: Bindings::default(),
+            shadowed_bindings: IntMap::default(),
             body: &[],
             body_index: 0,
-            visible_scope: VisibleScope {
-                modifier: Modifier::Module,
-                visibility,
-            },
-            in_annotation: false,
-            in_type_definition: false,
-            in_deferred_string_type_definition: None,
-            in_deferred_type_definition: false,
-            in_exception_handler: false,
-            in_f_string: false,
-            in_literal: false,
-            in_subscript: false,
-            in_type_checking_block: false,
-            seen_import_boundary: false,
-            futures_allowed: true,
-            annotations_future_enabled: is_python_stub_file(path),
+            flags: ContextFlags::new(path),
             handled_exceptions: Vec::default(),
         }
     }
@@ -174,8 +146,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }
@@ -191,8 +167,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }
@@ -244,10 +224,9 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some((
-                                    binding.source.as_ref().unwrap().into(),
-                                    format!("{name}.{member}"),
-                                ));
+                                if let Some(source) = binding.source {
+                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                }
                             }
                         }
                     }
@@ -263,10 +242,9 @@ impl<'a> Context<'a> {
                                     .take(scope_index)
                                     .all(|scope| scope.get(name).is_none())
                                 {
-                                    return Some((
-                                        binding.source.as_ref().unwrap().into(),
-                                        (*name).to_string(),
-                                    ));
+                                    if let Some(source) = binding.source {
+                                        return Some((self.stmts[source], (*name).to_string()));
+                                    }
                                 }
                             }
                         }
@@ -281,10 +259,9 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some((
-                                    binding.source.as_ref().unwrap().into(),
-                                    format!("{name}.{member}"),
-                                ));
+                                if let Some(source) = binding.source {
+                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                }
                             }
                         }
                     }
@@ -296,72 +273,86 @@ impl<'a> Context<'a> {
         })
     }
 
-    pub fn push_parent(&mut self, parent: &'a Stmt) {
-        let num_existing = self.parents.len();
-        self.parents.push(RefEquality(parent));
-        self.depths.insert(self.parents[num_existing], num_existing);
-        if num_existing > 0 {
-            self.child_to_parent
-                .insert(self.parents[num_existing], self.parents[num_existing - 1]);
-        }
+    /// Push a [`Stmt`] onto the stack.
+    pub fn push_stmt(&mut self, stmt: &'a Stmt) {
+        self.stmt_id = Some(self.stmts.insert(stmt, self.stmt_id));
     }
 
-    pub fn pop_parent(&mut self) {
-        self.parents.pop().expect("Attempted to pop without parent");
+    /// Pop the current [`Stmt`] off the stack.
+    pub fn pop_stmt(&mut self) {
+        let node_id = self.stmt_id.expect("Attempted to pop without statement");
+        self.stmt_id = self.stmts.parent_id(node_id);
     }
 
+    /// Push an [`Expr`] onto the stack.
     pub fn push_expr(&mut self, expr: &'a Expr) {
-        self.exprs.push(RefEquality(expr));
+        self.exprs.push(expr);
     }
 
+    /// Pop the current [`Expr`] off the stack.
     pub fn pop_expr(&mut self) {
         self.exprs
             .pop()
             .expect("Attempted to pop without expression");
     }
 
-    pub fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
-        let id = self.scopes.push_scope(kind);
-        self.scope_stack.push(id);
-        id
+    /// Push a [`Scope`] with the given [`ScopeKind`] onto the stack.
+    pub fn push_scope(&mut self, kind: ScopeKind<'a>) {
+        let id = self.scopes.push_scope(kind, self.scope_id);
+        self.scope_id = id;
     }
 
+    /// Pop the current [`Scope`] off the stack.
     pub fn pop_scope(&mut self) {
-        self.dead_scopes.push((
-            self.scope_stack
-                .pop()
-                .expect("Attempted to pop without scope"),
-            self.scope_stack.clone(),
-        ));
+        self.dead_scopes.push(self.scope_id);
+        self.scope_id = self.scopes[self.scope_id]
+            .parent
+            .expect("Attempted to pop without scope");
+    }
+
+    /// Push a [`Member`] onto the stack.
+    pub fn push_definition(&mut self, definition: Member<'a>) {
+        self.definition_id = self.definitions.push_member(definition);
+    }
+
+    /// Pop the current [`Member`] off the stack.
+    pub fn pop_definition(&mut self) {
+        let Definition::Member(member) = &self.definitions[self.definition_id] else {
+            panic!("Attempted to pop without member definition");
+        };
+        self.definition_id = member.parent;
     }
 
     /// Return the current `Stmt`.
-    pub fn current_stmt(&self) -> &RefEquality<'a, Stmt> {
-        self.parents.iter().rev().next().expect("No parent found")
+    pub fn stmt(&self) -> &'a Stmt {
+        let node_id = self.stmt_id.expect("No current statement");
+        self.stmts[node_id]
     }
 
     /// Return the parent `Stmt` of the current `Stmt`, if any.
-    pub fn current_stmt_parent(&self) -> Option<&RefEquality<'a, Stmt>> {
-        self.parents.iter().rev().nth(1)
+    pub fn stmt_parent(&self) -> Option<&'a Stmt> {
+        let node_id = self.stmt_id.expect("No current statement");
+        let parent_id = self.stmts.parent_id(node_id)?;
+        Some(self.stmts[parent_id])
     }
 
     /// Return the parent `Expr` of the current `Expr`.
-    pub fn current_expr_parent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(1)
+    pub fn expr_parent(&self) -> Option<&'a Expr> {
+        self.exprs.iter().rev().nth(1).copied()
     }
 
     /// Return the grandparent `Expr` of the current `Expr`.
-    pub fn current_expr_grandparent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(2)
+    pub fn expr_grandparent(&self) -> Option<&'a Expr> {
+        self.exprs.iter().rev().nth(2).copied()
     }
 
     /// Return an [`Iterator`] over the current `Expr` parents.
-    pub fn expr_ancestors(&self) -> impl Iterator<Item = &RefEquality<'a, Expr>> {
+    pub fn expr_ancestors(&self) -> impl Iterator<Item = &&Expr> {
         self.exprs.iter().rev().skip(1)
     }
 
     /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
-    pub fn current_sibling_stmt(&self) -> Option<&'a Stmt> {
+    pub fn sibling_stmt(&self) -> Option<&'a Stmt> {
         self.body.get(self.body_index + 1)
     }
 
@@ -377,40 +368,39 @@ impl<'a> Context<'a> {
 
     /// Returns the current top most scope.
     pub fn scope(&self) -> &Scope<'a> {
-        &self.scopes[self.scope_stack.top().expect("No current scope found")]
-    }
-
-    /// Returns the id of the top-most scope
-    pub fn scope_id(&self) -> ScopeId {
-        self.scope_stack.top().expect("No current scope found")
+        &self.scopes[self.scope_id]
     }
 
     /// Returns a mutable reference to the current top most scope.
     pub fn scope_mut(&mut self) -> &mut Scope<'a> {
-        let top_id = self.scope_stack.top().expect("No current scope found");
-        &mut self.scopes[top_id]
+        &mut self.scopes[self.scope_id]
     }
 
-    pub fn parent_scope(&self) -> Option<&Scope> {
-        self.scope_stack
-            .iter()
-            .nth(1)
-            .map(|index| &self.scopes[*index])
-    }
-
+    /// Returns an iterator over all scopes, starting from the current scope.
     pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scope_stack.iter().map(|index| &self.scopes[*index])
+        self.scopes.ancestors(self.scope_id)
     }
 
-    pub const fn in_exception_handler(&self) -> bool {
-        self.in_exception_handler
+    pub fn parents(&self) -> impl Iterator<Item = &Stmt> + '_ {
+        let node_id = self.stmt_id.expect("No current statement");
+        self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
+    }
+
+    /// Return `true` if the context is at the top level of the module (i.e., in the module scope,
+    /// and not nested within any statements).
+    pub fn at_top_level(&self) -> bool {
+        self.scope_id.is_global()
+            && self
+                .stmt_id
+                .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
     }
 
     /// Return the [`ExecutionContext`] of the current scope.
     pub const fn execution_context(&self) -> ExecutionContext {
-        if self.in_type_checking_block
-            || self.in_annotation
-            || self.in_deferred_string_type_definition.is_some()
+        if self.in_type_checking_block()
+            || self.in_annotation()
+            || self.in_complex_string_type_definition()
+            || self.in_simple_string_type_definition()
         {
             ExecutionContext::Typing
         } else {
@@ -426,4 +416,290 @@ impl<'a> Context<'a> {
         }
         exceptions
     }
+
+    /// Generate a [`Snapshot`] of the current context.
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            scope_id: self.scope_id,
+            stmt_id: self.stmt_id,
+            definition_id: self.definition_id,
+            flags: self.flags,
+        }
+    }
+
+    /// Restore the context to the given [`Snapshot`].
+    pub fn restore(&mut self, snapshot: Snapshot) {
+        let Snapshot {
+            scope_id,
+            stmt_id,
+            definition_id,
+            flags,
+        } = snapshot;
+        self.scope_id = scope_id;
+        self.stmt_id = stmt_id;
+        self.definition_id = definition_id;
+        self.flags = flags;
+    }
+
+    /// Return `true` if the context is in a type annotation.
+    pub const fn in_annotation(&self) -> bool {
+        self.flags.contains(ContextFlags::ANNOTATION)
+    }
+
+    /// Return `true` if the context is in a type definition.
+    pub const fn in_type_definition(&self) -> bool {
+        self.flags.contains(ContextFlags::TYPE_DEFINITION)
+    }
+
+    /// Return `true` if the context is in a "simple" string type definition.
+    pub const fn in_simple_string_type_definition(&self) -> bool {
+        self.flags
+            .contains(ContextFlags::SIMPLE_STRING_TYPE_DEFINITION)
+    }
+
+    /// Return `true` if the context is in a "complex" string type definition.
+    pub const fn in_complex_string_type_definition(&self) -> bool {
+        self.flags
+            .contains(ContextFlags::COMPLEX_STRING_TYPE_DEFINITION)
+    }
+
+    /// Return `true` if the context is in a `__future__` type definition.
+    pub const fn in_future_type_definition(&self) -> bool {
+        self.flags.contains(ContextFlags::FUTURE_TYPE_DEFINITION)
+    }
+
+    /// Return `true` if the context is in any kind of deferred type definition.
+    pub const fn in_deferred_type_definition(&self) -> bool {
+        self.in_simple_string_type_definition()
+            || self.in_complex_string_type_definition()
+            || self.in_future_type_definition()
+    }
+
+    /// Return `true` if the context is in an exception handler.
+    pub const fn in_exception_handler(&self) -> bool {
+        self.flags.contains(ContextFlags::EXCEPTION_HANDLER)
+    }
+
+    /// Return `true` if the context is in an f-string.
+    pub const fn in_f_string(&self) -> bool {
+        self.flags.contains(ContextFlags::F_STRING)
+    }
+
+    /// Return `true` if the context is in boolean test.
+    pub const fn in_boolean_test(&self) -> bool {
+        self.flags.contains(ContextFlags::BOOLEAN_TEST)
+    }
+
+    /// Return `true` if the context is in a `typing::Literal` annotation.
+    pub const fn in_literal(&self) -> bool {
+        self.flags.contains(ContextFlags::LITERAL)
+    }
+
+    /// Return `true` if the context is in a subscript expression.
+    pub const fn in_subscript(&self) -> bool {
+        self.flags.contains(ContextFlags::SUBSCRIPT)
+    }
+
+    /// Return `true` if the context is in a type-checking block.
+    pub const fn in_type_checking_block(&self) -> bool {
+        self.flags.contains(ContextFlags::TYPE_CHECKING_BLOCK)
+    }
+
+    /// Return `true` if the context has traversed past the "top-of-file" import boundary.
+    pub const fn seen_import_boundary(&self) -> bool {
+        self.flags.contains(ContextFlags::IMPORT_BOUNDARY)
+    }
+
+    /// Return `true` if the context has traverse past the `__future__` import boundary.
+    pub const fn seen_futures_boundary(&self) -> bool {
+        self.flags.contains(ContextFlags::FUTURES_BOUNDARY)
+    }
+
+    /// Return `true` if `__future__`-style type annotations are enabled.
+    pub const fn future_annotations(&self) -> bool {
+        self.flags.contains(ContextFlags::FUTURE_ANNOTATIONS)
+    }
+}
+
+bitflags! {
+    /// Flags indicating the current context of the analysis.
+    #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+    pub struct ContextFlags: u16 {
+        /// The context is in a type annotation.
+        ///
+        /// For example, the context could be visiting `int` in:
+        /// ```python
+        /// x: int = 1
+        /// ```
+        const ANNOTATION = 1 << 0;
+
+        /// The context is in a type definition.
+        ///
+        /// For example, the context could be visiting `int` in:
+        /// ```python
+        /// from typing import NewType
+        ///
+        /// UserId = NewType("UserId", int)
+        /// ```
+        ///
+        /// All type annotations are also type definitions, but the converse is not true.
+        /// In our example, `int` is a type definition but not a type annotation, as it
+        /// doesn't appear in a type annotation context, but rather in a type definition.
+        const TYPE_DEFINITION = 1 << 1;
+
+        /// The context is in a (deferred) "simple" string type definition.
+        ///
+        /// For example, the context could be visiting `list[int]` in:
+        /// ```python
+        /// x: "list[int]" = []
+        /// ```
+        ///
+        /// "Simple" string type definitions are those that consist of a single string literal,
+        /// as opposed to an implicitly concatenated string literal.
+        const SIMPLE_STRING_TYPE_DEFINITION =  1 << 2;
+
+        /// The context is in a (deferred) "complex" string type definition.
+        ///
+        /// For example, the context could be visiting `list[int]` in:
+        /// ```python
+        /// x: ("list" "[int]") = []
+        /// ```
+        ///
+        /// "Complex" string type definitions are those that consist of a implicitly concatenated
+        /// string literals. These are uncommon but valid.
+        const COMPLEX_STRING_TYPE_DEFINITION = 1 << 3;
+
+        /// The context is in a (deferred) `__future__` type definition.
+        ///
+        /// For example, the context could be visiting `list[int]` in:
+        /// ```python
+        /// from __future__ import annotations
+        ///
+        /// x: list[int] = []
+        /// ```
+        ///
+        /// `__future__`-style type annotations are only enabled if the `annotations` feature
+        /// is enabled via `from __future__ import annotations`.
+        const FUTURE_TYPE_DEFINITION = 1 << 4;
+
+        /// The context is in an exception handler.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// try:
+        ///     ...
+        /// except Exception:
+        ///     x: int = 1
+        /// ```
+        const EXCEPTION_HANDLER = 1 << 5;
+
+        /// The context is in an f-string.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// f'{x}'
+        /// ```
+        const F_STRING = 1 << 6;
+
+        /// The context is in a boolean test.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// if x:
+        ///     ...
+        /// ```
+        ///
+        /// The implication is that the actual value returned by the current expression is
+        /// not used, only its truthiness.
+        const BOOLEAN_TEST = 1 << 7;
+
+        /// The context is in a `typing::Literal` annotation.
+        ///
+        /// For example, the context could be visiting any of `"A"`, `"B"`, or `"C"` in:
+        /// ```python
+        /// def f(x: Literal["A", "B", "C"]):
+        ///     ...
+        /// ```
+        const LITERAL = 1 << 8;
+
+        /// The context is in a subscript expression.
+        ///
+        /// For example, the context could be visiting `x["a"]` in:
+        /// ```python
+        /// x["a"]["b"]
+        /// ```
+        const SUBSCRIPT = 1 << 9;
+
+        /// The context is in a type-checking block.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// from typing import TYPE_CHECKING
+        ///
+        ///
+        /// if TYPE_CHECKING:
+        ///    x: int = 1
+        /// ```
+        const TYPE_CHECKING_BLOCK = 1 << 10;
+
+
+        /// The context has traversed past the "top-of-file" import boundary.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// import os
+        ///
+        /// def f() -> None:
+        ///     ...
+        ///
+        /// x: int = 1
+        /// ```
+        const IMPORT_BOUNDARY = 1 << 11;
+
+        /// The context has traversed past the `__future__` import boundary.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// from __future__ import annotations
+        ///
+        /// import os
+        ///
+        /// x: int = 1
+        /// ```
+        ///
+        /// Python considers it a syntax error to import from `__future__` after
+        /// any other non-`__future__`-importing statements.
+        const FUTURES_BOUNDARY = 1 << 12;
+
+        /// `__future__`-style type annotations are enabled in this context.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// from __future__ import annotations
+        ///
+        ///
+        /// def f(x: int) -> int:
+        ///   ...
+        /// ```
+        const FUTURE_ANNOTATIONS = 1 << 13;
+    }
+}
+
+impl ContextFlags {
+    pub fn new(path: &Path) -> Self {
+        let mut flags = Self::default();
+        if is_python_stub_file(path) {
+            flags |= Self::FUTURE_ANNOTATIONS;
+        }
+        flags
+    }
+}
+
+/// A snapshot of the [`Context`] at a given point in the AST traversal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Snapshot {
+    scope_id: ScopeId,
+    stmt_id: Option<NodeId>,
+    definition_id: DefinitionId,
+    flags: ContextFlags,
 }

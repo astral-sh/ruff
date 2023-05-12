@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::SimpleCallArgs;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -11,7 +10,7 @@ use super::super::helpers::string_literal;
 
 #[violation]
 pub struct HashlibInsecureHashFunction {
-    pub string: String,
+    string: String,
 }
 
 impl Violation for HashlibInsecureHashFunction {
@@ -28,10 +27,10 @@ fn is_used_for_security(call_args: &SimpleCallArgs) -> bool {
     match call_args.keyword_argument("usedforsecurity") {
         Some(expr) => !matches!(
             &expr.node,
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Bool(false),
                 ..
-            }
+            })
         ),
         _ => true,
     }
@@ -43,7 +42,7 @@ enum HashlibCall {
 }
 
 /// S324
-pub fn hashlib_insecure_hash_functions(
+pub(crate) fn hashlib_insecure_hash_functions(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
@@ -74,7 +73,7 @@ pub fn hashlib_insecure_hash_functions(
                                 HashlibInsecureHashFunction {
                                     string: hash_func_name.to_string(),
                                 },
-                                Range::from(name_arg),
+                                name_arg.range(),
                             ));
                         }
                     }
@@ -91,7 +90,7 @@ pub fn hashlib_insecure_hash_functions(
                     HashlibInsecureHashFunction {
                         string: (*func_name).to_string(),
                     },
-                    Range::from(func),
+                    func.range(),
                 ));
             }
         }

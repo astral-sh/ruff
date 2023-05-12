@@ -1,17 +1,16 @@
 use std::fmt;
 
 use itertools::Itertools;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
+use rustpython_parser::ast::{self, Attributed, Cmpop, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_constant;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum ViolationsCmpop {
+pub(crate) enum ViolationsCmpop {
     Eq,
     NotEq,
     Lt,
@@ -61,9 +60,9 @@ impl fmt::Display for ViolationsCmpop {
 
 #[violation]
 pub struct ComparisonOfConstant {
-    pub left_constant: String,
-    pub op: ViolationsCmpop,
-    pub right_constant: String,
+    left_constant: String,
+    op: ViolationsCmpop,
+    right_constant: String,
 }
 
 impl Violation for ComparisonOfConstant {
@@ -83,7 +82,7 @@ impl Violation for ComparisonOfConstant {
 }
 
 /// PLR0133
-pub fn comparison_of_constant(
+pub(crate) fn comparison_of_constant(
     checker: &mut Checker,
     left: &Expr,
     ops: &[Cmpop],
@@ -91,18 +90,18 @@ pub fn comparison_of_constant(
 ) {
     for ((left, right), op) in std::iter::once(left)
         .chain(comparators.iter())
-        .tuple_windows::<(&Located<_>, &Located<_>)>()
+        .tuple_windows::<(&Attributed<_>, &Attributed<_>)>()
         .zip(ops)
     {
         if let (
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: left_constant,
                 ..
-            },
-            ExprKind::Constant {
+            }),
+            ExprKind::Constant(ast::ExprConstant {
                 value: right_constant,
                 ..
-            },
+            }),
         ) = (&left.node, &right.node)
         {
             let diagnostic = Diagnostic::new(
@@ -111,7 +110,7 @@ pub fn comparison_of_constant(
                     op: op.into(),
                     right_constant: unparse_constant(right_constant, checker.stylist),
                 },
-                Range::from(left),
+                left.range(),
             );
 
             checker.diagnostics.push(diagnostic);

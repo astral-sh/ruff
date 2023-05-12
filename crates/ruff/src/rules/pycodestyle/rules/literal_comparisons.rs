@@ -1,11 +1,10 @@
 use itertools::izip;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -37,12 +36,15 @@ impl From<&Cmpop> for EqCmpop {
 /// ## Example
 /// ```python
 /// if arg != None:
+///     pass
 /// if None == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is not None:
+///     pass
 /// ```
 ///
 /// ## References
@@ -79,13 +81,17 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// ## Example
 /// ```python
 /// if arg == True:
+///     pass
 /// if False == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is True:
+///     pass
 /// if arg is False:
+///     pass
 /// ```
 ///
 /// ## References
@@ -98,13 +104,17 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
     fn message(&self) -> String {
         let TrueFalseComparison(value, op) = self;
         match (value, op) {
-            (true, EqCmpop::Eq) => format!("Comparison to `True` should be `cond is True`"),
-            (true, EqCmpop::NotEq) => {
-                format!("Comparison to `True` should be `cond is not True`")
+            (true, EqCmpop::Eq) => {
+                format!("Comparison to `True` should be `cond is True` or `if cond:`")
             }
-            (false, EqCmpop::Eq) => format!("Comparison to `False` should be `cond is False`"),
+            (true, EqCmpop::NotEq) => {
+                format!("Comparison to `True` should be `cond is not True` or `if not cond:`")
+            }
+            (false, EqCmpop::Eq) => {
+                format!("Comparison to `False` should be `cond is False` or `if not cond:`")
+            }
             (false, EqCmpop::NotEq) => {
-                format!("Comparison to `False` should be `cond is not False`")
+                format!("Comparison to `False` should be `cond is not False` or `if cond:`")
             }
         }
     }
@@ -121,7 +131,7 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
 }
 
 /// E711, E712
-pub fn literal_comparisons(
+pub(crate) fn literal_comparisons(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -147,23 +157,21 @@ pub fn literal_comparisons(
         if check_none_comparisons
             && matches!(
                 comparator.node,
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::None,
                     kind: None
-                }
+                })
             )
         {
             if matches!(op, Cmpop::Eq) {
-                let diagnostic =
-                    Diagnostic::new(NoneComparison(op.into()), Range::from(comparator));
+                let diagnostic = Diagnostic::new(NoneComparison(op.into()), comparator.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(0, Cmpop::Is);
                 }
                 diagnostics.push(diagnostic);
             }
             if matches!(op, Cmpop::NotEq) {
-                let diagnostic =
-                    Diagnostic::new(NoneComparison(op.into()), Range::from(comparator));
+                let diagnostic = Diagnostic::new(NoneComparison(op.into()), comparator.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
@@ -172,26 +180,22 @@ pub fn literal_comparisons(
         }
 
         if check_true_false_comparisons {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Bool(value),
                 kind: None,
-            } = comparator.node
+            }) = comparator.node
             {
                 if matches!(op, Cmpop::Eq) {
-                    let diagnostic = Diagnostic::new(
-                        TrueFalseComparison(value, op.into()),
-                        Range::from(comparator),
-                    );
+                    let diagnostic =
+                        Diagnostic::new(TrueFalseComparison(value, op.into()), comparator.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(0, Cmpop::Is);
                     }
                     diagnostics.push(diagnostic);
                 }
                 if matches!(op, Cmpop::NotEq) {
-                    let diagnostic = Diagnostic::new(
-                        TrueFalseComparison(value, op.into()),
-                        Range::from(comparator),
-                    );
+                    let diagnostic =
+                        Diagnostic::new(TrueFalseComparison(value, op.into()), comparator.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(0, Cmpop::IsNot);
                     }
@@ -211,21 +215,21 @@ pub fn literal_comparisons(
         if check_none_comparisons
             && matches!(
                 next.node,
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::None,
                     kind: None
-                }
+                })
             )
         {
             if matches!(op, Cmpop::Eq) {
-                let diagnostic = Diagnostic::new(NoneComparison(op.into()), Range::from(next));
+                let diagnostic = Diagnostic::new(NoneComparison(op.into()), next.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(idx, Cmpop::Is);
                 }
                 diagnostics.push(diagnostic);
             }
             if matches!(op, Cmpop::NotEq) {
-                let diagnostic = Diagnostic::new(NoneComparison(op.into()), Range::from(next));
+                let diagnostic = Diagnostic::new(NoneComparison(op.into()), next.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(idx, Cmpop::IsNot);
                 }
@@ -234,14 +238,14 @@ pub fn literal_comparisons(
         }
 
         if check_true_false_comparisons {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Bool(value),
                 kind: None,
-            } = next.node
+            }) = next.node
             {
                 if matches!(op, Cmpop::Eq) {
                     let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(value, op.into()), Range::from(next));
+                        Diagnostic::new(TrueFalseComparison(value, op.into()), next.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::Is);
                     }
@@ -249,7 +253,7 @@ pub fn literal_comparisons(
                 }
                 if matches!(op, Cmpop::NotEq) {
                     let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(value, op.into()), Range::from(next));
+                        Diagnostic::new(TrueFalseComparison(value, op.into()), next.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
@@ -273,11 +277,11 @@ pub fn literal_comparisons(
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Edit::replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 content.to_string(),
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
+                expr.range(),
+            )));
         }
     }
 

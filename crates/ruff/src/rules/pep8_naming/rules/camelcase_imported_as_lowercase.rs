@@ -2,8 +2,6 @@ use rustpython_parser::ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-use ruff_python_stdlib::str;
 
 use crate::rules::pep8_naming::helpers;
 
@@ -32,8 +30,8 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[violation]
 pub struct CamelcaseImportedAsLowercase {
-    pub name: String,
-    pub asname: String,
+    name: String,
+    asname: String,
 }
 
 impl Violation for CamelcaseImportedAsLowercase {
@@ -45,21 +43,21 @@ impl Violation for CamelcaseImportedAsLowercase {
 }
 
 /// N813
-pub fn camelcase_imported_as_lowercase(
+pub(crate) fn camelcase_imported_as_lowercase(
     name: &str,
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
 ) -> Option<Diagnostic> {
-    if helpers::is_camelcase(name) && str::is_lower(asname) {
+    if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_lower(asname) {
         let mut diagnostic = Diagnostic::new(
             CamelcaseImportedAsLowercase {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
-            Range::from(alias),
+            alias.range(),
         );
-        diagnostic.set_parent(stmt.location);
+        diagnostic.set_parent(stmt.start());
         return Some(diagnostic);
     }
     None

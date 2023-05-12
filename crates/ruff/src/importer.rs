@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
-use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Location, Stmt, StmtKind, Suite};
+use ruff_text_size::TextSize;
+use rustpython_parser::ast::{self, Stmt, StmtKind, Suite};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -17,10 +17,7 @@ pub struct Importer<'a> {
     python_ast: &'a Suite,
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
-    /// A map from module name to top-level `StmtKind::ImportFrom` statements.
-    import_from_map: FxHashMap<&'a str, &'a Stmt>,
-    /// The last top-level import statement.
-    trailing_import: Option<&'a Stmt>,
+    ordered_imports: Vec<&'a Stmt>,
 }
 
 impl<'a> Importer<'a> {
@@ -29,34 +26,21 @@ impl<'a> Importer<'a> {
             python_ast,
             locator,
             stylist,
-            import_from_map: FxHashMap::default(),
-            trailing_import: None,
+            ordered_imports: Vec::default(),
         }
     }
 
     /// Visit a top-level import statement.
     pub fn visit_import(&mut self, import: &'a Stmt) {
-        // Store a reference to the import statement in the appropriate map.
-        match &import.node {
-            StmtKind::Import { .. } => {
-                // Nothing to do here, we don't extend top-level `import` statements at all, so
-                // no need to track them.
-            }
-            StmtKind::ImportFrom { module, level, .. } => {
-                // Store a reverse-map from module name to `import ... from` statement.
-                if level.map_or(true, |level| level == 0) {
-                    if let Some(module) = module {
-                        self.import_from_map.insert(module.as_str(), import);
-                    }
-                }
-            }
-            _ => {
-                panic!("Expected StmtKind::Import | StmtKind::ImportFrom");
-            }
-        }
+        self.ordered_imports.push(import);
+    }
 
-        // Store a reference to the last top-level import statement.
-        self.trailing_import = Some(import);
+    /// Return the import statement that precedes the given position, if any.
+    fn preceding_import(&self, at: TextSize) -> Option<&Stmt> {
+        self.ordered_imports
+            .partition_point(|stmt| stmt.start() < at)
+            .checked_sub(1)
+            .map(|idx| self.ordered_imports[idx])
     }
 
     /// Add an import statement to import the given module.
@@ -64,9 +48,9 @@ impl<'a> Importer<'a> {
     /// If there are no existing imports, the new import will be added at the top
     /// of the file. Otherwise, it will be added after the most recent top-level
     /// import statement.
-    pub fn add_import(&self, import: &AnyImport) -> Edit {
+    pub fn add_import(&self, import: &AnyImport, at: TextSize) -> Edit {
         let required_import = import.to_string();
-        if let Some(stmt) = self.trailing_import {
+        if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
             let Insertion {
                 prefix,
@@ -87,15 +71,33 @@ impl<'a> Importer<'a> {
         }
     }
 
-    /// Return the top-level [`Stmt`] that imports the given module using `StmtKind::ImportFrom`.
-    /// if it exists.
-    pub fn get_import_from(&self, module: &str) -> Option<&Stmt> {
-        self.import_from_map.get(module).copied()
+    /// Return the top-level [`Stmt`] that imports the given module using `StmtKind::ImportFrom`
+    /// preceding the given position, if any.
+    pub fn find_import_from(&self, module: &str, at: TextSize) -> Option<&Stmt> {
+        let mut import_from = None;
+        for stmt in &self.ordered_imports {
+            if stmt.start() >= at {
+                break;
+            }
+            if let StmtKind::ImportFrom(ast::StmtImportFrom {
+                module: name,
+                level,
+                ..
+            }) = &stmt.node
+            {
+                if level.map_or(true, |level| level.to_u32() == 0)
+                    && name.as_ref().map_or(false, |name| name == module)
+                {
+                    import_from = Some(*stmt);
+                }
+            }
+        }
+        import_from
     }
 
     /// Add the given member to an existing `StmtKind::ImportFrom` statement.
     pub fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut tree = match_module(self.locator.slice(stmt))?;
+        let mut tree = match_module(self.locator.slice(stmt.range()))?;
         let import_from = match_import_from(&mut tree)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {
@@ -113,11 +115,7 @@ impl<'a> Importer<'a> {
             ..CodegenState::default()
         };
         tree.codegen(&mut state);
-        Ok(Edit::replacement(
-            state.to_string(),
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ))
+        Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
 }
 
@@ -126,13 +124,13 @@ struct Insertion {
     /// The content to add before the insertion.
     prefix: &'static str,
     /// The location at which to insert.
-    location: Location,
+    location: TextSize,
     /// The content to add after the insertion.
     suffix: &'static str,
 }
 
 impl Insertion {
-    fn new(prefix: &'static str, location: Location, suffix: &'static str) -> Self {
+    fn new(prefix: &'static str, location: TextSize, suffix: &'static str) -> Self {
         Self {
             prefix,
             location,
@@ -142,7 +140,7 @@ impl Insertion {
 }
 
 /// Find the end of the last docstring.
-fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
+fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
     let mut iter = body.iter();
     let Some(mut stmt) = iter.next() else {
         return None;
@@ -156,10 +154,10 @@ fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
         }
         stmt = next;
     }
-    Some(stmt.end_location.unwrap())
+    Some(stmt.end())
 }
 
-/// Find the location at which a "top-of-file" import should be inserted,
+/// Find the location at which an "end-of-statement" import should be inserted,
 /// along with a prefix and suffix to use for the insertion.
 ///
 /// For example, given the following code:
@@ -168,22 +166,29 @@ fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
 /// """Hello, world!"""
 ///
 /// import os
+/// import math
+///
+///
+/// def foo():
+///     pass
 /// ```
 ///
-/// The location returned will be the start of the `import os` statement,
+/// The location returned will be the start of new line after the last
+/// import statement, which in this case is the line after `import math`,
 /// along with a trailing newline suffix.
 fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Insertion {
-    let location = stmt.end_location.unwrap();
-    let mut tokens = lexer::lex_located(locator.after(location), Mode::Module, location).flatten();
-    if let Some((.., Tok::Semi, end)) = tokens.next() {
+    let location = stmt.end();
+    let mut tokens =
+        lexer::lex_starts_at(locator.after(location), Mode::Module, location).flatten();
+    if let Some((Tok::Semi, range)) = tokens.next() {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
-        Insertion::new(" ", end, ";")
+        Insertion::new(" ", range.end(), ";")
     } else {
         // Otherwise, insert on the next line.
         Insertion::new(
             "",
-            Location::new(location.row() + 1, 0),
+            locator.full_line_end(location),
             stylist.line_ending().as_str(),
         )
     }
@@ -207,25 +212,25 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
     let mut location = if let Some(location) = match_docstring_end(body) {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
-        let first_token = lexer::lex_located(locator.after(location), Mode::Module, location)
+        let first_token = lexer::lex_starts_at(locator.after(location), Mode::Module, location)
             .flatten()
             .next();
-        if let Some((.., Tok::Semi, end)) = first_token {
-            return Insertion::new(" ", end, ";");
+        if let Some((Tok::Semi, range)) = first_token {
+            return Insertion::new(" ", range.end(), ";");
         }
 
         // Otherwise, advance to the next row.
-        Location::new(location.row() + 1, 0)
+        locator.full_line_end(location)
     } else {
-        Location::default()
+        TextSize::default()
     };
 
     // Skip over any comments and empty lines.
-    for (.., tok, end) in
-        lexer::lex_located(locator.after(location), Mode::Module, location).flatten()
+    for (tok, range) in
+        lexer::lex_starts_at(locator.after(location), Mode::Module, location).flatten()
     {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
-            location = Location::new(end.row() + 1, 0);
+            location = locator.full_line_end(range.end());
         } else {
             break;
         }
@@ -237,11 +242,12 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_text_size::TextSize;
     use rustpython_parser as parser;
-    use rustpython_parser::ast::Location;
     use rustpython_parser::lexer::LexResult;
 
-    use ruff_python_ast::source_code::{LineEnding, Locator, Stylist};
+    use ruff_python_ast::newlines::LineEnding;
+    use ruff_python_ast::source_code::{Locator, Stylist};
 
     use crate::importer::{top_of_file_insertion, Insertion};
 
@@ -258,7 +264,7 @@ mod tests {
         let contents = "";
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(1, 0), LineEnding::default().as_str())
+            Insertion::new("", TextSize::from(0), LineEnding::default().as_str())
         );
 
         let contents = r#"
@@ -266,7 +272,7 @@ mod tests {
             .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(2, 0), LineEnding::default().as_str())
+            Insertion::new("", TextSize::from(19), LineEnding::default().as_str())
         );
 
         let contents = r#"
@@ -275,7 +281,7 @@ mod tests {
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(2, 0), "\n")
+            Insertion::new("", TextSize::from(20), "\n")
         );
 
         let contents = r#"
@@ -285,7 +291,7 @@ mod tests {
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(3, 0), "\n")
+            Insertion::new("", TextSize::from(40), "\n")
         );
 
         let contents = r#"
@@ -294,7 +300,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(1, 0), "\n")
+            Insertion::new("", TextSize::from(0), "\n")
         );
 
         let contents = r#"
@@ -303,7 +309,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(2, 0), "\n")
+            Insertion::new("", TextSize::from(23), "\n")
         );
 
         let contents = r#"
@@ -313,7 +319,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(3, 0), "\n")
+            Insertion::new("", TextSize::from(43), "\n")
         );
 
         let contents = r#"
@@ -323,7 +329,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(3, 0), "\n")
+            Insertion::new("", TextSize::from(43), "\n")
         );
 
         let contents = r#"
@@ -332,7 +338,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(1, 0), "\n")
+            Insertion::new("", TextSize::from(0), "\n")
         );
 
         let contents = r#"
@@ -341,7 +347,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new(" ", Location::new(1, 20), ";")
+            Insertion::new(" ", TextSize::from(20), ";")
         );
 
         let contents = r#"
@@ -351,7 +357,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new(" ", Location::new(1, 20), ";")
+            Insertion::new(" ", TextSize::from(20), ";")
         );
 
         Ok(())

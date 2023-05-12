@@ -4,7 +4,6 @@ use rustpython_parser::ast::Constant;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::types::Range;
 use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
@@ -25,7 +24,7 @@ pub struct FormatExpr<'a> {
 }
 
 fn format_starred(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
 ) -> FormatResult<()> {
@@ -34,18 +33,14 @@ fn format_starred(
     Ok(())
 }
 
-fn format_name(
-    f: &mut Formatter<ASTFormatContext<'_>>,
-    expr: &Expr,
-    _id: &str,
-) -> FormatResult<()> {
-    write!(f, [literal(Range::from(expr))])?;
+fn format_name(f: &mut Formatter<ASTFormatContext>, expr: &Expr, _id: &str) -> FormatResult<()> {
+    write!(f, [literal(expr.range())])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
 fn format_subscript(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
     slice: &Expr,
@@ -77,7 +72,7 @@ fn format_subscript(
 }
 
 fn format_tuple(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elts: &[Expr],
 ) -> FormatResult<()> {
@@ -97,69 +92,75 @@ fn format_tuple(
     } else if !elts.is_empty() {
         write!(
             f,
-            [group(&format_with(|f| {
-                if expr.parentheses.is_if_expanded() {
-                    write!(f, [if_group_breaks(&text("("))])?;
-                }
-                if matches!(
-                    expr.parentheses,
-                    Parenthesize::IfExpanded | Parenthesize::Always
-                ) {
-                    write!(
-                        f,
-                        [soft_block_indent(&format_with(|f| {
-                            let magic_trailing_comma =
-                                expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
-                            let is_unbroken =
-                                expr.location.row() == expr.end_location.unwrap().row();
-                            if magic_trailing_comma {
-                                write!(f, [expand_parent()])?;
-                            }
-                            for (i, elt) in elts.iter().enumerate() {
-                                write!(f, [elt.format()])?;
-                                if i < elts.len() - 1 {
-                                    write!(f, [text(",")])?;
-                                    write!(f, [soft_line_break_or_space()])?;
-                                } else {
-                                    if magic_trailing_comma || is_unbroken {
-                                        write!(f, [if_group_breaks(&text(","))])?;
-                                    }
-                                }
-                            }
-                            Ok(())
-                        }))]
-                    )?;
-                } else {
-                    let magic_trailing_comma =
-                        expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
-                    let is_unbroken = expr.location.row() == expr.end_location.unwrap().row();
-                    if magic_trailing_comma {
-                        write!(f, [expand_parent()])?;
+            [group(&format_with(
+                |f: &mut Formatter<ASTFormatContext>| {
+                    if expr.parentheses.is_if_expanded() {
+                        write!(f, [if_group_breaks(&text("("))])?;
                     }
-                    for (i, elt) in elts.iter().enumerate() {
-                        write!(f, [elt.format()])?;
-                        if i < elts.len() - 1 {
-                            write!(f, [text(",")])?;
-                            write!(f, [soft_line_break_or_space()])?;
-                        } else {
-                            if magic_trailing_comma || is_unbroken {
-                                write!(f, [if_group_breaks(&text(","))])?;
+                    if matches!(
+                        expr.parentheses,
+                        Parenthesize::IfExpanded | Parenthesize::Always
+                    ) {
+                        write!(
+                            f,
+                            [soft_block_indent(&format_with(
+                                |f: &mut Formatter<ASTFormatContext>| {
+                                    let magic_trailing_comma = expr
+                                        .trivia
+                                        .iter()
+                                        .any(|c| c.kind.is_magic_trailing_comma());
+                                    let is_unbroken =
+                                        !f.context().locator().contains_line_break(expr.range());
+                                    if magic_trailing_comma {
+                                        write!(f, [expand_parent()])?;
+                                    }
+                                    for (i, elt) in elts.iter().enumerate() {
+                                        write!(f, [elt.format()])?;
+                                        if i < elts.len() - 1 {
+                                            write!(f, [text(",")])?;
+                                            write!(f, [soft_line_break_or_space()])?;
+                                        } else {
+                                            if magic_trailing_comma || is_unbroken {
+                                                write!(f, [if_group_breaks(&text(","))])?;
+                                            }
+                                        }
+                                    }
+                                    Ok(())
+                                }
+                            ))]
+                        )?;
+                    } else {
+                        let magic_trailing_comma =
+                            expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
+                        let is_unbroken = !f.context().locator().contains_line_break(expr.range());
+                        if magic_trailing_comma {
+                            write!(f, [expand_parent()])?;
+                        }
+                        for (i, elt) in elts.iter().enumerate() {
+                            write!(f, [elt.format()])?;
+                            if i < elts.len() - 1 {
+                                write!(f, [text(",")])?;
+                                write!(f, [soft_line_break_or_space()])?;
+                            } else {
+                                if magic_trailing_comma || is_unbroken {
+                                    write!(f, [if_group_breaks(&text(","))])?;
+                                }
                             }
                         }
                     }
+                    if expr.parentheses.is_if_expanded() {
+                        write!(f, [if_group_breaks(&text(")"))])?;
+                    }
+                    Ok(())
                 }
-                if expr.parentheses.is_if_expanded() {
-                    write!(f, [if_group_breaks(&text(")"))])?;
-                }
-                Ok(())
-            }))]
+            ))]
         )?;
     }
     Ok(())
 }
 
 fn format_slice(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     lower: &SliceIndex,
     upper: &SliceIndex,
@@ -242,7 +243,7 @@ fn format_slice(
 }
 
 fn format_formatted_value(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
     _conversion: usize,
@@ -258,7 +259,7 @@ fn format_formatted_value(
 }
 
 fn format_list(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elts: &[Expr],
 ) -> FormatResult<()> {
@@ -289,11 +290,7 @@ fn format_list(
     Ok(())
 }
 
-fn format_set(
-    f: &mut Formatter<ASTFormatContext<'_>>,
-    expr: &Expr,
-    elts: &[Expr],
-) -> FormatResult<()> {
+fn format_set(f: &mut Formatter<ASTFormatContext>, expr: &Expr, elts: &[Expr]) -> FormatResult<()> {
     if elts.is_empty() {
         write!(f, [text("set()")])?;
         Ok(())
@@ -328,7 +325,7 @@ fn format_set(
 }
 
 fn format_call(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -391,7 +388,7 @@ fn format_call(
 }
 
 fn format_list_comp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
@@ -412,7 +409,7 @@ fn format_list_comp(
 }
 
 fn format_set_comp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
@@ -433,7 +430,7 @@ fn format_set_comp(
 }
 
 fn format_dict_comp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     key: &Expr,
     value: &Expr,
@@ -458,7 +455,7 @@ fn format_dict_comp(
 }
 
 fn format_generator_exp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
@@ -477,7 +474,7 @@ fn format_generator_exp(
 }
 
 fn format_await(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
 ) -> FormatResult<()> {
@@ -499,7 +496,7 @@ fn format_await(
 }
 
 fn format_yield(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: Option<&Expr>,
 ) -> FormatResult<()> {
@@ -523,7 +520,7 @@ fn format_yield(
 }
 
 fn format_yield_from(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
 ) -> FormatResult<()> {
@@ -553,7 +550,7 @@ fn format_yield_from(
 }
 
 fn format_compare(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
@@ -573,17 +570,17 @@ fn format_compare(
 }
 
 fn format_joined_str(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     _values: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [literal(Range::from(expr))])?;
+    write!(f, [literal(expr.range())])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
 fn format_constant(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     constant: &Constant,
     _kind: Option<&str>,
@@ -598,11 +595,11 @@ fn format_constant(
                 write!(f, [text("False")])?;
             }
         }
-        Constant::Int(_) => write!(f, [int_literal(Range::from(expr))])?,
-        Constant::Float(_) => write!(f, [float_literal(Range::from(expr))])?,
+        Constant::Int(_) => write!(f, [int_literal(expr.range())])?,
+        Constant::Float(_) => write!(f, [float_literal(expr.range())])?,
         Constant::Str(_) => write!(f, [string_literal(expr)])?,
         Constant::Bytes(_) => write!(f, [string_literal(expr)])?,
-        Constant::Complex { .. } => write!(f, [complex_literal(Range::from(expr))])?,
+        Constant::Complex { .. } => write!(f, [complex_literal(expr.range())])?,
         Constant::Tuple(_) => unreachable!("Constant::Tuple should be handled by format_tuple"),
     }
     write!(f, [end_of_line_comments(expr)])?;
@@ -610,7 +607,7 @@ fn format_constant(
 }
 
 fn format_dict(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     keys: &[Option<Expr>],
     values: &[Expr],
@@ -672,7 +669,7 @@ fn format_dict(
 }
 
 fn format_attribute(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
     attr: &str,
@@ -685,7 +682,7 @@ fn format_attribute(
 }
 
 fn format_named_expr(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     target: &Expr,
     value: &Expr,
@@ -699,7 +696,7 @@ fn format_named_expr(
 }
 
 fn format_bool_op(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     ops: &[BoolOp],
     values: &[Expr],
@@ -716,7 +713,7 @@ fn format_bool_op(
 }
 
 fn format_bin_op(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     left: &Expr,
     op: &Operator,
@@ -739,7 +736,7 @@ fn format_bin_op(
 }
 
 fn format_unary_op(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     op: &UnaryOp,
     operand: &Expr,
@@ -768,7 +765,7 @@ fn format_unary_op(
 }
 
 fn format_lambda(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     args: &Arguments,
     body: &Expr,
@@ -786,7 +783,7 @@ fn format_lambda(
 }
 
 fn format_if_exp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -804,8 +801,8 @@ fn format_if_exp(
     Ok(())
 }
 
-impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for FormatExpr<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         if self.item.parentheses.is_always() {
             write!(f, [text("(")])?;
         }
@@ -889,7 +886,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
     }
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Expr {
+impl AsFormat<ASTFormatContext> for Expr {
     type Format<'a> = FormatExpr<'a>;
 
     fn format(&self) -> Self::Format<'_> {

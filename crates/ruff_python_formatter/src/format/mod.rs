@@ -2,7 +2,7 @@ mod alias;
 mod arg;
 mod arguments;
 mod bool_op;
-pub mod builders;
+pub(crate) mod builders;
 mod cmp_op;
 mod comments;
 mod comprehension;

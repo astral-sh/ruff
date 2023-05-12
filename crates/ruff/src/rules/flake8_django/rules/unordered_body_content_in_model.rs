@@ -1,10 +1,9 @@
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -14,7 +13,7 @@ use super::helpers;
 /// Checks for the order of Model's inner classes, methods, and fields as per
 /// the [Django Style Guide].
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// The [Django Style Guide] specifies that the order of Model inner classes,
 /// attributes and methods should be as follows:
 ///
@@ -63,8 +62,8 @@ use super::helpers;
 /// [Django Style Guide]: https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#model-style
 #[violation]
 pub struct DjangoUnorderedBodyContentInModel {
-    pub elem_type: ContentType,
-    pub before: ContentType,
+    elem_type: ContentType,
+    before: ContentType,
 }
 
 impl Violation for DjangoUnorderedBodyContentInModel {
@@ -76,7 +75,7 @@ impl Violation for DjangoUnorderedBodyContentInModel {
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-pub enum ContentType {
+pub(crate) enum ContentType {
     FieldDeclaration,
     ManagerDeclaration,
     MetaClass,
@@ -102,8 +101,8 @@ impl fmt::Display for ContentType {
 
 fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType> {
     match element {
-        StmtKind::Assign { targets, value, .. } => {
-            if let ExprKind::Call { func, .. } = &value.node {
+        StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
+            if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
                 if helpers::is_model_field(&checker.ctx, func) {
                     return Some(ContentType::FieldDeclaration);
                 }
@@ -111,7 +110,7 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
             let Some(expr) = targets.first() else {
                 return None;
             };
-            let ExprKind::Name { id, .. } = &expr.node else {
+            let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node else {
                 return None;
             };
             if id == "objects" {
@@ -120,14 +119,14 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
                 None
             }
         }
-        StmtKind::ClassDef { name, .. } => {
+        StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => {
             if name == "Meta" {
                 Some(ContentType::MetaClass)
             } else {
                 None
             }
         }
-        StmtKind::FunctionDef { name, .. } => match name.as_str() {
+        StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
             "__str__" => Some(ContentType::StrMethod),
             "save" => Some(ContentType::SaveMethod),
             "get_absolute_url" => Some(ContentType::GetAbsoluteUrlMethod),
@@ -138,7 +137,11 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
 }
 
 /// DJ012
-pub fn unordered_body_content_in_model(checker: &mut Checker, bases: &[Expr], body: &[Stmt]) {
+pub(crate) fn unordered_body_content_in_model(
+    checker: &mut Checker,
+    bases: &[Expr],
+    body: &[Stmt],
+) {
     if !bases
         .iter()
         .any(|base| helpers::is_model(&checker.ctx, base))
@@ -161,7 +164,7 @@ pub fn unordered_body_content_in_model(checker: &mut Checker, bases: &[Expr], bo
                 elem_type: current_element_type,
                 before: element_type,
             },
-            Range::from(element),
+            element.range(),
         );
         checker.diagnostics.push(diagnostic);
     }

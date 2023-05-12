@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Comprehension, Expr, ExprKind};
+use rustpython_parser::ast::{self, Comprehension, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -33,7 +32,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryComprehension {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryComprehension {
@@ -52,9 +51,9 @@ impl AlwaysAutofixableViolation for UnnecessaryComprehension {
 /// Add diagnostic for C416 based on the expression node id.
 fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
     let id = match &expr.node {
-        ExprKind::ListComp { .. } => "list",
-        ExprKind::SetComp { .. } => "set",
-        ExprKind::DictComp { .. } => "dict",
+        ExprKind::ListComp(_) => "list",
+        ExprKind::SetComp(_) => "set",
+        ExprKind::DictComp(_) => "dict",
         _ => return,
     };
     if !checker.ctx.is_builtin(id) {
@@ -64,10 +63,11 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         UnnecessaryComprehension {
             obj_type: id.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr)
         });
     }
@@ -75,7 +75,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
 }
 
 /// C416
-pub fn unnecessary_dict_comprehension(
+pub(crate) fn unnecessary_dict_comprehension(
     checker: &mut Checker,
     expr: &Expr,
     key: &Expr,
@@ -86,7 +86,7 @@ pub fn unnecessary_dict_comprehension(
         return;
     }
     let generator = &generators[0];
-    if !(generator.ifs.is_empty() && generator.is_async == 0) {
+    if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
     let Some(key_id) = helpers::expr_name(key) else {
@@ -95,7 +95,7 @@ pub fn unnecessary_dict_comprehension(
     let Some(value_id) = helpers::expr_name(value) else {
         return;
     };
-    let ExprKind::Tuple { elts, .. } = &generator.target.node else {
+    let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &generator.target.node else {
         return;
     };
     if elts.len() != 2 {
@@ -117,7 +117,7 @@ pub fn unnecessary_dict_comprehension(
 }
 
 /// C416
-pub fn unnecessary_list_set_comprehension(
+pub(crate) fn unnecessary_list_set_comprehension(
     checker: &mut Checker,
     expr: &Expr,
     elt: &Expr,
@@ -127,7 +127,7 @@ pub fn unnecessary_list_set_comprehension(
         return;
     }
     let generator = &generators[0];
-    if !(generator.ifs.is_empty() && generator.is_async == 0) {
+    if !generator.ifs.is_empty() || generator.is_async {
         return;
     }
     let Some(elt_id) = helpers::expr_name(elt) else {

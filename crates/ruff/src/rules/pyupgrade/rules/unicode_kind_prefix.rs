@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Expr, Location};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -22,15 +22,16 @@ impl AlwaysAutofixableViolation for UnicodeKindPrefix {
 }
 
 /// UP025
-pub fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
+pub(crate) fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
     if let Some(const_kind) = kind {
         if const_kind.to_lowercase() == "u" {
-            let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, Range::from(expr));
+            let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::deletion(
-                    expr.location,
-                    Location::new(expr.location.row(), expr.location.column() + 1),
-                ));
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::at(
+                    expr.start(),
+                    TextSize::from(1),
+                ))));
             }
             checker.diagnostics.push(diagnostic);
         }

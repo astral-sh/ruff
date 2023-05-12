@@ -11,7 +11,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -26,7 +25,7 @@ impl Violation for StarArgUnpackingAfterKeywordArg {
 }
 
 /// B026
-pub fn star_arg_unpacking_after_keyword_arg(
+pub(crate) fn star_arg_unpacking_after_keyword_arg(
     checker: &mut Checker,
     args: &[Expr],
     keywords: &[Keyword],
@@ -35,15 +34,15 @@ pub fn star_arg_unpacking_after_keyword_arg(
         return;
     };
     for arg in args {
-        let ExprKind::Starred { .. } = arg.node else {
+        let ExprKind::Starred (_) = arg.node else {
             continue;
         };
-        if arg.location <= keyword.location {
+        if arg.start() <= keyword.start() {
             continue;
         }
         checker.diagnostics.push(Diagnostic::new(
             StarArgUnpackingAfterKeywordArg,
-            Range::from(arg),
+            arg.range(),
         ));
     }
 }

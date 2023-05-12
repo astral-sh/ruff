@@ -15,13 +15,13 @@ use ruff_diagnostics::AutofixKind;
 use crate::ROOT_DIR;
 
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Write the generated docs to stdout (rather than to the filesystem).
     #[arg(long)]
     pub(crate) dry_run: bool,
 }
 
-pub fn main(args: &Args) -> Result<()> {
+pub(crate) fn main(args: &Args) -> Result<()> {
     for rule in Rule::iter() {
         if let Some(explanation) = rule.explanation() {
             let mut output = String::new();

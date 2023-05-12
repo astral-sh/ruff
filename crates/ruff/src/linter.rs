@@ -4,6 +4,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
+use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
@@ -23,6 +24,7 @@ use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
+use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
@@ -68,7 +70,6 @@ pub struct FixerResult<'a> {
 pub fn check_path(
     path: &Path,
     package: Option<&Path>,
-    contents: &str,
     tokens: Vec<LexResult>,
     locator: &Locator,
     stylist: &Stylist,
@@ -76,7 +77,6 @@ pub fn check_path(
     directives: &Directives,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: flags::Autofix,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -88,7 +88,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(&tokens));
+        doc_lines.extend(doc_lines_from_tokens(&tokens, locator));
     }
 
     // Run the token-based rules.
@@ -98,7 +98,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         let is_stub = is_python_stub_file(path);
-        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix, is_stub));
+        diagnostics.extend(check_tokens(locator, &tokens, settings, is_stub));
     }
 
     // Run the filesystem-based rules.
@@ -118,11 +118,7 @@ pub fn check_path(
     {
         #[cfg(feature = "logical_lines")]
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens,
-            locator,
-            stylist,
-            settings,
-            flags::Autofix::Enabled,
+            &tokens, locator, stylist, settings,
         ));
     }
 
@@ -147,7 +143,6 @@ pub fn check_path(
                         indexer,
                         &directives.noqa_line_for,
                         settings,
-                        autofix,
                         noqa,
                         path,
                         package,
@@ -161,7 +156,6 @@ pub fn check_path(
                         &directives.isort,
                         settings,
                         stylist,
-                        autofix,
                         path,
                         package,
                     );
@@ -169,7 +163,7 @@ pub fn check_path(
                     diagnostics.extend(import_diagnostics);
                 }
                 if use_doc_lines {
-                    doc_lines.extend(doc_lines_from_ast(&python_ast));
+                    doc_lines.extend(doc_lines_from_ast(&python_ast, locator));
                 }
             }
             Err(parse_error) => {
@@ -178,7 +172,7 @@ pub fn check_path(
                 // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
                 // `per-file-ignores`), and the easiest way to detect that suppression is
                 // to see if the diagnostic persists to the end of the function.
-                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
+                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
                 error = Some(parse_error);
             }
         }
@@ -197,7 +191,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            path, locator, stylist, indexer, &doc_lines, settings, autofix,
+            path, locator, stylist, indexer, &doc_lines, settings,
         ));
     }
 
@@ -218,11 +212,10 @@ pub fn check_path(
     {
         let ignored = check_noqa(
             &mut diagnostics,
-            contents,
-            indexer.commented_lines(),
+            locator,
+            indexer.comment_ranges(),
             &directives.noqa_line_for,
             settings,
-            error.as_ref().map_or(autofix, |_| flags::Autofix::Disabled),
         );
         if noqa.into() {
             for index in ignored.iter().rev() {
@@ -268,11 +261,15 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
-    let indexer: Indexer = tokens.as_slice().into();
+    let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives =
-        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+    let directives = directives::extract_directives(
+        &tokens,
+        directives::Flags::from_settings(settings),
+        &locator,
+        &indexer,
+    );
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let LinterResult {
@@ -281,7 +278,6 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     } = check_path(
         path,
         package,
-        &contents,
         tokens,
         &locator,
         &stylist,
@@ -289,25 +285,19 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &directives,
         settings,
         flags::Noqa::Disabled,
-        flags::Autofix::Disabled,
     );
 
     // Log any parse errors.
     if let Some(err) = error {
-        error!(
-            "{}{}{} {err:?}",
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
-        );
+        error!("{}", DisplayParseError::new(err, locator.to_source_code()));
     }
 
     // Add any missing `# noqa` pragmas.
     add_noqa(
         path,
         &diagnostics.0,
-        &contents,
-        indexer.commented_lines(),
+        &locator,
+        indexer.comment_ranges(),
         &directives.noqa_line_for,
         stylist.line_ending(),
     )
@@ -321,7 +311,6 @@ pub fn lint_only(
     package: Option<&Path>,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: flags::Autofix,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
@@ -333,17 +322,20 @@ pub fn lint_only(
     let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
-    let indexer: Indexer = tokens.as_slice().into();
+    let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives =
-        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+    let directives = directives::extract_directives(
+        &tokens,
+        directives::Flags::from_settings(settings),
+        &locator,
+        &indexer,
+    );
 
     // Generate diagnostics.
     let result = check_path(
         path,
         package,
-        contents,
         tokens,
         &locator,
         &stylist,
@@ -351,12 +343,11 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
-        autofix,
     );
 
     result.map(|(diagnostics, imports)| {
         (
-            diagnostics_to_messages(diagnostics, path, settings, &locator, &directives),
+            diagnostics_to_messages(diagnostics, path, &locator, &directives),
             imports,
         )
     })
@@ -366,14 +357,15 @@ pub fn lint_only(
 fn diagnostics_to_messages(
     diagnostics: Vec<Diagnostic>,
     path: &Path,
-    settings: &Settings,
     locator: &Locator,
     directives: &Directives,
 ) -> Vec<Message> {
     let file = once_cell::unsync::Lazy::new(|| {
-        let mut builder = SourceFileBuilder::new(&path.to_string_lossy());
-        if settings.show_source {
-            builder.set_source_code(&locator.to_source_code());
+        let mut builder =
+            SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
+
+        if let Some(line_index) = locator.line_index() {
+            builder.set_line_index(line_index.clone());
         }
 
         builder.finish()
@@ -382,9 +374,8 @@ fn diagnostics_to_messages(
     diagnostics
         .into_iter()
         .map(|diagnostic| {
-            let lineno = diagnostic.location.row();
-            let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_row)
+            let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
+            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
         })
         .collect()
 }
@@ -421,17 +412,20 @@ pub fn lint_fix<'a>(
         let stylist = Stylist::from_tokens(&tokens, &locator);
 
         // Extra indices from the code.
-        let indexer: Indexer = tokens.as_slice().into();
+        let indexer = Indexer::from_tokens(&tokens, &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
-        let directives =
-            directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+        let directives = directives::extract_directives(
+            &tokens,
+            directives::Flags::from_settings(settings),
+            &locator,
+            &indexer,
+        );
 
         // Generate diagnostics.
         let result = check_path(
             path,
             package,
-            &transformed,
             tokens,
             &locator,
             &stylist,
@@ -439,7 +433,6 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
-            flags::Autofix::Enabled,
         );
 
         if iterations == 0 {
@@ -449,24 +442,12 @@ pub fn lint_fix<'a>(
             // longer parseable on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
             if parseable && result.error.is_some() {
-                #[allow(clippy::print_stderr)]
-                {
-                    eprintln!(
-                        r#"
-{}: Autofix introduced a syntax error. Reverting all changes.
-
-This indicates a bug in `{}`. If you could open an issue at:
-
-    {}/issues/new?title=%5BAutofix%20error%5D
-
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
-"#,
-                        "error".red().bold(),
-                        CARGO_PKG_NAME,
-                        CARGO_PKG_REPOSITORY,
-                        fs::relativize_path(path),
-                    );
-                }
+                report_autofix_syntax_error(
+                    path,
+                    &transformed,
+                    &result.error.unwrap(),
+                    fixed.keys().copied(),
+                );
                 return Err(anyhow!("Autofix introduced a syntax error"));
             }
         }
@@ -489,36 +470,97 @@ This indicates a bug in `{}`. If you could open an issue at:
                 continue;
             }
 
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!(
-                    r#"
-{}: Failed to converge after {} iterations.
-
-This indicates a bug in `{}`. If you could open an issue at:
-
-    {}/issues/new?title=%5BInfinite%20loop%5D
-
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
-"#,
-                    "error".red().bold(),
-                    MAX_ITERATIONS,
-                    CARGO_PKG_NAME,
-                    CARGO_PKG_REPOSITORY,
-                    fs::relativize_path(path),
-                );
-            }
+            report_failed_to_converge_error(path, &transformed, &result.data.0);
         }
 
         return Ok(FixerResult {
             result: result.map(|(diagnostics, imports)| {
                 (
-                    diagnostics_to_messages(diagnostics, path, settings, &locator, &directives),
+                    diagnostics_to_messages(diagnostics, path, &locator, &directives),
                     imports,
                 )
             }),
             transformed,
             fixed,
         });
+    }
+}
+
+fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
+    rules
+        .into_iter()
+        .map(|rule| rule.noqa_code().to_string())
+        .sorted_unstable()
+        .dedup()
+        .join(", ")
+}
+
+#[allow(clippy::print_stderr)]
+fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Diagnostic]) {
+    let codes = collect_rule_codes(diagnostics.iter().map(|diagnostic| diagnostic.kind.rule()));
+    if cfg!(debug_assertions) {
+        eprintln!(
+            "{}: Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
+            "debug error".red().bold(),
+            MAX_ITERATIONS,
+            fs::relativize_path(path),
+            codes,
+            transformed,
+        );
+    } else {
+        eprintln!(
+            r#"
+{}: Failed to converge after {} iterations.
+
+This indicates a bug in `{}`. If you could open an issue at:
+
+    {}/issues/new?title=%5BInfinite%20loop%5D
+
+...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+"#,
+            "error".red().bold(),
+            MAX_ITERATIONS,
+            CARGO_PKG_NAME,
+            CARGO_PKG_REPOSITORY,
+            fs::relativize_path(path),
+            codes
+        );
+    }
+}
+
+#[allow(clippy::print_stderr)]
+fn report_autofix_syntax_error(
+    path: &Path,
+    transformed: &str,
+    error: &ParseError,
+    rules: impl IntoIterator<Item = Rule>,
+) {
+    let codes = collect_rule_codes(rules);
+    if cfg!(debug_assertions) {
+        eprintln!(
+            "{}: Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
+            "error".red().bold(),
+            fs::relativize_path(path),
+            codes,
+            error,
+            transformed,
+        );
+    } else {
+        eprintln!(
+            r#"
+{}: Autofix introduced a syntax error. Reverting all changes.
+
+This indicates a bug in `{}`. If you could open an issue at:
+
+    {}/issues/new?title=%5BAutofix%20error%5D
+
+...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+"#,
+            "error".red().bold(),
+            CARGO_PKG_NAME,
+            CARGO_PKG_REPOSITORY,
+            fs::relativize_path(path),
+            codes,
+        );
     }
 }

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_text_size::TextRange;
 
 #[violation]
 pub struct HardcodedBindAllInterfaces;
@@ -13,9 +13,9 @@ impl Violation for HardcodedBindAllInterfaces {
 }
 
 /// S104
-pub fn hardcoded_bind_all_interfaces(value: &str, range: &Range) -> Option<Diagnostic> {
+pub(crate) fn hardcoded_bind_all_interfaces(value: &str, range: TextRange) -> Option<Diagnostic> {
     if value == "0.0.0.0" {
-        Some(Diagnostic::new(HardcodedBindAllInterfaces, *range))
+        Some(Diagnostic::new(HardcodedBindAllInterfaces, range))
     } else {
         None
     }

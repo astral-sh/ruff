@@ -8,12 +8,13 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_text_size::{TextRange, TextSize};
 
-use ruff::message::{Location, Message};
+use ruff::message::Message;
 use ruff::registry::Rule;
-use ruff::resolver::PyprojectDiscovery;
+use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::{flags, AllSettings};
-use ruff::{fs, packaging, resolver, warn_user_once, IOError, Range};
+use ruff::{fs, packaging, resolver, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::SourceFileBuilder;
@@ -24,9 +25,9 @@ use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
-pub fn run(
+pub(crate) fn run(
     files: &[PathBuf],
-    pyproject_strategy: &PyprojectDiscovery,
+    pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
@@ -34,7 +35,7 @@ pub fn run(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -51,12 +52,12 @@ pub fn run(
             }
         }
 
-        match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => {
-                init_cache(&settings.cli.cache_dir);
+        match pyproject_config.strategy {
+            PyprojectDiscoveryStrategy::Fixed => {
+                init_cache(&pyproject_config.settings.cli.cache_dir);
             }
-            PyprojectDiscovery::Hierarchical(default) => {
-                for settings in std::iter::once(default).chain(resolver.iter()) {
+            PyprojectDiscoveryStrategy::Hierarchical => {
+                for settings in std::iter::once(&pyproject_config.settings).chain(resolver.iter()) {
                     init_cache(&settings.cli.cache_dir);
                 }
             }
@@ -71,7 +72,7 @@ pub fn run(
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
         &resolver,
-        pyproject_strategy,
+        pyproject_config,
     );
 
     let start = Instant::now();
@@ -85,7 +86,7 @@ pub fn run(
                         .parent()
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
-                    let settings = resolver.resolve_all(path, pyproject_strategy);
+                    let settings = resolver.resolve_all(path, pyproject_config);
 
                     lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
@@ -115,18 +116,16 @@ pub fn run(
                         fs::relativize_path(path).bold(),
                         ":".bold()
                     );
-                    let settings = resolver.resolve(path, pyproject_strategy);
+                    let settings = resolver.resolve(path, pyproject_config);
                     if settings.rules.enabled(Rule::IOError) {
-                        let file = SourceFileBuilder::new(&path.to_string_lossy()).finish();
+                        let file =
+                            SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                         Diagnostics::new(
                             vec![Message::from_diagnostic(
-                                Diagnostic::new(
-                                    IOError { message },
-                                    Range::new(Location::default(), Location::default()),
-                                ),
+                                Diagnostic::new(IOError { message }, TextRange::default()),
                                 file,
-                                1,
+                                TextSize::default(),
                             )],
                             ImportMap::default(),
                         )
@@ -143,8 +142,7 @@ pub fn run(
             acc += item;
             acc
         });
-    // TODO(chris): actually check the imports?
-    debug!("{:#?}", diagnostics.imports);
+
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
@@ -198,7 +196,7 @@ mod test {
     use path_absolutize::Absolutize;
 
     use ruff::logging::LogLevel;
-    use ruff::resolver::PyprojectDiscovery;
+    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff::settings::configuration::{Configuration, RuleSelection};
     use ruff::settings::flags::FixMode;
     use ruff::settings::flags::{Cache, Noqa};
@@ -240,7 +238,11 @@ mod test {
 
         let diagnostics = run(
             &[root_path.join("valid.ipynb")],
-            &PyprojectDiscovery::Fixed(AllSettings::from_configuration(configuration, &root_path)?),
+            &PyprojectConfig::new(
+                PyprojectDiscoveryStrategy::Fixed,
+                AllSettings::from_configuration(configuration, &root_path)?,
+                None,
+            ),
             &overrides,
             Cache::Disabled,
             Noqa::Enabled,
@@ -252,6 +254,8 @@ mod test {
             LogLevel::Default,
             FixMode::None,
             Flags::SHOW_VIOLATIONS,
+            #[cfg(feature = "ecosystem_ci")]
+            false,
         );
         let mut writer: Vec<u8> = Vec::new();
         // Mute the terminal color codes

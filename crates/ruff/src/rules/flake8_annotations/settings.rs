@@ -1,19 +1,17 @@
 //! Settings for the `flake-annotations` plugin.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::CacheKey;
 use ruff_macros::ConfigurationOptions;
 
-#[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Flake8AnnotationsOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = "false",

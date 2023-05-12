@@ -1,11 +1,11 @@
 use log::error;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
-use ruff_python_ast::types::{Range, RefEquality};
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::types::RefEquality;
 
 use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -29,7 +29,7 @@ use crate::registry::AsRule;
 /// Use instead:
 /// ```python
 /// def f():
-///    print(5)
+///     print(5)
 /// ```
 #[violation]
 pub struct UselessReturn;
@@ -46,7 +46,7 @@ impl AlwaysAutofixableViolation for UselessReturn {
 }
 
 /// PLR1711
-pub fn useless_return<'a>(
+pub(crate) fn useless_return<'a>(
     checker: &mut Checker<'a>,
     stmt: &'a Stmt,
     body: &'a [Stmt],
@@ -64,7 +64,7 @@ pub fn useless_return<'a>(
 
     // Find the last statement in the function.
     let last_stmt = body.last().unwrap();
-    if !matches!(last_stmt.node, StmtKind::Return { .. }) {
+    if !matches!(last_stmt.node, StmtKind::Return(_)) {
         return;
     }
 
@@ -75,13 +75,13 @@ pub fn useless_return<'a>(
 
     // Skip functions that consist of a docstring and a return statement.
     if body.len() == 2 {
-        if let StmtKind::Expr { value } = &body[0].node {
+        if let StmtKind::Expr(ast::StmtExpr { value }) = &body[0].node {
             if matches!(
                 value.node,
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Str(_),
                     ..
-                }
+                })
             ) {
                 return;
             }
@@ -89,7 +89,7 @@ pub fn useless_return<'a>(
     }
 
     // Verify that the last statement is a return statement.
-    let StmtKind::Return { value} = &last_stmt.node else {
+    let StmtKind::Return(ast::StmtReturn { value}) = &last_stmt.node else {
         return;
     };
 
@@ -105,7 +105,7 @@ pub fn useless_return<'a>(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessReturn, Range::from(last_stmt));
+    let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         match delete_stmt(
@@ -116,11 +116,12 @@ pub fn useless_return<'a>(
             checker.indexer,
             checker.stylist,
         ) {
-            Ok(fix) => {
-                if fix.is_deletion() || fix.content() == Some("pass") {
+            Ok(edit) => {
+                if edit.is_deletion() || edit.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(last_stmt));
                 }
-                diagnostic.set_fix(fix);
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => {
                 error!("Failed to delete `return` statement: {}", e);

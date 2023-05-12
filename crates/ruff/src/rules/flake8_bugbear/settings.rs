@@ -1,18 +1,16 @@
 //! Settings for the `flake8-bugbear` plugin.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
-#[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Flake8BugbearOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"[]"#,
@@ -23,7 +21,8 @@ pub struct Options {
         "#
     )]
     /// Additional callable functions to consider "immutable" when evaluating,
-    /// e.g., the `no-mutable-default-argument` rule (`B006`).
+    /// e.g., the `no-mutable-default-argument` rule (`B006`) or
+    /// `no-function-call-in-dataclass-defaults` rule (`RUF009`).
     pub extend_immutable_calls: Option<Vec<String>>,
 }
 

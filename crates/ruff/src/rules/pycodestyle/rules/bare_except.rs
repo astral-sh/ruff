@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Excepthandler, Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Expr, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,7 +45,7 @@ impl Violation for BareExcept {
 }
 
 /// E722
-pub fn bare_except(
+pub(crate) fn bare_except(
     type_: Option<&Expr>,
     body: &[Stmt],
     handler: &Excepthandler,
@@ -54,7 +54,7 @@ pub fn bare_except(
     if type_.is_none()
         && !body
             .iter()
-            .any(|stmt| matches!(stmt.node, StmtKind::Raise { exc: None, .. }))
+            .any(|stmt| matches!(stmt.node, StmtKind::Raise(ast::StmtRaise { exc: None, .. })))
     {
         Some(Diagnostic::new(BareExcept, except_range(handler, locator)))
     } else {

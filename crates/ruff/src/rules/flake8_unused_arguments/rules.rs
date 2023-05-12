@@ -16,9 +16,27 @@ use crate::checkers::ast::Checker;
 use super::helpers;
 use super::types::Argumentable;
 
+/// ## What it does
+/// Checks for the presence of unused arguments in function definitions.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// def foo(bar, baz):
+///     return bar * 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar):
+///     return bar * 2
+/// ```
 #[violation]
 pub struct UnusedFunctionArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedFunctionArgument {
@@ -29,9 +47,29 @@ impl Violation for UnusedFunctionArgument {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused arguments in instance method definitions.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     def my_method(self, arg1, arg2):
+///         print(arg1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     def my_method(self, arg1):
+///         print(arg1)
+/// ```
 #[violation]
 pub struct UnusedMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedMethodArgument {
@@ -42,9 +80,37 @@ impl Violation for UnusedMethodArgument {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused arguments in class method definitions.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     @classmethod
+///     def my_method(self, arg1, arg2):
+///         print(arg1)
+///
+///     def other_method(self):
+///         self.my_method("foo", "bar")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     @classmethod
+///     def my_method(self, arg1):
+///         print(arg1)
+///
+///     def other_method(self):
+///         self.my_method("foo", "bar")
+/// ```
 #[violation]
 pub struct UnusedClassMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedClassMethodArgument {
@@ -55,9 +121,37 @@ impl Violation for UnusedClassMethodArgument {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused arguments in static method definitions.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     @staticmethod
+///     def my_static_method(self, arg1, arg2):
+///         print(arg1)
+///
+///     def other_method(self):
+///         self.my_static_method("foo", "bar")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     @static
+///     def my_static_method(self, arg1):
+///         print(arg1)
+///
+///     def other_method(self):
+///         self.my_static_method("foo", "bar")
+/// ```
 #[violation]
 pub struct UnusedStaticMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedStaticMethodArgument {
@@ -68,9 +162,28 @@ impl Violation for UnusedStaticMethodArgument {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused arguments in lambda expression
+/// definitions.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// my_list = [1, 2, 3, 4, 5]
+/// squares = map(lambda x, y: x**2, my_list)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// my_list = [1, 2, 3, 4, 5]
+/// squares = map(lambda x: x**2, my_list)
+/// ```
 #[violation]
 pub struct UnusedLambdaArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedLambdaArgument {
@@ -164,7 +277,7 @@ fn call<'a>(
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
-pub fn unused_arguments(
+pub(crate) fn unused_arguments(
     checker: &Checker,
     parent: &Scope,
     scope: &Scope,

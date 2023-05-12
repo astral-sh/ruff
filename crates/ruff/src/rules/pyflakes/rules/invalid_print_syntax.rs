@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -17,8 +16,8 @@ impl Violation for InvalidPrintSyntax {
 }
 
 /// F633
-pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
-    let ExprKind::Name { id, .. } = &left.node else {
+pub(crate) fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &left.node else {
         return;
     };
     if id != "print" {
@@ -29,5 +28,5 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     };
     checker
         .diagnostics
-        .push(Diagnostic::new(InvalidPrintSyntax, Range::from(left)));
+        .push(Diagnostic::new(InvalidPrintSyntax, left.range()));
 }

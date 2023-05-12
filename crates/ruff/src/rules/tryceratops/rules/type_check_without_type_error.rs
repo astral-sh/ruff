@@ -1,13 +1,38 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for type checks that do not raise `TypeError`.
+///
+/// ## Why is this bad?
+/// The Python documentation states that `TypeError` should be raised upon
+/// encountering an inappropriate type.
+///
+/// ## Example
+/// ```python
+/// def foo(n: int):
+///     if isinstance(n, int):
+///         pass
+///     else:
+///         raise ValueError("n must be an integer")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(n: int):
+///     if isinstance(n, int):
+///         pass
+///     else:
+///         raise TypeError("n must be an integer")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/exceptions.html#TypeError)
 #[violation]
 pub struct TypeCheckWithoutTypeError;
 
@@ -25,33 +50,19 @@ struct ControlFlowVisitor<'a> {
     continues: Vec<&'a Stmt>,
 }
 
-impl<'a, 'b> Visitor<'b> for ControlFlowVisitor<'a>
+impl<'a, 'b> StatementVisitor<'b> for ControlFlowVisitor<'a>
 where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
-            StmtKind::FunctionDef { .. }
-            | StmtKind::AsyncFunctionDef { .. }
-            | StmtKind::ClassDef { .. } => {
+            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) | StmtKind::ClassDef(_) => {
                 // Don't recurse.
             }
-            StmtKind::Return { .. } => self.returns.push(stmt),
+            StmtKind::Return(_) => self.returns.push(stmt),
             StmtKind::Break => self.breaks.push(stmt),
             StmtKind::Continue => self.continues.push(stmt),
-            _ => visitor::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr.node {
-            ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::GeneratorExp { .. } => {
-                // Don't recurse.
-            }
-            _ => visitor::walk_expr(self, expr),
+            _ => walk_stmt(self, stmt),
         }
     }
 }
@@ -78,11 +89,13 @@ fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
 /// Returns `true` if an [`Expr`] is a test to check types (e.g. via isinstance)
 fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
     match &test.node {
-        ExprKind::BoolOp { values, .. } => values
+        ExprKind::BoolOp(ast::ExprBoolOp { values, .. }) => values
             .iter()
             .all(|expr| check_type_check_test(checker, expr)),
-        ExprKind::UnaryOp { operand, .. } => check_type_check_test(checker, operand),
-        ExprKind::Call { func, .. } => check_type_check_call(checker, func),
+        ExprKind::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+            check_type_check_test(checker, operand)
+        }
+        ExprKind::Call(ast::ExprCall { func, .. }) => check_type_check_call(checker, func),
         _ => false,
     }
 }
@@ -118,9 +131,9 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
 /// Returns `true` if an [`Expr`] is a reference to a builtin exception.
 fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
     match &exc.node {
-        ExprKind::Name { .. } => is_builtin_exception(checker, exc),
-        ExprKind::Call { func, .. } => {
-            if let ExprKind::Name { .. } = &func.node {
+        ExprKind::Name(_) => is_builtin_exception(checker, exc),
+        ExprKind::Call(ast::ExprCall { func, .. }) => {
+            if let ExprKind::Name(_) = &func.node {
                 is_builtin_exception(checker, func)
             } else {
                 false
@@ -132,10 +145,9 @@ fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
 
 fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
     if check_raise_type(checker, exc) {
-        checker.diagnostics.push(Diagnostic::new(
-            TypeCheckWithoutTypeError,
-            Range::from(item),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
     }
 }
 
@@ -145,7 +157,7 @@ fn check_body(checker: &mut Checker, body: &[Stmt]) {
         if has_control_flow(item) {
             return;
         }
-        if let StmtKind::Raise { exc: Some(exc), .. } = &item.node {
+        if let StmtKind::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item.node {
             check_raise(checker, exc, item);
         }
     }
@@ -158,12 +170,12 @@ fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
             return;
         }
         match &item.node {
-            StmtKind::If { test, .. } => {
+            StmtKind::If(ast::StmtIf { test, .. }) => {
                 if !check_type_check_test(checker, test) {
                     return;
                 }
             }
-            StmtKind::Raise { exc: Some(exc), .. } => {
+            StmtKind::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
                 check_raise(checker, exc, item);
             }
             _ => {}
@@ -172,7 +184,7 @@ fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// TRY004
-pub fn type_check_without_type_error(
+pub(crate) fn type_check_without_type_error(
     checker: &mut Checker,
     body: &[Stmt],
     test: &Expr,
@@ -180,7 +192,7 @@ pub fn type_check_without_type_error(
     parent: Option<&Stmt>,
 ) {
     if let Some(parent) = parent {
-        if let StmtKind::If { test, .. } = &parent.node {
+        if let StmtKind::If(ast::StmtIf { test, .. }) = &parent.node {
             if !check_type_check_test(checker, test) {
                 return;
             }

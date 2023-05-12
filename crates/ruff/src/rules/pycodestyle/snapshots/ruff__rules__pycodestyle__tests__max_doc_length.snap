@@ -10,7 +10,7 @@ W505.py:2:51: W505 Doc line too long (57 > 50 characters)
 
 W505.py:6:51: W505 Doc line too long (56 > 50 characters)
   |
-6 | def f():
+6 | def f1():
 7 |     """Here's a docstring that's also over the limit."""
   |                                                   ^^^^^^ W505
 8 | 
@@ -24,13 +24,39 @@ W505.py:10:51: W505 Doc line too long (56 > 50 characters)
 12 |     # Here's a standalone comment that's over the limit.
    |                                                   ^^^^^^ W505
 13 | 
-14 |     print("Here's a string that's over the limit, but it's not a docstring.")
+14 |     x = 2
    |
 
-W505.py:15:51: W505 Doc line too long (61 > 50 characters)
+W505.py:13:51: W505 Doc line too long (93 > 50 characters)
    |
-15 | "This is also considered a docstring, and is over the limit."
+13 |     x = 2
+14 |     # Another standalone that is preceded by a newline and indent toke and is over the limit.
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
+15 | 
+16 |     print("Here's a string that's over the limit, but it's not a docstring.")
+   |
+
+W505.py:18:51: W505 Doc line too long (61 > 50 characters)
+   |
+18 | "This is also considered a docstring, and is over the limit."
    |                                                   ^^^^^^^^^^^ W505
+   |
+
+W505.py:24:51: W505 Doc line too long (82 > 50 characters)
+   |
+24 |     """Here's a multi-line docstring.
+25 | 
+26 |     It's over the limit on this line, which isn't the first line in the docstring.
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
+27 |     """
+   |
+
+W505.py:31:51: W505 Doc line too long (85 > 50 characters)
+   |
+31 |     """Here's a multi-line docstring.
+32 | 
+33 |     It's over the limit on this line, which isn't the first line in the docstring."""
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
    |
 
 

@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -10,7 +10,6 @@ use crate::registry::AsRule;
 #[violation]
 pub struct TypedArgumentDefaultInStub;
 
-/// PYI011
 impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,7 +24,6 @@ impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
 #[violation]
 pub struct ArgumentDefaultInStub;
 
-/// PYI014
 impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,7 +38,6 @@ impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
 #[violation]
 pub struct AssignmentDefaultInStub;
 
-/// PYI015
 impl AlwaysAutofixableViolation for AssignmentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -83,14 +80,16 @@ fn is_valid_default_value_with_annotation(
     allow_container: bool,
 ) -> bool {
     match &default.node {
-        ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } | ExprKind::Set { elts, .. } => {
+        ExprKind::List(ast::ExprList { elts, .. })
+        | ExprKind::Tuple(ast::ExprTuple { elts, .. })
+        | ExprKind::Set(ast::ExprSet { elts }) => {
             return allow_container
                 && elts.len() <= 10
                 && elts
                     .iter()
                     .all(|e| is_valid_default_value_with_annotation(e, checker, false));
         }
-        ExprKind::Dict { keys, values, .. } => {
+        ExprKind::Dict(ast::ExprDict { keys, values }) => {
             return allow_container
                 && keys.len() <= 10
                 && keys.iter().zip(values).all(|(k, v)| {
@@ -99,60 +98,60 @@ fn is_valid_default_value_with_annotation(
                     }) && is_valid_default_value_with_annotation(v, checker, false)
                 });
         }
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Ellipsis | Constant::None,
             ..
-        } => {
+        }) => {
             return true;
         }
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(..),
             ..
-        } => return checker.locator.slice(default).len() <= 50,
-        ExprKind::Constant {
+        }) => return checker.locator.slice(default.range()).len() <= 50,
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Bytes(..),
             ..
-        } => return checker.locator.slice(default).len() <= 50,
+        }) => return checker.locator.slice(default.range()).len() <= 50,
         // Ex) `123`, `True`, `False`, `3.14`
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
             ..
-        } => {
-            return checker.locator.slice(default).len() <= 10;
+        }) => {
+            return checker.locator.slice(default.range()).len() <= 10;
         }
         // Ex) `2j`
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Complex { real, .. },
             ..
-        } => {
+        }) => {
             if *real == 0.0 {
-                return checker.locator.slice(default).len() <= 10;
+                return checker.locator.slice(default.range()).len() <= 10;
             }
         }
-        ExprKind::UnaryOp {
+        ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::USub,
             operand,
-        } => {
+        }) => {
             // Ex) `-1`, `-3.14`
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Int(..) | Constant::Float(..),
                 ..
-            } = &operand.node
+            }) = &operand.node
             {
-                return checker.locator.slice(operand).len() <= 10;
+                return checker.locator.slice(operand.range()).len() <= 10;
             }
             // Ex) `-2j`
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Complex { real, .. },
                 ..
-            } = &operand.node
+            }) = &operand.node
             {
                 if *real == 0.0 {
-                    return checker.locator.slice(operand).len() <= 10;
+                    return checker.locator.slice(operand.range()).len() <= 10;
                 }
             }
             // Ex) `-math.inf`, `-math.pi`, etc.
-            if let ExprKind::Attribute { .. } = &operand.node {
+            if let ExprKind::Attribute(_) = &operand.node {
                 if checker
                     .ctx
                     .resolve_call_path(operand)
@@ -167,42 +166,42 @@ fn is_valid_default_value_with_annotation(
                 }
             }
         }
-        ExprKind::BinOp {
+        ExprKind::BinOp(ast::ExprBinOp {
             left,
             op: Operator::Add | Operator::Sub,
             right,
-        } => {
+        }) => {
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Complex { .. },
                 ..
-            } = right.node
+            }) = right.node
             {
                 // Ex) `1 + 2j`, `1 - 2j`
-                if let ExprKind::Constant {
+                if let ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Int(..) | Constant::Float(..),
                     ..
-                } = &left.node
+                }) = &left.node
                 {
-                    return checker.locator.slice(left).len() <= 10;
-                } else if let ExprKind::UnaryOp {
+                    return checker.locator.slice(left.range()).len() <= 10;
+                } else if let ExprKind::UnaryOp(ast::ExprUnaryOp {
                     op: Unaryop::USub,
                     operand,
-                } = &left.node
+                }) = &left.node
                 {
                     // Ex) `-1 + 2j`, `-1 - 2j`
-                    if let ExprKind::Constant {
+                    if let ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Int(..) | Constant::Float(..),
                         ..
-                    } = &operand.node
+                    }) = &operand.node
                     {
-                        return checker.locator.slice(operand).len() <= 10;
+                        return checker.locator.slice(operand.range()).len() <= 10;
                     }
                 }
             }
         }
         // Ex) `math.inf`, `sys.stdin`, etc.
-        ExprKind::Attribute { .. } => {
+        ExprKind::Attribute(_) => {
             if checker
                 .ctx
                 .resolve_call_path(default)
@@ -221,25 +220,73 @@ fn is_valid_default_value_with_annotation(
     false
 }
 
-pub fn is_type_var_call(checker: &Checker, expr: &Expr) -> bool {
-    let ExprKind::Call {func, ..} = &expr.node else {
+/// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
+fn is_valid_pep_604_union(annotation: &Expr) -> bool {
+    match &annotation.node {
+        ExprKind::BinOp(ast::ExprBinOp {
+            left,
+            op: Operator::BitOr,
+            right,
+        }) => is_valid_pep_604_union(left) && is_valid_pep_604_union(right),
+        ExprKind::Name(_)
+        | ExprKind::Subscript(_)
+        | ExprKind::Attribute(_)
+        | ExprKind::Constant(ast::ExprConstant {
+            value: Constant::None,
+            ..
+        }) => true,
+        _ => false,
+    }
+}
+
+/// Returns `true` if an [`Expr`] appears to be a valid default value without an annotation.
+fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
+    matches!(
+        &default.node,
+        ExprKind::Call(_)
+            | ExprKind::Name(_)
+            | ExprKind::Attribute(_)
+            | ExprKind::Subscript(_)
+            | ExprKind::Constant(ast::ExprConstant {
+                value: Constant::Ellipsis | Constant::None,
+                ..
+            })
+    ) || is_valid_pep_604_union(default)
+}
+
+/// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
+/// call.
+fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
+    let ExprKind::Call(ast::ExprCall { func, .. } )= &expr.node else {
         return false;
     };
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TypeVar"]
-                || call_path.as_slice() == ["typing", "TypeVarTuple"]
-                || call_path.as_slice() == ["typing_extensions", "TypeVarTuple"]
-                || call_path.as_slice() == ["typing", "NewType"]
-                || call_path.as_slice() == ["typing", "ParamSpec"]
-                || call_path.as_slice() == ["typing_extensions", "ParamSpec"]
-        })
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        matches!(
+            call_path.as_slice(),
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
+            ]
+        )
+    })
+}
+
+/// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
+/// `__all__`).
+fn is_special_assignment(context: &Context, target: &Expr) -> bool {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+        match id.as_str() {
+            "__all__" => context.scope().kind.is_module(),
+            "__match_args__" | "__slots__" => context.scope().kind.is_class(),
+            _ => false,
+        }
+    } else {
+        false
+    }
 }
 
 /// PYI011
-pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
+pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
     if !args.defaults.is_empty() {
         let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
         for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
@@ -250,14 +297,14 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if arg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
-                            ));
+                                default.range(),
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -277,14 +324,14 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if kwarg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
-                            ));
+                                default.range(),
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -296,7 +343,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PYI014
-pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
+pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
     if !args.defaults.is_empty() {
         let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
         for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
@@ -307,14 +354,14 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if arg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
-                            ));
+                                default.range(),
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -334,14 +381,14 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if kwarg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
-                            ));
+                                default.range(),
+                            )));
                         }
 
                         checker.diagnostics.push(diagnostic);
@@ -353,26 +400,58 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PYI015
-pub fn assignment_default_in_stub(checker: &mut Checker, value: &Expr, annotation: Option<&Expr>) {
-    if annotation.map_or(false, |annotation| {
-        checker.ctx.match_typing_expr(annotation, "TypeAlias")
-    }) {
+pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+    if targets.len() == 1 && is_special_assignment(&checker.ctx, &targets[0]) {
         return;
     }
-    if is_type_var_call(checker, value) {
+    if is_type_var_like_call(&checker.ctx, value) {
         return;
     }
-    if !is_valid_default_value_with_annotation(value, checker, true) {
-        let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
-
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                "...".to_string(),
-                value.location,
-                value.end_location.unwrap(),
-            ));
-        }
-
-        checker.diagnostics.push(diagnostic);
+    if is_valid_default_value_without_annotation(value) {
+        return;
     }
+    if is_valid_default_value_with_annotation(value, checker, true) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            "...".to_string(),
+            value.range(),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// PYI015
+pub(crate) fn annotated_assignment_default_in_stub(
+    checker: &mut Checker,
+    target: &Expr,
+    value: &Expr,
+    annotation: &Expr,
+) {
+    if checker.ctx.match_typing_expr(annotation, "TypeAlias") {
+        return;
+    }
+    if is_special_assignment(&checker.ctx, target) {
+        return;
+    }
+    if is_type_var_like_call(&checker.ctx, value) {
+        return;
+    }
+    if is_valid_default_value_with_annotation(value, checker, true) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            "...".to_string(),
+            value.range(),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
 }

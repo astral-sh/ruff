@@ -1,14 +1,12 @@
+use anyhow::{bail, Result};
+use globset::{Glob, GlobSet, GlobSetBuilder};
+use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
-
-use anyhow::{bail, Result};
-use globset::{Glob, GlobSet, GlobSetBuilder};
-use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
-use schemars::JsonSchema;
-use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -20,21 +18,11 @@ use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 
 #[derive(
-    Clone,
-    Copy,
-    Debug,
-    PartialOrd,
-    Ord,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    JsonSchema,
-    CacheKey,
-    EnumIter,
+    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, CacheKey, EnumIter,
 )]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
     Py38,
@@ -218,9 +206,10 @@ impl FromStr for PatternPrefixPair {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
     Text,
     Json,
@@ -238,8 +227,9 @@ impl Default for SerializationFormat {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(try_from = "String")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Version(String);
 
 impl TryFrom<String> for Version {

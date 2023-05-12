@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{Expr, Keyword, Location};
+use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
+pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -32,20 +32,14 @@ pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[
         })
     {
         let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
-        let range = Range::new(
-            kwarg.location,
-            Location::new(
-                kwarg.location.row(),
-                kwarg.location.column() + "universal_newlines".len(),
-            ),
-        );
+        let range = TextRange::at(kwarg.start(), "universal_newlines".text_len());
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "text".to_string(),
-                range.location,
-                range.end_location,
-            ));
+                range,
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

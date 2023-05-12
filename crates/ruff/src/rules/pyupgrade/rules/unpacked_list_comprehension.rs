@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -24,58 +23,68 @@ impl AlwaysAutofixableViolation for UnpackedListComprehension {
 /// Returns `true` if `expr` contains an `ExprKind::Await`.
 fn contains_await(expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::Await { .. } => true,
-        ExprKind::BoolOp { values, .. } => values.iter().any(contains_await),
-        ExprKind::NamedExpr { target, value } => contains_await(target) || contains_await(value),
-        ExprKind::BinOp { left, right, .. } => contains_await(left) || contains_await(right),
-        ExprKind::UnaryOp { operand, .. } => contains_await(operand),
-        ExprKind::Lambda { body, .. } => contains_await(body),
-        ExprKind::IfExp { test, body, orelse } => {
+        ExprKind::Await(_) => true,
+        ExprKind::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().any(contains_await),
+        ExprKind::NamedExpr(ast::ExprNamedExpr { target, value }) => {
+            contains_await(target) || contains_await(value)
+        }
+        ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            contains_await(left) || contains_await(right)
+        }
+        ExprKind::UnaryOp(ast::ExprUnaryOp { operand, .. }) => contains_await(operand),
+        ExprKind::Lambda(ast::ExprLambda { body, .. }) => contains_await(body),
+        ExprKind::IfExp(ast::ExprIfExp { test, body, orelse }) => {
             contains_await(test) || contains_await(body) || contains_await(orelse)
         }
-        ExprKind::Dict { keys, values } => keys
+        ExprKind::Dict(ast::ExprDict { keys, values }) => keys
             .iter()
             .flatten()
             .chain(values.iter())
             .any(contains_await),
-        ExprKind::Set { elts } => elts.iter().any(contains_await),
-        ExprKind::ListComp { elt, .. } => contains_await(elt),
-        ExprKind::SetComp { elt, .. } => contains_await(elt),
-        ExprKind::DictComp { key, value, .. } => contains_await(key) || contains_await(value),
-        ExprKind::GeneratorExp { elt, .. } => contains_await(elt),
-        ExprKind::Yield { value } => value.as_ref().map_or(false, |value| contains_await(value)),
-        ExprKind::YieldFrom { value } => contains_await(value),
-        ExprKind::Compare {
+        ExprKind::Set(ast::ExprSet { elts }) => elts.iter().any(contains_await),
+        ExprKind::ListComp(ast::ExprListComp { elt, .. }) => contains_await(elt),
+        ExprKind::SetComp(ast::ExprSetComp { elt, .. }) => contains_await(elt),
+        ExprKind::DictComp(ast::ExprDictComp { key, value, .. }) => {
+            contains_await(key) || contains_await(value)
+        }
+        ExprKind::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) => contains_await(elt),
+        ExprKind::Yield(ast::ExprYield { value }) => {
+            value.as_ref().map_or(false, |value| contains_await(value))
+        }
+        ExprKind::YieldFrom(ast::ExprYieldFrom { value }) => contains_await(value),
+        ExprKind::Compare(ast::ExprCompare {
             left, comparators, ..
-        } => contains_await(left) || comparators.iter().any(contains_await),
-        ExprKind::Call {
+        }) => contains_await(left) || comparators.iter().any(contains_await),
+        ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        } => {
+        }) => {
             contains_await(func)
                 || args.iter().any(contains_await)
                 || keywords
                     .iter()
                     .any(|keyword| contains_await(&keyword.node.value))
         }
-        ExprKind::FormattedValue {
+        ExprKind::FormattedValue(ast::ExprFormattedValue {
             value, format_spec, ..
-        } => {
+        }) => {
             contains_await(value)
                 || format_spec
                     .as_ref()
                     .map_or(false, |value| contains_await(value))
         }
-        ExprKind::JoinedStr { values } => values.iter().any(contains_await),
-        ExprKind::Constant { .. } => false,
-        ExprKind::Attribute { value, .. } => contains_await(value),
-        ExprKind::Subscript { value, slice, .. } => contains_await(value) || contains_await(slice),
-        ExprKind::Starred { value, .. } => contains_await(value),
-        ExprKind::Name { .. } => false,
-        ExprKind::List { elts, .. } => elts.iter().any(contains_await),
-        ExprKind::Tuple { elts, .. } => elts.iter().any(contains_await),
-        ExprKind::Slice { lower, upper, step } => {
+        ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => values.iter().any(contains_await),
+        ExprKind::Constant(_) => false,
+        ExprKind::Attribute(ast::ExprAttribute { value, .. }) => contains_await(value),
+        ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            contains_await(value) || contains_await(slice)
+        }
+        ExprKind::Starred(ast::ExprStarred { value, .. }) => contains_await(value),
+        ExprKind::Name(_) => false,
+        ExprKind::List(ast::ExprList { elts, .. }) => elts.iter().any(contains_await),
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(contains_await),
+        ExprKind::Slice(ast::ExprSlice { lower, upper, step }) => {
             lower.as_ref().map_or(false, |value| contains_await(value))
                 || upper.as_ref().map_or(false, |value| contains_await(value))
                 || step.as_ref().map_or(false, |value| contains_await(value))
@@ -84,29 +93,29 @@ fn contains_await(expr: &Expr) -> bool {
 }
 
 /// UP027
-pub fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
     let Some(target) = targets.get(0) else {
         return;
     };
-    if let ExprKind::Tuple { .. } = target.node {
-        if let ExprKind::ListComp { elt, generators } = &value.node {
-            if generators.iter().any(|generator| generator.is_async > 0) || contains_await(elt) {
+    if let ExprKind::Tuple(_) = target.node {
+        if let ExprKind::ListComp(ast::ExprListComp { elt, generators }) = &value.node {
+            if generators.iter().any(|generator| generator.is_async) || contains_await(elt) {
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(UnpackedListComprehension, Range::from(value));
+            let mut diagnostic = Diagnostic::new(UnpackedListComprehension, value.range());
             if checker.patch(diagnostic.kind.rule()) {
-                let existing = checker.locator.slice(value);
+                let existing = checker.locator.slice(value.range());
 
                 let mut content = String::with_capacity(existing.len());
                 content.push('(');
                 content.push_str(&existing[1..existing.len() - 1]);
                 content.push(')');
-                diagnostic.set_fix(Edit::replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     content,
-                    value.location,
-                    value.end_location.unwrap(),
-                ));
+                    value.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

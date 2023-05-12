@@ -8,20 +8,23 @@ rust-version = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_rustpython = { path = "../ruff_rustpython" }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+memchr = "2.5.0"
 num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
-rustpython-common = { workspace = true }
+rustpython-literal = { workspace = true }
 rustpython-parser = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+
+[features]
+serde = ["dep:serde", "ruff_text_size/serde"]

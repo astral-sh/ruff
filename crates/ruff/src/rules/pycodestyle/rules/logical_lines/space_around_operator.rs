@@ -1,7 +1,7 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextRange;
 
 use super::{LogicalLine, Whitespace};
-use ruff_diagnostics::DiagnosticKind;
+use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
@@ -123,8 +123,7 @@ impl Violation for MultipleSpacesAfterOperator {
 }
 
 /// E221, E222, E223, E224
-pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
-    let mut diagnostics = vec![];
+pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut after_operator = false;
 
     for token in line.tokens() {
@@ -132,33 +131,29 @@ pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, Diagno
 
         if is_operator {
             if !after_operator {
-                match line.leading_whitespace(&token) {
+                match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
-                        let start = token.start();
-                        diagnostics.push((
-                            Location::new(start.row(), start.column() - offset),
-                            TabBeforeOperator.into(),
-                        ));
+                        context.push(
+                            TabBeforeOperator,
+                            TextRange::at(token.start() - offset, offset),
+                        );
                     }
                     (Whitespace::Many, offset) => {
-                        let start = token.start();
-                        diagnostics.push((
-                            Location::new(start.row(), start.column() - offset),
-                            MultipleSpacesBeforeOperator.into(),
-                        ));
+                        context.push(
+                            MultipleSpacesBeforeOperator,
+                            TextRange::at(token.start() - offset, offset),
+                        );
                     }
                     _ => {}
                 }
             }
 
-            match line.trailing_whitespace(&token) {
-                Whitespace::Tab => {
-                    let end = token.end();
-                    diagnostics.push((end, TabAfterOperator.into()));
+            match line.trailing_whitespace(token) {
+                (Whitespace::Tab, len) => {
+                    context.push(TabAfterOperator, TextRange::at(token.end(), len));
                 }
-                Whitespace::Many => {
-                    let end = token.end();
-                    diagnostics.push((end, MultipleSpacesAfterOperator.into()));
+                (Whitespace::Many, len) => {
+                    context.push(MultipleSpacesAfterOperator, TextRange::at(token.end(), len));
                 }
                 _ => {}
             }
@@ -166,8 +161,6 @@ pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, Diagno
 
         after_operator = is_operator;
     }
-
-    diagnostics
 }
 
 const fn is_operator_token(token: TokenKind) -> bool {

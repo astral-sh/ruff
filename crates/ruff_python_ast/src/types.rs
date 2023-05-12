@@ -1,38 +1,11 @@
 use std::ops::Deref;
 
-use rustpython_parser::ast::{Expr, Located, Location, Stmt};
+use rustpython_parser::ast::{Expr, Stmt};
 
 #[derive(Clone)]
 pub enum Node<'a> {
     Stmt(&'a Stmt),
     Expr(&'a Expr),
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Range {
-    pub location: Location,
-    pub end_location: Location,
-}
-
-impl Range {
-    pub const fn new(location: Location, end_location: Location) -> Self {
-        Self {
-            location,
-            end_location,
-        }
-    }
-}
-
-impl<T> From<&Located<T>> for Range {
-    fn from(located: &Located<T>) -> Self {
-        Range::new(located.location, located.end_location.unwrap())
-    }
-}
-
-impl<T> From<&Box<Located<T>>> for Range {
-    fn from(located: &Box<Located<T>>) -> Self {
-        Range::new(located.location, located.end_location.unwrap())
-    }
 }
 
 #[derive(Debug)]
@@ -94,6 +67,18 @@ impl<'a> From<&RefEquality<'a, Stmt>> for &'a Stmt {
 
 impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
     fn from(r: &RefEquality<'a, Expr>) -> Self {
+        r.0
+    }
+}
+
+impl<'a> From<RefEquality<'a, Stmt>> for &'a Stmt {
+    fn from(r: RefEquality<'a, Stmt>) -> Self {
+        r.0
+    }
+}
+
+impl<'a> From<RefEquality<'a, Expr>> for &'a Expr {
+    fn from(r: RefEquality<'a, Expr>) -> Self {
         r.0
     }
 }

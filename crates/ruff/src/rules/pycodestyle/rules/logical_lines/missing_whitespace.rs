@@ -1,13 +1,14 @@
 use super::LogicalLine;
+use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_python_ast::types::Range;
+use ruff_text_size::TextSize;
 
 #[violation]
 pub struct MissingWhitespace {
-    pub token: TokenKind,
+    token: TokenKind,
 }
 
 impl MissingWhitespace {
@@ -35,12 +36,14 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
 }
 
 /// E231
-pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-
+pub(crate) fn missing_whitespace(
+    line: &LogicalLine,
+    autofix: bool,
+    context: &mut LogicalLinesContext,
+) {
     let mut open_parentheses = 0u32;
-    let mut prev_lsqb = None;
-    let mut prev_lbrace = None;
+    let mut prev_lsqb = TextSize::default();
+    let mut prev_lbrace = TextSize::default();
     let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
@@ -48,17 +51,17 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagn
         match kind {
             TokenKind::Lsqb => {
                 open_parentheses += 1;
-                prev_lsqb = Some(token.start());
+                prev_lsqb = token.start();
             }
             TokenKind::Rsqb => {
                 open_parentheses += 1;
             }
             TokenKind::Lbrace => {
-                prev_lbrace = Some(token.start());
+                prev_lbrace = token.start();
             }
 
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
-                let after = line.text_after(&token);
+                let after = line.text_after(token);
 
                 if !after.chars().next().map_or(false, char::is_whitespace) {
                     if let Some(next_token) = iter.peek() {
@@ -79,18 +82,19 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagn
                     }
 
                     let kind = MissingWhitespace { token: kind };
-
-                    let (start, end) = token.range();
-                    let mut diagnostic = Diagnostic::new(kind, Range::new(start, start));
+                    let mut diagnostic = Diagnostic::new(kind, token.range());
 
                     if autofix {
-                        diagnostic.set_fix(Edit::insertion(" ".to_string(), end));
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                            " ".to_string(),
+                            token.end(),
+                        )));
                     }
-                    diagnostics.push(diagnostic);
+                    context.push_diagnostic(diagnostic);
                 }
             }
             _ => {}
         }
     }
-    diagnostics
 }

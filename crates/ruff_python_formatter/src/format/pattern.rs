@@ -12,7 +12,7 @@ pub struct FormatPattern<'a> {
     item: &'a Pattern,
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Pattern {
+impl AsFormat<ASTFormatContext> for Pattern {
     type Format<'a> = FormatPattern<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -20,7 +20,7 @@ impl AsFormat<ASTFormatContext<'_>> for Pattern {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatPattern<'_> {
+impl Format<ASTFormatContext> for FormatPattern<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let pattern = self.item;
 

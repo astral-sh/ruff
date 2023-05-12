@@ -68,6 +68,7 @@ mod tests {
     #[test_case(Rule::UndocumentedPublicPackage, Path::new("D104/__init__.py"); "D104_1")]
     #[test_case(Rule::SectionNameEndsInColon, Path::new("D.py"); "D416")]
     #[test_case(Rule::SectionNotOverIndented, Path::new("sections.py"); "D214")]
+    #[test_case(Rule::SectionNotOverIndented, Path::new("D214_module.py"); "D214_module")]
     #[test_case(Rule::SectionUnderlineAfterName, Path::new("sections.py"); "D408")]
     #[test_case(Rule::SectionUnderlineMatchesSectionLength, Path::new("sections.py"); "D409")]
     #[test_case(Rule::SectionUnderlineNotOverIndented, Path::new("sections.py"); "D215")]
@@ -163,6 +164,25 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/D209_D400.py"),
             &settings::Settings::for_rules([Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn all() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/all.py"),
+            &settings::Settings::for_rules([
+                Rule::UndocumentedPublicModule,
+                Rule::UndocumentedPublicClass,
+                Rule::UndocumentedPublicMethod,
+                Rule::UndocumentedPublicFunction,
+                Rule::UndocumentedPublicPackage,
+                Rule::UndocumentedMagicMethod,
+                Rule::UndocumentedPublicNestedClass,
+                Rule::UndocumentedPublicInit,
+            ]),
         )?;
         assert_messages!(diagnostics);
         Ok(())

@@ -1,16 +1,14 @@
 use rustpython_parser::ast::{Expr, Stmt};
 
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_debugger::types::DebuggerUsingType;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPath};
-use ruff_python_ast::types::Range;
-
-use crate::checkers::ast::Checker;
-use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 #[violation]
 pub struct Debugger {
-    pub using_type: DebuggerUsingType,
+    using_type: DebuggerUsingType,
 }
 
 impl Violation for Debugger {
@@ -43,7 +41,7 @@ const DEBUGGERS: &[&[&str]] = &[
 ];
 
 /// Checks for the presence of a debugger call.
-pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if let Some(target) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         DEBUGGERS
             .iter()
@@ -53,13 +51,13 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
             Debugger {
                 using_type: DebuggerUsingType::Call(format_call_path(target)),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }
 
 /// Checks for the presence of a debugger import.
-pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
+pub(crate) fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<Diagnostic> {
     // Special-case: allow `import builtins`, which is far more general than (e.g.)
     // `import celery.contrib.rdb`).
     if module.is_none() && name == "builtins" {
@@ -77,7 +75,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     } else {
@@ -90,7 +88,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     }

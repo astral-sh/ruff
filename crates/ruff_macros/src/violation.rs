@@ -2,8 +2,11 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Attribute, Error, ItemStruct, Lit, LitStr, Meta, Result};
 
-fn parse_attr<const LEN: usize>(path: [&'static str; LEN], attr: &Attribute) -> Option<LitStr> {
-    if let Meta::NameValue(name_value) = attr.parse_meta().ok()? {
+fn parse_attr<'a, const LEN: usize>(
+    path: [&'static str; LEN],
+    attr: &'a Attribute,
+) -> Option<&'a LitStr> {
+    if let Meta::NameValue(name_value) = &attr.meta {
         let path_idents = name_value
             .path
             .segments
@@ -11,7 +14,10 @@ fn parse_attr<const LEN: usize>(path: [&'static str; LEN], attr: &Attribute) -> 
             .map(|segment| &segment.ident);
 
         if itertools::equal(path_idents, path) {
-            if let Lit::Str(lit) = name_value.lit {
+            if let syn::Expr::Lit(syn::ExprLit {
+                lit: Lit::Str(lit), ..
+            }) = &name_value.value
+            {
                 return Some(lit);
             }
         }
@@ -24,7 +30,7 @@ fn parse_attr<const LEN: usize>(path: [&'static str; LEN], attr: &Attribute) -> 
 fn get_docs(attrs: &[Attribute]) -> Result<String> {
     let mut explanation = String::new();
     for attr in attrs {
-        if attr.path.is_ident("doc") {
+        if attr.path().is_ident("doc") {
             if let Some(lit) = parse_attr(["doc"], attr) {
                 let value = lit.value();
                 // `/// ` adds
@@ -39,7 +45,7 @@ fn get_docs(attrs: &[Attribute]) -> Result<String> {
     Ok(explanation)
 }
 
-pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
+pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
     let ident = &violation.ident;
     let explanation = get_docs(&violation.attrs)?;
     let violation = if explanation.trim().is_empty() {
@@ -53,8 +59,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        fixable: value.autofix_title_formatter().is_some(),
-                        suggestion: value.autofix_title_formatter().map(|f| f(&value)),
+                        suggestion: Violation::autofix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }
@@ -77,8 +82,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        fixable: value.autofix_title_formatter().is_some(),
-                        suggestion: value.autofix_title_formatter().map(|f| f(&value)),
+                        suggestion: Violation::autofix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }

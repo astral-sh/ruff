@@ -1,4 +1,5 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Stmt, StmtKind};
 
 use ruff_python_ast::source_code::Locator;
 
@@ -7,117 +8,126 @@ use super::helpers::trailing_comma;
 use super::types::{AliasData, TrailingComma};
 use super::{AnnotatedAliasData, AnnotatedImport};
 
-pub fn annotate_imports<'a>(
+pub(crate) fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
     locator: &Locator,
     split_on_trailing_comma: bool,
 ) -> Vec<AnnotatedImport<'a>> {
-    let mut annotated = vec![];
     let mut comments_iter = comments.into_iter().peekable();
-    for import in imports {
-        match &import.node {
-            StmtKind::Import { names } => {
-                // Find comments above.
-                let mut atop = vec![];
-                while let Some(comment) =
-                    comments_iter.next_if(|comment| comment.location.row() < import.location.row())
-                {
-                    atop.push(comment);
-                }
 
-                // Find comments inline.
-                let mut inline = vec![];
-                while let Some(comment) = comments_iter.next_if(|comment| {
-                    comment.end_location.row() == import.end_location.unwrap().row()
-                }) {
-                    inline.push(comment);
-                }
-
-                annotated.push(AnnotatedImport::Import {
-                    names: names
-                        .iter()
-                        .map(|alias| AliasData {
-                            name: &alias.node.name,
-                            asname: alias.node.asname.as_deref(),
-                        })
-                        .collect(),
-                    atop,
-                    inline,
-                });
-            }
-            StmtKind::ImportFrom {
-                module,
-                names,
-                level,
-            } => {
-                // Find comments above.
-                let mut atop = vec![];
-                while let Some(comment) =
-                    comments_iter.next_if(|comment| comment.location.row() < import.location.row())
-                {
-                    atop.push(comment);
-                }
-
-                // Find comments inline.
-                // We associate inline comments with the import statement unless there's a
-                // single member, and it's a single-line import (like `from foo
-                // import bar  # noqa`).
-                let mut inline = vec![];
-                if names.len() > 1
-                    || names
-                        .first()
-                        .map_or(false, |alias| alias.location.row() > import.location.row())
-                {
-                    while let Some(comment) = comments_iter
-                        .next_if(|comment| comment.location.row() == import.location.row())
-                    {
-                        inline.push(comment);
-                    }
-                }
-
-                // Capture names.
-                let mut aliases = vec![];
-                for alias in names {
+    imports
+        .iter()
+        .map(|import| {
+            match &import.node {
+                StmtKind::Import(ast::StmtImport { names }) => {
                     // Find comments above.
-                    let mut alias_atop = vec![];
-                    while let Some(comment) = comments_iter
-                        .next_if(|comment| comment.location.row() < alias.location.row())
+                    let mut atop = vec![];
+                    while let Some(comment) =
+                        comments_iter.next_if(|comment| comment.start() < import.start())
                     {
-                        alias_atop.push(comment);
+                        atop.push(comment);
                     }
 
                     // Find comments inline.
-                    let mut alias_inline = vec![];
-                    while let Some(comment) = comments_iter.next_if(|comment| {
-                        comment.end_location.row() == alias.end_location.unwrap().row()
-                    }) {
-                        alias_inline.push(comment);
+                    let mut inline = vec![];
+                    let import_line_end = locator.line_end(import.end());
+
+                    while let Some(comment) =
+                        comments_iter.next_if(|comment| comment.end() <= import_line_end)
+                    {
+                        inline.push(comment);
                     }
 
-                    aliases.push(AnnotatedAliasData {
-                        name: &alias.node.name,
-                        asname: alias.node.asname.as_deref(),
-                        atop: alias_atop,
-                        inline: alias_inline,
-                    });
+                    AnnotatedImport::Import {
+                        names: names
+                            .iter()
+                            .map(|alias| AliasData {
+                                name: &alias.node.name,
+                                asname: alias.node.asname.as_deref(),
+                            })
+                            .collect(),
+                        atop,
+                        inline,
+                    }
                 }
+                StmtKind::ImportFrom(ast::StmtImportFrom {
+                    module,
+                    names,
+                    level,
+                }) => {
+                    // Find comments above.
+                    let mut atop = vec![];
+                    while let Some(comment) =
+                        comments_iter.next_if(|comment| comment.start() < import.start())
+                    {
+                        atop.push(comment);
+                    }
 
-                annotated.push(AnnotatedImport::ImportFrom {
-                    module: module.as_deref(),
-                    names: aliases,
-                    level: *level,
-                    trailing_comma: if split_on_trailing_comma {
-                        trailing_comma(import, locator)
-                    } else {
-                        TrailingComma::default()
-                    },
-                    atop,
-                    inline,
-                });
+                    // Find comments inline.
+                    // We associate inline comments with the import statement unless there's a
+                    // single member, and it's a single-line import (like `from foo
+                    // import bar  # noqa`).
+                    let mut inline = vec![];
+                    if names.len() > 1
+                        || names.first().map_or(false, |alias| {
+                            locator
+                                .contains_line_break(TextRange::new(import.start(), alias.start()))
+                        })
+                    {
+                        let import_start_line_end = locator.line_end(import.start());
+                        while let Some(comment) =
+                            comments_iter.next_if(|comment| comment.end() <= import_start_line_end)
+                        {
+                            inline.push(comment);
+                        }
+                    }
+
+                    // Capture names.
+                    let aliases = names
+                        .iter()
+                        .map(|alias| {
+                            // Find comments above.
+                            let mut alias_atop = vec![];
+                            while let Some(comment) =
+                                comments_iter.next_if(|comment| comment.start() < alias.start())
+                            {
+                                alias_atop.push(comment);
+                            }
+
+                            // Find comments inline.
+                            let mut alias_inline = vec![];
+                            let alias_line_end = locator.line_end(alias.end());
+                            while let Some(comment) =
+                                comments_iter.next_if(|comment| comment.end() <= alias_line_end)
+                            {
+                                alias_inline.push(comment);
+                            }
+
+                            AnnotatedAliasData {
+                                name: &alias.node.name,
+                                asname: alias.node.asname.as_deref(),
+                                atop: alias_atop,
+                                inline: alias_inline,
+                            }
+                        })
+                        .collect();
+
+                    AnnotatedImport::ImportFrom {
+                        module: module.as_deref(),
+                        names: aliases,
+                        level: level.map(|level| level.to_u32()),
+                        trailing_comma: if split_on_trailing_comma {
+                            trailing_comma(import, locator)
+                        } else {
+                            TrailingComma::default()
+                        },
+                        atop,
+                        inline,
+                    }
+                }
+                _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
             }
-            _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
-        }
-    }
-    annotated
+        })
+        .collect()
 }

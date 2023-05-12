@@ -6,7 +6,23 @@ expression: content
   {
     "code": "F401",
     "message": "`os` imported but unused",
-    "fix": null,
+    "fix": {
+      "applicability": "Suggested",
+      "message": "Remove unused import: `os`",
+      "edits": [
+        {
+          "content": "",
+          "location": {
+            "row": 1,
+            "column": 1
+          },
+          "end_location": {
+            "row": 2,
+            "column": 1
+          }
+        }
+      ]
+    },
     "location": {
       "row": 1,
       "column": 8
@@ -22,17 +38,18 @@ expression: content
     "code": "F841",
     "message": "Local variable `x` is assigned to but never used",
     "fix": {
+      "applicability": "Suggested",
       "message": "Remove assignment to unused variable `x`",
       "edits": [
         {
           "content": "",
           "location": {
             "row": 6,
-            "column": 4
+            "column": 5
           },
           "end_location": {
             "row": 6,
-            "column": 9
+            "column": 10
           }
         }
       ]
@@ -46,7 +63,7 @@ expression: content
       "column": 6
     },
     "filename": "fib.py",
-    "noqa_row": 1
+    "noqa_row": 6
   },
   {
     "code": "F821",

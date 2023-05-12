@@ -9,7 +9,7 @@ pub struct FormatArguments<'a> {
     item: &'a Arguments,
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Arguments {
+impl AsFormat<ASTFormatContext> for Arguments {
     type Format<'a> = FormatArguments<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -17,8 +17,8 @@ impl AsFormat<ASTFormatContext<'_>> for Arguments {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatArguments<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for FormatArguments<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let args = self.item;
 
         let mut first = true;

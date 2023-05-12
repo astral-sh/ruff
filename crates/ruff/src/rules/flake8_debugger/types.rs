@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DebuggerUsingType {
+pub(crate) enum DebuggerUsingType {
     Call(String),
     Import(String),
 }

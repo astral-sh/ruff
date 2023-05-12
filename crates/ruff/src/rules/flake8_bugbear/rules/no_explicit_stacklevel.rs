@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, Keyword};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::SimpleCallArgs;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -39,7 +38,7 @@ impl Violation for NoExplicitStacklevel {
 }
 
 /// B028
-pub fn no_explicit_stacklevel(
+pub(crate) fn no_explicit_stacklevel(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
@@ -64,5 +63,5 @@ pub fn no_explicit_stacklevel(
 
     checker
         .diagnostics
-        .push(Diagnostic::new(NoExplicitStacklevel, Range::from(func)));
+        .push(Diagnostic::new(NoExplicitStacklevel, func.range()));
 }

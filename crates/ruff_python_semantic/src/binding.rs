@@ -2,37 +2,36 @@ use std::num::TryFromIntError;
 use std::ops::{Deref, Index, IndexMut};
 
 use bitflags::bitflags;
-use rustpython_parser::ast::Stmt;
+use ruff_text_size::TextRange;
 
-use ruff_python_ast::types::{Range, RefEquality};
-
+use crate::node::NodeId;
 use crate::scope::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
-    pub range: Range,
+    pub range: TextRange,
     /// The context in which the binding was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<RefEquality<'a, Stmt>>,
+    pub source: Option<NodeId>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a runtime context.
-    pub runtime_usage: Option<(ScopeId, Range)>,
+    pub runtime_usage: Option<(ScopeId, TextRange)>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a typing-time context.
-    pub typing_usage: Option<(ScopeId, Range)>,
+    pub typing_usage: Option<(ScopeId, TextRange)>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a synthetic context. This is used for
     /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
     /// that should be considered used even if they're never referenced.
-    pub synthetic_usage: Option<(ScopeId, Range)>,
+    pub synthetic_usage: Option<(ScopeId, TextRange)>,
     /// The exceptions that were handled when the binding was defined.
     pub exceptions: Exceptions,
 }
 
 impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, scope: ScopeId, range: Range, context: ExecutionContext) {
+    pub fn mark_used(&mut self, scope: ScopeId, range: TextRange, context: ExecutionContext) {
         match context {
             ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
             ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
@@ -186,7 +185,7 @@ impl From<BindingId> for usize {
 #[derive(Debug, Clone)]
 pub struct StarImportation<'a> {
     /// The level of the import. `None` or `Some(0)` indicate an absolute import.
-    pub level: Option<usize>,
+    pub level: Option<u32>,
     /// The module being imported. `None` indicates a wildcard import.
     pub module: Option<&'a str>,
 }
@@ -252,6 +251,7 @@ pub enum BindingKind<'a> {
     Annotation,
     Argument,
     Assignment,
+    NamedExprAssignment,
     Binding,
     LoopVar,
     Global,
@@ -267,7 +267,8 @@ pub enum BindingKind<'a> {
 }
 
 bitflags! {
-    pub struct Exceptions: u32 {
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+    pub struct Exceptions: u8 {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
         const IMPORT_ERROR = 0b0000_0100;

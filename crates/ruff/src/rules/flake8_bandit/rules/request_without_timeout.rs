@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{unparse_constant, SimpleCallArgs};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -28,7 +27,7 @@ impl Violation for RequestWithoutTimeout {
 const HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];
 
 /// S113
-pub fn request_without_timeout(
+pub(crate) fn request_without_timeout(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
@@ -46,23 +45,23 @@ pub fn request_without_timeout(
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(timeout_arg) = call_args.keyword_argument("timeout") {
             if let Some(timeout) = match &timeout_arg.node {
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: value @ Constant::None,
                     ..
-                } => Some(unparse_constant(value, checker.stylist)),
+                }) => Some(unparse_constant(value, checker.stylist)),
                 _ => None,
             } {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithoutTimeout {
                         timeout: Some(timeout),
                     },
-                    Range::from(timeout_arg),
+                    timeout_arg.range(),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 RequestWithoutTimeout { timeout: None },
-                Range::from(func),
+                func.range(),
             ));
         }
     }

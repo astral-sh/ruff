@@ -1,13 +1,13 @@
 use log::error;
-use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Attributed, Stmt, StmtKind, Withitem};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -42,9 +42,7 @@ use super::fix_with;
 /// ## References
 /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[violation]
-pub struct MultipleWithStatements {
-    pub fixable: bool,
-}
+pub struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -57,26 +55,25 @@ impl Violation for MultipleWithStatements {
         )
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Combine `with` statements"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Combine `with` statements".to_string())
     }
 }
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
-    let [Located { node: StmtKind::With { items, body, .. }, ..}] = body else { return None };
+    let [Attributed { node: StmtKind::With(ast::StmtWith { items, body, .. }), ..}] = body else { return None };
     find_last_with(body).or(Some((items, body)))
 }
 
 /// SIM117
-pub fn multiple_with_statements(
+pub(crate) fn multiple_with_statements(
     checker: &mut Checker,
     with_stmt: &Stmt,
     with_body: &[Stmt],
     with_parent: Option<&Stmt>,
 ) {
     if let Some(parent) = with_parent {
-        if let StmtKind::With { body, .. } = &parent.node {
+        if let StmtKind::With(ast::StmtWith { body, .. }) = &parent.node {
             if body.len() == 1 {
                 return;
             }
@@ -85,27 +82,24 @@ pub fn multiple_with_statements(
     if let Some((items, body)) = find_last_with(with_body) {
         let last_item = items.last().expect("Expected items to be non-empty");
         let colon = first_colon_range(
-            Range::new(
+            TextRange::new(
                 last_item
                     .optional_vars
                     .as_ref()
-                    .map_or(last_item.context_expr.end_location, |v| v.end_location)
-                    .unwrap(),
-                body.first()
-                    .expect("Expected body to be non-empty")
-                    .location,
+                    .map_or(last_item.context_expr.end(), |v| v.end()),
+                body.first().expect("Expected body to be non-empty").start(),
             ),
             checker.locator,
         );
         let fixable = !has_comments_in(
-            Range::new(with_stmt.location, with_body[0].location),
+            TextRange::new(with_stmt.start(), with_body[0].start()),
             checker.locator,
         );
         let mut diagnostic = Diagnostic::new(
-            MultipleWithStatements { fixable },
+            MultipleWithStatements,
             colon.map_or_else(
-                || Range::from(with_stmt),
-                |colon| Range::new(with_stmt.location, colon.end_location),
+                || with_stmt.range(),
+                |colon| TextRange::new(with_stmt.start(), colon.end()),
             ),
         );
         if fixable && checker.patch(diagnostic.kind.rule()) {
@@ -114,14 +108,15 @@ pub fn multiple_with_statements(
                 checker.stylist,
                 with_stmt,
             ) {
-                Ok(fix) => {
-                    if fix
+                Ok(edit) => {
+                    if edit
                         .content()
                         .unwrap_or_default()
                         .universal_newlines()
                         .all(|line| line.width() <= checker.settings.line_length)
                     {
-                        diagnostic.set_fix(fix);
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(edit));
                     }
                 }
                 Err(err) => error!("Failed to fix nested with: {err}"),

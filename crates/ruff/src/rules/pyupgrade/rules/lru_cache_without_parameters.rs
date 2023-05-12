@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -14,22 +14,22 @@ pub struct LRUCacheWithoutParameters;
 impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary parameters to `functools.lru_cache`")
+        format!("Unnecessary parentheses to `functools.lru_cache`")
     }
 
     fn autofix_title(&self) -> String {
-        "Remove unnecessary parameters".to_string()
+        "Remove unnecessary parentheses".to_string()
     }
 }
 
 /// UP011
-pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Expr]) {
+pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Expr]) {
     for expr in decorator_list.iter() {
-        let ExprKind::Call {
+        let ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        } = &expr.node else {
+        }) = &expr.node else {
             continue;
         };
 
@@ -45,14 +45,14 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
         {
             let mut diagnostic = Diagnostic::new(
                 LRUCacheWithoutParameters,
-                Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
+                TextRange::new(func.end(), expr.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(func, checker.stylist),
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
+                    expr.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

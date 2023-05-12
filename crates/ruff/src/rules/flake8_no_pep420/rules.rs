@@ -1,8 +1,8 @@
+use ruff_text_size::TextRange;
 use std::path::{Path, PathBuf};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::fs;
 
@@ -26,7 +26,7 @@ use crate::fs;
 /// - `namespace-packages`
 #[violation]
 pub struct ImplicitNamespacePackage {
-    pub filename: String,
+    filename: String,
 }
 
 impl Violation for ImplicitNamespacePackage {
@@ -38,7 +38,7 @@ impl Violation for ImplicitNamespacePackage {
 }
 
 /// INP001
-pub fn implicit_namespace_package(
+pub(crate) fn implicit_namespace_package(
     path: &Path,
     package: Option<&Path>,
     project_root: &Path,
@@ -64,7 +64,7 @@ pub fn implicit_namespace_package(
             ImplicitNamespacePackage {
                 filename: fs::relativize_path(path),
             },
-            Range::default(),
+            TextRange::default(),
         ))
     } else {
         None

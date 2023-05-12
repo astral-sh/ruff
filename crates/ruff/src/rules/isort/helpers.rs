@@ -8,11 +8,11 @@ use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
-    let contents = locator.slice(stmt);
+pub(crate) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
+    let contents = locator.slice(stmt.range());
     let mut count: usize = 0;
     let mut trailing_comma = TrailingComma::Absent;
-    for (_, tok, _) in lexer::lex_located(contents, Mode::Module, stmt.location).flatten() {
+    for (tok, _) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
         if matches!(tok, Tok::Lpar) {
             count += 1;
         }
@@ -36,7 +36,7 @@ pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
 }
 
 /// Return `true` if a [`Stmt`] is preceded by a "comment break"
-pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
+pub(crate) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     // Starting from the `Stmt` (`def f(): pass`), we want to detect patterns like
     // this:
     //
@@ -62,7 +62,7 @@ pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     //   # Direct comment.
     //   def f(): pass
     let mut seen_blank = false;
-    for line in locator.up_to(stmt.location).universal_newlines().rev() {
+    for line in locator.up_to(stmt.start()).universal_newlines().rev() {
         let line = line.trim();
         if seen_blank {
             if line.starts_with('#') {

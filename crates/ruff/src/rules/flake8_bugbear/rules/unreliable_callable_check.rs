@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -20,8 +19,13 @@ impl Violation for UnreliableCallableCheck {
 }
 
 /// B004
-pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let ExprKind::Name { id, .. } = &func.node else {
+pub(crate) fn unreliable_callable_check(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };
     if id != "getattr" && id != "hasattr" {
@@ -30,10 +34,10 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
     if args.len() < 2 {
         return;
     };
-    let ExprKind::Constant {
+    let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(s),
         ..
-    } = &args[1].node else
+    }) = &args[1].node else
     {
         return;
     };
@@ -42,5 +46,5 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
     }
     checker
         .diagnostics
-        .push(Diagnostic::new(UnreliableCallableCheck, Range::from(expr)));
+        .push(Diagnostic::new(UnreliableCallableCheck, expr.range()));
 }

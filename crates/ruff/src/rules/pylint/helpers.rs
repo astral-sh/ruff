@@ -4,7 +4,7 @@ use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
 
-pub fn in_dunder_init(checker: &Checker) -> bool {
+pub(crate) fn in_dunder_init(checker: &Checker) -> bool {
     let scope = checker.ctx.scope();
     let ScopeKind::Function(FunctionDef {
         name,
@@ -16,7 +16,7 @@ pub fn in_dunder_init(checker: &Checker) -> bool {
     if name != "__init__" {
         return false;
     }
-    let Some(parent) = checker.ctx.parent_scope() else {
+    let Some(parent) = scope.parent.map(|scope_id| &checker.ctx.scopes[scope_id]) else {
         return false;
     };
 

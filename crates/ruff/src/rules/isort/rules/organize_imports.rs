@@ -1,20 +1,20 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use rustpython_parser::ast::{Location, Stmt};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::Stmt;
 use textwrap::indent;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{
-    count_trailing_lines, followed_by_multi_statement_line, preceded_by_multi_statement_line,
+    followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::leading_space;
 
 use crate::registry::AsRule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 use super::super::track::Block;
 use super::super::{comments, format_imports};
@@ -40,26 +40,29 @@ use super::super::{comments, format_imports};
 #[violation]
 pub struct UnsortedImports;
 
-impl AlwaysAutofixableViolation for UnsortedImports {
+impl Violation for UnsortedImports {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Import block is un-sorted or un-formatted")
     }
 
-    fn autofix_title(&self) -> String {
-        "Organize imports".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Organize imports".to_string())
     }
 }
 
-fn extract_range(body: &[&Stmt]) -> Range {
-    let location = body.first().unwrap().location;
-    let end_location = body.last().unwrap().end_location.unwrap();
-    Range::new(location, end_location)
+fn extract_range(body: &[&Stmt]) -> TextRange {
+    let location = body.first().unwrap().start();
+    let end_location = body.last().unwrap().end();
+    TextRange::new(location, end_location)
 }
 
-fn extract_indentation_range(body: &[&Stmt]) -> Range {
-    let location = body.first().unwrap().location;
-    Range::new(Location::new(location.row(), 0), location)
+fn extract_indentation_range(body: &[&Stmt], locator: &Locator) -> TextRange {
+    let location = body.first().unwrap().start();
+
+    TextRange::new(locator.line_start(location), location)
 }
 
 /// Compares two strings, returning true if they are equal modulo whitespace
@@ -75,16 +78,15 @@ fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
 
 #[allow(clippy::cast_sign_loss)]
 /// I001
-pub fn organize_imports(
+pub(crate) fn organize_imports(
     block: &Block,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
     settings: &Settings,
-    autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
-    let indentation = locator.slice(extract_indentation_range(&block.imports));
+    let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
     let indentation = leading_space(indentation);
 
     let range = extract_range(&block.imports);
@@ -99,17 +101,14 @@ pub fn organize_imports(
 
     // Extract comments. Take care to grab any inline comments from the last line.
     let comments = comments::collect_comments(
-        Range::new(
-            range.location,
-            Location::new(range.end_location.row() + 1, 0),
-        ),
+        TextRange::new(range.start(), locator.full_line_end(range.end())),
         locator,
     );
 
-    let num_trailing_lines = if block.trailer.is_none() {
-        0
+    let trailing_line_end = if block.trailer.is_none() {
+        locator.full_line_end(range.end())
     } else {
-        count_trailing_lines(block.imports.last().unwrap(), locator)
+        trailing_lines_end(block.imports.last().unwrap(), locator)
     };
 
     // Generate the sorted import block.
@@ -139,24 +138,22 @@ pub fn organize_imports(
         settings.isort.lines_between_types,
         &settings.isort.forced_separate,
         settings.target_version,
+        &settings.isort.section_order,
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let range = Range::new(
-        Location::new(range.location.row(), 0),
-        Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
-    );
+    let range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
     let actual = locator.slice(range);
     if matches_ignoring_indentation(actual, &expected) {
         None
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+        if settings.rules.should_fix(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 indent(&expected, indentation),
-                range.location,
-                range.end_location,
-            ));
+                range,
+            )));
         }
         Some(diagnostic)
     }

@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::binding::{Binding, BindingKind, Bindings};
 use ruff_python_semantic::scope::Scope;
 
@@ -12,7 +11,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct UselessObjectInheritance {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for UselessObjectInheritance {
@@ -29,7 +28,7 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 
 fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Option<Diagnostic> {
     for expr in bases {
-        let ExprKind::Name { id, .. } = &expr.node else {
+        let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node else {
             continue;
         };
         if id != "object" {
@@ -48,7 +47,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Optio
             UselessObjectInheritance {
                 name: name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 
@@ -56,7 +55,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Optio
 }
 
 /// UP004
-pub fn useless_object_inheritance(
+pub(crate) fn useless_object_inheritance(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
@@ -65,14 +64,13 @@ pub fn useless_object_inheritance(
 ) {
     if let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) {
         if checker.patch(diagnostic.kind.rule()) {
-            let location = diagnostic.location;
-            let end_location = diagnostic.end_location;
-            diagnostic.try_set_fix(|| {
+            let expr_range = diagnostic.range();
+            #[allow(deprecated)]
+            diagnostic.try_set_fix_from_edit(|| {
                 remove_argument(
                     checker.locator,
-                    stmt.location,
-                    location,
-                    end_location,
+                    stmt.start(),
+                    expr_range,
                     bases,
                     keywords,
                     true,

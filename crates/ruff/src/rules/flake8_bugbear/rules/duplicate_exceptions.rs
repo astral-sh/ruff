@@ -1,23 +1,21 @@
 use itertools::Itertools;
+use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{
-    Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
-};
+use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path;
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct DuplicateTryBlockException {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for DuplicateTryBlockException {
@@ -52,9 +50,8 @@ impl AlwaysAutofixableViolation for DuplicateHandlerException {
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
-        Location::default(),
-        Location::default(),
-        ExprKind::Tuple {
+        TextRange::default(),
+        ast::ExprTuple {
             elts: elts.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
         },
@@ -95,18 +92,18 @@ fn duplicate_handler_exceptions<'a>(
                         .sorted()
                         .collect::<Vec<String>>(),
                 },
-                Range::from(expr),
+                expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     if unique_elts.len() == 1 {
                         unparse_expr(unique_elts[0], checker.stylist)
                     } else {
                         unparse_expr(&type_pattern(unique_elts), checker.stylist)
                     },
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
+                    expr.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -115,15 +112,15 @@ fn duplicate_handler_exceptions<'a>(
     seen
 }
 
-pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
     let mut seen: FxHashSet<CallPath> = FxHashSet::default();
     let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler { type_: Some(type_), .. } = &handler.node else {
+        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = &handler.node else {
             continue;
         };
         match &type_.node {
-            ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
+            ExprKind::Attribute(_) | ExprKind::Name(_) => {
                 if let Some(call_path) = call_path::collect_call_path(type_) {
                     if seen.contains(&call_path) {
                         duplicates.entry(call_path).or_default().push(type_);
@@ -132,7 +129,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
                     }
                 }
             }
-            ExprKind::Tuple { elts, .. } => {
+            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                 for (name, expr) in duplicate_handler_exceptions(checker, type_, elts) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(expr);
@@ -156,7 +153,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
                     DuplicateTryBlockException {
                         name: name.join("."),
                     },
-                    Range::from(expr),
+                    expr.range(),
                 ));
             }
         }

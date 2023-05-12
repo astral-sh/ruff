@@ -1,13 +1,10 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
-use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.
@@ -21,12 +18,12 @@ use ruff_python_ast::types::Range;
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\b'
+/// x = "\b"
 /// ```
 #[violation]
 pub struct InvalidCharacterBackspace;
@@ -54,12 +51,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterBackspace {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\x1A'
+/// x = "\x1A"
 /// ```
 #[violation]
 pub struct InvalidCharacterSub;
@@ -87,12 +84,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterSub {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\x1B'
+/// x = "\x1B"
 /// ```
 #[violation]
 pub struct InvalidCharacterEsc;
@@ -120,12 +117,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterEsc {
 ///
 /// ## Example
 /// ```python
-/// x = ''
+/// x = ""
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = '\0'
+/// x = "\0"
 /// ```
 #[violation]
 pub struct InvalidCharacterNul;
@@ -152,12 +149,12 @@ impl AlwaysAutofixableViolation for InvalidCharacterNul {
 ///
 /// ## Example
 /// ```python
-/// x = 'Dear Sir/Madam'
+/// x = "Dear Sir/Madam"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// x = 'Dear Sir\u200B/\u200BMadam'  # zero width space
+/// x = "Dear Sir\u200B/\u200BMadam"  # zero width space
 /// ```
 #[violation]
 pub struct InvalidCharacterZeroWidthSpace;
@@ -174,42 +171,30 @@ impl AlwaysAutofixableViolation for InvalidCharacterZeroWidthSpace {
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
-pub fn invalid_string_characters(
-    locator: &Locator,
-    start: Location,
-    end: Location,
-    autofix: bool,
-) -> Vec<Diagnostic> {
+pub(crate) fn invalid_string_characters(locator: &Locator, range: TextRange) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    let text = locator.slice(Range::new(start, end));
+    let text = locator.slice(range);
 
-    for (row, line) in UniversalNewlineIterator::from(text).enumerate() {
-        let mut char_offset = 0;
-        for char in line.chars() {
-            let (replacement, rule): (&str, DiagnosticKind) = match char {
-                '\x08' => ("\\b", InvalidCharacterBackspace.into()),
-                '\x1A' => ("\\x1A", InvalidCharacterSub.into()),
-                '\x1B' => ("\\x1B", InvalidCharacterEsc.into()),
-                '\0' => ("\\0", InvalidCharacterNul.into()),
-                '\u{200b}' => ("\\u200b", InvalidCharacterZeroWidthSpace.into()),
-                _ => {
-                    char_offset += 1;
-                    continue;
-                }
-            };
-            let location = helpers::to_absolute(Location::new(row + 1, char_offset), start);
-            let end_location = Location::new(location.row(), location.column() + 1);
-            let mut diagnostic = Diagnostic::new(rule, Range::new(location, end_location));
-            if autofix {
-                diagnostic.set_fix(Edit::replacement(
-                    replacement.to_string(),
-                    location,
-                    end_location,
-                ));
+    for (column, match_) in text.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
+        let c = match_.chars().next().unwrap();
+        let (replacement, rule): (&str, DiagnosticKind) = match c {
+            '\x08' => ("\\b", InvalidCharacterBackspace.into()),
+            '\x1A' => ("\\x1A", InvalidCharacterSub.into()),
+            '\x1B' => ("\\x1B", InvalidCharacterEsc.into()),
+            '\0' => ("\\0", InvalidCharacterNul.into()),
+            '\u{200b}' => ("\\u200b", InvalidCharacterZeroWidthSpace.into()),
+            _ => {
+                continue;
             }
-            diagnostics.push(diagnostic);
-            char_offset += 1;
-        }
+        };
+
+        let location = range.start() + TextSize::try_from(column).unwrap();
+        let range = TextRange::at(location, c.text_len());
+
+        #[allow(deprecated)]
+        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::unspecified(
+            Edit::range_replacement(replacement.to_string(), range),
+        )));
     }
 
     diagnostics

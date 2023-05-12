@@ -3,9 +3,9 @@ use std::collections::HashSet;
 
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DataEnum, DeriveInput, Error, Lit, Meta, MetaNameValue};
+use syn::{Attribute, Data, DataEnum, DeriveInput, Error, ExprLit, Lit, Meta, MetaNameValue};
 
-pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
+pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let DeriveInput { ident, data: Data::Enum(DataEnum {
         variants, ..
     }), .. } = input else {
@@ -26,9 +26,9 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let prefixes: Result<Vec<_>, _> = variant
             .attrs
             .iter()
-            .filter(|attr| attr.path.is_ident("prefix"))
+            .filter(|attr| attr.path().is_ident("prefix"))
             .map(|attr| {
-                let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(lit), ..})) = attr.parse_meta() else {
+                let Meta::NameValue(MetaNameValue{value: syn::Expr::Lit (ExprLit { lit: Lit::Str(lit), ..}), ..}) = &attr.meta else {
                     return Err(Error::new(attr.span(), r#"expected attribute to be in the form of [#prefix = "..."]"#));
                 };
                 let str = lit.value();
@@ -53,7 +53,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             ));
         }
 
-        let Some(doc_attr) = variant.attrs.iter().find(|attr| attr.path.is_ident("doc")) else {
+        let Some(doc_attr) = variant.attrs.iter().find(|attr| attr.path().is_ident("doc")) else {
             return Err(Error::new(variant.span(), r#"expected a doc comment"#))
         };
 
@@ -125,7 +125,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 /// Parses an attribute in the form of `#[doc = " [name](https://example.com/)"]`
 /// into a tuple of link label and URL.
 fn parse_doc_attr(doc_attr: &Attribute) -> syn::Result<(String, String)> {
-    let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(doc_lit), ..})) = doc_attr.parse_meta() else {
+    let Meta::NameValue(MetaNameValue{value: syn::Expr::Lit(ExprLit { lit: Lit::Str(doc_lit), ..}), ..}) = &doc_attr.meta else {
         return Err(Error::new(doc_attr.span(), r#"expected doc attribute to be in the form of #[doc = "..."]"#))
     };
     parse_markdown_link(doc_lit.value().trim())

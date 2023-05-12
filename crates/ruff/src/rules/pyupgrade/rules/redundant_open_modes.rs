@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
+use ruff_text_size::TextSize;
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -87,13 +87,13 @@ impl OpenMode {
 }
 
 fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
-    if let ExprKind::Call {
+    if let ExprKind::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    } = &expr.node
+    }) = &expr.node
     {
-        if matches!(&func.node, ExprKind::Name {id, ..} if id == OPEN_FUNC_NAME) {
+        if matches!(&func.node, ExprKind::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
             // Return the "open mode" parameter and keywords.
             return (args.get(1), keywords.clone());
         }
@@ -112,51 +112,52 @@ fn create_check(
         RedundantOpenModes {
             replacement: replacement_value.map(ToString::to_string),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if patch {
         if let Some(content) = replacement_value {
-            diagnostic.set_fix(Edit::replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 content.to_string(),
-                mode_param.location,
-                mode_param.end_location.unwrap(),
-            ));
+                mode_param.range(),
+            )));
         } else {
-            diagnostic.try_set_fix(|| create_remove_param_fix(locator, expr, mode_param));
+            #[allow(deprecated)]
+            diagnostic.try_set_fix_from_edit(|| create_remove_param_fix(locator, expr, mode_param));
         }
     }
     diagnostic
 }
 
 fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
-    let content = locator.slice(expr);
+    let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
-    let mut fix_start: Option<Location> = None;
-    let mut fix_end: Option<Location> = None;
+    let mut fix_start: Option<TextSize> = None;
+    let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.location).flatten() {
-        if start == mode_param.location {
+    for (tok, range) in lexer::lex_starts_at(content, Mode::Module, expr.start()).flatten() {
+        if range.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;
                 continue;
             }
-            fix_end = Some(end);
+            fix_end = Some(range.end());
             break;
         }
         if delete_first_arg && matches!(tok, Tok::Name { .. }) {
-            fix_end = Some(start);
+            fix_end = Some(range.start());
             break;
         }
         if matches!(tok, Tok::Lpar) {
             is_first_arg = true;
-            fix_start = Some(end);
+            fix_start = Some(range.end());
         }
         if matches!(tok, Tok::Comma) {
             is_first_arg = false;
             if !delete_first_arg {
-                fix_start = Some(start);
+                fix_start = Some(range.start());
             }
         }
     }
@@ -169,7 +170,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
 }
 
 /// UP015
-pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
     if !checker.ctx.is_builtin(OPEN_FUNC_NAME) {
         return;
@@ -177,10 +178,10 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
     if mode_param.is_none() && !keywords.is_empty() {
         if let Some(keyword) = find_keyword(&keywords, MODE_KEYWORD_ARGUMENT) {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(mode_param_value),
                 ..
-            } = &keyword.node.value.node
+            }) = &keyword.node.value.node
             {
                 if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                     checker.diagnostics.push(create_check(
@@ -194,10 +195,10 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
             }
         }
     } else if let Some(mode_param) = mode_param {
-        if let ExprKind::Constant {
+        if let ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(mode_param_value),
             ..
-        } = &mode_param.node
+        }) = &mode_param.node
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                 checker.diagnostics.push(create_check(

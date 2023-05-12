@@ -1,10 +1,10 @@
-use rustpython_parser::ast::{Expr, ExprKind, Location};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -52,35 +52,27 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,
-) -> impl Iterator<Item = (Range, Range)> + 'a {
-    let contents = locator.slice(expr);
-    lexer::lex_located(contents, Mode::Module, expr.location)
+) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
+    let contents = locator.slice(expr.range());
+    lexer::lex_starts_at(contents, Mode::Module, expr.start())
         .flatten()
-        .filter_map(|(location, tok, end_location)| match tok {
+        .filter_map(|(tok, range)| match tok {
             Tok::String {
                 kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
-                let first_char = locator.slice(Range {
-                    location,
-                    end_location: Location::new(location.row(), location.column() + 1),
-                });
+                let first_char =
+                    &locator.contents()[TextRange::at(range.start(), TextSize::from(1))];
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1
-                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
+                let f_position = u32::from(!(first_char == "f" || first_char == "F"));
                 Some((
-                    Range {
-                        location: Location::new(location.row(), location.column() + f_position),
-                        end_location: Location::new(
-                            location.row(),
-                            location.column() + f_position + 1,
-                        ),
-                    },
-                    Range {
-                        location,
-                        end_location,
-                    },
+                    TextRange::at(
+                        range.start() + TextSize::from(f_position),
+                        TextSize::from(1),
+                    ),
+                    range,
                 ))
             }
             _ => None,
@@ -92,33 +84,31 @@ fn unescape_f_string(content: &str) -> String {
 }
 
 fn fix_f_string_missing_placeholders(
-    prefix_range: &Range,
-    tok_range: &Range,
+    prefix_range: TextRange,
+    tok_range: TextRange,
     checker: &mut Checker,
-) -> Edit {
-    let content = checker.locator.slice(Range::new(
-        prefix_range.end_location,
-        tok_range.end_location,
-    ));
-    Edit::replacement(
+) -> Fix {
+    let content = &checker.locator.contents()[TextRange::new(prefix_range.end(), tok_range.end())];
+    #[allow(deprecated)]
+    Fix::unspecified(Edit::replacement(
         unescape_f_string(content),
-        prefix_range.location,
-        tok_range.end_location,
-    )
+        prefix_range.start(),
+        tok_range.end(),
+    ))
 }
 
 /// F541
-pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
+pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
         .iter()
-        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+        .any(|value| matches!(value.node, ExprKind::FormattedValue(_)))
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(fix_f_string_missing_placeholders(
-                    &prefix_range,
-                    &tok_range,
+                    prefix_range,
+                    tok_range,
                     checker,
                 ));
             }

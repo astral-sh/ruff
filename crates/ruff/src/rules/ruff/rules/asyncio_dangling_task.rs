@@ -1,11 +1,10 @@
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
@@ -52,7 +51,7 @@ use ruff_python_ast::types::Range;
 /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 #[violation]
 pub struct AsyncioDanglingTask {
-    pub method: Method,
+    method: Method,
 }
 
 impl Violation for AsyncioDanglingTask {
@@ -64,7 +63,7 @@ impl Violation for AsyncioDanglingTask {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Method {
+pub(crate) enum Method {
     CreateTask,
     EnsureFuture,
 }
@@ -79,23 +78,26 @@ impl fmt::Display for Method {
 }
 
 /// RUF006
-pub fn asyncio_dangling_task<'a, F>(expr: &'a Expr, resolve_call_path: F) -> Option<Diagnostic>
+pub(crate) fn asyncio_dangling_task<'a, F>(
+    expr: &'a Expr,
+    resolve_call_path: F,
+) -> Option<Diagnostic>
 where
     F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
 {
-    if let ExprKind::Call { func, .. } = &expr.node {
+    if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
         match resolve_call_path(func).as_deref() {
             Some(["asyncio", "create_task"]) => Some(Diagnostic::new(
                 AsyncioDanglingTask {
                     method: Method::CreateTask,
                 },
-                Range::from(expr),
+                expr.range(),
             )),
             Some(["asyncio", "ensure_future"]) => Some(Diagnostic::new(
                 AsyncioDanglingTask {
                     method: Method::EnsureFuture,
                 },
-                Range::from(expr),
+                expr.range(),
             )),
             _ => None,
         }

@@ -1,8 +1,5 @@
-use rustpython_parser::ast::Stmt;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -17,10 +14,12 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// var = 1
 ///
+///
 /// def foo():
 ///     global var  # [global-statement]
 ///     var = 10
 ///     print(var)
+///
 ///
 /// foo()
 /// print(var)
@@ -30,16 +29,18 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// var = 1
 ///
+///
 /// def foo():
 ///     print(var)
 ///     return 10
+///
 ///
 /// var = foo()
 /// print(var)
 /// ```
 #[violation]
 pub struct GlobalStatement {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for GlobalStatement {
@@ -51,23 +52,21 @@ impl Violation for GlobalStatement {
 }
 
 /// PLW0603
-pub fn global_statement(checker: &mut Checker, name: &str) {
+pub(crate) fn global_statement(checker: &mut Checker, name: &str) {
     let scope = checker.ctx.scope();
     if let Some(index) = scope.get(name) {
         let binding = &checker.ctx.bindings[*index];
         if binding.kind.is_global() {
-            let source: &Stmt = binding
+            let source = checker.ctx.stmts[binding
                 .source
-                .as_ref()
-                .expect("`global` bindings should always have a `source`")
-                .into();
+                .expect("`global` bindings should always have a `source`")];
             let diagnostic = Diagnostic::new(
                 GlobalStatement {
                     name: name.to_string(),
                 },
                 // Match Pylint's behavior by reporting on the `global` statement`, rather
                 // than the variable usage.
-                Range::from(source),
+                source.range(),
             );
             checker.diagnostics.push(diagnostic);
         }

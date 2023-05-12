@@ -1,9 +1,8 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::binding::{BindingKind, Importation};
 
 use crate::checkers::ast::Checker;
@@ -62,9 +61,9 @@ impl Violation for PandasUseOfDotStack {
     }
 }
 
-pub fn check_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn check_call(checker: &mut Checker, func: &Expr) {
     let rules = &checker.settings.rules;
-    let ExprKind::Attribute { value, attr, .. } = &func.node else {return};
+    let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. } )= &func.node else {return};
     let violation: DiagnosticKind = match attr.as_str() {
         "isnull" if rules.enabled(Rule::PandasUseOfDotIsNull) => PandasUseOfDotIsNull.into(),
         "notnull" if rules.enabled(Rule::PandasUseOfDotNotNull) => PandasUseOfDotNotNull.into(),
@@ -84,7 +83,7 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
 
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like non-Pandas imports).
-    if let ExprKind::Name { id, .. } = &value.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &value.node {
         if checker.ctx.find_binding(id).map_or(true, |binding| {
             if let BindingKind::Importation(Importation {
                 full_name: module, ..
@@ -111,5 +110,5 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
 
     checker
         .diagnostics
-        .push(Diagnostic::new(violation, Range::from(func)));
+        .push(Diagnostic::new(violation, func.range()));
 }

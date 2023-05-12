@@ -1,5 +1,62 @@
 # Breaking Changes
 
+## 0.0.266
+
+### `update-check` is no longer a valid configuration option ([#4313](https://github.com/charliermarsh/ruff/pull/4313))
+
+The `update-check` functionality was deprecated in [#2530](https://github.com/charliermarsh/ruff/pull/2530),
+in that the behavior itself was removed, and Ruff was changed to warn when that option was enabled.
+
+Now, Ruff will throw an error when `update-check` is provided via a configuration file (e.g.,
+`update-check = false`) or through the command-line, since it has no effect. Users should remove
+this option from their configuration.
+
+## 0.0.265
+
+### `--fix-only` now exits with a zero exit code, unless `--exit-non-zero-on-fix` is specified ([#4146](https://github.com/charliermarsh/ruff/pull/4146))
+
+Previously, `--fix-only` would exit with a non-zero exit code if any fixes were applied. This
+behavior was inconsistent with `--fix`, and further, meant that `--exit-non-zero-on-fix` was
+effectively ignored when `--fix-only` was specified.
+
+Now, `--fix-only` will exit with a zero exit code, unless `--exit-non-zero-on-fix` is specified,
+in which case it will exit with a non-zero exit code if any fixes were applied.
+
+## 0.0.260
+
+### Fixes are now represented as a list of edits ([#3709](https://github.com/charliermarsh/ruff/pull/3709))
+
+Previously, Ruff represented each fix as a single edit, which prohibited Ruff from automatically
+fixing violations that required multiple edits across a file. As such, Ruff now represents each
+fix as a list of edits.
+
+This primarily affects the JSON API. Ruff's JSON representation used to represent the `fix` field as
+a single edit, like so:
+
+```json
+{
+    "message": "Remove unused import: `sys`",
+    "content": "",
+    "location": {"row": 1, "column": 0},
+    "end_location": {"row": 2, "column": 0}
+}
+```
+
+The updated representation instead includes a list of edits:
+
+```json
+{
+    "message": "Remove unused import: `sys`",
+    "edits": [
+        {
+            "content": "",
+            "location": {"row": 1, "column": 0},
+            "end_location": {"row": 2, "column": 0},
+        }
+    ]
+}
+```
+
 ## 0.0.246
 
 ### `multiple-statements-on-one-line-def` (`E704`) was removed ([#2773](https://github.com/charliermarsh/ruff/pull/2773))

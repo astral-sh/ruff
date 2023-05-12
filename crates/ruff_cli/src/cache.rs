@@ -8,12 +8,13 @@ use anyhow::Result;
 use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
-use ruff::message::{Location, Message};
-use ruff::settings::{flags, AllSettings, Settings};
+use ruff::message::Message;
+use ruff::settings::{AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::SourceFileBuilder;
+use ruff_text_size::{TextRange, TextSize};
 use serde::ser::{SerializeSeq, SerializeStruct};
 use serde::{Deserialize, Serialize, Serializer};
 #[cfg(unix)]
@@ -22,8 +23,8 @@ use std::os::unix::fs::PermissionsExt;
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Vec storing all source files. The tuple is (filename, source code).
-type Files<'a> = Vec<(&'a str, Option<&'a str>)>;
-type FilesBuf = Vec<(String, Option<String>)>;
+type Files<'a> = Vec<(&'a str, &'a str)>;
+type FilesBuf = Vec<(String, String)>;
 
 struct CheckResultRef<'a> {
     imports: &'a ImportMap,
@@ -100,19 +101,17 @@ impl Serialize for SerializeMessage<'_> {
     {
         let Message {
             kind,
-            location,
-            end_location,
+            range,
             fix,
             // Serialized manually for all files
             file: _,
-            noqa_row,
+            noqa_offset: noqa_row,
         } = self.message;
 
-        let mut s = serializer.serialize_struct("Message", 6)?;
+        let mut s = serializer.serialize_struct("Message", 5)?;
 
         s.serialize_field("kind", &kind)?;
-        s.serialize_field("location", &location)?;
-        s.serialize_field("end_location", &end_location)?;
+        s.serialize_field("range", &range)?;
         s.serialize_field("fix", &fix)?;
         s.serialize_field("file_id", &self.file_id)?;
         s.serialize_field("noqa_row", &noqa_row)?;
@@ -124,11 +123,10 @@ impl Serialize for SerializeMessage<'_> {
 #[derive(Deserialize)]
 struct MessageHeader {
     kind: DiagnosticKind,
-    location: Location,
-    end_location: Location,
-    fix: Fix,
+    range: TextRange,
+    fix: Option<Fix>,
     file_id: usize,
-    noqa_row: usize,
+    noqa_row: TextSize,
 }
 
 #[derive(Deserialize)]
@@ -147,7 +145,6 @@ fn cache_key(
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> u64 {
     let mut hasher = CacheKeyHasher::new();
     CARGO_PKG_VERSION.cache_key(&mut hasher);
@@ -160,13 +157,12 @@ fn cache_key(
     #[cfg(unix)]
     metadata.permissions().mode().cache_key(&mut hasher);
     settings.cache_key(&mut hasher);
-    autofix.cache_key(&mut hasher);
     hasher.finish()
 }
 
 #[allow(dead_code)]
 /// Initialize the cache at the specified `Path`.
-pub fn init(path: &Path) -> Result<()> {
+pub(crate) fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     fs::create_dir_all(path.join(content_dir()))?;
 
@@ -201,16 +197,15 @@ fn del_sync(cache_dir: &Path, key: u64) -> Result<(), std::io::Error> {
 }
 
 /// Get a value from the cache.
-pub fn get(
+pub(crate) fn get(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
-    autofix: flags::Autofix,
 ) -> Option<(Vec<Message>, ImportMap)> {
     let encoded = read_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, metadata, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib),
     )
     .ok()?;
     match bincode::deserialize::<CheckResult>(&encoded[..]) {
@@ -223,15 +218,7 @@ pub fn get(
 
             let source_files: Vec<_> = sources
                 .into_iter()
-                .map(|(filename, text)| {
-                    let mut builder = SourceFileBuilder::from_string(filename);
-
-                    if let Some(text) = text {
-                        builder.set_source_text_string(text);
-                    }
-
-                    builder.finish()
-                })
+                .map(|(filename, text)| SourceFileBuilder::new(filename, text).finish())
                 .collect();
 
             for header in headers {
@@ -242,11 +229,10 @@ pub fn get(
 
                 messages.push(Message {
                     kind: header.kind,
-                    location: header.location,
-                    end_location: header.end_location,
+                    range: header.range,
                     fix: header.fix,
                     file: source_file.clone(),
-                    noqa_row: header.noqa_row,
+                    noqa_offset: header.noqa_row,
                 });
             }
 
@@ -260,19 +246,18 @@ pub fn get(
 }
 
 /// Set a value in the cache.
-pub fn set(
+pub(crate) fn set(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
-    autofix: flags::Autofix,
     messages: &[Message],
     imports: &ImportMap,
 ) {
     let check_result = CheckResultRef { imports, messages };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, metadata, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib),
         &bincode::serialize(&check_result).unwrap(),
     ) {
         error!("Failed to write to cache: {e:?}");
@@ -280,15 +265,14 @@ pub fn set(
 }
 
 /// Delete a value from the cache.
-pub fn del(
+pub(crate) fn del(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
-    autofix: flags::Autofix,
 ) {
     drop(del_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, metadata, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib),
     ));
 }

@@ -1,10 +1,10 @@
 #![allow(unused_imports)]
 
+use ruff_text_size::TextRange;
 use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
@@ -22,15 +22,15 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub fn shebang_missing(filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing(filepath: &Path) -> Option<Diagnostic> {
     if let Ok(true) = is_executable(filepath) {
-        let diagnostic = Diagnostic::new(ShebangMissingExecutableFile, Range::default());
+        let diagnostic = Diagnostic::new(ShebangMissingExecutableFile, TextRange::default());
         return Some(diagnostic);
     }
     None
 }
 
 #[cfg(not(target_family = "unix"))]
-pub fn shebang_missing(_filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing(_filepath: &Path) -> Option<Diagnostic> {
     None
 }

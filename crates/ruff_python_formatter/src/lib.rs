@@ -28,7 +28,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
     // Extract trivia.
-    let trivia = trivia::extract_trivia_tokens(&tokens);
+    let trivia = trivia::extract_trivia_tokens(&tokens, contents);
 
     // Parse the AST.
     let python_ast = ruff_rustpython::parse_program_tokens(tokens, "<filename>")?;
@@ -50,7 +50,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
                 indent_style: IndentStyle::Space(4),
                 line_width: 88.try_into().unwrap(),
             },
-            locator,
+            locator.contents(),
         ),
         [format::builders::statements(&python_cst)]
     )

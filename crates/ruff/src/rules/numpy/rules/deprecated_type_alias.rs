@@ -1,8 +1,7 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -31,7 +30,7 @@ use crate::registry::AsRule;
 /// ```
 #[violation]
 pub struct NumpyDeprecatedTypeAlias {
-    pub type_name: String,
+    type_name: String,
 }
 
 impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
@@ -48,7 +47,7 @@ impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
 }
 
 /// NPY001
-pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
     if let Some(type_name) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         if call_path.as_slice() == ["numpy", "bool"]
             || call_path.as_slice() == ["numpy", "int"]
@@ -68,19 +67,19 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             NumpyDeprecatedTypeAlias {
                 type_name: type_name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 match type_name {
                     "unicode" => "str",
                     "long" => "int",
                     _ => type_name,
                 }
                 .to_string(),
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

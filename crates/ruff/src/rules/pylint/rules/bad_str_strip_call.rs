@@ -1,11 +1,10 @@
 use std::fmt;
 
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
@@ -31,14 +30,14 @@ impl Violation for BadStrStripCall {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum StripKind {
+pub(crate) enum StripKind {
     Strip,
     LStrip,
     RStrip,
 }
 
 impl StripKind {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub(crate) fn from_str(s: &str) -> Option<Self> {
         match s {
             "strip" => Some(Self::Strip),
             "lstrip" => Some(Self::LStrip),
@@ -60,13 +59,13 @@ impl fmt::Display for StripKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum RemovalKind {
+pub(crate) enum RemovalKind {
     RemovePrefix,
     RemoveSuffix,
 }
 
 impl RemovalKind {
-    pub fn for_strip(s: StripKind) -> Option<Self> {
+    pub(crate) fn for_strip(s: StripKind) -> Option<Self> {
         match s {
             StripKind::Strip => None,
             StripKind::LStrip => Some(Self::RemovePrefix),
@@ -107,21 +106,21 @@ fn has_duplicates(s: &str) -> bool {
 }
 
 /// PLE1310
-pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
-    if let ExprKind::Attribute { value, attr, .. } = &func.node {
+pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
         if matches!(
             value.node,
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(_) | Constant::Bytes(_),
                 ..
-            }
+            })
         ) {
             if let Some(strip) = StripKind::from_str(attr.as_str()) {
                 if let Some(arg) = args.get(0) {
-                    if let ExprKind::Constant {
+                    if let ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
-                    } = &arg.node
+                    }) = &arg.node
                     {
                         if has_duplicates(value) {
                             let removal = if checker.settings.target_version >= PythonVersion::Py39
@@ -132,7 +131,7 @@ pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
                             };
                             checker.diagnostics.push(Diagnostic::new(
                                 BadStrStripCall { strip, removal },
-                                Range::from(arg),
+                                arg.range(),
                             ));
                         }
                     }

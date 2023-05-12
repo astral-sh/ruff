@@ -155,7 +155,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
                     },
                 ) {
                     // TODO(charlie): Encode this in the AST via separate node types.
-                    if !is_radix_literal(self.locator.slice(&**value)) {
+                    if !is_radix_literal(self.locator.slice(value.range())) {
                         value.parentheses = Parenthesize::Always;
                     }
                 }
@@ -191,7 +191,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
 ///
 /// TODO(charlie): It's weird that we have both `TriviaKind::Parentheses` (which aren't used
 /// during formatting) and `Parenthesize` (which are used during formatting).
-pub fn normalize_parentheses(python_cst: &mut [Stmt], locator: &Locator) {
+pub(crate) fn normalize_parentheses(python_cst: &mut [Stmt], locator: &Locator) {
     let mut normalizer = ParenthesesNormalizer { locator };
     for stmt in python_cst {
         normalizer.visit_stmt(stmt);

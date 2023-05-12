@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, KeywordData};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
@@ -23,13 +23,13 @@ impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
 }
 
 /// UP033
-pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr]) {
+pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr]) {
     for expr in decorator_list.iter() {
-        let ExprKind::Call {
+        let ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        } = &expr.node else {
+        }) = &expr.node else {
             continue;
         };
 
@@ -47,28 +47,29 @@ pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr
             if arg.as_ref().map_or(false, |arg| arg == "maxsize")
                 && matches!(
                     value.node,
-                    ExprKind::Constant {
+                    ExprKind::Constant(ast::ExprConstant {
                         value: Constant::None,
                         kind: None,
-                    }
+                    })
                 )
             {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
-                    Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
+                    TextRange::new(func.end(), expr.end()),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
                         let (import_edit, binding) = get_or_import_symbol(
                             "functools",
                             "cache",
+                            expr.start(),
                             &checker.ctx,
                             &checker.importer,
                             checker.locator,
                         )?;
-                        let reference_edit =
-                            Edit::replacement(binding, expr.location, expr.end_location.unwrap());
-                        Ok(Fix::from_iter([import_edit, reference_edit]))
+                        let reference_edit = Edit::range_replacement(binding, expr.range());
+                        #[allow(deprecated)]
+                        Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
                     });
                 }
                 checker.diagnostics.push(diagnostic);

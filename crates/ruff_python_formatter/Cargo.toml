@@ -9,7 +9,7 @@ rust-version = { workspace = true }
 ruff_formatter = { path = "../ruff_formatter" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_rustpython = { path = "../ruff_rustpython" }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -17,7 +17,6 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
-rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 
 [dev-dependencies]

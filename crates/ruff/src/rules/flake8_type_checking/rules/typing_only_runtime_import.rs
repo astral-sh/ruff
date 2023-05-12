@@ -6,7 +6,7 @@ use ruff_python_semantic::binding::{
     Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
 };
 
-use crate::rules::isort::{categorize, ImportType};
+use crate::rules::isort::{categorize, ImportSection, ImportType};
 use crate::settings::Settings;
 
 /// ## What it does
@@ -46,7 +46,7 @@ use crate::settings::Settings;
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyFirstPartyImport {
-    pub full_name: String,
+    full_name: String,
 }
 
 impl Violation for TypingOnlyFirstPartyImport {
@@ -96,7 +96,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyThirdPartyImport {
-    pub full_name: String,
+    full_name: String,
 }
 
 impl Violation for TypingOnlyThirdPartyImport {
@@ -130,7 +130,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///
 /// Use instead:
 /// ```python
-/// /// from __future__ import annotations
+/// from __future__ import annotations
 ///
 /// from typing import TYPE_CHECKING
 ///
@@ -146,7 +146,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyStandardLibraryImport {
-    pub full_name: String,
+    full_name: String,
 }
 
 impl Violation for TypingOnlyStandardLibraryImport {
@@ -240,7 +240,7 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// TCH001
-pub fn typing_only_runtime_import(
+pub(crate) fn typing_only_runtime_import(
     binding: &Binding,
     runtime_imports: &[&Binding],
     package: Option<&Path>,
@@ -283,7 +283,12 @@ pub fn typing_only_runtime_import(
         // Extract the module base and level from the full name.
         // Ex) `foo.bar.baz` -> `foo`, `0`
         // Ex) `.foo.bar.baz` -> `foo`, `1`
-        let level = full_name.chars().take_while(|c| *c == '.').count();
+        let level = full_name
+            .chars()
+            .take_while(|c| *c == '.')
+            .count()
+            .try_into()
+            .unwrap();
 
         // Categorize the import.
         match categorize(
@@ -294,25 +299,31 @@ pub fn typing_only_runtime_import(
             &settings.isort.known_modules,
             settings.target_version,
         ) {
-            ImportType::LocalFolder | ImportType::FirstParty => Some(Diagnostic::new(
-                TypingOnlyFirstPartyImport {
-                    full_name: full_name.to_string(),
-                },
-                binding.range,
-            )),
-            ImportType::ThirdParty => Some(Diagnostic::new(
-                TypingOnlyThirdPartyImport {
-                    full_name: full_name.to_string(),
-                },
-                binding.range,
-            )),
-            ImportType::StandardLibrary => Some(Diagnostic::new(
+            ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
+                Some(Diagnostic::new(
+                    TypingOnlyFirstPartyImport {
+                        full_name: full_name.to_string(),
+                    },
+                    binding.range,
+                ))
+            }
+            ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
+                Some(Diagnostic::new(
+                    TypingOnlyThirdPartyImport {
+                        full_name: full_name.to_string(),
+                    },
+                    binding.range,
+                ))
+            }
+            ImportSection::Known(ImportType::StandardLibrary) => Some(Diagnostic::new(
                 TypingOnlyStandardLibraryImport {
                     full_name: full_name.to_string(),
                 },
                 binding.range,
             )),
-            ImportType::Future => unreachable!("`__future__` imports should be marked as used"),
+            ImportSection::Known(ImportType::Future) => {
+                unreachable!("`__future__` imports should be marked as used")
+            }
         }
     } else {
         None

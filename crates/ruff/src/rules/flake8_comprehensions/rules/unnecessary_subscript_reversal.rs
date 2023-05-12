@@ -1,18 +1,16 @@
 use num_bigint::BigInt;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
-
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Unaryop};
 
 use crate::checkers::ast::Checker;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary subscript reversal of iterable.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to reverse the order of an iterable when passing it
 /// into `reversed()`, `set()` or `sorted()` functions as they will change
 /// the order of the elements again.
@@ -32,7 +30,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessarySubscriptReversal {
-    pub func: String,
+    func: String,
 }
 
 impl Violation for UnnecessarySubscriptReversal {
@@ -44,7 +42,7 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub fn unnecessary_subscript_reversal(
+pub(crate) fn unnecessary_subscript_reversal(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -62,10 +60,10 @@ pub fn unnecessary_subscript_reversal(
     if !checker.ctx.is_builtin(id) {
         return;
     }
-    let ExprKind::Subscript { slice, .. } = &first_arg.node else {
+    let ExprKind::Subscript(ast::ExprSubscript { slice, .. }) = &first_arg.node else {
         return;
     };
-    let ExprKind::Slice { lower, upper, step } = &slice.node else {
+    let ExprKind::Slice(ast::ExprSlice { lower, upper, step }) = &slice.node else {
             return;
         };
     if lower.is_some() || upper.is_some() {
@@ -74,16 +72,16 @@ pub fn unnecessary_subscript_reversal(
     let Some(step) = step.as_ref() else {
         return;
     };
-    let ExprKind::UnaryOp {
+    let ExprKind::UnaryOp(ast::ExprUnaryOp {
         op: Unaryop::USub,
         operand,
-    } = &step.node else {
+    }) = &step.node else {
         return;
     };
-    let ExprKind::Constant {
+    let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Int(val),
         ..
-    } = &operand.node else {
+    }) = &operand.node else {
         return;
     };
     if *val != BigInt::from(1) {
@@ -93,6 +91,6 @@ pub fn unnecessary_subscript_reversal(
         UnnecessarySubscriptReversal {
             func: id.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     ));
 }

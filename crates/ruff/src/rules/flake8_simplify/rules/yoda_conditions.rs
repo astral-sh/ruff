@@ -1,11 +1,10 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Cmpop, Expr, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 use ruff_python_stdlib::str::{self};
 
 use crate::checkers::ast::Checker;
@@ -30,37 +29,32 @@ impl Violation for YodaConditions {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+    fn autofix_title(&self) -> Option<String> {
         let YodaConditions { suggestion } = self;
-        if suggestion.is_some() {
-            Some(|YodaConditions { suggestion }| {
-                let suggestion = suggestion.as_ref().unwrap();
-                format!("Replace Yoda condition with `{suggestion}`")
-            })
-        } else {
-            None
-        }
+        suggestion
+            .as_ref()
+            .map(|suggestion| format!("Replace Yoda condition with `{suggestion}`"))
     }
 }
 
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::Attribute { attr, .. } => str::is_upper(attr),
-        ExprKind::Constant { .. } => true,
-        ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant_like),
-        ExprKind::Name { id, .. } => str::is_upper(id),
-        ExprKind::UnaryOp {
+        ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => str::is_upper(attr),
+        ExprKind::Constant(_) => true,
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
+        ExprKind::Name(ast::ExprName { id, .. }) => str::is_upper(id),
+        ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
             operand,
-        } => matches!(operand.node, ExprKind::Constant { .. }),
+        }) => matches!(operand.node, ExprKind::Constant(_)),
         _ => false,
     }
 }
 
 /// Generate a fix to reverse a comparison.
 fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Result<String> {
-    let range = Range::from(expr);
+    let range = expr.range();
     let contents = locator.slice(range);
 
     let mut expression = match_expression(contents)?;
@@ -132,7 +126,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
 }
 
 /// SIM300
-pub fn yoda_conditions(
+pub(crate) fn yoda_conditions(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -159,20 +153,20 @@ pub fn yoda_conditions(
             YodaConditions {
                 suggestion: Some(suggestion.to_string()),
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 suggestion,
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     } else {
         checker.diagnostics.push(Diagnostic::new(
             YodaConditions { suggestion: None },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

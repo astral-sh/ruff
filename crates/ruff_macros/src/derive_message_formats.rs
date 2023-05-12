@@ -3,7 +3,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
 use syn::{Block, Expr, ItemFn, Stmt};
 
-pub fn derive_message_formats(func: &ItemFn) -> proc_macro2::TokenStream {
+pub(crate) fn derive_message_formats(func: &ItemFn) -> proc_macro2::TokenStream {
     let mut strings = quote!();
 
     if let Err(err) = parse_block(&func.block, &mut strings) {
@@ -19,7 +19,7 @@ pub fn derive_message_formats(func: &ItemFn) -> proc_macro2::TokenStream {
 }
 
 fn parse_block(block: &Block, strings: &mut TokenStream) -> Result<(), TokenStream> {
-    let Some(Stmt::Expr(last)) = block.stmts.last() else {panic!("expected last statement in block to be an expression")};
+    let Some(Stmt::Expr(last, _)) = block.stmts.last() else {panic!("expected last statement in block to be an expression")};
     parse_expr(last, strings)?;
     Ok(())
 }

@@ -1,12 +1,8 @@
-use itertools::Itertools;
-use rustpython_parser::ast::Location;
-
-use ruff_diagnostics::DiagnosticKind;
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-
-use super::LogicalLineTokens;
 
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
@@ -20,11 +16,13 @@ impl Violation for MissingWhitespaceAfterKeyword {
 
 /// E275
 pub(crate) fn missing_whitespace_after_keyword(
-    tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
-    let mut diagnostics = vec![];
+    line: &LogicalLine,
+    context: &mut LogicalLinesContext,
+) {
+    for window in line.tokens().windows(2) {
+        let tok0 = &window[0];
+        let tok1 = &window[1];
 
-    for (tok0, tok1) in tokens.iter().tuple_windows() {
         let tok0_kind = tok0.kind();
         let tok1_kind = tok1.kind();
 
@@ -36,8 +34,7 @@ pub(crate) fn missing_whitespace_after_keyword(
                 || matches!(tok1_kind, TokenKind::Colon | TokenKind::Newline))
             && tok0.end() == tok1.start()
         {
-            diagnostics.push((tok0.end(), MissingWhitespaceAfterKeyword.into()));
+            context.push(MissingWhitespaceAfterKeyword, tok0.range());
         }
     }
-    diagnostics
 }

@@ -3,16 +3,17 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{
-    Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Location, Unaryop,
-};
+use rustpython_parser::ast::{self, Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::helpers::{
+    contains_effect, create_expr, has_comments, unparse_expr, Truthiness,
+};
+use ruff_python_ast::source_code::Stylist;
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -46,8 +47,7 @@ use crate::registry::AsRule;
 /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct DuplicateIsinstanceCall {
-    pub name: Option<String>,
-    pub fixable: bool,
+    name: Option<String>,
 }
 
 impl Violation for DuplicateIsinstanceCall {
@@ -55,7 +55,7 @@ impl Violation for DuplicateIsinstanceCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name, .. } = self;
+        let DuplicateIsinstanceCall { name } = self;
         if let Some(name) = name {
             format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
         } else {
@@ -63,21 +63,20 @@ impl Violation for DuplicateIsinstanceCall {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|DuplicateIsinstanceCall { name, .. }| {
-                if let Some(name) = name {
-                    format!("Merge `isinstance` calls for `{name}`")
-                } else {
-                    format!("Merge `isinstance` calls")
-                }
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let DuplicateIsinstanceCall { name } = self;
+
+        Some(if let Some(name) = name {
+            format!("Merge `isinstance` calls for `{name}`")
+        } else {
+            "Merge `isinstance` calls".to_string()
+        })
     }
 }
 
 #[violation]
 pub struct CompareWithTuple {
-    pub replacement: String,
+    replacement: String,
 }
 
 impl AlwaysAutofixableViolation for CompareWithTuple {
@@ -95,7 +94,7 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
 
 #[violation]
 pub struct ExprAndNotExpr {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for ExprAndNotExpr {
@@ -112,7 +111,7 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
 
 #[violation]
 pub struct ExprOrNotExpr {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for ExprOrNotExpr {
@@ -127,37 +126,124 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ContentAround {
+    Before,
+    After,
+    Both,
+}
+
+/// ## What it does
+/// Checks for `or` expressions that contain truthy values.
+///
+/// ## Why is this bad?
+/// If the expression is used as a condition, it can be replaced in-full with
+/// `True`.
+///
+/// In other cases, the expression can be short-circuited to the first truthy
+/// value.
+///
+/// By using `True` (or the first truthy value), the code is more concise
+/// and easier to understand, since it no longer contains redundant conditions.
+///
+/// ## Example
+/// ```python
+/// if x or [1] or y:
+///     pass
+///
+/// a = x or [1] or y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:
+///     pass
+///
+/// a = x or [1]
+/// ```
 #[violation]
-pub struct ExprOrTrue;
+pub struct ExprOrTrue {
+    expr: String,
+    remove: ContentAround,
+}
 
 impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `True` instead of `... or True`")
+        let ExprOrTrue { expr, remove } = self;
+        let replaced = match remove {
+            ContentAround::After => format!("{expr} or ..."),
+            ContentAround::Before => format!("... or {expr}"),
+            ContentAround::Both => format!("... or {expr} or ..."),
+        };
+        format!("Use `{expr}` instead of `{replaced}`")
     }
 
     fn autofix_title(&self) -> String {
-        "Replace with `True`".to_string()
+        let ExprOrTrue { expr, .. } = self;
+        format!("Replace with `{expr}`")
     }
 }
 
+/// ## What it does
+/// Checks for `and` expressions that contain falsey values.
+///
+/// ## Why is this bad?
+/// If the expression is used as a condition, it can be replaced in-full with
+/// `False`.
+///
+/// In other cases, the expression can be short-circuited to the first falsey
+/// value.
+///
+/// By using `False` (or the first falsey value), the code is more concise
+/// and easier to understand, since it no longer contains redundant conditions.
+///
+/// ## Example
+/// ```python
+/// if x and [] and y:
+///     pass
+///
+/// a = x and [] and y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if False:
+///     pass
+///
+/// a = x and []
+/// ```
 #[violation]
-pub struct ExprAndFalse;
+pub struct ExprAndFalse {
+    expr: String,
+    remove: ContentAround,
+}
 
 impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `False` instead of `... and False`")
+        let ExprAndFalse { expr, remove } = self;
+        let replaced = match remove {
+            ContentAround::After => format!(r#"{expr} and ..."#),
+            ContentAround::Before => format!("... and {expr}"),
+            ContentAround::Both => format!("... and {expr} and ..."),
+        };
+        format!("Use `{expr}` instead of `{replaced}`")
     }
 
     fn autofix_title(&self) -> String {
-        "Replace with `False`".to_string()
+        let ExprAndFalse { expr, .. } = self;
+        format!("Replace with `{expr}`")
     }
 }
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
-    if let (ExprKind::Name { id: a, .. }, ExprKind::Name { id: b, .. }) = (&a.node, &b.node) {
+    if let (
+        ExprKind::Name(ast::ExprName { id: a, .. }),
+        ExprKind::Name(ast::ExprName { id: b, .. }),
+    ) = (&a.node, &b.node)
+    {
         if a == b {
             return Some(a);
         }
@@ -166,8 +252,8 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 }
 
 /// SIM101
-pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
+pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values } )= &expr.node else {
         return;
     };
 
@@ -176,7 +262,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
-        let ExprKind::Call { func, args, keywords } = &call.node else {
+        let ExprKind::Call(ast::ExprCall { func, args, keywords }) = &call.node else {
             continue;
         };
         if args.len() != 2 {
@@ -185,7 +271,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if !keywords.is_empty() {
             continue;
         }
-        let ExprKind::Name { id: func_name, .. } = &func.node else {
+        let ExprKind::Name(ast::ExprName { id: func_name, .. }) = &func.node else {
             continue;
         };
         if func_name != "isinstance" {
@@ -208,22 +294,22 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
-            let target = if let ExprKind::Call { args, .. } = &values[indices[0]].node {
-                args.get(0).expect("`isinstance` should have two arguments")
-            } else {
-                unreachable!("Indices should only contain `isinstance` calls")
-            };
+            let target =
+                if let ExprKind::Call(ast::ExprCall { args, .. }) = &values[indices[0]].node {
+                    args.get(0).expect("`isinstance` should have two arguments")
+                } else {
+                    unreachable!("Indices should only contain `isinstance` calls")
+                };
             let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
-                    name: if let ExprKind::Name { id, .. } = &target.node {
+                    name: if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
                         Some(id.to_string())
                     } else {
                         None
                     },
-                    fixable,
                 },
-                Range::from(expr),
+                expr.range(),
             );
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
@@ -232,7 +318,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let ExprKind::Call { args, ..} = &expr.node else {
+                        let ExprKind::Call(ast::ExprCall { args, ..}) = &expr.node else {
                             unreachable!("Indices should only contain `isinstance` calls")
                         };
                         args.get(1).expect("`isinstance` should have two arguments")
@@ -240,19 +326,21 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     .collect();
 
                 // Generate a single `isinstance` call.
-                let call = create_expr(ExprKind::Call {
-                    func: Box::new(create_expr(ExprKind::Name {
-                        id: "isinstance".to_string(),
+                let call = create_expr(ast::ExprCall {
+                    func: Box::new(create_expr(ast::ExprName {
+                        id: "isinstance".into(),
                         ctx: ExprContext::Load,
                     })),
                     args: vec![
                         target.clone(),
-                        create_expr(ExprKind::Tuple {
+                        create_expr(ast::ExprTuple {
                             // Flatten all the types used across the `isinstance` calls.
                             elts: types
                                 .iter()
                                 .flat_map(|value| {
-                                    if let ExprKind::Tuple { elts, .. } = &value.node {
+                                    if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) =
+                                        &value.node
+                                    {
                                         Left(elts.iter())
                                     } else {
                                         Right(iter::once(*value))
@@ -267,7 +355,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 });
 
                 // Generate the combined `BoolOp`.
-                let bool_op = create_expr(ExprKind::BoolOp {
+                let bool_op = create_expr(ast::ExprBoolOp {
                     op: Boolop::Or,
                     values: iter::once(call)
                         .chain(
@@ -282,11 +370,11 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
-                diagnostic.set_fix(Edit::replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
+                    expr.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -294,7 +382,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 }
 
 fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
-    let ExprKind::Compare { left, ops, comparators } = &expr.node else {
+    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators } )= &expr.node else {
         return None;
     };
     if ops.len() != 1 || comparators.len() != 1 {
@@ -303,19 +391,19 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     if !matches!(&ops[0], Cmpop::Eq) {
         return None;
     }
-    let ExprKind::Name { id, .. } = &left.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &left.node else {
         return None;
     };
     let comparator = &comparators[0];
-    if !matches!(&comparator.node, ExprKind::Name { .. }) {
+    if !matches!(&comparator.node, ExprKind::Name(_)) {
         return None;
     }
     Some((id, comparator))
 }
 
 /// SIM109
-pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
+pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values }) = &expr.node else {
         return;
     };
 
@@ -352,13 +440,13 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         }
 
         // Create a `x in (a, b)` expression.
-        let in_expr = create_expr(ExprKind::Compare {
-            left: Box::new(create_expr(ExprKind::Name {
-                id: id.to_string(),
+        let in_expr = create_expr(ast::ExprCompare {
+            left: Box::new(create_expr(ast::ExprName {
+                id: id.into(),
                 ctx: ExprContext::Load,
             })),
             ops: vec![Cmpop::In],
-            comparators: vec![create_expr(ExprKind::Tuple {
+            comparators: vec![create_expr(ast::ExprTuple {
                 elts: comparators.into_iter().map(Clone::clone).collect(),
                 ctx: ExprContext::Load,
             })],
@@ -367,7 +455,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             CompareWithTuple {
                 replacement: unparse_expr(&in_expr, checker.stylist),
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             let unmatched: Vec<Expr> = values
@@ -380,24 +468,24 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                 in_expr
             } else {
                 // Wrap in a `x in (a, b) or ...` boolean operation.
-                create_expr(ExprKind::BoolOp {
+                create_expr(ast::ExprBoolOp {
                     op: Boolop::Or,
                     values: iter::once(in_expr).chain(unmatched).collect(),
                 })
             };
-            diagnostic.set_fix(Edit::replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&in_expr, checker.stylist),
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }
 }
 
 /// SIM220
-pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
+pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::And, values, }) = &expr.node else {
         return;
     };
     if values.len() < 2 {
@@ -408,10 +496,10 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
     let mut negated_expr = vec![];
     let mut non_negated_expr = vec![];
     for expr in values {
-        if let ExprKind::UnaryOp {
+        if let ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::Not,
             operand,
-        } = &expr.node
+        }) = &expr.node
         {
             negated_expr.push(operand);
         } else {
@@ -434,14 +522,14 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     ExprAndNotExpr {
                         name: id.to_string(),
                     },
-                    Range::from(expr),
+                    expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         "False".to_string(),
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -450,8 +538,8 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM221
-pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
+pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, }) = &expr.node else {
         return;
     };
     if values.len() < 2 {
@@ -462,10 +550,10 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     let mut negated_expr = vec![];
     let mut non_negated_expr = vec![];
     for expr in values {
-        if let ExprKind::UnaryOp {
+        if let ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::Not,
             operand,
-        } = &expr.node
+        }) = &expr.node
         {
             negated_expr.push(operand);
         } else {
@@ -488,14 +576,14 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     ExprOrNotExpr {
                         name: id.to_string(),
                     },
-                    Range::from(expr),
+                    expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         "True".to_string(),
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -503,27 +591,58 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub fn is_short_circuit(
-    ctx: &Context,
+pub(crate) fn get_short_circuit_edit(
+    expr: &Expr,
+    range: TextRange,
+    truthiness: Truthiness,
+    in_boolean_test: bool,
+    stylist: &Stylist,
+) -> Edit {
+    let content = if in_boolean_test {
+        match truthiness {
+            Truthiness::Truthy => "True".to_string(),
+            Truthiness::Falsey => "False".to_string(),
+            Truthiness::Unknown => {
+                unreachable!("short_circuit_truthiness should be Truthy or Falsey")
+            }
+        }
+    } else {
+        unparse_expr(expr, stylist)
+    };
+    Edit::range_replacement(content, range)
+}
+
+fn is_short_circuit(
     expr: &Expr,
     expected_op: &Boolop,
-) -> Option<(Location, Location)> {
-    let ExprKind::BoolOp { op, values, } = &expr.node else {
+    context: &Context,
+    stylist: &Stylist,
+) -> Option<(Edit, ContentAround)> {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op, values, }) = &expr.node else {
         return None;
     };
     if op != expected_op {
         return None;
     }
-    let short_circuit_value = match op {
-        Boolop::And => false,
-        Boolop::Or => true,
+    let short_circuit_truthiness = match op {
+        Boolop::And => Truthiness::Falsey,
+        Boolop::Or => Truthiness::Truthy,
     };
 
-    let mut location = expr.location;
-    for (value, next_value) in values.iter().tuple_windows() {
+    let mut location = expr.start();
+    let mut edit = None;
+    let mut remove = None;
+
+    for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
+        // Keep track of the location of the furthest-right, truthy or falsey expression.
+        let value_truthiness = Truthiness::from_expr(value, |id| context.is_builtin(id));
+        let next_value_truthiness = Truthiness::from_expr(next_value, |id| context.is_builtin(id));
+
         // Keep track of the location of the furthest-right, non-effectful expression.
-        if contains_effect(value, |id| ctx.is_builtin(id)) {
-            location = next_value.location;
+        if value_truthiness.is_unknown()
+            && (!context.in_boolean_test() || contains_effect(value, |id| context.is_builtin(id)))
+        {
+            location = next_value.start();
             continue;
         }
 
@@ -531,71 +650,82 @@ pub fn is_short_circuit(
         // we can return the location of the expression. This should only trigger if the
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
-        if let ExprKind::Constant {
-            value: Constant::Bool(bool),
-            ..
-        } = &value.node
-        {
-            if bool == &short_circuit_value {
-                return Some((location, expr.end_location.unwrap()));
-            }
+        if value_truthiness == short_circuit_truthiness {
+            remove = Some(if location == value.start() {
+                ContentAround::After
+            } else {
+                ContentAround::Both
+            });
+            edit = Some(get_short_circuit_edit(
+                value,
+                TextRange::new(location, expr.end()),
+                short_circuit_truthiness,
+                context.in_boolean_test(),
+                stylist,
+            ));
+            break;
         }
 
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
-        if let ExprKind::Constant {
-            value: Constant::Bool(bool),
-            ..
-        } = &next_value.node
-        {
-            if bool == &short_circuit_value {
-                return Some((location, expr.end_location.unwrap()));
-            }
+        if next_value_truthiness == short_circuit_truthiness {
+            remove = Some(if index == values.len() - 2 {
+                ContentAround::Before
+            } else {
+                ContentAround::Both
+            });
+            edit = Some(get_short_circuit_edit(
+                next_value,
+                TextRange::new(location, expr.end()),
+                short_circuit_truthiness,
+                context.in_boolean_test(),
+                stylist,
+            ));
+            break;
         }
     }
-    None
+
+    match (edit, remove) {
+        (Some(edit), Some(remove)) => Some((edit, remove)),
+        _ => None,
+    }
 }
 
 /// SIM222
-pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::Or) else {
-        return;
-    };
-    let mut diagnostic = Diagnostic::new(
-        ExprOrTrue,
-        Range {
-            location,
-            end_location,
-        },
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            "True".to_string(),
-            location,
-            end_location,
-        ));
+pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
+    if let Some((edit, remove)) = is_short_circuit(expr, &Boolop::Or, &checker.ctx, checker.stylist)
+    {
+        let mut diagnostic = Diagnostic::new(
+            ExprOrTrue {
+                expr: edit.content().unwrap_or_default().to_string(),
+                remove,
+            },
+            edit.range(),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(edit));
+        }
+        checker.diagnostics.push(diagnostic);
     }
-    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM223
-pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::And) else {
-        return;
-    };
-    let mut diagnostic = Diagnostic::new(
-        ExprAndFalse,
-        Range {
-            location,
-            end_location,
-        },
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            "False".to_string(),
-            location,
-            end_location,
-        ));
+pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
+    if let Some((edit, remove)) =
+        is_short_circuit(expr, &Boolop::And, &checker.ctx, checker.stylist)
+    {
+        let mut diagnostic = Diagnostic::new(
+            ExprAndFalse {
+                expr: edit.content().unwrap_or_default().to_string(),
+                remove,
+            },
+            edit.range(),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(edit));
+        }
+        checker.diagnostics.push(diagnostic);
     }
-    checker.diagnostics.push(diagnostic);
 }

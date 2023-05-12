@@ -4,12 +4,12 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{identifier_range, ReturnStatementVisitor};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 
 #[violation]
 pub struct TooManyReturnStatements {
-    pub returns: usize,
-    pub max_returns: usize,
+    returns: usize,
+    max_returns: usize,
 }
 
 impl Violation for TooManyReturnStatements {
@@ -31,7 +31,7 @@ fn num_returns(body: &[Stmt]) -> usize {
 }
 
 /// PLR0911
-pub fn too_many_return_statements(
+pub(crate) fn too_many_return_statements(
     stmt: &Stmt,
     body: &[Stmt],
     max_returns: usize,

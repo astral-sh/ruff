@@ -4,19 +4,19 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 
-use ruff::resolver::PyprojectDiscovery;
+use ruff::resolver::PyprojectConfig;
 use ruff::{resolver, warn_user_once};
 
 use crate::args::Overrides;
 
 /// Show the list of files to be checked based on current settings.
-pub fn show_files(
+pub(crate) fn show_files(
     files: &[PathBuf],
-    pyproject_strategy: &PyprojectDiscovery,
+    pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, _resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
+    let (paths, _resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");

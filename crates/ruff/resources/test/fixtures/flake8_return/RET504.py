@@ -3,7 +3,7 @@
 ###
 def x():
     a = 1
-    return a  # error
+    return a  # RET504
 
 
 # Can be refactored false positives
@@ -211,10 +211,10 @@ def nonlocal_assignment():
 def decorator() -> Flask:
     app = Flask(__name__)
 
-    @app.route('/hello')
+    @app.route("/hello")
     def hello() -> str:
         """Hello endpoint."""
-        return 'Hello, World!'
+        return "Hello, World!"
 
     return app
 
@@ -222,12 +222,13 @@ def decorator() -> Flask:
 def default():
     y = 1
 
-    def f(x = y) -> X:
+    def f(x=y) -> X:
         return x
 
     return y
 
 
+# Multiple assignment
 def get_queryset(option_1, option_2):
     queryset: Any = None
     queryset = queryset.filter(a=1)
@@ -246,4 +247,28 @@ def get_queryset():
 
 def get_queryset():
     queryset = Model.filter(a=1)
-    return queryset  # error
+    return queryset  # RET504
+
+
+# Function arguments
+def str_to_bool(val):
+    if isinstance(val, bool):
+        return val
+    val = val.strip().lower()
+    if val in ("1", "true", "yes"):
+        return True
+
+    return False
+
+
+def str_to_bool(val):
+    if isinstance(val, bool):
+        return val
+    val = 1
+    return val  # RET504
+
+
+def str_to_bool(val):
+    if isinstance(val, bool):
+        return some_obj
+    return val

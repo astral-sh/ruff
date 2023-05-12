@@ -31,3 +31,6 @@ typing.TypedDict.anything()
 # import aliases are resolved
 import typing as totally_not_typing
 totally_not_typing.TypedDict
+
+# relative imports are respected
+from .typing import TypedDict

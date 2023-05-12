@@ -1,16 +1,15 @@
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
 pub struct RedundantTupleInExceptionHandler {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
@@ -30,12 +29,15 @@ impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
 }
 
 /// B013
-pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn redundant_tuple_in_exception_handler(
+    checker: &mut Checker,
+    handlers: &[Excepthandler],
+) {
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler { type_: Some(type_), .. } = &handler.node else {
+        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = &handler.node else {
             continue;
         };
-        let ExprKind::Tuple { elts, .. } = &type_.node else {
+        let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &type_.node else {
             continue;
         };
         let [elt] = &elts[..] else {
@@ -45,14 +47,14 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             RedundantTupleInExceptionHandler {
                 name: unparse_expr(elt, checker.stylist),
             },
-            Range::from(type_),
+            type_.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(elt, checker.stylist),
-                type_.location,
-                type_.end_location.unwrap(),
-            ));
+                type_.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

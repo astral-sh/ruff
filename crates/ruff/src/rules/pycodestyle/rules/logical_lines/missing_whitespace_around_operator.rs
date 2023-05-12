@@ -1,11 +1,8 @@
-use rustpython_parser::ast::Location;
-
-use ruff_diagnostics::DiagnosticKind;
-use ruff_diagnostics::Violation;
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
+use ruff_diagnostics::{DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLineTokens;
 
 // E225
 #[violation]
@@ -54,124 +51,172 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 /// E225, E226, E227, E228
 #[allow(clippy::if_same_then_else)]
 pub(crate) fn missing_whitespace_around_operator(
-    tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
-    let mut diagnostics = vec![];
-
-    let mut needs_space_main: Option<bool> = Some(false);
-    let mut needs_space_aux: Option<bool> = None;
-    let mut prev_end_aux: Option<Location> = None;
+    line: &LogicalLine,
+    context: &mut LogicalLinesContext,
+) {
     let mut parens = 0u32;
-    let mut prev_type: Option<TokenKind> = None;
-    let mut prev_end: Option<Location> = None;
+    let mut prev_token: Option<&LogicalLineToken> = None;
+    let mut tokens = line.tokens().iter().peekable();
 
-    for token in tokens {
+    while let Some(token) = tokens.next() {
         let kind = token.kind();
 
-        if kind.is_skip_comment() {
+        if kind.is_trivia() {
             continue;
         }
 
         match kind {
             TokenKind::Lpar | TokenKind::Lambda => parens += 1,
-            TokenKind::Rpar => parens -= 1,
+            TokenKind::Rpar => parens = parens.saturating_sub(1),
             _ => {}
         };
 
-        let needs_space =
-            needs_space_main == Some(true) || needs_space_aux.is_some() || prev_end_aux.is_some();
-        if needs_space {
-            if Some(token.start()) != prev_end {
-                if needs_space_main != Some(true) && needs_space_aux != Some(true) {
-                    diagnostics.push((
-                        prev_end_aux.unwrap(),
-                        MissingWhitespaceAroundOperator.into(),
-                    ));
-                }
-                needs_space_main = Some(false);
-                needs_space_aux = None;
-                prev_end_aux = None;
-            } else if kind == TokenKind::Greater
-                && matches!(prev_type, Some(TokenKind::Less | TokenKind::Minus))
-            {
-                // Tolerate the "<>" operator, even if running Python 3
-                // Deal with Python 3's annotated return value "->"
-            } else if prev_type == Some(TokenKind::Slash)
-                && matches!(kind, TokenKind::Comma | TokenKind::Rpar | TokenKind::Colon)
-                || (prev_type == Some(TokenKind::Rpar) && kind == TokenKind::Colon)
-            {
-                // Tolerate the "/" operator in function definition
-                // For more info see PEP570
-            } else {
-                if needs_space_main == Some(true) || needs_space_aux == Some(true) {
-                    diagnostics.push((prev_end.unwrap(), MissingWhitespaceAroundOperator.into()));
-                } else if prev_type != Some(TokenKind::DoubleStar) {
-                    if prev_type == Some(TokenKind::Percent) {
-                        diagnostics.push((
-                            prev_end_aux.unwrap(),
-                            MissingWhitespaceAroundModuloOperator.into(),
-                        ));
-                    } else if !prev_type.unwrap().is_arithmetic() {
-                        diagnostics.push((
-                            prev_end_aux.unwrap(),
-                            MissingWhitespaceAroundBitwiseOrShiftOperator.into(),
-                        ));
-                    } else {
-                        diagnostics.push((
-                            prev_end_aux.unwrap(),
-                            MissingWhitespaceAroundArithmeticOperator.into(),
-                        ));
-                    }
-                }
-                needs_space_main = Some(false);
-                needs_space_aux = None;
-                prev_end_aux = None;
-            }
-        } else if (kind.is_operator() || matches!(kind, TokenKind::Name)) && prev_end.is_some() {
-            if kind == TokenKind::Equal && parens > 0 {
-                // Allow keyword args or defaults: foo(bar=None).
-            } else if kind.is_whitespace_needed() {
-                needs_space_main = Some(true);
-                needs_space_aux = None;
-                prev_end_aux = None;
-            } else if kind.is_unary() {
-                // Check if the operator is used as a binary operator
+        let needs_space = if kind == TokenKind::Equal && parens > 0 {
+            // Allow keyword args or defaults: foo(bar=None).
+            NeedsSpace::No
+        } else if kind == TokenKind::Slash {
+            // Tolerate the "/" operator in function definition
+            // For more info see PEP570
+
+            // `def f(a, /, b):` or `def f(a, b, /):` or `f = lambda a, /:`
+            //            ^                       ^                      ^
+            let slash_in_func = matches!(
+                tokens.peek().map(|t| t.kind()),
+                Some(TokenKind::Comma | TokenKind::Rpar | TokenKind::Colon)
+            );
+
+            NeedsSpace::from(!slash_in_func)
+        } else if kind.is_unary() || kind == TokenKind::DoubleStar {
+            let is_binary = prev_token.map_or(false, |prev_token| {
+                let prev_kind = prev_token.kind();
+
+                // Check if the operator is used as a binary operator.
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
-                if let Some(prev_type) = prev_type {
-                    if (matches!(
-                        prev_type,
-                        TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
-                    )) || (!prev_type.is_operator() && !prev_type.is_keyword())
-                        && (!prev_type.is_soft_keyword())
-                    {
-                        needs_space_main = None;
-                        needs_space_aux = None;
-                        prev_end_aux = None;
+                matches!(
+                    prev_kind,
+                    TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+                ) || !(prev_kind.is_operator()
+                    || prev_kind.is_keyword()
+                    || prev_kind.is_soft_keyword())
+            });
+
+            if is_binary {
+                if kind == TokenKind::DoubleStar {
+                    // Enforce consistent spacing, but don't enforce whitespaces.
+                    NeedsSpace::Optional
+                } else {
+                    NeedsSpace::Yes
+                }
+            } else {
+                NeedsSpace::No
+            }
+        } else if is_whitespace_needed(kind) {
+            NeedsSpace::Yes
+        } else {
+            NeedsSpace::No
+        };
+
+        if needs_space != NeedsSpace::No {
+            let has_leading_trivia = prev_token.map_or(true, |prev| {
+                prev.end() < token.start() || prev.kind().is_trivia()
+            });
+
+            let has_trailing_trivia = tokens.peek().map_or(true, |next| {
+                token.end() < next.start() || next.kind().is_trivia()
+            });
+
+            match (has_leading_trivia, has_trailing_trivia) {
+                // Operator with trailing but no leading space, enforce consistent spacing
+                (false, true) |
+                // Operator with leading but no trailing space, enforce consistent spacing.
+                (true, false)
+                => {
+                    context.push(MissingWhitespaceAroundOperator, token.range());
+                }
+                // Operator with no space, require spaces if it is required by the operator.
+                (false, false) => {
+                    if needs_space == NeedsSpace::Yes {
+                        context.push(diagnostic_kind_for_operator(kind), token.range());
                     }
                 }
-            } else if kind.is_whitespace_optional() {
-                needs_space_main = None;
-                needs_space_aux = None;
-                prev_end_aux = None;
-            }
-
-            if needs_space_main.is_none() {
-                // Surrounding space is optional, but ensure that
-                // trailing space matches opening space
-                prev_end_aux = prev_end;
-                needs_space_aux = Some(Some(token.start()) != prev_end_aux);
-            } else if needs_space_main == Some(true) && Some(token.start()) == prev_end_aux {
-                // A needed opening space was not found
-                diagnostics.push((prev_end.unwrap(), MissingWhitespaceAroundOperator.into()));
-                needs_space_main = Some(false);
-                needs_space_aux = None;
-                prev_end_aux = None;
+                (true, true) => {
+                    // Operator has leading and trailing spaces, all good
+                }
             }
         }
-        prev_type = Some(kind);
-        prev_end = Some(token.end());
-    }
 
-    diagnostics
+        prev_token = Some(token);
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum NeedsSpace {
+    /// Needs a leading and trailing space.
+    Yes,
+
+    /// Doesn't need a leading or trailing space. Or in other words, we don't care how many
+    /// leading or trailing spaces that token has.
+    No,
+
+    /// Needs consistent leading and trailing spacing. The operator needs spacing if
+    /// * it has a leading space
+    /// * it has a trailing space
+    Optional,
+}
+
+impl From<bool> for NeedsSpace {
+    fn from(value: bool) -> Self {
+        if value {
+            NeedsSpace::Yes
+        } else {
+            NeedsSpace::No
+        }
+    }
+}
+
+fn diagnostic_kind_for_operator(operator: TokenKind) -> DiagnosticKind {
+    if operator == TokenKind::Percent {
+        DiagnosticKind::from(MissingWhitespaceAroundModuloOperator)
+    } else if operator.is_bitwise_or_shift() {
+        DiagnosticKind::from(MissingWhitespaceAroundBitwiseOrShiftOperator)
+    } else if operator.is_arithmetic() {
+        DiagnosticKind::from(MissingWhitespaceAroundArithmeticOperator)
+    } else {
+        DiagnosticKind::from(MissingWhitespaceAroundOperator)
+    }
+}
+
+fn is_whitespace_needed(kind: TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::DoubleStarEqual
+            | TokenKind::StarEqual
+            | TokenKind::SlashEqual
+            | TokenKind::DoubleSlashEqual
+            | TokenKind::PlusEqual
+            | TokenKind::MinusEqual
+            | TokenKind::NotEqual
+            | TokenKind::Less
+            | TokenKind::Greater
+            | TokenKind::PercentEqual
+            | TokenKind::CircumflexEqual
+            | TokenKind::AmperEqual
+            | TokenKind::VbarEqual
+            | TokenKind::EqEqual
+            | TokenKind::LessEqual
+            | TokenKind::GreaterEqual
+            | TokenKind::LeftShiftEqual
+            | TokenKind::RightShiftEqual
+            | TokenKind::Equal
+            | TokenKind::And
+            | TokenKind::Or
+            | TokenKind::In
+            | TokenKind::Is
+            | TokenKind::Rarrow
+            | TokenKind::ColonEqual
+            | TokenKind::Slash
+            | TokenKind::Percent
+    ) || kind.is_arithmetic()
+        || kind.is_bitwise_or_shift()
 }

@@ -1,15 +1,15 @@
 use itertools::Itertools;
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::registry::Rule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -46,7 +46,7 @@ impl<'tok> Token<'tok> {
     }
 
     const fn from_spanned(spanned: &'tok Spanned) -> Token<'tok> {
-        let type_ = match &spanned.1 {
+        let type_ = match &spanned.0 {
             Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
             Tok::Newline => TokenType::Newline,
             Tok::For => TokenType::For,
@@ -110,6 +110,29 @@ impl Context {
     }
 }
 
+/// ## What it does
+/// Checks for the absence of trailing commas.
+///
+/// ## Why is this bad?
+/// The presence of a trailing comma can reduce diff size when parameters or
+/// elements are added or removed from function calls, function definitions,
+/// literals, etc.
+///
+/// ## Example
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2
+/// }
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2,
+/// }
+/// ```
 #[violation]
 pub struct MissingTrailingComma;
 
@@ -124,6 +147,37 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of trailing commas on bare (i.e., unparenthesized)
+/// tuples.
+///
+/// ## Why is this bad?
+/// The presence of a misplaced comma will cause Python to interpret the value
+/// as a tuple, which can lead to unexpected behaviour.
+///
+/// ## Example
+/// ```python
+/// import json
+///
+///
+/// foo = json.dumps({"bar": 1}),
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import json
+///
+///
+/// foo = json.dumps({"bar": 1})
+/// ```
+///
+/// In the event that a tuple is intended, then use instead:
+/// ```python
+/// import json
+///
+///
+/// foo = (json.dumps({"bar": 1}),)
+/// ```
 #[violation]
 pub struct TrailingCommaOnBareTuple;
 
@@ -134,6 +188,22 @@ impl Violation for TrailingCommaOnBareTuple {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of prohibited trailing commas.
+///
+/// ## Why is this bad?
+/// Trailing commas are not essential in some cases and can therefore be viewed
+/// as unnecessary.
+///
+/// ## Example
+/// ```python
+/// foo = (1, 2, 3,)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = (1, 2, 3)
+/// ```
 #[violation]
 pub struct ProhibitedTrailingComma;
 
@@ -149,11 +219,10 @@ impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
 }
 
 /// COM812, COM818, COM819
-pub fn trailing_commas(
+pub(crate) fn trailing_commas(
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -161,7 +230,7 @@ pub fn trailing_commas(
         .iter()
         .flatten()
         // Completely ignore comments -- they just interfere with the logic.
-        .filter(|&r| !matches!(r, (_, Tok::Comment(_), _)))
+        .filter(|&r| !matches!(r, (Tok::Comment(_), _)))
         .map(Token::from_spanned);
     let tokens = [Token::irrelevant(), Token::irrelevant()]
         .into_iter()
@@ -253,15 +322,10 @@ pub fn trailing_commas(
         };
         if comma_prohibited {
             let comma = prev.spanned.unwrap();
-            let mut diagnostic = Diagnostic::new(
-                ProhibitedTrailingComma,
-                Range {
-                    location: comma.0,
-                    end_location: comma.2,
-                },
-            );
-            if autofix.into() && settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
-                diagnostic.set_fix(Edit::deletion(comma.0, comma.2));
+            let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
+            if settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(diagnostic.range())));
             }
             diagnostics.push(diagnostic);
         }
@@ -272,13 +336,7 @@ pub fn trailing_commas(
             prev.type_ == TokenType::Comma && token.type_ == TokenType::Newline;
         if bare_comma_prohibited {
             let comma = prev.spanned.unwrap();
-            diagnostics.push(Diagnostic::new(
-                TrailingCommaOnBareTuple,
-                Range {
-                    location: comma.0,
-                    end_location: comma.2,
-                },
-            ));
+            diagnostics.push(Diagnostic::new(TrailingCommaOnBareTuple, comma.1));
         }
 
         // Comma is required if:
@@ -299,22 +357,19 @@ pub fn trailing_commas(
             let missing_comma = prev_prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(
                 MissingTrailingComma,
-                Range {
-                    location: missing_comma.2,
-                    end_location: missing_comma.2,
-                },
+                TextRange::empty(missing_comma.1.end()),
             );
-            if autofix.into() && settings.rules.should_fix(Rule::MissingTrailingComma) {
+            if settings.rules.should_fix(Rule::MissingTrailingComma) {
                 // Create a replacement that includes the final bracket (or other token),
                 // rather than just inserting a comma at the end. This prevents the UP034 autofix
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
-                let contents = locator.slice(Range::new(missing_comma.0, missing_comma.2));
-                diagnostic.set_fix(Edit::replacement(
+                let contents = locator.slice(missing_comma.1);
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     format!("{contents},"),
-                    missing_comma.0,
-                    missing_comma.2,
-                ));
+                    missing_comma.1,
+                )));
             }
             diagnostics.push(diagnostic);
         }

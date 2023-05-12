@@ -1,16 +1,16 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 #[violation]
 pub struct AbstractBaseClassWithoutAbstractMethod {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
@@ -22,7 +22,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 }
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for EmptyMethodWithoutAbstractDecorator {
@@ -35,22 +35,20 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(checker: &Checker, bases: &[Expr], keywords: &[Keyword]) -> bool {
+fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool {
     keywords.iter().any(|keyword| {
         keyword
             .node
             .arg
             .as_ref()
             .map_or(false, |arg| arg == "metaclass")
-            && checker
-                .ctx
+            && context
                 .resolve_call_path(&keyword.node.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["abc", "ABCMeta"]
                 })
     }) || bases.iter().any(|base| {
-        checker
-            .ctx
+        context
             .resolve_call_path(base)
             .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
@@ -59,8 +57,8 @@ fn is_abc_class(checker: &Checker, bases: &[Expr], keywords: &[Keyword]) -> bool
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match &stmt.node {
         StmtKind::Pass => true,
-        StmtKind::Expr { value } => match &value.node {
-            ExprKind::Constant { value, .. } => {
+        StmtKind::Expr(ast::StmtExpr { value }) => match &value.node {
+            ExprKind::Constant(ast::ExprConstant { value, .. }) => {
                 matches!(value, Constant::Str(..) | Constant::Ellipsis)
             }
             _ => false,
@@ -69,7 +67,9 @@ fn is_empty_body(body: &[Stmt]) -> bool {
     })
 }
 
-pub fn abstract_base_class(
+/// B024
+/// B027
+pub(crate) fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
@@ -80,7 +80,7 @@ pub fn abstract_base_class(
     if bases.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(checker, bases, keywords) {
+    if !is_abc_class(&checker.ctx, bases, keywords) {
         return;
     }
 
@@ -88,23 +88,23 @@ pub fn abstract_base_class(
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
         // Ignore abc's that declares a class attribute that must be set
-        if let StmtKind::AnnAssign { .. } | StmtKind::Assign { .. } = &stmt.node {
+        if let StmtKind::AnnAssign(_) | StmtKind::Assign(_) = &stmt.node {
             has_abstract_method = true;
             continue;
         }
 
         let (
-            StmtKind::FunctionDef {
+            StmtKind::FunctionDef(ast::StmtFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
-            } | StmtKind::AsyncFunctionDef {
+            }) | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
-            }
+            })
         ) = &stmt.node else {
             continue;
         };
@@ -128,7 +128,7 @@ pub fn abstract_base_class(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     }
@@ -142,7 +142,7 @@ pub fn abstract_base_class(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     }

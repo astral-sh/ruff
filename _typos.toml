@@ -5,3 +5,6 @@ extend-exclude = ["snapshots", "black"]
 trivias = "trivias"
 hel = "hel"
 whos = "whos"
+spawnve = "spawnve"
+ned = "ned"
+poit = "poit"

@@ -1,17 +1,17 @@
+use ruff_text_size::TextRange;
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, ExprKind, Location, Operator};
+use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum CallKind {
+pub(crate) enum CallKind {
     Isinstance,
     Issubclass,
 }
@@ -26,7 +26,7 @@ impl fmt::Display for CallKind {
 }
 
 impl CallKind {
-    pub fn from_name(name: &str) -> Option<Self> {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
         match name {
             "isinstance" => Some(CallKind::Isinstance),
             "issubclass" => Some(CallKind::Issubclass),
@@ -37,7 +37,7 @@ impl CallKind {
 
 #[violation]
 pub struct NonPEP604Isinstance {
-    pub kind: CallKind,
+    kind: CallKind,
 }
 
 impl AlwaysAutofixableViolation for NonPEP604Isinstance {
@@ -56,9 +56,8 @@ fn union(elts: &[Expr]) -> Expr {
         elts[0].clone()
     } else {
         Expr::new(
-            Location::default(),
-            Location::default(),
-            ExprKind::BinOp {
+            TextRange::default(),
+            ast::ExprBinOp {
                 left: Box::new(union(&elts[..elts.len() - 1])),
                 op: Operator::BitOr,
                 right: Box::new(elts[elts.len() - 1].clone()),
@@ -68,8 +67,13 @@ fn union(elts: &[Expr]) -> Expr {
 }
 
 /// UP038
-pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    if let ExprKind::Name { id, .. } = &func.node {
+pub(crate) fn use_pep604_isinstance(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
@@ -77,7 +81,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
             return;
         };
         if let Some(types) = args.get(1) {
-            if let ExprKind::Tuple { elts, .. } = &types.node {
+            if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &types.node {
                 // Ex) `()`
                 if elts.is_empty() {
                     return;
@@ -86,19 +90,18 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                 // Ex) `(*args,)`
                 if elts
                     .iter()
-                    .any(|elt| matches!(elt.node, ExprKind::Starred { .. }))
+                    .any(|elt| matches!(elt.node, ExprKind::Starred(_)))
                 {
                     return;
                 }
 
-                let mut diagnostic =
-                    Diagnostic::new(NonPEP604Isinstance { kind }, Range::from(expr));
+                let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         unparse_expr(&union(elts), checker.stylist),
-                        types.location,
-                        types.end_location.unwrap(),
-                    ));
+                        types.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

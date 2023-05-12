@@ -1,12 +1,10 @@
-use rustpython_parser::ast::{Expr, ExprKind};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
@@ -35,7 +33,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryCallAroundSorted {
-    pub func: String,
+    func: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
@@ -52,7 +50,7 @@ impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
 }
 
 /// C413
-pub fn unnecessary_call_around_sorted(
+pub(crate) fn unnecessary_call_around_sorted(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -67,7 +65,7 @@ pub fn unnecessary_call_around_sorted(
     let Some(arg) = args.first() else {
         return;
     };
-    let ExprKind::Call { func, .. } = &arg.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &arg.node else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {
@@ -83,10 +81,11 @@ pub fn unnecessary_call_around_sorted(
         UnnecessaryCallAroundSorted {
             func: outer.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr)
         });
     }

@@ -1,13 +1,13 @@
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData, Location};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, KeywordData};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -42,9 +42,9 @@ impl<'a> FormatSummaryValues<'a> {
     fn try_from_expr(checker: &'a Checker, expr: &'a Expr) -> Option<Self> {
         let mut extracted_args: Vec<String> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, String> = FxHashMap::default();
-        if let ExprKind::Call { args, keywords, .. } = &expr.node {
+        if let ExprKind::Call(ast::ExprCall { args, keywords, .. }) = &expr.node {
             for arg in args {
-                let arg = checker.locator.slice(arg);
+                let arg = checker.locator.slice(arg.range());
                 if contains_invalids(arg) {
                     return None;
                 }
@@ -53,7 +53,7 @@ impl<'a> FormatSummaryValues<'a> {
             for keyword in keywords {
                 let KeywordData { arg, value } = &keyword.node;
                 if let Some(key) = arg {
-                    let kwarg = checker.locator.slice(value);
+                    let kwarg = checker.locator.slice(value.range());
                     if contains_invalids(kwarg) {
                         return None;
                     }
@@ -104,18 +104,18 @@ fn contains_invalids(string: &str) -> bool {
 
 /// Generate an f-string from an [`Expr`].
 fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
-    let ExprKind::Call { func, .. } = &expr.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
         return None;
     };
-    let ExprKind::Attribute { value, .. } = &func.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &func.node else {
         return None;
     };
     if !matches!(
         &value.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(..),
             ..
-        },
+        }),
     ) {
         return None;
     };
@@ -124,7 +124,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         return None;
     };
 
-    let contents = checker.locator.slice(value);
+    let contents = checker.locator.slice(value.range());
 
     // Skip implicit string concatenations.
     if is_implicit_concatenation(contents) {
@@ -200,8 +200,15 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
                             converted.push(']');
                         }
                         FieldNamePart::StringIndex(index) => {
+                            let quote = match *trailing_quote {
+                                "'" | "'''" | "\"\"\"" => '"',
+                                "\"" => '\'',
+                                _ => unreachable!("invalid trailing quote"),
+                            };
                             converted.push('[');
+                            converted.push(quote);
                             converted.push_str(&index);
+                            converted.push(quote);
                             converted.push(']');
                         }
                     }
@@ -241,7 +248,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     }
 
     // Avoid refactoring multi-line strings.
-    if expr.location.row() != expr.end_location.unwrap().row() {
+    if checker.locator.contains_line_break(expr.range()) {
         return;
     }
 
@@ -252,30 +259,29 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     };
 
     // Avoid refactors that increase the resulting string length.
-    let existing = checker.locator.slice(expr);
+    let existing = checker.locator.slice(expr.range());
     if contents.len() > existing.len() {
         return;
     }
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
-    if expr.location.column() > 0 {
-        let existing = checker.locator.slice(Range::new(
-            Location::new(expr.location.row(), expr.location.column() - 1),
-            expr.end_location.unwrap(),
-        ));
-        if existing.chars().next().unwrap().is_ascii_alphabetic() {
-            contents.insert(0, ' ');
-        }
+    let existing = checker.locator.slice(TextRange::up_to(expr.start()));
+    if existing
+        .chars()
+        .last()
+        .map_or(false, |char| char.is_ascii_alphabetic())
+    {
+        contents.insert(0, ' ');
     }
 
-    let mut diagnostic = Diagnostic::new(FString, Range::from(expr));
+    let mut diagnostic = Diagnostic::new(FString, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents,
-            expr.location,
-            expr.end_location.unwrap(),
-        ));
+            expr.range(),
+        )));
     };
     checker.diagnostics.push(diagnostic);
 }

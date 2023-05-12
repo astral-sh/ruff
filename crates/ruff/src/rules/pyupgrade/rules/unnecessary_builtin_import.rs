@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use log::error;
-use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
+use rustpython_parser::ast::{Alias, AliasData, Attributed, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::types::RefEquality;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -65,11 +65,11 @@ const SIX: &[&str] = &["callable", "next"];
 const SIX_MOVES: &[&str] = &["filter", "input", "map", "range", "zip"];
 
 /// UP029
-pub fn unnecessary_builtin_import(
+pub(crate) fn unnecessary_builtin_import(
     checker: &mut Checker,
     stmt: &Stmt,
     module: &str,
-    names: &[Located<AliasData>],
+    names: &[Attributed<AliasData>],
 ) {
     let deprecated_names = match module {
         "builtins" => BUILTINS,
@@ -101,31 +101,32 @@ pub fn unnecessary_builtin_import(
                 .sorted()
                 .collect(),
         },
-        Range::from(stmt),
+        stmt.range(),
     );
 
     if checker.patch(diagnostic.kind.rule()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.ctx.current_stmt();
-        let defined_in = checker.ctx.current_stmt_parent();
+        let defined_by = checker.ctx.stmt();
+        let defined_in = checker.ctx.stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
             .map(|alias| format!("{module}.{}", alias.node.name))
             .collect();
         match autofix::actions::remove_unused_imports(
             unused_imports.iter().map(String::as_str),
-            defined_by.into(),
-            defined_in.map(Into::into),
+            defined_by,
+            defined_in,
             &deleted,
             checker.locator,
             checker.indexer,
             checker.stylist,
         ) {
-            Ok(fix) => {
-                if fix.is_deletion() || fix.content() == Some("pass") {
-                    checker.deletions.insert(*defined_by);
+            Ok(edit) => {
+                if edit.is_deletion() || edit.content() == Some("pass") {
+                    checker.deletions.insert(RefEquality(defined_by));
                 }
-                diagnostic.set_fix(fix);
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(edit));
             }
             Err(e) => error!("Failed to remove builtin import: {e}"),
         }

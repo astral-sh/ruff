@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -78,7 +77,7 @@ impl Violation for UnrecognizedPlatformCheck {
 /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
 #[violation]
 pub struct UnrecognizedPlatformName {
-    pub platform: String,
+    platform: String,
 }
 
 impl Violation for UnrecognizedPlatformName {
@@ -90,7 +89,7 @@ impl Violation for UnrecognizedPlatformName {
 }
 
 /// PYI007, PYI008
-pub fn unrecognized_platform(
+pub(crate) fn unrecognized_platform(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -102,7 +101,7 @@ pub fn unrecognized_platform(
     };
 
     let diagnostic_unrecognized_platform_check =
-        Diagnostic::new(UnrecognizedPlatformCheck, Range::from(expr));
+        Diagnostic::new(UnrecognizedPlatformCheck, expr.range());
     if !checker
         .ctx
         .resolve_call_path(left)
@@ -127,10 +126,10 @@ pub fn unrecognized_platform(
     }
 
     match &right.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(value),
             ..
-        } => {
+        }) => {
             // Other values are possible but we don't need them right now.
             // This protects against typos.
             if !["linux", "win32", "cygwin", "darwin"].contains(&value.as_str())
@@ -143,7 +142,7 @@ pub fn unrecognized_platform(
                     UnrecognizedPlatformName {
                         platform: value.clone(),
                     },
-                    Range::from(right),
+                    right.range(),
                 ));
             }
         }
