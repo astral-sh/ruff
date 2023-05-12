@@ -12,11 +12,10 @@ use ruff_python_semantic::{
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for mutable default values in dataclasses without the use of
-/// `dataclasses.field`.
+/// Checks for mutable default values in class attribute defaults.
 ///
 /// ## Why is it bad?
-/// Mutable default values share state across all instances of the dataclass,
+/// Mutable default values share state across all instances of the class,
 /// while not being obvious. This can lead to bugs when the attributes are
 /// changed in one instance, as those changes will unexpectedly affect all
 /// other instances.
@@ -53,17 +52,6 @@ use crate::checkers::ast::Checker;
 /// class A:
 ///     mutable_default: list[int] = I_KNOW_THIS_IS_SHARED_STATE
 /// ```
-#[violation]
-pub struct MutableDataclassDefault;
-
-impl Violation for MutableDataclassDefault {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Do not use mutable default values for dataclass attributes")
-    }
-}
-
-/// This rule is same as MutableDataclassDefault, but for any class. The same arguments apply.
 #[violation]
 pub struct MutableClassDefault;
 
@@ -159,25 +147,6 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
     }
 }
 
-/// Same as FunctionCallInDataclassDefaultArgument, but for any class.
-/// Importantly, this error will be issued on calls to dataclasses.field
-#[violation]
-pub struct FunctionCallInClassDefaultArgument {
-    pub name: Option<String>,
-}
-
-impl Violation for FunctionCallInClassDefaultArgument {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let FunctionCallInClassDefaultArgument { name } = self;
-        if let Some(name) = name {
-            format!("Do not perform function call `{name}` in non-dataclass attribute defaults")
-        } else {
-            format!("Do not perform function call in non-dataclass attribute defaults")
-        }
-    }
-}
-
 fn is_mutable_expr(expr: &Expr) -> bool {
     matches!(
         &expr.node,
@@ -208,8 +177,8 @@ fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
     context.match_typing_expr(value, "ClassVar")
 }
 
-/// RUF009/RUF011
-pub fn function_call_in_class_defaults(
+/// RUF009
+pub fn function_call_in_dataclass_defaults(
     checker: &mut Checker,
     body: &[Stmt],
     is_dataclass: bool,
@@ -259,13 +228,12 @@ pub fn function_call_in_class_defaults(
     }
 }
 
-/// RUF008/RUF010
-pub fn mutable_class_default(checker: &mut Checker, emit_dataclass_error: bool, body: &[Stmt]) {
+/// RUF008
+pub fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
     fn diagnostic(emit_dataclass_error: bool, value: &Expr) -> Diagnostic {
         if emit_dataclass_error {
             Diagnostic::new(MutableDataclassDefault, value.range())
         } else {
-            Diagnostic::new(MutableClassDefault, value.range())
         }
     }
 
@@ -282,14 +250,15 @@ pub fn mutable_class_default(checker: &mut Checker, emit_dataclass_error: bool, 
                 {
                     checker
                         .diagnostics
-                        .push(diagnostic(emit_dataclass_error, value));
+                        .push(
+            Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             StmtKind::Assign { value, .. } => {
                 if is_mutable_expr(value) {
                     checker
                         .diagnostics
-                        .push(diagnostic(emit_dataclass_error, value));
+                        .push(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             _ => (),
