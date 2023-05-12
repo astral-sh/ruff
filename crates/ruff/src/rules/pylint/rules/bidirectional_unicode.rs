@@ -33,7 +33,7 @@ impl Violation for BidirectionalUnicode {
 }
 
 /// PLE2502
-pub fn bidirectional_unicode(line: &Line) -> Vec<Diagnostic> {
+pub(crate) fn bidirectional_unicode(line: &Line) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     if line.contains(BIDI_UNICODE) {
         diagnostics.push(Diagnostic::new(BidirectionalUnicode, line.full_range()));

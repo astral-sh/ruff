@@ -7,13 +7,13 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     /// Python file for which to generate the CST.
     #[arg(required = true)]
     file: PathBuf,
 }
 
-pub fn main(args: &Args) -> Result<()> {
+pub(crate) fn main(args: &Args) -> Result<()> {
     let contents = fs::read_to_string(&args.file)?;
     match libcst_native::parse_module(&contents, None) {
         Ok(python_cst) => {

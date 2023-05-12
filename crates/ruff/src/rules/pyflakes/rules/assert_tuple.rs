@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -16,8 +16,8 @@ impl Violation for AssertTuple {
 }
 
 /// F631
-pub fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if let ExprKind::Tuple { elts, .. } = &test.node {
+pub(crate) fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+    if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &test.node {
         if !elts.is_empty() {
             checker
                 .diagnostics

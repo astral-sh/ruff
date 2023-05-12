@@ -1,5 +1,5 @@
-use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -29,28 +29,31 @@ impl AlwaysAutofixableViolation for SetAttrWithConstant {
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
     let stmt = Stmt::new(
-        TextSize::default(),
-        TextSize::default(),
-        StmtKind::Assign {
+        TextRange::default(),
+        StmtKind::Assign(ast::StmtAssign {
             targets: vec![Expr::new(
-                TextSize::default(),
-                TextSize::default(),
-                ExprKind::Attribute {
+                TextRange::default(),
+                ExprKind::Attribute(ast::ExprAttribute {
                     value: Box::new(obj.clone()),
-                    attr: name.to_string(),
+                    attr: name.into(),
                     ctx: ExprContext::Store,
-                },
+                }),
             )],
             value: Box::new(value.clone()),
             type_comment: None,
-        },
+        }),
     );
     unparse_stmt(&stmt, stylist)
 }
 
 /// B010
-pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let ExprKind::Name { id, .. } = &func.node else {
+pub(crate) fn setattr_with_constant(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };
     if id != "setattr" {
@@ -59,10 +62,10 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     let [obj, name, value] = args else {
         return;
     };
-    let ExprKind::Constant {
+    let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(name),
         ..
-    } = &name.node else {
+    } )= &name.node else {
         return;
     };
     if !is_identifier(name) {
@@ -74,11 +77,12 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `StmtKind::Expr`).
-    if let StmtKind::Expr { value: child } = &checker.ctx.current_stmt().node {
+    if let StmtKind::Expr(ast::StmtExpr { value: child }) = &checker.ctx.stmt().node {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
 
             if checker.patch(diagnostic.kind.rule()) {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     assignment(obj, name, value, checker.stylist),
                     expr.range(),

@@ -18,7 +18,12 @@ impl Violation for UselessContextlibSuppress {
 }
 
 /// B022
-pub fn useless_contextlib_suppress(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn useless_contextlib_suppress(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     if args.is_empty()
         && checker
             .ctx

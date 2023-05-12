@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,7 +25,7 @@ const MUTABLE_FUNCS: &[&[&str]] = &[
     &["collections", "deque"],
 ];
 
-pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
+pub(crate) fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
     checker
         .ctx
         .resolve_call_path(func)
@@ -38,19 +38,19 @@ pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
 
 fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::List { .. }
-        | ExprKind::Dict { .. }
-        | ExprKind::Set { .. }
-        | ExprKind::ListComp { .. }
-        | ExprKind::DictComp { .. }
-        | ExprKind::SetComp { .. } => true,
-        ExprKind::Call { func, .. } => is_mutable_func(checker, func),
+        ExprKind::List(_)
+        | ExprKind::Dict(_)
+        | ExprKind::Set(_)
+        | ExprKind::ListComp(_)
+        | ExprKind::DictComp(_)
+        | ExprKind::SetComp(_) => true,
+        ExprKind::Call(ast::ExprCall { func, .. }) => is_mutable_func(checker, func),
         _ => false,
     }
 }
 
 /// B006
-pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Scan in reverse order to right-align zip().
     for (arg, default) in arguments
         .kwonlyargs

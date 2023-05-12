@@ -1,9 +1,7 @@
 //! Settings for the `pep8-naming` plugin.
 
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use ruff_macros::{CacheKey, ConfigurationOptions};
+use serde::{Deserialize, Serialize};
 
 const IGNORE_NAMES: [&str; 12] = [
     "setUp",
@@ -20,14 +18,13 @@ const IGNORE_NAMES: [&str; 12] = [
     "maxDiff",
 ];
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Pep8NamingOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"["setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule", "asyncSetUp", "asyncTearDown", "setUpTestData", "failureException", "longMessage", "maxDiff"]"#,

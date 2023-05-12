@@ -4,7 +4,6 @@ use std::{fs, iter};
 
 use log::debug;
 use rustc_hash::FxHashMap;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -27,11 +26,11 @@ use super::types::{ImportBlock, Importable};
     Hash,
     Serialize,
     Deserialize,
-    JsonSchema,
     CacheKey,
     EnumIter,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum ImportType {
     Future,
     StandardLibrary,
@@ -40,10 +39,9 @@ pub enum ImportType {
     LocalFolder,
 }
 
-#[derive(
-    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, JsonSchema, CacheKey,
-)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, CacheKey)]
 #[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum ImportSection {
     Known(ImportType),
     UserDefined(String),
@@ -67,7 +65,7 @@ enum Reason<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn categorize<'a>(
     module_name: &str,
-    level: Option<usize>,
+    level: Option<u32>,
     src: &[PathBuf],
     package: Option<&Path>,
     known_modules: &'a KnownModules,
@@ -138,7 +136,7 @@ fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn categorize_imports<'a>(
+pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
     package: Option<&Path>,

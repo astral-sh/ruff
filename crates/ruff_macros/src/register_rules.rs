@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse::Parse;
 use syn::{Attribute, Ident, Path, Token};
 
-pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
+pub(crate) fn register_rules(input: &Input) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
@@ -74,7 +74,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
     }
 }
 
-pub struct Input {
+pub(crate) struct Input {
     entries: Vec<(Path, Ident, Vec<Attribute>)>,
 }
 

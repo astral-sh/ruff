@@ -1,5 +1,16 @@
 # Breaking Changes
 
+## 0.0.266
+
+### `update-check` is no longer a valid configuration option ([#4313](https://github.com/charliermarsh/ruff/pull/4313))
+
+The `update-check` functionality was deprecated in [#2530](https://github.com/charliermarsh/ruff/pull/2530),
+in that the behavior itself was removed, and Ruff was changed to warn when that option was enabled.
+
+Now, Ruff will throw an error when `update-check` is provided via a configuration file (e.g.,
+`update-check = false`) or through the command-line, since it has no effect. Users should remove
+this option from their configuration.
+
 ## 0.0.265
 
 ### `--fix-only` now exits with a zero exit code, unless `--exit-non-zero-on-fix` is specified ([#4146](https://github.com/charliermarsh/ruff/pull/4146))

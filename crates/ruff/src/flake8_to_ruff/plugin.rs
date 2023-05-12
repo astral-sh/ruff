@@ -175,7 +175,7 @@ impl From<&Plugin> for Linter {
 ///
 /// For example, if the user specified a `mypy-init-return` setting, we should
 /// infer that `flake8-annotations` is active.
-pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> Vec<Plugin> {
+pub(crate) fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> Vec<Plugin> {
     let mut plugins = BTreeSet::new();
     for key in flake8.keys() {
         match key.as_str() {
@@ -292,7 +292,7 @@ pub fn infer_plugins_from_options(flake8: &HashMap<String, Option<String>>) -> V
 ///
 /// For example, if the user ignores `ANN101`, we should infer that
 /// `flake8-annotations` is active.
-pub fn infer_plugins_from_codes(selectors: &HashSet<RuleSelector>) -> Vec<Plugin> {
+pub(crate) fn infer_plugins_from_codes(selectors: &HashSet<RuleSelector>) -> Vec<Plugin> {
     // Ignore cases in which we've knowingly changed rule prefixes.
     [
         Plugin::Flake82020,

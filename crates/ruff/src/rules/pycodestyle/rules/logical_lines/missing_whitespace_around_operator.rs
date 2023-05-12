@@ -3,7 +3,6 @@ use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineTo
 use ruff_diagnostics::{DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::TextRange;
 
 // E225
 #[violation]
@@ -129,30 +128,20 @@ pub(crate) fn missing_whitespace_around_operator(
 
             match (has_leading_trivia, has_trailing_trivia) {
                 // Operator with trailing but no leading space, enforce consistent spacing
-                (false, true) => {
-                    context.push(
-                        MissingWhitespaceAroundOperator,
-                        TextRange::empty(token.start()),
-                    );
-                }
+                (false, true) |
                 // Operator with leading but no trailing space, enforce consistent spacing.
-                (true, false) => {
-                    context.push(
-                        MissingWhitespaceAroundOperator,
-                        TextRange::empty(token.end()),
-                    );
+                (true, false)
+                => {
+                    context.push(MissingWhitespaceAroundOperator, token.range());
                 }
                 // Operator with no space, require spaces if it is required by the operator.
                 (false, false) => {
                     if needs_space == NeedsSpace::Yes {
-                        context.push(
-                            diagnostic_kind_for_operator(kind),
-                            TextRange::empty(token.start()),
-                        );
+                        context.push(diagnostic_kind_for_operator(kind), token.range());
                     }
                 }
                 (true, true) => {
-                    // Operator has leading and trailing space, all good
+                    // Operator has leading and trailing spaces, all good
                 }
             }
         }

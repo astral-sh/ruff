@@ -508,10 +508,11 @@ ruff_macros::register_rules!(
     rules::flake8_datetimez::rules::CallDateToday,
     rules::flake8_datetimez::rules::CallDateFromtimestamp,
     // pygrep-hooks
-    rules::pygrep_hooks::rules::Eval,
-    rules::pygrep_hooks::rules::DeprecatedLogWarn,
-    rules::pygrep_hooks::rules::BlanketTypeIgnore,
     rules::pygrep_hooks::rules::BlanketNOQA,
+    rules::pygrep_hooks::rules::BlanketTypeIgnore,
+    rules::pygrep_hooks::rules::DeprecatedLogWarn,
+    rules::pygrep_hooks::rules::Eval,
+    rules::pygrep_hooks::rules::InvalidMockAccess,
     // pandas-vet
     rules::pandas_vet::rules::PandasUseOfInplaceArgument,
     rules::pandas_vet::rules::PandasUseOfDotIsNull,

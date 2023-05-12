@@ -9,7 +9,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 use crate::registry::Rule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -219,11 +219,10 @@ impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
 }
 
 /// COM812, COM818, COM819
-pub fn trailing_commas(
+pub(crate) fn trailing_commas(
     tokens: &[LexResult],
     locator: &Locator,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -324,7 +323,8 @@ pub fn trailing_commas(
         if comma_prohibited {
             let comma = prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
-            if autofix.into() && settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
+            if settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(diagnostic.range())));
             }
             diagnostics.push(diagnostic);
@@ -359,12 +359,13 @@ pub fn trailing_commas(
                 MissingTrailingComma,
                 TextRange::empty(missing_comma.1.end()),
             );
-            if autofix.into() && settings.rules.should_fix(Rule::MissingTrailingComma) {
+            if settings.rules.should_fix(Rule::MissingTrailingComma) {
                 // Create a replacement that includes the final bracket (or other token),
                 // rather than just inserting a comma at the end. This prevents the UP034 autofix
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
                 let contents = locator.slice(missing_comma.1);
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     format!("{contents},"),
                     missing_comma.1,

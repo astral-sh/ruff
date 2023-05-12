@@ -29,8 +29,8 @@ use ruff_python_stdlib::str;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[violation]
 pub struct LowercaseImportedAsNonLowercase {
-    pub name: String,
-    pub asname: String,
+    name: String,
+    asname: String,
 }
 
 impl Violation for LowercaseImportedAsNonLowercase {
@@ -42,7 +42,7 @@ impl Violation for LowercaseImportedAsNonLowercase {
 }
 
 /// N812
-pub fn lowercase_imported_as_non_lowercase(
+pub(crate) fn lowercase_imported_as_non_lowercase(
     name: &str,
     asname: &str,
     alias: &Alias,

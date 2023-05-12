@@ -1,9 +1,5 @@
 use std::str::FromStr;
 
-use itertools::Itertools;
-use schemars::_serde_json::Value;
-use schemars::schema::{InstanceType, Schema, SchemaObject};
-use schemars::JsonSchema;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -198,59 +194,71 @@ pub(crate) const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
     }
 }
 
-impl JsonSchema for RuleSelector {
-    fn schema_name() -> String {
-        "RuleSelector".to_string()
-    }
+#[cfg(feature = "schemars")]
+mod schema {
+    use crate::registry::RuleNamespace;
+    use crate::rule_selector::{Linter, Rule, RuleCodePrefix};
+    use crate::RuleSelector;
+    use itertools::Itertools;
+    use schemars::_serde_json::Value;
+    use schemars::schema::{InstanceType, Schema, SchemaObject};
+    use schemars::JsonSchema;
+    use strum::IntoEnumIterator;
 
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-        Schema::Object(SchemaObject {
-            instance_type: Some(InstanceType::String.into()),
-            enum_values: Some(
-                [
-                    // Include the non-standard "ALL" selector.
-                    "ALL".to_string(),
-                    // Include the legacy "C" and "T" selectors.
-                    "C".to_string(),
-                    "T".to_string(),
-                    // Include some common redirect targets for those legacy selectors.
-                    "C9".to_string(),
-                    "T1".to_string(),
-                    "T2".to_string(),
-                ]
-                .into_iter()
-                .chain(
-                    RuleCodePrefix::iter()
-                        .filter(|p| {
-                            // Once logical lines are active by default, please remove this.
-                            // This is here because generate-all output otherwise depends on
-                            // the feature sets which makes the test running with
-                            // `--all-features` fail
-                            !Rule::from_code(&format!(
-                                "{}{}",
-                                p.linter().common_prefix(),
-                                p.short_code()
-                            ))
-                            .unwrap()
-                            .lint_source()
-                            .is_logical_lines()
-                        })
-                        .map(|p| {
-                            let prefix = p.linter().common_prefix();
-                            let code = p.short_code();
-                            format!("{prefix}{code}")
-                        })
-                        .chain(Linter::iter().filter_map(|l| {
-                            let prefix = l.common_prefix();
-                            (!prefix.is_empty()).then(|| prefix.to_string())
-                        })),
-                )
-                .sorted()
-                .map(Value::String)
-                .collect(),
-            ),
-            ..SchemaObject::default()
-        })
+    impl JsonSchema for RuleSelector {
+        fn schema_name() -> String {
+            "RuleSelector".to_string()
+        }
+
+        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+            Schema::Object(SchemaObject {
+                instance_type: Some(InstanceType::String.into()),
+                enum_values: Some(
+                    [
+                        // Include the non-standard "ALL" selector.
+                        "ALL".to_string(),
+                        // Include the legacy "C" and "T" selectors.
+                        "C".to_string(),
+                        "T".to_string(),
+                        // Include some common redirect targets for those legacy selectors.
+                        "C9".to_string(),
+                        "T1".to_string(),
+                        "T2".to_string(),
+                    ]
+                    .into_iter()
+                    .chain(
+                        RuleCodePrefix::iter()
+                            .filter(|p| {
+                                // Once logical lines are active by default, please remove this.
+                                // This is here because generate-all output otherwise depends on
+                                // the feature sets which makes the test running with
+                                // `--all-features` fail
+                                !Rule::from_code(&format!(
+                                    "{}{}",
+                                    p.linter().common_prefix(),
+                                    p.short_code()
+                                ))
+                                .unwrap()
+                                .lint_source()
+                                .is_logical_lines()
+                            })
+                            .map(|p| {
+                                let prefix = p.linter().common_prefix();
+                                let code = p.short_code();
+                                format!("{prefix}{code}")
+                            })
+                            .chain(Linter::iter().filter_map(|l| {
+                                let prefix = l.common_prefix();
+                                (!prefix.is_empty()).then(|| prefix.to_string())
+                            })),
+                    )
+                    .sorted()
+                    .map(Value::String)
+                    .collect(),
+                ),
+                ..SchemaObject::default()
+            })
+        }
     }
 }
 

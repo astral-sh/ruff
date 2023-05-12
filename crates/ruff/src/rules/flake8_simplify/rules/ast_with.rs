@@ -1,6 +1,6 @@
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{self, Attributed, Stmt, StmtKind, Withitem};
 use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Violation};
@@ -42,9 +42,7 @@ use super::fix_with;
 /// ## References
 /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[violation]
-pub struct MultipleWithStatements {
-    pub fixable: bool,
-}
+pub struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -57,26 +55,25 @@ impl Violation for MultipleWithStatements {
         )
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Combine `with` statements"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Combine `with` statements".to_string())
     }
 }
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
-    let [Located { node: StmtKind::With { items, body, .. }, ..}] = body else { return None };
+    let [Attributed { node: StmtKind::With(ast::StmtWith { items, body, .. }), ..}] = body else { return None };
     find_last_with(body).or(Some((items, body)))
 }
 
 /// SIM117
-pub fn multiple_with_statements(
+pub(crate) fn multiple_with_statements(
     checker: &mut Checker,
     with_stmt: &Stmt,
     with_body: &[Stmt],
     with_parent: Option<&Stmt>,
 ) {
     if let Some(parent) = with_parent {
-        if let StmtKind::With { body, .. } = &parent.node {
+        if let StmtKind::With(ast::StmtWith { body, .. }) = &parent.node {
             if body.len() == 1 {
                 return;
             }
@@ -99,7 +96,7 @@ pub fn multiple_with_statements(
             checker.locator,
         );
         let mut diagnostic = Diagnostic::new(
-            MultipleWithStatements { fixable },
+            MultipleWithStatements,
             colon.map_or_else(
                 || with_stmt.range(),
                 |colon| TextRange::new(with_stmt.start(), colon.end()),
@@ -118,6 +115,7 @@ pub fn multiple_with_statements(
                         .universal_newlines()
                         .all(|line| line.width() <= checker.settings.line_length)
                     {
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(edit));
                     }
                 }

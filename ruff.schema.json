@@ -531,13 +531,6 @@
       "items": {
         "$ref": "#/definitions/RuleSelector"
       }
-    },
-    "update-check": {
-      "description": "Enable or disable automatic update checks (overridden by the `--update-check` and `--no-update-check` command-line flags).",
-      "type": [
-        "boolean",
-        "null"
-      ]
     }
   },
   "additionalProperties": false,
@@ -1932,6 +1925,7 @@
         "PGH002",
         "PGH003",
         "PGH004",
+        "PGH005",
         "PIE",
         "PIE7",
         "PIE79",

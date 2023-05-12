@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Arguments, Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,7 +17,7 @@ impl Violation for PropertyWithParameters {
 }
 
 /// PLR0206
-pub fn property_with_parameters(
+pub(crate) fn property_with_parameters(
     checker: &mut Checker,
     stmt: &Stmt,
     decorator_list: &[Expr],
@@ -25,7 +25,7 @@ pub fn property_with_parameters(
 ) {
     if !decorator_list
         .iter()
-        .any(|d| matches!(&d.node, ExprKind::Name { id, .. } if id == "property"))
+        .any(|d| matches!(&d.node, ExprKind::Name(ast::ExprName { id, .. }) if id == "property"))
     {
         return;
     }

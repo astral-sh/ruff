@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -30,7 +30,7 @@ use ruff_python_ast::source_code::Locator;
 /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
 #[violation]
 pub struct ErrorSuffixOnExceptionName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for ErrorSuffixOnExceptionName {
@@ -42,14 +42,14 @@ impl Violation for ErrorSuffixOnExceptionName {
 }
 
 /// N818
-pub fn error_suffix_on_exception_name(
+pub(crate) fn error_suffix_on_exception_name(
     class_def: &Stmt,
     bases: &[Expr],
     name: &str,
     locator: &Locator,
 ) -> Option<Diagnostic> {
     if !bases.iter().any(|base| {
-        if let ExprKind::Name { id, .. } = &base.node {
+        if let ExprKind::Name(ast::ExprName { id, .. }) = &base.node {
             id == "Exception" || id.ends_with("Error")
         } else {
             false

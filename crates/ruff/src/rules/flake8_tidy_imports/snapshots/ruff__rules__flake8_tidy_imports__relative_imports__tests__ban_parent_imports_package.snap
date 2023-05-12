@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 ---
-application.py:5:1: TID252 [*] Relative imports from parent modules are banned
+application.py:5:1: TID252 Relative imports from parent modules are banned
   |
 5 | import attrs
 6 | 

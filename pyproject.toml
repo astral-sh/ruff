@@ -39,10 +39,22 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Quality Assurance",
 ]
-urls = { repository = "https://github.com/charliermarsh/ruff" }
+
+[project.urls]
+Repository = "https://github.com/charliermarsh/ruff"
+Documentation = "https://beta.ruff.rs/docs/"
+Changelog = "https://github.com/charliermarsh/ruff/releases"
 
 [tool.maturin]
 bindings = "bin"
 manifest-path = "crates/ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true
+
+[tool.black]
+force-exclude = '''
+/(
+  | crates/ruff/resources
+  | crates/ruff_python_formatter/resources
+)/
+'''

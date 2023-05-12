@@ -17,7 +17,7 @@ fn find_block_index(forced_separate: &[String], imp: &dyn Importable) -> usize {
 /// patterns in `forced_separate`, in the order they appear in the
 /// `forced_separate` set. Empty blocks are retained for patterns that do not
 /// match any imports.
-pub fn split_by_forced_separate<'a>(
+pub(crate) fn split_by_forced_separate<'a>(
     block: ImportBlock<'a>,
     forced_separate: &[String],
 ) -> Vec<ImportBlock<'a>> {

@@ -10,10 +10,13 @@ use ruff_python_ast::source_code::Locator;
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
-pub mod actions;
+pub(crate) mod actions;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {
+pub(crate) fn fix_file(
+    diagnostics: &[Diagnostic],
+    locator: &Locator,
+) -> Option<(String, FixTable)> {
     let mut with_fixes = diagnostics
         .iter()
         .filter(|diag| diag.fix.is_some())
@@ -108,6 +111,7 @@ mod tests {
     use crate::autofix::apply_fixes;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
+    #[allow(deprecated)]
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
         edit.into_iter()
             .map(|edit| Diagnostic {

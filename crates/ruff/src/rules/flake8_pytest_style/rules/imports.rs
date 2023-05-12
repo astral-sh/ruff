@@ -18,7 +18,7 @@ fn is_pytest_or_subpackage(imported_name: &str) -> bool {
 }
 
 /// PT013
-pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Diagnostic> {
+pub(crate) fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Diagnostic> {
     if is_pytest_or_subpackage(name) {
         if let Some(alias) = asname {
             if alias != name {
@@ -33,10 +33,10 @@ pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Di
 }
 
 /// PT013
-pub fn import_from(
+pub(crate) fn import_from(
     import_from: &Stmt,
     module: Option<&str>,
-    level: Option<usize>,
+    level: Option<u32>,
 ) -> Option<Diagnostic> {
     // If level is not zero or module is none, return
     if let Some(level) = level {

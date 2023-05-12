@@ -2,16 +2,21 @@ use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Stylist;
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Expr};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-pub fn is_ambiguous_name(name: &str) -> bool {
+pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
 
-pub fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr], stylist: &Stylist) -> String {
+pub(crate) fn compare(
+    left: &Expr,
+    ops: &[Cmpop],
+    comparators: &[Expr],
+    stylist: &Stylist,
+) -> String {
     unparse_expr(
-        &create_expr(ExprKind::Compare {
+        &create_expr(ast::ExprCompare {
             left: Box::new(left.clone()),
             ops: ops.to_vec(),
             comparators: comparators.to_vec(),

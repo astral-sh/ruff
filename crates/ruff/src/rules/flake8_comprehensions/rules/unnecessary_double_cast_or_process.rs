@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -46,8 +46,8 @@ use super::helpers;
 /// - Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
 #[violation]
 pub struct UnnecessaryDoubleCastOrProcess {
-    pub inner: String,
-    pub outer: String,
+    inner: String,
+    outer: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryDoubleCastOrProcess {
@@ -64,7 +64,7 @@ impl AlwaysAutofixableViolation for UnnecessaryDoubleCastOrProcess {
 }
 
 /// C414
-pub fn unnecessary_double_cast_or_process(
+pub(crate) fn unnecessary_double_cast_or_process(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -84,7 +84,7 @@ pub fn unnecessary_double_cast_or_process(
     let Some(arg) = args.first() else {
         return;
     };
-    let ExprKind::Call { func, ..} = &arg.node else {
+    let ExprKind::Call(ast::ExprCall { func, ..} )= &arg.node else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {

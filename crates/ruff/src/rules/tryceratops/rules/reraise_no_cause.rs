@@ -3,7 +3,7 @@ use rustpython_parser::ast::{ExprKind, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::RaiseStatementVisitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::checkers::ast::Checker;
 
@@ -47,17 +47,17 @@ impl Violation for ReraiseNoCause {
 }
 
 /// TRY200
-pub fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn reraise_no_cause(checker: &mut Checker, body: &[Stmt]) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
-        for stmt in body {
-            visitor.visit_stmt(stmt);
-        }
+        visitor.visit_body(body);
         visitor.raises
     };
 
     for (range, exc, cause) in raises {
-        if exc.map_or(false, |expr| matches!(expr.node, ExprKind::Call { .. })) && cause.is_none() {
+        if exc.map_or(false, |expr| {
+            matches!(expr.node, ExprKind::Call(_)) && cause.is_none()
+        }) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(ReraiseNoCause, range));

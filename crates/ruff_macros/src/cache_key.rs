@@ -3,7 +3,7 @@ use quote::{format_ident, quote};
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields};
 
-pub fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
+pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
     let fields = match &item.data {
         Data::Enum(item_enum) => {
             let arms = item_enum.variants.iter().enumerate().map(|(i, variant)| {

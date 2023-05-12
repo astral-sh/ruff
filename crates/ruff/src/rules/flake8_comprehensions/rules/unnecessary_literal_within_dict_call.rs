@@ -11,7 +11,7 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum DictKind {
+pub(crate) enum DictKind {
     Literal,
     Comprehension,
 }
@@ -29,7 +29,7 @@ impl fmt::Display for DictKind {
 /// Checks for `dict` calls that take unnecessary `dict` literals or `dict`
 /// comprehensions as arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to wrap a `dict` literal or comprehension within a `dict`
 /// call, since the literal or comprehension syntax already returns a `dict`.
 ///
@@ -46,7 +46,7 @@ impl fmt::Display for DictKind {
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralWithinDictCall {
-    pub kind: DictKind,
+    kind: DictKind,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinDictCall {
@@ -62,7 +62,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinDictCall {
 }
 
 /// C418
-pub fn unnecessary_literal_within_dict_call(
+pub(crate) fn unnecessary_literal_within_dict_call(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -79,8 +79,8 @@ pub fn unnecessary_literal_within_dict_call(
         return;
     }
     let argument_kind = match argument {
-        ExprKind::DictComp { .. } => DictKind::Comprehension,
-        ExprKind::Dict { .. } => DictKind::Literal,
+        ExprKind::DictComp(_) => DictKind::Comprehension,
+        ExprKind::Dict(_) => DictKind::Literal,
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

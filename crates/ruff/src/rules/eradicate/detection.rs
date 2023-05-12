@@ -31,7 +31,7 @@ static PARTIAL_DICTIONARY_REGEX: Lazy<Regex> =
 static PRINT_RETURN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(print|return)\b\s*").unwrap());
 
 /// Returns `true` if a comment contains Python code.
-pub fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
+pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     let line = if let Some(line) = line.trim().strip_prefix('#') {
         line.trim_start_matches([' ', '#'])
     } else {

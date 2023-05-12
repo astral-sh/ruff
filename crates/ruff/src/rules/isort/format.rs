@@ -7,7 +7,7 @@ use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 const CAPACITY: usize = 200;
 
 /// Add a plain import statement to the [`RopeBuilder`].
-pub fn format_import(
+pub(crate) fn format_import(
     alias: &AliasData,
     comments: &CommentSet,
     is_first: bool,
@@ -40,7 +40,7 @@ pub fn format_import(
 
 /// Add an import-from statement to the [`RopeBuilder`].
 #[allow(clippy::too_many_arguments)]
-pub fn format_import_from(
+pub(crate) fn format_import_from(
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],

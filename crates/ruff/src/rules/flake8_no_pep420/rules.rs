@@ -26,7 +26,7 @@ use crate::fs;
 /// - `namespace-packages`
 #[violation]
 pub struct ImplicitNamespacePackage {
-    pub filename: String,
+    filename: String,
 }
 
 impl Violation for ImplicitNamespacePackage {
@@ -38,7 +38,7 @@ impl Violation for ImplicitNamespacePackage {
 }
 
 /// INP001
-pub fn implicit_namespace_package(
+pub(crate) fn implicit_namespace_package(
     path: &Path,
     package: Option<&Path>,
     project_root: &Path,

@@ -1,6 +1,6 @@
 use anyhow::bail;
 use itertools::Itertools;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::{unparse_constant, unparse_expr};
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum EmptyStringCmpop {
+pub(crate) enum EmptyStringCmpop {
     Is,
     IsNot,
     Eq,
@@ -31,7 +31,7 @@ impl TryFrom<&Cmpop> for EmptyStringCmpop {
 }
 
 impl EmptyStringCmpop {
-    pub fn into_unary(self) -> &'static str {
+    pub(crate) fn into_unary(self) -> &'static str {
         match self {
             Self::Is | Self::Eq => "not ",
             Self::IsNot | Self::NotEq => "",
@@ -77,8 +77,8 @@ impl std::fmt::Display for EmptyStringCmpop {
 /// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct CompareToEmptyString {
-    pub existing: String,
-    pub replacement: String,
+    existing: String,
+    replacement: String,
 }
 
 impl Violation for CompareToEmptyString {
@@ -91,7 +91,7 @@ impl Violation for CompareToEmptyString {
     }
 }
 
-pub fn compare_to_empty_string(
+pub(crate) fn compare_to_empty_string(
     checker: &mut Checker,
     left: &Expr,
     ops: &[Cmpop],
@@ -100,7 +100,7 @@ pub fn compare_to_empty_string(
     // Omit string comparison rules within subscripts. This is mostly commonly used within
     // DataFrame and np.ndarray indexing.
     for parent in checker.ctx.expr_ancestors() {
-        if matches!(parent.node, ExprKind::Subscript { .. }) {
+        if matches!(parent.node, ExprKind::Subscript(_)) {
             return;
         }
     }
@@ -114,7 +114,7 @@ pub fn compare_to_empty_string(
         if let Ok(op) = EmptyStringCmpop::try_from(op) {
             if std::mem::take(&mut first) {
                 // Check the left-most expression.
-                if let ExprKind::Constant { value, .. } = &lhs.node {
+                if let ExprKind::Constant(ast::ExprConstant { value, .. }) = &lhs.node {
                     if let Constant::Str(s) = value {
                         if s.is_empty() {
                             let constant = unparse_constant(value, checker.stylist);
@@ -134,7 +134,7 @@ pub fn compare_to_empty_string(
             }
 
             // Check all right-hand expressions.
-            if let ExprKind::Constant { value, .. } = &rhs.node {
+            if let ExprKind::Constant(ast::ExprConstant { value, .. }) = &rhs.node {
                 if let Constant::Str(s) = value {
                     if s.is_empty() {
                         let expr = unparse_expr(lhs, checker.stylist);

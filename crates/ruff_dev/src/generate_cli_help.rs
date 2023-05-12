@@ -19,7 +19,7 @@ const SUBCOMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated subcommand
 const SUBCOMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated subcommand help. -->";
 
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     #[arg(long, default_value_t, value_enum)]
     pub(crate) mode: Mode,
 }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,7 +45,7 @@ impl Violation for DjangoExcludeWithModelForm {
 }
 
 /// DJ006
-pub fn exclude_with_model_form(
+pub(crate) fn exclude_with_model_form(
     checker: &Checker,
     bases: &[Expr],
     body: &[Stmt],
@@ -54,18 +54,18 @@ pub fn exclude_with_model_form(
         return None;
     }
     for element in body.iter() {
-        let StmtKind::ClassDef { name, body, .. } = &element.node else {
+        let StmtKind::ClassDef(ast::StmtClassDef { name, body, .. }) = &element.node else {
             continue;
         };
         if name != "Meta" {
             continue;
         }
         for element in body.iter() {
-            let StmtKind::Assign { targets, .. } = &element.node else {
+            let StmtKind::Assign(ast::StmtAssign { targets, .. }) = &element.node else {
                 continue;
             };
             for target in targets.iter() {
-                let ExprKind::Name { id, .. } = &target.node else {
+                let ExprKind::Name(ast::ExprName { id, .. }) = &target.node else {
                     continue;
                 };
                 if id == "exclude" {

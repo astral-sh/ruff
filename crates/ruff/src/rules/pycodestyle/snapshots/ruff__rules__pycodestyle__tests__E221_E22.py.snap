@@ -6,7 +6,7 @@ E22.py:3:6: E221 Multiple spaces before operator
 3 | #: E221
 4 | a = 12 + 3
 5 | b = 4  + 5
-  |       E221
+  |      ^^ E221
 6 | #: E221 E221
 7 | x             = 1
   |
@@ -16,7 +16,7 @@ E22.py:5:2: E221 Multiple spaces before operator
 5 | b = 4  + 5
 6 | #: E221 E221
 7 | x             = 1
-  |   E221
+  |  ^^^^^^^^^^^^^ E221
 8 | y             = 2
 9 | long_variable = 3
   |
@@ -26,7 +26,7 @@ E22.py:6:2: E221 Multiple spaces before operator
  6 | #: E221 E221
  7 | x             = 1
  8 | y             = 2
-   |   E221
+   |  ^^^^^^^^^^^^^ E221
  9 | long_variable = 3
 10 | #: E221 E221
    |
@@ -36,7 +36,7 @@ E22.py:9:5: E221 Multiple spaces before operator
  9 | long_variable = 3
 10 | #: E221 E221
 11 | x[0]          = 1
-   |      E221
+   |     ^^^^^^^^^^ E221
 12 | x[1]          = 2
 13 | long_variable = 3
    |
@@ -46,7 +46,7 @@ E22.py:10:5: E221 Multiple spaces before operator
 10 | #: E221 E221
 11 | x[0]          = 1
 12 | x[1]          = 2
-   |      E221
+   |     ^^^^^^^^^^ E221
 13 | long_variable = 3
 14 | #: E221 E221
    |
@@ -56,7 +56,7 @@ E22.py:13:9: E221 Multiple spaces before operator
 13 | long_variable = 3
 14 | #: E221 E221
 15 | x = f(x)          + 1
-   |          E221
+   |         ^^^^^^^^^^ E221
 16 | y = long_variable + 2
 17 | z = x[0]          + 3
    |
@@ -66,7 +66,7 @@ E22.py:15:9: E221 Multiple spaces before operator
 15 | x = f(x)          + 1
 16 | y = long_variable + 2
 17 | z = x[0]          + 3
-   |          E221
+   |         ^^^^^^^^^^ E221
 18 | #: E221:3:14
 19 | text = """
    |
@@ -76,7 +76,7 @@ E22.py:19:14: E221 Multiple spaces before operator
 19 | text = """
 20 |     bar
 21 |     foo %s"""  % rofl
-   |               E221
+   |              ^^ E221
 22 | #: Okay
 23 | x = 1
    |

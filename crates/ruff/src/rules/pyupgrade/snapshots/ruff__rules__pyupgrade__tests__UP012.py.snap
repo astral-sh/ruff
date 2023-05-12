@@ -373,6 +373,7 @@ UP012.py:59:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    59 |+bR"foo\o"  # br"foo\o"
 60 60 | U"foo".encode("utf-8")  # b"foo"
 61 61 | print("foo".encode())  # print(b"foo")
+62 62 | 
 
 UP012.py:60:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -391,6 +392,8 @@ UP012.py:60:1: UP012 [*] Unnecessary call to `encode` as UTF-8
 60    |-U"foo".encode("utf-8")  # b"foo"
    60 |+b"foo"  # b"foo"
 61 61 | print("foo".encode())  # print(b"foo")
+62 62 | 
+63 63 | # `encode` on parenthesized strings.
 
 UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
@@ -398,6 +401,8 @@ UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
 62 | U"foo".encode("utf-8")  # b"foo"
 63 | print("foo".encode())  # print(b"foo")
    |       ^^^^^^^^^^^^^^ UP012
+64 | 
+65 | # `encode` on parenthesized strings.
    |
    = help: Rewrite as bytes literal
 
@@ -407,5 +412,58 @@ UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
 60 60 | U"foo".encode("utf-8")  # b"foo"
 61    |-print("foo".encode())  # print(b"foo")
    61 |+print(b"foo")  # print(b"foo")
+62 62 | 
+63 63 | # `encode` on parenthesized strings.
+64 64 | (
+
+UP012.py:64:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+64 |   # `encode` on parenthesized strings.
+65 | / (
+66 | |     "abc"
+67 | |     "def"
+68 | | ).encode()
+   | |__________^ UP012
+69 |   
+70 |   ((
+   |
+   = help: Rewrite as bytes literal
+
+ℹ Suggested fix
+62 62 | 
+63 63 | # `encode` on parenthesized strings.
+64 64 | (
+65    |-    "abc"
+66    |-    "def"
+67    |-).encode()
+   65 |+    b"abc"
+   66 |+    b"def"
+   67 |+)
+68 68 | 
+69 69 | ((
+70 70 |     "abc"
+
+UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+   |
+69 |   ).encode()
+70 |   
+71 | / ((
+72 | |     "abc"
+73 | |     "def"
+74 | | )).encode()
+   | |___________^ UP012
+   |
+   = help: Rewrite as bytes literal
+
+ℹ Suggested fix
+67 67 | ).encode()
+68 68 | 
+69 69 | ((
+70    |-    "abc"
+71    |-    "def"
+72    |-)).encode()
+   70 |+    b"abc"
+   71 |+    b"def"
+   72 |+))
 
 

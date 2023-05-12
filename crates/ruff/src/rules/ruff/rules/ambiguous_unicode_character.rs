@@ -7,12 +7,12 @@ use ruff_python_ast::source_code::Locator;
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::confusables::CONFUSABLES;
 use crate::rules::ruff::rules::Context;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
-    pub confusable: char,
-    pub representant: char,
+    confusable: char,
+    representant: char,
 }
 
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
@@ -39,8 +39,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
 
 #[violation]
 pub struct AmbiguousUnicodeCharacterDocstring {
-    pub confusable: char,
-    pub representant: char,
+    confusable: char,
+    representant: char,
 }
 
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
@@ -67,8 +67,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
 
 #[violation]
 pub struct AmbiguousUnicodeCharacterComment {
-    pub confusable: char,
-    pub representant: char,
+    confusable: char,
+    representant: char,
 }
 
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
@@ -93,12 +93,11 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
     }
 }
 
-pub fn ambiguous_unicode_character(
+pub(crate) fn ambiguous_unicode_character(
     locator: &Locator,
     range: TextRange,
     context: Context,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -135,7 +134,8 @@ pub fn ambiguous_unicode_character(
                         char_range,
                     );
                     if settings.rules.enabled(diagnostic.kind.rule()) {
-                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                        if settings.rules.should_fix(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 (representant as char).to_string(),
                                 char_range,

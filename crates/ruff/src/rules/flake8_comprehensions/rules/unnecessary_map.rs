@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Violation};
@@ -40,7 +40,7 @@ use super::helpers;
 ///   `{v: v ** 2 for v in values}`.
 #[violation]
 pub struct UnnecessaryMap {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl Violation for UnnecessaryMap {
@@ -56,19 +56,18 @@ impl Violation for UnnecessaryMap {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|UnnecessaryMap { obj_type }| {
-            if obj_type == "generator" {
-                format!("Replace `map` using a generator expression")
-            } else {
-                format!("Replace `map` using a `{obj_type}` comprehension")
-            }
+    fn autofix_title(&self) -> Option<String> {
+        let UnnecessaryMap { obj_type } = self;
+        Some(if obj_type == "generator" {
+            format!("Replace `map` using a generator expression")
+        } else {
+            format!("Replace `map` using a `{obj_type}` comprehension")
         })
     }
 }
 
 /// C417
-pub fn unnecessary_map(
+pub(crate) fn unnecessary_map(
     checker: &mut Checker,
     expr: &Expr,
     parent: Option<&Expr>,
@@ -95,7 +94,7 @@ pub fn unnecessary_map(
 
             // Exclude the parent if already matched by other arms
             if let Some(parent) = parent {
-                if let ExprKind::Call { func: f, .. } = &parent.node {
+                if let ExprKind::Call(ast::ExprCall { func: f, .. }) = &parent.node {
                     if let Some(id_parent) = helpers::expr_name(f) {
                         if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
                             return;
@@ -104,7 +103,7 @@ pub fn unnecessary_map(
                 };
             };
 
-            if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda { .. }) {
+            if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda(_)) {
                 let mut diagnostic = create_diagnostic("generator", expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
@@ -127,14 +126,14 @@ pub fn unnecessary_map(
             }
 
             if let Some(arg) = args.first() {
-                if let ExprKind::Call { func, args, .. } = &arg.node {
+                if let ExprKind::Call(ast::ExprCall { func, args, .. }) = &arg.node {
                     if args.len() != 2 {
                         return;
                     }
                     let Some(argument) = helpers::first_argument_with_matching_function("map", func, args) else {
                         return;
                     };
-                    if let ExprKind::Lambda { .. } = argument {
+                    if let ExprKind::Lambda(_) = argument {
                         let mut diagnostic = create_diagnostic(id, expr.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             #[allow(deprecated)]
@@ -159,12 +158,12 @@ pub fn unnecessary_map(
             }
 
             if args.len() == 1 {
-                if let ExprKind::Call { func, args, .. } = &args[0].node {
+                if let ExprKind::Call(ast::ExprCall { func, args, .. }) = &args[0].node {
                     let Some(argument) = helpers::first_argument_with_matching_function("map", func, args) else {
                         return;
                     };
-                    if let ExprKind::Lambda { body, .. } = &argument {
-                        if matches!(&body.node, ExprKind::Tuple { elts, .. } | ExprKind::List { elts, .. } if elts.len() == 2)
+                    if let ExprKind::Lambda(ast::ExprLambda { body, .. }) = &argument {
+                        if matches!(&body.node, ExprKind::Tuple(ast::ExprTuple { elts, .. }) | ExprKind::List(ast::ExprList { elts, .. } )if elts.len() == 2)
                         {
                             let mut diagnostic = create_diagnostic(id, expr.range());
                             if checker.patch(diagnostic.kind.rule()) {

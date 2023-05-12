@@ -127,7 +127,6 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         task_tags: None,
         typing_modules: None,
         unfixable: None,
-        update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
         flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
@@ -199,7 +198,6 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &directives,
         &settings,
         flags::Noqa::Enabled,
-        flags::Autofix::Enabled,
     );
 
     let source_code = locator.to_source_code();

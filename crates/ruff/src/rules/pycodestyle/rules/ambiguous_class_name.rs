@@ -34,7 +34,7 @@ impl Violation for AmbiguousClassName {
 }
 
 /// E742
-pub fn ambiguous_class_name<F>(name: &str, locate: F) -> Option<Diagnostic>
+pub(crate) fn ambiguous_class_name<F>(name: &str, locate: F) -> Option<Diagnostic>
 where
     F: FnOnce() -> TextRange,
 {

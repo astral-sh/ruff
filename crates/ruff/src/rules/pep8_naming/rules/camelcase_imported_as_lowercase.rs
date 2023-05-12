@@ -30,8 +30,8 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[violation]
 pub struct CamelcaseImportedAsLowercase {
-    pub name: String,
-    pub asname: String,
+    name: String,
+    asname: String,
 }
 
 impl Violation for CamelcaseImportedAsLowercase {
@@ -43,7 +43,7 @@ impl Violation for CamelcaseImportedAsLowercase {
 }
 
 /// N813
-pub fn camelcase_imported_as_lowercase(
+pub(crate) fn camelcase_imported_as_lowercase(
     name: &str,
     asname: &str,
     alias: &Alias,

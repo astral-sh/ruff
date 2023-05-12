@@ -151,6 +151,7 @@ UP006.py:45:10: UP006 Use `list` instead of `List` for type annotations
    |          ^^^^^^^^^^^^^^ UP006
 46 |     ...
    |
+   = help: Replace `List` with `list`
 
 UP006.py:49:11: UP006 [*] Use `list` instead of `List` for type annotations
    |
@@ -212,6 +213,7 @@ UP006.py:53:16: UP006 Use `list` instead of `List` for type annotations
    |                ^^^^^^^^^^^^^^ UP006
 54 |     ...
    |
+   = help: Replace `List` with `list`
 
 UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
    |
@@ -219,6 +221,7 @@ UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
    |          ^^^^^^^^^^^^^^^^^^^^^^ UP006
 58 |     ...
    |
+   = help: Replace `List` with `list`
 
 UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
    |
@@ -226,5 +229,6 @@ UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
    |          ^^^^^^^^^^^^^^^^^^^^^^ UP006
 58 |     ...
    |
+   = help: Replace `List` with `list`
 
 

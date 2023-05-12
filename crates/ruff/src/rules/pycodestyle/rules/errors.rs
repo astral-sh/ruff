@@ -1,6 +1,7 @@
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ParseError;
 
+use crate::logging::DisplayParseErrorType;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
@@ -33,12 +34,12 @@ impl Violation for SyntaxError {
 }
 
 /// E901
-pub fn syntax_error(
+pub(crate) fn syntax_error(
     diagnostics: &mut Vec<Diagnostic>,
     parse_error: &ParseError,
     locator: &Locator,
 ) {
-    let rest = locator.after(parse_error.location);
+    let rest = locator.after(parse_error.offset);
 
     // Try to create a non-empty range so that the diagnostic can print a caret at the
     // right position. This requires that we retrieve the next character, if any, and take its length
@@ -50,8 +51,8 @@ pub fn syntax_error(
 
     diagnostics.push(Diagnostic::new(
         SyntaxError {
-            message: parse_error.error.to_string(),
+            message: format!("{}", DisplayParseErrorType::new(&parse_error.error)),
         },
-        TextRange::at(parse_error.location, len),
+        TextRange::at(parse_error.offset, len),
     ));
 }

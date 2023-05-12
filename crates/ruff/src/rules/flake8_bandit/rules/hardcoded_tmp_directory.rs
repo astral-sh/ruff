@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 
 #[violation]
 pub struct HardcodedTempFile {
-    pub string: String,
+    string: String,
 }
 
 impl Violation for HardcodedTempFile {
@@ -20,7 +20,7 @@ impl Violation for HardcodedTempFile {
 }
 
 /// S108
-pub fn hardcoded_tmp_directory(
+pub(crate) fn hardcoded_tmp_directory(
     expr: &Expr,
     value: &str,
     prefixes: &[String],

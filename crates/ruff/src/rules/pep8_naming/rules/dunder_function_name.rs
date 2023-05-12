@@ -41,7 +41,7 @@ impl Violation for DunderFunctionName {
 }
 
 /// N807
-pub fn dunder_function_name(
+pub(crate) fn dunder_function_name(
     scope: &Scope,
     stmt: &Stmt,
     name: &str,

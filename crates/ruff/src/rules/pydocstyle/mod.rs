@@ -168,4 +168,23 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn all() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/all.py"),
+            &settings::Settings::for_rules([
+                Rule::UndocumentedPublicModule,
+                Rule::UndocumentedPublicClass,
+                Rule::UndocumentedPublicMethod,
+                Rule::UndocumentedPublicFunction,
+                Rule::UndocumentedPublicPackage,
+                Rule::UndocumentedMagicMethod,
+                Rule::UndocumentedPublicNestedClass,
+                Rule::UndocumentedPublicInit,
+            ]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 }

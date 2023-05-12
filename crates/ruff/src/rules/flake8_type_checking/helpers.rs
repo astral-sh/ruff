@@ -1,5 +1,5 @@
 use num_traits::Zero;
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
@@ -8,23 +8,23 @@ use ruff_python_semantic::context::Context;
 use ruff_python_semantic::scope::ScopeKind;
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
-pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
+pub(crate) fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
     // Ex) `if False:`
     if matches!(
         test.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Bool(false),
             ..
-        }
+        })
     ) {
         return true;
     }
 
     // Ex) `if 0:`
-    if let ExprKind::Constant {
+    if let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Int(value),
         ..
-    } = &test.node
+    }) = &test.node
     {
         if value.is_zero() {
             return true;
@@ -41,7 +41,7 @@ pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
     false
 }
 
-pub const fn is_valid_runtime_import(binding: &Binding) -> bool {
+pub(crate) const fn is_valid_runtime_import(binding: &Binding) -> bool {
     if matches!(
         binding.kind,
         BindingKind::Importation(..)
@@ -54,7 +54,7 @@ pub const fn is_valid_runtime_import(binding: &Binding) -> bool {
     }
 }
 
-pub fn runtime_evaluated(
+pub(crate) fn runtime_evaluated(
     context: &Context,
     base_classes: &[String],
     decorators: &[String],

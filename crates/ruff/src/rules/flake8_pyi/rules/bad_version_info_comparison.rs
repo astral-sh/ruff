@@ -56,7 +56,7 @@ impl Violation for BadVersionInfoComparison {
 }
 
 /// PYI006
-pub fn bad_version_info_comparison(
+pub(crate) fn bad_version_info_comparison(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,

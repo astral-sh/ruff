@@ -14,7 +14,7 @@ use crate::args::Overrides;
 
 /// Resolve the relevant settings strategy and defaults for the current
 /// invocation.
-pub fn resolve(
+pub(crate) fn resolve(
     isolated: bool,
     config: Option<&Path>,
     overrides: &Overrides,

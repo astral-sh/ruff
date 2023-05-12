@@ -36,7 +36,7 @@ use ruff_python_ast::source_code::Locator;
 /// [PEP 8]: https://peps.python.org/pep-0008/#class-names
 #[violation]
 pub struct InvalidClassName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for InvalidClassName {
@@ -48,7 +48,11 @@ impl Violation for InvalidClassName {
 }
 
 /// N801
-pub fn invalid_class_name(class_def: &Stmt, name: &str, locator: &Locator) -> Option<Diagnostic> {
+pub(crate) fn invalid_class_name(
+    class_def: &Stmt,
+    name: &str,
+    locator: &Locator,
+) -> Option<Diagnostic> {
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
         return Some(Diagnostic::new(

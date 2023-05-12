@@ -33,7 +33,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
 pub struct InvalidArgumentName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for InvalidArgumentName {
@@ -45,7 +45,11 @@ impl Violation for InvalidArgumentName {
 }
 
 /// N803
-pub fn invalid_argument_name(name: &str, arg: &Arg, ignore_names: &[String]) -> Option<Diagnostic> {
+pub(crate) fn invalid_argument_name(
+    name: &str,
+    arg: &Arg,
+    ignore_names: &[String],
+) -> Option<Diagnostic> {
     if ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return None;
     }

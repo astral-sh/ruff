@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, KeywordData};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,7 +42,7 @@ impl<'a> FormatSummaryValues<'a> {
     fn try_from_expr(checker: &'a Checker, expr: &'a Expr) -> Option<Self> {
         let mut extracted_args: Vec<String> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, String> = FxHashMap::default();
-        if let ExprKind::Call { args, keywords, .. } = &expr.node {
+        if let ExprKind::Call(ast::ExprCall { args, keywords, .. }) = &expr.node {
             for arg in args {
                 let arg = checker.locator.slice(arg.range());
                 if contains_invalids(arg) {
@@ -104,18 +104,18 @@ fn contains_invalids(string: &str) -> bool {
 
 /// Generate an f-string from an [`Expr`].
 fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
-    let ExprKind::Call { func, .. } = &expr.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
         return None;
     };
-    let ExprKind::Attribute { value, .. } = &func.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &func.node else {
         return None;
     };
     if !matches!(
         &value.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(..),
             ..
-        },
+        }),
     ) {
         return None;
     };
@@ -277,6 +277,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     let mut diagnostic = Diagnostic::new(FString, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents,
             expr.range(),

@@ -7,7 +7,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 #[violation]
 pub struct WhitespaceBeforeParameters {
-    pub bracket: TokenKind,
+    bracket: TokenKind,
 }
 
 impl WhitespaceBeforeParameters {
@@ -63,6 +63,7 @@ pub(crate) fn whitespace_before_parameters(
             let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
 
             if autofix {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::deletion(start, end)));
             }
             context.push_diagnostic(diagnostic);

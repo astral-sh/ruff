@@ -1,14 +1,14 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
-pub fn expr_name(func: &Expr) -> Option<&str> {
-    if let ExprKind::Name { id, .. } = &func.node {
+pub(crate) fn expr_name(func: &Expr) -> Option<&str> {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         Some(id)
     } else {
         None
     }
 }
 
-pub fn exactly_one_argument_with_matching_function<'a>(
+pub(crate) fn exactly_one_argument_with_matching_function<'a>(
     name: &str,
     func: &Expr,
     args: &'a [Expr],
@@ -26,7 +26,7 @@ pub fn exactly_one_argument_with_matching_function<'a>(
     Some(&args[0].node)
 }
 
-pub fn first_argument_with_matching_function<'a>(
+pub(crate) fn first_argument_with_matching_function<'a>(
     name: &str,
     func: &Expr,
     args: &'a [Expr],

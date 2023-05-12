@@ -10,7 +10,7 @@ use syn::{
 
 use crate::rule_code_prefix::{get_prefix_ident, if_all_same};
 
-pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
+pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let Some(last_stmt) = func.block.stmts.last() else {
         return Err(Error::new(func.block.span(), "expected body to end in an expression"));
     };

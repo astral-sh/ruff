@@ -57,7 +57,7 @@ impl AllSettings {
                 fix_only: config.fix_only.unwrap_or(false),
                 format: config.format.unwrap_or_default(),
                 show_fixes: config.show_fixes.unwrap_or(false),
-                update_check: config.update_check.unwrap_or_default(),
+                show_source: config.show_source.unwrap_or(false),
             },
             lib: Settings::from_configuration(config, project_root)?,
         })
@@ -66,15 +66,14 @@ impl AllSettings {
 
 #[derive(Debug, Default, Clone)]
 #[allow(clippy::struct_excessive_bools)]
-/// Settings that are not used by this library and
-/// only here so that `ruff_cli` can use them.
+/// Settings that are not used by this library and only here so that `ruff_cli` can use them.
 pub struct CliSettings {
     pub cache_dir: PathBuf,
     pub fix: bool,
     pub fix_only: bool,
     pub format: SerializationFormat,
     pub show_fixes: bool,
-    pub update_check: bool,
+    pub show_source: bool,
 }
 
 #[derive(Debug, CacheKey)]
@@ -83,7 +82,6 @@ pub struct Settings {
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
-    pub show_source: bool,
     pub target_version: PythonVersion,
 
     // Resolver settings
@@ -170,7 +168,6 @@ impl Settings {
                 config.per_file_ignores.unwrap_or_default(),
             )?,
             respect_gitignore: config.respect_gitignore.unwrap_or(true),
-            show_source: config.show_source.unwrap_or_default(),
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
@@ -431,7 +428,7 @@ pub fn resolve_per_file_ignores(
 
 #[cfg(test)]
 mod tests {
-    use crate::codes::{self, Pycodestyle};
+    use crate::codes::Pycodestyle;
     use crate::registry::{Rule, RuleSet};
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
@@ -451,7 +448,7 @@ mod tests {
     #[test]
     fn rule_codes() {
         let actual = resolve_rules([RuleSelection {
-            select: Some(vec![codes::Pycodestyle::W.into()]),
+            select: Some(vec![Pycodestyle::W.into()]),
             ..RuleSelection::default()
         }]);
 

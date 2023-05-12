@@ -93,17 +93,18 @@ fn test_stdin_json() -> Result<()> {
     "code": "F401",
     "message": "`os` imported but unused",
     "fix": {{
+      "applicability": "Unspecified",
       "message": "Remove unused import: `os`",
       "edits": [
         {{
           "content": "",
           "location": {{
             "row": 1,
-            "column": 0
+            "column": 1
           }},
           "end_location": {{
             "row": 2,
-            "column": 0
+            "column": 1
           }}
         }}
       ]
@@ -195,7 +196,15 @@ fn explain_status_codes() -> Result<()> {
 fn show_statistics() -> Result<()> {
     let mut cmd = Command::cargo_bin(BIN_NAME)?;
     let output = cmd
-        .args(["-", "--format", "text", "--select", "F401", "--statistics"])
+        .args([
+            "-",
+            "--format",
+            "text",
+            "--select",
+            "F401",
+            "--statistics",
+            "--isolated",
+        ])
         .write_stdin("import sys\nimport os\n\nprint(os.getuid())\n")
         .assert()
         .failure();

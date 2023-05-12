@@ -12,7 +12,7 @@ use super::helpers;
 /// Checks for `set` calls that take unnecessary `list` or `tuple` literals
 /// as arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a call to `set`.
 /// Instead, the expression can be rewritten as a set literal.
 ///
@@ -31,7 +31,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralSet {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
@@ -47,7 +47,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub fn unnecessary_literal_set(
+pub(crate) fn unnecessary_literal_set(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -61,8 +61,8 @@ pub fn unnecessary_literal_set(
         return;
     }
     let kind = match argument {
-        ExprKind::List { .. } => "list",
-        ExprKind::Tuple { .. } => "tuple",
+        ExprKind::List(_) => "list",
+        ExprKind::Tuple(_) => "tuple",
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

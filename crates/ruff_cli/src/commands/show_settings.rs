@@ -10,7 +10,7 @@ use ruff::resolver::PyprojectConfig;
 use crate::args::Overrides;
 
 /// Print the user-facing configuration settings.
-pub fn show_settings(
+pub(crate) fn show_settings(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,

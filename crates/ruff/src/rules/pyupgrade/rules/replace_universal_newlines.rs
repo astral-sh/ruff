@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
+pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -35,6 +35,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[
         let range = TextRange::at(kwarg.start(), "universal_newlines".text_len());
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "text".to_string(),
                 range,

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -47,9 +47,7 @@ use crate::registry::{AsRule, Rule};
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[violation]
-pub struct RawStringInException {
-    pub fixable: bool,
-}
+pub struct RawStringInException;
 
 impl Violation for RawStringInException {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -59,9 +57,8 @@ impl Violation for RawStringInException {
         format!("Exception must not use a string literal, assign to variable first")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Assign to variable; remove string literal"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Assign to variable; remove string literal".to_string())
     }
 }
 
@@ -104,9 +101,7 @@ impl Violation for RawStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[violation]
-pub struct FStringInException {
-    pub fixable: bool,
-}
+pub struct FStringInException;
 
 impl Violation for FStringInException {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -116,9 +111,8 @@ impl Violation for FStringInException {
         format!("Exception must not use an f-string literal, assign to variable first")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Assign to variable; remove f-string literal"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Assign to variable; remove f-string literal".to_string())
     }
 }
 
@@ -163,9 +157,7 @@ impl Violation for FStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[violation]
-pub struct DotFormatInException {
-    pub fixable: bool,
-}
+pub struct DotFormatInException;
 
 impl Violation for DotFormatInException {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -175,9 +167,8 @@ impl Violation for DotFormatInException {
         format!("Exception must not use a `.format()` string directly, assign to variable first")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Assign to variable; remove `.format()` string"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Assign to variable; remove `.format()` string".to_string())
     }
 }
 
@@ -193,16 +184,17 @@ impl Violation for DotFormatInException {
 /// 2. Replace the exception argument with the variable name.
 fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &str) -> Fix {
     let assignment = unparse_stmt(
-        &create_stmt(StmtKind::Assign {
-            targets: vec![create_expr(ExprKind::Name {
-                id: String::from("msg"),
+        &create_stmt(StmtKind::Assign(ast::StmtAssign {
+            targets: vec![create_expr(ExprKind::Name(ast::ExprName {
+                id: "msg".into(),
                 ctx: ExprContext::Store,
-            })],
+            }))],
             value: Box::new(exc_arg.clone()),
             type_comment: None,
-        }),
+        })),
         stylist,
     );
+    #[allow(deprecated)]
     Fix::unspecified_edits(
         Edit::insertion(
             format!(
@@ -221,15 +213,15 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
 }
 
 /// EM101, EM102, EM103
-pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
-    if let ExprKind::Call { args, .. } = &exc.node {
+pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
+    if let ExprKind::Call(ast::ExprCall { args, .. }) = &exc.node {
         if let Some(first) = args.first() {
             match &first.node {
                 // Check for string literals
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Str(string),
                     ..
-                } => {
+                }) => {
                     if checker.settings.rules.enabled(Rule::RawStringInException) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
                             let indentation = whitespace::indentation(checker.locator, stmt)
@@ -240,12 +232,8 @@ pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
                                         None
                                     }
                                 });
-                            let mut diagnostic = Diagnostic::new(
-                                RawStringInException {
-                                    fixable: indentation.is_some(),
-                                },
-                                first.range(),
-                            );
+                            let mut diagnostic =
+                                Diagnostic::new(RawStringInException, first.range());
                             if let Some(indentation) = indentation {
                                 if checker.patch(diagnostic.kind.rule()) {
                                     diagnostic.set_fix(generate_fix(
@@ -261,7 +249,7 @@ pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
                     }
                 }
                 // Check for f-strings
-                ExprKind::JoinedStr { .. } => {
+                ExprKind::JoinedStr(_) => {
                     if checker.settings.rules.enabled(Rule::FStringInException) {
                         let indentation = whitespace::indentation(checker.locator, stmt).and_then(
                             |indentation| {
@@ -272,12 +260,7 @@ pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
                                 }
                             },
                         );
-                        let mut diagnostic = Diagnostic::new(
-                            FStringInException {
-                                fixable: indentation.is_some(),
-                            },
-                            first.range(),
-                        );
+                        let mut diagnostic = Diagnostic::new(FStringInException, first.range());
                         if let Some(indentation) = indentation {
                             if checker.patch(diagnostic.kind.rule()) {
                                 diagnostic.set_fix(generate_fix(
@@ -292,10 +275,12 @@ pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
                     }
                 }
                 // Check for .format() calls
-                ExprKind::Call { func, .. } => {
+                ExprKind::Call(ast::ExprCall { func, .. }) => {
                     if checker.settings.rules.enabled(Rule::DotFormatInException) {
-                        if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                            if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
+                        if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) =
+                            &func.node
+                        {
+                            if attr == "format" && matches!(value.node, ExprKind::Constant(_)) {
                                 let indentation = whitespace::indentation(checker.locator, stmt)
                                     .and_then(|indentation| {
                                         if checker.ctx.find_binding("msg").is_none() {
@@ -304,12 +289,8 @@ pub fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
                                             None
                                         }
                                     });
-                                let mut diagnostic = Diagnostic::new(
-                                    DotFormatInException {
-                                        fixable: indentation.is_some(),
-                                    },
-                                    first.range(),
-                                );
+                                let mut diagnostic =
+                                    Diagnostic::new(DotFormatInException, first.range());
                                 if let Some(indentation) = indentation {
                                     if checker.patch(diagnostic.kind.rule()) {
                                         diagnostic.set_fix(generate_fix(

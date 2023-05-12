@@ -249,7 +249,7 @@ C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehen
 18 18 | # Error, but unfixable.
 19 19 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
 
-C417.py:21:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:21:1: C417 Unnecessary `map` usage (rewrite using a generator expression)
    |
 21 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
 22 | # For more complex expressions, this would differ: `(x + 2 if x else 3 for x in nums)`.
