@@ -178,16 +178,7 @@ fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
 }
 
 /// RUF009
-<<<<<<< HEAD:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_class_fields.rs
-pub fn function_call_in_dataclass_defaults(
-    checker: &mut Checker,
-    body: &[Stmt],
-    is_dataclass: bool,
-    emit_dataclass_error: bool,
-) {
-=======
 pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt]) {
->>>>>>> ruff/main:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_dataclass_fields.rs
     let extend_immutable_calls: Vec<CallPath> = checker
         .settings
         .flake8_bugbear
@@ -206,32 +197,16 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
             if is_class_var_annotation(&checker.ctx, annotation) {
                 continue;
             }
-<<<<<<< HEAD:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_class_fields.rs
-            if let ExprKind::Call { func, .. } = &expr.node {
-                if !(is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
-                    || is_dataclass && is_allowed_dataclass_function(&checker.ctx, func))
-=======
             if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
                 if !is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
                     && !is_allowed_dataclass_function(&checker.ctx, func)
->>>>>>> ruff/main:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_dataclass_fields.rs
                 {
-                    let diagnostic: Diagnostic = if emit_dataclass_error {
-                        Diagnostic::new(
-                            FunctionCallInDataclassDefaultArgument {
-                                name: compose_call_path(func),
-                            },
-                            expr.range(),
-                        )
-                    } else {
-                        Diagnostic::new(
-                            FunctionCallInClassDefaultArgument {
-                                name: compose_call_path(func),
-                            },
-                            expr.range(),
-                        )
-                    };
-                    checker.diagnostics.push(diagnostic);
+                    checker.diagnostics.push(Diagnostic::new(
+                        FunctionCallInDataclassDefaultArgument {
+                            name: compose_call_path(func),
+                        },
+                        expr.range(),
+                    ));
                 }
             }
         }
@@ -239,18 +214,7 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
 }
 
 /// RUF008
-<<<<<<< HEAD:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_class_fields.rs
-pub fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
-    fn diagnostic(emit_dataclass_error: bool, value: &Expr) -> Diagnostic {
-        if emit_dataclass_error {
-            Diagnostic::new(MutableDataclassDefault, value.range())
-        } else {
-        }
-    }
-
-=======
-pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
->>>>>>> ruff/main:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_dataclass_fields.rs
+pub(crate) fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
     for statement in body {
         match &statement.node {
             StmtKind::AnnAssign(ast::StmtAnnAssign {
@@ -264,8 +228,7 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
                 {
                     checker
                         .diagnostics
-                        .push(
-            Diagnostic::new(MutableClassDefault, value.range()));
+                        .push(Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
             StmtKind::Assign(ast::StmtAssign { value, .. }) => {

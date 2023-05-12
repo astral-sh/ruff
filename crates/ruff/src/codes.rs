@@ -725,10 +725,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "005") => Rule::CollectionLiteralConcatenation,
         (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "007") => Rule::PairwiseOverZipped,
-        (Ruff, "008") => Rule::MutableDataclassDefault,
+        (Ruff, "008") => Rule::MutableClassDefault,
         (Ruff, "009") => Rule::FunctionCallInDataclassDefaultArgument,
-        (Ruff, "010") => Rule::MutableClassDefault,
-        (Ruff, "011") => Rule::FunctionCallInClassDefaultArgument,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django
