@@ -1,9 +1,9 @@
 name: "[ruff] Release"
 
 on:
-  workflow_dispatch:
-  release:
-    types: [published]
+  push:
+    tags:
+      - v*
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -45,9 +45,9 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-            ARCHIVE_FILE=ruff-x86_64-apple-darwin.tar.gz
-            tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
-            shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+          ARCHIVE_FILE=ruff-x86_64-apple-darwin.tar.gz
+          tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
         with:
@@ -82,9 +82,9 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-            ARCHIVE_FILE=ruff-aarch64-apple-darwin.tar.gz
-            tar czvf $ARCHIVE_FILE -C target/aarch64-apple-darwin/release ruff
-            shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+          ARCHIVE_FILE=ruff-aarch64-apple-darwin.tar.gz
+          tar czvf $ARCHIVE_FILE -C target/aarch64-apple-darwin/release ruff
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
         with:
@@ -132,9 +132,9 @@ jobs:
       - name: "Archive binary"
         shell: bash
         run: |
-            ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.zip
-            7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
-            sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.zip
+          7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
+          sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
         with:
@@ -177,9 +177,9 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-            ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
-            tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
-            shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
         with:
@@ -235,7 +235,7 @@ jobs:
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             ruff --help
-            python -m ruff --help
+            python3 -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -243,9 +243,9 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-            ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
-            tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
-            shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
         with:
@@ -293,9 +293,9 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-            ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
-            tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
-            shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
         with:
@@ -347,9 +347,9 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-            ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
-            tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
-            shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v3
         with:
