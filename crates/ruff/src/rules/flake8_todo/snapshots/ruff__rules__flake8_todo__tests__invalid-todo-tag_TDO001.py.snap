@@ -10,15 +10,6 @@ TDO001.py:7:3: TDO001 Invalid TODO tag: `XXX` should be `TODO`
 10 | # FIXME (evanrittenhouse): this is not fine
    |
 
-TDO001.py:8:3: TDO001 Invalid TODO tag: `BUG` should be `TODO`
-   |
- 8 | # T001 - errors
- 9 | # XXX (evanrittenhouse): this is not fine
-10 | # BUG (evanrittenhouse): this is not fine
-   |   ^^^ TDO001
-11 | # FIXME (evanrittenhouse): this is not fine
-   |
-
 TDO001.py:9:3: TDO001 Invalid TODO tag: `FIXME` should be `TODO`
    |
  9 | # XXX (evanrittenhouse): this is not fine

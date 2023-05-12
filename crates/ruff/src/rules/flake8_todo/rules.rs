@@ -22,7 +22,7 @@ use crate::{
 /// If someone greps for a TODO to fix, but the comment is tagged with a "FIXME"
 /// tag instead of a "TODO", that comment may never be found!
 ///
-/// Note that this rule will only flag "FIXME", "BUG", and "XXX" tags as incorrect.
+/// Note that this rule will only flag "FIXME" and "XXX" tags as incorrect.
 ///
 /// ## Example
 /// ```python
@@ -209,9 +209,8 @@ impl Violation for MissingSpaceAfterColonInTodo {
 
 // Matches against any of the 4 recognized PATTERNS.
 static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
-    let patterns: [&str; 4] = [
+    let patterns: [&str; 3] = [
         r#"^#\s*(?i)(TODO).*$"#,
-        r#"^#\s*(?i)(BUG).*$"#,
         r#"^#\s*(?i)(FIXME).*$"#,
         r#"^#\s*(?i)(XXX).*$"#,
     ];
@@ -221,8 +220,7 @@ static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 
 // Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the length of the
 // tag that we're trying to capture.
-static PATTERN_TAG_LENGTH: &'static [usize; 4] =
-    &["TODO".len(), "BUG".len(), "FIXME".len(), "XXX".len()];
+static PATTERN_TAG_LENGTH: &'static [usize; 3] = &["TODO".len(), "FIXME".len(), "XXX".len()];
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
