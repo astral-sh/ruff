@@ -6,10 +6,10 @@ use ruff_python_semantic::context::Snapshot;
 /// A collection of AST nodes that are deferred for later analysis.
 /// Used to, e.g., store functions, whose bodies shouldn't be analyzed until all
 /// module-level definitions have been analyzed.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct Deferred<'a> {
     pub(crate) string_type_definitions: Vec<(TextRange, &'a str, Snapshot)>,
-    pub(crate) type_definitions: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) future_type_definitions: Vec<(&'a Expr, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,
     pub(crate) lambdas: Vec<(&'a Expr, Snapshot)>,
     pub(crate) for_loops: Vec<Snapshot>,
