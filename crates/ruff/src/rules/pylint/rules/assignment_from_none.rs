@@ -1,7 +1,6 @@
-use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
 
 use crate::checkers::ast::Checker;
 
@@ -47,7 +46,18 @@ pub fn assignment_from_none(checker: &mut Checker, body: &Stmt) {
         if let Some(expr) = value {
             // if function call
             if let ExprKind::Call { func, .. } = expr.node() {
+                println!("{:?}", body);
                 println!("{:?}", func);
+                // let function_name = func.node.name();
+                // for node in ast.iter() {
+                //     match node.kind {
+                //         StmtKind::FunctionDef { name, returns, .. } if name == function_name => {
+                //              You've found the function definition
+                //              Now you can inspect its body to see if it returns None
+                //         }
+                //         _ => {}
+                //     }
+                // }
                 checker.diagnostics.push(Diagnostic::new(
                     AssignmentFromNone { kind: Kind::Empty },
                     body.range(),
