@@ -396,13 +396,12 @@ impl<'a> Context<'a> {
     }
 
     /// Return the [`ExecutionContext`] of the current scope.
-    pub fn execution_context(&self) -> ExecutionContext {
-        if self.flags.intersects(
-            ContextFlags::TYPE_CHECKING_BLOCK
-                | ContextFlags::ANNOTATION
-                | ContextFlags::COMPLEX_STRING_TYPE_DEFINITION
-                | ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
-        ) {
+    pub const fn execution_context(&self) -> ExecutionContext {
+        if self.in_type_checking_block()
+            || self.in_annotation()
+            || self.in_complex_string_type_definition()
+            || self.in_simple_string_type_definition()
+        {
             ExecutionContext::Typing
         } else {
             ExecutionContext::Runtime
@@ -443,81 +442,81 @@ impl<'a> Context<'a> {
     }
 
     /// Return `true` if the context is in a type annotation.
-    pub fn in_annotation(&self) -> bool {
+    pub const fn in_annotation(&self) -> bool {
         self.flags.contains(ContextFlags::ANNOTATION)
     }
 
     /// Return `true` if the context is in a type definition.
-    pub fn in_type_definition(&self) -> bool {
+    pub const fn in_type_definition(&self) -> bool {
         self.flags.contains(ContextFlags::TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in a "simple" string type definition.
-    pub fn in_simple_string_type_definition(&self) -> bool {
+    pub const fn in_simple_string_type_definition(&self) -> bool {
         self.flags
             .contains(ContextFlags::SIMPLE_STRING_TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in a "complex" string type definition.
-    pub fn in_complex_string_type_definition(&self) -> bool {
+    pub const fn in_complex_string_type_definition(&self) -> bool {
         self.flags
             .contains(ContextFlags::COMPLEX_STRING_TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in a `__future__` type definition.
-    pub fn in_future_type_definition(&self) -> bool {
+    pub const fn in_future_type_definition(&self) -> bool {
         self.flags.contains(ContextFlags::FUTURE_TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in any kind of deferred type definition.
-    pub fn in_deferred_type_definition(&self) -> bool {
+    pub const fn in_deferred_type_definition(&self) -> bool {
         self.in_simple_string_type_definition()
             || self.in_complex_string_type_definition()
             || self.in_future_type_definition()
     }
 
     /// Return `true` if the context is in an exception handler.
-    pub fn in_exception_handler(&self) -> bool {
+    pub const fn in_exception_handler(&self) -> bool {
         self.flags.contains(ContextFlags::EXCEPTION_HANDLER)
     }
 
     /// Return `true` if the context is in an f-string.
-    pub fn in_f_string(&self) -> bool {
+    pub const fn in_f_string(&self) -> bool {
         self.flags.contains(ContextFlags::F_STRING)
     }
 
     /// Return `true` if the context is in boolean test.
-    pub fn in_boolean_test(&self) -> bool {
+    pub const fn in_boolean_test(&self) -> bool {
         self.flags.contains(ContextFlags::BOOLEAN_TEST)
     }
 
     /// Return `true` if the context is in a `typing::Literal` annotation.
-    pub fn in_literal(&self) -> bool {
+    pub const fn in_literal(&self) -> bool {
         self.flags.contains(ContextFlags::LITERAL)
     }
 
     /// Return `true` if the context is in a subscript expression.
-    pub fn in_subscript(&self) -> bool {
+    pub const fn in_subscript(&self) -> bool {
         self.flags.contains(ContextFlags::SUBSCRIPT)
     }
 
     /// Return `true` if the context is in a type-checking block.
-    pub fn in_type_checking_block(&self) -> bool {
+    pub const fn in_type_checking_block(&self) -> bool {
         self.flags.contains(ContextFlags::TYPE_CHECKING_BLOCK)
     }
 
     /// Return `true` if the context has traversed past the "top-of-file" import boundary.
-    pub fn seen_import_boundary(&self) -> bool {
+    pub const fn seen_import_boundary(&self) -> bool {
         self.flags.contains(ContextFlags::IMPORT_BOUNDARY)
     }
 
     /// Return `true` if the context has traverse past the `__future__` import boundary.
-    pub fn seen_futures_boundary(&self) -> bool {
+    pub const fn seen_futures_boundary(&self) -> bool {
         self.flags.contains(ContextFlags::FUTURES_BOUNDARY)
     }
 
     /// Return `true` if `__future__`-style type annotations are enabled.
-    pub fn future_annotations(&self) -> bool {
+    pub const fn future_annotations(&self) -> bool {
         self.flags.contains(ContextFlags::FUTURE_ANNOTATIONS)
     }
 }
