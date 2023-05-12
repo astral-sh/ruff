@@ -3643,6 +3643,17 @@ where
                     flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
+            ExprKind::FormattedValue(ast::ExprFormattedValue {
+                value, conversion, ..
+            }) => {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::ExplicitFStringTypeConversion)
+                {
+                    ruff::rules::explicit_f_string_type_conversion(self, expr, value, *conversion);
+                }
+            }
             _ => {}
         };
 
