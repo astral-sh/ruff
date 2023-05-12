@@ -1102,7 +1102,7 @@ where
                     .rules
                     .enabled(Rule::MissingFutureAnnotationsWithImports)
                 {
-                    if let Some(module) = module.as_deref() {
+                    if let Some(module) = module {
                         flake8_future_annotations::rules::missing_future_annotations_from_typing_import(
                             self,
                             stmt,

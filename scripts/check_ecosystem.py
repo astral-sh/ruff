@@ -161,7 +161,7 @@ async def compare(
     ruff1: Path,
     ruff2: Path,
     repo: Repository,
-    checkouts: Optional[Path] = None,
+    checkouts: Path | None = None,
 ) -> Diff | None:
     """Check a specific repository against two versions of ruff."""
     removed, added = set(), set()

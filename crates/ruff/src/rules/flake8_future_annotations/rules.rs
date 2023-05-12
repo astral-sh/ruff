@@ -64,7 +64,7 @@ impl Violation for MissingFutureAnnotationsWithImports {
 }
 
 /// FA100
-pub fn missing_future_annotations_from_typing_import(
+pub(crate) fn missing_future_annotations_from_typing_import(
     checker: &mut Checker,
     stmt: &Stmt,
     module: &str,
@@ -91,7 +91,7 @@ pub fn missing_future_annotations_from_typing_import(
 }
 
 /// FA100
-pub fn missing_future_annotations_from_typing_usage(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn missing_future_annotations_from_typing_usage(checker: &mut Checker, expr: &Expr) {
     if checker.ctx.annotations_future_enabled {
         return;
     }
