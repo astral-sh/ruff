@@ -52,6 +52,17 @@ pub(crate) fn f_string_conversion(
 
         match id.as_str() {
             "ascii" | "str" | "repr" => {
+                if !checker
+                    .ctx
+                    .find_binding(id)
+                    .map(|binding| &binding.kind)
+                    .expect("Must at least find builtin")
+                    .is_builtin()
+                {
+                    // The call is to a different than the builtin
+                    return;
+                }
+
                 let mut diagnostic = Diagnostic::new(FStringConversion, formatted_value.range());
 
                 // Replace the call node with its argument and a conversion
