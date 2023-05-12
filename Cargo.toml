@@ -11,14 +11,14 @@ include = ["LICENSE", "Cargo.toml", "src/**/*.rs"]
 [workspace]
 resolver = "2"
 members = [
-    "ast", "core", "literal", "parser",
+    "ast", "core", "format", "literal", "parser",
     "ruff_text_size", "ruff_source_location",
 ]
 
 [workspace.dependencies]
-rustpython-ast = { path = "ast", version = "0.2.0", default-features = false }
-rustpython-parser-core = { path = "core", version = "0.2.0", default-features = false }
-rustpython-literal = { path = "literal", version = "0.2.0" }
+rustpython-ast = { path = "ast", default-features = false }
+rustpython-parser-core = { path = "core", default-features = false }
+rustpython-literal = { path = "literal" }
 
 ahash = "0.7.6"
 anyhow = "1.0.45"

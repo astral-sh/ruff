@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "Parser for python code."
 authors = ["RustPython Team"]
 build = "build.rs"
-repository = "https://github.com/RustPython/RustPython"
+repository = "https://github.com/RustPython/Parser/"
 license = "MIT"
 edition = "2021"
 

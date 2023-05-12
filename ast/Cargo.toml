@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "AST definitions for RustPython"
 authors = ["RustPython Team"]
 edition = "2021"
-repository = "https://github.com/RustPython/RustPython"
+repository = "https://github.com/RustPython/Parser/"
 license = "MIT"
 
 [features]
