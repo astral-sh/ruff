@@ -46,6 +46,7 @@ Changelog = "https://github.com/charliermarsh/ruff/releases"
 [tool.maturin]
 bindings = "bin"
 manifest-path = "crates/ruff_cli/Cargo.toml"
+module-name = "ruff"
 python-source = "python"
 strip = true
 
