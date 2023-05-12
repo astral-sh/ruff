@@ -37,6 +37,7 @@ jobs:
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           ruff --help
+          python -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -73,6 +74,7 @@ jobs:
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
           ruff --help
+          python -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -121,6 +123,7 @@ jobs:
         run: |
           python -m pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           ruff --help
+          python -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -166,6 +169,7 @@ jobs:
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           ruff --help
+          python -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -231,6 +235,7 @@ jobs:
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             ruff --help
+            python -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -280,6 +285,7 @@ jobs:
             apk add py3-pip
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links /io/dist/ --force-reinstall
             ruff --help
+            python -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:

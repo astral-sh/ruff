@@ -727,6 +727,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "007") => Rule::PairwiseOverZipped,
         (Ruff, "008") => Rule::MutableClassDefault,
         (Ruff, "009") => Rule::FunctionCallInDataclassDefaultArgument,
+        (Ruff, "010") => Rule::ExplicitFStringTypeConversion,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django
