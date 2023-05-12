@@ -17,7 +17,7 @@ import re
 import tempfile
 import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple, Self
 
