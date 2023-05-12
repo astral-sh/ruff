@@ -195,6 +195,7 @@ jobs:
           fi
 
   python-package:
+    name: "python package"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -210,7 +211,6 @@ jobs:
           manylinux: auto
           args: --out dist
       - name: "Test wheel"
-        if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           ruff --help
