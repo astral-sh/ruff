@@ -8,8 +8,9 @@ use ruff_python_stdlib::typing::PEP_585_SUBSCRIPT_ELIGIBLE;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for missing `from __future__ import annotations` import if a type used in the
-/// module can be rewritten using PEP 563.
+/// Checks for missing `from __future__ import annotations` imports upon
+/// detecting type annotations that can be written more succinctly under
+/// PEP 563.
 ///
 /// ## Why is this bad?
 /// Pairs well with pyupgrade with the --py37-plus flag or higher, since pyupgrade only
@@ -51,7 +52,7 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct MissingFutureAnnotationsWithImports {
-    pub names: Vec<String>,
+    names: Vec<String>,
 }
 
 impl Violation for MissingFutureAnnotationsWithImports {
@@ -70,7 +71,7 @@ pub(crate) fn missing_future_annotations_from_typing_import(
     module: &str,
     names: &[Alias],
 ) {
-    if checker.ctx.annotations_future_enabled {
+    if checker.ctx.future_annotations() {
         return;
     }
 
@@ -92,7 +93,7 @@ pub(crate) fn missing_future_annotations_from_typing_import(
 
 /// FA100
 pub(crate) fn missing_future_annotations_from_typing_usage(checker: &mut Checker, expr: &Expr) {
-    if checker.ctx.annotations_future_enabled {
+    if checker.ctx.future_annotations() {
         return;
     }
 
