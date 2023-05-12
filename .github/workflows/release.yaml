@@ -235,7 +235,6 @@ jobs:
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
             ruff --help
-            python3 -m ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
