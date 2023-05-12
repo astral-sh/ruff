@@ -140,30 +140,30 @@ impl<'a> Checker<'a> {
 /// Visit an body of [`Stmt`] nodes within a type-checking block.
 macro_rules! visit_type_checking_block {
     ($self:ident, $body:expr) => {{
-        let flags = $self.ctx.flags;
+        let snapshot = $self.ctx.flags;
         $self.ctx.flags |= ContextFlags::TYPE_CHECKING_BLOCK;
         $self.visit_body($body);
-        $self.ctx.flags = flags;
+        $self.ctx.flags = snapshot;
     }};
 }
 
 /// Visit an [`Expr`], and treat it as a type definition.
 macro_rules! visit_type_definition {
     ($self:ident, $expr:expr) => {{
-        let flags = $self.ctx.flags;
+        let snapshot = $self.ctx.flags;
         $self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
         $self.visit_expr($expr);
-        $self.ctx.flags = flags;
+        $self.ctx.flags = snapshot;
     }};
 }
 
 /// Visit an [`Expr`], and treat it as _not_ a type definition.
 macro_rules! visit_non_type_definition {
     ($self:ident, $expr:expr) => {{
-        let flags = $self.ctx.flags;
+        let snapshot = $self.ctx.flags;
         $self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
         $self.visit_expr($expr);
-        $self.ctx.flags = flags;
+        $self.ctx.flags = snapshot;
     }};
 }
 
@@ -172,10 +172,10 @@ macro_rules! visit_non_type_definition {
 /// its truthiness.
 macro_rules! visit_boolean_test {
     ($self:ident, $expr:expr) => {{
-        let flags = $self.ctx.flags;
+        let snapshot = $self.ctx.flags;
         $self.ctx.flags |= ContextFlags::BOOLEAN_TEST;
         $self.visit_expr($expr);
-        $self.ctx.flags = flags;
+        $self.ctx.flags = snapshot;
     }};
 }
 
@@ -222,7 +222,9 @@ where
             }
         }
 
-        let flags = self.ctx.flags;
+        // Store the flags prior to any further descent, so that we can restore them after visiting
+        // the node.
+        let flags_snapshot = self.ctx.flags;
 
         // Pre-visit.
         match &stmt.node {
@@ -2236,15 +2238,15 @@ where
             _ => {}
         }
 
-        self.ctx.flags = flags;
+        self.ctx.flags = flags_snapshot;
         self.ctx.pop_stmt();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
-        let flags = self.ctx.flags;
+        let flags_snapshot = self.ctx.flags;
         self.ctx.flags |= ContextFlags::ANNOTATION;
         visit_type_definition!(self, expr);
-        self.ctx.flags = flags;
+        self.ctx.flags = flags_snapshot;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
@@ -2273,7 +2275,9 @@ where
 
         self.ctx.push_expr(expr);
 
-        let flags = self.ctx.flags;
+        // Store the flags prior to any further descent, so that we can restore them after visiting
+        // the node.
+        let flags_snapshot = self.ctx.flags;
 
         // If we're in a boolean test (e.g., the `test` of a `StmtKind::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
@@ -3891,7 +3895,7 @@ where
             _ => {}
         };
 
-        self.ctx.flags = flags;
+        self.ctx.flags = flags_snapshot;
         self.ctx.pop_expr();
     }
 
@@ -4789,11 +4793,9 @@ impl<'a> Checker<'a> {
             for (expr, snapshot) in type_definitions {
                 self.ctx.restore(snapshot);
 
-                self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
-                self.ctx.flags |= ContextFlags::FUTURE_TYPE_DEFINITION;
+                self.ctx.flags |=
+                    ContextFlags::TYPE_DEFINITION | ContextFlags::FUTURE_TYPE_DEFINITION;
                 self.visit_expr(expr);
-                self.ctx.flags -= ContextFlags::FUTURE_TYPE_DEFINITION;
-                self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
             }
         }
     }
@@ -4818,17 +4820,13 @@ impl<'a> Checker<'a> {
                         }
                     }
 
-                    self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
-                    self.ctx.flags |= match kind {
+                    let type_definition_flag = match kind {
                         AnnotationKind::Simple => ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
                         AnnotationKind::Complex => ContextFlags::COMPLEX_STRING_TYPE_DEFINITION,
                     };
+
+                    self.ctx.flags |= ContextFlags::TYPE_DEFINITION | type_definition_flag;
                     self.visit_expr(expr);
-                    self.ctx.flags -= match kind {
-                        AnnotationKind::Simple => ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
-                        AnnotationKind::Complex => ContextFlags::COMPLEX_STRING_TYPE_DEFINITION,
-                    };
-                    self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
                 } else {
                     if self
                         .settings

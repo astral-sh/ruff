@@ -525,19 +525,162 @@ bitflags! {
     /// Flags indicating the current context of the analysis.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
     pub struct ContextFlags: u16 {
+        /// The context is in a type annotation.
+        ///
+        /// For example, the context could be visiting `int` in:
+        /// ```python
+        /// x: int = 1
+        /// ```
         const ANNOTATION = 1 << 0;
+
+        /// The context is in a type definition.
+        ///
+        /// For example, the context could be visiting `int` in:
+        /// ```python
+        /// from typing import NewType
+        ///
+        /// UserId = NewType("UserId", int)
+        /// ```
+        ///
+        /// All type annotations are also type definitions, but the converse is not true.
+        /// In our example, `int` is a type definition but not a type annotation, as it
+        /// doesn't appear in a type annotation context, but rather in a type definition.
         const TYPE_DEFINITION = 1 << 1;
+
+        /// The context is in a (deferred) "simple" string type definition.
+        ///
+        /// For example, the context could be visiting `list[int]` in:
+        /// ```python
+        /// x: "list[int]" = []
+        /// ```
+        ///
+        /// "Simple" string type definitions are those that consist of a single string literal,
+        /// as opposed to an implicitly concatenated string literal.
         const SIMPLE_STRING_TYPE_DEFINITION =  1 << 2;
+
+        /// The context is in a (deferred) "complex" string type definition.
+        ///
+        /// For example, the context could be visiting `list[int]` in:
+        /// ```python
+        /// x: ("list" "[int]") = []
+        /// ```
+        ///
+        /// "Complex" string type definitions are those that consist of a implicitly concatenated
+        /// string literals. These are uncommon but valid.
         const COMPLEX_STRING_TYPE_DEFINITION = 1 << 3;
+
+        /// The context is in a (deferred) `__future__` type definition.
+        ///
+        /// For example, the context could be visiting `list[int]` in:
+        /// ```python
+        /// from __future__ import annotations
+        ///
+        /// x: list[int] = []
+        /// ```
+        ///
+        /// `__future__`-style type annotations are only enabled if the `annotations` feature
+        /// is enabled via `from __future__ import annotations`.
         const FUTURE_TYPE_DEFINITION = 1 << 4;
+
+        /// The context is in an exception handler.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// try:
+        ///     ...
+        /// except Exception:
+        ///     x: int = 1
+        /// ```
         const EXCEPTION_HANDLER = 1 << 5;
+
+        /// The context is in an f-string.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// f'{x}'
+        /// ```
         const F_STRING = 1 << 6;
+
+        /// The context is in a boolean test.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// if x:
+        ///     ...
+        /// ```
+        ///
+        /// The implication is that the actual value returned by the current expression is
+        /// not used, only its truthiness.
         const BOOLEAN_TEST = 1 << 7;
+
+        /// The context is in a `typing::Literal` annotation.
+        ///
+        /// For example, the context could be visiting any of `"A"`, `"B"`, or `"C"` in:
+        /// ```python
+        /// def f(x: Literal["A", "B", "C"]):
+        ///     ...
+        /// ```
         const LITERAL = 1 << 8;
+
+        /// The context is in a subscript expression.
+        ///
+        /// For example, the context could be visiting `x["a"]` in:
+        /// ```python
+        /// x["a"]["b"]
+        /// ```
         const SUBSCRIPT = 1 << 9;
+
+        /// The context is in a type-checking block.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// from typing import TYPE_CHECKING
+        ///
+        ///
+        /// if TYPE_CHECKING:
+        ///    x: int = 1
+        /// ```
         const TYPE_CHECKING_BLOCK = 1 << 10;
+
+
+        /// The context has traversed past the "top-of-file" import boundary.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// import os
+        ///
+        /// def f() -> None:
+        ///     ...
+        ///
+        /// x: int = 1
+        /// ```
         const IMPORT_BOUNDARY = 1 << 11;
+
+        /// The context has traversed past the `__future__` import boundary.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// from __future__ import annotations
+        ///
+        /// import os
+        ///
+        /// x: int = 1
+        /// ```
+        ///
+        /// Python considers it a syntax error to import from `__future__` after
+        /// any other non-`__future__`-importing statements.
         const FUTURES_BOUNDARY = 1 << 12;
+
+        /// `__future__`-style type annotations are enabled in this context.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// from __future__ import annotations
+        ///
+        ///
+        /// def f(x: int) -> int:
+        ///   ...
+        /// ```
         const FUTURE_ANNOTATIONS = 1 << 13;
     }
 }
