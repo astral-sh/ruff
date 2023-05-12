@@ -397,6 +397,28 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [meson-python](https://github.com/mesonbuild/meson-python)
 - [nox](https://github.com/wntrblm/nox)
 
+### Show Your Support
+
+If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
+
+```md
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/charliermarsh/ruff)
+```
+
+...or `README.rst`:
+
+```rst
+.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json
+    :target: https://github.com/charliermarsh/ruff
+    :alt: Ruff
+```
+
+...or, as HTML:
+
+```html
+<a href="https://github.com/charliermarsh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
+```
+
 ## License
 
 MIT
