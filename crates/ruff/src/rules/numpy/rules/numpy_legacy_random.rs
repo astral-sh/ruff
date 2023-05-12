@@ -44,7 +44,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// [NEP 19]: https://numpy.org/neps/nep-0019-rng-policy.html
 #[violation]
 pub struct NumpyLegacyRandom {
-    pub method_name: String,
+    method_name: String,
 }
 
 impl Violation for NumpyLegacyRandom {
@@ -56,7 +56,7 @@ impl Violation for NumpyLegacyRandom {
 }
 
 /// NPY002
-pub fn numpy_legacy_random(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn numpy_legacy_random(checker: &mut Checker, expr: &Expr) {
     if let Some(method_name) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         // seeding state
         if call_path.as_slice() == ["numpy", "random", "seed"]

@@ -36,7 +36,7 @@ use ruff_python_semantic::context::Context;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
 #[violation]
 pub struct InvalidFunctionName {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for InvalidFunctionName {
@@ -48,7 +48,7 @@ impl Violation for InvalidFunctionName {
 }
 
 /// N802
-pub fn invalid_function_name(
+pub(crate) fn invalid_function_name(
     stmt: &Stmt,
     name: &str,
     decorator_list: &[Expr],

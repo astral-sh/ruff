@@ -59,3 +59,14 @@ u"foo".encode("utf-8")  # b"foo"
 R"foo\o".encode("utf-8")  # br"foo\o"
 U"foo".encode("utf-8")  # b"foo"
 print("foo".encode())  # print(b"foo")
+
+# `encode` on parenthesized strings.
+(
+    "abc"
+    "def"
+).encode()
+
+((
+    "abc"
+    "def"
+)).encode()

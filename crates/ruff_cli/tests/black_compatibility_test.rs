@@ -24,7 +24,7 @@ struct Blackd {
 const BIN_NAME: &str = "ruff";
 
 impl Blackd {
-    pub fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         // Get free TCP port to run on
         let address = TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0))?.local_addr()?;
 
@@ -63,7 +63,7 @@ impl Blackd {
     }
 
     /// Format given code with blackd.
-    pub fn check(&self, code: &[u8]) -> Result<Vec<u8>> {
+    pub(crate) fn check(&self, code: &[u8]) -> Result<Vec<u8>> {
         match self
             .client
             .post(&format!("http://{}/", self.address))

@@ -9,12 +9,12 @@ use crate::context::ASTFormatContext;
 use crate::cst::Expr;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct StringLiteralPart {
+pub(crate) struct StringLiteralPart {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for StringLiteralPart {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for StringLiteralPart {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
         // Extract leading and trailing quotes.
@@ -110,23 +110,23 @@ impl Format<ASTFormatContext<'_>> for StringLiteralPart {
 }
 
 #[inline]
-pub const fn string_literal_part(range: TextRange) -> StringLiteralPart {
+pub(crate) const fn string_literal_part(range: TextRange) -> StringLiteralPart {
     StringLiteralPart { range }
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct StringLiteral<'a> {
+pub(crate) struct StringLiteral<'a> {
     expr: &'a Expr,
 }
 
-impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for StringLiteral<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let expr = self.expr;
 
         // TODO(charlie): This tokenization needs to happen earlier, so that we can attach
         // comments to individual string literals.
         let contents = f.context().locator().slice(expr.range());
-        let elts = rustpython_parser::lexer::lex_located(contents, Mode::Module, expr.start())
+        let elts = rustpython_parser::lexer::lex_starts_at(contents, Mode::Module, expr.start())
             .flatten()
             .filter_map(|(tok, range)| {
                 if matches!(tok, Tok::String { .. }) {
@@ -159,7 +159,7 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
 }
 
 #[inline]
-pub const fn string_literal(expr: &Expr) -> StringLiteral {
+pub(crate) const fn string_literal(expr: &Expr) -> StringLiteral {
     StringLiteral { expr }
 }
 

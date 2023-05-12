@@ -8,9 +8,9 @@ use rustpython_common::cformat::{
 };
 
 pub(crate) struct CFormatSummary {
-    pub starred: bool,
-    pub num_positional: usize,
-    pub keywords: FxHashSet<String>,
+    pub(crate) starred: bool,
+    pub(crate) num_positional: usize,
+    pub(crate) keywords: FxHashSet<String>,
 }
 
 impl From<&CFormatString> for CFormatSummary {

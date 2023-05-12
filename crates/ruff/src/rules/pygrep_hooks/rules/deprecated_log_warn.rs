@@ -42,7 +42,7 @@ impl Violation for DeprecatedLogWarn {
 }
 
 /// PGH002
-pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
+pub(crate) fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
     if checker
         .ctx
         .resolve_call_path(func)

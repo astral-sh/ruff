@@ -116,7 +116,7 @@ impl<'a> Visitor<'a> for AttachmentVisitor {
     }
 }
 
-pub fn attach(python_cst: &mut [Stmt], trivia: Vec<TriviaToken>) {
+pub(crate) fn attach(python_cst: &mut [Stmt], trivia: Vec<TriviaToken>) {
     let index = decorate_trivia(trivia, python_cst);
     let mut visitor = AttachmentVisitor { index };
     for stmt in python_cst {

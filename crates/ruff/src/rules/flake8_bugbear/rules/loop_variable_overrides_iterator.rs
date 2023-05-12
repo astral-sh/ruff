@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct LoopVariableOverridesIterator {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for LoopVariableOverridesIterator {
@@ -32,18 +32,18 @@ where
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
-            ExprKind::Name { id, .. } => {
+            ExprKind::Name(ast::ExprName { id, .. }) => {
                 self.names.insert(id, expr);
             }
-            ExprKind::ListComp { generators, .. }
-            | ExprKind::DictComp { generators, .. }
-            | ExprKind::SetComp { generators, .. }
-            | ExprKind::GeneratorExp { generators, .. } => {
+            ExprKind::ListComp(ast::ExprListComp { generators, .. })
+            | ExprKind::DictComp(ast::ExprDictComp { generators, .. })
+            | ExprKind::SetComp(ast::ExprSetComp { generators, .. })
+            | ExprKind::GeneratorExp(ast::ExprGeneratorExp { generators, .. }) => {
                 for comp in generators {
                     self.visit_expr(&comp.iter);
                 }
             }
-            ExprKind::Lambda { args, body } => {
+            ExprKind::Lambda(ast::ExprLambda { args, body }) => {
                 visitor::walk_expr(self, body);
                 for arg in &args.args {
                     self.names.remove(arg.node.arg.as_str());
@@ -55,7 +55,7 @@ where
 }
 
 /// B020
-pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
     let target_names = {
         let mut target_finder = NameFinder::default();
         target_finder.visit_expr(target);

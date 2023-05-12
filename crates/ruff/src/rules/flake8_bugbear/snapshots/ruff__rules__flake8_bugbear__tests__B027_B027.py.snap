@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-B027.py:18:5: B027 [*] `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:18:5: B027 `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
    |
 18 |   class AbstractClass(ABC):
 19 |       def empty_1(self):  # error
@@ -11,18 +11,8 @@ B027.py:18:5: B027 [*] `AbstractClass.empty_1` is an empty method in an abstract
 21 |   
 22 |       def empty_2(self):  # error
    |
-   = help: Add the `@abstractmethod` decorator
 
-ℹ Suggested fix
-15 15 | 
-16 16 | 
-17 17 | class AbstractClass(ABC):
-   18 |+    @notabstract
-18 19 |     def empty_1(self):  # error
-19 20 |         ...
-20 21 | 
-
-B027.py:21:5: B027 [*] `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:21:5: B027 `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
    |
 21 |           ...
 22 |   
@@ -33,18 +23,8 @@ B027.py:21:5: B027 [*] `AbstractClass.empty_2` is an empty method in an abstract
 25 |   
 26 |       def empty_3(self):  # error
    |
-   = help: Add the `@abstractmethod` decorator
 
-ℹ Suggested fix
-18 18 |     def empty_1(self):  # error
-19 19 |         ...
-20 20 | 
-   21 |+    @notabstract
-21 22 |     def empty_2(self):  # error
-22 23 |         pass
-23 24 | 
-
-B027.py:24:5: B027 [*] `AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:24:5: B027 `AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator
    |
 24 |           pass
 25 |   
@@ -56,18 +36,8 @@ B027.py:24:5: B027 [*] `AbstractClass.empty_3` is an empty method in an abstract
 29 |   
 30 |       def empty_4(self):  # error
    |
-   = help: Add the `@abstractmethod` decorator
 
-ℹ Suggested fix
-21 21 |     def empty_2(self):  # error
-22 22 |         pass
-23 23 | 
-   24 |+    @notabstract
-24 25 |     def empty_3(self):  # error
-25 26 |         """docstring"""
-26 27 |         ...
-
-B027.py:28:5: B027 [*] `AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:28:5: B027 `AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator
    |
 28 |           ...
 29 |   
@@ -82,15 +52,5 @@ B027.py:28:5: B027 [*] `AbstractClass.empty_4` is an empty method in an abstract
 36 |   
 37 |       @notabstract
    |
-   = help: Add the `@abstractmethod` decorator
-
-ℹ Suggested fix
-25 25 |         """docstring"""
-26 26 |         ...
-27 27 | 
-   28 |+    @notabstract
-28 29 |     def empty_4(self):  # error
-29 30 |         """multiple ellipsis/pass"""
-30 31 |         ...
 
 

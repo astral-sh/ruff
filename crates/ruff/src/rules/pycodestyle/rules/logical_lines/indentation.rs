@@ -27,7 +27,7 @@ use super::LogicalLine;
 /// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct IndentationWithInvalidMultiple {
-    pub indent_size: usize,
+    indent_size: usize,
 }
 
 impl Violation for IndentationWithInvalidMultiple {
@@ -60,7 +60,7 @@ impl Violation for IndentationWithInvalidMultiple {
 /// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct IndentationWithInvalidMultipleComment {
-    pub indent_size: usize,
+    indent_size: usize,
 }
 
 impl Violation for IndentationWithInvalidMultipleComment {

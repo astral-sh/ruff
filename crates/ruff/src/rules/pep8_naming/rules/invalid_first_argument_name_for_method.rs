@@ -52,7 +52,7 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 }
 
 /// N805
-pub fn invalid_first_argument_name_for_method(
+pub(crate) fn invalid_first_argument_name_for_method(
     checker: &Checker,
     scope: &Scope,
     name: &str,
@@ -73,7 +73,7 @@ pub fn invalid_first_argument_name_for_method(
         return None;
     }
     let arg = args.posonlyargs.first().or_else(|| args.args.first())?;
-    if arg.node.arg == "self" {
+    if &arg.node.arg == "self" {
         return None;
     }
     if checker

@@ -123,6 +123,8 @@ quoting the executed command, along with the relevant file contents and `pyproje
 }
 
 fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+    #[cfg(feature = "ecosystem_ci")]
+    let ecosystem_ci = args.ecosystem_ci;
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -150,7 +152,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         fix_only,
         format,
         show_fixes,
-        update_check,
+        show_source,
         ..
     } = pyproject_config.settings.cli;
 
@@ -182,8 +184,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIXES;
     }
-
-    if pyproject_config.settings.lib.show_source {
+    if show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
 
@@ -210,7 +211,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(format, log_level, autofix, printer_flags);
+    let printer = Printer::new(
+        format,
+        log_level,
+        autofix,
+        printer_flags,
+        #[cfg(feature = "ecosystem_ci")]
+        ecosystem_ci,
+    );
 
     if cli.watch {
         if format != SerializationFormat::Text {
@@ -309,13 +317,6 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                 let mut stdout = BufWriter::new(io::stdout().lock());
                 printer.write_once(&diagnostics, &mut stdout)?;
             }
-        }
-
-        if update_check {
-            warn_user_once!(
-                "update-check has been removed; setting it will cause an error in a future \
-                 version."
-            );
         }
 
         if !cli.exit_zero {

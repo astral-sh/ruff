@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 
 #[violation]
 pub struct NonlocalWithoutBinding {
-    pub name: String,
+    pub(crate) name: String,
 }
 
 impl Violation for NonlocalWithoutBinding {

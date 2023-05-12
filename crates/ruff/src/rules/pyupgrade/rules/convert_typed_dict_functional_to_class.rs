@@ -1,6 +1,8 @@
 use anyhow::{bail, Result};
 use log::debug;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{
+    self, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
+};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -13,8 +15,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct ConvertTypedDictFunctionalToClass {
-    pub name: String,
-    pub fixable: bool,
+    name: String,
+    fixable: bool,
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {
@@ -26,11 +28,9 @@ impl Violation for ConvertTypedDictFunctionalToClass {
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|ConvertTypedDictFunctionalToClass { name, .. }| {
-                format!("Convert `{name}` to class syntax")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let ConvertTypedDictFunctionalToClass { name, .. } = self;
+        Some(format!("Convert `{name}` to class syntax"))
     }
 }
 
@@ -42,14 +42,14 @@ fn match_typed_dict_assign<'a>(
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
-    let ExprKind::Name { id: class_name, .. } = &target.node else {
+    let ExprKind::Name(ast::ExprName { id: class_name, .. }) = &target.node else {
         return None;
     };
-    let ExprKind::Call {
+    let ExprKind::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    } = &value.node else {
+    }) = &value.node else {
         return None;
     };
     if !checker
@@ -67,14 +67,14 @@ fn match_typed_dict_assign<'a>(
 /// Generate a `StmtKind::AnnAssign` representing the provided property
 /// definition.
 fn create_property_assignment_stmt(property: &str, annotation: &ExprKind) -> Stmt {
-    create_stmt(StmtKind::AnnAssign {
-        target: Box::new(create_expr(ExprKind::Name {
-            id: property.to_string(),
+    create_stmt(ast::StmtAnnAssign {
+        target: Box::new(create_expr(ast::ExprName {
+            id: property.into(),
             ctx: ExprContext::Load,
         })),
         annotation: Box::new(create_expr(annotation.clone())),
         value: None,
-        simple: 1,
+        simple: true,
     })
 }
 
@@ -90,8 +90,8 @@ fn create_class_def_stmt(
         Some(keyword) => vec![keyword.clone()],
         None => vec![],
     };
-    create_stmt(StmtKind::ClassDef {
-        name: class_name.to_string(),
+    create_stmt(ast::StmtClassDef {
+        name: class_name.into(),
         bases: vec![base_class.clone()],
         keywords,
         body,
@@ -109,10 +109,10 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
         .map(|(key, value)| match key {
             Some(Expr {
                 node:
-                    ExprKind::Constant {
+                    ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(property),
                         ..
-                    },
+                    }),
                 ..
             }) => {
                 if is_identifier(property) {
@@ -127,7 +127,7 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
 }
 
 fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<Stmt>> {
-    let ExprKind::Name { id, .. } = &func.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         bail!("Expected `func` to be `ExprKind::Name`")
     };
     if id != "dict" {
@@ -186,10 +186,10 @@ fn match_properties_and_total<'a>(
     if let Some(dict) = args.get(1) {
         let total = match_total_from_only_keyword(keywords);
         match &dict.node {
-            ExprKind::Dict { keys, values } => {
+            ExprKind::Dict(ast::ExprDict { keys, values }) => {
                 Ok((properties_from_dict_literal(keys, values)?, total))
             }
-            ExprKind::Call { func, keywords, .. } => {
+            ExprKind::Call(ast::ExprCall { func, keywords, .. }) => {
                 Ok((properties_from_dict_call(func, keywords)?, total))
             }
             _ => bail!("Expected `arg` to be `ExprKind::Dict` or `ExprKind::Call`"),
@@ -210,6 +210,7 @@ fn convert_to_class(
     base_class: &Expr,
     stylist: &Stylist,
 ) -> Fix {
+    #[allow(deprecated)]
     Fix::unspecified(Edit::range_replacement(
         unparse_stmt(
             &create_class_def_stmt(class_name, body, total_keyword, base_class),
@@ -220,7 +221,7 @@ fn convert_to_class(
 }
 
 /// UP013
-pub fn convert_typed_dict_functional_to_class(
+pub(crate) fn convert_typed_dict_functional_to_class(
     checker: &mut Checker,
     stmt: &Stmt,
     targets: &[Expr],

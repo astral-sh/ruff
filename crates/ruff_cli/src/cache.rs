@@ -9,7 +9,7 @@ use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
 use ruff::message::Message;
-use ruff::settings::{flags, AllSettings, Settings};
+use ruff::settings::{AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_python_ast::imports::ImportMap;
@@ -145,7 +145,6 @@ fn cache_key(
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> u64 {
     let mut hasher = CacheKeyHasher::new();
     CARGO_PKG_VERSION.cache_key(&mut hasher);
@@ -158,13 +157,12 @@ fn cache_key(
     #[cfg(unix)]
     metadata.permissions().mode().cache_key(&mut hasher);
     settings.cache_key(&mut hasher);
-    autofix.cache_key(&mut hasher);
     hasher.finish()
 }
 
 #[allow(dead_code)]
 /// Initialize the cache at the specified `Path`.
-pub fn init(path: &Path) -> Result<()> {
+pub(crate) fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     fs::create_dir_all(path.join(content_dir()))?;
 
@@ -199,16 +197,15 @@ fn del_sync(cache_dir: &Path, key: u64) -> Result<(), std::io::Error> {
 }
 
 /// Get a value from the cache.
-pub fn get(
+pub(crate) fn get(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
-    autofix: flags::Autofix,
 ) -> Option<(Vec<Message>, ImportMap)> {
     let encoded = read_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, metadata, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib),
     )
     .ok()?;
     match bincode::deserialize::<CheckResult>(&encoded[..]) {
@@ -249,19 +246,18 @@ pub fn get(
 }
 
 /// Set a value in the cache.
-pub fn set(
+pub(crate) fn set(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
-    autofix: flags::Autofix,
     messages: &[Message],
     imports: &ImportMap,
 ) {
     let check_result = CheckResultRef { imports, messages };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, metadata, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib),
         &bincode::serialize(&check_result).unwrap(),
     ) {
         error!("Failed to write to cache: {e:?}");
@@ -269,15 +265,14 @@ pub fn set(
 }
 
 /// Delete a value from the cache.
-pub fn del(
+pub(crate) fn del(
     path: &Path,
     package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
-    autofix: flags::Autofix,
 ) {
     drop(del_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, metadata, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib),
     ));
 }

@@ -16,7 +16,7 @@ impl Violation for ReturnOutsideFunction {
     }
 }
 
-pub fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
     if matches!(
         checker.ctx.scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module

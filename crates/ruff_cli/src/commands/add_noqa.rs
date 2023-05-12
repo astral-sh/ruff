@@ -13,7 +13,7 @@ use ruff::{packaging, resolver, warn_user_once};
 use crate::args::Overrides;
 
 /// Add `noqa` directives to a collection of files.
-pub fn add_noqa(
+pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,

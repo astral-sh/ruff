@@ -35,8 +35,8 @@ impl Violation for UnnecessaryDirectLambdaCall {
 }
 
 /// PLC3002
-pub fn unnecessary_direct_lambda_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let ExprKind::Lambda { .. } = &func.node {
+pub(crate) fn unnecessary_direct_lambda_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
+    if let ExprKind::Lambda(_) = &func.node {
         checker
             .diagnostics
             .push(Diagnostic::new(UnnecessaryDirectLambdaCall, expr.range()));

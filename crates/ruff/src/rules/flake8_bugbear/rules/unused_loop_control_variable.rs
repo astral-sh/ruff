@@ -19,7 +19,7 @@
 //! ```
 
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -65,18 +65,12 @@ impl Violation for UnusedLoopControlVariable {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedLoopControlVariable {
-            certainty, rename, ..
-        } = self;
-        if certainty.to_bool() && rename.is_some() {
-            Some(|UnusedLoopControlVariable { name, rename, .. }| {
-                let rename = rename.as_ref().unwrap();
-                format!("Rename unused `{name}` to `{rename}`")
-            })
-        } else {
-            None
-        }
+    fn autofix_title(&self) -> Option<String> {
+        let UnusedLoopControlVariable { rename, name, .. } = self;
+
+        rename
+            .as_ref()
+            .map(|rename| format!("Rename unused `{name}` to `{rename}`"))
     }
 }
 
@@ -99,7 +93,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let ExprKind::Name { id, .. } = &expr.node {
+        if let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node {
             self.names.insert(id, expr);
         }
         visitor::walk_expr(self, expr);
@@ -107,7 +101,7 @@ where
 }
 
 /// B007
-pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
+pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
     let control_names = {
         let mut finder = NameFinder::new();
         finder.visit_expr(target);
@@ -169,6 +163,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {
                         if !binding.used() {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 rename,
                                 expr.range(),

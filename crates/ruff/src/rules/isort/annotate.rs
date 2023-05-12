@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{self, Stmt, StmtKind};
 
 use ruff_python_ast::source_code::Locator;
 
@@ -8,7 +8,7 @@ use super::helpers::trailing_comma;
 use super::types::{AliasData, TrailingComma};
 use super::{AnnotatedAliasData, AnnotatedImport};
 
-pub fn annotate_imports<'a>(
+pub(crate) fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],
     comments: Vec<Comment<'a>>,
     locator: &Locator,
@@ -20,7 +20,7 @@ pub fn annotate_imports<'a>(
         .iter()
         .map(|import| {
             match &import.node {
-                StmtKind::Import { names } => {
+                StmtKind::Import(ast::StmtImport { names }) => {
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
@@ -51,11 +51,11 @@ pub fn annotate_imports<'a>(
                         inline,
                     }
                 }
-                StmtKind::ImportFrom {
+                StmtKind::ImportFrom(ast::StmtImportFrom {
                     module,
                     names,
                     level,
-                } => {
+                }) => {
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
@@ -116,7 +116,7 @@ pub fn annotate_imports<'a>(
                     AnnotatedImport::ImportFrom {
                         module: module.as_deref(),
                         names: aliases,
-                        level: *level,
+                        level: level.map(|level| level.to_u32()),
                         trailing_comma: if split_on_trailing_comma {
                             trailing_comma(import, locator)
                         } else {

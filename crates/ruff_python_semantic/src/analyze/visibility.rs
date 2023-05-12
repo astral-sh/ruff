@@ -1,29 +1,16 @@
 use std::path::Path;
 
-use rustpython_parser::ast::{Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Stmt, StmtKind};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
 
 use crate::context::Context;
 
-#[derive(Debug, Clone, Copy)]
-pub enum Modifier {
-    Module,
-    Class,
-    Function,
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, is_macro::Is)]
 pub enum Visibility {
     Public,
     Private,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct VisibleScope {
-    pub modifier: Modifier,
-    pub visibility: Visibility,
 }
 
 /// Returns `true` if a function is a "static method".
@@ -138,31 +125,48 @@ fn stem(path: &str) -> &str {
     }
 }
 
-/// Return the `Visibility` of the Python file at `Path` based on its name.
-pub fn module_visibility(module_path: Option<&[String]>, path: &Path) -> Visibility {
-    if let Some(module_path) = module_path {
-        if module_path.iter().any(|m| is_private_module(m)) {
-            return Visibility::Private;
-        }
-    } else {
-        // When module_path is None, path is a script outside a package, so just
-        // check to see if the module name itself is private.
-        // Ex) `_foo.py` (but not `__init__.py`)
-        let mut components = path.iter().rev();
-        if let Some(filename) = components.next() {
-            let module_name = filename.to_string_lossy();
-            let module_name = stem(&module_name);
-            if is_private_module(module_name) {
-                return Visibility::Private;
-            }
-        }
-    }
-    Visibility::Public
+/// A Python module can either be defined as a module path (i.e., the dot-separated path to the
+/// module) or, if the module can't be resolved, as a file path (i.e., the path to the file defining
+/// the module).
+#[derive(Debug)]
+pub enum ModuleSource<'a> {
+    /// A module path is a dot-separated path to the module.
+    Path(&'a [String]),
+    /// A file path is the path to the file defining the module, often a script outside of a
+    /// package.
+    File(&'a Path),
 }
 
-pub fn function_visibility(stmt: &Stmt) -> Visibility {
+impl ModuleSource<'_> {
+    /// Return the `Visibility` of the module.
+    pub(crate) fn to_visibility(&self) -> Visibility {
+        match self {
+            Self::Path(path) => {
+                if path.iter().any(|m| is_private_module(m)) {
+                    return Visibility::Private;
+                }
+            }
+            Self::File(path) => {
+                // Check to see if the filename itself indicates private visibility.
+                // Ex) `_foo.py` (but not `__init__.py`)
+                let mut components = path.iter().rev();
+                if let Some(filename) = components.next() {
+                    let module_name = filename.to_string_lossy();
+                    let module_name = stem(&module_name);
+                    if is_private_module(module_name) {
+                        return Visibility::Private;
+                    }
+                }
+            }
+        }
+        Visibility::Public
+    }
+}
+
+pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
-        StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
+        StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private
             } else {
@@ -173,18 +177,18 @@ pub fn function_visibility(stmt: &Stmt) -> Visibility {
     }
 }
 
-pub fn method_visibility(stmt: &Stmt) -> Visibility {
+pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
-        StmtKind::FunctionDef {
+        StmtKind::FunctionDef(ast::StmtFunctionDef {
             name,
             decorator_list,
             ..
-        }
-        | StmtKind::AsyncFunctionDef {
+        })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             name,
             decorator_list,
             ..
-        } => {
+        }) => {
             // Is this a setter or deleter?
             if decorator_list.iter().any(|expr| {
                 collect_call_path(expr).map_or(false, |call_path| {
@@ -211,9 +215,9 @@ pub fn method_visibility(stmt: &Stmt) -> Visibility {
     }
 }
 
-pub fn class_visibility(stmt: &Stmt) -> Visibility {
+pub(crate) fn class_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
-        StmtKind::ClassDef { name, .. } => {
+        StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private
             } else {

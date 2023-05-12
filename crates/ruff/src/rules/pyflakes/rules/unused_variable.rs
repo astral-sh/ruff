@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Attributed, ExprKind, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
@@ -48,22 +48,24 @@ pub struct UnusedVariable {
     pub name: String,
 }
 
-impl AlwaysAutofixableViolation for UnusedVariable {
+impl Violation for UnusedVariable {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedVariable { name } = self;
         format!("Local variable `{name}` is assigned to but never used")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let UnusedVariable { name } = self;
-        format!("Remove assignment to unused variable `{name}`")
+        Some(format!("Remove assignment to unused variable `{name}`"))
     }
 }
 
 /// Return the [`TextRange`] of the token after the next match of
 /// the predicate, skipping over any bracketed expressions.
-fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> TextRange
+fn match_token_after<F, T>(located: &Attributed<T>, locator: &Locator, f: F) -> TextRange
 where
     F: Fn(Tok) -> bool,
 {
@@ -74,7 +76,7 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for ((tok, _), (_, range)) in lexer::lex_located(contents, Mode::Module, located.start())
+    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, Mode::Module, located.start())
         .flatten()
         .tuple_windows()
     {
@@ -125,7 +127,7 @@ where
 
 /// Return the [`TextRange`] of the token matching the predicate,
 /// skipping over any bracketed expressions.
-fn match_token<F, T>(located: &Located<T>, locator: &Locator, f: F) -> TextRange
+fn match_token<F, T>(located: &Attributed<T>, locator: &Locator, f: F) -> TextRange
 where
     F: Fn(Tok) -> bool,
 {
@@ -136,7 +138,7 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, located.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, located.start()).flatten() {
         match tok {
             Tok::Lpar => {
                 par_count += 1;
@@ -196,14 +198,15 @@ fn remove_unused_variable(
     checker: &Checker,
 ) -> Option<(DeletionKind, Fix)> {
     // First case: simple assignment (`x = 1`)
-    if let StmtKind::Assign { targets, value, .. } = &stmt.node {
+    if let StmtKind::Assign(ast::StmtAssign { targets, value, .. }) = &stmt.node {
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
-            if matches!(target.node, ExprKind::Name { .. }) {
+            if matches!(target.node, ExprKind::Name(_)) {
                 return if targets.len() > 1
                     || contains_effect(value, |id| checker.ctx.is_builtin(id))
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
+                    #[allow(deprecated)]
                     Some((
                         DeletionKind::Partial,
                         Fix::unspecified(Edit::deletion(
@@ -224,6 +227,7 @@ fn remove_unused_variable(
                         checker.indexer,
                         checker.stylist,
                     ) {
+                        #[allow(deprecated)]
                         Ok(fix) => Some((DeletionKind::Whole, Fix::unspecified(fix))),
                         Err(err) => {
                             error!("Failed to delete unused variable: {}", err);
@@ -236,16 +240,17 @@ fn remove_unused_variable(
     }
 
     // Second case: simple annotated assignment (`x: int = 1`)
-    if let StmtKind::AnnAssign {
+    if let StmtKind::AnnAssign(ast::StmtAnnAssign {
         target,
         value: Some(value),
         ..
-    } = &stmt.node
+    }) = &stmt.node
     {
-        if matches!(target.node, ExprKind::Name { .. }) {
+        if matches!(target.node, ExprKind::Name(_)) {
             return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
+                #[allow(deprecated)]
                 Some((
                     DeletionKind::Partial,
                     Fix::unspecified(Edit::deletion(
@@ -265,6 +270,7 @@ fn remove_unused_variable(
                     checker.indexer,
                     checker.stylist,
                 ) {
+                    #[allow(deprecated)]
                     Ok(edit) => Some((DeletionKind::Whole, Fix::unspecified(edit))),
                     Err(err) => {
                         error!("Failed to delete unused variable: {}", err);
@@ -276,12 +282,13 @@ fn remove_unused_variable(
     }
 
     // Third case: withitem (`with foo() as x:`)
-    if let StmtKind::With { items, .. } = &stmt.node {
+    if let StmtKind::With(ast::StmtWith { items, .. }) = &stmt.node {
         // Find the binding that matches the given `Range`.
         // TODO(charlie): Store the `Withitem` in the `Binding`.
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == range {
+                    #[allow(deprecated)]
                     return Some((
                         DeletionKind::Partial,
                         Fix::unspecified(Edit::deletion(
@@ -303,7 +310,7 @@ fn remove_unused_variable(
 }
 
 /// F841
-pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
+pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
     let scope = &checker.ctx.scopes[scope];
     if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
         return;

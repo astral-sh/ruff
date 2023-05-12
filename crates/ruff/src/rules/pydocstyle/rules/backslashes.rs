@@ -5,7 +5,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 
 #[violation]
 pub struct EscapeSequenceInDocstring;
@@ -20,7 +20,7 @@ impl Violation for EscapeSequenceInDocstring {
 static BACKSLASH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\[^(\r\n|\n)uN]").unwrap());
 
 /// D301
-pub fn backslashes(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
 
     // Docstring is already raw.

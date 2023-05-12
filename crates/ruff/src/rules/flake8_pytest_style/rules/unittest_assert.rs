@@ -3,7 +3,7 @@ use std::hash::BuildHasherDefault;
 use anyhow::{anyhow, bail, Result};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{
-    Cmpop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
+    self, Cmpop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 
 use ruff_python_ast::helpers::{create_expr, create_stmt};
@@ -12,7 +12,7 @@ use ruff_python_ast::helpers::{create_expr, create_stmt};
 /// `unittest` module. Note: any variants that can't be replaced with plain
 /// `assert` statements are commented out.
 #[derive(Copy, Clone)]
-pub enum UnittestAssert {
+pub(crate) enum UnittestAssert {
     AlmostEqual,
     AlmostEquals,
     CountEqual,
@@ -145,18 +145,18 @@ impl TryFrom<&str> for UnittestAssert {
 }
 
 fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
-    create_stmt(StmtKind::Assert {
+    create_stmt(StmtKind::Assert(ast::StmtAssert {
         test: Box::new(expr.clone()),
         msg: msg.map(|msg| Box::new(msg.clone())),
-    })
+    }))
 }
 
 fn compare(left: &Expr, cmpop: Cmpop, right: &Expr) -> Expr {
-    create_expr(ExprKind::Compare {
+    create_expr(ExprKind::Compare(ast::ExprCompare {
         left: Box::new(left.clone()),
         ops: vec![cmpop],
         comparators: vec![right.clone()],
-    })
+    }))
 }
 
 impl UnittestAssert {
@@ -201,7 +201,7 @@ impl UnittestAssert {
     }
 
     /// Create a map from argument name to value.
-    pub fn args_map<'a>(
+    pub(crate) fn args_map<'a>(
         &'a self,
         args: &'a [Expr],
         keywords: &'a [Keyword],
@@ -209,7 +209,7 @@ impl UnittestAssert {
         // If we have variable-length arguments, abort.
         if args
             .iter()
-            .any(|arg| matches!(arg.node, ExprKind::Starred { .. }))
+            .any(|arg| matches!(arg.node, ExprKind::Starred(_)))
             || keywords.iter().any(|kw| kw.node.arg.is_none())
         {
             bail!("Variable-length arguments are not supported");
@@ -245,7 +245,7 @@ impl UnittestAssert {
                     .node
                     .arg
                     .as_ref()
-                    .map_or(false, |kwarg_name| kwarg_name == arg_name)
+                    .map_or(false, |kwarg_name| &kwarg_name == arg_name)
                 {
                     Some(&keyword.node.value)
                 } else {
@@ -259,7 +259,7 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+    pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
         let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True | UnittestAssert::False => {
@@ -268,10 +268,10 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 Ok(if matches!(self, UnittestAssert::False) {
-                    let unary_expr = create_expr(ExprKind::UnaryOp {
+                    let unary_expr = create_expr(ExprKind::UnaryOp(ast::ExprUnaryOp {
                         op: Unaryop::Not,
                         operand: Box::new(create_expr(expr.node.clone())),
-                    });
+                    }));
                     assert(&unary_expr, msg)
                 } else {
                     assert(expr, msg)
@@ -337,10 +337,10 @@ impl UnittestAssert {
                 let expr = compare(
                     expr,
                     cmpop,
-                    &create_expr(ExprKind::Constant {
+                    &create_expr(ExprKind::Constant(ast::ExprConstant {
                         value: Constant::None,
                         kind: None,
-                    }),
+                    })),
                 );
                 Ok(assert(&expr, msg))
             }
@@ -352,9 +352,9 @@ impl UnittestAssert {
                     .get("cls")
                     .ok_or_else(|| anyhow!("Missing argument `cls`"))?;
                 let msg = args.get("msg").copied();
-                let isinstance = create_expr(ExprKind::Call {
-                    func: Box::new(create_expr(ExprKind::Name {
-                        id: "isinstance".to_string(),
+                let isinstance = create_expr(ast::ExprCall {
+                    func: Box::new(create_expr(ast::ExprName {
+                        id: "isinstance".into(),
                         ctx: ExprContext::Load,
                     })),
                     args: vec![(**obj).clone(), (**cls).clone()],
@@ -363,7 +363,7 @@ impl UnittestAssert {
                 if matches!(self, UnittestAssert::IsInstance) {
                     Ok(assert(&isinstance, msg))
                 } else {
-                    let expr = create_expr(ExprKind::UnaryOp {
+                    let expr = create_expr(ast::ExprUnaryOp {
                         op: Unaryop::Not,
                         operand: Box::new(isinstance),
                     });
@@ -381,13 +381,13 @@ impl UnittestAssert {
                     .get("regex")
                     .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
-                let re_search = create_expr(ExprKind::Call {
-                    func: Box::new(create_expr(ExprKind::Attribute {
-                        value: Box::new(create_expr(ExprKind::Name {
-                            id: "re".to_string(),
+                let re_search = create_expr(ast::ExprCall {
+                    func: Box::new(create_expr(ast::ExprAttribute {
+                        value: Box::new(create_expr(ast::ExprName {
+                            id: "re".into(),
                             ctx: ExprContext::Load,
                         })),
-                        attr: "search".to_string(),
+                        attr: "search".into(),
                         ctx: ExprContext::Load,
                     })),
                     args: vec![(**regex).clone(), (**text).clone()],
@@ -397,7 +397,7 @@ impl UnittestAssert {
                     Ok(assert(&re_search, msg))
                 } else {
                     Ok(assert(
-                        &create_expr(ExprKind::UnaryOp {
+                        &create_expr(ast::ExprUnaryOp {
                             op: Unaryop::Not,
                             operand: Box::new(re_search),
                         }),

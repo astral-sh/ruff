@@ -16,7 +16,7 @@ impl Violation for PassStatementStubBody {
 }
 
 /// PYI009
-pub fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
     if body.len() != 1 {
         return;
     }

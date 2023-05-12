@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -16,7 +16,7 @@ use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_fu
 /// ## What it does
 /// Checks for function calls in default function arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// Any function call that's used in a default argument will only be performed
 /// once, at definition time. The returned value will then be reused by all
 /// calls to the function, which can lead to unexpected behaviour.
@@ -84,7 +84,7 @@ where
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
-            ExprKind::Call { func, args, .. } => {
+            ExprKind::Call(ast::ExprCall { func, args, .. }) => {
                 if !is_mutable_func(self.checker, func)
                     && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
@@ -99,14 +99,14 @@ where
                 }
                 visitor::walk_expr(self, expr);
             }
-            ExprKind::Lambda { .. } => {}
+            ExprKind::Lambda(_) => {}
             _ => visitor::walk_expr(self, expr),
         }
     }
 }
 
 fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
-    let ExprKind::Name { id, .. } = &expr.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node else {
         return false;
     };
     if id != "float" {
@@ -115,10 +115,10 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
     let Some(arg) = args.first() else {
         return false;
     };
-    let ExprKind::Constant {
+    let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } = &arg.node else {
+    } )= &arg.node else {
         return false;
     };
     let lowercased = value.to_lowercase();
@@ -129,7 +129,7 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
 }
 
 /// B008
-pub fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
+pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<CallPath> = checker
         .settings

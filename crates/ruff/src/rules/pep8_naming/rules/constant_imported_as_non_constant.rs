@@ -30,8 +30,8 @@ use ruff_python_stdlib::str;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[violation]
 pub struct ConstantImportedAsNonConstant {
-    pub name: String,
-    pub asname: String,
+    name: String,
+    asname: String,
 }
 
 impl Violation for ConstantImportedAsNonConstant {
@@ -43,7 +43,7 @@ impl Violation for ConstantImportedAsNonConstant {
 }
 
 /// N811
-pub fn constant_imported_as_non_constant(
+pub(crate) fn constant_imported_as_non_constant(
     name: &str,
     asname: &str,
     alias: &Alias,

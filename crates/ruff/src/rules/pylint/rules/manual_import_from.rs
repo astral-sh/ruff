@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Alias, AliasData, Located, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Alias, AliasData, Attributed, Int, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,9 +9,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct ManualFromImport {
-    pub module: String,
-    pub name: String,
-    pub fixable: bool,
+    module: String,
+    name: String,
 }
 
 impl Violation for ManualFromImport {
@@ -19,27 +18,30 @@ impl Violation for ManualFromImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ManualFromImport { module, name, .. } = self;
+        let ManualFromImport { module, name } = self;
         format!("Use `from {module} import {name}` in lieu of alias")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|ManualFromImport { module, name, .. }| {
-                format!("Replace with `from {module} import {name}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let ManualFromImport { module, name } = self;
+        Some(format!("Replace with `from {module} import {name}`"))
     }
 }
 
 /// PLR0402
-pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
+pub(crate) fn manual_from_import(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    alias: &Alias,
+    names: &[Alias],
+) {
     let Some(asname) = &alias.node.asname else {
         return;
     };
     let Some((module, name)) = alias.node.name.rsplit_once('.') else {
         return;
     };
-    if name != asname {
+    if asname != name {
         return;
     }
 
@@ -48,23 +50,23 @@ pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, nam
         ManualFromImport {
             module: module.to_string(),
             name: name.to_string(),
-            fixable,
         },
         alias.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_stmt(
-                &create_stmt(StmtKind::ImportFrom {
-                    module: Some(module.to_string()),
-                    names: vec![Located::with_range(
+                &create_stmt(ast::StmtImportFrom {
+                    module: Some(module.into()),
+                    names: vec![Attributed::new(
+                        stmt.range(),
                         AliasData {
-                            name: asname.into(),
+                            name: asname.clone(),
                             asname: None,
                         },
-                        stmt.range(),
                     )],
-                    level: Some(0),
+                    level: Some(Int::new(0)),
                 }),
                 checker.stylist,
             ),

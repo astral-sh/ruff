@@ -35,7 +35,7 @@ impl AlwaysAutofixableViolation for MissingNewlineAtEndOfFile {
 }
 
 /// W292
-pub fn no_newline_at_end_of_file(
+pub(crate) fn no_newline_at_end_of_file(
     locator: &Locator,
     stylist: &Stylist,
     autofix: bool,
@@ -55,6 +55,7 @@ pub fn no_newline_at_end_of_file(
 
         let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
         if autofix {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                 stylist.line_ending().to_string(),
                 range.start(),

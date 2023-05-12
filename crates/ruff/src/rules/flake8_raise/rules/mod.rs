@@ -1,4 +1,4 @@
-pub use unnecessary_paren_on_raise_exception::{
+pub(crate) use unnecessary_paren_on_raise_exception::{
     unnecessary_paren_on_raise_exception, UnnecessaryParenOnRaiseException,
 };
 

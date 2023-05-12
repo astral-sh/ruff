@@ -1,7 +1,7 @@
 use std::hash::{BuildHasherDefault, Hash};
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -13,8 +13,8 @@ use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
-    pub name: String,
-    pub repeated_value: bool,
+    name: String,
+    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyLiteral {
@@ -26,12 +26,13 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         format!("Dictionary key literal `{name}` repeated")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyLiteral { repeated_value, .. } = self;
+    fn autofix_title(&self) -> Option<String> {
+        let MultiValueRepeatedKeyLiteral {
+            repeated_value,
+            name,
+        } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyLiteral { name, .. }| {
-                format!("Remove repeated key literal `{name}`")
-            })
+            Some(format!("Remove repeated key literal `{name}`"))
         } else {
             None
         }
@@ -39,8 +40,8 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 }
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
-    pub name: String,
-    pub repeated_value: bool,
+    name: String,
+    repeated_value: bool,
 }
 
 impl Violation for MultiValueRepeatedKeyVariable {
@@ -52,12 +53,13 @@ impl Violation for MultiValueRepeatedKeyVariable {
         format!("Dictionary key `{name}` repeated")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyVariable { repeated_value, .. } = self;
+    fn autofix_title(&self) -> Option<String> {
+        let MultiValueRepeatedKeyVariable {
+            repeated_value,
+            name,
+        } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyVariable { name, .. }| {
-                format!("Remove repeated key `{name}`")
-            })
+            Some(format!("Remove repeated key `{name}`"))
         } else {
             None
         }
@@ -72,14 +74,16 @@ enum DictionaryKey<'a> {
 
 fn into_dictionary_key(expr: &Expr) -> Option<DictionaryKey> {
     match &expr.node {
-        ExprKind::Constant { value, .. } => Some(DictionaryKey::Constant(value.into())),
-        ExprKind::Name { id, .. } => Some(DictionaryKey::Variable(id)),
+        ExprKind::Constant(ast::ExprConstant { value, .. }) => {
+            Some(DictionaryKey::Constant(value.into()))
+        }
+        ExprKind::Name(ast::ExprName { id, .. }) => Some(DictionaryKey::Variable(id)),
         _ => None,
     }
 }
 
 /// F601, F602
-pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     // Generate a map from key to (index, value).
     let mut seen: FxHashMap<DictionaryKey, FxHashSet<ComparableExpr>> =
         FxHashMap::with_capacity_and_hasher(keys.len(), BuildHasherDefault::default());
@@ -109,6 +113,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
+                                    #[allow(deprecated)]
                                     diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),
@@ -137,6 +142,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
+                                    #[allow(deprecated)]
                                     diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                                         values[i - 1].end(),
                                         values[i].end(),

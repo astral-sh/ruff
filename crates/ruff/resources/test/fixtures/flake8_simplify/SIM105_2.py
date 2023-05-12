@@ -6,6 +6,7 @@ def foo():
     pass
 
 
+# SIM105
 try:
     foo()
 except ValueError:

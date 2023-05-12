@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{self, Int, Stmt, StmtKind};
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -59,7 +59,7 @@ pub enum Strictness {
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[violation]
 pub struct RelativeImports {
-    pub strictness: Strictness,
+    strictness: Strictness,
 }
 
 impl Violation for RelativeImports {
@@ -73,19 +73,20 @@ impl Violation for RelativeImports {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|RelativeImports { strictness }| match strictness {
+    fn autofix_title(&self) -> Option<String> {
+        let RelativeImports { strictness } = self;
+        Some(match strictness {
             Strictness::Parents => {
-                format!("Replace relative imports from parent modules with absolute imports")
+                "Replace relative imports from parent modules with absolute imports".to_string()
             }
-            Strictness::All => format!("Replace relative imports with absolute imports"),
+            Strictness::All => "Replace relative imports with absolute imports".to_string(),
         })
     }
 }
 
 fn fix_banned_relative_import(
     stmt: &Stmt,
-    level: Option<usize>,
+    level: Option<u32>,
     module: Option<&str>,
     module_path: Option<&[String]>,
     stylist: &Stylist,
@@ -101,18 +102,18 @@ fn fix_banned_relative_import(
         return None;
     }
 
-    let StmtKind::ImportFrom { names, .. } = &stmt.node else {
+    let StmtKind::ImportFrom(ast::StmtImportFrom { names, .. }) = &stmt.node else {
         panic!("Expected StmtKind::ImportFrom");
     };
     let content = unparse_stmt(
-        &create_stmt(StmtKind::ImportFrom {
-            module: Some(module_path.to_string()),
+        &create_stmt(ast::StmtImportFrom {
+            module: Some(module_path.to_string().into()),
             names: names.clone(),
-            level: Some(0),
+            level: Some(Int::new(0)),
         }),
         stylist,
     );
-
+    #[allow(deprecated)]
     Some(Fix::unspecified(Edit::range_replacement(
         content,
         stmt.range(),
@@ -123,7 +124,7 @@ fn fix_banned_relative_import(
 pub fn banned_relative_import(
     checker: &Checker,
     stmt: &Stmt,
-    level: Option<usize>,
+    level: Option<u32>,
     module: Option<&str>,
     module_path: Option<&[String]>,
     strictness: &Strictness,

@@ -8,6 +8,7 @@ UP017.py:7:7: UP017 Use `datetime.UTC` alias
   |       ^^^^^^^^^^^^ UP017
 9 | print(tz.utc)
   |
+  = help: Convert to `datetime.UTC` alias
 
 UP017.py:8:7: UP017 Use `datetime.UTC` alias
    |
@@ -18,6 +19,7 @@ UP017.py:8:7: UP017 Use `datetime.UTC` alias
 11 | 
 12 | print(datetime.timezone.utc)
    |
+   = help: Convert to `datetime.UTC` alias
 
 UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
    |
@@ -43,5 +45,6 @@ UP017.py:11:7: UP017 Use `datetime.UTC` alias
 12 | print(dt.timezone.utc)
    |       ^^^^^^^^^^^^^^^ UP017
    |
+   = help: Convert to `datetime.UTC` alias
 
 

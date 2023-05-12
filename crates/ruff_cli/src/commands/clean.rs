@@ -11,7 +11,7 @@ use ruff::logging::LogLevel;
 use ruff_cache::CACHE_DIR_NAME;
 
 /// Clear any caches in the current directory or any subdirectories.
-pub fn clean(level: LogLevel) -> Result<()> {
+pub(crate) fn clean(level: LogLevel) -> Result<()> {
     let mut stderr = BufWriter::new(io::stderr().lock());
     for entry in WalkDir::new(&*path_dedot::CWD)
         .into_iter()

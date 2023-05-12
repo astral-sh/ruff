@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind};
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -23,7 +23,7 @@ use super::helpers::{
 };
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Parentheses {
+pub(crate) enum Parentheses {
     None,
     Empty,
 }
@@ -39,8 +39,8 @@ impl fmt::Display for Parentheses {
 
 #[violation]
 pub struct PytestFixtureIncorrectParenthesesStyle {
-    pub expected: Parentheses,
-    pub actual: Parentheses,
+    expected: Parentheses,
+    actual: Parentheses,
 }
 
 impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
@@ -61,7 +61,7 @@ impl AlwaysAutofixableViolation for PytestFixtureIncorrectParenthesesStyle {
 
 #[violation]
 pub struct PytestFixturePositionalArgs {
-    pub function: String,
+    function: String,
 }
 
 impl Violation for PytestFixturePositionalArgs {
@@ -88,7 +88,7 @@ impl AlwaysAutofixableViolation for PytestExtraneousScopeFunction {
 
 #[violation]
 pub struct PytestMissingFixtureNameUnderscore {
-    pub function: String,
+    function: String,
 }
 
 impl Violation for PytestMissingFixtureNameUnderscore {
@@ -101,7 +101,7 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 
 #[violation]
 pub struct PytestIncorrectFixtureNameUnderscore {
-    pub function: String,
+    function: String,
 }
 
 impl Violation for PytestIncorrectFixtureNameUnderscore {
@@ -114,7 +114,7 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 
 #[violation]
 pub struct PytestFixtureParamWithoutValue {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for PytestFixtureParamWithoutValue {
@@ -150,7 +150,7 @@ impl Violation for PytestFixtureFinalizerCallback {
 
 #[violation]
 pub struct PytestUselessYieldFixture {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for PytestUselessYieldFixture {
@@ -208,28 +208,28 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
-            StmtKind::Return { value, .. } => {
+            StmtKind::Return(ast::StmtReturn { value }) => {
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {}
+            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {}
             _ => visitor::walk_stmt(self, stmt),
         }
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
-            ExprKind::YieldFrom { .. } => {
+            ExprKind::YieldFrom(_) => {
                 self.has_yield_from = true;
             }
-            ExprKind::Yield { value, .. } => {
+            ExprKind::Yield(ast::ExprYield { value }) => {
                 self.yield_statements.push(expr);
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            ExprKind::Call { func, .. } => {
+            ExprKind::Call(ast::ExprCall { func, .. }) => {
                 if collect_call_path(func).map_or(false, |call_path| {
                     call_path.as_slice() == ["request", "addfinalizer"]
                 }) {
@@ -265,7 +265,7 @@ fn pytest_fixture_parentheses(
     checker.diagnostics.push(diagnostic);
 }
 
-pub fn fix_extraneous_scope_function(
+pub(crate) fn fix_extraneous_scope_function(
     locator: &Locator,
     stmt_at: TextSize,
     expr_range: TextRange,
@@ -278,12 +278,11 @@ pub fn fix_extraneous_scope_function(
 /// PT001, PT002, PT003
 fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Expr) {
     match &decorator.node {
-        ExprKind::Call {
+        ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-            ..
-        } => {
+        }) => {
             if checker
                 .settings
                 .rules
@@ -292,6 +291,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 && args.is_empty()
                 && keywords.is_empty()
             {
+                #[allow(deprecated)]
                 let fix = Fix::unspecified(Edit::deletion(func.end(), decorator.end()));
                 pytest_fixture_parentheses(
                     checker,
@@ -354,6 +354,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 .enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
                 && checker.settings.flake8_pytest_style.fixture_parentheses
             {
+                #[allow(deprecated)]
                 let fix = Fix::unspecified(Edit::insertion(
                     Parentheses::Empty.to_string(),
                     decorator.end(),
@@ -413,8 +414,8 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
         .enabled(Rule::PytestUselessYieldFixture)
     {
         if let Some(stmt) = body.last() {
-            if let StmtKind::Expr { value, .. } = &stmt.node {
-                if let ExprKind::Yield { .. } = value.node {
+            if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
+                if let ExprKind::Yield(_) = value.node {
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(
                             PytestUselessYieldFixture {
@@ -423,6 +424,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
                             stmt.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
+                            #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                 "return".to_string(),
                                 TextRange::at(stmt.start(), "yield".text_len()),
@@ -495,6 +497,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let range = checker.locator.full_lines_range(expr.range());
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -511,6 +514,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let line_range = checker.locator.full_lines_range(expr.range());
+                    #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(line_range)));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -519,7 +523,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
     }
 }
 
-pub fn fixture(
+pub(crate) fn fixture(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,

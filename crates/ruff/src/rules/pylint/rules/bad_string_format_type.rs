@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
 use rustpython_common::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -50,37 +50,37 @@ enum DataType {
 impl From<&Expr> for DataType {
     fn from(expr: &Expr) -> Self {
         match &expr.node {
-            ExprKind::NamedExpr { value, .. } => (&**value).into(),
-            ExprKind::UnaryOp { operand, .. } => (&**operand).into(),
-            ExprKind::Dict { .. } => DataType::Object,
-            ExprKind::Set { .. } => DataType::Object,
-            ExprKind::ListComp { .. } => DataType::Object,
-            ExprKind::SetComp { .. } => DataType::Object,
-            ExprKind::DictComp { .. } => DataType::Object,
-            ExprKind::GeneratorExp { .. } => DataType::Object,
-            ExprKind::JoinedStr { .. } => DataType::String,
-            ExprKind::BinOp { left, op, .. } => {
+            ExprKind::NamedExpr(ast::ExprNamedExpr { value, .. }) => (&**value).into(),
+            ExprKind::UnaryOp(ast::ExprUnaryOp { operand, .. }) => (&**operand).into(),
+            ExprKind::Dict(_) => DataType::Object,
+            ExprKind::Set(_) => DataType::Object,
+            ExprKind::ListComp(_) => DataType::Object,
+            ExprKind::SetComp(_) => DataType::Object,
+            ExprKind::DictComp(_) => DataType::Object,
+            ExprKind::GeneratorExp(_) => DataType::Object,
+            ExprKind::JoinedStr(_) => DataType::String,
+            ExprKind::BinOp(ast::ExprBinOp { left, op, .. }) => {
                 // Ex) "a" % "b"
                 if matches!(
                     left.node,
-                    ExprKind::Constant {
+                    ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(..),
                         ..
-                    }
+                    })
                 ) && matches!(op, Operator::Mod)
                 {
                     return DataType::String;
                 }
                 DataType::Unknown
             }
-            ExprKind::Constant { value, .. } => match value {
+            ExprKind::Constant(ast::ExprConstant { value, .. }) => match value {
                 Constant::Str(_) => DataType::String,
                 Constant::Int(_) => DataType::Integer,
                 Constant::Float(_) => DataType::Float,
                 _ => DataType::Unknown,
             },
-            ExprKind::List { .. } => DataType::Object,
-            ExprKind::Tuple { .. } => DataType::Object,
+            ExprKind::List(_) => DataType::Object,
+            ExprKind::Tuple(_) => DataType::Object,
             _ => DataType::Unknown,
         }
     }
@@ -221,10 +221,10 @@ fn is_valid_dict(
         let Some(key) = key else {
             return true;
         };
-        if let ExprKind::Constant {
+        if let ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(mapping_key),
             ..
-        } = &key.node
+        }) = &key.node
         {
             let Some(format) = formats_hash.get(mapping_key.as_str()) else {
                 return true;
@@ -241,11 +241,11 @@ fn is_valid_dict(
 }
 
 /// PLE1307
-pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
+pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator.slice(expr.range());
     let mut strings: Vec<TextRange> = vec![];
-    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(content, Mode::Module, expr.start()).flatten() {
         if matches!(tok, Tok::String { .. }) {
             strings.push(range);
         } else if matches!(tok, Tok::Percent) {
@@ -276,9 +276,11 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
 
     // Parse the parameters.
     let is_valid = match &right.node {
-        ExprKind::Tuple { elts, .. } => is_valid_tuple(&format_strings, elts),
-        ExprKind::Dict { keys, values } => is_valid_dict(&format_strings, keys, values),
-        ExprKind::Constant { .. } => is_valid_constant(&format_strings, right),
+        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
+        ExprKind::Dict(ast::ExprDict { keys, values }) => {
+            is_valid_dict(&format_strings, keys, values)
+        }
+        ExprKind::Constant(_) => is_valid_constant(&format_strings, right),
         _ => true,
     };
     if !is_valid {

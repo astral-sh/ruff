@@ -1,12 +1,8 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
-    ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
-    Unaryop, Withitem,
-};
+use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
 
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 
 use crate::directives::IsortDirectives;
 use crate::rules::isort::helpers;
@@ -25,7 +21,7 @@ pub struct Block<'a> {
     pub trailer: Option<Trailer>,
 }
 
-pub struct ImportTracker<'a> {
+pub(crate) struct ImportTracker<'a> {
     locator: &'a Locator<'a>,
     is_stub: bool,
     blocks: Vec<Block<'a>>,
@@ -35,7 +31,11 @@ pub struct ImportTracker<'a> {
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(locator: &'a Locator<'a>, directives: &'a IsortDirectives, is_stub: bool) -> Self {
+    pub(crate) fn new(
+        locator: &'a Locator<'a>,
+        directives: &'a IsortDirectives,
+        is_stub: bool,
+    ) -> Self {
         Self {
             locator,
             is_stub,
@@ -76,14 +76,14 @@ impl<'a> ImportTracker<'a> {
             // sibling (i.e., as if the comment is the next statement, as
             // opposed to the class or function).
             match &stmt.node {
-                StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
                         Trailer::FunctionDef
                     }
                 }
-                StmtKind::ClassDef { .. } => {
+                StmtKind::ClassDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
@@ -103,7 +103,7 @@ impl<'a> ImportTracker<'a> {
         }
     }
 
-    pub fn iter<'b>(&'a self) -> impl Iterator<Item = &'b Block<'a>>
+    pub(crate) fn iter<'b>(&'a self) -> impl Iterator<Item = &'b Block<'a>>
     where
         'a: 'b,
     {
@@ -111,7 +111,7 @@ impl<'a> ImportTracker<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for ImportTracker<'a>
+impl<'a, 'b> StatementVisitor<'b> for ImportTracker<'a>
 where
     'b: 'a,
 {
@@ -138,11 +138,7 @@ where
         }
 
         // Track imports.
-        if matches!(
-            stmt.node,
-            StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
-        ) && !is_excluded
-        {
+        if matches!(stmt.node, StmtKind::Import(_) | StmtKind::ImportFrom(_)) && !is_excluded {
             self.track_import(stmt);
         } else {
             self.finalize(self.trailer_for(stmt));
@@ -152,36 +148,25 @@ where
         let prev_nested = self.nested;
         self.nested = true;
         match &stmt.node {
-            StmtKind::FunctionDef { body, .. } => {
+            StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::AsyncFunctionDef { body, .. } => {
+            StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::ClassDef { body, .. } => {
+            StmtKind::ClassDef(ast::StmtClassDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::For { body, orelse, .. } => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
-            StmtKind::AsyncFor { body, orelse, .. } => {
+            StmtKind::For(ast::StmtFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -192,7 +177,7 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::While { body, orelse, .. } => {
+            StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -203,7 +188,7 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::If { body, orelse, .. } => {
+            StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -214,36 +199,46 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::With { body, .. } => {
+            StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+                for stmt in body {
+                    self.visit_stmt(stmt);
+                }
+                self.finalize(None);
+
+                for stmt in orelse {
+                    self.visit_stmt(stmt);
+                }
+                self.finalize(None);
+            }
+            StmtKind::With(ast::StmtWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::AsyncWith { body, .. } => {
+            StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::Match { subject, cases } => {
-                self.visit_expr(subject);
+            StmtKind::Match(ast::StmtMatch { cases, .. }) => {
                 for match_case in cases {
                     self.visit_match_case(match_case);
                 }
             }
-            StmtKind::Try {
+            StmtKind::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            }
-            | StmtKind::TryStar {
+            })
+            | StmtKind::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => {
+            }) => {
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
@@ -268,29 +263,12 @@ where
         self.nested = prev_nested;
     }
 
-    fn visit_annotation(&mut self, _: &'b Expr) {}
-
-    fn visit_expr(&mut self, _: &'b Expr) {}
-
-    fn visit_constant(&mut self, _: &'b Constant) {}
-
-    fn visit_expr_context(&mut self, _: &'b ExprContext) {}
-
-    fn visit_boolop(&mut self, _: &'b Boolop) {}
-
-    fn visit_operator(&mut self, _: &'b Operator) {}
-
-    fn visit_unaryop(&mut self, _: &'b Unaryop) {}
-
-    fn visit_cmpop(&mut self, _: &'b Cmpop) {}
-
-    fn visit_comprehension(&mut self, _: &'b Comprehension) {}
-
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         let prev_nested = self.nested;
         self.nested = true;
 
-        let ExcepthandlerKind::ExceptHandler { body, .. } = &excepthandler.node;
+        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+            &excepthandler.node;
         for stmt in body {
             self.visit_stmt(stmt);
         }
@@ -299,22 +277,10 @@ where
         self.nested = prev_nested;
     }
 
-    fn visit_arguments(&mut self, _: &'b Arguments) {}
-
-    fn visit_arg(&mut self, _: &'b Arg) {}
-
-    fn visit_keyword(&mut self, _: &'b Keyword) {}
-
-    fn visit_alias(&mut self, _: &'b Alias) {}
-
-    fn visit_withitem(&mut self, _: &'b Withitem) {}
-
     fn visit_match_case(&mut self, match_case: &'b MatchCase) {
         for stmt in &match_case.body {
             self.visit_stmt(stmt);
         }
         self.finalize(None);
     }
-
-    fn visit_pattern(&mut self, _: &'b Pattern) {}
 }

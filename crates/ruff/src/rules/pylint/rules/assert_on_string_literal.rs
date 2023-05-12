@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,9 +42,9 @@ impl Violation for AssertOnStringLiteral {
 }
 
 /// PLW0129
-pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
+pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
     match &test.node {
-        ExprKind::Constant { value, .. } => match value {
+        ExprKind::Constant(ast::ExprConstant { value, .. }) => match value {
             Constant::Str(value, ..) => {
                 checker.diagnostics.push(Diagnostic::new(
                     AssertOnStringLiteral {
@@ -71,11 +71,11 @@ pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
             }
             _ => {}
         },
-        ExprKind::JoinedStr { values } => {
+        ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
                     kind: if values.iter().all(|value| match &value.node {
-                        ExprKind::Constant { value, .. } => match value {
+                        ExprKind::Constant(ast::ExprConstant { value, .. }) => match value {
                             Constant::Str(value, ..) => value.is_empty(),
                             Constant::Bytes(value) => value.is_empty(),
                             _ => false,
@@ -84,7 +84,7 @@ pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                     }) {
                         Kind::Empty
                     } else if values.iter().any(|value| match &value.node {
-                        ExprKind::Constant { value, .. } => match value {
+                        ExprKind::Constant(ast::ExprConstant { value, .. }) => match value {
                             Constant::Str(value, ..) => !value.is_empty(),
                             Constant::Bytes(value) => !value.is_empty(),
                             _ => false,

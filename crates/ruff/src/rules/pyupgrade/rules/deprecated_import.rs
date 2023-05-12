@@ -62,14 +62,9 @@ impl Violation for DeprecatedImport {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        if let Deprecation::WithoutRename(WithoutRename { fixable, .. }) = self.deprecation {
-            fixable.then_some(|DeprecatedImport { deprecation }| {
-                let Deprecation::WithoutRename(WithoutRename { target, .. }) = deprecation else {
-                    unreachable!();
-                };
-                format!("Import from `{target}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        if let Deprecation::WithoutRename(WithoutRename { target, .. }) = &self.deprecation {
+            Some(format!("Import from `{target}`"))
         } else {
             None
         }
@@ -298,7 +293,7 @@ impl<'a> ImportReplacer<'a> {
             if self.version >= PythonVersion::Py39 {
                 for member in self.members {
                     if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
-                        if member.name == *name {
+                        if &member.name == *name {
                             Some(*target)
                         } else {
                             None
@@ -501,7 +496,7 @@ impl<'a> ImportReplacer<'a> {
         let full_names: String = names
             .iter()
             .map(|name| match &name.asname {
-                Some(asname) => format!("{} as {asname}", name.name),
+                Some(asname) => format!("{} as {}", name.name, asname),
                 None => format!("{}", name.name),
             })
             .join(", ");
@@ -510,18 +505,18 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub fn deprecated_import(
+pub(crate) fn deprecated_import(
     checker: &mut Checker,
     stmt: &Stmt,
     names: &[Alias],
     module: Option<&str>,
-    level: Option<usize>,
+    level: Option<u32>,
 ) {
     // Avoid relative and star imports.
     if level.map_or(false, |level| level > 0) {
         return;
     }
-    if names.first().map_or(false, |name| name.node.name == "*") {
+    if names.first().map_or(false, |name| &name.node.name == "*") {
         return;
     }
     let Some(module) = module else {
@@ -551,6 +546,7 @@ pub fn deprecated_import(
         );
         if checker.patch(Rule::DeprecatedImport) {
             if let Some(content) = fix {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     content,
                     stmt.range(),

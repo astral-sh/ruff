@@ -8,12 +8,12 @@ use crate::shared_traits::AsFormat;
 use crate::trivia::{Relationship, TriviaKind};
 
 #[derive(Copy, Clone)]
-pub struct Block<'a> {
+pub(crate) struct Block<'a> {
     body: &'a Body,
 }
 
-impl Format<ASTFormatContext<'_>> for Block<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for Block<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for (i, stmt) in self.body.node.iter().enumerate() {
             if i > 0 {
                 write!(f, [hard_line_break()])?;
@@ -40,17 +40,17 @@ impl Format<ASTFormatContext<'_>> for Block<'_> {
 }
 
 #[inline]
-pub fn block(body: &Body) -> Block {
+pub(crate) fn block(body: &Body) -> Block {
     Block { body }
 }
 
 #[derive(Copy, Clone)]
-pub struct Statements<'a> {
+pub(crate) struct Statements<'a> {
     suite: &'a [Stmt],
 }
 
-impl Format<ASTFormatContext<'_>> for Statements<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for Statements<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for (i, stmt) in self.suite.iter().enumerate() {
             if i > 0 {
                 write!(f, [hard_line_break()])?;
@@ -61,17 +61,17 @@ impl Format<ASTFormatContext<'_>> for Statements<'_> {
     }
 }
 
-pub fn statements(suite: &[Stmt]) -> Statements {
+pub(crate) fn statements(suite: &[Stmt]) -> Statements {
     Statements { suite }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Literal {
+pub(crate) struct Literal {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext<'_>> for Literal {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for Literal {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let text = f.context().contents();
 
         f.write_element(FormatElement::StaticTextSlice {
@@ -82,7 +82,7 @@ impl Format<ASTFormatContext<'_>> for Literal {
 }
 
 #[inline]
-pub const fn literal(range: TextRange) -> Literal {
+pub(crate) const fn literal(range: TextRange) -> Literal {
     Literal { range }
 }
 

@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
 
 #[violation]
@@ -16,7 +16,7 @@ impl Violation for DocstringStartsWithThis {
 }
 
 /// D404
-pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let trimmed = body.trim();

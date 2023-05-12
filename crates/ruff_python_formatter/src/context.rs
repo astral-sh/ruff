@@ -3,23 +3,21 @@ use std::rc::Rc;
 use ruff_formatter::{FormatContext, SimpleFormatOptions};
 use ruff_python_ast::source_code::Locator;
 
-pub struct ASTFormatContext<'a> {
+pub struct ASTFormatContext {
     options: SimpleFormatOptions,
     contents: Rc<str>,
-    locator: Locator<'a>,
 }
 
-impl<'a> ASTFormatContext<'a> {
-    pub fn new(options: SimpleFormatOptions, locator: Locator<'a>) -> Self {
+impl ASTFormatContext {
+    pub fn new(options: SimpleFormatOptions, contents: &str) -> Self {
         Self {
             options,
-            contents: Rc::from(locator.contents()),
-            locator,
+            contents: Rc::from(contents),
         }
     }
 }
 
-impl FormatContext for ASTFormatContext<'_> {
+impl FormatContext for ASTFormatContext {
     type Options = SimpleFormatOptions;
 
     fn options(&self) -> &Self::Options {
@@ -27,12 +25,12 @@ impl FormatContext for ASTFormatContext<'_> {
     }
 }
 
-impl<'a> ASTFormatContext<'a> {
-    pub fn contents(&'a self) -> Rc<str> {
+impl ASTFormatContext {
+    pub fn contents(&self) -> Rc<str> {
         self.contents.clone()
     }
 
-    pub fn locator(&'a self) -> &'a Locator {
-        &self.locator
+    pub fn locator(&self) -> Locator {
+        Locator::new(&self.contents)
     }
 }

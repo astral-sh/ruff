@@ -24,7 +24,7 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: 
     output.push('\n');
 }
 
-pub fn generate() -> String {
+pub(crate) fn generate() -> String {
     let mut output: String = "### Top-level\n\n".into();
 
     let sorted_options: Vec<_> = Options::metadata()

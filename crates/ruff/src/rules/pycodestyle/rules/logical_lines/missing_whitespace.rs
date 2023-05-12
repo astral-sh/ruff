@@ -4,11 +4,11 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextSize;
 
 #[violation]
 pub struct MissingWhitespace {
-    pub token: TokenKind,
+    token: TokenKind,
 }
 
 impl MissingWhitespace {
@@ -82,10 +82,10 @@ pub(crate) fn missing_whitespace(
                     }
 
                     let kind = MissingWhitespace { token: kind };
-
-                    let mut diagnostic = Diagnostic::new(kind, TextRange::empty(token.start()));
+                    let mut diagnostic = Diagnostic::new(kind, token.range());
 
                     if autofix {
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                             " ".to_string(),
                             token.end(),

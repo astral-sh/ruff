@@ -3,9 +3,9 @@
 
 use num_bigint::BigInt;
 use rustpython_parser::ast::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
-    ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern,
-    PatternKind, Stmt, StmtKind, Unaryop, Withitem,
+    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
+    ExcepthandlerKind, Expr, ExprContext, ExprKind, Identifier, Int, Keyword, MatchCase, Operator,
+    Pattern, PatternKind, Stmt, StmtKind, Unaryop, Withitem,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -136,7 +136,7 @@ pub struct ComparableAlias<'a> {
 impl<'a> From<&'a Alias> for ComparableAlias<'a> {
     fn from(alias: &'a Alias) -> Self {
         Self {
-            name: &alias.node.name,
+            name: alias.node.name.as_str(),
             asname: alias.node.asname.as_deref(),
         }
     }
@@ -195,43 +195,47 @@ pub enum ComparablePattern<'a> {
 impl<'a> From<&'a Pattern> for ComparablePattern<'a> {
     fn from(pattern: &'a Pattern) -> Self {
         match &pattern.node {
-            PatternKind::MatchValue { value } => Self::MatchValue {
+            PatternKind::MatchValue(ast::PatternMatchValue { value }) => Self::MatchValue {
                 value: value.into(),
             },
-            PatternKind::MatchSingleton { value } => Self::MatchSingleton {
-                value: value.into(),
-            },
-            PatternKind::MatchSequence { patterns } => Self::MatchSequence {
-                patterns: patterns.iter().map(Into::into).collect(),
-            },
-            PatternKind::MatchMapping {
+            PatternKind::MatchSingleton(ast::PatternMatchSingleton { value }) => {
+                Self::MatchSingleton {
+                    value: value.into(),
+                }
+            }
+            PatternKind::MatchSequence(ast::PatternMatchSequence { patterns }) => {
+                Self::MatchSequence {
+                    patterns: patterns.iter().map(Into::into).collect(),
+                }
+            }
+            PatternKind::MatchMapping(ast::PatternMatchMapping {
                 keys,
                 patterns,
                 rest,
-            } => Self::MatchMapping {
+            }) => Self::MatchMapping {
                 keys: keys.iter().map(Into::into).collect(),
                 patterns: patterns.iter().map(Into::into).collect(),
                 rest: rest.as_deref(),
             },
-            PatternKind::MatchClass {
+            PatternKind::MatchClass(ast::PatternMatchClass {
                 cls,
                 patterns,
                 kwd_attrs,
                 kwd_patterns,
-            } => Self::MatchClass {
+            }) => Self::MatchClass {
                 cls: cls.into(),
                 patterns: patterns.iter().map(Into::into).collect(),
-                kwd_attrs: kwd_attrs.iter().map(String::as_str).collect(),
+                kwd_attrs: kwd_attrs.iter().map(Identifier::as_str).collect(),
                 kwd_patterns: kwd_patterns.iter().map(Into::into).collect(),
             },
-            PatternKind::MatchStar { name } => Self::MatchStar {
+            PatternKind::MatchStar(ast::PatternMatchStar { name }) => Self::MatchStar {
                 name: name.as_deref(),
             },
-            PatternKind::MatchAs { pattern, name } => Self::MatchAs {
+            PatternKind::MatchAs(ast::PatternMatchAs { pattern, name }) => Self::MatchAs {
                 pattern: pattern.as_ref().map(Into::into),
                 name: name.as_deref(),
             },
-            PatternKind::MatchOr { patterns } => Self::MatchOr {
+            PatternKind::MatchOr(ast::PatternMatchOr { patterns }) => Self::MatchOr {
                 patterns: patterns.iter().map(Into::into).collect(),
             },
         }
@@ -340,7 +344,7 @@ pub struct ComparableArg<'a> {
 impl<'a> From<&'a Arg> for ComparableArg<'a> {
     fn from(arg: &'a Arg) -> Self {
         Self {
-            arg: &arg.node.arg,
+            arg: arg.node.arg.as_str(),
             annotation: arg.node.annotation.as_ref().map(Into::into),
             type_comment: arg.node.type_comment.as_deref(),
         }
@@ -356,7 +360,7 @@ pub struct ComparableKeyword<'a> {
 impl<'a> From<&'a Keyword> for ComparableKeyword<'a> {
     fn from(keyword: &'a Keyword) -> Self {
         Self {
-            arg: keyword.node.arg.as_deref(),
+            arg: keyword.node.arg.as_ref().map(Identifier::as_str),
             value: (&keyword.node.value).into(),
         }
     }
@@ -367,7 +371,7 @@ pub struct ComparableComprehension<'a> {
     pub target: ComparableExpr<'a>,
     pub iter: ComparableExpr<'a>,
     pub ifs: Vec<ComparableExpr<'a>>,
-    pub is_async: usize,
+    pub is_async: bool,
 }
 
 impl<'a> From<&'a Comprehension> for ComparableComprehension<'a> {
@@ -392,7 +396,8 @@ pub enum ComparableExcepthandler<'a> {
 
 impl<'a> From<&'a Excepthandler> for ComparableExcepthandler<'a> {
     fn from(excepthandler: &'a Excepthandler) -> Self {
-        let ExcepthandlerKind::ExceptHandler { type_, name, body } = &excepthandler.node;
+        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, name, body }) =
+            &excepthandler.node;
         Self::ExceptHandler {
             type_: type_.as_ref().map(Into::into),
             name: name.as_deref(),
@@ -474,7 +479,7 @@ pub enum ComparableExpr<'a> {
     },
     FormattedValue {
         value: Box<ComparableExpr<'a>>,
-        conversion: usize,
+        conversion: Int,
         format_spec: Option<Box<ComparableExpr<'a>>>,
     },
     JoinedStr {
@@ -532,133 +537,135 @@ impl<'a> From<&'a Box<Expr>> for ComparableExpr<'a> {
 impl<'a> From<&'a Expr> for ComparableExpr<'a> {
     fn from(expr: &'a Expr) -> Self {
         match &expr.node {
-            ExprKind::BoolOp { op, values } => Self::BoolOp {
+            ExprKind::BoolOp(ast::ExprBoolOp { op, values }) => Self::BoolOp {
                 op: op.into(),
                 values: values.iter().map(Into::into).collect(),
             },
-            ExprKind::NamedExpr { target, value } => Self::NamedExpr {
+            ExprKind::NamedExpr(ast::ExprNamedExpr { target, value }) => Self::NamedExpr {
                 target: target.into(),
                 value: value.into(),
             },
-            ExprKind::BinOp { left, op, right } => Self::BinOp {
+            ExprKind::BinOp(ast::ExprBinOp { left, op, right }) => Self::BinOp {
                 left: left.into(),
                 op: op.into(),
                 right: right.into(),
             },
-            ExprKind::UnaryOp { op, operand } => Self::UnaryOp {
+            ExprKind::UnaryOp(ast::ExprUnaryOp { op, operand }) => Self::UnaryOp {
                 op: op.into(),
                 operand: operand.into(),
             },
-            ExprKind::Lambda { args, body } => Self::Lambda {
+            ExprKind::Lambda(ast::ExprLambda { args, body }) => Self::Lambda {
                 args: (&**args).into(),
                 body: body.into(),
             },
-            ExprKind::IfExp { test, body, orelse } => Self::IfExp {
+            ExprKind::IfExp(ast::ExprIfExp { test, body, orelse }) => Self::IfExp {
                 test: test.into(),
                 body: body.into(),
                 orelse: orelse.into(),
             },
-            ExprKind::Dict { keys, values } => Self::Dict {
+            ExprKind::Dict(ast::ExprDict { keys, values }) => Self::Dict {
                 keys: keys
                     .iter()
                     .map(|expr| expr.as_ref().map(Into::into))
                     .collect(),
                 values: values.iter().map(Into::into).collect(),
             },
-            ExprKind::Set { elts } => Self::Set {
+            ExprKind::Set(ast::ExprSet { elts }) => Self::Set {
                 elts: elts.iter().map(Into::into).collect(),
             },
-            ExprKind::ListComp { elt, generators } => Self::ListComp {
+            ExprKind::ListComp(ast::ExprListComp { elt, generators }) => Self::ListComp {
                 elt: elt.into(),
                 generators: generators.iter().map(Into::into).collect(),
             },
-            ExprKind::SetComp { elt, generators } => Self::SetComp {
+            ExprKind::SetComp(ast::ExprSetComp { elt, generators }) => Self::SetComp {
                 elt: elt.into(),
                 generators: generators.iter().map(Into::into).collect(),
             },
-            ExprKind::DictComp {
+            ExprKind::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
-            } => Self::DictComp {
+            }) => Self::DictComp {
                 key: key.into(),
                 value: value.into(),
                 generators: generators.iter().map(Into::into).collect(),
             },
-            ExprKind::GeneratorExp { elt, generators } => Self::GeneratorExp {
-                elt: elt.into(),
-                generators: generators.iter().map(Into::into).collect(),
-            },
-            ExprKind::Await { value } => Self::Await {
+            ExprKind::GeneratorExp(ast::ExprGeneratorExp { elt, generators }) => {
+                Self::GeneratorExp {
+                    elt: elt.into(),
+                    generators: generators.iter().map(Into::into).collect(),
+                }
+            }
+            ExprKind::Await(ast::ExprAwait { value }) => Self::Await {
                 value: value.into(),
             },
-            ExprKind::Yield { value } => Self::Yield {
+            ExprKind::Yield(ast::ExprYield { value }) => Self::Yield {
                 value: value.as_ref().map(Into::into),
             },
-            ExprKind::YieldFrom { value } => Self::YieldFrom {
+            ExprKind::YieldFrom(ast::ExprYieldFrom { value }) => Self::YieldFrom {
                 value: value.into(),
             },
-            ExprKind::Compare {
+            ExprKind::Compare(ast::ExprCompare {
                 left,
                 ops,
                 comparators,
-            } => Self::Compare {
+            }) => Self::Compare {
                 left: left.into(),
                 ops: ops.iter().map(Into::into).collect(),
                 comparators: comparators.iter().map(Into::into).collect(),
             },
-            ExprKind::Call {
+            ExprKind::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
-            } => Self::Call {
+            }) => Self::Call {
                 func: func.into(),
                 args: args.iter().map(Into::into).collect(),
                 keywords: keywords.iter().map(Into::into).collect(),
             },
-            ExprKind::FormattedValue {
+            ExprKind::FormattedValue(ast::ExprFormattedValue {
                 value,
                 conversion,
                 format_spec,
-            } => Self::FormattedValue {
+            }) => Self::FormattedValue {
                 value: value.into(),
                 conversion: *conversion,
                 format_spec: format_spec.as_ref().map(Into::into),
             },
-            ExprKind::JoinedStr { values } => Self::JoinedStr {
+            ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => Self::JoinedStr {
                 values: values.iter().map(Into::into).collect(),
             },
-            ExprKind::Constant { value, kind } => Self::Constant {
+            ExprKind::Constant(ast::ExprConstant { value, kind }) => Self::Constant {
                 value: value.into(),
                 kind: kind.as_ref().map(String::as_str),
             },
-            ExprKind::Attribute { value, attr, ctx } => Self::Attribute {
+            ExprKind::Attribute(ast::ExprAttribute { value, attr, ctx }) => Self::Attribute {
                 value: value.into(),
-                attr,
+                attr: attr.as_str(),
                 ctx: ctx.into(),
             },
-            ExprKind::Subscript { value, slice, ctx } => Self::Subscript {
+            ExprKind::Subscript(ast::ExprSubscript { value, slice, ctx }) => Self::Subscript {
                 value: value.into(),
                 slice: slice.into(),
                 ctx: ctx.into(),
             },
-            ExprKind::Starred { value, ctx } => Self::Starred {
+            ExprKind::Starred(ast::ExprStarred { value, ctx }) => Self::Starred {
                 value: value.into(),
                 ctx: ctx.into(),
             },
-            ExprKind::Name { id, ctx } => Self::Name {
-                id,
+            ExprKind::Name(ast::ExprName { id, ctx }) => Self::Name {
+                id: id.as_str(),
                 ctx: ctx.into(),
             },
-            ExprKind::List { elts, ctx } => Self::List {
+            ExprKind::List(ast::ExprList { elts, ctx }) => Self::List {
                 elts: elts.iter().map(Into::into).collect(),
                 ctx: ctx.into(),
             },
-            ExprKind::Tuple { elts, ctx } => Self::Tuple {
+            ExprKind::Tuple(ast::ExprTuple { elts, ctx }) => Self::Tuple {
                 elts: elts.iter().map(Into::into).collect(),
                 ctx: ctx.into(),
             },
-            ExprKind::Slice { lower, upper, step } => Self::Slice {
+            ExprKind::Slice(ast::ExprSlice { lower, upper, step }) => Self::Slice {
                 lower: lower.as_ref().map(Into::into),
                 upper: upper.as_ref().map(Into::into),
                 step: step.as_ref().map(Into::into),
@@ -712,7 +719,7 @@ pub enum ComparableStmt<'a> {
         target: ComparableExpr<'a>,
         annotation: ComparableExpr<'a>,
         value: Option<ComparableExpr<'a>>,
-        simple: usize,
+        simple: bool,
     },
     For {
         target: ComparableExpr<'a>,
@@ -778,7 +785,7 @@ pub enum ComparableStmt<'a> {
     ImportFrom {
         module: Option<&'a str>,
         names: Vec<ComparableAlias<'a>>,
-        level: Option<usize>,
+        level: Option<Int>,
     },
     Global {
         names: Vec<&'a str>,
@@ -797,187 +804,187 @@ pub enum ComparableStmt<'a> {
 impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match &stmt.node {
-            StmtKind::FunctionDef {
+            StmtKind::FunctionDef(ast::StmtFunctionDef {
                 name,
                 args,
                 body,
                 decorator_list,
                 returns,
                 type_comment,
-            } => Self::FunctionDef {
-                name,
+            }) => Self::FunctionDef {
+                name: name.as_str(),
                 args: args.into(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
                 type_comment: type_comment.as_ref().map(std::string::String::as_str),
             },
-            StmtKind::AsyncFunctionDef {
+            StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
                 args,
                 body,
                 decorator_list,
                 returns,
                 type_comment,
-            } => Self::AsyncFunctionDef {
-                name,
+            }) => Self::AsyncFunctionDef {
+                name: name.as_str(),
                 args: args.into(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
                 type_comment: type_comment.as_ref().map(std::string::String::as_str),
             },
-            StmtKind::ClassDef {
+            StmtKind::ClassDef(ast::StmtClassDef {
                 name,
                 bases,
                 keywords,
                 body,
                 decorator_list,
-            } => Self::ClassDef {
-                name,
+            }) => Self::ClassDef {
+                name: name.as_str(),
                 bases: bases.iter().map(Into::into).collect(),
                 keywords: keywords.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
             },
-            StmtKind::Return { value } => Self::Return {
+            StmtKind::Return(ast::StmtReturn { value }) => Self::Return {
                 value: value.as_ref().map(Into::into),
             },
-            StmtKind::Delete { targets } => Self::Delete {
+            StmtKind::Delete(ast::StmtDelete { targets }) => Self::Delete {
                 targets: targets.iter().map(Into::into).collect(),
             },
-            StmtKind::Assign {
+            StmtKind::Assign(ast::StmtAssign {
                 targets,
                 value,
                 type_comment,
-            } => Self::Assign {
+            }) => Self::Assign {
                 targets: targets.iter().map(Into::into).collect(),
                 value: value.into(),
                 type_comment: type_comment.as_ref().map(std::string::String::as_str),
             },
-            StmtKind::AugAssign { target, op, value } => Self::AugAssign {
+            StmtKind::AugAssign(ast::StmtAugAssign { target, op, value }) => Self::AugAssign {
                 target: target.into(),
                 op: op.into(),
                 value: value.into(),
             },
-            StmtKind::AnnAssign {
+            StmtKind::AnnAssign(ast::StmtAnnAssign {
                 target,
                 annotation,
                 value,
                 simple,
-            } => Self::AnnAssign {
+            }) => Self::AnnAssign {
                 target: target.into(),
                 annotation: annotation.into(),
                 value: value.as_ref().map(Into::into),
                 simple: *simple,
             },
-            StmtKind::For {
+            StmtKind::For(ast::StmtFor {
                 target,
                 iter,
                 body,
                 orelse,
                 type_comment,
-            } => Self::For {
+            }) => Self::For {
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
                 type_comment: type_comment.as_ref().map(String::as_str),
             },
-            StmtKind::AsyncFor {
+            StmtKind::AsyncFor(ast::StmtAsyncFor {
                 target,
                 iter,
                 body,
                 orelse,
                 type_comment,
-            } => Self::AsyncFor {
+            }) => Self::AsyncFor {
                 target: target.into(),
                 iter: iter.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
                 type_comment: type_comment.as_ref().map(String::as_str),
             },
-            StmtKind::While { test, body, orelse } => Self::While {
+            StmtKind::While(ast::StmtWhile { test, body, orelse }) => Self::While {
                 test: test.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
             },
-            StmtKind::If { test, body, orelse } => Self::If {
+            StmtKind::If(ast::StmtIf { test, body, orelse }) => Self::If {
                 test: test.into(),
                 body: body.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
             },
-            StmtKind::With {
+            StmtKind::With(ast::StmtWith {
                 items,
                 body,
                 type_comment,
-            } => Self::With {
+            }) => Self::With {
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
                 type_comment: type_comment.as_ref().map(String::as_str),
             },
-            StmtKind::AsyncWith {
+            StmtKind::AsyncWith(ast::StmtAsyncWith {
                 items,
                 body,
                 type_comment,
-            } => Self::AsyncWith {
+            }) => Self::AsyncWith {
                 items: items.iter().map(Into::into).collect(),
                 body: body.iter().map(Into::into).collect(),
                 type_comment: type_comment.as_ref().map(String::as_str),
             },
-            StmtKind::Match { subject, cases } => Self::Match {
+            StmtKind::Match(ast::StmtMatch { subject, cases }) => Self::Match {
                 subject: subject.into(),
                 cases: cases.iter().map(Into::into).collect(),
             },
-            StmtKind::Raise { exc, cause } => Self::Raise {
+            StmtKind::Raise(ast::StmtRaise { exc, cause }) => Self::Raise {
                 exc: exc.as_ref().map(Into::into),
                 cause: cause.as_ref().map(Into::into),
             },
-            StmtKind::Try {
+            StmtKind::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => Self::Try {
+            }) => Self::Try {
                 body: body.iter().map(Into::into).collect(),
                 handlers: handlers.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
                 finalbody: finalbody.iter().map(Into::into).collect(),
             },
-            StmtKind::TryStar {
+            StmtKind::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => Self::TryStar {
+            }) => Self::TryStar {
                 body: body.iter().map(Into::into).collect(),
                 handlers: handlers.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),
                 finalbody: finalbody.iter().map(Into::into).collect(),
             },
-            StmtKind::Assert { test, msg } => Self::Assert {
+            StmtKind::Assert(ast::StmtAssert { test, msg }) => Self::Assert {
                 test: test.into(),
                 msg: msg.as_ref().map(Into::into),
             },
-            StmtKind::Import { names } => Self::Import {
+            StmtKind::Import(ast::StmtImport { names }) => Self::Import {
                 names: names.iter().map(Into::into).collect(),
             },
-            StmtKind::ImportFrom {
+            StmtKind::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
-            } => Self::ImportFrom {
-                module: module.as_ref().map(String::as_str),
+            }) => Self::ImportFrom {
+                module: module.as_deref(),
                 names: names.iter().map(Into::into).collect(),
                 level: *level,
             },
-            StmtKind::Global { names } => Self::Global {
-                names: names.iter().map(String::as_str).collect(),
+            StmtKind::Global(ast::StmtGlobal { names }) => Self::Global {
+                names: names.iter().map(Identifier::as_str).collect(),
             },
-            StmtKind::Nonlocal { names } => Self::Nonlocal {
-                names: names.iter().map(String::as_str).collect(),
+            StmtKind::Nonlocal(ast::StmtNonlocal { names }) => Self::Nonlocal {
+                names: names.iter().map(Identifier::as_str).collect(),
             },
-            StmtKind::Expr { value } => Self::Expr {
+            StmtKind::Expr(ast::StmtExpr { value }) => Self::Expr {
                 value: value.into(),
             },
             StmtKind::Pass => Self::Pass,

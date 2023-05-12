@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct BlindExcept {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for BlindExcept {
@@ -21,7 +21,7 @@ impl Violation for BlindExcept {
 }
 
 /// BLE001
-pub fn blind_except(
+pub(crate) fn blind_except(
     checker: &mut Checker,
     type_: Option<&Expr>,
     name: Option<&str>,
@@ -30,17 +30,17 @@ pub fn blind_except(
     let Some(type_) = type_ else {
         return;
     };
-    let ExprKind::Name { id, .. } = &type_.node else {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &type_.node else {
         return;
     };
     for exception in ["BaseException", "Exception"] {
         if id == exception && checker.ctx.is_builtin(exception) {
             // If the exception is re-raised, don't flag an error.
             if body.iter().any(|stmt| {
-                if let StmtKind::Raise { exc, .. } = &stmt.node {
+                if let StmtKind::Raise(ast::StmtRaise { exc, .. }) = &stmt.node {
                     if let Some(exc) = exc {
-                        if let ExprKind::Name { id, .. } = &exc.node {
-                            name.map_or(false, |name| name == id)
+                        if let ExprKind::Name(ast::ExprName { id, .. }) = &exc.node {
+                            name.map_or(false, |name| id == name)
                         } else {
                             false
                         }
@@ -56,10 +56,11 @@ pub fn blind_except(
 
             // If the exception is logged, don't flag an error.
             if body.iter().any(|stmt| {
-                if let StmtKind::Expr { value } = &stmt.node {
-                    if let ExprKind::Call { func, keywords, .. } = &value.node {
+                if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
+                    if let ExprKind::Call(ast::ExprCall { func, keywords, .. }) = &value.node {
                         if logging::is_logger_candidate(&checker.ctx, func) {
-                            if let ExprKind::Attribute { attr, .. } = &func.node {
+                            if let Some(attribute) = func.node.as_attribute_expr() {
+                                let attr = attribute.attr.as_str();
                                 if attr == "exception" {
                                     return true;
                                 }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -22,14 +22,14 @@ impl AlwaysAutofixableViolation for RaiseNotImplemented {
 
 fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
     match &expr.node {
-        ExprKind::Call { func, .. } => {
-            if let ExprKind::Name { id, .. } = &func.node {
+        ExprKind::Call(ast::ExprCall { func, .. }) => {
+            if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
                 if id == "NotImplemented" {
                     return Some(func);
                 }
             }
         }
-        ExprKind::Name { id, .. } => {
+        ExprKind::Name(ast::ExprName { id, .. }) => {
             if id == "NotImplemented" {
                 return Some(expr);
             }
@@ -40,12 +40,13 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 }
 
 /// F901
-pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(RaiseNotImplemented, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             "NotImplementedError".to_string(),
             expr.range(),

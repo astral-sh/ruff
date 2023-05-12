@@ -9,7 +9,7 @@ pub struct FormatWithitem<'a> {
     item: &'a Withitem,
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Withitem {
+impl AsFormat<ASTFormatContext> for Withitem {
     type Format<'a> = FormatWithitem<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -17,7 +17,7 @@ impl AsFormat<ASTFormatContext<'_>> for Withitem {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatWithitem<'_> {
+impl Format<ASTFormatContext> for FormatWithitem<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let withitem = self.item;
 

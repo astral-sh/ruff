@@ -1,5 +1,5 @@
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -14,7 +14,7 @@ use crate::checkers::ast::Checker;
 /// ## What it does
 /// Checks for mutable default values in class attribute defaults.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// Mutable default values share state across all instances of the class,
 /// while not being obvious. This can lead to bugs when the attributes are
 /// changed in one instance, as those changes will unexpectedly affect all
@@ -65,7 +65,7 @@ impl Violation for MutableClassDefault {
 /// ## What it does
 /// Checks for function calls in dataclass defaults.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// Function calls are only performed once, at definition time. The returned
 /// value is then reused by all instances of the dataclass.
 ///
@@ -150,12 +150,12 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 fn is_mutable_expr(expr: &Expr) -> bool {
     matches!(
         &expr.node,
-        ExprKind::List { .. }
-            | ExprKind::Dict { .. }
-            | ExprKind::Set { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::DictComp { .. }
-            | ExprKind::SetComp { .. }
+        ExprKind::List(_)
+            | ExprKind::Dict(_)
+            | ExprKind::Set(_)
+            | ExprKind::ListComp(_)
+            | ExprKind::DictComp(_)
+            | ExprKind::SetComp(_)
     )
 }
 
@@ -171,19 +171,23 @@ fn is_allowed_dataclass_function(context: &Context, func: &Expr) -> bool {
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
 fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
-    let ExprKind::Subscript { value, .. } = &annotation.node else {
+    let ExprKind::Subscript(ast::ExprSubscript { value, .. }) = &annotation.node else {
         return false;
     };
     context.match_typing_expr(value, "ClassVar")
 }
 
 /// RUF009
+<<<<<<< HEAD:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_class_fields.rs
 pub fn function_call_in_dataclass_defaults(
     checker: &mut Checker,
     body: &[Stmt],
     is_dataclass: bool,
     emit_dataclass_error: bool,
 ) {
+=======
+pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt]) {
+>>>>>>> ruff/main:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_dataclass_fields.rs
     let extend_immutable_calls: Vec<CallPath> = checker
         .settings
         .flake8_bugbear
@@ -193,18 +197,24 @@ pub fn function_call_in_dataclass_defaults(
         .collect();
 
     for statement in body {
-        if let StmtKind::AnnAssign {
+        if let StmtKind::AnnAssign(ast::StmtAnnAssign {
             annotation,
             value: Some(expr),
             ..
-        } = &statement.node
+        }) = &statement.node
         {
             if is_class_var_annotation(&checker.ctx, annotation) {
                 continue;
             }
+<<<<<<< HEAD:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_class_fields.rs
             if let ExprKind::Call { func, .. } = &expr.node {
                 if !(is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
                     || is_dataclass && is_allowed_dataclass_function(&checker.ctx, func))
+=======
+            if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
+                if !is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
+                    && !is_allowed_dataclass_function(&checker.ctx, func)
+>>>>>>> ruff/main:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_dataclass_fields.rs
                 {
                     let diagnostic: Diagnostic = if emit_dataclass_error {
                         Diagnostic::new(
@@ -229,6 +239,7 @@ pub fn function_call_in_dataclass_defaults(
 }
 
 /// RUF008
+<<<<<<< HEAD:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_class_fields.rs
 pub fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
     fn diagnostic(emit_dataclass_error: bool, value: &Expr) -> Diagnostic {
         if emit_dataclass_error {
@@ -237,13 +248,16 @@ pub fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
         }
     }
 
+=======
+pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
+>>>>>>> ruff/main:crates/ruff/src/rules/ruff/rules/mutable_defaults_in_dataclass_fields.rs
     for statement in body {
         match &statement.node {
-            StmtKind::AnnAssign {
+            StmtKind::AnnAssign(ast::StmtAnnAssign {
                 annotation,
                 value: Some(value),
                 ..
-            } => {
+            }) => {
                 if !is_class_var_annotation(&checker.ctx, annotation)
                     && !is_immutable_annotation(&checker.ctx, annotation)
                     && is_mutable_expr(value)
@@ -254,7 +268,7 @@ pub fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
             Diagnostic::new(MutableClassDefault, value.range()));
                 }
             }
-            StmtKind::Assign { value, .. } => {
+            StmtKind::Assign(ast::StmtAssign { value, .. }) => {
                 if is_mutable_expr(value) {
                     checker
                         .diagnostics
@@ -266,7 +280,7 @@ pub fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-pub fn is_dataclass(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub(crate) fn is_dataclass(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|decorator| {
         checker
             .ctx

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, ExprContext, ExprKind, Operator};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,8 +9,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct CollectionLiteralConcatenation {
-    pub expr: String,
-    pub fixable: bool,
+    expr: String,
 }
 
 impl Violation for CollectionLiteralConcatenation {
@@ -18,15 +17,13 @@ impl Violation for CollectionLiteralConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CollectionLiteralConcatenation { expr, .. } = self;
+        let CollectionLiteralConcatenation { expr } = self;
         format!("Consider `{expr}` instead of concatenation")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|CollectionLiteralConcatenation { expr, .. }| {
-                format!("Replace with `{expr}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let CollectionLiteralConcatenation { expr } = self;
+        Some(format!("Replace with `{expr}`"))
     }
 }
 
@@ -36,7 +33,7 @@ fn make_splat_elts(
     splat_at_left: bool,
 ) -> Vec<Expr> {
     let mut new_elts = other_elements.to_owned();
-    let splat = create_expr(ExprKind::Starred {
+    let splat = create_expr(ast::ExprStarred {
         value: Box::from(splat_element.clone()),
         ctx: ExprContext::Load,
     });
@@ -57,18 +54,26 @@ enum Kind {
 /// RUF005
 /// This suggestion could be unsafe if the non-literal expression in the
 /// expression has overridden the `__add__` (or `__radd__`) magic methods.
-pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BinOp { left, op: Operator::Add, right } = &expr.node else {
+pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BinOp(ast::ExprBinOp { left, op: Operator::Add, right }) = &expr.node else {
         return;
     };
 
     // Figure out which way the splat is, and what the kind of the collection is.
     let (kind, splat_element, other_elements, splat_at_left, ctx) = match (&left.node, &right.node)
     {
-        (ExprKind::List { elts: l_elts, ctx }, _) => (Kind::List, right, l_elts, false, ctx),
-        (ExprKind::Tuple { elts: l_elts, ctx }, _) => (Kind::Tuple, right, l_elts, false, ctx),
-        (_, ExprKind::List { elts: r_elts, ctx }) => (Kind::List, left, r_elts, true, ctx),
-        (_, ExprKind::Tuple { elts: r_elts, ctx }) => (Kind::Tuple, left, r_elts, true, ctx),
+        (ExprKind::List(ast::ExprList { elts: l_elts, ctx }), _) => {
+            (Kind::List, right, l_elts, false, ctx)
+        }
+        (ExprKind::Tuple(ast::ExprTuple { elts: l_elts, ctx }), _) => {
+            (Kind::Tuple, right, l_elts, false, ctx)
+        }
+        (_, ExprKind::List(ast::ExprList { elts: r_elts, ctx })) => {
+            (Kind::List, left, r_elts, true, ctx)
+        }
+        (_, ExprKind::Tuple(ast::ExprTuple { elts: r_elts, ctx })) => {
+            (Kind::Tuple, left, r_elts, true, ctx)
+        }
         _ => return,
     };
 
@@ -76,17 +81,17 @@ pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     // will be considered as splat elements.
     if !matches!(
         splat_element.node,
-        ExprKind::Call { .. } | ExprKind::Name { .. } | ExprKind::Attribute { .. }
+        ExprKind::Call(_) | ExprKind::Name(_) | ExprKind::Attribute(_)
     ) {
         return;
     }
 
     let new_expr = match kind {
-        Kind::List => create_expr(ExprKind::List {
+        Kind::List => create_expr(ast::ExprList {
             elts: make_splat_elts(splat_element, other_elements, splat_at_left),
             ctx: ctx.clone(),
         }),
-        Kind::Tuple => create_expr(ExprKind::Tuple {
+        Kind::Tuple => create_expr(ast::ExprTuple {
             elts: make_splat_elts(splat_element, other_elements, splat_at_left),
             ctx: ctx.clone(),
         }),
@@ -102,12 +107,12 @@ pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     let mut diagnostic = Diagnostic::new(
         CollectionLiteralConcatenation {
             expr: contents.clone(),
-            fixable,
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         if fixable {
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 contents,
                 expr.range(),

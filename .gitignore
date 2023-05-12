@@ -3,7 +3,8 @@
 crates/ruff/resources/test/cpython
 mkdocs.yml
 .overrides
-github_search.jsonl
+ruff-old
+github_search*.jsonl
 
 ###
 # Rust.gitignore

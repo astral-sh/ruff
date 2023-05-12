@@ -73,7 +73,7 @@ impl Violation for ModuleImportNotAtTopOfFile {
 }
 
 /// E401
-pub fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
+pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
         checker
             .diagnostics
@@ -82,7 +82,11 @@ pub fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &
 }
 
 /// E402
-pub fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt, locator: &Locator) {
+pub(crate) fn module_import_not_at_top_of_file(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    locator: &Locator,
+) {
     if checker.ctx.seen_import_boundary && locator.is_at_start_of_line(stmt.start()) {
         checker
             .diagnostics

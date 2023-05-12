@@ -20,7 +20,7 @@ impl AlwaysAutofixableViolation for ShebangLeadingWhitespace {
 }
 
 /// EXE004
-pub fn shebang_whitespace(
+pub(crate) fn shebang_whitespace(
     range: TextRange,
     shebang: &ShebangDirective,
     autofix: bool,
@@ -32,6 +32,7 @@ pub fn shebang_whitespace(
                 TextRange::at(range.start(), *n_spaces),
             );
             if autofix {
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::at(
                     range.start(),
                     *n_spaces,

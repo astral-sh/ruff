@@ -13,7 +13,7 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use crate::cst::matchers::match_module;
 
 /// Safely adjust the indentation of the indented block at [`TextRange`].
-pub fn adjust_indentation(
+pub(crate) fn adjust_indentation(
     range: TextRange,
     indentation: &str,
     locator: &Locator,
@@ -50,7 +50,11 @@ pub fn adjust_indentation(
 }
 
 /// Generate a fix to remove arguments from a `super` call.
-pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Edit> {
+pub(crate) fn remove_super_arguments(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &Expr,
+) -> Option<Edit> {
     let range = expr.range();
     let contents = locator.slice(range);
 
@@ -81,7 +85,7 @@ pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr)
 }
 
 /// Remove any imports matching `members` from an import-from statement.
-pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
+pub(crate) fn remove_import_members(contents: &str, members: &[&str]) -> String {
     let mut names: Vec<TextRange> = vec![];
     let mut commas: Vec<TextRange> = vec![];
     let mut removal_indices: Vec<usize> = vec![];

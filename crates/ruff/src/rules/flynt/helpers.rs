@@ -1,19 +1,19 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Int};
 
 use ruff_python_ast::helpers::create_expr;
 
 /// Wrap an expression in a `FormattedValue` with no special formatting.
 fn to_formatted_value_expr(inner: &Expr) -> Expr {
-    create_expr(ExprKind::FormattedValue {
+    create_expr(ast::ExprFormattedValue {
         value: Box::new(inner.clone()),
-        conversion: 0,
+        conversion: Int::new(0),
         format_spec: None,
     })
 }
 
 /// Convert a string to a constant string expression.
 pub(crate) fn to_constant_string(s: &str) -> Expr {
-    create_expr(ExprKind::Constant {
+    create_expr(ast::ExprConstant {
         value: Constant::Str(s.to_owned()),
         kind: None,
     })
@@ -23,11 +23,11 @@ pub(crate) fn to_constant_string(s: &str) -> Expr {
 /// (i.e. one that can be safely converted to a formatted value).
 fn is_simple_call(expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::Call {
+        ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        } => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
+        }) => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
         _ => false,
     }
 }
@@ -36,8 +36,8 @@ fn is_simple_call(expr: &Expr) -> bool {
 /// attribute accesses).
 fn is_simple_callee(func: &Expr) -> bool {
     match &func.node {
-        ExprKind::Name { .. } => true,
-        ExprKind::Attribute { value, .. } => is_simple_callee(value),
+        ExprKind::Name(_) => true,
+        ExprKind::Attribute(ast::ExprAttribute { value, .. }) => is_simple_callee(value),
         _ => false,
     }
 }
@@ -46,21 +46,21 @@ fn is_simple_callee(func: &Expr) -> bool {
 pub(crate) fn to_fstring_elem(expr: &Expr) -> Option<Expr> {
     match &expr.node {
         // These are directly handled by `unparse_fstring_elem`:
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
-        }
-        | ExprKind::JoinedStr { .. }
-        | ExprKind::FormattedValue { .. } => Some(expr.clone()),
+        })
+        | ExprKind::JoinedStr(_)
+        | ExprKind::FormattedValue(_) => Some(expr.clone()),
         // These should be pretty safe to wrap in a formatted value.
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value:
                 Constant::Int(_) | Constant::Float(_) | Constant::Bool(_) | Constant::Complex { .. },
             ..
-        }
-        | ExprKind::Name { .. }
-        | ExprKind::Attribute { .. } => Some(to_formatted_value_expr(expr)),
-        ExprKind::Call { .. } if is_simple_call(expr) => Some(to_formatted_value_expr(expr)),
+        })
+        | ExprKind::Name(_)
+        | ExprKind::Attribute(_) => Some(to_formatted_value_expr(expr)),
+        ExprKind::Call(_) if is_simple_call(expr) => Some(to_formatted_value_expr(expr)),
         _ => None,
     }
 }
