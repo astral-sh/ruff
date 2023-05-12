@@ -14,7 +14,7 @@ pub(crate) fn match_module(module_text: &str) -> Result<Module> {
 pub(crate) fn match_expression(expression_text: &str) -> Result<Expression> {
     match libcst_native::parse_expression(expression_text) {
         Ok(expression) => Ok(expression),
-        Err(_) => bail!("Failed to extract CST from source"),
+        Err(_) => bail!("Failed to extract expression from source"),
     }
 }
 
