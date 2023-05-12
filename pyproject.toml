@@ -1,7 +1,5 @@
 [build-system]
-requires = ["maturin>=0.14.10,<0.15"]
-# We depend on >=0.14.10 because we specify name in
-# [package.metadata.maturin] in ruff_cli/Cargo.toml.
+requires = ["maturin>=0.15.1,<0.16"]
 
 build-backend = "maturin"
 
