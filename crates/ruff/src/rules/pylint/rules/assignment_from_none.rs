@@ -41,28 +41,24 @@ impl Violation for AssignmentFromNone {
 /// PLE1128
 pub fn assignment_from_none(checker: &mut Checker, body: &Stmt) {
     // if return statement
-    if let StmtKind::Return { value } = body.node() {
+    if let StmtKind::Return { value: Some(expr) } = body.node() {
         // if something on that return statement
-        if let Some(expr) = value {
-            // if function call
-            if let ExprKind::Call { func, .. } = expr.node() {
-                println!("{:?}", body);
-                println!("{:?}", func);
-                // let function_name = func.node.name();
-                // for node in ast.iter() {
-                //     match node.kind {
-                //         StmtKind::FunctionDef { name, returns, .. } if name == function_name => {
-                //              You've found the function definition
-                //              Now you can inspect its body to see if it returns None
-                //         }
-                //         _ => {}
-                //     }
-                // }
-                checker.diagnostics.push(Diagnostic::new(
-                    AssignmentFromNone { kind: Kind::Empty },
-                    body.range(),
-                ));
-            }
+        // if function call
+        if let ExprKind::Call { func, .. } = expr.node() {
+            // let function_name = func.node.name();
+            // for node in ast.iter() {
+            //     match node.kind {
+            //         StmtKind::FunctionDef { name, returns, .. } if name == function_name => {
+            //              You've found the function definition
+            //              Now you can inspect its body to see if it returns None
+            //         }
+            //         _ => {}
+            //     }
+            // }
+            checker.diagnostics.push(Diagnostic::new(
+                AssignmentFromNone { kind: Kind::Empty },
+                func.range(),
+            ));
         }
     }
 }
