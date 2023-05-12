@@ -5,5 +5,4 @@
 
 # T001 - errors
 # XXX (evanrittenhouse): this is not fine
-# BUG (evanrittenhouse): this is not fine
 # FIXME (evanrittenhouse): this is not fine

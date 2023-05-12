@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+
 
 use once_cell::sync::Lazy;
 
 use regex::RegexSet;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -220,13 +220,13 @@ static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 
 // Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the length of the
 // tag that we're trying to capture.
-static PATTERN_TAG_LENGTH: &'static [usize; 3] = &["TODO".len(), "FIXME".len(), "XXX".len()];
+static PATTERN_TAG_LENGTH: &[usize; 3] = &["TODO".len(), "FIXME".len(), "XXX".len()];
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r#"^#\s*(http|https)://.*"#, // issue link
         r#"^#\s*\d+$"#,              // issue code - like "003"
-        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TDO-003"
+        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD-003"
     ])
     .unwrap()
 });
@@ -261,7 +261,7 @@ pub fn check_todos(
         check_for_tag_errors(&tag, &mut diagnostics, autofix, settings);
         check_for_static_errors(comment, *token_range, &tag, &mut diagnostics);
 
-        // TDO-003
+        // TD-003
         if let Some((next_token, _next_range)) = iter.peek() {
             if let Tok::Comment(next_comment) = next_token {
                 if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
@@ -312,30 +312,29 @@ fn check_for_tag_errors(
     autofix: flags::Autofix,
     settings: &Settings,
 ) {
-    if tag.content != "TODO" {
-        if tag.content.to_uppercase() == "TODO" {
-            // TDO-006
-            let mut invalid_capitalization = Diagnostic::new(
-                InvalidCapitalizationInTodo {
-                    tag: tag.content.to_string(),
-                },
+    if tag.content == "TODO" {
+        return;
+    }
+
+    if tag.content.to_uppercase() == "TODO" {
+        // TD-006
+        let mut invalid_capitalization = Diagnostic::new(
+            InvalidCapitalizationInTodo {
+                tag: tag.content.to_string(),
+            },
+            tag.range,
+        );
+
+        if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
+            invalid_capitalization.set_fix(Fix::unspecified(Edit::range_replacement(
+                "TODO".to_string(),
                 tag.range,
-            );
-
-            if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
-                invalid_capitalization.set_fix(Fix::unspecified(Edit::range_replacement(
-                    "TODO".to_string(),
-                    tag.range,
-                )));
-            }
-
-            diagnostics.push(invalid_capitalization);
-
-            // Avoid pushing multiple diagnostics for the same range.
-            return;
+            )));
         }
 
-        // TDO-001
+        diagnostics.push(invalid_capitalization);
+    } else {
+        // TD-001
         diagnostics.push(Diagnostic::new(
             InvalidTodoTag {
                 tag: tag.content.to_string(),
@@ -360,6 +359,11 @@ fn check_for_static_errors(
     let mut author_range: Option<TextRange> = None;
     // Absolute offset of the comment's colon from the start of the file.
     let mut colon_offset: Option<TextSize> = None;
+
+    let comment_rest = &comment[usize::from(relative_offset)..];
+    let trimmed_start = comment_rest.trim_start();
+    // Relative offset from the end of the tag to the start of the rest of the comment
+    let whitespace_offset = comment_rest.text_len();
 
     // An "author block" must be contained in parentheses, like "(ruff)". To check if it exists,
     // we can check the first non-whitespace character after the tag. If that first character is a
