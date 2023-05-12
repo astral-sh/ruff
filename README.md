@@ -423,3 +423,9 @@ If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 ## License
 
 MIT
+
+<div align="center">
+  <a target="_blank" href="https://astral.sh" style="background:none">
+    <img src="https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/svg/Astral.svg">
+  </a>
+</div>
