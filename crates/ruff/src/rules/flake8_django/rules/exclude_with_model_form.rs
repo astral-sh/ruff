@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -54,18 +54,18 @@ pub(crate) fn exclude_with_model_form(
         return None;
     }
     for element in body.iter() {
-        let StmtKind::ClassDef(ast::StmtClassDef { name, body, .. }) = &element.node else {
+        let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = &element else {
             continue;
         };
         if name != "Meta" {
             continue;
         }
         for element in body.iter() {
-            let StmtKind::Assign(ast::StmtAssign { targets, .. }) = &element.node else {
+            let Stmt::Assign(ast::StmtAssign { targets, .. }) = &element else {
                 continue;
             };
             for target in targets.iter() {
-                let ExprKind::Name(ast::ExprName { id, .. }) = &target.node else {
+                let Expr::Name(ast::ExprName { id, .. }) = &target else {
                     continue;
                 };
                 if id == "exclude" {

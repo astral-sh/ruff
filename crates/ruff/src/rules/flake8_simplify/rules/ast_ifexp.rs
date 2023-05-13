@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind, Unaryop};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -81,13 +82,13 @@ pub(crate) fn explicit_true_false_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &body.node else {
+    let Expr::Constant(ast::ExprConstant { value, .. } )= &body else {
         return;
     };
     if !matches!(value, Constant::Bool(true)) {
         return;
     }
-    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &orelse.node else {
+    let Expr::Constant(ast::ExprConstant { value, .. } )= &orelse else {
         return;
     };
     if !matches!(value, Constant::Bool(false)) {
@@ -101,26 +102,27 @@ pub(crate) fn explicit_true_false_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if matches!(test.node, ExprKind::Compare(_)) {
+        if matches!(test, Expr::Compare(_)) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&test.clone(), checker.stylist),
                 expr.range(),
             )));
         } else if checker.ctx.is_builtin("bool") {
+            let node = ast::ExprName {
+                id: "bool".into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            };
+            let node1 = ast::ExprCall {
+                func: Box::new(node.into()),
+                args: vec![test.clone()],
+                keywords: vec![],
+                range: TextRange::default(),
+            };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(
-                    &create_expr(ast::ExprCall {
-                        func: Box::new(create_expr(ast::ExprName {
-                            id: "bool".into(),
-                            ctx: ExprContext::Load,
-                        })),
-                        args: vec![test.clone()],
-                        keywords: vec![],
-                    }),
-                    checker.stylist,
-                ),
+                unparse_expr(&node1.into(), checker.stylist),
                 expr.range(),
             )));
         };
@@ -136,13 +138,13 @@ pub(crate) fn explicit_false_true_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::Constant(ast::ExprConstant { value, .. }) = &body.node else {
+    let Expr::Constant(ast::ExprConstant { value, .. }) = &body else {
         return;
     };
     if !matches!(value, Constant::Bool(false)) {
         return;
     }
-    let ExprKind::Constant(ast::ExprConstant { value, .. }) = &orelse.node else {
+    let Expr::Constant(ast::ExprConstant { value, .. }) = &orelse else {
         return;
     };
     if !matches!(value, Constant::Bool(true)) {
@@ -156,15 +158,15 @@ pub(crate) fn explicit_false_true_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        let node = test.clone();
+        let node1 = ast::ExprUnaryOp {
+            op: Unaryop::Not,
+            operand: Box::new(node),
+            range: TextRange::default(),
+        };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(
-                &create_expr(ast::ExprUnaryOp {
-                    op: Unaryop::Not,
-                    operand: Box::new(create_expr(test.node.clone())),
-                }),
-                checker.stylist,
-            ),
+            unparse_expr(&node1.into(), checker.stylist),
             expr.range(),
         )));
     }
@@ -179,18 +181,18 @@ pub(crate) fn twisted_arms_in_ifexpr(
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::UnaryOp(ast::ExprUnaryOp { op, operand: test_operand } )= &test.node else {
+    let Expr::UnaryOp(ast::ExprUnaryOp { op, operand: test_operand, range: _ } )= &test else {
         return;
     };
-    if !matches!(op, Unaryop::Not) {
+    if !op.is_not() {
         return;
     }
 
     // Check if the test operand and else branch use the same variable.
-    let ExprKind::Name(ast::ExprName { id: test_id, .. } )= &test_operand.node else {
+    let Expr::Name(ast::ExprName { id: test_id, .. } )= test_operand.as_ref() else {
         return;
     };
-    let ExprKind::Name(ast::ExprName {id: orelse_id, ..}) = &orelse.node else {
+    let Expr::Name(ast::ExprName {id: orelse_id, ..}) = orelse else {
         return;
     };
     if !test_id.eq(orelse_id) {
@@ -205,16 +207,18 @@ pub(crate) fn twisted_arms_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        let node = body.clone();
+        let node1 = orelse.clone();
+        let node2 = orelse.clone();
+        let node3 = ast::ExprIfExp {
+            test: Box::new(node2),
+            body: Box::new(node1),
+            orelse: Box::new(node),
+            range: TextRange::default(),
+        };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(
-                &create_expr(ast::ExprIfExp {
-                    test: Box::new(create_expr(orelse.node.clone())),
-                    body: Box::new(create_expr(orelse.node.clone())),
-                    orelse: Box::new(create_expr(body.node.clone())),
-                }),
-                checker.stylist,
-            ),
+            unparse_expr(&node3.into(), checker.stylist),
             expr.range(),
         )));
     }

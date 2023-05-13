@@ -1,6 +1,6 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
-use rustpython_parser::ast::{self, Cmpop, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,15 +39,16 @@ impl Violation for YodaConditions {
 
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
-    match &expr.node {
-        ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => str::is_upper(attr),
-        ExprKind::Constant(_) => true,
-        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
-        ExprKind::Name(ast::ExprName { id, .. }) => str::is_upper(id),
-        ExprKind::UnaryOp(ast::ExprUnaryOp {
+    match &expr {
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_upper(attr),
+        Expr::Constant(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
+        Expr::Name(ast::ExprName { id, .. }) => str::is_upper(id),
+        Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
             operand,
-        }) => matches!(operand.node, ExprKind::Constant(_)),
+            range: _,
+        }) => operand.is_constant_expr(),
         _ => false,
     }
 }

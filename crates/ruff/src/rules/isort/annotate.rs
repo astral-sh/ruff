@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Ranged, Stmt};
 
 use ruff_python_ast::source_code::Locator;
 
@@ -19,19 +19,19 @@ pub(crate) fn annotate_imports<'a>(
     imports
         .iter()
         .map(|import| {
-            match &import.node {
-                StmtKind::Import(ast::StmtImport { names }) => {
+            match &import {
+                Stmt::Import(ast::StmtImport { names, range }) => {
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
-                        comments_iter.next_if(|comment| comment.start() < import.start())
+                        comments_iter.next_if(|comment| comment.start() < range.start())
                     {
                         atop.push(comment);
                     }
 
                     // Find comments inline.
                     let mut inline = vec![];
-                    let import_line_end = locator.line_end(import.end());
+                    let import_line_end = locator.line_end(range.end());
 
                     while let Some(comment) =
                         comments_iter.next_if(|comment| comment.end() <= import_line_end)
@@ -43,18 +43,19 @@ pub(crate) fn annotate_imports<'a>(
                         names: names
                             .iter()
                             .map(|alias| AliasData {
-                                name: &alias.node.name,
-                                asname: alias.node.asname.as_deref(),
+                                name: &alias.name,
+                                asname: alias.asname.as_deref(),
                             })
                             .collect(),
                         atop,
                         inline,
                     }
                 }
-                StmtKind::ImportFrom(ast::StmtImportFrom {
+                Stmt::ImportFrom(ast::StmtImportFrom {
                     module,
                     names,
                     level,
+                    range: _,
                 }) => {
                     // Find comments above.
                     let mut atop = vec![];
@@ -105,8 +106,8 @@ pub(crate) fn annotate_imports<'a>(
                             }
 
                             AnnotatedAliasData {
-                                name: &alias.node.name,
-                                asname: alias.node.asname.as_deref(),
+                                name: &alias.name,
+                                asname: alias.asname.as_deref(),
                                 atop: alias_atop,
                                 inline: alias_inline,
                             }
@@ -126,7 +127,7 @@ pub(crate) fn annotate_imports<'a>(
                         inline,
                     }
                 }
-                _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
+                _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
             }
         })
         .collect()

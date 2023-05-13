@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -50,9 +50,7 @@ impl Violation for ReturnInTryExceptFinally {
 }
 
 fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
-    stmts
-        .iter()
-        .find(|stmt| matches!(stmt.node, StmtKind::Return(_)))
+    stmts.iter().find(|stmt| matches!(stmt, Stmt::Return(_)))
 }
 
 /// SIM107
@@ -64,8 +62,7 @@ pub(crate) fn return_in_try_except_finally(
 ) {
     let try_has_return = find_return(body).is_some();
     let except_has_return = handlers.iter().any(|handler| {
-        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-            &handler.node;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = &handler;
         find_return(body).is_some()
     });
 

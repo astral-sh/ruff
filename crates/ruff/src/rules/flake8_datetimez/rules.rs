@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -321,10 +321,11 @@ pub(crate) fn call_datetime_strptime_without_zone(
     }
 
     // Does the `strptime` call contain a format string with a timezone specifier?
-    if let Some(ExprKind::Constant(ast::ExprConstant {
+    if let Some(Expr::Constant(ast::ExprConstant {
         value: Constant::Str(format),
         kind: None,
-    })) = args.get(1).as_ref().map(|arg| &arg.node)
+        range: _,
+    })) = args.get(1).as_ref()
     {
         if format.contains("%z") {
             return;
@@ -339,8 +340,8 @@ pub(crate) fn call_datetime_strptime_without_zone(
         return;
     };
 
-    if let ExprKind::Call(ast::ExprCall { keywords, .. }) = &grandparent.node {
-        if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &parent.node {
+    if let Expr::Call(ast::ExprCall { keywords, .. }) = &grandparent {
+        if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &parent {
             let attr = attr.as_str();
             // Ex) `datetime.strptime(...).astimezone()`
             if attr == "astimezone" {

@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, StmtKind};
+use rustpython_parser::ast::{self, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -739,13 +739,13 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     };
 
     let (
-        StmtKind::FunctionDef(ast::StmtFunctionDef {
+        Stmt::FunctionDef(ast::StmtFunctionDef {
             args: arguments, ..
         })
-        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             args: arguments, ..
         })
-    ) = &stmt.node else {
+    ) = &stmt else {
         return;
     };
 
@@ -764,7 +764,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             ),
         )
     {
-        let arg_name = arg.node.arg.as_str();
+        let arg_name = arg.arg.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -773,7 +773,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if let Some(arg) = &arguments.vararg {
-        let arg_name = arg.node.arg.as_str();
+        let arg_name = arg.arg.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -783,7 +783,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         }
     }
     if let Some(arg) = &arguments.kwarg {
-        let arg_name = arg.node.arg.as_str();
+        let arg_name = arg.arg.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)

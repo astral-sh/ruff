@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -125,8 +125,8 @@ pub(crate) fn unrecognized_platform(
         return;
     }
 
-    match &right.node {
-        ExprKind::Constant(ast::ExprConstant {
+    match &right {
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str(value),
             ..
         }) => {

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{self, Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged, Stmt};
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -207,29 +207,29 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt.node {
-            StmtKind::Return(ast::StmtReturn { value }) => {
+        match &stmt {
+            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {}
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {}
             _ => visitor::walk_stmt(self, stmt),
         }
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr.node {
-            ExprKind::YieldFrom(_) => {
+        match &expr {
+            Expr::YieldFrom(_) => {
                 self.has_yield_from = true;
             }
-            ExprKind::Yield(ast::ExprYield { value }) => {
+            Expr::Yield(ast::ExprYield { value, range: _ }) => {
                 self.yield_statements.push(expr);
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            ExprKind::Call(ast::ExprCall { func, .. }) => {
+            Expr::Call(ast::ExprCall { func, .. }) => {
                 if collect_call_path(func).map_or(false, |call_path| {
                     call_path.as_slice() == ["request", "addfinalizer"]
                 }) {
@@ -277,11 +277,12 @@ pub(crate) fn fix_extraneous_scope_function(
 
 /// PT001, PT002, PT003
 fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &Expr) {
-    match &decorator.node {
-        ExprKind::Call(ast::ExprCall {
+    match &decorator {
+        Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
+            range: _,
         }) => {
             if checker
                 .settings
@@ -323,7 +324,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
             {
                 let scope_keyword = keywords
                     .iter()
-                    .find(|kw| kw.node.arg.as_ref().map_or(false, |arg| arg == "scope"));
+                    .find(|kw| kw.arg.as_ref().map_or(false, |arg| arg == "scope"));
 
                 if let Some(scope_keyword) = scope_keyword {
                     if keyword_is_literal(scope_keyword, "function") {
@@ -414,8 +415,8 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
         .enabled(Rule::PytestUselessYieldFixture)
     {
         if let Some(stmt) = body.last() {
-            if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
-                if let ExprKind::Yield(_) = value.node {
+            if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &stmt {
+                if value.is_yield_expr() {
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(
                             PytestUselessYieldFixture {
@@ -441,7 +442,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
 /// PT019
 fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
     args.args.iter().chain(&args.kwonlyargs).for_each(|arg| {
-        let name = &arg.node.arg;
+        let name = &arg.arg;
         if name.starts_with('_') {
             checker.diagnostics.push(Diagnostic::new(
                 PytestFixtureParamWithoutValue {

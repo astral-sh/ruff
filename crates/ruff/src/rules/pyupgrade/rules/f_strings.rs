@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use rustpython_format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, KeywordData};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,7 +42,7 @@ impl<'a> FormatSummaryValues<'a> {
     fn try_from_expr(checker: &'a Checker, expr: &'a Expr) -> Option<Self> {
         let mut extracted_args: Vec<String> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, String> = FxHashMap::default();
-        if let ExprKind::Call(ast::ExprCall { args, keywords, .. }) = &expr.node {
+        if let Expr::Call(ast::ExprCall { args, keywords, .. }) = &expr {
             for arg in args {
                 let arg = checker.locator.slice(arg.range());
                 if contains_invalids(arg) {
@@ -51,7 +51,11 @@ impl<'a> FormatSummaryValues<'a> {
                 extracted_args.push(arg.to_string());
             }
             for keyword in keywords {
-                let KeywordData { arg, value } = &keyword.node;
+                let Keyword {
+                    arg,
+                    value,
+                    range: _,
+                } = &keyword;
                 if let Some(key) = arg {
                     let kwarg = checker.locator.slice(value.range());
                     if contains_invalids(kwarg) {
@@ -104,15 +108,15 @@ fn contains_invalids(string: &str) -> bool {
 
 /// Generate an f-string from an [`Expr`].
 fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
-    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return None;
     };
-    let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &func.node else {
+    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() else {
         return None;
     };
     if !matches!(
-        &value.node,
-        ExprKind::Constant(ast::ExprConstant {
+        value.as_ref(),
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str(..),
             ..
         }),

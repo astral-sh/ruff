@@ -1,5 +1,5 @@
 use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -67,12 +67,13 @@ const BLOCKING_HTTP_CALLS: &[&[&str]] = &[
 /// ASYNC100
 pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
     if in_async_function(&checker.ctx) {
-        if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 if BLOCKING_HTTP_CALLS.contains(&call_path.as_slice()) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(BlockingHttpCallInAsyncFunction, func.range));
+                    checker.diagnostics.push(Diagnostic::new(
+                        BlockingHttpCallInAsyncFunction,
+                        func.range(),
+                    ));
                 }
             }
         }
@@ -133,12 +134,12 @@ const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
 /// ASYNC101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
     if in_async_function(&checker.ctx) {
-        if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 if OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&call_path.as_slice()) {
                     checker.diagnostics.push(Diagnostic::new(
                         OpenSleepOrSubprocessInAsyncFunction,
-                        func.range,
+                        func.range(),
                     ));
                 }
             }
@@ -197,12 +198,12 @@ const UNSAFE_OS_METHODS: &[&[&str]] = &[
 /// ASYNC102
 pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
     if in_async_function(&checker.ctx) {
-        if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 if UNSAFE_OS_METHODS.contains(&call_path.as_slice()) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BlockingOsCallInAsyncFunction, func.range));
+                        .push(Diagnostic::new(BlockingOsCallInAsyncFunction, func.range()));
                 }
             }
         }

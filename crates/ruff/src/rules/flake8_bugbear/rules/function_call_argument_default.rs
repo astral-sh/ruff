@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -83,8 +83,8 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr.node {
-            ExprKind::Call(ast::ExprCall { func, args, .. }) => {
+        match &expr {
+            Expr::Call(ast::ExprCall { func, args, .. }) => {
                 if !is_mutable_func(self.checker, func)
                     && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
@@ -99,14 +99,14 @@ where
                 }
                 visitor::walk_expr(self, expr);
             }
-            ExprKind::Lambda(_) => {}
+            Expr::Lambda(_) => {}
             _ => visitor::walk_expr(self, expr),
         }
     }
 }
 
 fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
-    let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = &expr else {
         return false;
     };
     if id != "float" {
@@ -115,10 +115,10 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
     let Some(arg) = args.first() else {
         return false;
     };
-    let ExprKind::Constant(ast::ExprConstant {
+    let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } )= &arg.node else {
+    } )= &arg else {
         return false;
     };
     let lowercased = value.to_lowercase();

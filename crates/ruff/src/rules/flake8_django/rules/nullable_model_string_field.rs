@@ -1,5 +1,5 @@
 use rustpython_parser::ast::Constant::Bool;
-use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -64,7 +64,7 @@ const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
 pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     for statement in body.iter() {
-        let StmtKind::Assign(ast::StmtAssign {value, ..}) = &statement.node else {
+        let Stmt::Assign(ast::StmtAssign {value, ..}) = &statement else {
             continue
         };
         if let Some(field_name) = is_nullable_field(checker, value) {
@@ -80,7 +80,7 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> V
 }
 
 fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
-    let ExprKind::Call(ast::ExprCall {func, keywords, ..}) = &value.node else {
+    let Expr::Call(ast::ExprCall {func, keywords, ..}) = &value else {
         return None;
     };
 
@@ -96,10 +96,10 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
     let mut blank_key = false;
     let mut unique_key = false;
     for keyword in keywords.iter() {
-        let ExprKind::Constant(ast::ExprConstant {value: Bool(true), ..}) = &keyword.node.value.node else {
+        let Expr::Constant(ast::ExprConstant {value: Bool(true), ..}) = &keyword.value else {
             continue
         };
-        let Some(argument) = &keyword.node.arg else {
+        let Some(argument) = &keyword.arg else {
             continue
         };
         match argument.as_str() {

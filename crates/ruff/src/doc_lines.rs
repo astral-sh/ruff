@@ -4,7 +4,7 @@
 use std::iter::FusedIterator;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Constant, ExprKind, Stmt, StmtKind, Suite};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt, Suite};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -79,11 +79,11 @@ struct StringLinesVisitor<'a> {
 
 impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
-            if let ExprKind::Constant(ast::ExprConstant {
+        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &stmt {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(..),
                 ..
-            }) = &value.node
+            }) = value.as_ref()
             {
                 for line in UniversalNewlineIterator::with_offset(
                     self.locator.slice(value.range()),

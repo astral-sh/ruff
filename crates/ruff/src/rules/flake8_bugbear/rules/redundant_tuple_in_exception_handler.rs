@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -34,10 +34,10 @@ pub(crate) fn redundant_tuple_in_exception_handler(
     handlers: &[Excepthandler],
 ) {
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = &handler.node else {
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = &handler else {
             continue;
         };
-        let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &type_.node else {
+        let Expr::Tuple(ast::ExprTuple { elts, .. }) = type_.as_ref() else {
             continue;
         };
         let [elt] = &elts[..] else {

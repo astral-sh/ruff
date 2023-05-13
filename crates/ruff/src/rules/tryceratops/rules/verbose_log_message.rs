@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,12 +51,13 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr.node {
-            ExprKind::Name(ast::ExprName {
+        match &expr {
+            Expr::Name(ast::ExprName {
                 id,
                 ctx: ExprContext::Load,
+                range: _,
             }) => self.names.push((id, expr)),
-            ExprKind::Attribute(_) => {}
+            Expr::Attribute(_) => {}
             _ => visitor::walk_expr(self, expr),
         }
     }
@@ -65,9 +66,8 @@ where
 /// TRY401
 pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-            name, body, ..
-        }) = &handler.node;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { name, body, .. }) =
+            &handler;
         let Some(target) = name else {
             continue;
         };
@@ -80,10 +80,10 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandl
         };
 
         for (expr, func) in calls {
-            let ExprKind::Call(ast::ExprCall { args, .. }) = &expr.node else {
+            let Expr::Call(ast::ExprCall { args, .. }) = &expr else {
                 continue;
             };
-            if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
+            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &func {
                 if attr == "exception" {
                     // Collect all referenced names in the `logging.exception` call.
                     let names: Vec<(&str, &Expr)> = {

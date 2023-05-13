@@ -1,5 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, MatchCase, Ranged, Stmt};
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
@@ -75,15 +75,15 @@ impl<'a> ImportTracker<'a> {
             // least one blank line. In that case, we treat it as a regular
             // sibling (i.e., as if the comment is the next statement, as
             // opposed to the class or function).
-            match &stmt.node {
-                StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {
+            match &stmt {
+                Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
                         Trailer::FunctionDef
                     }
                 }
-                StmtKind::ClassDef(_) => {
+                Stmt::ClassDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
@@ -138,7 +138,7 @@ where
         }
 
         // Track imports.
-        if matches!(stmt.node, StmtKind::Import(_) | StmtKind::ImportFrom(_)) && !is_excluded {
+        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) && !is_excluded {
             self.track_import(stmt);
         } else {
             self.finalize(self.trailer_for(stmt));
@@ -147,37 +147,26 @@ where
         // Track scope.
         let prev_nested = self.nested;
         self.nested = true;
-        match &stmt.node {
-            StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
+        match &stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
+            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::ClassDef(ast::StmtClassDef { body, .. }) => {
+            Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::For(ast::StmtFor { body, orelse, .. }) => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-
-                for stmt in orelse {
-                    self.visit_stmt(stmt);
-                }
-                self.finalize(None);
-            }
-            StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
+            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -188,7 +177,7 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
+            Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -199,7 +188,7 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -210,34 +199,47 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::With(ast::StmtWith { body, .. }) => {
+            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
+                for stmt in body {
+                    self.visit_stmt(stmt);
+                }
+                self.finalize(None);
+
+                for stmt in orelse {
+                    self.visit_stmt(stmt);
+                }
+                self.finalize(None);
+            }
+            Stmt::With(ast::StmtWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            StmtKind::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for match_case in cases {
                     self.visit_match_case(match_case);
                 }
             }
-            StmtKind::Try(ast::StmtTry {
+            Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             })
-            | StmtKind::TryStar(ast::StmtTryStar {
+            | Stmt::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             }) => {
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
@@ -267,8 +269,8 @@ where
         let prev_nested = self.nested;
         self.nested = true;
 
-        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-            &excepthandler.node;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+            &excepthandler;
         for stmt in body {
             self.visit_stmt(stmt);
         }

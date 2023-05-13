@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arg, Arguments, Expr};
+use rustpython_parser::ast::{Arg, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -23,7 +23,7 @@ impl Violation for HardcodedPasswordDefault {
 
 fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
     string_literal(default).filter(|string| !string.is_empty())?;
-    let kwarg_name = &arg.node.arg;
+    let kwarg_name = &arg.arg;
     if !matches_password_name(kwarg_name) {
         return None;
     }

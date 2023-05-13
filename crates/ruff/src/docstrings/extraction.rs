@@ -1,6 +1,6 @@
 //! Extract docstrings from an AST.
 
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, Stmt};
 
 use ruff_python_semantic::definition::{Definition, DefinitionId, Definitions, Member, MemberKind};
 
@@ -8,13 +8,13 @@ use ruff_python_semantic::definition::{Definition, DefinitionId, Definitions, Me
 pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
     let stmt = suite.first()?;
     // Require the docstring to be a standalone expression.
-    let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node else {
+    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
         return None;
     };
     // Only match strings.
     if !matches!(
-        &value.node,
-        ExprKind::Constant(ast::ExprConstant {
+        value.as_ref(),
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
         })
@@ -29,10 +29,9 @@ pub(crate) fn extract_docstring<'a>(definition: &'a Definition<'a>) -> Option<&'
     match definition {
         Definition::Module(module) => docstring_from(module.python_ast),
         Definition::Member(member) => {
-            if let StmtKind::ClassDef(ast::StmtClassDef { body, .. })
-            | StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) =
-                &member.stmt.node
+            if let Stmt::ClassDef(ast::StmtClassDef { body, .. })
+            | Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) = &member.stmt
             {
                 docstring_from(body)
             } else {

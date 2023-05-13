@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use rustpython_parser::ast::{self, Attributed, Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -123,16 +123,17 @@ fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
 /// YTT101, YTT102, YTT301, YTT303
 pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
     if is_sys(checker, value, "version") {
-        match &slice.node {
-            ExprKind::Slice(ast::ExprSlice {
+        match &slice {
+            Expr::Slice(ast::ExprSlice {
                 lower: None,
                 upper: Some(upper),
                 step: None,
+                range: _,
             }) => {
-                if let ExprKind::Constant(ast::ExprConstant {
+                if let Expr::Constant(ast::ExprConstant {
                     value: Constant::Int(i),
                     ..
-                }) = &upper.node
+                }) = upper.as_ref()
                 {
                     if *i == BigInt::from(1)
                         && checker.settings.rules.enabled(Rule::SysVersionSlice1)
@@ -150,7 +151,7 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 }
             }
 
-            ExprKind::Constant(ast::ExprConstant {
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(i),
                 ..
             }) => {
@@ -173,26 +174,22 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
 pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
-    match &left.node {
-        ExprKind::Subscript(ast::ExprSubscript { value, slice, .. })
+    match &left {
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(checker, value, "version_info") =>
         {
-            if let ExprKind::Constant(ast::ExprConstant {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(i),
                 ..
-            }) = &slice.node
+            }) = slice.as_ref()
             {
                 if *i == BigInt::from(0) {
                     if let (
                         [Cmpop::Eq | Cmpop::NotEq],
-                        [Attributed {
-                            node:
-                                ExprKind::Constant(ast::ExprConstant {
-                                    value: Constant::Int(n),
-                                    ..
-                                }),
+                        [Expr::Constant(ast::ExprConstant {
+                            value: Constant::Int(n),
                             ..
-                        }],
+                        })],
                     ) = (ops, comparators)
                     {
                         if *n == BigInt::from(3)
@@ -206,14 +203,10 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
                 } else if *i == BigInt::from(1) {
                     if let (
                         [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
-                        [Attributed {
-                            node:
-                                ExprKind::Constant(ast::ExprConstant {
-                                    value: Constant::Int(_),
-                                    ..
-                                }),
+                        [Expr::Constant(ast::ExprConstant {
+                            value: Constant::Int(_),
                             ..
-                        }],
+                        })],
                     ) = (ops, comparators)
                     {
                         if checker.settings.rules.enabled(Rule::SysVersionInfo1CmpInt) {
@@ -226,19 +219,15 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
             }
         }
 
-        ExprKind::Attribute(ast::ExprAttribute { value, attr, .. })
+        Expr::Attribute(ast::ExprAttribute { value, attr, .. })
             if is_sys(checker, value, "version_info") && attr == "minor" =>
         {
             if let (
                 [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
-                [Attributed {
-                    node:
-                        ExprKind::Constant(ast::ExprConstant {
-                            value: Constant::Int(_),
-                            ..
-                        }),
+                [Expr::Constant(ast::ExprConstant {
+                    value: Constant::Int(_),
                     ..
-                }],
+                })],
             ) = (ops, comparators)
             {
                 if checker
@@ -259,14 +248,10 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
     if is_sys(checker, left, "version") {
         if let (
             [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
-            [Attributed {
-                node:
-                    ExprKind::Constant(ast::ExprConstant {
-                        value: Constant::Str(s),
-                        ..
-                    }),
+            [Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(s),
                 ..
-            }],
+            })],
         ) = (ops, comparators)
         {
             if s.len() == 1 {

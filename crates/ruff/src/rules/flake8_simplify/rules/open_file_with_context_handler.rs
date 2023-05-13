@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, StmtKind};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,22 +45,22 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
     let Some(expr) = checker.ctx.expr_grandparent() else {
         return false;
     };
-    let ExprKind::Await(ast::ExprAwait { value }) = &expr.node else {
+    let Expr::Await(ast::ExprAwait { value, range: _ }) = &expr else {
         return false;
     };
-    let ExprKind::Call(ast::ExprCall { func,  .. }) = &value.node else {
+    let Expr::Call(ast::ExprCall { func,  .. }) = value.as_ref() else {
          return false;
      };
-    let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node else {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return false;
     };
     if attr != "enter_async_context" {
         return false;
     }
     for parent in checker.ctx.parents() {
-        if let StmtKind::With(ast::StmtWith { items, .. }) = &parent.node {
+        if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
-                if let ExprKind::Call(ast::ExprCall { func, .. }) = &item.context_expr.node {
+                if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if checker
                         .ctx
                         .resolve_call_path(func)
@@ -83,19 +83,19 @@ fn match_exit_stack(checker: &Checker) -> bool {
     let Some(expr) = checker.ctx.expr_parent() else {
         return false;
     };
-    let ExprKind::Call(ast::ExprCall { func,  .. }) = &expr.node else {
+    let Expr::Call(ast::ExprCall { func,  .. }) = expr else {
          return false;
      };
-    let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node else {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
         return false;
     };
     if attr != "enter_context" {
         return false;
     }
     for parent in checker.ctx.parents() {
-        if let StmtKind::With(ast::StmtWith { items, .. }) = &parent.node {
+        if let Stmt::With(ast::StmtWith { items, .. }) = &parent {
             for item in items {
-                if let ExprKind::Call(ast::ExprCall { func, .. }) = &item.context_expr.node {
+                if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if checker
                         .ctx
                         .resolve_call_path(func)
@@ -121,7 +121,7 @@ pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr)
     {
         if checker.ctx.is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.ctx.stmt().node, StmtKind::With(_)) {
+            if matches!(checker.ctx.stmt(), Stmt::With(_)) {
                 return;
             }
 

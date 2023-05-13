@@ -20,7 +20,7 @@ pub(crate) fn order_imports<'a>(
 ) -> OrderedImportBlock<'a> {
     let mut ordered = OrderedImportBlock::default();
 
-    // Sort `StmtKind::Import`.
+    // Sort `Stmt::Import`.
     ordered.import.extend(
         block
             .import
@@ -28,7 +28,7 @@ pub(crate) fn order_imports<'a>(
             .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, force_to_top)),
     );
 
-    // Sort `StmtKind::ImportFrom`.
+    // Sort `Stmt::ImportFrom`.
     ordered.import_from.extend(
         // Include all non-re-exports.
         block
@@ -54,7 +54,7 @@ pub(crate) fn order_imports<'a>(
                         trailing_comma,
                     },
                 )| {
-                    // Within each `StmtKind::ImportFrom`, sort the members.
+                    // Within each `Stmt::ImportFrom`, sort the members.
                     (
                         import_from,
                         comments,

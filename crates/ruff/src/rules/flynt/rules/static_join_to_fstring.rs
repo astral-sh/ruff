@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -27,7 +28,7 @@ impl AlwaysAutofixableViolation for StaticJoinToFString {
 }
 
 fn is_static_length(elts: &[Expr]) -> bool {
-    elts.iter().all(|e| !matches!(e.node, ExprKind::Starred(_)))
+    elts.iter().all(|e| !matches!(e, Expr::Starred(_)))
 }
 
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
@@ -35,7 +36,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let mut first = true;
 
     for expr in joinees {
-        if matches!(expr.node, ExprKind::JoinedStr(_)) {
+        if matches!(expr, Expr::JoinedStr(_)) {
             // Oops, already an f-string. We don't know how to handle those
             // gracefully right now.
             return None;
@@ -46,17 +47,19 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         fstring_elems.push(helpers::to_fstring_elem(expr)?);
     }
 
-    Some(create_expr(ast::ExprJoinedStr {
+    let node = ast::ExprJoinedStr {
         values: fstring_elems,
-    }))
+        range: TextRange::default(),
+    };
+    Some(node.into())
 }
 
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
-    let ExprKind::Call(ast::ExprCall {
+    let Expr::Call(ast::ExprCall {
         args,
         keywords,
         ..
-    })= &expr.node else {
+    })= &expr else {
         return;
     };
 
@@ -67,9 +70,9 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     }
 
     // Get the elements to join; skip (e.g.) generators, sets, etc.
-    let joinees = match &args[0].node {
-        ExprKind::List(ast::ExprList { elts, .. }) if is_static_length(elts) => elts,
-        ExprKind::Tuple(ast::ExprTuple { elts, .. }) if is_static_length(elts) => elts,
+    let joinees = match &args[0] {
+        Expr::List(ast::ExprList { elts, .. }) if is_static_length(elts) => elts,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) if is_static_length(elts) => elts,
         _ => return,
     };
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -99,10 +99,10 @@ impl fmt::Display for ContentType {
     }
 }
 
-fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType> {
+fn get_element_type(checker: &Checker, element: &Stmt) -> Option<ContentType> {
     match element {
-        StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
-            if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                 if helpers::is_model_field(&checker.ctx, func) {
                     return Some(ContentType::FieldDeclaration);
                 }
@@ -110,7 +110,7 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
             let Some(expr) = targets.first() else {
                 return None;
             };
-            let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node else {
+            let Expr::Name(ast::ExprName { id, .. }) = &expr else {
                 return None;
             };
             if id == "objects" {
@@ -119,14 +119,14 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
                 None
             }
         }
-        StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => {
+        Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
             if name == "Meta" {
                 Some(ContentType::MetaClass)
             } else {
                 None
             }
         }
-        StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
+        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
             "__str__" => Some(ContentType::StrMethod),
             "save" => Some(ContentType::SaveMethod),
             "get_absolute_url" => Some(ContentType::GetAbsoluteUrlMethod),
@@ -150,7 +150,7 @@ pub(crate) fn unordered_body_content_in_model(
     }
     let mut elements_type_found = Vec::new();
     for element in body.iter() {
-        let Some(current_element_type) = get_element_type(checker, &element.node) else {
+        let Some(current_element_type) = get_element_type(checker, element) else {
             continue;
         };
         let Some(&element_type) = elements_type_found

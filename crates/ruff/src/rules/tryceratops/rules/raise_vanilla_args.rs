@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,15 +53,15 @@ fn any_string<F>(expr: &Expr, predicate: F) -> bool
 where
     F: (Fn(&str) -> bool) + Copy,
 {
-    match &expr.node {
-        ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
+    match &expr {
+        Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
             for value in values {
                 if any_string(value, predicate) {
                     return true;
                 }
             }
         }
-        ExprKind::Constant(ast::ExprConstant {
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str(val),
             ..
         }) => {
@@ -77,7 +77,7 @@ where
 
 /// TRY003
 pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Call(ast::ExprCall { args, .. }) = &expr.node {
+    if let Expr::Call(ast::ExprCall { args, .. }) = &expr {
         if let Some(arg) = args.first() {
             if any_string(arg, |part| part.chars().any(char::is_whitespace)) {
                 checker

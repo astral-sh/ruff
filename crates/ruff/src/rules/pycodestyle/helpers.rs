@@ -1,4 +1,4 @@
-use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Stylist;
 use ruff_text_size::{TextLen, TextRange};
@@ -15,14 +15,13 @@ pub(crate) fn compare(
     comparators: &[Expr],
     stylist: &Stylist,
 ) -> String {
-    unparse_expr(
-        &create_expr(ast::ExprCompare {
-            left: Box::new(left.clone()),
-            ops: ops.to_vec(),
-            comparators: comparators.to_vec(),
-        }),
-        stylist,
-    )
+    let node = ast::ExprCompare {
+        left: Box::new(left.clone()),
+        ops: ops.to_vec(),
+        comparators: comparators.to_vec(),
+        range: TextRange::default(),
+    };
+    unparse_expr(&node.into(), stylist)
 }
 
 pub(super) fn is_overlong(

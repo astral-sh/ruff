@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Attributed, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,7 +20,10 @@ impl AlwaysAutofixableViolation for DeprecatedCElementTree {
     }
 }
 
-fn add_check_for_node<T>(checker: &mut Checker, node: &Attributed<T>) {
+fn add_check_for_node<T>(checker: &mut Checker, node: &T)
+where
+    T: Ranged,
+{
     let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, node.range());
     if checker.patch(diagnostic.kind.rule()) {
         let contents = checker.locator.slice(node.range());
@@ -35,19 +38,20 @@ fn add_check_for_node<T>(checker: &mut Checker, node: &Attributed<T>) {
 
 /// UP023
 pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
-    match &stmt.node {
-        StmtKind::Import(ast::StmtImport { names }) => {
+    match &stmt {
+        Stmt::Import(ast::StmtImport { names, range: _ }) => {
             // Ex) `import xml.etree.cElementTree as ET`
             for name in names {
-                if &name.node.name == "xml.etree.cElementTree" && name.node.asname.is_some() {
+                if &name.name == "xml.etree.cElementTree" && name.asname.is_some() {
                     add_check_for_node(checker, name);
                 }
             }
         }
-        StmtKind::ImportFrom(ast::StmtImportFrom {
+        Stmt::ImportFrom(ast::StmtImportFrom {
             module,
             names,
             level,
+            range: _,
         }) => {
             if level.map_or(false, |level| level.to_u32() > 0) {
                 // Ex) `import .xml.etree.cElementTree as ET`
@@ -58,13 +62,13 @@ pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
                 } else if module == "xml.etree" {
                     // Ex) `from xml.etree import cElementTree as ET`
                     for name in names {
-                        if &name.node.name == "cElementTree" && name.node.asname.is_some() {
+                        if &name.name == "cElementTree" && name.asname.is_some() {
                             add_check_for_node(checker, name);
                         }
                     }
                 }
             }
         }
-        _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
+        _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
     }
 }

@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
 use rustpython_format::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -49,21 +49,21 @@ enum DataType {
 
 impl From<&Expr> for DataType {
     fn from(expr: &Expr) -> Self {
-        match &expr.node {
-            ExprKind::NamedExpr(ast::ExprNamedExpr { value, .. }) => (&**value).into(),
-            ExprKind::UnaryOp(ast::ExprUnaryOp { operand, .. }) => (&**operand).into(),
-            ExprKind::Dict(_) => DataType::Object,
-            ExprKind::Set(_) => DataType::Object,
-            ExprKind::ListComp(_) => DataType::Object,
-            ExprKind::SetComp(_) => DataType::Object,
-            ExprKind::DictComp(_) => DataType::Object,
-            ExprKind::GeneratorExp(_) => DataType::Object,
-            ExprKind::JoinedStr(_) => DataType::String,
-            ExprKind::BinOp(ast::ExprBinOp { left, op, .. }) => {
+        match &expr {
+            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => (&**value).into(),
+            Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => (&**operand).into(),
+            Expr::Dict(_) => DataType::Object,
+            Expr::Set(_) => DataType::Object,
+            Expr::ListComp(_) => DataType::Object,
+            Expr::SetComp(_) => DataType::Object,
+            Expr::DictComp(_) => DataType::Object,
+            Expr::GeneratorExp(_) => DataType::Object,
+            Expr::JoinedStr(_) => DataType::String,
+            Expr::BinOp(ast::ExprBinOp { left, op, .. }) => {
                 // Ex) "a" % "b"
                 if matches!(
-                    left.node,
-                    ExprKind::Constant(ast::ExprConstant {
+                    left.as_ref(),
+                    Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(..),
                         ..
                     })
@@ -73,14 +73,14 @@ impl From<&Expr> for DataType {
                 }
                 DataType::Unknown
             }
-            ExprKind::Constant(ast::ExprConstant { value, .. }) => match value {
+            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
                 Constant::Str(_) => DataType::String,
                 Constant::Int(_) => DataType::Integer,
                 Constant::Float(_) => DataType::Float,
                 _ => DataType::Unknown,
             },
-            ExprKind::List(_) => DataType::Object,
-            ExprKind::Tuple(_) => DataType::Object,
+            Expr::List(_) => DataType::Object,
+            Expr::Tuple(_) => DataType::Object,
             _ => DataType::Unknown,
         }
     }
@@ -221,10 +221,10 @@ fn is_valid_dict(
         let Some(key) = key else {
             return true;
         };
-        if let ExprKind::Constant(ast::ExprConstant {
+        if let Expr::Constant(ast::ExprConstant {
             value: Constant::Str(mapping_key),
             ..
-        }) = &key.node
+        }) = &key
         {
             let Some(format) = formats_hash.get(mapping_key.as_str()) else {
                 return true;
@@ -275,12 +275,14 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     }
 
     // Parse the parameters.
-    let is_valid = match &right.node {
-        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
-        ExprKind::Dict(ast::ExprDict { keys, values }) => {
-            is_valid_dict(&format_strings, keys, values)
-        }
-        ExprKind::Constant(_) => is_valid_constant(&format_strings, right),
+    let is_valid = match &right {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
+        Expr::Dict(ast::ExprDict {
+            keys,
+            values,
+            range: _,
+        }) => is_valid_dict(&format_strings, keys, values),
+        Expr::Constant(_) => is_valid_constant(&format_strings, right),
         _ => true,
     };
     if !is_valid {

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -21,16 +21,16 @@ pub(crate) fn continue_outside_loop<'a>(
     let mut allowed: bool = false;
     let mut child = stmt;
     for parent in parents {
-        match &parent.node {
-            StmtKind::For(ast::StmtFor { orelse, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-            | StmtKind::While(ast::StmtWhile { orelse, .. }) => {
+        match &parent {
+            Stmt::For(ast::StmtFor { orelse, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
+            | Stmt::While(ast::StmtWhile { orelse, .. }) => {
                 if !orelse.contains(child) {
                     allowed = true;
                     break;
                 }
             }
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) | StmtKind::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
                 break;
             }
             _ => {}

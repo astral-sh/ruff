@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -23,10 +23,10 @@ pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let Some(stmt) = body.first() else {
         return;
     };
-    let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node else {
+    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &stmt else {
         return;
     };
-    let ExprKind::JoinedStr ( _) = value.node else {
+    let Expr::JoinedStr ( _) = value.as_ref() else {
         return;
     };
     checker.diagnostics.push(Diagnostic::new(

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,7 +25,7 @@ pub(crate) fn unreliable_callable_check(
     func: &Expr,
     args: &[Expr],
 ) {
-    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = &func else {
         return;
     };
     if id != "getattr" && id != "hasattr" {
@@ -34,10 +34,10 @@ pub(crate) fn unreliable_callable_check(
     if args.len() < 2 {
         return;
     };
-    let ExprKind::Constant(ast::ExprConstant {
+    let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(s),
         ..
-    }) = &args[1].node else
+    }) = &args[1] else
     {
         return;
     };

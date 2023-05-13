@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -44,8 +44,8 @@ pub(crate) fn request_without_timeout(
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(timeout_arg) = call_args.keyword_argument("timeout") {
-            if let Some(timeout) = match &timeout_arg.node {
-                ExprKind::Constant(ast::ExprConstant {
+            if let Some(timeout) = match &timeout_arg {
+                Expr::Constant(ast::ExprConstant {
                     value: value @ Constant::None,
                     ..
                 }) => Some(unparse_constant(value, checker.stylist)),

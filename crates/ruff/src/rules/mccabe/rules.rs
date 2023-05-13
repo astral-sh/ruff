@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -68,44 +68,46 @@ impl Violation for ComplexStructure {
 fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
     for stmt in stmts {
-        match &stmt.node {
-            StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+        match &stmt {
+            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            StmtKind::For(ast::StmtFor { body, orelse, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
+            Stmt::For(ast::StmtFor { body, orelse, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            StmtKind::With(ast::StmtWith { body, .. })
-            | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            Stmt::With(ast::StmtWith { body, .. })
+            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                 complexity += get_complexity_number(body);
             }
-            StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
+            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            StmtKind::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 complexity += 1;
                 for case in cases {
                     complexity += get_complexity_number(&case.body);
                 }
             }
-            StmtKind::Try(ast::StmtTry {
+            Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             })
-            | StmtKind::TryStar(ast::StmtTryStar {
+            | Stmt::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             }) => {
                 complexity += get_complexity_number(body);
                 if !orelse.is_empty() {
@@ -115,19 +117,18 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(finalbody);
                 for handler in handlers {
                     complexity += 1;
-                    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-                        body,
-                        ..
-                    }) = &handler.node;
+                    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                        body, ..
+                    }) = &handler;
                     complexity += get_complexity_number(body);
                 }
             }
-            StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
             }
-            StmtKind::ClassDef(ast::StmtClassDef { body, .. }) => {
+            Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
                 complexity += get_complexity_number(body);
             }
             _ => {}

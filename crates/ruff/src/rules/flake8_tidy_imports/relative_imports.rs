@@ -1,9 +1,10 @@
-use rustpython_parser::ast::{self, Int, Stmt, StmtKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Int, Ranged, Stmt};
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
-use ruff_python_ast::helpers::{create_stmt, resolve_imported_module_path, unparse_stmt};
+use ruff_python_ast::helpers::{resolve_imported_module_path, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -102,17 +103,16 @@ fn fix_banned_relative_import(
         return None;
     }
 
-    let StmtKind::ImportFrom(ast::StmtImportFrom { names, .. }) = &stmt.node else {
-        panic!("Expected StmtKind::ImportFrom");
+    let Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) = &stmt else {
+        panic!("Expected Stmt::ImportFrom");
     };
-    let content = unparse_stmt(
-        &create_stmt(ast::StmtImportFrom {
-            module: Some(module_path.to_string().into()),
-            names: names.clone(),
-            level: Some(Int::new(0)),
-        }),
-        stylist,
-    );
+    let node = ast::StmtImportFrom {
+        module: Some(module_path.to_string().into()),
+        names: names.clone(),
+        level: Some(Int::new(0)),
+        range: TextRange::default(),
+    };
+    let content = unparse_stmt(&node.into(), stylist);
     #[allow(deprecated)]
     Some(Fix::unspecified(Edit::range_replacement(
         content,

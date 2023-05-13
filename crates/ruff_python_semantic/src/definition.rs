@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::num::TryFromIntError;
 use std::ops::{Deref, Index};
 
-use rustpython_parser::ast::{self, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Stmt};
 
 use crate::analyze::visibility::{
     class_visibility, function_visibility, method_visibility, ModuleSource, Visibility,
@@ -87,10 +87,10 @@ pub struct Member<'a> {
 
 impl<'a> Member<'a> {
     fn name(&self) -> &'a str {
-        match &self.stmt.node {
-            StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. }) => name,
-            StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name,
-            StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => name,
+        match &self.stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name,
+            Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name,
+            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => name,
             _ => unreachable!("Unexpected member kind: {:?}", self.kind),
         }
     }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -36,39 +36,40 @@ impl Violation for InvalidEnvvarValue {
 fn is_valid_key(expr: &Expr) -> bool {
     // We can't infer the types of these defaults, so assume they're valid.
     if matches!(
-        expr.node,
-        ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) | ExprKind::Call(_)
+        expr,
+        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
     ) {
         return true;
     }
 
     // Allow string concatenation.
-    if let ExprKind::BinOp(ast::ExprBinOp {
+    if let Expr::BinOp(ast::ExprBinOp {
         left,
         right,
         op: Operator::Add,
-    }) = &expr.node
+        range: _,
+    }) = &expr
     {
         return is_valid_key(left) && is_valid_key(right);
     }
 
     // Allow string formatting.
-    if let ExprKind::BinOp(ast::ExprBinOp {
+    if let Expr::BinOp(ast::ExprBinOp {
         left,
         op: Operator::Mod,
         ..
-    }) = &expr.node
+    }) = &expr
     {
         return is_valid_key(left);
     }
 
     // Otherwise, the default must be a string.
     matches!(
-        expr.node,
-        ExprKind::Constant(ast::ExprConstant {
+        expr,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str { .. },
             ..
-        }) | ExprKind::JoinedStr(_)
+        }) | Expr::JoinedStr(_)
     )
 }
 
@@ -88,8 +89,8 @@ pub(crate) fn invalid_envvar_value(
         let Some(expr) = args.get(0).or_else(|| {
             keywords
                 .iter()
-                .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg == "key"))
-                .map(|keyword| &keyword.node.value)
+                .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "key"))
+                .map(|keyword| &keyword.value)
         }) else {
             return;
         };

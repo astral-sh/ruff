@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use log::error;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Attributed, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -65,9 +65,10 @@ impl Violation for UnusedVariable {
 
 /// Return the [`TextRange`] of the token after the next match of
 /// the predicate, skipping over any bracketed expressions.
-fn match_token_after<F, T>(located: &Attributed<T>, locator: &Locator, f: F) -> TextRange
+fn match_token_after<F, T>(located: &T, locator: &Locator, f: F) -> TextRange
 where
     F: Fn(Tok) -> bool,
+    T: Ranged,
 {
     let contents = locator.after(located.start());
 
@@ -127,9 +128,10 @@ where
 
 /// Return the [`TextRange`] of the token matching the predicate,
 /// skipping over any bracketed expressions.
-fn match_token<F, T>(located: &Attributed<T>, locator: &Locator, f: F) -> TextRange
+fn match_token<F, T>(located: &T, locator: &Locator, f: F) -> TextRange
 where
     F: Fn(Tok) -> bool,
+    T: Ranged,
 {
     let contents = locator.after(located.start());
 
@@ -198,9 +200,9 @@ fn remove_unused_variable(
     checker: &Checker,
 ) -> Option<(DeletionKind, Fix)> {
     // First case: simple assignment (`x = 1`)
-    if let StmtKind::Assign(ast::StmtAssign { targets, value, .. }) = &stmt.node {
+    if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = &stmt {
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
-            if matches!(target.node, ExprKind::Name(_)) {
+            if target.is_name_expr() {
                 return if targets.len() > 1
                     || contains_effect(value, |id| checker.ctx.is_builtin(id))
                 {
@@ -240,13 +242,13 @@ fn remove_unused_variable(
     }
 
     // Second case: simple annotated assignment (`x: int = 1`)
-    if let StmtKind::AnnAssign(ast::StmtAnnAssign {
+    if let Stmt::AnnAssign(ast::StmtAnnAssign {
         target,
         value: Some(value),
         ..
-    }) = &stmt.node
+    }) = &stmt
     {
-        if matches!(target.node, ExprKind::Name(_)) {
+        if target.is_name_expr() {
             return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
@@ -282,7 +284,7 @@ fn remove_unused_variable(
     }
 
     // Third case: withitem (`with foo() as x:`)
-    if let StmtKind::With(ast::StmtWith { items, .. }) = &stmt.node {
+    if let Stmt::With(ast::StmtWith { items, .. }) = &stmt {
         // Find the binding that matches the given `Range`.
         // TODO(charlie): Store the `Withitem` in the `Binding`.
         for item in items {

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -87,13 +87,14 @@ impl OpenMode {
 }
 
 fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
-    if let ExprKind::Call(ast::ExprCall {
+    if let Expr::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    }) = &expr.node
+        range: _,
+    }) = &expr
     {
-        if matches!(&func.node, ExprKind::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
+        if matches!(func.as_ref(), Expr::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
             // Return the "open mode" parameter and keywords.
             return (args.get(1), keywords.clone());
         }
@@ -178,15 +179,15 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
     if mode_param.is_none() && !keywords.is_empty() {
         if let Some(keyword) = find_keyword(&keywords, MODE_KEYWORD_ARGUMENT) {
-            if let ExprKind::Constant(ast::ExprConstant {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(mode_param_value),
                 ..
-            }) = &keyword.node.value.node
+            }) = &keyword.value
             {
                 if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                     checker.diagnostics.push(create_check(
                         expr,
-                        &keyword.node.value,
+                        &keyword.value,
                         mode.replacement_value(),
                         checker.locator,
                         checker.patch(Rule::RedundantOpenModes),
@@ -195,10 +196,10 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
             }
         }
     } else if let Some(mode_param) = mode_param {
-        if let ExprKind::Constant(ast::ExprConstant {
+        if let Expr::Constant(ast::ExprConstant {
             value: Constant::Str(mode_param_value),
             ..
-        }) = &mode_param.node
+        }) = &mode_param
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
                 checker.diagnostics.push(create_check(

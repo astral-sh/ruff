@@ -1,5 +1,5 @@
 use num_traits::{One, Zero};
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -33,10 +33,10 @@ pub(crate) fn snmp_insecure_version(
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(mp_model_arg) = call_args.keyword_argument("mpModel") {
-            if let ExprKind::Constant(ast::ExprConstant {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(value),
                 ..
-            }) = &mp_model_arg.node
+            }) = &mp_model_arg
             {
                 if value.is_zero() || value.is_one() {
                     checker
