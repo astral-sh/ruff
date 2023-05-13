@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/flake8_todo/mod.rs
+source: crates/ruff/src/rules/flake8_todos/mod.rs
 ---
 TD006.py:4:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
   |

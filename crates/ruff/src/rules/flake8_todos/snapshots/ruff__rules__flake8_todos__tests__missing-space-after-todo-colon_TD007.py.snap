@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/flake8_todo/mod.rs
+source: crates/ruff/src/rules/flake8_todos/mod.rs
 ---
 TD007.py:5:3: TD007 Missing space after colon in TODO
   |

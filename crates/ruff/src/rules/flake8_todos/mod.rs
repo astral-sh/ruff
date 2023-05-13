@@ -13,16 +13,16 @@ mod tests {
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::InvalidTodoTag, Path::new("TD001.py"); "TD001")]
-    #[test_case(Rule::MissingAuthorInTodo, Path::new("TD002.py"); "TD002")]
-    #[test_case(Rule::MissingLinkInTodo, Path::new("TD003.py"); "TD003")]
-    #[test_case(Rule::MissingColonInTodo, Path::new("TD004.py"); "TD004")]
-    #[test_case(Rule::MissingTextInTodo, Path::new("TD005.py"); "TD005")]
-    #[test_case(Rule::InvalidCapitalizationInTodo, Path::new("TD006.py"); "TD006")]
-    #[test_case(Rule::MissingSpaceAfterColonInTodo, Path::new("TD007.py"); "TD007")]
+    #[test_case(Rule::MissingTodoAuthor, Path::new("TD002.py"); "TD002")]
+    #[test_case(Rule::MissingTodoLink, Path::new("TD003.py"); "TD003")]
+    #[test_case(Rule::MissingTodoColon, Path::new("TD004.py"); "TD004")]
+    #[test_case(Rule::MissingTodoDescription, Path::new("TD005.py"); "TD005")]
+    #[test_case(Rule::InvalidTodoCapitalization, Path::new("TD006.py"); "TD006")]
+    #[test_case(Rule::MissingSpaceAfterTodoColon, Path::new("TD007.py"); "TD007")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("flake8_todo").join(path).as_path(),
+            Path::new("flake8_todos").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);

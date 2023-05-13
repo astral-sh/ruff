@@ -59,9 +59,9 @@ impl Violation for InvalidTodoTag {
 /// # TODO(charlie): now an author is assigned
 /// ```
 #[violation]
-pub struct MissingAuthorInTodo;
+pub struct MissingTodoAuthor;
 
-impl Violation for MissingAuthorInTodo {
+impl Violation for MissingTodoAuthor {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing author in TODO; try: `# TODO(<author_name>): ...`")
@@ -93,9 +93,9 @@ impl Violation for MissingAuthorInTodo {
 /// # SIXCHR-003
 /// ```
 #[violation]
-pub struct MissingLinkInTodo;
+pub struct MissingTodoLink;
 
-impl Violation for MissingLinkInTodo {
+impl Violation for MissingTodoLink {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing issue link on the line following this TODO")
@@ -122,9 +122,9 @@ impl Violation for MissingLinkInTodo {
 /// # TODO(charlie): colon fixed
 /// ```
 #[violation]
-pub struct MissingColonInTodo;
+pub struct MissingTodoColon;
 
-impl Violation for MissingColonInTodo {
+impl Violation for MissingTodoColon {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing colon in TODO")
@@ -149,12 +149,12 @@ impl Violation for MissingColonInTodo {
 /// # TODO(charlie): fix some issue
 /// ```
 #[violation]
-pub struct MissingTextInTodo;
+pub struct MissingTodoDescription;
 
-impl Violation for MissingTextInTodo {
+impl Violation for MissingTodoDescription {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing text after `TODO`")
+        format!("Missing issue description after `TODO`")
     }
 }
 
@@ -176,19 +176,19 @@ impl Violation for MissingTextInTodo {
 /// # TODO(charlie): this is capitalized
 /// ```
 #[violation]
-pub struct InvalidCapitalizationInTodo {
+pub struct InvalidTodoCapitalization {
     tag: String,
 }
 
-impl AlwaysAutofixableViolation for InvalidCapitalizationInTodo {
+impl AlwaysAutofixableViolation for InvalidTodoCapitalization {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidCapitalizationInTodo { tag } = self;
+        let InvalidTodoCapitalization { tag } = self;
         format!("Invalid TODO capitalization: `{tag}` should be `TODO`")
     }
 
     fn autofix_title(&self) -> String {
-        let InvalidCapitalizationInTodo { tag } = self;
+        let InvalidTodoCapitalization { tag } = self;
         format!("Replace `{tag}` with `TODO`")
     }
 }
@@ -213,16 +213,15 @@ impl AlwaysAutofixableViolation for InvalidCapitalizationInTodo {
 /// # TODO(charlie): fix this
 /// ```
 #[violation]
-pub struct MissingSpaceAfterColonInTodo;
+pub struct MissingSpaceAfterTodoColon;
 
-impl Violation for MissingSpaceAfterColonInTodo {
+impl Violation for MissingSpaceAfterTodoColon {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing space after colon in TODO")
     }
 }
 
-// Matches against any of the four recognized patterns.
 static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r#"^#\s*(?i)(TODO).*$"#,
@@ -232,17 +231,17 @@ static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     .unwrap()
 });
 
-// Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the
-// length of the tag that we're trying to capture.
+// Maps the index of a particular Regex (specified by its index in the above TODO_REGEX_SET slice)
+// to the length of the tag that we're trying to capture.
 static PATTERN_TAG_LENGTH: &[usize; 3] = &["TODO".len(), "FIXME".len(), "XXX".len()];
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
-    RegexSet::new([
+    let patterns: [&str; 3] = [
         r#"^#\s*(http|https)://.*"#, // issue link
         r#"^#\s*\d+$"#,              // issue code - like "003"
-        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD-003"
-    ])
-    .unwrap()
+        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003" or "TD-003"
+    ];
+    RegexSet::new(patterns).unwrap()
 });
 
 // If this struct ever gets pushed outside of this module, it may be worth creating an enum for
@@ -254,7 +253,7 @@ struct Tag<'a> {
     content: &'a str,
 }
 
-pub(crate) fn check_todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let mut iter = tokens.iter().flatten().peekable();
@@ -269,9 +268,9 @@ pub(crate) fn check_todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diag
         };
 
         check_for_tag_errors(&tag, &mut diagnostics, settings);
-        check_for_static_errors(comment, *token_range, &tag, &mut diagnostics);
+        check_for_static_errors(&mut diagnostics, comment, *token_range, &tag);
 
-        // TD-003
+        // TD003
         if let Some((next_token, _next_range)) = iter.peek() {
             if let Tok::Comment(next_comment) = next_token {
                 if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
@@ -279,17 +278,17 @@ pub(crate) fn check_todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diag
                 }
             }
 
-            diagnostics.push(Diagnostic::new(MissingLinkInTodo, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
         } else {
             // There's a TODO on the last line of the file, so there can't be a link after it.
-            diagnostics.push(Diagnostic::new(MissingLinkInTodo, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
         }
     }
 
     diagnostics
 }
 
-/// Returns the tag pulled out of a given comment if it exists.
+/// Returns the tag pulled out of a given comment, if it exists.
 fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<'a>> {
     let Some(regex_index) = TODO_REGEX_SET.matches(comment).into_iter().next() else {
         return None;
@@ -322,15 +321,15 @@ fn check_for_tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: 
     }
 
     if tag.content.to_uppercase() == "TODO" {
-        // TD-006
+        // TD006
         let mut invalid_capitalization = Diagnostic::new(
-            InvalidCapitalizationInTodo {
+            InvalidTodoCapitalization {
                 tag: tag.content.to_string(),
             },
             tag.range,
         );
 
-        if settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
+        if settings.rules.should_fix(Rule::InvalidTodoCapitalization) {
             invalid_capitalization.set_fix(Fix::automatic(Edit::range_replacement(
                 "TODO".to_string(),
                 tag.range,
@@ -339,7 +338,7 @@ fn check_for_tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: 
 
         diagnostics.push(invalid_capitalization);
     } else {
-        // TD-001
+        // TD001
         diagnostics.push(Diagnostic::new(
             InvalidTodoTag {
                 tag: tag.content.to_string(),
@@ -352,10 +351,10 @@ fn check_for_tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: 
 /// Checks for "static" errors in the comment - missing colon, missing author, etc. This function
 /// modifies `diagnostics` in-place.
 fn check_for_static_errors(
+    diagnostics: &mut Vec<Diagnostic>,
     comment: &str,
     comment_range: TextRange,
     tag: &Tag,
-    diagnostics: &mut Vec<Diagnostic>,
 ) {
     let post_tag = &comment[usize::from(tag.range.end() - comment_range.start())..];
     let trimmed = post_tag.trim_start();
@@ -369,7 +368,7 @@ fn check_for_static_errors(
                 trimmed.text_len()
             }
         } else {
-            diagnostics.push(Diagnostic::new(MissingAuthorInTodo, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoAuthor, tag.range));
 
             TextSize::new(0)
         };
@@ -380,16 +379,16 @@ fn check_for_static_errors(
         if let Some(stripped) = after_colon.strip_prefix(' ') {
             stripped
         } else {
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterColonInTodo, tag.range));
+            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range));
             after_colon
         }
     } else {
-        diagnostics.push(Diagnostic::new(MissingColonInTodo, tag.range));
+        diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
         ""
     };
 
     if post_colon.is_empty() {
-        diagnostics.push(Diagnostic::new(MissingTextInTodo, tag.range));
+        diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
     }
 }
 

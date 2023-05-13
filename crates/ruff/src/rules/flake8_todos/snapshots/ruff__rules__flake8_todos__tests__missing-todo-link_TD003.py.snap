@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/flake8_todo/mod.rs
+source: crates/ruff/src/rules/flake8_todos/mod.rs
 ---
 TD003.py:9:3: TD003 Missing issue link on the line following this TODO
    |

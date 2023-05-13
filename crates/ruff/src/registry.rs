@@ -675,13 +675,13 @@ ruff_macros::register_rules!(
     // flynt
     rules::flynt::rules::StaticJoinToFString,
     // flake8-todo
-    rules::flake8_todo::rules::InvalidTodoTag,
-    rules::flake8_todo::rules::MissingAuthorInTodo,
-    rules::flake8_todo::rules::MissingLinkInTodo,
-    rules::flake8_todo::rules::MissingColonInTodo,
-    rules::flake8_todo::rules::MissingTextInTodo,
-    rules::flake8_todo::rules::InvalidCapitalizationInTodo,
-    rules::flake8_todo::rules::MissingSpaceAfterColonInTodo,
+    rules::flake8_todos::rules::InvalidTodoTag,
+    rules::flake8_todos::rules::MissingTodoAuthor,
+    rules::flake8_todos::rules::MissingTodoLink,
+    rules::flake8_todos::rules::MissingTodoColon,
+    rules::flake8_todos::rules::MissingTodoDescription,
+    rules::flake8_todos::rules::InvalidTodoCapitalization,
+    rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
 );
 
 pub trait AsRule {
@@ -951,12 +951,12 @@ impl Rule {
             | Rule::ProhibitedTrailingComma
             | Rule::TypeCommentInStub
             | Rule::InvalidTodoTag
-            | Rule::MissingAuthorInTodo
-            | Rule::MissingLinkInTodo
-            | Rule::MissingColonInTodo
-            | Rule::MissingTextInTodo
-            | Rule::InvalidCapitalizationInTodo
-            | Rule::MissingSpaceAfterColonInTodo => LintSource::Tokens,
+            | Rule::MissingTodoAuthor
+            | Rule::MissingTodoLink
+            | Rule::MissingTodoColon
+            | Rule::MissingTodoDescription
+            | Rule::InvalidTodoCapitalization
+            | Rule::MissingSpaceAfterTodoColon => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
