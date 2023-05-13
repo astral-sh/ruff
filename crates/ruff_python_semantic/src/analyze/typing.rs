@@ -2,8 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
 
 use ruff_python_ast::call_path::{from_unqualified_name, CallPath};
 use ruff_python_stdlib::typing::{
-    IMMUTABLE_GENERIC_TYPES, IMMUTABLE_TYPES, PEP_585_BUILTINS_ELIGIBLE, PEP_593_SUBSCRIPTS,
-    SUBSCRIPTS,
+    IMMUTABLE_GENERIC_TYPES, IMMUTABLE_TYPES, PEP_585_GENERICS, PEP_593_SUBSCRIPTS, SUBSCRIPTS,
 };
 
 use crate::context::Context;
@@ -62,11 +61,81 @@ pub fn match_annotated_subscript<'a>(
     })
 }
 
-/// Returns `true` if `Expr` represents a reference to a typing object with a
-/// PEP 585 built-in.
-pub fn is_pep585_builtin(expr: &Expr, context: &Context) -> bool {
-    context.resolve_call_path(expr).map_or(false, |call_path| {
-        PEP_585_BUILTINS_ELIGIBLE.contains(&call_path.as_slice())
+/// A module member, like `("typing", "Deque")`.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ModuleMember<'a> {
+    /// The module name, like `"typing"`.
+    module: &'a str,
+    /// The member name, like `"Deque"`.
+    member: &'a str,
+}
+
+impl ModuleMember<'_> {
+    /// Returns the module name, like `"typing"`.
+    pub fn module(&self) -> &str {
+        self.module
+    }
+
+    /// Returns the member name, like `"Deque"`.
+    pub fn member(&self) -> &str {
+        self.member
+    }
+
+    /// Returns `true` if this is a builtin symbol, like `int`.
+    pub fn is_builtin(&self) -> bool {
+        self.module.is_empty()
+    }
+}
+
+impl std::fmt::Display for ModuleMember<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_builtin() {
+            std::write!(f, "{}", self.member)
+        } else {
+            std::write!(
+                f,
+                "{module}.{member}",
+                module = self.module,
+                member = self.member
+            )
+        }
+    }
+}
+
+/// A symbol replacement, like `(("typing", "Deque"), ("collections", "deque"))`.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SymbolReplacement<'a> {
+    /// The symbol to replace, like `("typing", "Deque")`.
+    pub from: ModuleMember<'a>,
+    /// The symbol to replace with, like `("collections", "deque")`.
+    pub to: ModuleMember<'a>,
+}
+
+/// Returns the PEP 585 standard library generic variant for a `typing` module reference, if such
+/// a variant exists.
+pub fn to_pep585_generic(expr: &Expr, context: &Context) -> Option<SymbolReplacement<'static>> {
+    context.resolve_call_path(expr).and_then(|call_path| {
+        let [module, name] = call_path.as_slice() else {
+            return None;
+        };
+        PEP_585_GENERICS
+            .iter()
+            .find_map(|((from_module, from_member), (to_module, to_member))| {
+                if module == from_module && name == from_member {
+                    Some(SymbolReplacement {
+                        from: ModuleMember {
+                            module: from_module,
+                            member: from_member,
+                        },
+                        to: ModuleMember {
+                            module: to_module,
+                            member: to_member,
+                        },
+                    })
+                } else {
+                    None
+                }
+            })
     })
 }
 
