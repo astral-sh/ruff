@@ -72,6 +72,17 @@ fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec
                 keywords,
             }) = arg.node()
             {
+                if args.len() == 1 {
+                    let new_arg = Expr::new(
+                        TextRange::default(),
+                        ast::ExprStarred {
+                            value: Box::new(args[0].clone()),
+                            ctx: ast::ExprContext::Load,
+                        },
+                    );
+                    new_args.push(new_arg);
+                    continue;
+                }
                 if MinMax::try_from_call(func, keywords, context) == Some(min_max) {
                     inner(context, min_max, args, new_args);
                     continue;
