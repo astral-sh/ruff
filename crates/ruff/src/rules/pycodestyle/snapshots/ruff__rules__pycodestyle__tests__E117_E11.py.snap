@@ -27,6 +27,8 @@ E11.py:42:1: E117 Over-indented
 43 | def start():
 44 |         print()
    | ^^^^^^^^ E117
+45 | #: E112
+46 | if False:  #
    |
 
 
