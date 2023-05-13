@@ -8,6 +8,7 @@ class A:
 class B(A, A):
     ...
 
+
 ###
 # Non-errors.
 ###
