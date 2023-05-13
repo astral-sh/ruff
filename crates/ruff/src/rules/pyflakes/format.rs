@@ -1,7 +1,7 @@
 //! Implements helper functions for using vendored/format.rs
 use std::convert::TryFrom;
 
-use rustpython_common::format::{
+use rustpython_format::{
     FieldName, FieldType, FormatParseError, FormatPart, FormatString, FromTemplate,
 };
 

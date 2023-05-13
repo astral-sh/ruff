@@ -198,7 +198,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if checker.ctx.in_boolean_test {
+        if checker.ctx.in_boolean_test() {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(operand, checker.stylist),
