@@ -663,6 +663,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::PairwiseOverZipped,
     rules::ruff::rules::MutableDataclassDefault,
     rules::ruff::rules::FunctionCallInDataclassDefaultArgument,
+    rules::ruff::rules::ExplicitFStringTypeConversion,
     // flake8-django
     rules::flake8_django::rules::DjangoNullableModelStringField,
     rules::flake8_django::rules::DjangoLocalsInRenderFunction,
