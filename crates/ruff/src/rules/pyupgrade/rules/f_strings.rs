@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_common::format::{
+use rustpython_format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use rustpython_parser::ast::{self, Constant, Expr, ExprKind, KeywordData};

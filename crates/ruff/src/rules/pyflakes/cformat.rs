@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use rustc_hash::FxHashSet;
-use rustpython_common::cformat::{
+use rustpython_format::cformat::{
     CFormatError, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
 

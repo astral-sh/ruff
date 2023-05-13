@@ -7,7 +7,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::raw_contents;
-use rustpython_common::format::{
+use rustpython_format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 
