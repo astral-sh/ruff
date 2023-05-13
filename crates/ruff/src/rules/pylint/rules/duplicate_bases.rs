@@ -32,7 +32,7 @@ pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, bases: &[Expr])
                         name: name.to_string(),
                     },
                     base.range(),
-                ))
+                ));
             }
             unique_bases.insert(id);
         }
