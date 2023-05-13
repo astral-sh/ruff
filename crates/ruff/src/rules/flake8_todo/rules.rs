@@ -1,21 +1,21 @@
 use once_cell::sync::Lazy;
-
 use regex::RegexSet;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+
 use crate::{registry::Rule, settings::Settings};
 
 /// ## What it does
-/// Checks that a TODO comment is actually labelled with "TODO".
+/// Checks that a TODO comment is labelled with "TODO".
 ///
 /// ## Why is this bad?
 /// Ambiguous tags reduce code visibility and can lead to dangling TODOs.
-/// If someone greps for a TODO to fix, but the comment is tagged with a "FIXME"
-/// tag instead of a "TODO", that comment may never be found!
+/// For example, if a comment is tagged with "FIXME" rather than "TODO", it may
+/// be overlooked by future readers.
 ///
 /// Note that this rule will only flag "FIXME" and "XXX" tags as incorrect.
 ///
@@ -32,20 +32,22 @@ use crate::{registry::Rule, settings::Settings};
 pub struct InvalidTodoTag {
     pub tag: String,
 }
+
 impl Violation for InvalidTodoTag {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InvalidTodoTag { tag } = self;
-        format!("Invalid TODO tag: `{tag}` should be `TODO`")
+        format!("Invalid TODO tag: `{tag}`")
     }
 }
 
 /// ## What it does
-/// Checks that a TODO comment has an author assigned to it.
+/// Checks that a TODO comment includes an author.
 ///
 /// ## Why is this bad?
-/// Assigning an author to a task helps keep it on the radar and keeps code
-/// formatting consistent.
+/// Including an author on a TODO provides future readers with context around
+/// the issue. While the TODO author is not always considered responsible for
+/// fixing the issue, they are typically the individual with the most context.
 ///
 /// ## Example
 /// ```python
@@ -54,23 +56,25 @@ impl Violation for InvalidTodoTag {
 ///
 /// Use instead
 /// ```python
-/// # TODO(ruff): now an author is assigned
+/// # TODO(charlie): now an author is assigned
 /// ```
 #[violation]
 pub struct MissingAuthorInTodo;
+
 impl Violation for MissingAuthorInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author in TODO. Try: # TODO (<author_name>): ...")
+        format!("Missing author in TODO; try: `# TODO(<author_name>): ...`")
     }
 }
 
 /// ## What it does
-/// Checks that an issue link or ticket is associated with a TODO.
+/// Checks that a TODO comment is associated with a link to a relevant issue
+/// or ticket.
 ///
 /// ## Why is this bad?
 /// Including an issue link near a TODO makes it easier for resolvers
-/// to get context around the issue and keeps code formatting consistent.
+/// to get context around the issue.
 ///
 /// ## Example
 /// ```python
@@ -79,17 +83,18 @@ impl Violation for MissingAuthorInTodo {
 ///
 /// Use one of these instead:
 /// ```python
-/// # TODO (ruff): this comment has an issue link
+/// # TODO(charlie): this comment has an issue link
 /// # https://github.com/charliermarsh/ruff/issues/3870
 ///
-/// # TODO (ruff): this comment has a 3-digit issue code
+/// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003
 ///
-/// # TODO (ruff): this comment has an issue code of (up to) 6 characters, then digits
+/// # TODO(charlie): this comment has an issue code of (up to) 6 characters, then digits
 /// # SIXCHR-003
 /// ```
 #[violation]
 pub struct MissingLinkInTodo;
+
 impl Violation for MissingLinkInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -101,70 +106,80 @@ impl Violation for MissingLinkInTodo {
 /// Checks that a "TODO" tag is followed by a colon.
 ///
 /// ## Why is this bad?
-/// Skipping colons after a "TODO" tag can create inconsistent code formatting.
+/// "TODO" tags are typically followed by a parenthesized author name, a colon,
+/// a space, and a description of the issue, in that order.
+///
+/// Deviating from this pattern can lead to inconsistent and non-idiomatic
+/// comments.
 ///
 /// ## Example
 /// ```python
-/// # TODO(ruff) fix this colon
+/// # TODO(charlie) fix this colon
 /// ```
 ///
 /// Used instead:
 /// ```python
-/// # TODO(ruff): colon fixed
+/// # TODO(charlie): colon fixed
 /// ```
 #[violation]
 pub struct MissingColonInTodo;
+
 impl Violation for MissingColonInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing colon in TODO. Try: # TODO: ...")
+        format!("Missing colon in TODO")
     }
 }
 
 /// ## What it does
-/// Checks that a "TODO" tag has some text after it.
+/// Checks that a "TODO" tag contains a description of the issue following the
+/// tag itself.
 ///
 /// ## Why is this bad?
-/// Just putting a "TODO" tag in the code, without any context, makes it harder
-/// for the reader/future resolver to understand the issue that has to be fixed.
+/// TODO comments should include a description of the issue to provide context
+/// for future readers.
 ///
 /// ## Example
 /// ```python
-/// # TODO(ruff)
+/// # TODO(charlie)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// # TODO(ruff): fix some issue
+/// # TODO(charlie): fix some issue
 /// ```
 #[violation]
 pub struct MissingTextInTodo;
+
 impl Violation for MissingTextInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing text after 'TODO'")
+        format!("Missing text after `TODO`")
     }
 }
 
 /// ## What it does
-/// Checks that a "TODO" tag is properly capitalized, i.e. that the tag is uppercase.
+/// Checks that a "TODO" tag is properly capitalized (i.e., that the tag is
+/// uppercase).
 ///
 /// ## Why is this bad?
-/// Inconsistent capitalization leads to less readable code.
+/// Capitalizing the "TODO" in a TODO comment is a convention that makes it
+/// easier for future readers to identify TODOs.
 ///
 /// ## Example
 /// ```python
-/// # todo(ruff): capitalize this
+/// # todo(charlie): capitalize this
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// # TODO(ruff): this is capitalized
+/// # TODO(charlie): this is capitalized
 /// ```
 #[violation]
 pub struct InvalidCapitalizationInTodo {
-    pub tag: String,
+    tag: String,
 }
+
 impl AlwaysAutofixableViolation for InvalidCapitalizationInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -182,19 +197,24 @@ impl AlwaysAutofixableViolation for InvalidCapitalizationInTodo {
 /// Checks that the colon after a "TODO" tag is followed by a space.
 ///
 /// ## Why is this bad?
-/// Skipping the space after a colon leads to less readable code.
+/// "TODO" tags are typically followed by a parenthesized author name, a colon,
+/// a space, and a description of the issue, in that order.
+///
+/// Deviating from this pattern can lead to inconsistent and non-idiomatic
+/// comments.
 ///
 /// ## Example
 /// ```python
-/// # TODO(ruff):fix this
+/// # TODO(charlie):fix this
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// # TODO(ruff): fix this
+/// # TODO(charlie): fix this
 /// ```
 #[violation]
 pub struct MissingSpaceAfterColonInTodo;
+
 impl Violation for MissingSpaceAfterColonInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -202,19 +222,18 @@ impl Violation for MissingSpaceAfterColonInTodo {
     }
 }
 
-// Matches against any of the 4 recognized PATTERNS.
+// Matches against any of the four recognized patterns.
 static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
-    let patterns: [&str; 3] = [
+    RegexSet::new([
         r#"^#\s*(?i)(TODO).*$"#,
         r#"^#\s*(?i)(FIXME).*$"#,
         r#"^#\s*(?i)(XXX).*$"#,
-    ];
-
-    RegexSet::new(patterns).unwrap()
+    ])
+    .unwrap()
 });
 
-// Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the length of the
-// tag that we're trying to capture.
+// Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the
+// length of the tag that we're trying to capture.
 static PATTERN_TAG_LENGTH: &[usize; 3] = &["TODO".len(), "FIXME".len(), "XXX".len()];
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
@@ -406,7 +425,6 @@ mod tests {
             )
         );
 
-        // sanity checks :)
         let test_comment = "# todo: todo tag";
         let expected = Tag {
             content: "todo",
