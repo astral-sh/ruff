@@ -785,6 +785,10 @@ where
                 if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
                 }
+
+                if self.settings.rules.enabled(Rule::DuplicateBases) {
+                    pylint::rules::duplicate_bases(self, name, bases);
+                }
             }
             StmtKind::Import(ast::StmtImport { names }) => {
                 if self.settings.rules.enabled(Rule::MultipleImportsOnOneLine) {

@@ -190,6 +190,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::LoggingTooManyArgs,
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
+    rules::pylint::rules::DuplicateBases,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
