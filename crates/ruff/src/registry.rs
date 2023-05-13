@@ -190,6 +190,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::LoggingTooManyArgs,
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
+    rules::pylint::rules::DuplicateBases,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -674,6 +675,14 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
     // flynt
     rules::flynt::rules::StaticJoinToFString,
+    // flake8-todo
+    rules::flake8_todos::rules::InvalidTodoTag,
+    rules::flake8_todos::rules::MissingTodoAuthor,
+    rules::flake8_todos::rules::MissingTodoLink,
+    rules::flake8_todos::rules::MissingTodoColon,
+    rules::flake8_todos::rules::MissingTodoDescription,
+    rules::flake8_todos::rules::InvalidTodoCapitalization,
+    rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
 );
 
 pub trait AsRule {
@@ -814,6 +823,9 @@ pub enum Linter {
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
+    #[prefix = "TD"]
+    Flake8Todo,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
@@ -938,7 +950,14 @@ impl Rule {
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::ProhibitedTrailingComma
-            | Rule::TypeCommentInStub => LintSource::Tokens,
+            | Rule::TypeCommentInStub
+            | Rule::InvalidTodoTag
+            | Rule::MissingTodoAuthor
+            | Rule::MissingTodoLink
+            | Rule::MissingTodoColon
+            | Rule::MissingTodoDescription
+            | Rule::InvalidTodoCapitalization
+            | Rule::MissingSpaceAfterTodoColon => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
