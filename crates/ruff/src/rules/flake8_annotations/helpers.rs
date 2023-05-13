@@ -6,13 +6,14 @@ use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
 
-pub(super) fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, Option<&Expr>, &Vec<Stmt>) {
+pub(super) fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, Option<&Expr>, &Vec<Stmt>, &Vec<Expr>) {
     match &stmt.node {
         StmtKind::FunctionDef(ast::StmtFunctionDef {
             name,
             args,
             returns,
             body,
+            decorator_list,
             ..
         })
         | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
@@ -20,8 +21,9 @@ pub(super) fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, Option<&Expr
             args,
             returns,
             body,
+            decorator_list,
             ..
-        }) => (name, args, returns.as_ref().map(|expr| &**expr), body),
+        }) => (name, args, returns.as_ref().map(|expr| &**expr), body, decorator_list),
         _ => panic!("Found non-FunctionDef in match_name"),
     }
 }
