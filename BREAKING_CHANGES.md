@@ -1,6 +1,6 @@
 # Breaking Changes
 
-## 0.0.266
+## 0.0.267
 
 ### `update-check` is no longer a valid configuration option ([#4313](https://github.com/charliermarsh/ruff/pull/4313))
 

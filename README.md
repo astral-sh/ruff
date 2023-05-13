@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.266'
+  rev: 'v0.0.267'
   hooks:
     - id: ruff
 ```
@@ -424,3 +424,9 @@ If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 ## License
 
 MIT
+
+<div align="center">
+  <a target="_blank" href="https://astral.sh" style="background:none">
+    <img src="https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/svg/Astral.svg">
+  </a>
+</div>

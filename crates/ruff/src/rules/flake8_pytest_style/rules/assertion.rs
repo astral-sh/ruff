@@ -9,6 +9,7 @@ use rustpython_parser::ast::{
     self, Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind,
     Unaryop,
 };
+use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -323,15 +324,25 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     // Extract the module text.
     let contents = locator.lines(stmt.range());
 
-    // "Embed" it in a function definition, to preserve indentation while retaining valid source
-    // code. (We'll strip the prefix later on.)
-    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+    // If the block is indented, "embed" it in a function definition, to preserve
+    // indentation while retaining valid source code. (We'll strip the prefix later
+    // on.)
+    let module_text = if outer_indent.is_empty() {
+        Cow::Borrowed(contents)
+    } else {
+        Cow::Owned(format!(
+            "def f():{}{contents}",
+            stylist.line_ending().as_str()
+        ))
+    };
 
     // Parse the CST.
     let mut tree = match_module(&module_text)?;
 
     // Extract the assert statement.
-    let statements: &mut Vec<Statement> = {
+    let statements = if outer_indent.is_empty() {
+        &mut tree.body
+    } else {
         let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
             bail!("Expected statement to be embedded in a function definition")
         };
@@ -343,10 +354,12 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 
         &mut indented_block.body
     };
-    let [Statement::Simple(simple_statement_line)] = statements.as_mut_slice() else {
+
+    let [Statement::Simple(simple_statement_line)] = &statements[..] else {
         bail!("Expected one simple statement")
     };
-    let [SmallStatement::Assert(assert_statement)] = &mut *simple_statement_line.body else {
+
+    let [SmallStatement::Assert(assert_statement)] = &simple_statement_line.body[..] else {
         bail!("Expected simple statement to be an assert")
     };
 
@@ -407,10 +420,14 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 
     // Reconstruct and reformat the code.
     let module_text = state.to_string();
-    let contents = module_text
-        .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
-        .unwrap()
-        .to_string();
+    let contents = if outer_indent.is_empty() {
+        module_text
+    } else {
+        module_text
+            .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
+            .unwrap()
+            .to_string()
+    };
 
     let range = locator.full_lines_range(stmt.range());
 

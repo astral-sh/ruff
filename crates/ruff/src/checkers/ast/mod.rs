@@ -137,48 +137,6 @@ impl<'a> Checker<'a> {
     }
 }
 
-/// Visit an body of [`Stmt`] nodes within a type-checking block.
-macro_rules! visit_type_checking_block {
-    ($self:ident, $body:expr) => {{
-        let snapshot = $self.ctx.flags;
-        $self.ctx.flags |= ContextFlags::TYPE_CHECKING_BLOCK;
-        $self.visit_body($body);
-        $self.ctx.flags = snapshot;
-    }};
-}
-
-/// Visit an [`Expr`], and treat it as a type definition.
-macro_rules! visit_type_definition {
-    ($self:ident, $expr:expr) => {{
-        let snapshot = $self.ctx.flags;
-        $self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
-        $self.visit_expr($expr);
-        $self.ctx.flags = snapshot;
-    }};
-}
-
-/// Visit an [`Expr`], and treat it as _not_ a type definition.
-macro_rules! visit_non_type_definition {
-    ($self:ident, $expr:expr) => {{
-        let snapshot = $self.ctx.flags;
-        $self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
-        $self.visit_expr($expr);
-        $self.ctx.flags = snapshot;
-    }};
-}
-
-/// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
-/// expressions return value is significant, or whether the calling context only relies on
-/// its truthiness.
-macro_rules! visit_boolean_test {
-    ($self:ident, $expr:expr) => {{
-        let snapshot = $self.ctx.flags;
-        $self.ctx.flags |= ContextFlags::BOOLEAN_TEST;
-        $self.visit_expr($expr);
-        $self.ctx.flags = snapshot;
-    }};
-}
-
 impl<'a, 'b> Visitor<'b> for Checker<'a>
 where
     'b: 'a,
@@ -1932,7 +1890,7 @@ where
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
                         if runtime_annotation {
-                            visit_type_definition!(self, expr);
+                            self.visit_type_definition(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1941,7 +1899,7 @@ where
                 for arg in &args.args {
                     if let Some(expr) = &arg.node.annotation {
                         if runtime_annotation {
-                            visit_type_definition!(self, expr);
+                            self.visit_type_definition(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1950,7 +1908,7 @@ where
                 if let Some(arg) = &args.vararg {
                     if let Some(expr) = &arg.node.annotation {
                         if runtime_annotation {
-                            visit_type_definition!(self, expr);
+                            self.visit_type_definition(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1959,7 +1917,7 @@ where
                 for arg in &args.kwonlyargs {
                     if let Some(expr) = &arg.node.annotation {
                         if runtime_annotation {
-                            visit_type_definition!(self, expr);
+                            self.visit_type_definition(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1968,7 +1926,7 @@ where
                 if let Some(arg) = &args.kwarg {
                     if let Some(expr) = &arg.node.annotation {
                         if runtime_annotation {
-                            visit_type_definition!(self, expr);
+                            self.visit_type_definition(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -1976,7 +1934,7 @@ where
                 }
                 for expr in returns {
                     if runtime_annotation {
-                        visit_type_definition!(self, expr);
+                        self.visit_type_definition(expr);
                     } else {
                         self.visit_annotation(expr);
                     };
@@ -2183,13 +2141,13 @@ where
                 };
 
                 if runtime_annotation {
-                    visit_type_definition!(self, annotation);
+                    self.visit_type_definition(annotation);
                 } else {
                     self.visit_annotation(annotation);
                 }
                 if let Some(expr) = value {
                     if self.ctx.match_typing_expr(annotation, "TypeAlias") {
-                        visit_type_definition!(self, expr);
+                        self.visit_type_definition(expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -2197,25 +2155,25 @@ where
                 self.visit_expr(target);
             }
             StmtKind::Assert(ast::StmtAssert { test, msg }) => {
-                visit_boolean_test!(self, test);
+                self.visit_boolean_test(test);
                 if let Some(expr) = msg {
                     self.visit_expr(expr);
                 }
             }
             StmtKind::While(ast::StmtWhile { test, body, orelse }) => {
-                visit_boolean_test!(self, test);
+                self.visit_boolean_test(test);
                 self.visit_body(body);
                 self.visit_body(orelse);
             }
             StmtKind::If(ast::StmtIf { test, body, orelse }) => {
-                visit_boolean_test!(self, test);
+                self.visit_boolean_test(test);
 
                 if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
                     if self.settings.rules.enabled(Rule::EmptyTypeCheckingBlock) {
                         flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
                     }
 
-                    visit_type_checking_block!(self, body);
+                    self.visit_type_checking_block(body);
                 } else {
                     self.visit_body(body);
                 }
@@ -2258,7 +2216,7 @@ where
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let flags_snapshot = self.ctx.flags;
         self.ctx.flags |= ContextFlags::ANNOTATION;
-        visit_type_definition!(self, expr);
+        self.visit_type_definition(expr);
         self.ctx.flags = flags_snapshot;
     }
 
@@ -3666,6 +3624,17 @@ where
                     flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
+            ExprKind::FormattedValue(ast::ExprFormattedValue {
+                value, conversion, ..
+            }) => {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::ExplicitFStringTypeConversion)
+                {
+                    ruff::rules::explicit_f_string_type_conversion(self, expr, value, *conversion);
+                }
+            }
             _ => {}
         };
 
@@ -3675,7 +3644,7 @@ where
                 self.deferred.lambdas.push((expr, self.ctx.snapshot()));
             }
             ExprKind::IfExp(ast::ExprIfExp { test, body, orelse }) => {
-                visit_boolean_test!(self, test);
+                self.visit_boolean_test(test);
                 self.visit_expr(body);
                 self.visit_expr(orelse);
             }
@@ -3717,7 +3686,7 @@ where
                     Some(Callable::Bool) => {
                         self.visit_expr(func);
                         if !args.is_empty() {
-                            visit_boolean_test!(self, &args[0]);
+                            self.visit_boolean_test(&args[0]);
                         }
                         for expr in args.iter().skip(1) {
                             self.visit_expr(expr);
@@ -3726,7 +3695,7 @@ where
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
                         if !args.is_empty() {
-                            visit_type_definition!(self, &args[0]);
+                            self.visit_type_definition(&args[0]);
                         }
                         for expr in args.iter().skip(1) {
                             self.visit_expr(expr);
@@ -3735,21 +3704,21 @@ where
                     Some(Callable::NewType) => {
                         self.visit_expr(func);
                         for expr in args.iter().skip(1) {
-                            visit_type_definition!(self, expr);
+                            self.visit_type_definition(expr);
                         }
                     }
                     Some(Callable::TypeVar) => {
                         self.visit_expr(func);
                         for expr in args.iter().skip(1) {
-                            visit_type_definition!(self, expr);
+                            self.visit_type_definition(expr);
                         }
                         for keyword in keywords {
                             let KeywordData { arg, value } = &keyword.node;
                             if let Some(id) = arg {
                                 if id == "bound" {
-                                    visit_type_definition!(self, value);
+                                    self.visit_type_definition(value);
                                 } else {
-                                    visit_non_type_definition!(self, value);
+                                    self.visit_non_type_definition(value);
                                 }
                             }
                         }
@@ -3767,8 +3736,8 @@ where
                                             ExprKind::List(ast::ExprList { elts, .. })
                                             | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                                                 if elts.len() == 2 {
-                                                    visit_non_type_definition!(self, &elts[0]);
-                                                    visit_type_definition!(self, &elts[1]);
+                                                    self.visit_non_type_definition(&elts[0]);
+                                                    self.visit_type_definition(&elts[1]);
                                                 }
                                             }
                                             _ => {}
@@ -3782,7 +3751,7 @@ where
                         // Ex) NamedTuple("a", a=int)
                         for keyword in keywords {
                             let KeywordData { value, .. } = &keyword.node;
-                            visit_type_definition!(self, value);
+                            self.visit_type_definition(value);
                         }
                     }
                     Some(Callable::TypedDict) => {
@@ -3792,10 +3761,10 @@ where
                         if args.len() > 1 {
                             if let ExprKind::Dict(ast::ExprDict { keys, values }) = &args[1].node {
                                 for key in keys.iter().flatten() {
-                                    visit_non_type_definition!(self, key);
+                                    self.visit_non_type_definition(key);
                                 }
                                 for value in values {
-                                    visit_type_definition!(self, value);
+                                    self.visit_type_definition(value);
                                 }
                             }
                         }
@@ -3803,7 +3772,7 @@ where
                         // Ex) TypedDict("a", a=int)
                         for keyword in keywords {
                             let KeywordData { value, .. } = &keyword.node;
-                            visit_type_definition!(self, value);
+                            self.visit_type_definition(value);
                         }
                     }
                     Some(Callable::MypyExtension) => {
@@ -3811,23 +3780,23 @@ where
 
                         if let Some(arg) = args.first() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                            visit_type_definition!(self, arg);
+                            self.visit_type_definition(arg);
 
                             for arg in args.iter().skip(1) {
-                                visit_non_type_definition!(self, arg);
+                                self.visit_non_type_definition(arg);
                             }
                             for keyword in keywords {
                                 let KeywordData { value, .. } = &keyword.node;
-                                visit_non_type_definition!(self, value);
+                                self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
                             for keyword in keywords {
                                 let KeywordData { value, arg } = &keyword.node;
                                 if arg.as_ref().map_or(false, |arg| arg == "type") {
-                                    visit_type_definition!(self, value);
+                                    self.visit_type_definition(value);
                                 } else {
-                                    visit_non_type_definition!(self, value);
+                                    self.visit_non_type_definition(value);
                                 }
                             }
                         }
@@ -3838,11 +3807,11 @@ where
                         // any strings as deferred type definitions).
                         self.visit_expr(func);
                         for arg in args {
-                            visit_non_type_definition!(self, arg);
+                            self.visit_non_type_definition(arg);
                         }
                         for keyword in keywords {
                             let KeywordData { value, .. } = &keyword.node;
-                            visit_non_type_definition!(self, value);
+                            self.visit_non_type_definition(value);
                         }
                     }
                 }
@@ -3868,7 +3837,7 @@ where
                                 // Ex) Optional[int]
                                 SubscriptKind::AnnotatedSubscript => {
                                     self.visit_expr(value);
-                                    visit_type_definition!(self, slice);
+                                    self.visit_type_definition(slice);
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
@@ -3882,7 +3851,7 @@ where
                                         if let Some(expr) = elts.first() {
                                             self.visit_expr(expr);
                                             for expr in elts.iter().skip(1) {
-                                                visit_non_type_definition!(self, expr);
+                                                self.visit_non_type_definition(expr);
                                             }
                                             self.visit_expr_context(ctx);
                                         }
@@ -3933,7 +3902,7 @@ where
         self.visit_expr(&comprehension.iter);
         self.visit_expr(&comprehension.target);
         for expr in &comprehension.ifs {
-            visit_boolean_test!(self, expr);
+            self.visit_boolean_test(expr);
         }
     }
 
@@ -4232,6 +4201,50 @@ where
 }
 
 impl<'a> Checker<'a> {
+    /// Visit a [`Module`]. Returns `true` if the module contains a module-level docstring.
+    fn visit_module(&mut self, python_ast: &'a Suite) -> bool {
+        if self.settings.rules.enabled(Rule::FStringDocstring) {
+            flake8_bugbear::rules::f_string_docstring(self, python_ast);
+        }
+        let docstring = docstrings::extraction::docstring_from(python_ast);
+        docstring.is_some()
+    }
+
+    /// Visit an body of [`Stmt`] nodes within a type-checking block.
+    fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
+        let snapshot = self.ctx.flags;
+        self.ctx.flags |= ContextFlags::TYPE_CHECKING_BLOCK;
+        self.visit_body(body);
+        self.ctx.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a type definition.
+    pub fn visit_type_definition(&mut self, expr: &'a Expr) {
+        let snapshot = self.ctx.flags;
+        self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
+        self.visit_expr(expr);
+        self.ctx.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as _not_ a type definition.
+    pub fn visit_non_type_definition(&mut self, expr: &'a Expr) {
+        let snapshot = self.ctx.flags;
+        self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
+        self.visit_expr(expr);
+        self.ctx.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
+    /// expressions return value is significant, or whether the calling context only relies on
+    /// its truthiness.
+    pub fn visit_boolean_test(&mut self, expr: &'a Expr) {
+        let snapshot = self.ctx.flags;
+        self.ctx.flags |= ContextFlags::BOOLEAN_TEST;
+        self.visit_expr(expr);
+        self.ctx.flags = snapshot;
+    }
+
+    /// Add a [`Binding`] to the current scope, bound to the given name.
     fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) {
         let binding_id = self.ctx.bindings.next_id();
         if let Some((stack_index, existing_binding_id)) = self
@@ -4800,14 +4813,6 @@ impl<'a> Checker<'a> {
             },
             expr.range(),
         ));
-    }
-
-    fn visit_module(&mut self, python_ast: &'a Suite) -> bool {
-        if self.settings.rules.enabled(Rule::FStringDocstring) {
-            flake8_bugbear::rules::f_string_docstring(self, python_ast);
-        }
-        let docstring = docstrings::extraction::docstring_from(python_ast);
-        docstring.is_some()
     }
 
     fn check_deferred_future_type_definitions(&mut self) {

@@ -39,3 +39,8 @@ def test_error():
 message
 """
     )
+
+
+assert something  # OK
+assert something and something_else  # Error
+assert something and something_else and something_third  # Error

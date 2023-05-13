@@ -1,0 +1,61 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF010.py:8:4: RUF010 [*] Use conversion in f-string
+   |
+ 8 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+   |    ^^^^^^^^ RUF010
+ 9 | 
+10 | f"{foo(bla)}"  # OK
+   |
+   = help: Replace f-string function call with conversion
+
+ℹ Fix
+5 5 |     pass
+6 6 | 
+7 7 | 
+8   |-f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+  8 |+f"{bla!s}, {repr(bla)}, {ascii(bla)}"  # RUF010
+9 9 | 
+10 10 | f"{foo(bla)}"  # OK
+11 11 | 
+
+RUF010.py:8:16: RUF010 [*] Use conversion in f-string
+   |
+ 8 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+   |                ^^^^^^^^^ RUF010
+ 9 | 
+10 | f"{foo(bla)}"  # OK
+   |
+   = help: Replace f-string function call with conversion
+
+ℹ Fix
+5 5 |     pass
+6 6 | 
+7 7 | 
+8   |-f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+  8 |+f"{str(bla)}, {bla!r}, {ascii(bla)}"  # RUF010
+9 9 | 
+10 10 | f"{foo(bla)}"  # OK
+11 11 | 
+
+RUF010.py:8:29: RUF010 [*] Use conversion in f-string
+   |
+ 8 | f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+   |                             ^^^^^^^^^^ RUF010
+ 9 | 
+10 | f"{foo(bla)}"  # OK
+   |
+   = help: Replace f-string function call with conversion
+
+ℹ Fix
+5 5 |     pass
+6 6 | 
+7 7 | 
+8   |-f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
+  8 |+f"{str(bla)}, {repr(bla)}, {bla!a}"  # RUF010
+9 9 | 
+10 10 | f"{foo(bla)}"  # OK
+11 11 | 
+
+
