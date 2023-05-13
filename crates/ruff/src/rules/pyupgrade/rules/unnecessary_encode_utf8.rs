@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -38,11 +38,11 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
 fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
-    let ExprKind::Attribute(ast::ExprAttribute {
+    let Expr::Attribute(ast::ExprAttribute {
         value: variable,
         attr,
         ..
-    }) = &func.node else {
+    }) = &func else {
         return None;
     };
     if attr != "encode" {
@@ -52,10 +52,10 @@ fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
 }
 
 fn is_utf8_encoding_arg(arg: &Expr) -> bool {
-    if let ExprKind::Constant(ast::ExprConstant {
+    if let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    }) = &arg.node
+    }) = &arg
     {
         UTF8_LITERALS.contains(&value.to_lowercase().as_str())
     } else {
@@ -89,13 +89,8 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
         // Ex `"".encode(kwarg=kwarg)`
         (0, 1) => {
             let kwarg = &kwargs[0];
-            if kwarg
-                .node
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg == "encoding")
-            {
-                if is_utf8_encoding_arg(&kwarg.node.value) {
+            if kwarg.arg.as_ref().map_or(false, |arg| arg == "encoding") {
+                if is_utf8_encoding_arg(&kwarg.value) {
                     return Some(EncodingArg::Keyword(kwarg));
                 }
             }
@@ -144,8 +139,8 @@ pub(crate) fn unnecessary_encode_utf8(
     let Some(variable) = match_encoded_variable(func) else {
         return;
     };
-    match &variable.node {
-        ExprKind::Constant(ast::ExprConstant {
+    match &variable {
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str(literal),
             ..
         }) => {
@@ -212,7 +207,7 @@ pub(crate) fn unnecessary_encode_utf8(
             }
         }
         // Ex) `f"foo{bar}".encode("utf-8")`
-        ExprKind::JoinedStr(_) => {
+        Expr::JoinedStr(_) => {
             if let Some(encoding_arg) = match_encoding_arg(args, kwargs) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to

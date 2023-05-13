@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,13 +55,13 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt.node {
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) | StmtKind::ClassDef(_) => {
+        match &stmt {
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
-            StmtKind::Return(_) => self.returns.push(stmt),
-            StmtKind::Break => self.breaks.push(stmt),
-            StmtKind::Continue => self.continues.push(stmt),
+            Stmt::Return(_) => self.returns.push(stmt),
+            Stmt::Break(_) => self.breaks.push(stmt),
+            Stmt::Continue(_) => self.continues.push(stmt),
             _ => walk_stmt(self, stmt),
         }
     }
@@ -88,14 +88,12 @@ fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
 
 /// Returns `true` if an [`Expr`] is a test to check types (e.g. via isinstance)
 fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
-    match &test.node {
-        ExprKind::BoolOp(ast::ExprBoolOp { values, .. }) => values
+    match &test {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values
             .iter()
             .all(|expr| check_type_check_test(checker, expr)),
-        ExprKind::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
-            check_type_check_test(checker, operand)
-        }
-        ExprKind::Call(ast::ExprCall { func, .. }) => check_type_check_call(checker, func),
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => check_type_check_test(checker, operand),
+        Expr::Call(ast::ExprCall { func, .. }) => check_type_check_call(checker, func),
         _ => false,
     }
 }
@@ -130,10 +128,10 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
 
 /// Returns `true` if an [`Expr`] is a reference to a builtin exception.
 fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
-    match &exc.node {
-        ExprKind::Name(_) => is_builtin_exception(checker, exc),
-        ExprKind::Call(ast::ExprCall { func, .. }) => {
-            if let ExprKind::Name(_) = &func.node {
+    match &exc {
+        Expr::Name(_) => is_builtin_exception(checker, exc),
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            if let Expr::Name(_) = func.as_ref() {
                 is_builtin_exception(checker, func)
             } else {
                 false
@@ -157,7 +155,7 @@ fn check_body(checker: &mut Checker, body: &[Stmt]) {
         if has_control_flow(item) {
             return;
         }
-        if let StmtKind::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item.node {
+        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
             check_raise(checker, exc, item);
         }
     }
@@ -169,13 +167,13 @@ fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
         if has_control_flow(item) {
             return;
         }
-        match &item.node {
-            StmtKind::If(ast::StmtIf { test, .. }) => {
+        match &item {
+            Stmt::If(ast::StmtIf { test, .. }) => {
                 if !check_type_check_test(checker, test) {
                     return;
                 }
             }
-            StmtKind::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
+            Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) => {
                 check_raise(checker, exc, item);
             }
             _ => {}
@@ -191,11 +189,9 @@ pub(crate) fn type_check_without_type_error(
     orelse: &[Stmt],
     parent: Option<&Stmt>,
 ) {
-    if let Some(parent) = parent {
-        if let StmtKind::If(ast::StmtIf { test, .. }) = &parent.node {
-            if !check_type_check_test(checker, test) {
-                return;
-            }
+    if let Some(Stmt::If(ast::StmtIf { test, .. })) = parent {
+        if !check_type_check_test(checker, test) {
+            return;
         }
     }
 

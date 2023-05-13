@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -71,19 +72,19 @@ impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
 /// SIM112
 pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     // Ex) `os.environ['foo']`
-    if let ExprKind::Subscript(_) = &expr.node {
+    if let Expr::Subscript(_) = &expr {
         check_os_environ_subscript(checker, expr);
         return;
     }
 
     // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
-    let ExprKind::Call(ast::ExprCall { func, args, .. }) = &expr.node else {
+    let Expr::Call(ast::ExprCall { func, args, .. }) = &expr else {
         return;
     };
     let Some(arg) = args.get(0) else {
         return;
     };
-    let ExprKind::Constant(ast::ExprConstant { value: Constant::Str(env_var), .. }) = &arg.node else {
+    let Expr::Constant(ast::ExprConstant { value: Constant::Str(env_var), .. }) = &arg else {
         return;
     };
     if !checker
@@ -112,19 +113,19 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
 }
 
 fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) = &expr.node else {
+    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &expr else {
         return;
     };
-    let ExprKind::Attribute(ast::ExprAttribute { value: attr_value, attr, .. }) = &value.node else {
+    let Expr::Attribute(ast::ExprAttribute { value: attr_value, attr, .. }) = value.as_ref() else {
         return;
     };
-    let ExprKind::Name(ast::ExprName { id, .. }) = &attr_value.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = attr_value.as_ref() else {
         return;
     };
     if id != "os" || attr != "environ" {
         return;
     }
-    let ExprKind::Constant(ast::ExprConstant { value: Constant::Str(env_var), kind }) = &slice.node else {
+    let Expr::Constant(ast::ExprConstant { value: Constant::Str(env_var), kind, range: _ }) = slice.as_ref() else {
         return;
     };
     let capital_env_var = env_var.to_ascii_uppercase();
@@ -140,10 +141,12 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         slice.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        let new_env_var = create_expr(ast::ExprConstant {
+        let node = ast::ExprConstant {
             value: capital_env_var.into(),
             kind: kind.clone(),
-        });
+            range: TextRange::default(),
+        };
+        let new_env_var = node.into();
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(&new_env_var, checker.stylist),
@@ -155,16 +158,16 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 
 /// SIM910
 pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Call(ast::ExprCall { func, args, keywords }) = &expr.node else {
+    let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = &expr else {
         return;
     };
     if !keywords.is_empty() {
         return;
     }
-    let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. } )= &func.node else {
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. } )= func.as_ref() else {
         return;
     };
-    if !matches!(value.node, ExprKind::Dict(_)) {
+    if !value.is_dict_expr() {
         return;
     }
     if attr != "get" {
@@ -173,15 +176,15 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Some(key) = args.get(0) else {
         return;
     };
-    if !matches!(key.node, ExprKind::Constant(_) | ExprKind::Name(_)) {
+    if !matches!(key, Expr::Constant(_) | Expr::Name(_)) {
         return;
     }
     let Some(default) = args.get(1) else {
         return;
     };
     if !matches!(
-        default.node,
-        ExprKind::Constant(ast::ExprConstant {
+        default,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::None,
             ..
         })

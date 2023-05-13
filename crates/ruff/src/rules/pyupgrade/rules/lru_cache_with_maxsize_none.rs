@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, KeywordData};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,11 +25,12 @@ impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
 /// UP033
 pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr]) {
     for expr in decorator_list.iter() {
-        let ExprKind::Call(ast::ExprCall {
+        let Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        }) = &expr.node else {
+            range: _,
+        }) = &expr else {
             continue;
         };
 
@@ -43,13 +44,18 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                     call_path.as_slice() == ["functools", "lru_cache"]
                 })
         {
-            let KeywordData { arg, value } = &keywords[0].node;
+            let Keyword {
+                arg,
+                value,
+                range: _,
+            } = &keywords[0];
             if arg.as_ref().map_or(false, |arg| arg == "maxsize")
                 && matches!(
-                    value.node,
-                    ExprKind::Constant(ast::ExprConstant {
+                    value,
+                    Expr::Constant(ast::ExprConstant {
                         value: Constant::None,
                         kind: None,
+                        range: _,
                     })
                 )
             {

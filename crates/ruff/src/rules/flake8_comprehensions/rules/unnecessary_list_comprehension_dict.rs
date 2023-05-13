@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -52,10 +52,10 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     if !checker.ctx.is_builtin("dict") {
         return;
     }
-    let ExprKind::ListComp(ast::ExprListComp { elt, .. }) = &argument else {
+    let Expr::ListComp(ast::ExprListComp { elt, .. }) = &argument else {
         return;
     };
-    let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &elt.node else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {
         return;
     };
     if elts.len() != 2 {

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -19,7 +19,7 @@ pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
         return None;
     }
     let target = &targets[0];
-    let ExprKind::Name(ast::ExprName { id, .. }) = &target.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = &target else {
         return None;
     };
     if id != "df" {

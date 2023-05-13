@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -23,11 +23,12 @@ impl AlwaysAutofixableViolation for UnnecessaryParenOnRaiseException {
 
 /// RSE102
 pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Call(ast::ExprCall {
+    if let Expr::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    }) = &expr.node
+        range: _,
+    }) = &expr
     {
         if args.is_empty() && keywords.is_empty() {
             let range = match_parens(func.end(), checker.locator)

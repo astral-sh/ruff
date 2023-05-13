@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,7 +49,7 @@ impl Violation for InvalidMockAccess {
 
 /// PGH005
 pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &expr.node {
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &expr {
         if matches!(
             attr.as_str(),
             "assert_any_call"
@@ -72,10 +72,10 @@ pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
 
 /// PGH005
 pub(crate) fn non_existent_mock_method(checker: &mut Checker, test: &Expr) {
-    let attr = match &test.node {
-        ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => attr,
-        ExprKind::Call(ast::ExprCall { func, .. }) => match &func.node {
-            ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => attr,
+    let attr = match &test {
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr,
+        Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr,
             _ => return,
         },
         _ => return,

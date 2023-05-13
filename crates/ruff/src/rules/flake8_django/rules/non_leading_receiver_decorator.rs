@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -58,8 +58,8 @@ where
     let mut diagnostics = vec![];
     let mut seen_receiver = false;
     for (i, decorator) in decorator_list.iter().enumerate() {
-        let is_receiver = match &decorator.node {
-            ExprKind::Call(ast::ExprCall { func, .. }) => resolve_call_path(func)
+        let is_receiver = match &decorator {
+            Expr::Call(ast::ExprCall { func, .. }) => resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["django", "dispatch", "receiver"]
                 }),

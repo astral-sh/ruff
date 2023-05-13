@@ -1,5 +1,5 @@
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, Ranged};
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -101,7 +101,7 @@ fn fix_f_string_missing_placeholders(
 pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
         .iter()
-        .any(|value| matches!(value.node, ExprKind::FormattedValue(_)))
+        .any(|value| matches!(value, Expr::FormattedValue(_)))
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);

@@ -7,6 +7,7 @@ use libcst_native::{
     ParenthesizedWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp,
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
+use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -115,10 +116,8 @@ pub(crate) fn fix_unnecessary_generator_set(
 
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
-    if let Some(parent_element) = parent {
-        if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
-            content = format!(" {content} ");
-        }
+    if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
+        content = format!(" {content} ");
     }
 
     Ok(Edit::range_replacement(content, expr.range()))
@@ -185,10 +184,8 @@ pub(crate) fn fix_unnecessary_generator_dict(
 
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
-    if let Some(parent_element) = parent {
-        if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
-            content = format!(" {content} ");
-        }
+    if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
+        content = format!(" {content} ");
     }
 
     Ok(Edit::range_replacement(content, expr.range()))
@@ -1100,10 +1097,8 @@ pub(crate) fn fix_unnecessary_map(
         // If the expression is embedded in an f-string, surround it with spaces to avoid
         // syntax errors.
         if kind == "set" || kind == "dict" {
-            if let Some(parent_element) = parent {
-                if let &rustpython_parser::ast::ExprKind::FormattedValue(_) = &parent_element.node {
-                    content = format!(" {content} ");
-                }
+            if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
+                content = format!(" {content} ");
             }
         }
 

@@ -3,16 +3,17 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use log::error;
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
-    self, Boolop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
+    self, Boolop, Constant, Expr, ExprContext, ExprLambda, Keyword, Ranged, Stmt,
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{create_expr, trailing_comment_start_offset, unparse_expr};
+use ruff_python_ast::helpers::{trailing_comment_start_offset, unparse_expr};
 use ruff_python_ast::types::RefEquality;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -301,17 +302,17 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
         // redundant. Consider removing all `pass` statements instead.
         let docstring_stmt = &body[0];
         let pass_stmt = &body[1];
-        let StmtKind::Expr(ast::StmtExpr { value } )= &docstring_stmt.node else {
+        let Stmt::Expr(ast::StmtExpr { value, range: _ } )= &docstring_stmt else {
             return;
         };
         if matches!(
-            value.node,
-            ExprKind::Constant(ast::ExprConstant {
+            value.as_ref(),
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(..),
                 ..
             })
         ) {
-            if matches!(pass_stmt.node, StmtKind::Pass) {
+            if pass_stmt.is_pass_stmt() {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
@@ -350,19 +351,19 @@ pub(crate) fn duplicate_class_field_definition<'a, 'b>(
     let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
-        let target = match &stmt.node {
-            StmtKind::Assign(ast::StmtAssign { targets, .. }) => {
+        let target = match &stmt {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                 if targets.len() != 1 {
                     continue;
                 }
-                if let ExprKind::Name(ast::ExprName { id, .. }) = &targets[0].node {
+                if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
                     id
                 } else {
                     continue;
                 }
             }
-            StmtKind::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     id
                 } else {
                     continue;
@@ -410,7 +411,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 ) where
     'b: 'a,
 {
-    let StmtKind::ClassDef(ast::StmtClassDef { bases, .. }) = &parent.node else {
+    let Stmt::ClassDef(ast::StmtClassDef { bases, .. }) = &parent else {
         return;
     };
 
@@ -425,11 +426,11 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
     let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
     for stmt in body {
-        let StmtKind::Assign(ast::StmtAssign { value, .. }) = &stmt.node else {
+        let Stmt::Assign(ast::StmtAssign { value, .. }) = &stmt else {
             continue;
         };
 
-        if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
+        if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             if checker
                 .ctx
                 .resolve_call_path(func)
@@ -457,7 +458,7 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], v
         if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
-            if let ExprKind::Dict(_) = value.node {
+            if let Expr::Dict(_) = value {
                 let diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
                 checker.diagnostics.push(diagnostic);
             }
@@ -467,10 +468,10 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], v
 
 /// Return `true` if a key is a valid keyword argument name.
 fn is_valid_kwarg_name(key: &Expr) -> bool {
-    if let ExprKind::Constant(ast::ExprConstant {
+    if let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    }) = &key.node
+    }) = &key
     {
         is_identifier(value)
     } else {
@@ -482,8 +483,8 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
 pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     for kw in kwargs {
         // keyword is a spread operator (indicated by None)
-        if kw.node.arg.is_none() {
-            if let ExprKind::Dict(ast::ExprDict { keys, .. }) = &kw.node.value.node {
+        if kw.arg.is_none() {
+            if let Expr::Dict(ast::ExprDict { keys, .. }) = &kw.value {
                 // ensure foo(**{"bar-bar": 1}) doesn't error
                 if keys.iter().all(|expr| expr.as_ref().map_or(false, is_valid_kwarg_name)) ||
                     // handle case of foo(**{**bar})
@@ -499,17 +500,18 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
 
 /// PIE810
 pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values }) = &expr.node else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = &expr else {
         return;
     };
 
     let mut duplicates = BTreeMap::new();
     for (index, call) in values.iter().enumerate() {
-        let ExprKind::Call(ast::ExprCall {
+        let Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        }) = &call.node else {
+            range: _
+        }) = &call else {
             continue
         };
 
@@ -517,14 +519,14 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
             continue;
         }
 
-        let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. } )= &func.node else {
+        let Expr::Attribute(ast::ExprAttribute { value, attr, .. } )= func.as_ref() else {
             continue
         };
         if attr != "startswith" && attr != "endswith" {
             continue;
         }
 
-        let ExprKind::Name(ast::ExprName { id: arg_name, .. } )= &value.node else {
+        let Expr::Name(ast::ExprName { id: arg_name, .. } )= value.as_ref() else {
             continue
         };
 
@@ -548,7 +550,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let ExprKind::Call(ast::ExprCall { func: _, args, keywords: _}) = &expr.node else {
+                        let Expr::Call(ast::ExprCall { func: _, args, keywords: _, range: _}) = &expr else {
                             unreachable!("{}", format!("Indices should only contain `{attr_name}` calls"))
                         };
                         args.get(0)
@@ -556,35 +558,43 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     })
                     .collect();
 
-                let call = create_expr(ExprKind::Call(ast::ExprCall {
-                    func: Box::new(create_expr(ExprKind::Attribute(ast::ExprAttribute {
-                        value: Box::new(create_expr(ExprKind::Name(ast::ExprName {
-                            id: arg_name.into(),
-                            ctx: ExprContext::Load,
-                        }))),
-                        attr: attr_name.into(),
-                        ctx: ExprContext::Load,
-                    }))),
-                    args: vec![create_expr(ExprKind::Tuple(ast::ExprTuple {
-                        elts: words
-                            .iter()
-                            .flat_map(|value| {
-                                if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &value.node {
-                                    Left(elts.iter())
-                                } else {
-                                    Right(iter::once(*value))
-                                }
-                            })
-                            .map(Clone::clone)
-                            .collect(),
-                        ctx: ExprContext::Load,
-                    }))],
+                let node = Expr::Tuple(ast::ExprTuple {
+                    elts: words
+                        .iter()
+                        .flat_map(|value| {
+                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &value {
+                                Left(elts.iter())
+                            } else {
+                                Right(iter::once(*value))
+                            }
+                        })
+                        .map(Clone::clone)
+                        .collect(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                });
+                let node1 = Expr::Name(ast::ExprName {
+                    id: arg_name.into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                });
+                let node2 = Expr::Attribute(ast::ExprAttribute {
+                    value: Box::new(node1),
+                    attr: attr_name.into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                });
+                let node3 = Expr::Call(ast::ExprCall {
+                    func: Box::new(node2),
+                    args: vec![node],
                     keywords: vec![],
-                }));
+                    range: TextRange::default(),
+                });
+                let call = node3;
 
                 // Generate the combined `BoolOp`.
                 let mut call = Some(call);
-                let bool_op = create_expr(ExprKind::BoolOp(ast::ExprBoolOp {
+                let node = Expr::BoolOp(ast::ExprBoolOp {
                     op: Boolop::Or,
                     values: values
                         .iter()
@@ -597,7 +607,9 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                             }
                         })
                         .collect(),
-                }));
+                    range: TextRange::default(),
+                });
+                let bool_op = node;
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
@@ -610,17 +622,20 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PIE807
-pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Lambda(ast::ExprLambda { args, body }) = &expr.node else {
-        panic!("Expected ExprKind::Lambda");
-    };
+pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambda) {
+    let ExprLambda {
+        args,
+        body,
+        range: _,
+    } = expr;
+
     if args.args.is_empty()
         && args.kwonlyargs.is_empty()
         && args.posonlyargs.is_empty()
         && args.vararg.is_none()
         && args.kwarg.is_none()
     {
-        if let ExprKind::List(ast::ExprList { elts, .. }) = &body.node {
+        if let Expr::List(ast::ExprList { elts, .. }) = body.as_ref() {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {

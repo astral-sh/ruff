@@ -1,6 +1,5 @@
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Comprehension, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,18 +26,18 @@ impl Violation for FunctionUsesLoopVariable {
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
     // Tuple of: name, defining expression, and defining range.
-    loaded: Vec<(&'a str, &'a Expr, TextRange)>,
+    loaded: Vec<(&'a str, &'a Expr)>,
     // Tuple of: name, defining expression, and defining range.
-    stored: Vec<(&'a str, &'a Expr, TextRange)>,
+    stored: Vec<(&'a str, &'a Expr)>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::Name(ast::ExprName { id, ctx }) => match ctx {
-                ExprContext::Load => self.loaded.push((id, expr, expr.range())),
-                ExprContext::Store => self.stored.push((id, expr, expr.range())),
+        match &expr {
+            Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
+                ExprContext::Load => self.loaded.push((id, expr)),
+                ExprContext::Store => self.stored.push((id, expr)),
                 ExprContext::Del => {}
             },
             _ => visitor::walk_expr(self, expr),
@@ -48,7 +47,7 @@ impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
 
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
-    names: Vec<(&'a str, &'a Expr, TextRange)>,
+    names: Vec<(&'a str, &'a Expr)>,
     safe_functions: Vec<&'a Expr>,
 }
 
@@ -56,9 +55,9 @@ struct SuspiciousVariablesVisitor<'a> {
 /// functions, but not bound as arguments).
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt.node {
-            StmtKind::FunctionDef(ast::StmtFunctionDef { args, body, .. })
-            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { args, body, .. }) => {
+        match &stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef { args, body, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { args, body, .. }) => {
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
@@ -76,9 +75,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 );
                 return;
             }
-            StmtKind::Return(ast::StmtReturn { value: Some(value) }) => {
+            Stmt::Return(ast::StmtReturn {
+                value: Some(value),
+                range: _,
+            }) => {
                 // Mark `return lambda: x` as safe.
-                if matches!(value.node, ExprKind::Lambda(_)) {
+                if value.is_lambda_expr() {
                     self.safe_functions.push(value);
                 }
             }
@@ -88,44 +90,53 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::Call(ast::ExprCall {
+        match &expr {
+            Expr::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
+                range: _,
             }) => {
-                if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
-                    let id = id.as_str();
-                    if id == "filter" || id == "reduce" || id == "map" {
-                        for arg in args {
-                            if matches!(arg.node, ExprKind::Lambda(_)) {
-                                self.safe_functions.push(arg);
+                match func.as_ref() {
+                    Expr::Name(ast::ExprName { id, .. }) => {
+                        let id = id.as_str();
+                        if id == "filter" || id == "reduce" || id == "map" {
+                            for arg in args {
+                                if matches!(arg, Expr::Lambda(_)) {
+                                    self.safe_functions.push(arg);
+                                }
                             }
                         }
                     }
-                }
-                if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
-                    if attr == "reduce" {
-                        if let ExprKind::Name(ast::ExprName { id, .. }) = &value.node {
-                            if id == "functools" {
-                                for arg in args {
-                                    if matches!(arg.node, ExprKind::Lambda(_)) {
-                                        self.safe_functions.push(arg);
+                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                        if attr == "reduce" {
+                            if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+                                if id == "functools" {
+                                    for arg in args {
+                                        if arg.is_lambda_expr() {
+                                            self.safe_functions.push(arg);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    _ => {}
                 }
+
                 for keyword in keywords {
-                    if keyword.node.arg.as_ref().map_or(false, |arg| arg == "key")
-                        && matches!(keyword.node.value.node, ExprKind::Lambda(_))
+                    if keyword.arg.as_ref().map_or(false, |arg| arg == "key")
+                        && matches!(keyword.value, Expr::Lambda(_))
                     {
-                        self.safe_functions.push(&keyword.node.value);
+                        self.safe_functions.push(&keyword.value);
                     }
                 }
             }
-            ExprKind::Lambda(ast::ExprLambda { args, body }) => {
+            Expr::Lambda(ast::ExprLambda {
+                args,
+                body,
+                range: _,
+            }) => {
                 if !self.safe_functions.contains(&expr) {
                     // Collect all loaded variable names.
                     let mut visitor = LoadedNamesVisitor::default();
@@ -160,15 +171,14 @@ struct NamesFromAssignmentsVisitor<'a> {
 /// `Visitor` to collect all names used in an assignment expression.
 impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::Name(ast::ExprName { id, .. }) => {
+        match &expr {
+            Expr::Name(ast::ExprName { id, .. }) => {
                 self.names.insert(id.as_str());
             }
-            ExprKind::Starred(ast::ExprStarred { value, .. }) => {
+            Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.visit_expr(value);
             }
-            ExprKind::List(ast::ExprList { elts, .. })
-            | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for expr in elts {
                     self.visit_expr(expr);
                 }
@@ -186,26 +196,23 @@ struct AssignedNamesVisitor<'a> {
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if matches!(
-            &stmt.node,
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_)
-        ) {
+        if matches!(&stmt, Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)) {
             // Don't recurse.
             return;
         }
 
-        match &stmt.node {
-            StmtKind::Assign(ast::StmtAssign { targets, .. }) => {
+        match &stmt {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
                 for expr in targets {
                     visitor.visit_expr(expr);
                 }
                 self.names.extend(visitor.names);
             }
-            StmtKind::AugAssign(ast::StmtAugAssign { target, .. })
-            | StmtKind::AnnAssign(ast::StmtAnnAssign { target, .. })
-            | StmtKind::For(ast::StmtFor { target, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
+            Stmt::AugAssign(ast::StmtAugAssign { target, .. })
+            | Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
+            | Stmt::For(ast::StmtFor { target, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
                 visitor.visit_expr(target);
                 self.names.extend(visitor.names);
@@ -217,7 +224,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if matches!(&expr.node, ExprKind::Lambda(_)) {
+        if matches!(&expr, Expr::Lambda(_)) {
             // Don't recurse.
             return;
         }
@@ -260,7 +267,7 @@ pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &
 
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
-        for (name, expr, range) in suspicious_variables {
+        for (name, expr) in suspicious_variables {
             if reassigned_in_loop.contains(name) {
                 if !checker.flake8_bugbear_seen.contains(&expr) {
                     checker.flake8_bugbear_seen.push(expr);
@@ -268,7 +275,7 @@ pub(crate) fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &
                         FunctionUsesLoopVariable {
                             name: name.to_string(),
                         },
-                        range,
+                        expr.range(),
                     ));
                 }
             }

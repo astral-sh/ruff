@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExcepthandlerKind, MatchCase, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, MatchCase, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,41 +20,42 @@ impl Violation for UselessElseOnLoop {
 }
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
-    body.iter().any(|stmt| match &stmt.node {
-        StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+    body.iter().any(|stmt| match &stmt {
+        Stmt::If(ast::StmtIf { body, orelse, .. }) => {
             loop_exits_early(body) || loop_exits_early(orelse)
         }
-        StmtKind::With(ast::StmtWith { body, .. })
-        | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => loop_exits_early(body),
-        StmtKind::Match(ast::StmtMatch { cases, .. }) => cases
+        Stmt::With(ast::StmtWith { body, .. })
+        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => loop_exits_early(body),
+        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
             .iter()
             .any(|MatchCase { body, .. }| loop_exits_early(body)),
-        StmtKind::Try(ast::StmtTry {
+        Stmt::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
+            ..
         })
-        | StmtKind::TryStar(ast::StmtTryStar {
+        | Stmt::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
+            ..
         }) => {
             loop_exits_early(body)
                 || loop_exits_early(orelse)
                 || loop_exits_early(finalbody)
-                || handlers.iter().any(|handler| match &handler.node {
-                    ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-                        body,
-                        ..
+                || handlers.iter().any(|handler| match &handler {
+                    Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                        body, ..
                     }) => loop_exits_early(body),
                 })
         }
-        StmtKind::For(ast::StmtFor { orelse, .. })
-        | StmtKind::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-        | StmtKind::While(ast::StmtWhile { orelse, .. }) => loop_exits_early(orelse),
-        StmtKind::Break => true,
+        Stmt::For(ast::StmtFor { orelse, .. })
+        | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
+        | Stmt::While(ast::StmtWhile { orelse, .. }) => loop_exits_early(orelse),
+        Stmt::Break(_) => true,
         _ => false,
     })
 }

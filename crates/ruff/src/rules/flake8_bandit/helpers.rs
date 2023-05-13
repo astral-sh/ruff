@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr};
 
 use crate::checkers::ast::Checker;
 
@@ -9,8 +9,8 @@ static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 pub(crate) fn string_literal(expr: &Expr) -> Option<&str> {
-    match &expr.node {
-        ExprKind::Constant(ast::ExprConstant {
+    match &expr {
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str(string),
             ..
         }) => Some(string),
@@ -24,7 +24,7 @@ pub(crate) fn matches_password_name(string: &str) -> bool {
 
 pub(crate) fn is_untyped_exception(type_: Option<&Expr>, checker: &Checker) -> bool {
     type_.map_or(true, |type_| {
-        if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &type_.node {
+        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
                 checker
                     .ctx

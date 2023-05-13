@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,46 +25,48 @@ impl Violation for TooManyStatements {
 fn num_statements(stmts: &[Stmt]) -> usize {
     let mut count = 0;
     for stmt in stmts {
-        match &stmt.node {
-            StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+        match &stmt {
+            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
                 count += 1;
                 count += num_statements(body);
                 if let Some(stmt) = orelse.first() {
                     // `elif:` and `else: if:` have the same AST representation.
                     // Avoid treating `elif:` as two statements.
-                    if !matches!(stmt.node, StmtKind::If(_)) {
+                    if !matches!(stmt, Stmt::If(_)) {
                         count += 1;
                     }
                     count += num_statements(orelse);
                 }
             }
-            StmtKind::For(ast::StmtFor { body, orelse, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
+            Stmt::For(ast::StmtFor { body, orelse, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. }) => {
                 count += num_statements(body);
                 count += num_statements(orelse);
             }
-            StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
+            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 count += 1;
                 count += num_statements(body);
                 count += num_statements(orelse);
             }
-            StmtKind::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 count += 1;
                 for case in cases {
                     count += num_statements(&case.body);
                 }
             }
-            StmtKind::Try(ast::StmtTry {
+            Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             })
-            | StmtKind::TryStar(ast::StmtTryStar {
+            | Stmt::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             }) => {
                 count += 1;
                 count += num_statements(body);
@@ -80,20 +82,19 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 }
                 for handler in handlers {
                     count += 1;
-                    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-                        body,
-                        ..
-                    }) = &handler.node;
+                    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                        body, ..
+                    }) = &handler;
                     count += num_statements(body);
                 }
             }
-            StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
-            | StmtKind::With(ast::StmtWith { body, .. }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
+            | Stmt::With(ast::StmtWith { body, .. }) => {
                 count += 1;
                 count += num_statements(body);
             }
-            StmtKind::Return(_) => {}
+            Stmt::Return(_) => {}
             _ => {
                 count += 1;
             }

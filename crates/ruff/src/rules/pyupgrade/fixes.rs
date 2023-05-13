@@ -4,7 +4,7 @@ use libcst_native::{
     SmallStatement, Statement, Suite,
 };
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;

@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Violation};
@@ -93,17 +93,15 @@ pub(crate) fn unnecessary_map(
             }
 
             // Exclude the parent if already matched by other arms
-            if let Some(parent) = parent {
-                if let ExprKind::Call(ast::ExprCall { func: f, .. }) = &parent.node {
-                    if let Some(id_parent) = helpers::expr_name(f) {
-                        if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
-                            return;
-                        }
+            if let Some(Expr::Call(ast::ExprCall { func: f, .. })) = parent {
+                if let Some(id_parent) = helpers::expr_name(f) {
+                    if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
+                        return;
                     }
-                };
+                }
             };
 
-            if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda(_)) {
+            if args.len() == 2 && matches!(&args[0], Expr::Lambda(_)) {
                 let mut diagnostic = create_diagnostic("generator", expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
@@ -125,30 +123,28 @@ pub(crate) fn unnecessary_map(
                 return;
             }
 
-            if let Some(arg) = args.first() {
-                if let ExprKind::Call(ast::ExprCall { func, args, .. }) = &arg.node {
-                    if args.len() != 2 {
-                        return;
-                    }
-                    let Some(argument) = helpers::first_argument_with_matching_function("map", func, args) else {
+            if let Some(Expr::Call(ast::ExprCall { func, args, .. })) = args.first() {
+                if args.len() != 2 {
+                    return;
+                }
+                let Some(argument) = helpers::first_argument_with_matching_function("map", func, args) else {
                         return;
                     };
-                    if let ExprKind::Lambda(_) = argument {
-                        let mut diagnostic = create_diagnostic(id, expr.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.try_set_fix_from_edit(|| {
-                                fixes::fix_unnecessary_map(
-                                    checker.locator,
-                                    checker.stylist,
-                                    expr,
-                                    parent,
-                                    id,
-                                )
-                            });
-                        }
-                        checker.diagnostics.push(diagnostic);
+                if let Expr::Lambda(_) = argument {
+                    let mut diagnostic = create_diagnostic(id, expr.range());
+                    if checker.patch(diagnostic.kind.rule()) {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
+                            fixes::fix_unnecessary_map(
+                                checker.locator,
+                                checker.stylist,
+                                expr,
+                                parent,
+                                id,
+                            )
+                        });
                     }
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }
@@ -158,12 +154,12 @@ pub(crate) fn unnecessary_map(
             }
 
             if args.len() == 1 {
-                if let ExprKind::Call(ast::ExprCall { func, args, .. }) = &args[0].node {
+                if let Expr::Call(ast::ExprCall { func, args, .. }) = &args[0] {
                     let Some(argument) = helpers::first_argument_with_matching_function("map", func, args) else {
                         return;
                     };
-                    if let ExprKind::Lambda(ast::ExprLambda { body, .. }) = &argument {
-                        if matches!(&body.node, ExprKind::Tuple(ast::ExprTuple { elts, .. }) | ExprKind::List(ast::ExprList { elts, .. } )if elts.len() == 2)
+                    if let Expr::Lambda(ast::ExprLambda { body, .. }) = argument {
+                        if matches!(body.as_ref(), Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. } ) if elts.len() == 2)
                         {
                             let mut diagnostic = create_diagnostic(id, expr.range());
                             if checker.patch(diagnostic.kind.rule()) {

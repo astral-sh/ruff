@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -28,14 +28,13 @@ impl AlwaysAutofixableViolation for YieldInForLoop {
 /// Return `true` if the two expressions are equivalent, and consistent solely
 /// of tuples and names.
 fn is_same_expr(a: &Expr, b: &Expr) -> bool {
-    match (&a.node, &b.node) {
+    match (&a, &b) {
+        (Expr::Name(ast::ExprName { id: a, .. }), Expr::Name(ast::ExprName { id: b, .. })) => {
+            a == b
+        }
         (
-            ExprKind::Name(ast::ExprName { id: a, .. }),
-            ExprKind::Name(ast::ExprName { id: b, .. }),
-        ) => a == b,
-        (
-            ExprKind::Tuple(ast::ExprTuple { elts: a, .. }),
-            ExprKind::Tuple(ast::ExprTuple { elts: b, .. }),
+            Expr::Tuple(ast::ExprTuple { elts: a, .. }),
+            Expr::Tuple(ast::ExprTuple { elts: b, .. }),
         ) => a.len() == b.len() && a.iter().zip(b).all(|(a, b)| is_same_expr(a, b)),
         _ => false,
     }
@@ -44,12 +43,10 @@ fn is_same_expr(a: &Expr, b: &Expr) -> bool {
 /// Collect all named variables in an expression consisting solely of tuples and
 /// names.
 fn collect_names(expr: &Expr) -> Vec<&str> {
-    match &expr.node {
-        ExprKind::Name(ast::ExprName { id, .. }) => vec![id],
-        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().flat_map(collect_names).collect()
-        }
-        _ => panic!("Expected: ExprKind::Name | ExprKind::Tuple"),
+    match &expr {
+        Expr::Name(ast::ExprName { id, .. }) => vec![id],
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().flat_map(collect_names).collect(),
+        _ => panic!("Expected: Expr::Name | Expr::Tuple"),
     }
 }
 
@@ -68,8 +65,8 @@ struct YieldFromVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt.node {
-            StmtKind::For(ast::StmtFor {
+        match &stmt {
+            Stmt::For(ast::StmtFor {
                 target,
                 body,
                 orelse,
@@ -86,8 +83,12 @@ impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
                 }
                 // If the body is not a yield, don't rewrite.
                 let body = &body[0];
-                if let StmtKind::Expr(ast::StmtExpr { value }) = &body.node {
-                    if let ExprKind::Yield(ast::ExprYield { value: Some(value) }) = &value.node {
+                if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body {
+                    if let Expr::Yield(ast::ExprYield {
+                        value: Some(value),
+                        range: _,
+                    }) = value.as_ref()
+                    {
                         if is_same_expr(target, value) {
                             self.yields.push(YieldFrom {
                                 stmt,
@@ -99,7 +100,7 @@ impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
                     }
                 }
             }
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) | StmtKind::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse into anything that defines a new scope.
             }
             _ => statement_visitor::walk_stmt(self, stmt),
@@ -122,8 +123,8 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::Name(ast::ExprName { id, ctx }) => {
+        match &expr {
+            Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 if matches!(ctx, ExprContext::Load | ExprContext::Del) {
                     if let Some(parent) = self.parent {
                         self.references
@@ -141,7 +142,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
 /// UP028
 pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
     // Intentionally omit async functions.
-    if let StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. }) = &stmt.node {
+    if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) = &stmt {
         let yields = {
             let mut visitor = YieldFromVisitor::default();
             visitor.visit_body(body);

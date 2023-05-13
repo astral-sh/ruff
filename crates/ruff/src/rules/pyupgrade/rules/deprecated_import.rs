@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Alias, AliasData, Stmt};
+use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -261,7 +261,7 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
 struct ImportReplacer<'a> {
     stmt: &'a Stmt,
     module: &'a str,
-    members: &'a [AliasData],
+    members: &'a [Alias],
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
     version: PythonVersion,
@@ -271,7 +271,7 @@ impl<'a> ImportReplacer<'a> {
     const fn new(
         stmt: &'a Stmt,
         module: &'a str,
-        members: &'a [AliasData],
+        members: &'a [Alias],
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
         version: PythonVersion,
@@ -475,7 +475,7 @@ impl<'a> ImportReplacer<'a> {
     }
 
     /// Partitions imports into matched and unmatched names.
-    fn partition_imports(&self, candidates: &[&str]) -> (Vec<&AliasData>, Vec<&AliasData>) {
+    fn partition_imports(&self, candidates: &[&str]) -> (Vec<&Alias>, Vec<&Alias>) {
         let mut matched_names = vec![];
         let mut unmatched_names = vec![];
         for name in self.members {
@@ -490,7 +490,7 @@ impl<'a> ImportReplacer<'a> {
 
     /// Converts a list of names and a module into an `import from`-style
     /// import.
-    fn format_import_from(names: &[&AliasData], module: &str) -> String {
+    fn format_import_from(names: &[&Alias], module: &str) -> String {
         // Construct the whitespace strings.
         // Generate the formatted names.
         let full_names: String = names
@@ -516,7 +516,7 @@ pub(crate) fn deprecated_import(
     if level.map_or(false, |level| level > 0) {
         return;
     }
-    if names.first().map_or(false, |name| &name.node.name == "*") {
+    if names.first().map_or(false, |name| &name.name == "*") {
         return;
     }
     let Some(module) = module else {
@@ -527,7 +527,7 @@ pub(crate) fn deprecated_import(
         return;
     }
 
-    let members: Vec<AliasData> = names.iter().map(|alias| alias.node.clone()).collect();
+    let members: Vec<Alias> = names.iter().map(std::clone::Clone::clone).collect();
     let fixer = ImportReplacer::new(
         stmt,
         module,

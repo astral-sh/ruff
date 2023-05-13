@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Result};
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

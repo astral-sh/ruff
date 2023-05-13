@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -93,15 +93,12 @@ pub(crate) fn logging_call(
     keywords: &[Keyword],
 ) {
     // If there are any starred arguments, abort.
-    if args
-        .iter()
-        .any(|arg| matches!(arg.node, ExprKind::Starred(_)))
-    {
+    if args.iter().any(|arg| matches!(arg, Expr::Starred(_))) {
         return;
     }
 
     // If there are any starred keyword arguments, abort.
-    if keywords.iter().any(|keyword| keyword.node.arg.is_none()) {
+    if keywords.iter().any(|keyword| keyword.arg.is_none()) {
         return;
     }
 
@@ -109,42 +106,40 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &func {
         if LoggingLevel::from_attribute(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
-            if let Some(msg) = call_args.argument("msg", 0) {
-                if let ExprKind::Constant(ast::ExprConstant {
-                    value: Constant::Str(value),
-                    ..
-                }) = &msg.node
-                {
-                    if let Ok(summary) = CFormatSummary::try_from(value.as_str()) {
-                        if summary.starred {
-                            return;
-                        }
-                        if !summary.keywords.is_empty() {
-                            return;
-                        }
+            if let Some(Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(value),
+                ..
+            })) = call_args.argument("msg", 0)
+            {
+                if let Ok(summary) = CFormatSummary::try_from(value.as_str()) {
+                    if summary.starred {
+                        return;
+                    }
+                    if !summary.keywords.is_empty() {
+                        return;
+                    }
 
-                        let message_args = call_args.args.len() - 1;
+                    let message_args = call_args.args.len() - 1;
 
-                        if checker.settings.rules.enabled(Rule::LoggingTooManyArgs) {
-                            if summary.num_positional < message_args {
-                                checker
-                                    .diagnostics
-                                    .push(Diagnostic::new(LoggingTooManyArgs, func.range()));
-                            }
+                    if checker.settings.rules.enabled(Rule::LoggingTooManyArgs) {
+                        if summary.num_positional < message_args {
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(LoggingTooManyArgs, func.range()));
                         }
+                    }
 
-                        if checker.settings.rules.enabled(Rule::LoggingTooFewArgs) {
-                            if message_args > 0
-                                && call_args.kwargs.is_empty()
-                                && summary.num_positional > message_args
-                            {
-                                checker
-                                    .diagnostics
-                                    .push(Diagnostic::new(LoggingTooFewArgs, func.range()));
-                            }
+                    if checker.settings.rules.enabled(Rule::LoggingTooFewArgs) {
+                        if message_args > 0
+                            && call_args.kwargs.is_empty()
+                            && summary.num_positional > message_args
+                        {
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(LoggingTooFewArgs, func.range()));
                         }
                     }
                 }

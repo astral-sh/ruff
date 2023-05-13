@@ -1,5 +1,5 @@
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -50,8 +50,8 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr.node {
-            ExprKind::Name(ast::ExprName { id, .. }) => {
+        match &expr {
+            Expr::Name(ast::ExprName { id, .. }) => {
                 if self.names.contains(&id.as_str()) {
                     self.uses_args = true;
                 }
@@ -72,20 +72,24 @@ fn check_patch_call(
         return None;
     }
 
-    if let Some(new_arg) = simple_args.argument("new", new_arg_number) {
-        if let ExprKind::Lambda(ast::ExprLambda { args, body }) = &new_arg.node {
-            // Walk the lambda body.
-            let mut visitor = LambdaBodyVisitor {
-                names: collect_arg_names(args),
-                uses_args: false,
-            };
-            visitor.visit_expr(body);
+    if let Some(Expr::Lambda(ast::ExprLambda {
+        args,
+        body,
+        range: _,
+    })) = simple_args.argument("new", new_arg_number)
+    {
+        // Walk the lambda body.
+        let mut visitor = LambdaBodyVisitor {
+            names: collect_arg_names(args),
+            uses_args: false,
+        };
+        visitor.visit_expr(body);
 
-            if !visitor.uses_args {
-                return Some(Diagnostic::new(PytestPatchWithLambda, call.range()));
-            }
+        if !visitor.uses_args {
+            return Some(Diagnostic::new(PytestPatchWithLambda, call.range()));
         }
     }
+
     None
 }
 

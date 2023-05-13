@@ -3,7 +3,7 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Stmt, StmtKind, Suite};
+use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -71,7 +71,7 @@ impl<'a> Importer<'a> {
         }
     }
 
-    /// Return the top-level [`Stmt`] that imports the given module using `StmtKind::ImportFrom`
+    /// Return the top-level [`Stmt`] that imports the given module using `Stmt::ImportFrom`
     /// preceding the given position, if any.
     pub fn find_import_from(&self, module: &str, at: TextSize) -> Option<&Stmt> {
         let mut import_from = None;
@@ -79,11 +79,11 @@ impl<'a> Importer<'a> {
             if stmt.start() >= at {
                 break;
             }
-            if let StmtKind::ImportFrom(ast::StmtImportFrom {
+            if let Stmt::ImportFrom(ast::StmtImportFrom {
                 module: name,
                 level,
                 ..
-            }) = &stmt.node
+            }) = &stmt
             {
                 if level.map_or(true, |level| level.to_u32() == 0)
                     && name.as_ref().map_or(false, |name| name == module)
@@ -95,7 +95,7 @@ impl<'a> Importer<'a> {
         import_from
     }
 
-    /// Add the given member to an existing `StmtKind::ImportFrom` statement.
+    /// Add the given member to an existing `Stmt::ImportFrom` statement.
     pub fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
         let mut tree = match_module(self.locator.slice(stmt.range()))?;
         let import_from = match_import_from(&mut tree)?;
