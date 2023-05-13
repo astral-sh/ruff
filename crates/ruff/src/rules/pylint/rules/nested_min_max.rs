@@ -77,7 +77,18 @@ fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec
                     continue;
                 }
             }
-            new_args.push(arg.clone());
+            let new_arg = if arg.is_generator_exp_expr() {
+                Expr::new(
+                    TextRange::default(),
+                    ast::ExprStarred {
+                        value: Box::new(arg.clone()),
+                        ctx: ast::ExprContext::Load,
+                    },
+                )
+            } else {
+                arg.clone()
+            };
+            new_args.push(new_arg);
         }
     }
 

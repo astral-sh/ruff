@@ -191,7 +191,42 @@ nested_min_max.py:18:1: PLW3301 Nested `min` calls can be flattened
 21 | |     min(2, 3),
 22 | | )
    | |_^ PLW3301
+23 |   
+24 |   # Handle generator expressions.
    |
    = help: Flatten nested `min` calls
+
+nested_min_max.py:24:1: PLW3301 [*] Nested `min` calls can be flattened
+   |
+24 | # Handle generator expressions.
+25 | min(1, min(i for i in range(10)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+26 | max(1, max(i for i in range(10)))
+   |
+   = help: Flatten nested `min` calls
+
+ℹ Suggested fix
+21 21 | )
+22 22 | 
+23 23 | # Handle generator expressions.
+24    |-min(1, min(i for i in range(10)))
+   24 |+min(1, *(i for i in range(10)))
+25 25 | max(1, max(i for i in range(10)))
+
+nested_min_max.py:25:1: PLW3301 [*] Nested `max` calls can be flattened
+   |
+25 | # Handle generator expressions.
+26 | min(1, min(i for i in range(10)))
+27 | max(1, max(i for i in range(10)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+   |
+   = help: Flatten nested `max` calls
+
+ℹ Suggested fix
+22 22 | 
+23 23 | # Handle generator expressions.
+24 24 | min(1, min(i for i in range(10)))
+25    |-max(1, max(i for i in range(10)))
+   25 |+max(1, *(i for i in range(10)))
 
 
