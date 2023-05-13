@@ -17,7 +17,7 @@ import re
 import tempfile
 import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from contextlib import nullcontext
+from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple, Self
 
@@ -37,6 +37,7 @@ class Repository(NamedTuple):
     ignore: str = ""
     exclude: str = ""
 
+    @asynccontextmanager
     async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
         """Shallow clone this repository to a temporary directory."""
         if checkout_dir.exists():
