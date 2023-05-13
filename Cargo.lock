@@ -2001,7 +2001,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/RustPython/Parser.git?rev=735c06d5f43da05d191f32442224f082f1d202ee#735c06d5f43da05d191f32442224f082f1d202ee"
 dependencies = [
  "schemars",
  "serde",
@@ -2072,7 +2072,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/RustPython/Parser.git?rev=735c06d5f43da05d191f32442224f082f1d202ee#735c06d5f43da05d191f32442224f082f1d202ee"
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -2083,7 +2083,7 @@ dependencies = [
 [[package]]
 name = "rustpython-format"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/RustPython/Parser.git?rev=735c06d5f43da05d191f32442224f082f1d202ee#735c06d5f43da05d191f32442224f082f1d202ee"
 dependencies = [
  "bitflags 2.2.1",
  "itertools",
@@ -2095,7 +2095,7 @@ dependencies = [
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/RustPython/Parser.git?rev=735c06d5f43da05d191f32442224f082f1d202ee#735c06d5f43da05d191f32442224f082f1d202ee"
 dependencies = [
  "hexf-parse",
  "lexical-parse-float",
@@ -2106,7 +2106,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/RustPython/Parser.git?rev=735c06d5f43da05d191f32442224f082f1d202ee#735c06d5f43da05d191f32442224f082f1d202ee"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2128,7 +2128,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/RustPython/Parser.git?rev=735c06d5f43da05d191f32442224f082f1d202ee#735c06d5f43da05d191f32442224f082f1d202ee"
 dependencies = [
  "ruff_text_size",
 ]
