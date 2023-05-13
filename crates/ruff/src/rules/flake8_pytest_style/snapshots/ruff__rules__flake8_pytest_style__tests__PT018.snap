@@ -269,4 +269,39 @@ PT018.py:35:5: PT018 Assertion should be broken down into multiple parts
    |
    = help: Break down assertion into multiple parts
 
+PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
+   |
+45 | assert something  # OK
+46 | assert something and something_else  # Error
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+47 | assert something and something_else and something_third  # Error
+   |
+   = help: Break down assertion into multiple parts
+
+ℹ Suggested fix
+42 42 | 
+43 43 | 
+44 44 | assert something  # OK
+45    |-assert something and something_else  # Error
+   45 |+assert something
+   46 |+assert something_else
+46 47 | assert something and something_else and something_third  # Error
+
+PT018.py:46:1: PT018 [*] Assertion should be broken down into multiple parts
+   |
+46 | assert something  # OK
+47 | assert something and something_else  # Error
+48 | assert something and something_else and something_third  # Error
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |
+   = help: Break down assertion into multiple parts
+
+ℹ Suggested fix
+43 43 | 
+44 44 | assert something  # OK
+45 45 | assert something and something_else  # Error
+46    |-assert something and something_else and something_third  # Error
+   46 |+assert something and something_else
+   47 |+assert something_third
+
 
