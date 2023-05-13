@@ -236,7 +236,7 @@ Rule selection:
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
       --extend-per-file-ignores <EXTEND_PER_FILE_IGNORES>
-          List of mappings from file pattern to code to exclude
+          List of mappings from file pattern to code to exclude, on top of those already specified with per-file-ignores
       --fixable <RULE_CODE>
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>
