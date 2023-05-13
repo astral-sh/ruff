@@ -7,8 +7,8 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, pycodestyle,
-    pylint, pyupgrade, ruff,
+    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, flake8_todos,
+    pycodestyle, pylint, pyupgrade, ruff,
 };
 use crate::settings::Settings;
 use ruff_diagnostics::Diagnostic;
@@ -59,6 +59,15 @@ pub(crate) fn check_tokens(
     ]);
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
+    let enforce_todos = settings.rules.any_enabled(&[
+        Rule::InvalidTodoTag,
+        Rule::MissingTodoAuthor,
+        Rule::MissingTodoLink,
+        Rule::MissingTodoColon,
+        Rule::MissingTodoDescription,
+        Rule::InvalidTodoCapitalization,
+        Rule::MissingSpaceAfterTodoColon,
+    ]);
 
     // RUF001, RUF002, RUF003
     if enforce_ambiguous_unicode_character {
@@ -177,6 +186,15 @@ pub(crate) fn check_tokens(
     // PYI033
     if enforce_type_comment_in_stub && is_stub {
         diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(tokens));
+    }
+
+    // TD001, TD002, TD003, TD004, TD005, TD006, TD007
+    if enforce_todos {
+        diagnostics.extend(
+            flake8_todos::rules::todos(tokens, settings)
+                .into_iter()
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
     }
 
     diagnostics
