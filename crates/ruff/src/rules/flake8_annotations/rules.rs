@@ -434,11 +434,11 @@ fn check_dynamically_typed<F>(
     annotation: &Expr,
     func: F,
     diagnostics: &mut Vec<Diagnostic>,
-    is_overriden: bool,
+    is_overridden: bool,
 ) where
     F: FnOnce() -> String,
 {
-    if !is_overriden && checker.ctx.match_typing_expr(annotation, "Any") {
+    if !is_overridden && checker.ctx.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
             AnyType { name: func() },
             annotation.range(),
@@ -479,7 +479,7 @@ pub(crate) fn definition(
     // unless configured to suppress ANN* for declarations that are fully untyped.
     let mut diagnostics = Vec::new();
 
-    let is_overriden = visibility::is_override(&checker.ctx, decorator_list);
+    let is_overridden = visibility::is_override(&checker.ctx, decorator_list);
 
     // ANN001, ANN401
     for arg in args
@@ -503,7 +503,7 @@ pub(crate) fn definition(
                     annotation,
                     || arg.node.arg.to_string(),
                     &mut diagnostics,
-                    is_overriden,
+                    is_overridden,
                 );
             }
         } else {
@@ -538,7 +538,7 @@ pub(crate) fn definition(
                         expr,
                         || format!("*{name}"),
                         &mut diagnostics,
-                        is_overriden,
+                        is_overridden,
                     );
                 }
             }
@@ -570,7 +570,7 @@ pub(crate) fn definition(
                         expr,
                         || format!("**{name}"),
                         &mut diagnostics,
-                        is_overriden,
+                        is_overridden,
                     );
                 }
             }
@@ -628,7 +628,7 @@ pub(crate) fn definition(
                 expr,
                 || name.to_string(),
                 &mut diagnostics,
-                is_overriden,
+                is_overridden,
             );
         }
     } else if !(
