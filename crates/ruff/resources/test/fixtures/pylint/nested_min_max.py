@@ -20,6 +20,8 @@ min(
     min(2, 3),
 )
 
-# Handle generator expressions.
+# Handle iterable expressions.
+min(1, min(a))
 min(1, min(i for i in range(10)))
+max(1, max(a))
 max(1, max(i for i in range(10)))
