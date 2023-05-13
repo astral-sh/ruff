@@ -223,27 +223,70 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
-    RegexSet::new([
-        r#"^#\s*(?i)(TODO).*$"#,
-        r#"^#\s*(?i)(FIXME).*$"#,
-        r#"^#\s*(?i)(XXX).*$"#,
-    ])
-    .unwrap()
-});
+enum Directive {
+    Todo,
+    Fixme,
+    Xxx,
+}
 
-// Maps the index of a particular Regex (specified by its index in the above TODO_REGEX_SET slice)
-// to the length of the tag that we're trying to capture.
-static PATTERN_TAG_LENGTH: &[usize; 3] = &["TODO".len(), "FIXME".len(), "XXX".len()];
+impl Directive {
+    /// Extract a [`Directive`] from a comment.
+    ///
+    /// Returns the offset of the directive within the comment, and the matching directive tag.
+    fn from_comment(comment: &str) -> Option<(usize, Directive)> {
+        let mut chars = comment.chars().peekable();
+        let mut offset = 0;
 
-static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
-    let patterns: [&str; 3] = [
-        r#"^#\s*(http|https)://.*"#, // issue link
-        r#"^#\s*\d+$"#,              // issue code - like "003"
-        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003" or "TD-003"
-    ];
-    RegexSet::new(patterns).unwrap()
-});
+        // Detect the leading `#`.
+        if chars.next() == Some('#') {
+            offset += 1;
+        } else {
+            return None;
+        }
+
+        // Skip any whitespace after the leading `#`.
+        while let Some(c) = chars.peek() {
+            if !c.is_whitespace() {
+                break;
+            }
+            offset += c.len_utf8();
+            chars.next();
+        }
+
+        // Match the directive itself.
+        match (
+            chars.next(),
+            chars.next(),
+            chars.next(),
+            chars.next(),
+            chars.next(),
+        ) {
+            (
+                Some('F' | 'f'),
+                Some('I' | 'i'),
+                Some('X' | 'x'),
+                Some('M' | 'm'),
+                Some('E' | 'e'),
+            ) => Some((offset, Directive::Fixme)),
+            (Some('T' | 't'), Some('O' | 'o'), Some('D' | 'd'), Some('O' | 'o'), ..) => {
+                Some((offset, Directive::Todo))
+            }
+            (Some('X' | 'x'), Some('X' | 'x'), Some('X' | 'x'), ..) => {
+                Some((offset, Directive::Xxx))
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the length of the directive tag.
+    fn len(&self) -> usize {
+        match self {
+            Directive::Fixme => 5,
+            Directive::Todo => 4,
+            Directive::Xxx => 3,
+        }
+    }
+}
 
 // If this struct ever gets pushed outside of this module, it may be worth creating an enum for
 // the different tag types + other convenience methods.
@@ -253,6 +296,15 @@ struct Tag<'a> {
     range: TextRange,
     content: &'a str,
 }
+
+static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+    RegexSet::new([
+        r#"^#\s*(http|https)://.*"#, // issue link
+        r#"^#\s*\d+$"#,              // issue code - like "003"
+        r#"^#\s*[A-Z]{1,6}\-?\d+$"#, // issue code - like "TD003" or "TD-003"
+    ])
+    .unwrap()
+});
 
 pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -296,26 +348,15 @@ pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic
 
 /// Returns the tag pulled out of a given comment, if it exists.
 fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<'a>> {
-    let Some(regex_index) = TODO_REGEX_SET.matches(comment).into_iter().next() else {
+    let Some((offset, directive)) = Directive::from_comment(comment) else {
         return None;
     };
 
-    let tag_length = PATTERN_TAG_LENGTH[regex_index];
-
-    let mut tag_start_offset = 0usize;
-    for (i, char) in comment.chars().enumerate() {
-        // Regex ensures that the first letter in the comment is the first letter of the tag.
-        if char.is_alphabetic() {
-            tag_start_offset = i;
-            break;
-        }
-    }
-
     Some(Tag {
-        content: &comment[tag_start_offset..tag_start_offset + tag_length],
+        content: &comment[offset..offset + directive.len()],
         range: TextRange::at(
-            comment_range.start() + TextSize::try_from(tag_start_offset).ok().unwrap(),
-            TextSize::try_from(tag_length).ok().unwrap(),
+            comment_range.start() + TextSize::try_from(offset).ok().unwrap(),
+            TextSize::try_from(directive.len()).ok().unwrap(),
         ),
     })
 }
