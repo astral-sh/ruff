@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -246,7 +247,7 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 
 // If this struct ever gets pushed outside of this module, it may be worth creating an enum for
 // the different tag types + other convenience methods.
-/// Represents a TODO tag or any of its variants - FIXME, XXX, BUG, TODO.
+/// Represents a TODO tag or any of its variants - FIXME, XXX, TODO.
 #[derive(Debug, PartialEq, Eq)]
 struct Tag<'a> {
     range: TextRange,
@@ -256,7 +257,7 @@ struct Tag<'a> {
 pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let mut iter = tokens.iter().flatten().peekable();
+    let mut iter = tokens.iter().flatten().multipeek();
     while let Some((token, token_range)) = iter.next() {
         let Tok::Comment(comment) = token else {
             continue;
@@ -267,20 +268,25 @@ pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic
             continue;
         };
 
-        check_for_tag_errors(&tag, &mut diagnostics, settings);
-        check_for_static_errors(&mut diagnostics, comment, *token_range, &tag);
+        tag_errors(&tag, &mut diagnostics, settings);
+        static_errors(&mut diagnostics, comment, *token_range, &tag);
 
         // TD003
-        if let Some((next_token, _next_range)) = iter.peek() {
-            if let Tok::Comment(next_comment) = next_token {
-                if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
-                    continue;
+        let mut has_issue_link = false;
+        while let Some((token, token_range)) = iter.peek() {
+            if let Tok::Comment(comment) = token {
+                if detect_tag(comment, token_range).is_some() {
+                    break;
                 }
+                if ISSUE_LINK_REGEX_SET.is_match(comment) {
+                    has_issue_link = true;
+                    break;
+                }
+            } else {
+                break;
             }
-
-            diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
-        } else {
-            // There's a TODO on the last line of the file, so there can't be a link after it.
+        }
+        if !has_issue_link {
             diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
         }
     }
@@ -314,15 +320,15 @@ fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<
     })
 }
 
-/// Check that the tag is valid. This function modifies `diagnostics` in-place.
-fn check_for_tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: &Settings) {
+/// Check that the tag itself is valid. This function modifies `diagnostics` in-place.
+fn tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: &Settings) {
     if tag.content == "TODO" {
         return;
     }
 
     if tag.content.to_uppercase() == "TODO" {
         // TD006
-        let mut invalid_capitalization = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             InvalidTodoCapitalization {
                 tag: tag.content.to_string(),
             },
@@ -330,13 +336,13 @@ fn check_for_tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: 
         );
 
         if settings.rules.should_fix(Rule::InvalidTodoCapitalization) {
-            invalid_capitalization.set_fix(Fix::automatic(Edit::range_replacement(
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 "TODO".to_string(),
                 tag.range,
             )));
         }
 
-        diagnostics.push(invalid_capitalization);
+        diagnostics.push(diagnostic);
     } else {
         // TD001
         diagnostics.push(Diagnostic::new(
@@ -348,9 +354,9 @@ fn check_for_tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: 
     }
 }
 
-/// Checks for "static" errors in the comment - missing colon, missing author, etc. This function
+/// Checks for "static" errors in the comment: missing colon, missing author, etc. This function
 /// modifies `diagnostics` in-place.
-fn check_for_static_errors(
+fn static_errors(
     diagnostics: &mut Vec<Diagnostic>,
     comment: &str,
     comment_range: TextRange,
@@ -375,7 +381,7 @@ fn check_for_static_errors(
 
     let post_author = &post_tag[usize::from(author_end)..];
 
-    let post_colon = if let Some((_colon, after_colon)) = post_author.split_once(':') {
+    let post_colon = if let Some((.., after_colon)) = post_author.split_once(':') {
         if let Some(stripped) = after_colon.strip_prefix(' ') {
             stripped
         } else {
