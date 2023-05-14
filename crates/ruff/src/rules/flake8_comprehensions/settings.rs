@@ -2,11 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
-use crate::settings::configuration::CombinePluginOptions;
-
-#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
@@ -44,16 +44,6 @@ impl From<Settings> for Options {
             allow_dict_calls_with_keyword_arguments: Some(
                 settings.allow_dict_calls_with_keyword_arguments,
             ),
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            allow_dict_calls_with_keyword_arguments: self
-                .allow_dict_calls_with_keyword_arguments
-                .or(other.allow_dict_calls_with_keyword_arguments),
         }
     }
 }

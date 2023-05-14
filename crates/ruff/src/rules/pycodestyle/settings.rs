@@ -1,11 +1,11 @@
 //! Settings for the `pycodestyle` plugin.
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 use serde::{Deserialize, Serialize};
 
-use crate::settings::configuration::CombinePluginOptions;
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case", rename = "Pycodestyle")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
@@ -54,17 +54,6 @@ impl From<Settings> for Options {
         Self {
             max_doc_length: settings.max_doc_length,
             ignore_overlong_task_comments: Some(settings.ignore_overlong_task_comments),
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            max_doc_length: self.max_doc_length.or(other.max_doc_length),
-            ignore_overlong_task_comments: self
-                .ignore_overlong_task_comments
-                .or(other.ignore_overlong_task_comments),
         }
     }
 }

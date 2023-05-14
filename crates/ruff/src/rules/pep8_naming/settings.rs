@@ -1,9 +1,7 @@
 //! Settings for the `pep8-naming` plugin.
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 use serde::{Deserialize, Serialize};
-
-use crate::settings::configuration::CombinePluginOptions;
 
 const IGNORE_NAMES: [&str; 12] = [
     "setUp",
@@ -20,7 +18,9 @@ const IGNORE_NAMES: [&str; 12] = [
     "maxDiff",
 ];
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
@@ -104,18 +104,6 @@ impl From<Settings> for Options {
             ignore_names: Some(settings.ignore_names),
             classmethod_decorators: Some(settings.classmethod_decorators),
             staticmethod_decorators: Some(settings.staticmethod_decorators),
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            ignore_names: self.ignore_names.or(other.ignore_names),
-            classmethod_decorators: self.classmethod_decorators.or(other.classmethod_decorators),
-            staticmethod_decorators: self
-                .staticmethod_decorators
-                .or(other.staticmethod_decorators),
         }
     }
 }

@@ -3,9 +3,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
-
-use crate::settings::configuration::CombinePluginOptions;
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
@@ -22,7 +20,9 @@ const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("pyarrow", "pa"),
 ];
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
@@ -131,17 +131,6 @@ impl From<Settings> for Options {
             extend_aliases: None,
             banned_aliases: None,
             banned_from: None,
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            aliases: self.aliases.or(other.aliases),
-            extend_aliases: self.extend_aliases.or(other.extend_aliases),
-            banned_aliases: self.banned_aliases.or(other.banned_aliases),
-            banned_from: self.banned_from.or(other.banned_from),
         }
     }
 }

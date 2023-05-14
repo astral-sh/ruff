@@ -2,9 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
-
-use crate::settings::configuration::CombinePluginOptions;
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 fn default_tmp_dirs() -> Vec<String> {
     ["/tmp", "/var/tmp", "/dev/shm"]
@@ -12,7 +10,9 @@ fn default_tmp_dirs() -> Vec<String> {
         .to_vec()
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
@@ -86,20 +86,6 @@ impl Default for Settings {
         Self {
             hardcoded_tmp_directory: default_tmp_dirs(),
             check_typed_exception: false,
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            hardcoded_tmp_directory: self
-                .hardcoded_tmp_directory
-                .or(other.hardcoded_tmp_directory),
-            hardcoded_tmp_directory_extend: self
-                .hardcoded_tmp_directory_extend
-                .or(other.hardcoded_tmp_directory_extend),
-            check_typed_exception: self.check_typed_exception.or(other.check_typed_exception),
         }
     }
 }

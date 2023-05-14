@@ -2,9 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
-
-use crate::settings::configuration::CombinePluginOptions;
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -22,7 +20,9 @@ impl Default for Quote {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
@@ -110,17 +110,6 @@ impl From<Settings> for Options {
             multiline_quotes: Some(settings.multiline_quotes),
             docstring_quotes: Some(settings.docstring_quotes),
             avoid_escape: Some(settings.avoid_escape),
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            inline_quotes: self.inline_quotes.or(other.inline_quotes),
-            multiline_quotes: self.multiline_quotes.or(other.multiline_quotes),
-            docstring_quotes: self.docstring_quotes.or(other.docstring_quotes),
-            avoid_escape: self.avoid_escape.or(other.avoid_escape),
         }
     }
 }

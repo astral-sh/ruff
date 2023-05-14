@@ -7,11 +7,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
-use crate::settings::configuration::CombinePluginOptions;
 use crate::warn_user_once;
 
 use super::categorize::ImportSection;
@@ -34,7 +33,9 @@ impl Default for RelativeImportsOrder {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
@@ -504,40 +505,6 @@ impl From<Settings> for Options {
                     .map(|(section, modules)| (ImportSection::UserDefined(section), modules))
                     .collect(),
             ),
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            force_wrap_aliases: self.force_wrap_aliases.or(other.force_wrap_aliases),
-            force_single_line: self.force_single_line.or(other.force_single_line),
-            single_line_exclusions: self.single_line_exclusions.or(other.single_line_exclusions),
-            combine_as_imports: self.combine_as_imports.or(other.combine_as_imports),
-            split_on_trailing_comma: self
-                .split_on_trailing_comma
-                .or(other.split_on_trailing_comma),
-            order_by_type: self.order_by_type.or(other.order_by_type),
-            force_sort_within_sections: self
-                .force_sort_within_sections
-                .or(other.force_sort_within_sections),
-            force_to_top: self.force_to_top.or(other.force_to_top),
-            known_first_party: self.known_first_party.or(other.known_first_party),
-            known_third_party: self.known_third_party.or(other.known_third_party),
-            known_local_folder: self.known_local_folder.or(other.known_local_folder),
-            extra_standard_library: self.extra_standard_library.or(other.extra_standard_library),
-            relative_imports_order: self.relative_imports_order.or(other.relative_imports_order),
-            required_imports: self.required_imports.or(other.required_imports),
-            classes: self.classes.or(other.classes),
-            constants: self.constants.or(other.constants),
-            variables: self.variables.or(other.variables),
-            no_lines_before: self.no_lines_before.or(other.no_lines_before),
-            lines_after_imports: self.lines_after_imports.or(other.lines_after_imports),
-            lines_between_types: self.lines_between_types.or(other.lines_between_types),
-            forced_separate: self.forced_separate.or(other.forced_separate),
-            section_order: self.section_order.or(other.section_order),
-            sections: self.sections.or(other.sections),
         }
     }
 }

@@ -3,15 +3,15 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::ConfigurationOptions;
-
-use crate::settings::configuration::CombinePluginOptions;
+use ruff_macros::{CombineOptions, ConfigurationOptions};
 
 use super::banned_api::ApiBan;
 use super::relative_imports::Strictness;
 use super::Settings;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
@@ -59,15 +59,6 @@ impl From<Settings> for Options {
         Self {
             ban_relative_imports: Some(settings.ban_relative_imports),
             banned_api: Some(settings.banned_api),
-        }
-    }
-}
-
-impl CombinePluginOptions for Options {
-    fn combine(self, other: Self) -> Self {
-        Self {
-            ban_relative_imports: self.ban_relative_imports.or(other.ban_relative_imports),
-            banned_api: self.banned_api.or(other.banned_api),
         }
     }
 }
