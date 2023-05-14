@@ -8,7 +8,7 @@ use libcst_native::{
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
 
-use ruff_diagnostics::Edit;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::cst::matchers::{match_expr, match_module};
@@ -1142,7 +1142,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Edit> {
+) -> Result<Fix> {
     // Expr(ListComp) -> Expr(GeneratorExp)
     let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
@@ -1312,5 +1312,8 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Fix::suggested(Edit::range_replacement(
+        state.to_string(),
+        expr.range(),
+    )))
 }
