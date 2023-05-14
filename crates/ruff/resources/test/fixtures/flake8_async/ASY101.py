@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 
@@ -16,3 +17,15 @@ async def foo():
 
 async def foo():
     subprocess.call("foo")
+
+
+async def foo():
+    subprocess.foo(0)
+
+
+async def foo():
+    os.wait4(10)
+
+
+async def foo():
+    os.wait(12)

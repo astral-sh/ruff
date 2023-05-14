@@ -2,11 +2,11 @@ import os
 
 
 async def foo():
-    os.wait()
+    os.popen()
 
 
 async def foo():
-    os.popen("foo")
+    os.spawnl()
 
 
 async def foo():

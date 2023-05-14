@@ -1,0 +1,46 @@
+---
+source: crates/ruff/src/rules/flake8_async/mod.rs
+---
+ASY101.py:7:5: ASY101 Async functions should not contain a call to `open`, `time.sleep` or any subprocess method
+  |
+7 | async def foo():
+8 |     open("foo")
+  |     ^^^^ ASY101
+  |
+
+ASY101.py:11:5: ASY101 Async functions should not contain a call to `open`, `time.sleep` or any subprocess method
+   |
+11 | async def foo():
+12 |     time.sleep(1)
+   |     ^^^^^^^^^^ ASY101
+   |
+
+ASY101.py:15:5: ASY101 Async functions should not contain a call to `open`, `time.sleep` or any subprocess method
+   |
+15 | async def foo():
+16 |     subprocess.run("foo")
+   |     ^^^^^^^^^^^^^^ ASY101
+   |
+
+ASY101.py:19:5: ASY101 Async functions should not contain a call to `open`, `time.sleep` or any subprocess method
+   |
+19 | async def foo():
+20 |     subprocess.call("foo")
+   |     ^^^^^^^^^^^^^^^ ASY101
+   |
+
+ASY101.py:27:5: ASY101 Async functions should not contain a call to `open`, `time.sleep` or any subprocess method
+   |
+27 | async def foo():
+28 |     os.wait4(10)
+   |     ^^^^^^^^ ASY101
+   |
+
+ASY101.py:31:5: ASY101 Async functions should not contain a call to `open`, `time.sleep` or any subprocess method
+   |
+31 | async def foo():
+32 |     os.wait(12)
+   |     ^^^^^^^ ASY101
+   |
+
+

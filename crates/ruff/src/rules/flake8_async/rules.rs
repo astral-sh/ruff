@@ -6,21 +6,37 @@ use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule};
 
-// TODO: Fix docstrings and improve messages
+
+struct ViolatingCalls<'a> {
+    members: &'a [&'a [&'a str]],
+}
+
+impl<'a> ViolatingCalls<'a> {
+    pub const fn new(members: &'a [&'a [&'a str]]) -> Self {
+        Self { members }
+    }
+}
 
 /// ## What it does
 /// Checks that async functions do not contain a blocking HTTP call
 ///
 /// ## Why is this bad?
-/// TODO
+/// Because blocking an async function makes the asynchronous nature of the function useless and
+/// could confuse a reader or user
 ///
 /// ## Example
-/// TODO
+/// async def foo():
+///    urllib.request.urlopen("http://example.com/foo/bar").read()
 ///
 /// Use instead:
-/// TODO
+/// Many options, but e.g.:
+///
+/// async def foo():
+///    async with aiohttp.ClientSession() as session:
+///        async with session.get("http://example.com/foo/bar") as resp:
+///            result = await resp.json()
+///            print(result)
 #[violation]
 pub struct BlockingHttpCallInsideAsyncDef;
 
@@ -31,31 +47,65 @@ impl Violation for BlockingHttpCallInsideAsyncDef {
     }
 }
 
+// TODO: Complete
+const BLOCKING_HTTP_CALLS: &[ViolatingCalls] = &[
+    ViolatingCalls::new(
+        &[
+            &["urllib", "request", "urlopen"],
+            &["httpx", "get"],
+            &["httpx", "post"],
+            &["httpx", "put"],
+            &["httpx", "patch"],
+            &["httpx", "delete"],
+            &["requests", "get"],
+            &["requests", "post"],
+            &["requests", "delete"],
+            &["requests", "patch"],
+            &["requests", "put"],
+        ]
+    )];
+
 /// ASY100
-// TODO: Implement
-pub fn blocking_http_call_inside_async_def(checker: &mut Checker, func: &Expr) {
-    let diagnostic = Diagnostic::new(BlockingHttpCallInsideAsyncDef, func.range());
-
-    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
-        return;
+pub fn blocking_http_call_inside_async_def(checker: &mut Checker, expr: &Expr) {
+    if checker
+        .ctx
+        .scopes()
+        .find_map(|scope| {
+            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
+                Some(*async_)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(false) {
+        if let ExprKind::Call { func, .. } = &expr.node {
+            if let Some(call_path) = collect_call_path(func) {
+                for v_call in BLOCKING_HTTP_CALLS {
+                    for member in v_call.members {
+                        if call_path.as_slice() == *member {
+                            checker.diagnostics.push(Diagnostic::new(BlockingHttpCallInsideAsyncDef, func.range));
+                        }
+                    }
+                }
+            }
+        }
     }
-
-    checker.diagnostics.push(diagnostic);
 }
-
 
 /// ## What it does
 /// Checks that async functions do not contain a call to `open`, `time.sleep` or `subprocess`
 /// methods
 ///
 /// ## Why is this bad?
-/// TODO
+/// Calling these functions in an async process can lead to unexpected behaviour
 ///
 /// ## Example
-/// TODO
+/// async def foo():
+///     time.sleep(1000)
 ///
 /// Use instead:
-/// TODO
+/// def foo():
+///     time.sleep(1000)
 #[violation]
 pub struct OpenSleepOrSubprocessInsideAsyncDef;
 
@@ -69,8 +119,28 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
     }
 }
 
+const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[ViolatingCalls] = &[
+    ViolatingCalls::new(
+        &[
+            &["open"],
+            &["time", "sleep"],
+            &["subprocess", "run"],
+            &["subprocess", "Popen"],
+            // Deprecated subprocess calls:
+            &["subprocess", "call"],
+            &["subprocess", "check_call"],
+            &["subprocess", "check_output"],
+            &["subprocess", "getoutput"],
+            &["subprocess", "getstatusoutput"],
+            &["os", "wait"],
+            &["os", "wait3"],
+            &["os", "wait4"],
+            &["os", "waitid"],
+            &["os", "waitpid"],
+        ]
+    )];
+
 /// ASY101
-// TODO: Implement
 pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, expr: &Expr) {
     if checker
         .ctx
@@ -85,9 +155,13 @@ pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, expr: &E
         .unwrap_or(false) {
         if let ExprKind::Call { func, .. } = &expr.node {
             if let Some(call_path) = collect_call_path(func) {
-                if call_path.as_slice() == ["time", "sleep"]
-                {
-                    checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, expr.range));
+                for v_call in OPEN_SLEEP_OR_SUBPROCESS_CALL {
+                    for member in v_call.members {
+                        if call_path.as_slice() == *member
+                        {
+                            checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, func.range));
+                        }
+                    }
                 }
             }
         }
@@ -98,13 +172,16 @@ pub fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, expr: &E
 /// Checks that async functions do not contain a call to an unsafe `os` method
 ///
 /// ## Why is this bad?
-/// TODO
+/// Calling unsafe 'os' methods can lead to unpredictable behaviour mid process and/or state
+/// changes
 ///
 /// ## Example
-/// TODO
+/// async def foo():
+///     os.popen()
 ///
 /// Use instead:
-/// TODO
+/// def foo():
+///     os.popen()
 #[violation]
 pub struct UnsafeOsMethodInsideAsyncDef;
 
@@ -115,14 +192,49 @@ impl Violation for UnsafeOsMethodInsideAsyncDef {
     }
 }
 
+const UNSAFE_OS_METHODS: &[ViolatingCalls] = &[
+    ViolatingCalls::new(
+        &[
+            &["os", "popen"],
+            &["os", "posix_spawn"],
+            &["os", "posix_spawnp"],
+            &["os", "spawnl"],
+            &["os", "spawnle"],
+            &["os", "spawnlp"],
+            &["os", "spawnlpe"],
+            &["os", "spawnv"],
+            &["os", "spawnve"],
+            &["os", "spawnvp"],
+            &["os", "spawnvpe"],
+            &["os", "system"]
+        ]
+    )];
+
 /// ASY102
 // TODO: Implement
-pub fn unsafe_os_method_inside_async_def(checker: &mut Checker, func: &Expr) {
-    let diagnostic = Diagnostic::new(UnsafeOsMethodInsideAsyncDef, func.range());
-
-    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
-        return;
+pub fn unsafe_os_method_inside_async_def(checker: &mut Checker, expr: &Expr) {
+    if checker
+        .ctx
+        .scopes()
+        .find_map(|scope| {
+            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
+                Some(*async_)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(false) {
+        if let ExprKind::Call { func, .. } = &expr.node {
+            if let Some(call_path) = collect_call_path(func) {
+                for v_call in UNSAFE_OS_METHODS {
+                    for member in v_call.members {
+                        if call_path.as_slice() == *member
+                        {
+                            checker.diagnostics.push(Diagnostic::new(UnsafeOsMethodInsideAsyncDef, func.range));
+                        }
+                    }
+                }
+            }
+        }
     }
-
-    checker.diagnostics.push(diagnostic);
 }
