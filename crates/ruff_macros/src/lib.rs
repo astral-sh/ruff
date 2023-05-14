@@ -5,6 +5,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput, ItemFn, ItemStruct};
 
 mod cache_key;
+mod combine_options;
 mod config;
 mod derive_message_formats;
 mod map_codes;
@@ -18,6 +19,15 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
     let input = parse_macro_input!(input as DeriveInput);
 
     config::derive_impl(input)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+#[proc_macro_derive(CombineOptions)]
+pub fn derive_combine_options(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    combine_options::derive_impl(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
