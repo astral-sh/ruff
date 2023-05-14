@@ -47,21 +47,28 @@ impl Violation for BlockingHttpCallInsideAsyncDef {
     }
 }
 
-// TODO: Complete
 const BLOCKING_HTTP_CALLS: &[ViolatingCalls] = &[
     ViolatingCalls::new(
         &[
             &["urllib", "request", "urlopen"],
             &["httpx", "get"],
             &["httpx", "post"],
-            &["httpx", "put"],
-            &["httpx", "patch"],
             &["httpx", "delete"],
+            &["httpx", "patch"],
+            &["httpx", "put"],
+            &["httpx", "head"],
+            &["httpx", "connect"],
+            &["httpx", "options"],
+            &["httpx", "trace"],
             &["requests", "get"],
             &["requests", "post"],
             &["requests", "delete"],
             &["requests", "patch"],
             &["requests", "put"],
+            &["requests", "head"],
+            &["requests", "connect"],
+            &["requests", "options"],
+            &["requests", "trace"],
         ]
     )];
 
