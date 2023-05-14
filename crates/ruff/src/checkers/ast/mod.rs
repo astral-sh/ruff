@@ -2269,8 +2269,7 @@ where
                 {
                     flake8_future_annotations::rules::missing_future_annotations(self, value);
                 }
-                if !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(Rule::NonPEP604Annotation)
+                if self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.future_annotations()
@@ -2347,8 +2346,7 @@ where
                                 self, expr,
                             );
                         }
-                        if !self.settings.pyupgrade.keep_runtime_typing
-                            && self.settings.rules.enabled(Rule::NonPEP585Annotation)
+                        if self.settings.rules.enabled(Rule::NonPEP585Annotation)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.ctx.future_annotations()
@@ -2410,8 +2408,7 @@ where
                 {
                     flake8_future_annotations::rules::missing_future_annotations(self, expr);
                 }
-                if !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(Rule::NonPEP585Annotation)
+                if self.settings.rules.enabled(Rule::NonPEP585Annotation)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.future_annotations()

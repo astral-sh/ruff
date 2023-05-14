@@ -19,7 +19,6 @@ use crate::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -87,7 +86,6 @@ pub struct Configuration {
     pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
     pub pylint: Option<pylint::settings::Options>,
-    pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
 
 impl Configuration {
@@ -222,7 +220,6 @@ impl Configuration {
             pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
             pylint: options.pylint,
-            pyupgrade: options.pyupgrade,
         })
     }
 
@@ -298,7 +295,6 @@ impl Configuration {
             pycodestyle: self.pycodestyle.or(config.pycodestyle),
             pydocstyle: self.pydocstyle.or(config.pydocstyle),
             pylint: self.pylint.or(config.pylint),
-            pyupgrade: self.pyupgrade.or(config.pyupgrade),
         }
     }
 }
