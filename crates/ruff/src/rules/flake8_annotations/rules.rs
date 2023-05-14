@@ -434,10 +434,11 @@ fn check_dynamically_typed<F>(
     annotation: &Expr,
     func: F,
     diagnostics: &mut Vec<Diagnostic>,
+    is_overridden: bool,
 ) where
     F: FnOnce() -> String,
 {
-    if checker.ctx.match_typing_expr(annotation, "Any") {
+    if !is_overridden && checker.ctx.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
             AnyType { name: func() },
             annotation.range(),
@@ -468,7 +469,7 @@ pub(crate) fn definition(
         _ => return vec![],
     };
 
-    let (name, args, returns, body) = match_function_def(stmt);
+    let (name, args, returns, body, decorator_list) = match_function_def(stmt);
     // Keep track of whether we've seen any typed arguments or return values.
     let mut has_any_typed_arg = false; // Any argument has been typed?
     let mut has_typed_return = false; // Return value has been typed?
@@ -477,6 +478,8 @@ pub(crate) fn definition(
     // Temporary storage for diagnostics; we emit them at the end
     // unless configured to suppress ANN* for declarations that are fully untyped.
     let mut diagnostics = Vec::new();
+
+    let is_overridden = visibility::is_override(&checker.ctx, decorator_list);
 
     // ANN001, ANN401
     for arg in args
@@ -500,6 +503,7 @@ pub(crate) fn definition(
                     annotation,
                     || arg.node.arg.to_string(),
                     &mut diagnostics,
+                    is_overridden,
                 );
             }
         } else {
@@ -529,7 +533,13 @@ pub(crate) fn definition(
             if !checker.settings.flake8_annotations.allow_star_arg_any {
                 if checker.settings.rules.enabled(Rule::AnyType) {
                     let name = &arg.node.arg;
-                    check_dynamically_typed(checker, expr, || format!("*{name}"), &mut diagnostics);
+                    check_dynamically_typed(
+                        checker,
+                        expr,
+                        || format!("*{name}"),
+                        &mut diagnostics,
+                        is_overridden,
+                    );
                 }
             }
         } else {
@@ -560,6 +570,7 @@ pub(crate) fn definition(
                         expr,
                         || format!("**{name}"),
                         &mut diagnostics,
+                        is_overridden,
                     );
                 }
             }
@@ -612,7 +623,13 @@ pub(crate) fn definition(
     if let Some(expr) = &returns {
         has_typed_return = true;
         if checker.settings.rules.enabled(Rule::AnyType) {
-            check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
+            check_dynamically_typed(
+                checker,
+                expr,
+                || name.to_string(),
+                &mut diagnostics,
+                is_overridden,
+            );
         }
     } else if !(
         // Allow omission of return annotation if the function only returns `None`

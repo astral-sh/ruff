@@ -4,7 +4,7 @@ use itertools::Itertools;
 use log::error;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_common::cformat::{CFormatError, CFormatErrorType};
+use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     self, Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr,
     ExprContext, ExprKind, KeywordData, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite,
@@ -760,6 +760,10 @@ where
 
                 if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                }
+
+                if self.settings.rules.enabled(Rule::DuplicateBases) {
+                    pylint::rules::duplicate_bases(self, name, bases);
                 }
             }
             StmtKind::Import(ast::StmtImport { names }) => {

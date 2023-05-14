@@ -1,0 +1,40 @@
+---
+source: crates/ruff/src/rules/flake8_todos/mod.rs
+---
+TD003.py:9:3: TD003 Missing issue link on the line following this TODO
+   |
+ 9 | # TDO003 - errors
+10 | # TODO: this comment has no
+   |   ^^^^ TD003
+11 | # link after it
+   |
+
+TD003.py:12:3: TD003 Missing issue link on the line following this TODO
+   |
+12 | # link after it
+13 | 
+14 | # TODO: here's a TODO with no link after it
+   |   ^^^^ TD003
+15 | def foo(x):
+16 |     return x
+   |
+
+TD003.py:25:3: TD003 Missing issue link on the line following this TODO
+   |
+25 | # TDO-3870
+26 | 
+27 | # TODO: here's a TODO without an issue link
+   |   ^^^^ TD003
+28 | # TODO: followed by a new TODO with an issue link
+29 | # TDO-3870
+   |
+
+TD003.py:29:3: TD003 Missing issue link on the line following this TODO
+   |
+29 | # TDO-3870
+30 | 
+31 | # TODO: here's a TODO on the last line with no link
+   |   ^^^^ TD003
+   |
+
+

@@ -1,4 +1,5 @@
 from typing import Any, Type
+from typing_extensions import override
 
 # Error
 def foo(a, b):
@@ -91,6 +92,31 @@ class Foo:
         pass
 
     # ANN401
+    def foo(self: "Foo", a: int, *params: str, **options: Any) -> int:
+        pass
+
+    # ANN401
+    @override
+    def foo(self: "Foo", a: Any, *params: str, **options: str) -> int:
+        pass
+
+    # ANN401
+    @override
+    def foo(self: "Foo", a: int, *params: str, **options: str) -> Any:
+        pass
+
+    # ANN401
+    @override
+    def foo(self: "Foo", a: int, *params: Any, **options: Any) -> int:
+        pass
+
+    # ANN401
+    @override
+    def foo(self: "Foo", a: int, *params: Any, **options: str) -> int:
+        pass
+
+    # ANN401
+    @override
     def foo(self: "Foo", a: int, *params: str, **options: Any) -> int:
         pass
 
