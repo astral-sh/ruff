@@ -54,7 +54,9 @@ impl Violation for SyncProcessCallInAsyncFunction {
 }
 
 const HTTP_PACKAGES: [&str; 2] = ["httpx", "requests"];
-const HTTP_METHODS: [&str; 9] = ["get", "options", "head", "post", "put", "patch", "delete", "request", "send"];
+const HTTP_METHODS: [&str; 9] = [
+    "get", "options", "head", "post", "put", "patch", "delete", "request", "send",
+];
 const TIME_METHODS: [&str; 1] = ["sleep"];
 const SUBPROCESS_METHODS: [&str; 7] = [
     "run",
@@ -65,7 +67,7 @@ const SUBPROCESS_METHODS: [&str; 7] = [
     "check_output",
     "getoutput",
     "getstatusoutput",
-    ];
+];
 const OS_PROCESS_METHODS: [&str; 12] = [
     "popen",
     "posix_spawn",
@@ -79,14 +81,8 @@ const OS_PROCESS_METHODS: [&str; 12] = [
     "spawnvp",
     "spawnvpe",
     "system",
-    ];
-const OS_WAIT_METHODS: [&str; 5] = [
-    "wait",
-    "wait3",
-    "wait4",
-    "waitid",
-    "waitpid",
-    ];
+];
+const OS_WAIT_METHODS: [&str; 5] = ["wait", "wait3", "wait4", "waitid", "waitpid"];
 
 pub(crate) fn check_sync_in_async(checker: &mut Checker, body: &[Stmt]) {
     for stmt in body {
@@ -94,32 +90,37 @@ pub(crate) fn check_sync_in_async(checker: &mut Checker, body: &[Stmt]) {
             if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
                 if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
                     if "open" == id.as_str() {
-                        let diagnostic = Diagnostic::new(BlockingSyncCallInAsyncFunction, stmt.range());
+                        let diagnostic =
+                            Diagnostic::new(BlockingSyncCallInAsyncFunction, stmt.range());
                         checker.diagnostics.push(diagnostic);
                     }
-                } else if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
+                } else if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) =
+                    &func.node
+                {
                     if let ExprKind::Name(ast::ExprName { id, .. }) = &value.node {
                         let module = id.as_str();
                         let method = attr.as_str();
                         let range = stmt.range();
-                        
+
                         if HTTP_PACKAGES.contains(&module) && HTTP_METHODS.contains(&method) {
                             let diagnostic = Diagnostic::new(SyncHttpCallInAsyncFunction, range);
                             checker.diagnostics.push(diagnostic);
-                        } else if "time" == module && TIME_METHODS.contains(&method) {
-                            let diagnostic = Diagnostic::new(BlockingSyncCallInAsyncFunction, range);
-                            checker.diagnostics.push(diagnostic);
-                        } else if "subprocess" == module && SUBPROCESS_METHODS.contains(&method) {
-                            let diagnostic = Diagnostic::new(BlockingSyncCallInAsyncFunction, range);
+                        } else if ("time" == module && TIME_METHODS.contains(&method))
+                            || ("subprocess" == module && SUBPROCESS_METHODS.contains(&method))
+                        {
+                            let diagnostic =
+                                Diagnostic::new(BlockingSyncCallInAsyncFunction, range);
                             checker.diagnostics.push(diagnostic);
                         } else if "os" == module {
                             if OS_WAIT_METHODS.contains(&method) {
-                                let diagnostic = Diagnostic::new(BlockingSyncCallInAsyncFunction, range);
+                                let diagnostic =
+                                    Diagnostic::new(BlockingSyncCallInAsyncFunction, range);
                                 checker.diagnostics.push(diagnostic);
                             } else if OS_PROCESS_METHODS.contains(&method) {
-                                let diagnostic = Diagnostic::new(SyncProcessCallInAsyncFunction, range);
+                                let diagnostic =
+                                    Diagnostic::new(SyncProcessCallInAsyncFunction, range);
                                 checker.diagnostics.push(diagnostic);
-                            }   
+                            }
                         }
                     }
                 }
