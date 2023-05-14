@@ -1,9 +1,8 @@
-use itertools::Itertools;
-use rustpython_parser::ast::{Alias, Expr, Stmt};
+use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_stdlib::typing::PEP_585_SUBSCRIPT_ELIGIBLE;
+use ruff_python_ast::call_path::format_call_path;
 
 use crate::checkers::ast::Checker;
 
@@ -13,35 +12,38 @@ use crate::checkers::ast::Checker;
 /// PEP 563.
 ///
 /// ## Why is this bad?
-/// Pairs well with pyupgrade with the --py37-plus flag or higher, since pyupgrade only
-/// replaces type annotations with the PEP 563 rules if `from __future__ import annotations`
-/// is present.
+/// PEP 563 enabled the use of a number of convenient type annotations, such as
+/// `list[str]` instead of `List[str]`, or `str | None` instead of
+/// `Optional[str]`. However, these annotations are only available on Python
+/// 3.9 and higher, _unless_ the `from __future__ import annotations` import is present.
+///
+/// By adding the `__future__` import, the pyupgrade rules can automatically
+/// migrate existing code to use the new syntax, even for older Python versions.
+/// This rule thus pairs well with pyupgrade and with Ruff's pyupgrade rules.
 ///
 /// ## Example
 /// ```python
-/// import typing as t
-/// from typing import List
+/// from typing import List, Dict, Optional
 ///
 ///
-/// def function(a_dict: t.Dict[str, t.Optional[int]]) -> None:
+/// def function(a_dict: Dict[str, Optional[int]]) -> None:
 ///     a_list: List[str] = []
 ///     a_list.append("hello")
 /// ```
 ///
-/// To fix the lint error:
+/// Use instead:
 /// ```python
 /// from __future__ import annotations
 ///
-/// import typing as t
-/// from typing import List
+/// from typing import List, Dict, Optional
 ///
 ///
-/// def function(a_dict: t.Dict[str, t.Optional[int]]) -> None:
+/// def function(a_dict: Dict[str, Optional[int]]) -> None:
 ///     a_list: List[str] = []
 ///     a_list.append("hello")
 /// ```
 ///
-/// After running additional pyupgrade autofixes:
+/// After running the additional pyupgrade rules:
 /// ```python
 /// from __future__ import annotations
 ///
@@ -51,60 +53,26 @@ use crate::checkers::ast::Checker;
 ///     a_list.append("hello")
 /// ```
 #[violation]
-pub struct MissingFutureAnnotationsWithImports {
-    names: Vec<String>,
+pub struct MissingFutureAnnotationsImport {
+    name: String,
 }
 
-impl Violation for MissingFutureAnnotationsWithImports {
+impl Violation for MissingFutureAnnotationsImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingFutureAnnotationsWithImports { names } = self;
-        let names = names.iter().map(|name| format!("`{name}`")).join(", ");
-        format!("Missing `from __future__ import annotations`, but imports: {names}")
+        let MissingFutureAnnotationsImport { name } = self;
+        format!("Missing `from __future__ import annotations`, but uses `{name}`")
     }
 }
 
 /// FA100
-pub(crate) fn missing_future_annotations_from_typing_import(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    module: &str,
-    names: &[Alias],
-) {
-    if checker.ctx.future_annotations() {
-        return;
-    }
-
-    let names: Vec<String> = names
-        .iter()
-        .map(|name| name.node.name.as_str())
-        .filter(|alias| PEP_585_SUBSCRIPT_ELIGIBLE.contains(&[module, alias].as_slice()))
-        .map(std::string::ToString::to_string)
-        .sorted()
-        .collect();
-
-    if !names.is_empty() {
-        checker.diagnostics.push(Diagnostic::new(
-            MissingFutureAnnotationsWithImports { names },
-            stmt.range(),
-        ));
-    }
-}
-
-/// FA100
-pub(crate) fn missing_future_annotations_from_typing_usage(checker: &mut Checker, expr: &Expr) {
-    if checker.ctx.future_annotations() {
-        return;
-    }
-
+pub(crate) fn missing_future_annotations(checker: &mut Checker, expr: &Expr) {
     if let Some(binding) = checker.ctx.resolve_call_path(expr) {
-        if PEP_585_SUBSCRIPT_ELIGIBLE.contains(&binding.as_slice()) {
-            checker.diagnostics.push(Diagnostic::new(
-                MissingFutureAnnotationsWithImports {
-                    names: vec![binding.iter().join(".")],
-                },
-                expr.range(),
-            ));
-        }
+        checker.diagnostics.push(Diagnostic::new(
+            MissingFutureAnnotationsImport {
+                name: format_call_path(&binding),
+            },
+            expr.range(),
+        ));
     }
 }

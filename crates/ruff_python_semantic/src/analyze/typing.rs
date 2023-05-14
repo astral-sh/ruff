@@ -70,6 +70,15 @@ pub fn is_pep585_builtin(expr: &Expr, context: &Context) -> bool {
     })
 }
 
+/// Returns `true` if `Expr` represents a reference to a typing object with a
+/// PEP 603 built-in.
+pub fn is_pep604_builtin(expr: &Expr, context: &Context) -> bool {
+    context.resolve_call_path(expr).map_or(false, |call_path| {
+        context.match_typing_call_path(&call_path, "Optional")
+            || context.match_typing_call_path(&call_path, "Union")
+    })
+}
+
 pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Name(_) | ExprKind::Attribute(_) => {

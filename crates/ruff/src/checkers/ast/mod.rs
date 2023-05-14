@@ -1077,20 +1077,6 @@ where
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::MissingFutureAnnotationsWithImports)
-                {
-                    if let Some(module) = module {
-                        flake8_future_annotations::rules::missing_future_annotations_from_typing_import(
-                            self,
-                            stmt,
-                            module,
-                            names,
-                        );
-                    }
-                }
                 if self.settings.rules.enabled(Rule::BannedApi) {
                     if let Some(module) =
                         helpers::resolve_imported_module_path(level, module, self.module_path)
@@ -2271,12 +2257,25 @@ where
         match &expr.node {
             ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::MissingFutureAnnotationsImport)
+                    && (self.settings.target_version < PythonVersion::Py310
+                        && (self.settings.target_version >= PythonVersion::Py37
+                            && !self.ctx.future_annotations()
+                            && self.ctx.in_annotation()))
+                    && analyze::typing::is_pep604_builtin(value, &self.ctx)
+                {
+                    flake8_future_annotations::rules::missing_future_annotations(self, value);
+                }
                 if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.future_annotations()
                             && self.ctx.in_annotation()))
+                    && analyze::typing::is_pep604_builtin(value, &self.ctx)
                 {
                     pyupgrade::rules::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -2334,6 +2333,20 @@ where
                         }
 
                         // Ex) List[...]
+                        if self
+                            .settings
+                            .rules
+                            .enabled(Rule::MissingFutureAnnotationsImport)
+                            && (self.settings.target_version < PythonVersion::Py39
+                                && (self.settings.target_version >= PythonVersion::Py37
+                                    && !self.ctx.future_annotations()
+                                    && self.ctx.in_annotation()))
+                            && analyze::typing::is_pep585_builtin(expr, &self.ctx)
+                        {
+                            flake8_future_annotations::rules::missing_future_annotations(
+                                self, expr,
+                            );
+                        }
                         if !self.settings.pyupgrade.keep_runtime_typing
                             && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                             && (self.settings.target_version >= PythonVersion::Py39
@@ -2385,6 +2398,18 @@ where
             }
             ExprKind::Attribute(ast::ExprAttribute { attr, value, .. }) => {
                 // Ex) typing.List[...]
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::MissingFutureAnnotationsImport)
+                    && (self.settings.target_version < PythonVersion::Py39
+                        && (self.settings.target_version >= PythonVersion::Py37
+                            && !self.ctx.future_annotations()
+                            && self.ctx.in_annotation()))
+                    && analyze::typing::is_pep585_builtin(expr, &self.ctx)
+                {
+                    flake8_future_annotations::rules::missing_future_annotations(self, expr);
+                }
                 if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                     && (self.settings.target_version >= PythonVersion::Py39
@@ -2414,16 +2439,6 @@ where
                 }
                 if self.settings.rules.enabled(Rule::BannedApi) {
                     flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
-                }
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::MissingFutureAnnotationsWithImports)
-                    && analyze::typing::is_pep585_builtin(expr, &self.ctx)
-                {
-                    flake8_future_annotations::rules::missing_future_annotations_from_typing_usage(
-                        self, expr,
-                    );
                 }
                 if self.settings.rules.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);

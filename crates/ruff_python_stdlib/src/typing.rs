@@ -198,21 +198,6 @@ pub const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
     &["typing_extensions", "Type"],
 ];
 
-// See: https://peps.python.org/pep-0585/
-pub const PEP_585_SUBSCRIPT_ELIGIBLE: &[&[&str]] = &[
-    &["typing", "DefaultDict"],
-    &["typing", "Deque"],
-    &["typing", "Dict"],
-    &["typing", "FrozenSet"],
-    &["typing", "List"],
-    &["typing", "Optional"],
-    &["typing", "Set"],
-    &["typing", "Tuple"],
-    &["typing", "Type"],
-    &["typing", "Union"],
-    &["typing_extensions", "Type"],
-];
-
 // See: https://github.com/JelleZijlstra/autotyping/blob/0adba5ba0eee33c1de4ad9d0c79acfd737321dd9/autotyping/autotyping.py#L69-L91
 pub static SIMPLE_MAGIC_RETURN_TYPES: Lazy<FxHashMap<&'static str, &'static str>> =
     Lazy::new(|| {

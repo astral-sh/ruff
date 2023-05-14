@@ -9,6 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -28,7 +29,10 @@ mod tests {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
-            &settings::Settings::for_rules(vec![Rule::MissingFutureAnnotationsWithImports]),
+            &settings::Settings {
+                target_version: PythonVersion::Py37,
+                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImport)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
