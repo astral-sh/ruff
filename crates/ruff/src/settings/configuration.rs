@@ -299,6 +299,22 @@ impl Configuration {
     }
 }
 
+pub trait CombinePluginOptions {
+    #[must_use]
+    fn combine(self, other: Self) -> Self;
+}
+
+impl<T: CombinePluginOptions> CombinePluginOptions for Option<T> {
+    fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(base), Some(other)) => Some(base.combine(other)),
+            (Some(base), None) => Some(base),
+            (None, Some(other)) => Some(other),
+            (None, None) => None,
+        }
+    }
+}
+
 /// Given a list of source paths, which could include glob patterns, resolve the
 /// matching paths.
 pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
