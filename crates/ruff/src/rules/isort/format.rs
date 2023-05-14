@@ -73,6 +73,7 @@ pub(crate) fn format_import_from(
     {
         let (single_line, import_width) =
             format_single_line(import_from, comments, aliases, is_first, stylist);
+        // TODO(jonathan): handle tabs
         if import_width <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
             return single_line;
         }

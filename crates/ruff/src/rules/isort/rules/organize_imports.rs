@@ -116,6 +116,7 @@ pub(crate) fn organize_imports(
         block,
         comments,
         locator,
+        // TODO(jonathan): handle tabs
         settings.line_length - indentation.len(),
         stylist,
         &settings.src,

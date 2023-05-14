@@ -288,6 +288,7 @@ pub(crate) fn nested_if_statements(
                     .content()
                     .unwrap_or_default()
                     .universal_newlines()
+                    // TODO(jonathan): handle tabs
                     .all(|line| line.width() <= checker.settings.line_length)
                 {
                     #[allow(deprecated)]
@@ -508,6 +509,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
+    // TODO(jonathan): handle tabs
     if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
         + contents.width()
         > checker.settings.line_length
@@ -863,6 +865,7 @@ pub(crate) fn use_dict_get_with_default(
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
+    // TODO(jonathan): handle tabs
     if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
         + contents.width()
         > checker.settings.line_length

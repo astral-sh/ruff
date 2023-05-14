@@ -111,6 +111,7 @@ pub(crate) fn multiple_with_statements(
                         .content()
                         .unwrap_or_default()
                         .universal_newlines()
+                        // TODO(jonathan): handle tabs
                         .all(|line| line.width() <= checker.settings.line_length)
                     {
                         #[allow(deprecated)]

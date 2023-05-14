@@ -224,6 +224,7 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
+                // TODO(jonathan): handle tabs
                 if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
                     + contents.width()
                     > checker.settings.line_length
@@ -316,6 +317,7 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
+                // TODO(jonathan): handle tabs
                 if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
                     + contents.width()
                     > checker.settings.line_length
