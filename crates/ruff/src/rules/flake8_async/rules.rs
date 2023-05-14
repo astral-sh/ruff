@@ -8,7 +8,6 @@ use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
 
-
 struct ViolatingCalls<'a> {
     members: &'a [&'a [&'a str]],
 }
@@ -48,30 +47,27 @@ impl Violation for BlockingHttpCallInsideAsyncDef {
     }
 }
 
-const BLOCKING_HTTP_CALLS: &[ViolatingCalls] = &[
-    ViolatingCalls::new(
-        &[
-            &["urllib", "request", "urlopen"],
-            &["httpx", "get"],
-            &["httpx", "post"],
-            &["httpx", "delete"],
-            &["httpx", "patch"],
-            &["httpx", "put"],
-            &["httpx", "head"],
-            &["httpx", "connect"],
-            &["httpx", "options"],
-            &["httpx", "trace"],
-            &["requests", "get"],
-            &["requests", "post"],
-            &["requests", "delete"],
-            &["requests", "patch"],
-            &["requests", "put"],
-            &["requests", "head"],
-            &["requests", "connect"],
-            &["requests", "options"],
-            &["requests", "trace"],
-        ]
-    )];
+const BLOCKING_HTTP_CALLS: &[ViolatingCalls] = &[ViolatingCalls::new(&[
+    &["urllib", "request", "urlopen"],
+    &["httpx", "get"],
+    &["httpx", "post"],
+    &["httpx", "delete"],
+    &["httpx", "patch"],
+    &["httpx", "put"],
+    &["httpx", "head"],
+    &["httpx", "connect"],
+    &["httpx", "options"],
+    &["httpx", "trace"],
+    &["requests", "get"],
+    &["requests", "post"],
+    &["requests", "delete"],
+    &["requests", "patch"],
+    &["requests", "put"],
+    &["requests", "head"],
+    &["requests", "connect"],
+    &["requests", "options"],
+    &["requests", "trace"],
+])];
 
 /// ASY100
 pub(crate) fn blocking_http_call_inside_async_def(checker: &mut Checker, expr: &Expr) {
@@ -85,13 +81,16 @@ pub(crate) fn blocking_http_call_inside_async_def(checker: &mut Checker, expr: &
                 None
             }
         })
-        .unwrap_or(false) {
+        .unwrap_or(false)
+    {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
             if let Some(call_path) = collect_call_path(func) {
                 for v_call in BLOCKING_HTTP_CALLS {
                     for member in v_call.members {
                         if call_path.as_slice() == *member {
-                            checker.diagnostics.push(Diagnostic::new(BlockingHttpCallInsideAsyncDef, func.range));
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(BlockingHttpCallInsideAsyncDef, func.range));
                         }
                     }
                 }
@@ -127,26 +126,23 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
     }
 }
 
-const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[ViolatingCalls] = &[
-    ViolatingCalls::new(
-        &[
-            &["open"],
-            &["time", "sleep"],
-            &["subprocess", "run"],
-            &["subprocess", "Popen"],
-            // Deprecated subprocess calls:
-            &["subprocess", "call"],
-            &["subprocess", "check_call"],
-            &["subprocess", "check_output"],
-            &["subprocess", "getoutput"],
-            &["subprocess", "getstatusoutput"],
-            &["os", "wait"],
-            &["os", "wait3"],
-            &["os", "wait4"],
-            &["os", "waitid"],
-            &["os", "waitpid"],
-        ]
-    )];
+const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[ViolatingCalls] = &[ViolatingCalls::new(&[
+    &["open"],
+    &["time", "sleep"],
+    &["subprocess", "run"],
+    &["subprocess", "Popen"],
+    // Deprecated subprocess calls:
+    &["subprocess", "call"],
+    &["subprocess", "check_call"],
+    &["subprocess", "check_output"],
+    &["subprocess", "getoutput"],
+    &["subprocess", "getstatusoutput"],
+    &["os", "wait"],
+    &["os", "wait3"],
+    &["os", "wait4"],
+    &["os", "waitid"],
+    &["os", "waitpid"],
+])];
 
 /// ASY101
 pub(crate) fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, expr: &Expr) {
@@ -160,14 +156,17 @@ pub(crate) fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, e
                 None
             }
         })
-        .unwrap_or(false) {
+        .unwrap_or(false)
+    {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
             if let Some(call_path) = collect_call_path(func) {
                 for v_call in OPEN_SLEEP_OR_SUBPROCESS_CALL {
                     for member in v_call.members {
-                        if call_path.as_slice() == *member
-                        {
-                            checker.diagnostics.push(Diagnostic::new(OpenSleepOrSubprocessInsideAsyncDef, func.range));
+                        if call_path.as_slice() == *member {
+                            checker.diagnostics.push(Diagnostic::new(
+                                OpenSleepOrSubprocessInsideAsyncDef,
+                                func.range,
+                            ));
                         }
                     }
                 }
@@ -200,23 +199,20 @@ impl Violation for UnsafeOsMethodInsideAsyncDef {
     }
 }
 
-const UNSAFE_OS_METHODS: &[ViolatingCalls] = &[
-    ViolatingCalls::new(
-        &[
-            &["os", "popen"],
-            &["os", "posix_spawn"],
-            &["os", "posix_spawnp"],
-            &["os", "spawnl"],
-            &["os", "spawnle"],
-            &["os", "spawnlp"],
-            &["os", "spawnlpe"],
-            &["os", "spawnv"],
-            &["os", "spawnve"],
-            &["os", "spawnvp"],
-            &["os", "spawnvpe"],
-            &["os", "system"]
-        ]
-    )];
+const UNSAFE_OS_METHODS: &[ViolatingCalls] = &[ViolatingCalls::new(&[
+    &["os", "popen"],
+    &["os", "posix_spawn"],
+    &["os", "posix_spawnp"],
+    &["os", "spawnl"],
+    &["os", "spawnle"],
+    &["os", "spawnlp"],
+    &["os", "spawnlpe"],
+    &["os", "spawnv"],
+    &["os", "spawnve"],
+    &["os", "spawnvp"],
+    &["os", "spawnvpe"],
+    &["os", "system"],
+])];
 
 /// ASY102
 pub(crate) fn unsafe_os_method_inside_async_def(checker: &mut Checker, expr: &Expr) {
@@ -230,14 +226,16 @@ pub(crate) fn unsafe_os_method_inside_async_def(checker: &mut Checker, expr: &Ex
                 None
             }
         })
-        .unwrap_or(false) {
+        .unwrap_or(false)
+    {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
             if let Some(call_path) = collect_call_path(func) {
                 for v_call in UNSAFE_OS_METHODS {
                     for member in v_call.members {
-                        if call_path.as_slice() == *member
-                        {
-                            checker.diagnostics.push(Diagnostic::new(UnsafeOsMethodInsideAsyncDef, func.range));
+                        if call_path.as_slice() == *member {
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(UnsafeOsMethodInsideAsyncDef, func.range));
                         }
                     }
                 }

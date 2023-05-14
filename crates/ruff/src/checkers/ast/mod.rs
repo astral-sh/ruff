@@ -42,9 +42,9 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
 use crate::rules::{
-    flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
-    flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
+    flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
+    flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
+    flake8_debugger, flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
     flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
@@ -2585,13 +2585,25 @@ where
                 }
 
                 // flake8-async
-                if self.settings.rules.enabled(Rule::BlockingHttpCallInsideAsyncDef) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::BlockingHttpCallInsideAsyncDef)
+                {
                     flake8_async::rules::blocking_http_call_inside_async_def(self, expr);
                 }
-                if self.settings.rules.enabled(Rule::OpenSleepOrSubprocessInsideAsyncDef) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::OpenSleepOrSubprocessInsideAsyncDef)
+                {
                     flake8_async::rules::open_sleep_or_subprocess_inside_async_def(self, expr);
                 }
-                if self.settings.rules.enabled(Rule::UnsafeOsMethodInsideAsyncDef) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UnsafeOsMethodInsideAsyncDef)
+                {
                     flake8_async::rules::unsafe_os_method_inside_async_def(self, expr);
                 }
 
