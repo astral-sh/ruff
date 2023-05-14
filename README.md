@@ -263,6 +263,7 @@ quality tools, including:
 - [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 - [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
 - [flake8-executable](https://pypi.org/project/flake8-executable/)
+- [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
 - [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)

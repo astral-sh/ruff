@@ -290,6 +290,8 @@ ruff_macros::register_rules!(
     rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
     rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
     rules::flake8_annotations::rules::AnyType,
+    // flake8-future-annotations
+    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImport,
     // flake8-2020
     rules::flake8_2020::rules::SysVersionSlice3,
     rules::flake8_2020::rules::SysVersion2,
@@ -769,6 +771,9 @@ pub enum Linter {
     /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
+    /// [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
+    #[prefix = "FA"]
+    Flake8FutureAnnotations,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,

@@ -44,12 +44,12 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_django, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_logging_format, flake8_pie, flake8_print, flake8_pyi,
-    flake8_pytest_style, flake8_raise, flake8_return, flake8_self, flake8_simplify,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, flynt,
-    mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks,
-    pylint, pyupgrade, ruff, tryceratops,
+    flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
+    flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
+    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
+    flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle,
+    pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -1077,7 +1077,6 @@ where
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
-
                 if self.settings.rules.enabled(Rule::BannedApi) {
                     if let Some(module) =
                         helpers::resolve_imported_module_path(level, module, self.module_path)
@@ -2258,12 +2257,25 @@ where
         match &expr.node {
             ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::MissingFutureAnnotationsImport)
+                    && (self.settings.target_version < PythonVersion::Py310
+                        && (self.settings.target_version >= PythonVersion::Py37
+                            && !self.ctx.future_annotations()
+                            && self.ctx.in_annotation()))
+                    && analyze::typing::is_pep604_builtin(value, &self.ctx)
+                {
+                    flake8_future_annotations::rules::missing_future_annotations(self, value);
+                }
                 if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.future_annotations()
                             && self.ctx.in_annotation()))
+                    && analyze::typing::is_pep604_builtin(value, &self.ctx)
                 {
                     pyupgrade::rules::use_pep604_annotation(self, expr, value, slice);
                 }
@@ -2321,6 +2333,20 @@ where
                         }
 
                         // Ex) List[...]
+                        if self
+                            .settings
+                            .rules
+                            .enabled(Rule::MissingFutureAnnotationsImport)
+                            && (self.settings.target_version < PythonVersion::Py39
+                                && (self.settings.target_version >= PythonVersion::Py37
+                                    && !self.ctx.future_annotations()
+                                    && self.ctx.in_annotation()))
+                            && analyze::typing::is_pep585_builtin(expr, &self.ctx)
+                        {
+                            flake8_future_annotations::rules::missing_future_annotations(
+                                self, expr,
+                            );
+                        }
                         if !self.settings.pyupgrade.keep_runtime_typing
                             && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                             && (self.settings.target_version >= PythonVersion::Py39
@@ -2372,6 +2398,18 @@ where
             }
             ExprKind::Attribute(ast::ExprAttribute { attr, value, .. }) => {
                 // Ex) typing.List[...]
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::MissingFutureAnnotationsImport)
+                    && (self.settings.target_version < PythonVersion::Py39
+                        && (self.settings.target_version >= PythonVersion::Py37
+                            && !self.ctx.future_annotations()
+                            && self.ctx.in_annotation()))
+                    && analyze::typing::is_pep585_builtin(expr, &self.ctx)
+                {
+                    flake8_future_annotations::rules::missing_future_annotations(self, expr);
+                }
                 if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                     && (self.settings.target_version >= PythonVersion::Py39
