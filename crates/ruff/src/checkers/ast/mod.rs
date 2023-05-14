@@ -42,7 +42,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
 use crate::rules::{
-    flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
+    flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
@@ -594,6 +594,17 @@ where
                 } else {
                     if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                         flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                    }
+                }
+
+                // Rules that apply to async functions only
+                if let StmtKind::AsyncFunctionDef(_) = &stmt.node {
+                    if self.settings.rules.any_enabled(&[
+                        Rule::SyncHttpCallInAsyncFunction,
+                        Rule::BlockingSyncCallInAsyncFunction,
+                        Rule::SyncProcessCallInAsyncFunction,
+                    ]) {
+                        flake8_async::rules::check_sync_in_async(self, body);
                     }
                 }
             }

@@ -1,0 +1,18 @@
+---
+source: crates/ruff/src/rules/flake8_async/mod.rs
+---
+ASYNC100.py:20:5: ASYNC100 Sync HTTP call in async function, should use httpx.AsyncClient
+   |
+20 | async def f():
+21 |     httpx.get("https://example.com")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC100
+   |
+
+ASYNC100.py:24:5: ASYNC100 Sync HTTP call in async function, should use httpx.AsyncClient
+   |
+24 | async def f():
+25 |     requests.get("https://example.com")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ASYNC100
+   |
+
+

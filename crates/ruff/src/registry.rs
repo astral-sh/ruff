@@ -685,6 +685,10 @@ ruff_macros::register_rules!(
     rules::flake8_todos::rules::MissingTodoDescription,
     rules::flake8_todos::rules::InvalidTodoCapitalization,
     rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
+    // flake8-async
+    rules::flake8_async::rules::SyncHttpCallInAsyncFunction,
+    rules::flake8_async::rules::BlockingSyncCallInAsyncFunction,
+    rules::flake8_async::rules::SyncProcessCallInAsyncFunction,
 );
 
 pub trait AsRule {
@@ -735,6 +739,9 @@ pub enum Linter {
     /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
+    /// [flake8-annotations](https://pypi.org/project/flake8-async/)
+    #[prefix = "ASYNC"]
+    Flake8Async,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,

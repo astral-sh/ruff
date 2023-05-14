@@ -755,6 +755,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Todo, "005") => Rule::MissingTodoDescription,
         (Flake8Todo, "006") => Rule::InvalidTodoCapitalization,
         (Flake8Todo, "007") => Rule::MissingSpaceAfterTodoColon,
+
+        // flake8-async
+        (Flake8Async, "100") => Rule::SyncHttpCallInAsyncFunction,
+        (Flake8Async, "101") => Rule::BlockingSyncCallInAsyncFunction,
+        (Flake8Async, "102") => Rule::SyncProcessCallInAsyncFunction,
+
         _ => return None,
     })
 }

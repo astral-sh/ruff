@@ -1,0 +1,11 @@
+---
+source: crates/ruff/src/rules/flake8_async/mod.rs
+---
+ASYNC102.py:2:5: ASYNC102 Sync process call in async function, use framework equivalent
+  |
+2 | async def f():
+3 |     os.popen(foo)  # ASYNC102
+  |     ^^^^^^^^^^^^^ ASYNC102
+  |
+
+

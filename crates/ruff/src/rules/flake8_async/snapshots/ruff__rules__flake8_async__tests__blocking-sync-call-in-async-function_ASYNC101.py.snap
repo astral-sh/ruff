@@ -1,0 +1,39 @@
+---
+source: crates/ruff/src/rules/flake8_async/mod.rs
+---
+ASYNC101.py:6:5: ASYNC101 Blocking sync call in async function, use framework equivalent
+  |
+6 | async def f():
+7 |     time.sleep(0)  # ASYNC101
+  |     ^^^^^^^^^^^^^ ASYNC101
+  |
+
+ASYNC101.py:14:5: ASYNC101 Blocking sync call in async function, use framework equivalent
+   |
+14 | async def f():
+15 |     subprocess.run(0)  # ASYNC101
+   |     ^^^^^^^^^^^^^^^^^ ASYNC101
+   |
+
+ASYNC101.py:18:5: ASYNC101 Blocking sync call in async function, use framework equivalent
+   |
+18 | async def f():
+19 |     subprocess.call(0)  # ASYNC101
+   |     ^^^^^^^^^^^^^^^^^^ ASYNC101
+   |
+
+ASYNC101.py:22:5: ASYNC101 Blocking sync call in async function, use framework equivalent
+   |
+22 | async def f():
+23 |     open("foo")  # ASYNC101
+   |     ^^^^^^^^^^^ ASYNC101
+   |
+
+ASYNC101.py:30:5: ASYNC101 Blocking sync call in async function, use framework equivalent
+   |
+30 | async def f():
+31 |     os.wait(foo)  # ASYNC101
+   |     ^^^^^^^^^^^^ ASYNC101
+   |
+
+
