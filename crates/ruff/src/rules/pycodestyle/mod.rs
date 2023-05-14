@@ -185,10 +185,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pycodestyle/E501_2.py"),
             &settings::Settings {
-                pycodestyle: Settings {
-                    tab_size: tab_size.into(),
-                    ..Settings::default()
-                },
+                tab_size,
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
         )?;

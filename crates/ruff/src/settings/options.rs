@@ -311,6 +311,15 @@ pub struct Options {
     /// `E501`).
     pub line_length: Option<usize>,
     #[option(
+        default = "4",
+        value_type = "int",
+        example = r#"
+            tabulation-length = 8
+        "#
+    )]
+    /// The tabulation size to calculate line length.
+    pub tab_size: Option<u8>,
+    #[option(
         default = "None",
         value_type = "str",
         example = r#"

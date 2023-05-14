@@ -28,6 +28,8 @@ pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
 
 pub const LINE_LENGTH: usize = 88;
 
+pub const TAB_SIZE: u8 = 4;
+
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
 pub static DUMMY_VARIABLE_RGX: Lazy<Regex> =
@@ -77,6 +79,7 @@ impl Default for Settings {
             ignore_init_module_imports: false,
             include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
             line_length: LINE_LENGTH,
+            tab_size: TAB_SIZE,
             namespace_packages: vec![],
             per_file_ignores: vec![],
             respect_gitignore: true,

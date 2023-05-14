@@ -103,6 +103,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
         line_length: Some(defaults::LINE_LENGTH),
+        tab_size: Some(defaults::TAB_SIZE),
         select: Some(defaults::PREFIXES.to_vec()),
         target_version: Some(defaults::TARGET_VERSION),
         // Ignore a bunch of options that don't make sense in a single-file editor.

@@ -5,8 +5,6 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Generator;
 
-use super::settings::TabSize;
-
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
 }
@@ -31,9 +29,9 @@ pub(super) fn is_overlong(
     limit: usize,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
-    tab_size: TabSize,
+    tab_size: u8,
 ) -> Option<Overlong> {
-    let tab_size: usize = tab_size.into();
+    let tab_size = tab_size as usize;
     let mut start_offset = line.start();
     let mut width = 0;
 

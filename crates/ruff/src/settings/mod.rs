@@ -99,6 +99,7 @@ pub struct Settings {
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
+    pub tab_size: u8,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
     pub task_tags: Vec<String>,
@@ -161,6 +162,7 @@ impl Settings {
             )?,
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
             line_length: config.line_length.unwrap_or(defaults::LINE_LENGTH),
+            tab_size: config.tab_size.unwrap_or(defaults::TAB_SIZE),
             namespace_packages: config.namespace_packages.unwrap_or_default(),
             per_file_ignores: resolve_per_file_ignores(
                 config
