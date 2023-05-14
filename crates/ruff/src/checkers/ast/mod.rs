@@ -598,7 +598,7 @@ where
                 }
 
                 // Rules that apply to async functions only
-                if let StmtKind::AsyncFunctionDef(_) = &stmt.node {
+                if stmt.is_async_function_def_stmt() {
                     if self.settings.rules.any_enabled(&[
                         Rule::SyncHttpCallInAsyncFunction,
                         Rule::BlockingSyncCallInAsyncFunction,
