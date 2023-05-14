@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -56,6 +58,14 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             allow_multiline: Some(settings.allow_multiline),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            allow_multiline: self.allow_multiline.or(other.allow_multiline),
         }
     }
 }

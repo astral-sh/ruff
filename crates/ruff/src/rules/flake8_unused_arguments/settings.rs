@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -38,6 +40,13 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             ignore_variadic_names: Some(settings.ignore_variadic_names),
+        }
+    }
+}
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            ignore_variadic_names: self.ignore_variadic_names.or(other.ignore_variadic_names),
         }
     }
 }

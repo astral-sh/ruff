@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -34,6 +36,14 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             max_string_length: Some(settings.max_string_length),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            max_string_length: self.max_string_length.or(other.max_string_length),
         }
     }
 }

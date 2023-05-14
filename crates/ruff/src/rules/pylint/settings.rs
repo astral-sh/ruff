@@ -5,6 +5,8 @@ use ruff_macros::{CacheKey, ConfigurationOptions};
 use rustpython_parser::ast::Constant;
 use serde::{Deserialize, Serialize};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -114,6 +116,20 @@ impl From<Settings> for Options {
             max_returns: Some(settings.max_returns),
             max_branches: Some(settings.max_branches),
             max_statements: Some(settings.max_statements),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            allow_magic_value_types: self
+                .allow_magic_value_types
+                .or(other.allow_magic_value_types),
+            max_branches: self.max_branches.or(other.max_branches),
+            max_returns: self.max_returns.or(other.max_returns),
+            max_args: self.max_args.or(other.max_args),
+            max_statements: self.max_statements.or(other.max_statements),
         }
     }
 }

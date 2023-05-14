@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -38,6 +40,14 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             builtins_ignorelist: Some(settings.builtins_ignorelist),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            builtins_ignorelist: self.builtins_ignorelist.or(other.builtins_ignorelist),
         }
     }
 }

@@ -1,6 +1,6 @@
 //! Settings for the `pydocstyle` plugin.
 
-use crate::registry::Rule;
+use crate::{registry::Rule, settings::configuration::CombinePluginOptions};
 use ruff_macros::{CacheKey, ConfigurationOptions};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -134,6 +134,16 @@ impl From<Settings> for Options {
             convention: settings.convention,
             ignore_decorators: Some(settings.ignore_decorators.into_iter().collect()),
             property_decorators: Some(settings.property_decorators.into_iter().collect()),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            convention: self.convention.or(other.convention),
+            ignore_decorators: self.ignore_decorators.or(other.ignore_decorators),
+            property_decorators: self.property_decorators.or(other.property_decorators),
         }
     }
 }

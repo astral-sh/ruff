@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
     ("matplotlib", "mpl"),
@@ -129,6 +131,17 @@ impl From<Settings> for Options {
             extend_aliases: None,
             banned_aliases: None,
             banned_from: None,
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            aliases: self.aliases.or(other.aliases),
+            extend_aliases: self.extend_aliases.or(other.extend_aliases),
+            banned_aliases: self.banned_aliases.or(other.banned_aliases),
+            banned_from: self.banned_from.or(other.banned_from),
         }
     }
 }

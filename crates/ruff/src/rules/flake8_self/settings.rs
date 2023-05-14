@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 // By default, ignore the `namedtuple` methods and attributes, which are underscore-prefixed to
 // prevent conflicts with field names.
 const IGNORE_NAMES: [&str; 5] = ["_make", "_asdict", "_replace", "_fields", "_field_defaults"];
@@ -54,6 +56,13 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             ignore_names: Some(settings.ignore_names),
+        }
+    }
+}
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            ignore_names: self.ignore_names.or(other.ignore_names),
         }
     }
 }

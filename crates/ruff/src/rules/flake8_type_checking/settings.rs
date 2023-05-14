@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -96,6 +98,21 @@ impl From<Settings> for Options {
             exempt_modules: Some(settings.exempt_modules),
             runtime_evaluated_base_classes: Some(settings.runtime_evaluated_base_classes),
             runtime_evaluated_decorators: Some(settings.runtime_evaluated_decorators),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            strict: self.strict.or(other.strict),
+            exempt_modules: self.exempt_modules.or(other.exempt_modules),
+            runtime_evaluated_base_classes: self
+                .runtime_evaluated_base_classes
+                .or(other.runtime_evaluated_base_classes),
+            runtime_evaluated_decorators: self
+                .runtime_evaluated_decorators
+                .or(other.runtime_evaluated_decorators),
         }
     }
 }

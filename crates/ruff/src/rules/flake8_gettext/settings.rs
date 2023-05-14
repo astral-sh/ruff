@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -66,6 +68,19 @@ impl From<Settings> for Options {
         Self {
             function_names: Some(settings.functions_names),
             extend_function_names: vec![],
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            function_names: self.function_names.or(other.function_names),
+            extend_function_names: other
+                .extend_function_names
+                .into_iter()
+                .chain(self.extend_function_names.into_iter())
+                .collect(),
         }
     }
 }

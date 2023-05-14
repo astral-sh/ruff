@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -42,6 +44,16 @@ impl From<Settings> for Options {
             allow_dict_calls_with_keyword_arguments: Some(
                 settings.allow_dict_calls_with_keyword_arguments,
             ),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            allow_dict_calls_with_keyword_arguments: self
+                .allow_dict_calls_with_keyword_arguments
+                .or(other.allow_dict_calls_with_keyword_arguments),
         }
     }
 }

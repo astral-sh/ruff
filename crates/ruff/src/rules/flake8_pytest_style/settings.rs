@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::settings::configuration::CombinePluginOptions;
+
 use super::types;
 
 fn default_broad_exceptions() -> Vec<String> {
@@ -164,6 +166,28 @@ impl Default for Settings {
             raises_require_match_for: default_broad_exceptions(),
             raises_extend_require_match_for: vec![],
             mark_parentheses: true,
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            fixture_parentheses: self.fixture_parentheses.or(other.fixture_parentheses),
+            parametrize_names_type: self.parametrize_names_type.or(other.parametrize_names_type),
+            parametrize_values_type: self
+                .parametrize_values_type
+                .or(other.parametrize_values_type),
+            parametrize_values_row_type: self
+                .parametrize_values_row_type
+                .or(other.parametrize_values_row_type),
+            raises_require_match_for: self
+                .raises_require_match_for
+                .or(other.raises_require_match_for),
+            raises_extend_require_match_for: self
+                .raises_extend_require_match_for
+                .or(other.raises_extend_require_match_for),
+            mark_parentheses: self.mark_parentheses.or(other.mark_parentheses),
         }
     }
 }

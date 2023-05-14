@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use ruff_macros::CacheKey;
 use ruff_macros::ConfigurationOptions;
 
+use crate::settings::configuration::CombinePluginOptions;
+
 #[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions)]
 #[serde(
     deny_unknown_fields,
@@ -90,6 +92,20 @@ impl From<Settings> for Options {
             suppress_none_returning: Some(settings.suppress_none_returning),
             allow_star_arg_any: Some(settings.allow_star_arg_any),
             ignore_fully_untyped: Some(settings.ignore_fully_untyped),
+        }
+    }
+}
+
+impl CombinePluginOptions for Options {
+    fn combine(self, other: Self) -> Self {
+        Self {
+            mypy_init_return: self.mypy_init_return.or(other.mypy_init_return),
+            suppress_dummy_args: self.suppress_dummy_args.or(other.suppress_dummy_args),
+            suppress_none_returning: self
+                .suppress_none_returning
+                .or(other.suppress_none_returning),
+            allow_star_arg_any: self.allow_star_arg_any.or(other.allow_star_arg_any),
+            ignore_fully_untyped: self.ignore_fully_untyped.or(other.ignore_fully_untyped),
         }
     }
 }
