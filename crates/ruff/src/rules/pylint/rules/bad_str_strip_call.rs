@@ -9,6 +9,26 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
+/// ## What it does
+/// Checks duplicate characters in `str#strip` calls.
+///
+/// ## Why is this bad?
+/// All characters in `str#strip` calls are removed from both the leading and
+/// trailing ends of the string. Including duplicate characters in the call
+/// is redundant and often indicative of a mistake.
+///
+/// ## Example
+/// ```python
+/// "bar foo baz".strip("bar baz ")  # "foo"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "bar foo baz".strip("abrz ")  # "foo"
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[violation]
 pub struct BadStrStripCall {
     strip: StripKind,
