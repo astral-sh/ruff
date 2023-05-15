@@ -3671,7 +3671,7 @@ where
                     .rules
                     .enabled(Rule::ExplicitFStringTypeConversion)
                 {
-                    ruff::rules::explicit_f_string_type_conversion(self, expr, value, *conversion);
+                    ruff::rules::explicit_f_string_type_conversion(self, value, *conversion);
                 }
             }
             _ => {}

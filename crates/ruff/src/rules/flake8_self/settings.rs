@@ -2,13 +2,15 @@
 
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 // By default, ignore the `namedtuple` methods and attributes, which are underscore-prefixed to
 // prevent conflicts with field names.
 const IGNORE_NAMES: [&str; 5] = ["_make", "_asdict", "_replace", "_fields", "_field_defaults"];
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",

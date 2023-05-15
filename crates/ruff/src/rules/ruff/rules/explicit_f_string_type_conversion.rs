@@ -1,9 +1,7 @@
-use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -44,7 +42,6 @@ impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
 /// RUF010
 pub(crate) fn explicit_f_string_type_conversion(
     checker: &mut Checker,
-    expr: &Expr,
     formatted_value: &Expr,
     conversion: ast::Int,
 ) {
@@ -70,43 +67,29 @@ pub(crate) fn explicit_f_string_type_conversion(
         return;
     };
 
-    if !matches!(id.as_str(), "str" | "repr" | "ascii") {
-        return;
+    let conversion = match id.as_str() {
+        "ascii" => 'a',
+        "str" => 's',
+        "repr" => 'r',
+        _ => return,
     };
 
     if !checker.ctx.is_builtin(id) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, formatted_value.range());
+    let formatted_value_range = formatted_value.range();
+    let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, formatted_value_range);
 
     if checker.patch(diagnostic.kind.rule()) {
-        // Replace the call node with its argument and a conversion flag.
-        let mut conv_expr = expr.clone();
-        let ExprKind::FormattedValue(ast::ExprFormattedValue {
-            ref mut conversion,
-            ref mut value,
-            ..
-        }) = conv_expr.node else {
-            return;
-        };
-
-        *conversion = match id.as_str() {
-            "ascii" => ast::Int::new(ast::ConversionFlag::Ascii as u32),
-            "str" => ast::Int::new(ast::ConversionFlag::Str as u32),
-            "repr" => ast::Int::new(ast::ConversionFlag::Repr as u32),
-            &_ => unreachable!(),
-        };
-
-        value.node = args[0].node.clone();
-
-        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-            unparse_expr(&conv_expr, checker.stylist),
-            formatted_value
-                .range()
-                .sub_start(TextSize::from(1))
-                .add_end(TextSize::from(1)),
-        )));
+        let arg_range = args[0].range();
+        let remove_call = Edit::deletion(formatted_value_range.start(), arg_range.start());
+        let add_conversion = Edit::replacement(
+            format!("!{conversion}"),
+            arg_range.end(),
+            formatted_value_range.end(),
+        );
+        diagnostic.set_fix(Fix::automatic_edits(remove_call, [add_conversion]));
     }
 
     checker.diagnostics.push(diagnostic);
