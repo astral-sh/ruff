@@ -14,12 +14,12 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// area = (lambda r: 3.14 * r ** 2)(radius)
+/// area = (lambda r: 3.14 * r**2)(radius)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// area = 3.14 * radius ** 2
+/// area = 3.14 * radius**2
 /// ```
 ///
 /// ## References
@@ -35,8 +35,8 @@ impl Violation for UnnecessaryDirectLambdaCall {
 }
 
 /// PLC3002
-pub fn unnecessary_direct_lambda_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let ExprKind::Lambda { .. } = &func.node {
+pub(crate) fn unnecessary_direct_lambda_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
+    if let ExprKind::Lambda(_) = &func.node {
         checker
             .diagnostics
             .push(Diagnostic::new(UnnecessaryDirectLambdaCall, expr.range()));

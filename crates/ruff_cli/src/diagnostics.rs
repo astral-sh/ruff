@@ -25,17 +25,17 @@ use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use crate::cache;
 
 #[derive(Debug, Default, PartialEq)]
-pub struct Diagnostics {
-    pub messages: Vec<Message>,
-    pub fixed: FxHashMap<String, FixTable>,
-    pub imports: ImportMap,
+pub(crate) struct Diagnostics {
+    pub(crate) messages: Vec<Message>,
+    pub(crate) fixed: FxHashMap<String, FixTable>,
+    pub(crate) imports: ImportMap,
     /// Jupyter notebook indexing table for each input file that is a jupyter notebook
     /// so we can rewrite the diagnostics in the end
-    pub jupyter_index: FxHashMap<String, JupyterIndex>,
+    pub(crate) jupyter_index: FxHashMap<String, JupyterIndex>,
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
+    pub(crate) fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
@@ -100,7 +100,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
 }
 
 /// Lint the source code at the given `Path`.
-pub fn lint_path(
+pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
     settings: &AllSettings,
@@ -119,9 +119,7 @@ pub fn lint_path(
         && matches!(autofix, flags::FixMode::None | flags::FixMode::Generate)
     {
         let metadata = path.metadata()?;
-        if let Some((messages, imports)) =
-            cache::get(path, package, &metadata, settings, autofix.into())
-        {
+        if let Some((messages, imports)) = cache::get(path, package, &metadata, settings) {
             debug!("Cache hit for: {}", path.display());
             return Ok(Diagnostics::new(messages, imports));
         }
@@ -172,26 +170,12 @@ pub fn lint_path(
             (result, fixed)
         } else {
             // If we fail to autofix, lint the original source code.
-            let result = lint_only(
-                &contents,
-                path,
-                package,
-                &settings.lib,
-                noqa,
-                autofix.into(),
-            );
+            let result = lint_only(&contents, path, package, &settings.lib, noqa);
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
-        let result = lint_only(
-            &contents,
-            path,
-            package,
-            &settings.lib,
-            noqa,
-            autofix.into(),
-        );
+        let result = lint_only(&contents, path, package, &settings.lib, noqa);
         let fixed = FxHashMap::default();
         (result, fixed)
     };
@@ -209,20 +193,12 @@ pub fn lint_path(
 
         // Purge the cache.
         if let Some(metadata) = metadata {
-            cache::del(path, package, &metadata, settings, autofix.into());
+            cache::del(path, package, &metadata, settings);
         }
     } else {
         // Re-populate the cache.
         if let Some(metadata) = metadata {
-            cache::set(
-                path,
-                package,
-                &metadata,
-                settings,
-                autofix.into(),
-                &messages,
-                &imports,
-            );
+            cache::set(path, package, &metadata, settings, &messages, &imports);
         }
     }
 
@@ -250,7 +226,7 @@ pub fn lint_path(
 
 /// Generate `Diagnostic`s from source code content derived from
 /// stdin.
-pub fn lint_stdin(
+pub(crate) fn lint_stdin(
     path: Option<&Path>,
     package: Option<&Path>,
     contents: &str,
@@ -305,7 +281,6 @@ pub fn lint_stdin(
                 package,
                 settings,
                 noqa,
-                autofix.into(),
             );
             let fixed = FxHashMap::default();
 
@@ -323,7 +298,6 @@ pub fn lint_stdin(
             package,
             settings,
             noqa,
-            autofix.into(),
         );
         let fixed = FxHashMap::default();
         (result, fixed)

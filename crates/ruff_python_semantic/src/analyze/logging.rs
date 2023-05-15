@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_python_ast::call_path::collect_call_path;
 
@@ -17,9 +17,9 @@ use crate::context::Context;
 /// bar.error()
 /// ```
 pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
-    if let ExprKind::Attribute { value, .. } = &func.node {
+    if let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &func.node {
         let Some(call_path) = (if let Some(call_path) = context.resolve_call_path(value) {
-            if call_path.first().map_or(false, |module| *module == "logging") {
+            if call_path.first().map_or(false, |module| *module == "logging") || call_path.as_slice() == ["flask", "current_app", "logger"] {
                 Some(call_path)
             } else {
                 None

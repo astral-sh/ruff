@@ -1,12 +1,12 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::whitespace;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
@@ -48,7 +48,7 @@ impl AlwaysAutofixableViolation for OverIndentation {
 }
 
 /// D206, D207, D208
-pub fn indent(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     // Split the docstring into lines.
@@ -90,10 +90,11 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
                         TextRange::at(line.start(), line_indent.text_len()),
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -131,14 +132,14 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(over_indented.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    let new_indent = whitespace::clean(docstring.indentation);
-
-                    let edit = if new_indent.is_empty() {
+                    let indent = whitespace::clean(docstring.indentation);
+                    let edit = if indent.is_empty() {
                         Edit::range_deletion(over_indented)
                     } else {
-                        Edit::range_replacement(new_indent, over_indented)
+                        Edit::range_replacement(indent, over_indented)
                     };
-                    diagnostic.set_fix(edit);
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(edit));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -151,10 +152,15 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement(
-                        whitespace::clean(docstring.indentation),
-                        TextRange::at(last.start(), line_indent.text_len()),
-                    ));
+                    let indent = whitespace::clean(docstring.indentation);
+                    let range = TextRange::at(last.start(), line_indent.text_len());
+                    let edit = if indent.is_empty() {
+                        Edit::range_deletion(range)
+                    } else {
+                        Edit::range_replacement(indent, range)
+                    };
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(edit));
                 }
                 checker.diagnostics.push(diagnostic);
             }

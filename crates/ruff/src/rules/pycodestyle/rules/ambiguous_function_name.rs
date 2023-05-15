@@ -34,7 +34,7 @@ impl Violation for AmbiguousFunctionName {
 }
 
 /// E743
-pub fn ambiguous_function_name<F>(name: &str, locate: F) -> Option<Diagnostic>
+pub(crate) fn ambiguous_function_name<F>(name: &str, locate: F) -> Option<Diagnostic>
 where
     F: FnOnce() -> TextRange,
 {

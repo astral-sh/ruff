@@ -1,12 +1,10 @@
 #![cfg(target_arch = "wasm32")]
 
-use js_sys;
-
-use wasm_bindgen_test::*;
+use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff::registry::Rule;
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
-use ruff_wasm::*;
+use ruff_wasm::{check, ExpandedMessage};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{

@@ -6,7 +6,6 @@ use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
-use ruff_diagnostics::DiagnosticKind;
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 use ruff_text_size::{TextRange, TextSize};
 use std::borrow::Cow;
@@ -93,7 +92,7 @@ impl Emitter for TextEmitter {
                 col = diagnostic_location.column,
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
-                    message_kind: &message.kind,
+                    message,
                     show_fix_status: self.flags.contains(EmitterFlags::SHOW_FIX_STATUS)
                 }
             )?;
@@ -114,45 +113,35 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub message_kind: &'a DiagnosticKind,
-    pub show_fix_status: bool,
+    pub(crate) message: &'a Message,
+    pub(crate) show_fix_status: bool,
 }
 
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.show_fix_status && self.message_kind.fixable {
+        let kind = &self.message.kind;
+
+        if self.show_fix_status && self.message.fix.is_some() {
             write!(
                 f,
                 "{code} {autofix}{body}",
-                code = self
-                    .message_kind
-                    .rule()
-                    .noqa_code()
-                    .to_string()
-                    .red()
-                    .bold(),
+                code = kind.rule().noqa_code().to_string().red().bold(),
                 autofix = format_args!("[{}] ", "*".cyan()),
-                body = self.message_kind.body,
+                body = kind.body,
             )
         } else {
             write!(
                 f,
                 "{code} {body}",
-                code = self
-                    .message_kind
-                    .rule()
-                    .noqa_code()
-                    .to_string()
-                    .red()
-                    .bold(),
-                body = self.message_kind.body,
+                code = kind.rule().noqa_code().to_string().red().bold(),
+                body = kind.body,
             )
         }
     }
 }
 
 pub(super) struct MessageCodeFrame<'a> {
-    pub message: &'a Message,
+    pub(crate) message: &'a Message,
 }
 
 impl Display for MessageCodeFrame<'_> {
@@ -245,36 +234,39 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: TextSize = TextSize::new(4);
+    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `pycodestyle.tab-size`
 
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
     let mut column = 0;
 
-    for (index, m) in source.match_indices(['\t', '\n', '\r']) {
-        match m {
-            "\t" => {
-                let tab_width = TAB_SIZE - TextSize::new(column % 4);
+    for (index, c) in source.chars().enumerate() {
+        match c {
+            '\t' => {
+                let tab_width = TAB_SIZE - column % TAB_SIZE;
+                column += tab_width;
 
                 if index < usize::from(annotation_range.start()) {
-                    range += tab_width - TextSize::new(1);
+                    range += TextSize::new(tab_width - 1);
                 } else if index < usize::from(annotation_range.end()) {
-                    range = range.add_end(tab_width - TextSize::new(1));
+                    range = range.add_end(TextSize::new(tab_width - 1));
                 }
 
                 result.push_str(&source[last_end..index]);
 
-                for _ in 0..u32::from(tab_width) {
+                for _ in 0..tab_width {
                     result.push(' ');
                 }
 
                 last_end = index + 1;
             }
-            "\n" | "\r" => {
+            '\n' | '\r' => {
                 column = 0;
             }
-            _ => unreachable!(),
+            _ => {
+                column += 1;
+            }
         }
     }
 

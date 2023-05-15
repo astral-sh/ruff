@@ -38,14 +38,22 @@ fn generate_fix(
     } else {
         (stderr, stdout)
     };
-    Ok(Fix::new(vec![
+    #[allow(deprecated)]
+    Ok(Fix::unspecified_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
-        remove_argument(locator, func.start(), second.range(), args, keywords, false)?,
-    ]))
+        [remove_argument(
+            locator,
+            func.start(),
+            second.range(),
+            args,
+            keywords,
+            false,
+        )?],
+    ))
 }
 
 /// UP022
-pub fn replace_stdout_stderr(
+pub(crate) fn replace_stdout_stderr(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,7 +49,7 @@ use crate::checkers::ast::Checker;
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[violation]
 pub struct PrivateMemberAccess {
-    pub access: String,
+    access: String,
 }
 
 impl Violation for PrivateMemberAccess {
@@ -61,16 +61,21 @@ impl Violation for PrivateMemberAccess {
 }
 
 /// SLF001
-pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Attribute { value, attr, .. } = &expr.node {
+pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
+    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &expr.node {
         if (attr.starts_with("__") && !attr.ends_with("__"))
             || (attr.starts_with('_') && !attr.starts_with("__"))
         {
-            if checker.settings.flake8_self.ignore_names.contains(attr) {
+            if checker
+                .settings
+                .flake8_self
+                .ignore_names
+                .contains(attr.as_ref())
+            {
                 return;
             }
 
-            if let ExprKind::Call { func, .. } = &value.node {
+            if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
                 // Ignore `super()` calls.
                 if let Some(call_path) = collect_call_path(func) {
                     if call_path.as_slice() == ["super"] {

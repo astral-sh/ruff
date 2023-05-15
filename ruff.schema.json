@@ -428,17 +428,6 @@
         }
       ]
     },
-    "pyupgrade": {
-      "description": "Options for the `pyupgrade` plugin.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/PyUpgradeOptions"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "required-version": {
       "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
       "anyOf": [
@@ -531,13 +520,6 @@
       "items": {
         "$ref": "#/definitions/RuleSelector"
       }
-    },
-    "update-check": {
-      "description": "Enable or disable automatic update checks (overridden by the `--update-check` and `--no-update-check` command-line flags).",
-      "type": [
-        "boolean",
-        "null"
-      ]
     }
   },
   "additionalProperties": false,
@@ -730,8 +712,10 @@
       "properties": {
         "extend-function-names": {
           "description": "Additional function names to consider as internationalization calls, in addition to those included in `function-names`.",
-          "default": [],
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
@@ -1342,19 +1326,6 @@
       },
       "additionalProperties": false
     },
-    "PyUpgradeOptions": {
-      "type": "object",
-      "properties": {
-        "keep-runtime-typing": {
-          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and enabling it is equivalent to disabling `use-pep585-annotation` (`UP006`) and `use-pep604-annotation` (`UP007`) entirely.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
     "Pycodestyle": {
       "type": "object",
       "properties": {
@@ -1550,6 +1521,12 @@
         "ARG003",
         "ARG004",
         "ARG005",
+        "ASYNC",
+        "ASYNC1",
+        "ASYNC10",
+        "ASYNC100",
+        "ASYNC101",
+        "ASYNC102",
         "B",
         "B0",
         "B00",
@@ -1823,12 +1800,20 @@
         "F9",
         "F90",
         "F901",
+        "FA",
+        "FA1",
+        "FA10",
+        "FA100",
         "FBT",
         "FBT0",
         "FBT00",
         "FBT001",
         "FBT002",
         "FBT003",
+        "FLY",
+        "FLY0",
+        "FLY00",
+        "FLY002",
         "G",
         "G0",
         "G00",
@@ -1924,6 +1909,7 @@
         "PGH002",
         "PGH003",
         "PGH004",
+        "PGH005",
         "PIE",
         "PIE7",
         "PIE79",
@@ -1961,6 +1947,9 @@
         "PLE0116",
         "PLE0117",
         "PLE0118",
+        "PLE02",
+        "PLE024",
+        "PLE0241",
         "PLE03",
         "PLE030",
         "PLE0302",
@@ -2052,6 +2041,10 @@
         "PLW29",
         "PLW290",
         "PLW2901",
+        "PLW3",
+        "PLW33",
+        "PLW330",
+        "PLW3301",
         "PT",
         "PT0",
         "PT00",
@@ -2168,6 +2161,8 @@
         "RUF007",
         "RUF008",
         "RUF009",
+        "RUF01",
+        "RUF010",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -2293,6 +2288,16 @@
         "TCH003",
         "TCH004",
         "TCH005",
+        "TD",
+        "TD0",
+        "TD00",
+        "TD001",
+        "TD002",
+        "TD003",
+        "TD004",
+        "TD005",
+        "TD006",
+        "TD007",
         "TID",
         "TID2",
         "TID25",

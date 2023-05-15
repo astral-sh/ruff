@@ -22,7 +22,7 @@ impl Violation for ShebangMissingExecutableFile {
 
 /// EXE002
 #[cfg(target_family = "unix")]
-pub fn shebang_missing(filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing(filepath: &Path) -> Option<Diagnostic> {
     if let Ok(true) = is_executable(filepath) {
         let diagnostic = Diagnostic::new(ShebangMissingExecutableFile, TextRange::default());
         return Some(diagnostic);
@@ -31,6 +31,6 @@ pub fn shebang_missing(filepath: &Path) -> Option<Diagnostic> {
 }
 
 #[cfg(not(target_family = "unix"))]
-pub fn shebang_missing(_filepath: &Path) -> Option<Diagnostic> {
+pub(crate) fn shebang_missing(_filepath: &Path) -> Option<Diagnostic> {
     None
 }

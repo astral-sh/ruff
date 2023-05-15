@@ -3,26 +3,27 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::StmtKind;
+use rustpython_parser::ast::{self, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::{cast, whitespace};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pydocstyle::settings::Convention;
 
 #[violation]
 pub struct SectionNotOverIndented {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionNotOverIndented {
@@ -40,7 +41,7 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
 
 #[violation]
 pub struct SectionUnderlineNotOverIndented {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
@@ -58,7 +59,7 @@ impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
 
 #[violation]
 pub struct CapitalizeSectionName {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for CapitalizeSectionName {
@@ -76,7 +77,7 @@ impl AlwaysAutofixableViolation for CapitalizeSectionName {
 
 #[violation]
 pub struct NewLineAfterSectionName {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for NewLineAfterSectionName {
@@ -94,7 +95,7 @@ impl AlwaysAutofixableViolation for NewLineAfterSectionName {
 
 #[violation]
 pub struct DashedUnderlineAfterSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
@@ -112,7 +113,7 @@ impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
 
 #[violation]
 pub struct SectionUnderlineAfterName {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
@@ -130,7 +131,7 @@ impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
 
 #[violation]
 pub struct SectionUnderlineMatchesSectionLength {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
@@ -148,7 +149,7 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
 
 #[violation]
 pub struct NoBlankLineAfterSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
@@ -166,7 +167,7 @@ impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
 
 #[violation]
 pub struct NoBlankLineBeforeSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
@@ -184,7 +185,7 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
 
 #[violation]
 pub struct BlankLineAfterLastSection {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
@@ -202,7 +203,7 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
 
 #[violation]
 pub struct EmptyDocstringSection {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for EmptyDocstringSection {
@@ -215,7 +216,7 @@ impl Violation for EmptyDocstringSection {
 
 #[violation]
 pub struct SectionNameEndsInColon {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for SectionNameEndsInColon {
@@ -252,7 +253,7 @@ impl Violation for UndocumentedParam {
 
 #[violation]
 pub struct BlankLinesBetweenHeaderAndContent {
-    pub name: String,
+    name: String,
 }
 
 impl AlwaysAutofixableViolation for BlankLinesBetweenHeaderAndContent {
@@ -269,7 +270,11 @@ impl AlwaysAutofixableViolation for BlankLinesBetweenHeaderAndContent {
 
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
-pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option<&Convention>) {
+pub(crate) fn sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    convention: Option<&Convention>,
+) {
     match convention {
         Some(Convention::Google) => {
             parse_google_sections(
@@ -373,7 +378,8 @@ fn blanks_and_section_underline(
                         let range =
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and the underline.
-                        diagnostic.set_fix(Edit::range_deletion(range));
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
                     }
                     checker.diagnostics.push(diagnostic);
                 }
@@ -405,11 +411,12 @@ fn blanks_and_section_underline(
                             "-".repeat(context.section_name().len()),
                             checker.stylist.line_ending().as_str()
                         );
-                        diagnostic.set_fix(Edit::replacement(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                             content,
                             blank_lines_end,
                             non_blank_line.full_end(),
-                        ));
+                        )));
                     };
                     checker.diagnostics.push(diagnostic);
                 }
@@ -435,10 +442,11 @@ fn blanks_and_section_underline(
                         );
 
                         // Replace the existing indentation with whitespace of the appropriate length.
-                        diagnostic.set_fix(Edit::range_replacement(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             whitespace::clean(docstring.indentation),
                             range,
-                        ));
+                        )));
                     };
                     checker.diagnostics.push(diagnostic);
                 }
@@ -478,10 +486,11 @@ fn blanks_and_section_underline(
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             // Delete any blank lines between the header and content.
-                            diagnostic.set_fix(Edit::deletion(
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                                 line_after_dashes.start(),
                                 blank_lines_after_dashes_end,
-                            ));
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -516,7 +525,11 @@ fn blanks_and_section_underline(
                         whitespace::clean(docstring.indentation),
                         "-".repeat(context.section_name().len()),
                     );
-                    diagnostic.set_fix(Edit::insertion(content, context.summary_range().end()));
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                        content,
+                        context.summary_range().end(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -536,7 +549,8 @@ fn blanks_and_section_underline(
                         let range =
                             TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
-                        diagnostic.set_fix(Edit::range_deletion(range));
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
                     }
                     checker.diagnostics.push(diagnostic);
                 }
@@ -565,7 +579,11 @@ fn blanks_and_section_underline(
                     "-".repeat(context.section_name().len()),
                 );
 
-                diagnostic.set_fix(Edit::insertion(content, context.summary_range().end()));
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                    content,
+                    context.summary_range().end(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -599,10 +617,11 @@ fn common_section(
                 // Replace the section title with the capitalized variant. This requires
                 // locating the start and end of the section name.
                 let section_range = context.section_name_range();
-                diagnostic.set_fix(Edit::range_replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     capitalized_section_name.to_string(),
                     section_range,
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -622,11 +641,12 @@ fn common_section(
                 let content = whitespace::clean(docstring.indentation);
                 let fix_range = TextRange::at(context.range().start(), leading_space.text_len());
 
-                diagnostic.set_fix(if content.is_empty() {
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(if content.is_empty() {
                     Edit::range_deletion(fix_range)
                 } else {
                     Edit::range_replacement(content, fix_range)
-                });
+                }));
             };
             checker.diagnostics.push(diagnostic);
         }
@@ -649,7 +669,11 @@ fn common_section(
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline at the beginning of the next section.
-                    diagnostic.set_fix(Edit::insertion(line_end.to_string(), next.range().start()));
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                        line_end.to_string(),
+                        next.range().start(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -667,10 +691,11 @@ fn common_section(
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
-                    diagnostic.set_fix(Edit::insertion(
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                         format!("{}{}", line_end, docstring.indentation),
                         context.range().end(),
-                    ));
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -691,10 +716,11 @@ fn common_section(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a blank line before the section.
-                diagnostic.set_fix(Edit::insertion(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                     line_end.to_string(),
                     context.range().start(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -704,21 +730,22 @@ fn common_section(
 }
 
 fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
-    let (
-        DefinitionKind::Function(parent)
-        | DefinitionKind::NestedFunction(parent)
-        | DefinitionKind::Method(parent)
-    ) = docstring.kind else {
+    let Definition::Member(Member {
+        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
+        stmt,
+        ..
+    }) = docstring.definition else {
         return;
     };
+
     let (
-        StmtKind::FunctionDef {
+        StmtKind::FunctionDef(ast::StmtFunctionDef {
             args: arguments, ..
-        }
-        | StmtKind::AsyncFunctionDef {
+        })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             args: arguments, ..
-        }
-    ) = &parent.node else {
+        })
+    ) = &stmt.node else {
         return;
     };
 
@@ -732,12 +759,12 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
-                matches!(docstring.kind, DefinitionKind::Method(_))
-                    && !is_staticmethod(&checker.ctx, cast::decorator_list(parent)),
+                docstring.definition.is_method()
+                    && !is_staticmethod(&checker.ctx, cast::decorator_list(stmt)),
             ),
         )
     {
-        let arg_name = &arg.node.arg;
+        let arg_name = arg.node.arg.as_str();
         if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
@@ -746,7 +773,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if let Some(arg) = &arguments.vararg {
-        let arg_name = &arg.node.arg;
+        let arg_name = arg.node.arg.as_str();
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -756,7 +783,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         }
     }
     if let Some(arg) = &arguments.kwarg {
-        let arg_name = &arg.node.arg;
+        let arg_name = arg.node.arg.as_str();
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
             && !docstrings_args.contains(arg_name)
@@ -770,7 +797,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
             UndocumentedParam { names },
-            identifier_range(parent, checker.locator),
+            identifier_range(stmt, checker.locator),
         ));
     }
 }
@@ -893,10 +920,11 @@ fn numpy_section(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 let section_range = context.section_name_range();
-                diagnostic.set_fix(Edit::range_deletion(TextRange::at(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::at(
                     section_range.end(),
                     suffix.text_len(),
-                )));
+                ))));
             }
 
             checker.diagnostics.push(diagnostic);
@@ -930,10 +958,11 @@ fn google_section(
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the suffix.
                 let section_name_range = context.section_name_range();
-                diagnostic.set_fix(Edit::range_replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     ":".to_string(),
                     TextRange::at(section_name_range.end(), suffix.text_len()),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }

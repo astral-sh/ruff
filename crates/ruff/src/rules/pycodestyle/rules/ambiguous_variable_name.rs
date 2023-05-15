@@ -37,7 +37,7 @@ impl Violation for AmbiguousVariableName {
 }
 
 /// E741
-pub fn ambiguous_variable_name(name: &str, range: TextRange) -> Option<Diagnostic> {
+pub(crate) fn ambiguous_variable_name(name: &str, range: TextRange) -> Option<Diagnostic> {
     if is_ambiguous_name(name) {
         Some(Diagnostic::new(
             AmbiguousVariableName(name.to_string()),

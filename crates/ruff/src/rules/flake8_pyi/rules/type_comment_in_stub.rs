@@ -17,7 +17,7 @@ use ruff_macros::{derive_message_formats, violation};
 ///
 /// ## Example
 /// ```python
-/// x = 1 # type: int
+/// x = 1  # type: int
 /// ```
 ///
 /// Use instead:
@@ -35,7 +35,7 @@ impl Violation for TypeCommentInStub {
 }
 
 /// PYI033
-pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
+pub(crate) fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     for token in tokens.iter().flatten() {

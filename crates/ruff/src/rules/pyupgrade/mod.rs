@@ -2,7 +2,6 @@
 mod fixes;
 mod helpers;
 pub(crate) mod rules;
-pub mod settings;
 pub(crate) mod types;
 
 #[cfg(test)]
@@ -58,7 +57,8 @@ mod tests {
     #[test_case(Rule::FormatLiterals, Path::new("UP030_2.py"); "UP030_2")]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"); "UP031_0")]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"); "UP031_1")]
-    #[test_case(Rule::FString, Path::new("UP032.py"); "UP032")]
+    #[test_case(Rule::FString, Path::new("UP032_0.py"); "UP032_0")]
+    #[test_case(Rule::FString, Path::new("UP032_1.py"); "UP032_1")]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_0.py"); "UP033_0")]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_1.py"); "UP033_1")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]

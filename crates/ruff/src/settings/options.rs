@@ -1,9 +1,9 @@
 //! Options that the user can provide via pyproject.toml.
 
-use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::ConfigurationOptions;
 
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
@@ -11,14 +11,12 @@ use crate::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
-#[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"[]"#,
@@ -71,7 +69,7 @@ pub struct Options {
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     pub dummy_variable_rgx: Option<String>,
     #[option(
-        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
+        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
         value_type = "list[str]",
         example = r#"
             exclude = [".venv"]
@@ -164,7 +162,7 @@ pub struct Options {
     ///
     /// This option has been **deprecated** in favor of `ignore`
     /// since its usage is now interchangeable with `ignore`.
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schemars", schemars(skip))]
     pub extend_ignore: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",
@@ -448,14 +446,6 @@ pub struct Options {
     )]
     /// A list of rule codes or prefixes to consider non-autofix-able.
     pub unfixable: Option<Vec<RuleSelector>>,
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = "update-check = true"
-    )]
-    /// Enable or disable automatic update checks (overridden by the
-    /// `--update-check` and `--no-update-check` command-line flags).
-    pub update_check: Option<bool>,
     #[option_group]
     /// Options for the `flake8-annotations` plugin.
     pub flake8_annotations: Option<flake8_annotations::settings::Options>,
@@ -519,9 +509,6 @@ pub struct Options {
     #[option_group]
     /// Options for the `pylint` plugin.
     pub pylint: Option<pylint::settings::Options>,
-    #[option_group]
-    /// Options for the `pyupgrade` plugin.
-    pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     #[option(
         default = "{}",

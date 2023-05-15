@@ -39,7 +39,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push('\n');
 }
 
-pub fn generate() -> String {
+pub(crate) fn generate() -> String {
     // Generate the table string.
     let mut table_out = format!("The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option.\n\n");
     for linter in Linter::iter() {

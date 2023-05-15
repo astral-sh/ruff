@@ -3,14 +3,16 @@ use ruff_macros::CacheKey;
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
+const RULESET_SIZE: usize = 10;
+
 /// A set of [`Rule`]s.
 ///
 /// Uses a bitset where a bit of one signals that the Rule with that [u16] is in this set.
 #[derive(Clone, Default, CacheKey, PartialEq, Eq)]
-pub struct RuleSet([u64; 10]);
+pub struct RuleSet([u64; RULESET_SIZE]);
 
 impl RuleSet {
-    const EMPTY: [u64; 10] = [0; 10];
+    const EMPTY: [u64; RULESET_SIZE] = [0; RULESET_SIZE];
 
     // 64 fits into a u16 without truncation
     #[allow(clippy::cast_possible_truncation)]

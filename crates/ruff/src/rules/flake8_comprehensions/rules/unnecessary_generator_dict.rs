@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,7 +42,7 @@ impl AlwaysAutofixableViolation for UnnecessaryGeneratorDict {
 }
 
 /// C402 (`dict((x, y) for x, y in iterable)`)
-pub fn unnecessary_generator_dict(
+pub(crate) fn unnecessary_generator_dict(
     checker: &mut Checker,
     expr: &Expr,
     parent: Option<&Expr>,
@@ -53,12 +53,13 @@ pub fn unnecessary_generator_dict(
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
         return;
     };
-    if let ExprKind::GeneratorExp { elt, .. } = argument {
+    if let ExprKind::GeneratorExp(ast::ExprGeneratorExp { elt, .. }) = argument {
         match &elt.node {
-            ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
+            ExprKind::Tuple(ast::ExprTuple { elts, .. }) if elts.len() == 2 => {
                 let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
+                    #[allow(deprecated)]
+                    diagnostic.try_set_fix_from_edit(|| {
                         fixes::fix_unnecessary_generator_dict(
                             checker.locator,
                             checker.stylist,

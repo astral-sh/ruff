@@ -1,21 +1,16 @@
-use anyhow::{anyhow, Result};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::context::Context;
 
-use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
-use crate::importer::Importer;
 use crate::registry::Rule;
 
 #[violation]
 pub struct AbstractBaseClassWithoutAbstractMethod {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
@@ -25,23 +20,18 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
-
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
-    pub name: String,
+    name: String,
 }
 
-impl AlwaysAutofixableViolation for EmptyMethodWithoutAbstractDecorator {
+impl Violation for EmptyMethodWithoutAbstractDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let EmptyMethodWithoutAbstractDecorator { name } = self;
         format!(
             "`{name}` is an empty method in an abstract base class, but has no abstract decorator"
         )
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add the `@abstractmethod` decorator".to_string()
     }
 }
 
@@ -67,8 +57,8 @@ fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match &stmt.node {
         StmtKind::Pass => true,
-        StmtKind::Expr { value } => match &value.node {
-            ExprKind::Constant { value, .. } => {
+        StmtKind::Expr(ast::StmtExpr { value }) => match &value.node {
+            ExprKind::Constant(ast::ExprConstant { value, .. }) => {
                 matches!(value, Constant::Str(..) | Constant::Ellipsis)
             }
             _ => false,
@@ -77,29 +67,9 @@ fn is_empty_body(body: &[Stmt]) -> bool {
     })
 }
 
-fn fix_abstractmethod_missing(
-    context: &Context,
-    importer: &Importer,
-    locator: &Locator,
-    stylist: &Stylist,
-    stmt: &Stmt,
-) -> Result<Fix> {
-    let indent = indentation(locator, stmt).ok_or(anyhow!("Unable to detect indentation"))?;
-    let (import_edit, binding) =
-        get_or_import_symbol("abc", "abstractmethod", context, importer, locator)?;
-    let reference_edit = Edit::insertion(
-        format!(
-            "@{binding}{line_ending}{indent}",
-            line_ending = stylist.line_ending().as_str(),
-        ),
-        stmt.range().start(),
-    );
-    Ok(Fix::from_iter([import_edit, reference_edit]))
-}
-
 /// B024
 /// B027
-pub fn abstract_base_class(
+pub(crate) fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
@@ -118,23 +88,23 @@ pub fn abstract_base_class(
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
         // Ignore abc's that declares a class attribute that must be set
-        if let StmtKind::AnnAssign { .. } | StmtKind::Assign { .. } = &stmt.node {
+        if let StmtKind::AnnAssign(_) | StmtKind::Assign(_) = &stmt.node {
             has_abstract_method = true;
             continue;
         }
 
         let (
-            StmtKind::FunctionDef {
+            StmtKind::FunctionDef(ast::StmtFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
-            } | StmtKind::AsyncFunctionDef {
+            }) | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
-            }
+            })
         ) = &stmt.node else {
             continue;
         };
@@ -154,24 +124,12 @@ pub fn abstract_base_class(
             && is_empty_body(body)
             && !is_overload(&checker.ctx, decorator_list)
         {
-            let mut diagnostic = Diagnostic::new(
+            checker.diagnostics.push(Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
                 stmt.range(),
-            );
-            if checker.patch(Rule::EmptyMethodWithoutAbstractDecorator) {
-                diagnostic.try_set_fix(|| {
-                    fix_abstractmethod_missing(
-                        &checker.ctx,
-                        &checker.importer,
-                        checker.locator,
-                        checker.stylist,
-                        stmt,
-                    )
-                });
-            }
-            checker.diagnostics.push(diagnostic);
+            ));
         }
     }
     if checker

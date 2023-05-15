@@ -19,12 +19,11 @@
 //! ```
 
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
 
@@ -66,18 +65,12 @@ impl Violation for UnusedLoopControlVariable {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedLoopControlVariable {
-            certainty, rename, ..
-        } = self;
-        if certainty.to_bool() && rename.is_some() {
-            Some(|UnusedLoopControlVariable { name, rename, .. }| {
-                let rename = rename.as_ref().unwrap();
-                format!("Rename unused `{name}` to `{rename}`")
-            })
-        } else {
-            None
-        }
+    fn autofix_title(&self) -> Option<String> {
+        let UnusedLoopControlVariable { rename, name, .. } = self;
+
+        rename
+            .as_ref()
+            .map(|rename| format!("Rename unused `{name}` to `{rename}`"))
     }
 }
 
@@ -100,7 +93,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let ExprKind::Name { id, .. } = &expr.node {
+        if let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node {
             self.names.insert(id, expr);
         }
         visitor::walk_expr(self, expr);
@@ -108,12 +101,7 @@ where
 }
 
 /// B007
-pub fn unused_loop_control_variable(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    target: &Expr,
-    body: &[Stmt],
-) {
+pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
     let control_names = {
         let mut finder = NameFinder::new();
         finder.visit_expr(target);
@@ -170,13 +158,16 @@ pub fn unused_loop_control_variable(
                     let binding = &checker.ctx.bindings[*index];
                     binding
                         .source
-                        .as_ref()
-                        .and_then(|source| (source == &RefEquality(stmt)).then_some(binding))
+                        .and_then(|source| (Some(source) == checker.ctx.stmt_id).then_some(binding))
                 });
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {
                         if !binding.used() {
-                            diagnostic.set_fix(Edit::range_replacement(rename, expr.range()));
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                rename,
+                                expr.range(),
+                            )));
                         }
                     }
                 }

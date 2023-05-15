@@ -1,6 +1,6 @@
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -9,25 +9,27 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct IfExprWithTrueFalse {
-    pub expr: String,
+    expr: String,
 }
 
-impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
+impl Violation for IfExprWithTrueFalse {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let IfExprWithTrueFalse { expr } = self;
         format!("Use `bool({expr})` instead of `True if {expr} else False`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let IfExprWithTrueFalse { expr } = self;
-        format!("Replace with `not {expr}")
+        Some(format!("Replace with `not {expr}"))
     }
 }
 
 #[violation]
 pub struct IfExprWithFalseTrue {
-    pub expr: String,
+    expr: String,
 }
 
 impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
@@ -45,8 +47,8 @@ impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
 
 #[violation]
 pub struct IfExprWithTwistedArms {
-    pub expr_body: String,
-    pub expr_else: String,
+    expr_body: String,
+    expr_else: String,
 }
 
 impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
@@ -72,20 +74,20 @@ impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
 }
 
 /// SIM210
-pub fn explicit_true_false_in_ifexpr(
+pub(crate) fn explicit_true_false_in_ifexpr(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::Constant { value, .. } = &body.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &body.node else {
         return;
     };
     if !matches!(value, Constant::Bool(true)) {
         return;
     }
-    let ExprKind::Constant { value, .. } = &orelse.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &orelse.node else {
         return;
     };
     if !matches!(value, Constant::Bool(false)) {
@@ -99,17 +101,19 @@ pub fn explicit_true_false_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if matches!(test.node, ExprKind::Compare { .. }) {
-            diagnostic.set_fix(Edit::range_replacement(
+        if matches!(test.node, ExprKind::Compare(_)) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&test.clone(), checker.stylist),
                 expr.range(),
-            ));
+            )));
         } else if checker.ctx.is_builtin("bool") {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
-                    &create_expr(ExprKind::Call {
-                        func: Box::new(create_expr(ExprKind::Name {
-                            id: "bool".to_string(),
+                    &create_expr(ast::ExprCall {
+                        func: Box::new(create_expr(ast::ExprName {
+                            id: "bool".into(),
                             ctx: ExprContext::Load,
                         })),
                         args: vec![test.clone()],
@@ -118,27 +122,27 @@ pub fn explicit_true_false_in_ifexpr(
                     checker.stylist,
                 ),
                 expr.range(),
-            ));
+            )));
         };
     }
     checker.diagnostics.push(diagnostic);
 }
 
 /// SIM211
-pub fn explicit_false_true_in_ifexpr(
+pub(crate) fn explicit_false_true_in_ifexpr(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::Constant { value, .. } = &body.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. }) = &body.node else {
         return;
     };
     if !matches!(value, Constant::Bool(false)) {
         return;
     }
-    let ExprKind::Constant { value, .. } = &orelse.node else {
+    let ExprKind::Constant(ast::ExprConstant { value, .. }) = &orelse.node else {
         return;
     };
     if !matches!(value, Constant::Bool(true)) {
@@ -152,29 +156,30 @@ pub fn explicit_false_true_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::UnaryOp {
+                &create_expr(ast::ExprUnaryOp {
                     op: Unaryop::Not,
                     operand: Box::new(create_expr(test.node.clone())),
                 }),
                 checker.stylist,
             ),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
 
 /// SIM212
-pub fn twisted_arms_in_ifexpr(
+pub(crate) fn twisted_arms_in_ifexpr(
     checker: &mut Checker,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
     orelse: &Expr,
 ) {
-    let ExprKind::UnaryOp { op, operand: test_operand } = &test.node else {
+    let ExprKind::UnaryOp(ast::ExprUnaryOp { op, operand: test_operand } )= &test.node else {
         return;
     };
     if !matches!(op, Unaryop::Not) {
@@ -182,10 +187,10 @@ pub fn twisted_arms_in_ifexpr(
     }
 
     // Check if the test operand and else branch use the same variable.
-    let ExprKind::Name { id: test_id, .. } = &test_operand.node else {
+    let ExprKind::Name(ast::ExprName { id: test_id, .. } )= &test_operand.node else {
         return;
     };
-    let ExprKind::Name {id: orelse_id, ..} = &orelse.node else {
+    let ExprKind::Name(ast::ExprName {id: orelse_id, ..}) = &orelse.node else {
         return;
     };
     if !test_id.eq(orelse_id) {
@@ -200,9 +205,10 @@ pub fn twisted_arms_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::IfExp {
+                &create_expr(ast::ExprIfExp {
                     test: Box::new(create_expr(orelse.node.clone())),
                     body: Box::new(create_expr(orelse.node.clone())),
                     orelse: Box::new(create_expr(body.node.clone())),
@@ -210,7 +216,7 @@ pub fn twisted_arms_in_ifexpr(
                 checker.stylist,
             ),
             expr.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

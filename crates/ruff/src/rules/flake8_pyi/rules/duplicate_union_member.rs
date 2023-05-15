@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::unparse_expr;
@@ -11,7 +11,7 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct DuplicateUnionMember {
-    pub duplicate_name: String,
+    duplicate_name: String,
 }
 
 impl AlwaysAutofixableViolation for DuplicateUnionMember {
@@ -26,7 +26,7 @@ impl AlwaysAutofixableViolation for DuplicateUnionMember {
 }
 
 /// PYI016
-pub fn duplicate_union_member(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn duplicate_union_member(checker: &mut Checker, expr: &Expr) {
     let mut seen_nodes = FxHashSet::default();
     traverse_union(&mut seen_nodes, checker, expr, None);
 }
@@ -45,11 +45,11 @@ fn traverse_union<'a>(
     //
     // So we have to traverse both branches in order (left, then right), to report duplicates
     // in the order they appear in the source code.
-    if let ExprKind::BinOp {
+    if let ExprKind::BinOp(ast::ExprBinOp {
         op: Operator::BitOr,
         left,
         right,
-    } = &expr.node
+    }) = &expr.node
     {
         // Traverse left subtree, then the right subtree, propagating the previous node.
         traverse_union(seen_nodes, checker, left, Some(expr));
@@ -72,18 +72,19 @@ fn traverse_union<'a>(
             let parent = parent.expect("Parent node must exist");
 
             // SAFETY: Parent node must have been a `BinOp` in order for us to have traversed it.
-            let ExprKind::BinOp { left, right, .. } = &parent.node else {
+            let ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) = &parent.node else {
                 panic!("Parent node must be a BinOp");
             };
 
             // Replace the parent with its non-duplicate child.
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
                     if expr.node == left.node { right } else { left },
                     checker.stylist,
                 ),
                 parent.range(),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -1,13 +1,11 @@
 [build-system]
-requires = ["maturin>=0.14.10,<0.15"]
-# We depend on >=0.14.10 because we specify name in
-# [package.metadata.maturin] in ruff_cli/Cargo.toml.
+requires = ["maturin>=0.15.1,<0.16"]
 
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.264"
+version = "0.0.267"
 description = "An extremely fast Python linter, written in Rust."
 authors = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
 maintainers = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
@@ -39,10 +37,23 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Topic :: Software Development :: Quality Assurance",
 ]
-urls = { repository = "https://github.com/charliermarsh/ruff" }
+
+[project.urls]
+Repository = "https://github.com/charliermarsh/ruff"
+Documentation = "https://beta.ruff.rs/docs/"
+Changelog = "https://github.com/charliermarsh/ruff/releases"
 
 [tool.maturin]
 bindings = "bin"
 manifest-path = "crates/ruff_cli/Cargo.toml"
+module-name = "ruff"
 python-source = "python"
 strip = true
+
+[tool.black]
+force-exclude = '''
+/(
+  | crates/ruff/resources
+  | crates/ruff_python_formatter/resources
+)/
+'''

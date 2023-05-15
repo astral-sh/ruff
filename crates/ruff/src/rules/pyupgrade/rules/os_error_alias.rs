@@ -1,6 +1,6 @@
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
@@ -63,10 +63,11 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         target.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             "OSError".to_string(),
             target.range(),
-        ));
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -75,7 +76,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, target.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let ExprKind::Tuple { elts, ..} = &target.node else {
+        let ExprKind::Tuple(ast::ExprTuple { elts, ..}) = &target.node else {
             panic!("Expected ExprKind::Tuple");
         };
 
@@ -95,24 +96,26 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         if elts.iter().all(|elt| !is_os_error(&checker.ctx, elt)) {
             remaining.insert(
                 0,
-                create_expr(ExprKind::Name {
-                    id: "OSError".to_string(),
+                create_expr(ast::ExprName {
+                    id: "OSError".into(),
                     ctx: ExprContext::Load,
                 }),
             );
         }
 
         if remaining.len() == 1 {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "OSError".to_string(),
                 target.range(),
-            ));
+            )));
         } else {
-            diagnostic.set_fix(Edit::range_replacement(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 format!(
                     "({})",
                     unparse_expr(
-                        &create_expr(ExprKind::Tuple {
+                        &create_expr(ast::ExprTuple {
                             elts: remaining,
                             ctx: ExprContext::Load,
                         }),
@@ -120,26 +123,27 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                     )
                 ),
                 target.range(),
-            ));
+            )));
         }
     }
     checker.diagnostics.push(diagnostic);
 }
 
 /// UP024
-pub fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]) {
+pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
+        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
+            &handler.node;
         let Some(expr) = type_.as_ref() else {
             continue;
         };
         match &expr.node {
-            ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
+            ExprKind::Name(_) | ExprKind::Attribute(_) => {
                 if is_alias(&checker.ctx, expr) {
                     atom_diagnostic(checker, expr);
                 }
             }
-            ExprKind::Tuple { elts, .. } => {
+            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                 // List of aliases to replace with `OSError`.
                 let mut aliases: Vec<&Expr> = vec![];
                 for elt in elts {
@@ -157,18 +161,15 @@ pub fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]
 }
 
 /// UP024
-pub fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
     if is_alias(&checker.ctx, func) {
         atom_diagnostic(checker, func);
     }
 }
 
 /// UP024
-pub fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
-    if matches!(
-        expr.node,
-        ExprKind::Name { .. } | ExprKind::Attribute { .. }
-    ) {
+pub(crate) fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
+    if matches!(expr.node, ExprKind::Name(_) | ExprKind::Attribute(_)) {
         if is_alias(&checker.ctx, expr) {
             atom_diagnostic(checker, expr);
         }

@@ -10,13 +10,16 @@ use ruff_python_ast::source_code::Locator;
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
-pub mod actions;
+pub(crate) mod actions;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {
+pub(crate) fn fix_file(
+    diagnostics: &[Diagnostic],
+    locator: &Locator,
+) -> Option<(String, FixTable)> {
     let mut with_fixes = diagnostics
         .iter()
-        .filter(|diag| !diag.fix.is_empty())
+        .filter(|diag| diag.fix.is_some())
         .peekable();
 
     if with_fixes.peek().is_none() {
@@ -38,11 +41,10 @@ fn apply_fixes<'a>(
 
     for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
-            if diagnostic.fix.is_empty() {
-                None
-            } else {
-                Some((diagnostic.kind.rule(), &diagnostic.fix))
-            }
+            diagnostic
+                .fix
+                .as_ref()
+                .map(|fix| (diagnostic.kind.rule(), fix))
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
@@ -103,18 +105,20 @@ mod tests {
 
     use ruff_diagnostics::Diagnostic;
     use ruff_diagnostics::Edit;
+    use ruff_diagnostics::Fix;
     use ruff_python_ast::source_code::Locator;
 
     use crate::autofix::apply_fixes;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
+    #[allow(deprecated)]
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
         edit.into_iter()
             .map(|edit| Diagnostic {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
-                fix: edit.into(),
+                fix: Some(Fix::unspecified(edit)),
                 parent: None,
             })
             .collect()

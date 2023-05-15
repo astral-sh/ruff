@@ -1,6 +1,6 @@
-use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, ArgData, Expr, ExprKind, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::scope::ScopeKind;
 
@@ -24,7 +24,7 @@ impl AlwaysAutofixableViolation for SuperCallWithParameters {
 
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         id == "super" && !args.is_empty()
     } else {
         false
@@ -32,21 +32,25 @@ fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 }
 
 /// UP008
-pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn super_call_with_parameters(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
     if !is_super_call_with_arguments(func, args) {
         return;
     }
     let scope = checker.ctx.scope();
-    let parents: Vec<&Stmt> = checker.ctx.parents.iter().map(Into::into).collect();
 
     // Check: are we in a Function scope?
-    if !matches!(scope.kind, ScopeKind::Function { .. }) {
+    if !matches!(scope.kind, ScopeKind::Function(_)) {
         return;
     }
 
-    let mut parents = parents.iter().rev();
+    let mut parents = checker.ctx.parents();
 
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
@@ -56,10 +60,10 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     };
 
     // Find the enclosing function definition (if any).
-    let Some(StmtKind::FunctionDef {
+    let Some(StmtKind::FunctionDef(ast::StmtFunctionDef {
         args: parent_args, ..
-    }) = parents
-        .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef { .. }))
+    })) = parents
+        .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef ( _)))
         .map(|stmt| &stmt.node) else {
         return;
     };
@@ -72,21 +76,21 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     };
 
     // Find the enclosing class definition (if any).
-    let Some(StmtKind::ClassDef {
+    let Some(StmtKind::ClassDef(ast::StmtClassDef {
         name: parent_name, ..
-    }) = parents
-        .find(|stmt| matches!(stmt.node, StmtKind::ClassDef { .. }))
+    })) = parents
+        .find(|stmt| matches!(stmt.node, StmtKind::ClassDef (_)))
         .map(|stmt| &stmt.node) else {
         return;
     };
 
     let (
-        ExprKind::Name {
+        ExprKind::Name(ast::ExprName {
             id: first_arg_id, ..
-        },
-        ExprKind::Name {
+        }),
+        ExprKind::Name(ast::ExprName {
             id: second_arg_id, ..
-        },
+        }),
     ) = (&first_arg.node, &second_arg.node) else {
         return;
     };
@@ -97,8 +101,9 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(fix) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
-            diagnostic.set_fix(fix);
+        if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(edit));
         }
     }
     checker.diagnostics.push(diagnostic);

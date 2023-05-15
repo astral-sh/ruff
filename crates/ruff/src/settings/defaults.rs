@@ -1,11 +1,10 @@
+use std::collections::HashSet;
+
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
-use std::collections::HashSet;
 
-use super::types::{FilePattern, PythonVersion};
-use super::Settings;
 use crate::codes::{self, RuleCodePrefix};
 use crate::registry::Linter;
 use crate::rule_selector::{prefix_to_selector, RuleSelector};
@@ -14,9 +13,11 @@ use crate::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use crate::settings::types::FilePatternSet;
+
+use super::types::{FilePattern, PythonVersion};
+use super::Settings;
 
 pub const PREFIXES: &[RuleSelector] = &[
     prefix_to_selector(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E)),
@@ -38,6 +39,7 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
         FilePattern::Builtin(".direnv"),
         FilePattern::Builtin(".eggs"),
         FilePattern::Builtin(".git"),
+        FilePattern::Builtin(".git-rewrite"),
         FilePattern::Builtin(".hg"),
         FilePattern::Builtin(".mypy_cache"),
         FilePattern::Builtin(".nox"),
@@ -78,7 +80,6 @@ impl Default for Settings {
             namespace_packages: vec![],
             per_file_ignores: vec![],
             respect_gitignore: true,
-            show_source: false,
             src: vec![path_dedot::CWD.clone()],
             project_root: path_dedot::CWD.clone(),
             target_version: TARGET_VERSION,
@@ -105,7 +106,6 @@ impl Default for Settings {
             pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
             pylint: pylint::settings::Settings::default(),
-            pyupgrade: pyupgrade::settings::Settings::default(),
         }
     }
 }

@@ -4,11 +4,10 @@ use std::collections::BTreeSet;
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
@@ -16,8 +15,9 @@ use crate::warn_user_once;
 
 use super::categorize::ImportSection;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
     /// "further" imports (more `.` characters, least local).
@@ -34,13 +34,14 @@ impl Default for RelativeImportsOrder {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
 )]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "IsortOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"false"#,

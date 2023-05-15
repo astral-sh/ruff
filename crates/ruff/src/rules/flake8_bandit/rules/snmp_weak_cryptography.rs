@@ -20,7 +20,7 @@ impl Violation for SnmpWeakCryptography {
 }
 
 /// S509
-pub fn snmp_weak_cryptography(
+pub(crate) fn snmp_weak_cryptography(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

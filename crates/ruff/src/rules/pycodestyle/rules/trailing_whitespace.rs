@@ -1,11 +1,11 @@
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
 use crate::registry::Rule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 /// ## What it does
 /// Checks for superfluous trailing whitespace.
@@ -75,11 +75,7 @@ impl AlwaysAutofixableViolation for BlankLineWithWhitespace {
 }
 
 /// W291, W293
-pub(crate) fn trailing_whitespace(
-    line: &Line,
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Option<Diagnostic> {
+pub(crate) fn trailing_whitespace(line: &Line, settings: &Settings) -> Option<Diagnostic> {
     let whitespace_len: TextSize = line
         .chars()
         .rev()
@@ -92,19 +88,17 @@ pub(crate) fn trailing_whitespace(
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
-                if matches!(autofix, flags::Autofix::Enabled)
-                    && settings.rules.should_fix(Rule::BlankLineWithWhitespace)
-                {
-                    diagnostic.set_fix(Edit::range_deletion(range));
+                if settings.rules.should_fix(Rule::BlankLineWithWhitespace) {
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
                 }
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
-            if matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(Rule::TrailingWhitespace)
-            {
-                diagnostic.set_fix(Edit::range_deletion(range));
+            if settings.rules.should_fix(Rule::TrailingWhitespace) {
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
             }
             return Some(diagnostic);
         }

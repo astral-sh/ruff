@@ -1,19 +1,16 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 #[violation]
 pub struct BlankLineAfterSummary {
-    pub num_lines: usize,
+    num_lines: usize,
 }
 
-fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String {
-    "Insert single blank line".to_string()
-}
 impl Violation for BlankLineAfterSummary {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
@@ -29,17 +26,13 @@ impl Violation for BlankLineAfterSummary {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let BlankLineAfterSummary { num_lines } = self;
-        if *num_lines > 0 {
-            return Some(fmt_blank_line_after_summary_autofix_msg);
-        }
-        None
+    fn autofix_title(&self) -> Option<String> {
+        Some("Insert single blank line".to_string())
     }
 }
 
 /// D205
-pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines_count: usize = 1;
@@ -82,11 +75,12 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
                 }
 
                 // Insert one blank line after the summary (replacing any existing lines).
-                diagnostic.set_fix(Edit::replacement(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                     checker.stylist.line_ending().to_string(),
                     summary_end,
                     blank_end,
-                ));
+                )));
             }
         }
         checker.diagnostics.push(diagnostic);

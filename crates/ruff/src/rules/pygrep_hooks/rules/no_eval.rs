@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,8 +39,8 @@ impl Violation for Eval {
 }
 
 /// PGH001
-pub fn no_eval(checker: &mut Checker, func: &Expr) {
-    let ExprKind::Name { id, .. } = &func.node else {
+pub(crate) fn no_eval(checker: &mut Checker, func: &Expr) {
+    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
         return;
     };
     if id != "eval" {

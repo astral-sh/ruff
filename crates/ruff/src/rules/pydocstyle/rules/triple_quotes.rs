@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 
 #[violation]
 pub struct TripleSingleQuotes;
@@ -15,7 +15,7 @@ impl Violation for TripleSingleQuotes {
 }
 
 /// D300
-pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let leading_quote = docstring.leading_quote().to_ascii_lowercase();

@@ -3,10 +3,10 @@ use std::cmp::Ordering;
 use log::error;
 use num_bigint::{BigInt, Sign};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
+use rustpython_parser::ast::{self, Attributed, Cmpop, Constant, Expr, ExprKind, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::RefEquality;
@@ -52,7 +52,7 @@ impl BlockMetadata {
     }
 }
 
-fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata> {
+fn metadata<T>(locator: &Locator, located: &Attributed<T>) -> Option<BlockMetadata> {
     indentation(locator, located)?;
 
     let line_start = locator.line_start(located.start());
@@ -64,7 +64,7 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
     let mut elif = None;
     let mut else_ = None;
 
-    for (tok, range) in lexer::lex_located(text, Mode::Module, line_start)
+    for (tok, range) in lexer::lex_starts_at(text, Mode::Module, line_start)
         .flatten()
         .filter(|(tok, _)| {
             !matches!(
@@ -107,10 +107,10 @@ fn bigint_to_u32(number: &BigInt) -> u32 {
 fn extract_version(elts: &[Expr]) -> Vec<u32> {
     let mut version: Vec<u32> = vec![];
     for elt in elts {
-        if let ExprKind::Constant {
+        if let ExprKind::Constant(ast::ExprConstant {
             value: Constant::Int(item),
             ..
-        } = &elt.node
+        }) = &elt.node
         {
             let number = bigint_to_u32(item);
             version.push(number);
@@ -155,18 +155,18 @@ fn fix_py2_block(
     body: &[Stmt],
     orelse: &[Stmt],
     block: &BlockMetadata,
-) -> Option<Edit> {
+) -> Option<Fix> {
     if orelse.is_empty() {
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.ctx.current_stmt();
-        let defined_in = checker.ctx.current_stmt_parent();
+        let defined_by = checker.ctx.stmt();
+        let defined_in = checker.ctx.stmt_parent();
         return match delete_stmt(
-            defined_by.into(),
+            defined_by,
             if block.starter == Tok::If {
-                defined_in.map(Into::into)
+                defined_in
             } else {
                 None
             },
@@ -175,9 +175,10 @@ fn fix_py2_block(
             checker.indexer,
             checker.stylist,
         ) {
-            Ok(fix) => {
-                checker.deletions.insert(RefEquality(defined_by.into()));
-                Some(fix)
+            Ok(edit) => {
+                checker.deletions.insert(RefEquality(defined_by));
+                #[allow(deprecated)]
+                Some(Fix::unspecified(edit))
             }
             Err(err) => {
                 error!("Failed to remove block: {}", err);
@@ -193,13 +194,14 @@ fn fix_py2_block(
 
         if indentation(checker.locator, start).is_none() {
             // Inline `else` block (e.g., `else: x = 1`).
-            Some(Edit::range_replacement(
+            #[allow(deprecated)]
+            Some(Fix::unspecified(Edit::range_replacement(
                 checker
                     .locator
                     .slice(TextRange::new(start.start(), end.end()))
                     .to_string(),
                 stmt.range(),
-            ))
+            )))
         } else {
             indentation(checker.locator, stmt)
                 .and_then(|indentation| {
@@ -212,11 +214,12 @@ fn fix_py2_block(
                     .ok()
                 })
                 .map(|contents| {
-                    Edit::replacement(
+                    #[allow(deprecated)]
+                    Fix::unspecified(Edit::replacement(
                         contents,
                         checker.locator.line_start(stmt.start()),
                         stmt.end(),
-                    )
+                    ))
                 })
         }
     } else {
@@ -233,7 +236,8 @@ fn fix_py2_block(
                 end_location = body.last().unwrap().end();
             }
         }
-        Some(Edit::deletion(stmt.start(), end_location))
+        #[allow(deprecated)]
+        Some(Fix::unspecified(Edit::deletion(stmt.start(), end_location)))
     }
 }
 
@@ -244,7 +248,7 @@ fn fix_py3_block(
     test: &Expr,
     body: &[Stmt],
     block: &BlockMetadata,
-) -> Option<Edit> {
+) -> Option<Fix> {
     match block.starter {
         Tok::If => {
             // If the first statement is an if, use the body of this statement, and ignore
@@ -254,13 +258,14 @@ fn fix_py3_block(
 
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
-                Some(Edit::range_replacement(
+                #[allow(deprecated)]
+                Some(Fix::unspecified(Edit::range_replacement(
                     checker
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
                     stmt.range(),
-                ))
+                )))
             } else {
                 indentation(checker.locator, stmt)
                     .and_then(|indentation| {
@@ -273,11 +278,12 @@ fn fix_py3_block(
                         .ok()
                     })
                     .map(|contents| {
-                        Edit::replacement(
+                        #[allow(deprecated)]
+                        Fix::unspecified(Edit::replacement(
                             contents,
                             checker.locator.line_start(stmt.start()),
                             stmt.end(),
-                        )
+                        ))
                     })
             }
         }
@@ -286,25 +292,29 @@ fn fix_py3_block(
             // the rest.
             let end = body.last().unwrap();
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
-            Some(Edit::range_replacement(format!("else{text}"), stmt.range()))
+            #[allow(deprecated)]
+            Some(Fix::unspecified(Edit::range_replacement(
+                format!("else{text}"),
+                stmt.range(),
+            )))
         }
         _ => None,
     }
 }
 
 /// UP036
-pub fn outdated_version_block(
+pub(crate) fn outdated_version_block(
     checker: &mut Checker,
     stmt: &Stmt,
     test: &Expr,
     body: &[Stmt],
     orelse: &[Stmt],
 ) {
-    let ExprKind::Compare {
+    let ExprKind::Compare(ast::ExprCompare {
         left,
         ops,
         comparators,
-    } = &test.node else {
+    }) = &test.node else {
         return;
     };
 
@@ -322,7 +332,7 @@ pub fn outdated_version_block(
         let comparison = &comparators[0].node;
         let op = &ops[0];
         match comparison {
-            ExprKind::Tuple { elts, .. } => {
+            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
                 let version = extract_version(elts);
                 let target = checker.settings.target_version;
                 if op == &Cmpop::Lt || op == &Cmpop::LtE {
@@ -354,10 +364,10 @@ pub fn outdated_version_block(
                     }
                 }
             }
-            ExprKind::Constant {
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Int(number),
                 ..
-            } => {
+            }) => {
                 let version_number = bigint_to_u32(number);
                 if version_number == 2 && op == &Cmpop::Eq {
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());

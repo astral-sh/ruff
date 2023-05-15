@@ -1,11 +1,11 @@
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_common::format::{
+use rustpython_format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, KeywordData};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
 
@@ -42,7 +42,7 @@ impl<'a> FormatSummaryValues<'a> {
     fn try_from_expr(checker: &'a Checker, expr: &'a Expr) -> Option<Self> {
         let mut extracted_args: Vec<String> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, String> = FxHashMap::default();
-        if let ExprKind::Call { args, keywords, .. } = &expr.node {
+        if let ExprKind::Call(ast::ExprCall { args, keywords, .. }) = &expr.node {
             for arg in args {
                 let arg = checker.locator.slice(arg.range());
                 if contains_invalids(arg) {
@@ -104,18 +104,18 @@ fn contains_invalids(string: &str) -> bool {
 
 /// Generate an f-string from an [`Expr`].
 fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
-    let ExprKind::Call { func, .. } = &expr.node else {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
         return None;
     };
-    let ExprKind::Attribute { value, .. } = &func.node else {
+    let ExprKind::Attribute(ast::ExprAttribute { value, .. }) = &func.node else {
         return None;
     };
     if !matches!(
         &value.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(..),
             ..
-        },
+        }),
     ) {
         return None;
     };
@@ -267,13 +267,21 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
     let existing = checker.locator.slice(TextRange::up_to(expr.start()));
-    if existing.chars().last().unwrap().is_ascii_alphabetic() {
+    if existing
+        .chars()
+        .last()
+        .map_or(false, |char| char.is_ascii_alphabetic())
+    {
         contents.insert(0, ' ');
     }
 
     let mut diagnostic = Diagnostic::new(FString, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            expr.range(),
+        )));
     };
     checker.diagnostics.push(diagnostic);
 }

@@ -1,8 +1,8 @@
 use itertools::izip;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 
@@ -36,12 +36,15 @@ impl From<&Cmpop> for EqCmpop {
 /// ## Example
 /// ```python
 /// if arg != None:
+///     pass
 /// if None == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is not None:
+///     pass
 /// ```
 ///
 /// ## References
@@ -78,13 +81,17 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// ## Example
 /// ```python
 /// if arg == True:
+///     pass
 /// if False == arg:
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if arg is True:
+///     pass
 /// if arg is False:
+///     pass
 /// ```
 ///
 /// ## References
@@ -124,7 +131,7 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
 }
 
 /// E711, E712
-pub fn literal_comparisons(
+pub(crate) fn literal_comparisons(
     checker: &mut Checker,
     expr: &Expr,
     left: &Expr,
@@ -150,10 +157,10 @@ pub fn literal_comparisons(
         if check_none_comparisons
             && matches!(
                 comparator.node,
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::None,
                     kind: None
-                }
+                })
             )
         {
             if matches!(op, Cmpop::Eq) {
@@ -173,10 +180,10 @@ pub fn literal_comparisons(
         }
 
         if check_true_false_comparisons {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Bool(value),
                 kind: None,
-            } = comparator.node
+            }) = comparator.node
             {
                 if matches!(op, Cmpop::Eq) {
                     let diagnostic =
@@ -208,10 +215,10 @@ pub fn literal_comparisons(
         if check_none_comparisons
             && matches!(
                 next.node,
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::None,
                     kind: None
-                }
+                })
             )
         {
             if matches!(op, Cmpop::Eq) {
@@ -231,10 +238,10 @@ pub fn literal_comparisons(
         }
 
         if check_true_false_comparisons {
-            if let ExprKind::Constant {
+            if let ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Bool(value),
                 kind: None,
-            } = next.node
+            }) = next.node
             {
                 if matches!(op, Cmpop::Eq) {
                     let diagnostic =
@@ -270,7 +277,11 @@ pub fn literal_comparisons(
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Edit::range_replacement(content.to_string(), expr.range()));
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                content.to_string(),
+                expr.range(),
+            )));
         }
     }
 

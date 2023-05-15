@@ -276,7 +276,6 @@ mod tests {
             &directives,
             &settings,
             flags::Noqa::Enabled,
-            flags::Autofix::Enabled,
         );
         diagnostics.sort_by_key(Diagnostic::start);
         let actual = diagnostics

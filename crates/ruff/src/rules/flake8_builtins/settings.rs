@@ -1,18 +1,18 @@
 //! Settings for the `flake8-builtins` plugin.
 
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
+    Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, CombineOptions,
 )]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "Flake8BuiltinsOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"[]"#,

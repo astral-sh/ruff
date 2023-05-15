@@ -30,10 +30,13 @@ pub trait Violation: Debug + PartialEq + Eq {
         None
     }
 
-    /// If autofix is (potentially) available for this violation returns another
-    /// function that in turn can be used to obtain a string describing the
-    /// autofix.
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+    // TODO micha: Move `autofix_title` to `Fix`, add new `advice` method that is shown as an advice.
+    // Change the `Diagnostic` renderer to show the advice, and render the fix message after the `Suggested fix: <here>`
+
+    /// Returns the title for the autofix. The message is also shown as an advice as part of the diagnostics.
+    ///
+    /// Required for rules that have autofixes.
+    fn autofix_title(&self) -> Option<String> {
         None
     }
 
@@ -72,8 +75,8 @@ impl<VA: AlwaysAutofixableViolation> Violation for VA {
         <Self as AlwaysAutofixableViolation>::explanation()
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(Self::autofix_title)
+    fn autofix_title(&self) -> Option<String> {
+        Some(<Self as AlwaysAutofixableViolation>::autofix_title(self))
     }
 
     fn message_formats() -> &'static [&'static str] {

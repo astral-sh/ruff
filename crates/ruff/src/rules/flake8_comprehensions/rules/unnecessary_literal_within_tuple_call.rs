@@ -12,7 +12,7 @@ use super::helpers;
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
 /// arguments.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,
 /// since there is a literal syntax for these types.
 ///
@@ -33,7 +33,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryLiteralWithinTupleCall {
-    pub literal: String,
+    literal: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
@@ -66,7 +66,7 @@ impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub fn unnecessary_literal_within_tuple_call(
+pub(crate) fn unnecessary_literal_within_tuple_call(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -83,8 +83,8 @@ pub fn unnecessary_literal_within_tuple_call(
         return;
     }
     let argument_kind = match argument {
-        ExprKind::Tuple { .. } => "tuple",
-        ExprKind::List { .. } => "list",
+        ExprKind::Tuple(_) => "tuple",
+        ExprKind::List(_) => "list",
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(
@@ -94,7 +94,8 @@ pub fn unnecessary_literal_within_tuple_call(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_literal_within_tuple_call(checker.locator, checker.stylist, expr)
         });
     }

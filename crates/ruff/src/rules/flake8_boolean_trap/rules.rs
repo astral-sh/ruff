@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -38,11 +38,13 @@ impl Violation for BooleanPositionalValueInFunctionCall {
 }
 
 const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
+    "append",
     "assertEqual",
     "assertEquals",
     "assertNotEqual",
     "assertNotEquals",
     "bytes",
+    "count",
     "failIfEqual",
     "failUnlessEqual",
     "float",
@@ -53,9 +55,11 @@ const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "getfloat",
     "getint",
     "index",
+    "insert",
     "int",
     "param",
     "pop",
+    "remove",
     "setattr",
     "setdefault",
     "str",
@@ -67,11 +71,11 @@ const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
 fn allow_boolean_trap(func: &Expr) -> bool {
-    if let ExprKind::Attribute { attr, .. } = &func.node {
+    if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&attr.as_ref());
     }
 
-    if let ExprKind::Name { id, .. } = &func.node {
+    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&id.as_ref());
     }
 
@@ -81,10 +85,10 @@ fn allow_boolean_trap(func: &Expr) -> bool {
 const fn is_boolean_arg(arg: &Expr) -> bool {
     matches!(
         &arg.node,
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Bool(_),
             ..
-        }
+        })
     )
 }
 
@@ -94,7 +98,7 @@ fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     }
 }
 
-pub fn check_positional_boolean_in_def(
+pub(crate) fn check_positional_boolean_in_def(
     checker: &mut Checker,
     name: &str,
     decorator_list: &[Expr],
@@ -120,11 +124,11 @@ pub fn check_positional_boolean_in_def(
 
         // check for both bool (python class) and 'bool' (string annotation)
         let hint = match &expr.node {
-            ExprKind::Name { id, .. } => id == "bool",
-            ExprKind::Constant {
+            ExprKind::Name(name) => &name.id == "bool",
+            ExprKind::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
-            } => value == "bool",
+            }) => value == "bool",
             _ => false,
         };
         if !hint {
@@ -137,7 +141,7 @@ pub fn check_positional_boolean_in_def(
     }
 }
 
-pub fn check_boolean_default_value_in_function_definition(
+pub(crate) fn check_boolean_default_value_in_function_definition(
     checker: &mut Checker,
     name: &str,
     decorator_list: &[Expr],
@@ -158,7 +162,7 @@ pub fn check_boolean_default_value_in_function_definition(
     }
 }
 
-pub fn check_boolean_positional_value_in_function_call(
+pub(crate) fn check_boolean_positional_value_in_function_call(
     checker: &mut Checker,
     args: &[Expr],
     func: &Expr,

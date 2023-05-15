@@ -1,5 +1,5 @@
-pub use add_required_imports::{add_required_imports, MissingRequiredImport};
-pub use organize_imports::{organize_imports, UnsortedImports};
+pub(crate) use add_required_imports::{add_required_imports, MissingRequiredImport};
+pub(crate) use organize_imports::{organize_imports, UnsortedImports};
 
-pub mod add_required_imports;
-pub mod organize_imports;
+pub(crate) mod add_required_imports;
+pub(crate) mod organize_imports;

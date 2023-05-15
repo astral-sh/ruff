@@ -13,7 +13,7 @@ impl Violation for HardcodedBindAllInterfaces {
 }
 
 /// S104
-pub fn hardcoded_bind_all_interfaces(value: &str, range: TextRange) -> Option<Diagnostic> {
+pub(crate) fn hardcoded_bind_all_interfaces(value: &str, range: TextRange) -> Option<Diagnostic> {
     if value == "0.0.0.0" {
         Some(Diagnostic::new(HardcodedBindAllInterfaces, range))
     } else {

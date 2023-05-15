@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -29,14 +29,14 @@ fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
 }
 
 /// B019
-pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
+pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
     if !matches!(checker.ctx.scope().kind, ScopeKind::Class(_)) {
         return;
     }
     for decorator in decorator_list {
         // TODO(charlie): This should take into account `classmethod-decorators` and
         // `staticmethod-decorators`.
-        if let ExprKind::Name { id, .. } = &decorator.node {
+        if let ExprKind::Name(ast::ExprName { id, .. }) = &decorator.node {
             if id == "classmethod" || id == "staticmethod" {
                 return;
             }
@@ -46,7 +46,7 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
         if is_cache_func(
             checker,
             match &decorator.node {
-                ExprKind::Call { func, .. } => func,
+                ExprKind::Call(ast::ExprCall { func, .. }) => func,
                 _ => decorator,
             },
         ) {

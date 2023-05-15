@@ -1,6 +1,6 @@
 use crate::message::Message;
 use colored::{Color, ColoredString, Colorize, Styles};
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::{Applicability, Fix};
 use ruff_python_ast::source_code::{OneIndexed, SourceFile};
 use ruff_text_size::{TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
@@ -21,15 +21,11 @@ pub(super) struct Diff<'a> {
 }
 
 impl<'a> Diff<'a> {
-    pub fn from_message(message: &'a Message) -> Option<Diff> {
-        if message.fix.is_empty() {
-            None
-        } else {
-            Some(Diff {
-                source_code: &message.file,
-                fix: &message.fix,
-            })
-        }
+    pub(crate) fn from_message(message: &'a Message) -> Option<Diff> {
+        message.fix.as_ref().map(|fix| Diff {
+            source_code: &message.file,
+            fix,
+        })
     }
 }
 
@@ -51,7 +47,13 @@ impl Display for Diff<'_> {
 
         let diff = TextDiff::from_lines(self.source_code.source_text(), &output);
 
-        writeln!(f, "{}", "ℹ Suggested fix".blue())?;
+        let message = match self.fix.applicability() {
+            Applicability::Automatic => "Fix",
+            Applicability::Suggested => "Suggested fix",
+            Applicability::Manual => "Possible fix",
+            Applicability::Unspecified => "Suggested fix", // For backwards compatibility, unspecified fixes are 'suggested'
+        };
+        writeln!(f, "ℹ {}", message.blue())?;
 
         let (largest_old, largest_new) = diff
             .ops()

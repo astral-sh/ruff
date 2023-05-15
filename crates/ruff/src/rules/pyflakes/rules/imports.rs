@@ -44,17 +44,14 @@ impl Violation for UnusedImport {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedImport { context, .. } = self;
-        context
-            .is_none()
-            .then_some(|UnusedImport { name, multiple, .. }| {
-                if *multiple {
-                    "Remove unused import".to_string()
-                } else {
-                    format!("Remove unused import: `{name}`")
-                }
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let UnusedImport { name, multiple, .. } = self;
+
+        Some(if *multiple {
+            "Remove unused import".to_string()
+        } else {
+            format!("Remove unused import: `{name}`")
+        })
     }
 }
 #[violation]
@@ -127,7 +124,7 @@ impl Violation for UndefinedLocalWithNestedImportStarUsage {
 
 #[violation]
 pub struct FutureFeatureNotDefined {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for FutureFeatureNotDefined {
@@ -138,8 +135,8 @@ impl Violation for FutureFeatureNotDefined {
     }
 }
 
-pub fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
-    if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
+pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
+    if !ALL_FEATURE_NAMES.contains(&alias.node.name.as_str()) {
         checker.diagnostics.push(Diagnostic::new(
             FutureFeatureNotDefined {
                 name: alias.node.name.to_string(),

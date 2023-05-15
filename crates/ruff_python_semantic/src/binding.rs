@@ -3,10 +3,8 @@ use std::ops::{Deref, Index, IndexMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Stmt;
 
-use ruff_python_ast::types::RefEquality;
-
+use crate::node::NodeId;
 use crate::scope::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -16,7 +14,7 @@ pub struct Binding<'a> {
     /// The context in which the binding was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<RefEquality<'a, Stmt>>,
+    pub source: Option<NodeId>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a runtime context.
     pub runtime_usage: Option<(ScopeId, TextRange)>,
@@ -187,7 +185,7 @@ impl From<BindingId> for usize {
 #[derive(Debug, Clone)]
 pub struct StarImportation<'a> {
     /// The level of the import. `None` or `Some(0)` indicate an absolute import.
-    pub level: Option<usize>,
+    pub level: Option<u32>,
     /// The module being imported. `None` indicates a wildcard import.
     pub module: Option<&'a str>,
 }

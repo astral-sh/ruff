@@ -45,7 +45,7 @@ fn get_docs(attrs: &[Attribute]) -> Result<String> {
     Ok(explanation)
 }
 
-pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
+pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
     let ident = &violation.ident;
     let explanation = get_docs(&violation.attrs)?;
     let violation = if explanation.trim().is_empty() {
@@ -59,8 +59,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        fixable: value.autofix_title_formatter().is_some(),
-                        suggestion: value.autofix_title_formatter().map(|f| f(&value)),
+                        suggestion: Violation::autofix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }
@@ -83,8 +82,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
 
                     Self {
                         body: Violation::message(&value),
-                        fixable: value.autofix_title_formatter().is_some(),
-                        suggestion: value.autofix_title_formatter().map(|f| f(&value)),
+                        suggestion: Violation::autofix_title(&value),
                         name: stringify!(#ident).to_string(),
                     }
                 }

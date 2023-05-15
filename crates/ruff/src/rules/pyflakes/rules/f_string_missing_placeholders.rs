@@ -2,7 +2,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -54,7 +54,7 @@ fn find_useless_f_strings<'a>(
     locator: &'a Locator,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
     let contents = locator.slice(expr.range());
-    lexer::lex_located(contents, Mode::Module, expr.start())
+    lexer::lex_starts_at(contents, Mode::Module, expr.start())
         .flatten()
         .filter_map(|(tok, range)| match tok {
             Tok::String {
@@ -87,20 +87,21 @@ fn fix_f_string_missing_placeholders(
     prefix_range: TextRange,
     tok_range: TextRange,
     checker: &mut Checker,
-) -> Edit {
+) -> Fix {
     let content = &checker.locator.contents()[TextRange::new(prefix_range.end(), tok_range.end())];
-    Edit::replacement(
+    #[allow(deprecated)]
+    Fix::unspecified(Edit::replacement(
         unescape_f_string(content),
         prefix_range.start(),
         tok_range.end(),
-    )
+    ))
 }
 
 /// F541
-pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
+pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
         .iter()
-        .any(|value| matches!(value.node, ExprKind::FormattedValue { .. }))
+        .any(|value| matches!(value.node, ExprKind::FormattedValue(_)))
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);

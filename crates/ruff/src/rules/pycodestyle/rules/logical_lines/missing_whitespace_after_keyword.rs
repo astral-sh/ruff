@@ -1,6 +1,3 @@
-use itertools::Itertools;
-use ruff_text_size::TextRange;
-
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use ruff_diagnostics::Violation;
@@ -22,7 +19,10 @@ pub(crate) fn missing_whitespace_after_keyword(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
-    for (tok0, tok1) in line.tokens().iter().tuple_windows() {
+    for window in line.tokens().windows(2) {
+        let tok0 = &window[0];
+        let tok1 = &window[1];
+
         let tok0_kind = tok0.kind();
         let tok1_kind = tok1.kind();
 
@@ -34,7 +34,7 @@ pub(crate) fn missing_whitespace_after_keyword(
                 || matches!(tok1_kind, TokenKind::Colon | TokenKind::Newline))
             && tok0.end() == tok1.start()
         {
-            context.push(MissingWhitespaceAfterKeyword, TextRange::empty(tok0.end()));
+            context.push(MissingWhitespaceAfterKeyword, tok0.range());
         }
     }
 }

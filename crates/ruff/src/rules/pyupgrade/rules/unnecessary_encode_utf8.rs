@@ -1,8 +1,8 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -11,14 +11,14 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Reason {
+pub(crate) enum Reason {
     BytesLiteral,
     DefaultArgument,
 }
 
 #[violation]
 pub struct UnnecessaryEncodeUTF8 {
-    pub reason: Reason,
+    reason: Reason,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
@@ -38,11 +38,11 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
 fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
-    let ExprKind::Attribute {
+    let ExprKind::Attribute(ast::ExprAttribute {
         value: variable,
         attr,
         ..
-    } = &func.node else {
+    }) = &func.node else {
         return None;
     };
     if attr != "encode" {
@@ -52,10 +52,10 @@ fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
 }
 
 fn is_utf8_encoding_arg(arg: &Expr) -> bool {
-    if let ExprKind::Constant {
+    if let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } = &arg.node
+    }) = &arg.node
     {
         UTF8_LITERALS.contains(&value.to_lowercase().as_str())
     } else {
@@ -106,34 +106,35 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
     None
 }
 
-/// Return an [`Edit`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -> Edit {
+/// Return a [`Fix`] replacing the call to encode with a byte string.
+fn replace_with_bytes_literal(locator: &Locator, expr: &Expr) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let contents = locator.slice(constant.range());
+    let contents = locator.slice(expr.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
-    let mut prev = None;
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, constant.start()).flatten() {
-        if matches!(tok, Tok::String { .. }) {
-            if let Some(prev) = prev {
+    let mut prev = expr.start();
+    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, expr.start()).flatten() {
+        match tok {
+            Tok::Dot => break,
+            Tok::String { .. } => {
                 replacement.push_str(locator.slice(TextRange::new(prev, range.start())));
+                let string = locator.slice(range);
+                replacement.push_str(&format!(
+                    "b{}",
+                    &string.trim_start_matches('u').trim_start_matches('U')
+                ));
             }
-            let string = locator.slice(range);
-            replacement.push_str(&format!(
-                "b{}",
-                &string.trim_start_matches('u').trim_start_matches('U')
-            ));
-        } else {
-            if let Some(prev) = prev {
+            _ => {
                 replacement.push_str(locator.slice(TextRange::new(prev, range.end())));
             }
         }
-        prev = Some(range.end());
+        prev = range.end();
     }
-    Edit::range_replacement(replacement, expr.range())
+    #[allow(deprecated)]
+    Fix::unspecified(Edit::range_replacement(replacement, expr.range()))
 }
 
 /// UP012
-pub fn unnecessary_encode_utf8(
+pub(crate) fn unnecessary_encode_utf8(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -144,10 +145,10 @@ pub fn unnecessary_encode_utf8(
         return;
     };
     match &variable.node {
-        ExprKind::Constant {
+        ExprKind::Constant(ast::ExprConstant {
             value: Constant::Str(literal),
             ..
-        } => {
+        }) => {
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
             if let Some(encoding_arg) = match_encoding_arg(args, kwargs) {
                 if literal.is_ascii() {
@@ -159,11 +160,7 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.set_fix(replace_with_bytes_literal(
-                            checker.locator,
-                            expr,
-                            variable,
-                        ));
+                        diagnostic.set_fix(replace_with_bytes_literal(checker.locator, expr));
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
@@ -176,7 +173,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -197,7 +195,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -213,7 +212,7 @@ pub fn unnecessary_encode_utf8(
             }
         }
         // Ex) `f"foo{bar}".encode("utf-8")`
-        ExprKind::JoinedStr { .. } => {
+        ExprKind::JoinedStr(_) => {
             if let Some(encoding_arg) = match_encoding_arg(args, kwargs) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to
@@ -225,7 +224,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),
@@ -246,7 +246,8 @@ pub fn unnecessary_encode_utf8(
                         expr.range(),
                     );
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
+                        #[allow(deprecated)]
+                        diagnostic.try_set_fix_from_edit(|| {
                             remove_argument(
                                 checker.locator,
                                 func.start(),

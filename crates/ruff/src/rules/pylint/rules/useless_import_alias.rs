@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Alias;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -36,7 +36,7 @@ impl AlwaysAutofixableViolation for UselessImportAlias {
 }
 
 /// PLC0414
-pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
+pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     let Some(asname) = &alias.node.asname else {
         return;
     };
@@ -49,7 +49,11 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(asname.to_string(), alias.range()));
+        #[allow(deprecated)]
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            asname.to_string(),
+            alias.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

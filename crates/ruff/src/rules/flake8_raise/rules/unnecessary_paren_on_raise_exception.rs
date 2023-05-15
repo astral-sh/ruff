@@ -1,6 +1,6 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::match_parens;
 
@@ -22,19 +22,20 @@ impl AlwaysAutofixableViolation for UnnecessaryParenOnRaiseException {
 }
 
 /// RSE102
-pub fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Call {
+pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) {
+    if let ExprKind::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    } = &expr.node
+    }) = &expr.node
     {
         if args.is_empty() && keywords.is_empty() {
             let range = match_parens(func.end(), checker.locator)
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::deletion(func.end(), range.end()));
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::deletion(func.end(), range.end())));
             }
             checker.diagnostics.push(diagnostic);
         }

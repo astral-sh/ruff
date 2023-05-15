@@ -70,24 +70,30 @@ pub(crate) struct Printer {
     log_level: LogLevel,
     autofix_level: flags::FixMode,
     flags: Flags,
+    /// Dev-only argument to show fixes
+    #[cfg(feature = "ecosystem_ci")]
+    ecosystem_ci: bool,
 }
 
 impl Printer {
-    pub const fn new(
+    pub(crate) const fn new(
         format: SerializationFormat,
         log_level: LogLevel,
         autofix_level: flags::FixMode,
         flags: Flags,
+        #[cfg(feature = "ecosystem_ci")] ecosystem_ci: bool,
     ) -> Self {
         Self {
             format,
             log_level,
             autofix_level,
             flags,
+            #[cfg(feature = "ecosystem_ci")]
+            ecosystem_ci,
         }
     }
 
-    pub fn write_to_user(&self, message: &str) {
+    pub(crate) fn write_to_user(&self, message: &str) {
         if self.log_level >= LogLevel::Default {
             notify_user!("{}", message);
         }
@@ -118,7 +124,7 @@ impl Printer {
                     let num_fixable = diagnostics
                         .messages
                         .iter()
-                        .filter(|message| message.kind.fixable)
+                        .filter(|message| message.fix.is_some())
                         .count();
                     if num_fixable > 0 {
                         writeln!(
@@ -147,7 +153,11 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_once(&self, diagnostics: &Diagnostics, writer: &mut impl Write) -> Result<()> {
+    pub(crate) fn write_once(
+        &self,
+        diagnostics: &Diagnostics,
+        writer: &mut impl Write,
+    ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -179,8 +189,14 @@ impl Printer {
                 JunitEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Text => {
+                #[cfg(feature = "ecosystem_ci")]
+                let show_fixes = self.ecosystem_ci && self.flags.contains(Flags::SHOW_FIXES);
+                #[cfg(not(feature = "ecosystem_ci"))]
+                let show_fixes = false;
+
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.autofix_level))
+                    .with_show_fix(show_fixes)
                     .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
 
@@ -228,7 +244,7 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub(crate) fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
@@ -236,7 +252,7 @@ impl Printer {
                 (
                     message.kind.rule(),
                     &message.kind.body,
-                    message.kind.fixable,
+                    message.fix.is_some(),
                 )
             })
             .sorted()
@@ -323,7 +339,7 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub(crate) fn write_continuously(&self, diagnostics: &Diagnostics) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
@@ -357,7 +373,7 @@ impl Printer {
         Ok(())
     }
 
-    pub fn clear_screen() -> Result<()> {
+    pub(crate) fn clear_screen() -> Result<()> {
         #[cfg(not(target_family = "wasm"))]
         clearscreen::clear()?;
         Ok(())

@@ -13,20 +13,20 @@ use ruff_python_ast::source_code::Locator;
 use crate::cst::helpers::{expand_indented_block, find_tok, is_elif};
 use crate::trivia::{Parenthesize, Trivia};
 
-pub mod helpers;
-pub mod visitor;
+pub(crate) mod helpers;
+pub(crate) mod visitor;
 
 type Ident = String;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Located<T> {
+pub struct Attributed<T> {
     pub range: TextRange,
     pub node: T,
     pub trivia: Vec<Trivia>,
     pub parentheses: Parenthesize,
 }
 
-impl<T> Located<T> {
+impl<T> Attributed<T> {
     pub fn new(range: TextRange, node: T) -> Self {
         Self {
             range,
@@ -57,7 +57,7 @@ impl<T> Located<T> {
     }
 }
 
-impl<T> Deref for Located<T> {
+impl<T> Deref for Attributed<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.node
@@ -96,7 +96,7 @@ impl From<&rustpython_parser::ast::Boolop> for BoolOpKind {
     }
 }
 
-pub type BoolOp = Located<BoolOpKind>;
+pub(crate) type BoolOp = Attributed<BoolOpKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum OperatorKind {
@@ -115,7 +115,7 @@ pub enum OperatorKind {
     FloorDiv,
 }
 
-pub type Operator = Located<OperatorKind>;
+pub(crate) type Operator = Attributed<OperatorKind>;
 
 impl From<&rustpython_parser::ast::Operator> for OperatorKind {
     fn from(op: &rustpython_parser::ast::Operator) -> Self {
@@ -145,7 +145,7 @@ pub enum UnaryOpKind {
     USub,
 }
 
-pub type UnaryOp = Located<UnaryOpKind>;
+pub(crate) type UnaryOp = Attributed<UnaryOpKind>;
 
 impl From<&rustpython_parser::ast::Unaryop> for UnaryOpKind {
     fn from(op: &rustpython_parser::ast::Unaryop) -> Self {
@@ -172,7 +172,7 @@ pub enum CmpOpKind {
     NotIn,
 }
 
-pub type CmpOp = Located<CmpOpKind>;
+pub(crate) type CmpOp = Attributed<CmpOpKind>;
 
 impl From<&rustpython_parser::ast::Cmpop> for CmpOpKind {
     fn from(op: &rustpython_parser::ast::Cmpop) -> Self {
@@ -191,7 +191,7 @@ impl From<&rustpython_parser::ast::Cmpop> for CmpOpKind {
     }
 }
 
-pub type Body = Located<Vec<Stmt>>;
+pub(crate) type Body = Attributed<Vec<Stmt>>;
 
 impl From<(Vec<rustpython_parser::ast::Stmt>, &Locator<'_>)> for Body {
     fn from((body, locator): (Vec<rustpython_parser::ast::Stmt>, &Locator)) -> Self {
@@ -319,7 +319,7 @@ pub enum StmtKind {
     ImportFrom {
         module: Option<Ident>,
         names: Vec<Alias>,
-        level: Option<usize>,
+        level: Option<u32>,
     },
     Global {
         names: Vec<Ident>,
@@ -335,7 +335,7 @@ pub enum StmtKind {
     Continue,
 }
 
-pub type Stmt = Located<StmtKind>;
+pub(crate) type Stmt = Attributed<StmtKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind {
@@ -453,7 +453,7 @@ pub enum ExprKind {
     },
 }
 
-pub type Expr = Located<ExprKind>;
+pub(crate) type Expr = Attributed<ExprKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comprehension {
@@ -472,7 +472,7 @@ pub enum ExcepthandlerKind {
     },
 }
 
-pub type Excepthandler = Located<ExcepthandlerKind>;
+pub(crate) type Excepthandler = Attributed<ExcepthandlerKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SliceIndexKind {
@@ -482,7 +482,7 @@ pub enum SliceIndexKind {
     Index { value: Box<Expr> },
 }
 
-pub type SliceIndex = Located<SliceIndexKind>;
+pub(crate) type SliceIndex = Attributed<SliceIndexKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
@@ -502,7 +502,7 @@ pub struct ArgData {
     pub type_comment: Option<String>,
 }
 
-pub type Arg = Located<ArgData>;
+pub(crate) type Arg = Attributed<ArgData>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeywordData {
@@ -510,7 +510,7 @@ pub struct KeywordData {
     pub value: Expr,
 }
 
-pub type Keyword = Located<KeywordData>;
+pub(crate) type Keyword = Attributed<KeywordData>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AliasData {
@@ -518,7 +518,7 @@ pub struct AliasData {
     pub asname: Option<Ident>,
 }
 
-pub type Alias = Located<AliasData>;
+pub(crate) type Alias = Attributed<AliasData>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Withitem {
@@ -568,15 +568,19 @@ pub enum PatternKind {
     },
 }
 
-pub type Pattern = Located<PatternKind>;
+pub(crate) type Pattern = Attributed<PatternKind>;
 
 impl From<(rustpython_parser::ast::Alias, &Locator<'_>)> for Alias {
     fn from((alias, _locator): (rustpython_parser::ast::Alias, &Locator)) -> Self {
         Alias {
             range: alias.range(),
             node: AliasData {
-                name: alias.node.name,
-                asname: alias.node.asname,
+                name: alias.node.name.to_string(),
+                asname: alias
+                    .node
+                    .asname
+                    .as_ref()
+                    .map(rustpython_parser::ast::Identifier::to_string),
             },
             trivia: vec![],
             parentheses: Parenthesize::Never,
@@ -597,8 +601,9 @@ impl From<(rustpython_parser::ast::Withitem, &Locator<'_>)> for Withitem {
 
 impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandler {
     fn from((excepthandler, locator): (rustpython_parser::ast::Excepthandler, &Locator)) -> Self {
-        let rustpython_parser::ast::ExcepthandlerKind::ExceptHandler { type_, name, body } =
-            excepthandler.node;
+        let rustpython_parser::ast::ExcepthandlerKind::ExceptHandler(
+            ast::ExcepthandlerExceptHandler { type_, name, body },
+        ) = excepthandler.node;
 
         // Find the start and end of the `body`.
         let body = {
@@ -622,7 +627,7 @@ impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandl
             range: TextRange::new(excepthandler.range.start(), body.end()),
             node: ExcepthandlerKind::ExceptHandler {
                 type_: type_.map(|type_| Box::new((*type_, locator).into())),
-                name,
+                name: name.map(Into::into),
                 body,
             },
             trivia: vec![],
@@ -636,61 +641,69 @@ impl From<(rustpython_parser::ast::Pattern, &Locator<'_>)> for Pattern {
         Pattern {
             range: pattern.range(),
             node: match pattern.node {
-                rustpython_parser::ast::PatternKind::MatchValue { value } => {
-                    PatternKind::MatchValue {
-                        value: Box::new((*value, locator).into()),
-                    }
-                }
-                rustpython_parser::ast::PatternKind::MatchSingleton { value } => {
-                    PatternKind::MatchSingleton { value }
-                }
-                rustpython_parser::ast::PatternKind::MatchSequence { patterns } => {
-                    PatternKind::MatchSequence {
-                        patterns: patterns
-                            .into_iter()
-                            .map(|pattern| (pattern, locator).into())
-                            .collect(),
-                    }
-                }
-                rustpython_parser::ast::PatternKind::MatchMapping {
-                    keys,
-                    patterns,
-                    rest,
-                } => PatternKind::MatchMapping {
+                rustpython_parser::ast::PatternKind::MatchValue(
+                    rustpython_parser::ast::PatternMatchValue { value },
+                ) => PatternKind::MatchValue {
+                    value: Box::new((*value, locator).into()),
+                },
+                rustpython_parser::ast::PatternKind::MatchSingleton(
+                    rustpython_parser::ast::PatternMatchSingleton { value },
+                ) => PatternKind::MatchSingleton { value },
+                rustpython_parser::ast::PatternKind::MatchSequence(
+                    rustpython_parser::ast::PatternMatchSequence { patterns },
+                ) => PatternKind::MatchSequence {
+                    patterns: patterns
+                        .into_iter()
+                        .map(|pattern| (pattern, locator).into())
+                        .collect(),
+                },
+                rustpython_parser::ast::PatternKind::MatchMapping(
+                    rustpython_parser::ast::PatternMatchMapping {
+                        keys,
+                        patterns,
+                        rest,
+                    },
+                ) => PatternKind::MatchMapping {
                     keys: keys.into_iter().map(|key| (key, locator).into()).collect(),
                     patterns: patterns
                         .into_iter()
                         .map(|pattern| (pattern, locator).into())
                         .collect(),
-                    rest,
+                    rest: rest.map(Into::into),
                 },
-                rustpython_parser::ast::PatternKind::MatchClass {
-                    cls,
-                    patterns,
-                    kwd_attrs,
-                    kwd_patterns,
-                } => PatternKind::MatchClass {
+                rustpython_parser::ast::PatternKind::MatchClass(
+                    rustpython_parser::ast::PatternMatchClass {
+                        cls,
+                        patterns,
+                        kwd_attrs,
+                        kwd_patterns,
+                    },
+                ) => PatternKind::MatchClass {
                     cls: Box::new((*cls, locator).into()),
                     patterns: patterns
                         .into_iter()
                         .map(|pattern| (pattern, locator).into())
                         .collect(),
-                    kwd_attrs,
+                    kwd_attrs: kwd_attrs.into_iter().map(Into::into).collect(),
                     kwd_patterns: kwd_patterns
                         .into_iter()
                         .map(|pattern| (pattern, locator).into())
                         .collect(),
                 },
-                rustpython_parser::ast::PatternKind::MatchStar { name } => {
-                    PatternKind::MatchStar { name }
-                }
-                rustpython_parser::ast::PatternKind::MatchAs { pattern, name } => {
-                    PatternKind::MatchAs {
-                        pattern: pattern.map(|pattern| Box::new((*pattern, locator).into())),
-                        name,
-                    }
-                }
-                rustpython_parser::ast::PatternKind::MatchOr { patterns } => PatternKind::MatchOr {
+                rustpython_parser::ast::PatternKind::MatchStar(
+                    rustpython_parser::ast::PatternMatchStar { name },
+                ) => PatternKind::MatchStar {
+                    name: name.map(Into::into),
+                },
+                rustpython_parser::ast::PatternKind::MatchAs(
+                    rustpython_parser::ast::PatternMatchAs { pattern, name },
+                ) => PatternKind::MatchAs {
+                    pattern: pattern.map(|pattern| Box::new((*pattern, locator).into())),
+                    name: name.map(Into::into),
+                },
+                rustpython_parser::ast::PatternKind::MatchOr(
+                    rustpython_parser::ast::PatternMatchOr { patterns },
+                ) => PatternKind::MatchOr {
                     patterns: patterns
                         .into_iter()
                         .map(|pattern| (pattern, locator).into())
@@ -737,7 +750,7 @@ impl From<(rustpython_parser::ast::MatchCase, &Locator<'_>)> for MatchCase {
 impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
     fn from((stmt, locator): (rustpython_parser::ast::Stmt, &Locator)) -> Self {
         match stmt.node {
-            rustpython_parser::ast::StmtKind::Expr { value } => Stmt {
+            rustpython_parser::ast::StmtKind::Expr(ast::StmtExpr { value }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Expr {
                     value: Box::new((*value, locator).into()),
@@ -751,7 +764,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::Return { value } => Stmt {
+            rustpython_parser::ast::StmtKind::Return(ast::StmtReturn { value }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Return {
                     value: value.map(|v| (*v, locator).into()),
@@ -759,11 +772,11 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::Assign {
+            rustpython_parser::ast::StmtKind::Assign(ast::StmtAssign {
                 targets,
                 value,
                 type_comment,
-            } => Stmt {
+            }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Assign {
                     targets: targets
@@ -776,13 +789,13 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::ClassDef {
+            rustpython_parser::ast::StmtKind::ClassDef(ast::StmtClassDef {
                 name,
                 bases,
                 keywords,
                 body,
                 decorator_list,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -804,7 +817,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 Stmt {
                     range: TextRange::new(stmt.range.start(), body.end()),
                     node: StmtKind::ClassDef {
-                        name,
+                        name: name.into(),
                         bases: bases
                             .into_iter()
                             .map(|node| (node, locator).into())
@@ -823,7 +836,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::If { test, body, orelse } => {
+            rustpython_parser::ast::StmtKind::If(ast::StmtIf { test, body, orelse }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -907,7 +920,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     }
                 }
             }
-            rustpython_parser::ast::StmtKind::Assert { test, msg } => Stmt {
+            rustpython_parser::ast::StmtKind::Assert(ast::StmtAssert { test, msg }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Assert {
                     test: Box::new((*test, locator).into()),
@@ -916,14 +929,14 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::FunctionDef {
+            rustpython_parser::ast::StmtKind::FunctionDef(ast::StmtFunctionDef {
                 name,
                 args,
                 body,
                 decorator_list,
                 returns,
                 type_comment,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -946,11 +959,11 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     range: TextRange::new(
                         decorator_list
                             .first()
-                            .map_or(stmt.range.start(), ast::Located::start),
+                            .map_or(stmt.range.start(), ast::Attributed::start),
                         body.end(),
                     ),
                     node: StmtKind::FunctionDef {
-                        name,
+                        name: name.into(),
                         args: Box::new((*args, locator).into()),
                         body,
                         decorator_list: decorator_list
@@ -964,14 +977,14 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::AsyncFunctionDef {
+            rustpython_parser::ast::StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
                 args,
                 body,
                 decorator_list,
                 returns,
                 type_comment,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -998,7 +1011,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                         body.end(),
                     ),
                     node: StmtKind::AsyncFunctionDef {
-                        name,
+                        name: name.into(),
                         args: Box::new((*args, locator).into()),
                         body,
                         decorator_list: decorator_list
@@ -1012,7 +1025,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::Delete { targets } => Stmt {
+            rustpython_parser::ast::StmtKind::Delete(ast::StmtDelete { targets }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Delete {
                     targets: targets
@@ -1023,7 +1036,11 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::AugAssign { target, op, value } => Stmt {
+            rustpython_parser::ast::StmtKind::AugAssign(ast::StmtAugAssign {
+                target,
+                op,
+                value,
+            }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::AugAssign {
                     op: {
@@ -1080,29 +1097,29 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::AnnAssign {
+            rustpython_parser::ast::StmtKind::AnnAssign(ast::StmtAnnAssign {
                 target,
                 annotation,
                 value,
                 simple,
-            } => Stmt {
+            }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::AnnAssign {
                     target: Box::new((*target, locator).into()),
                     annotation: Box::new((*annotation, locator).into()),
                     value: value.map(|node| Box::new((*node, locator).into())),
-                    simple,
+                    simple: usize::from(simple),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::For {
+            rustpython_parser::ast::StmtKind::For(ast::StmtFor {
                 target,
                 iter,
                 body,
                 orelse,
                 type_comment,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -1152,13 +1169,13 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::AsyncFor {
+            rustpython_parser::ast::StmtKind::AsyncFor(ast::StmtAsyncFor {
                 target,
                 iter,
                 body,
                 orelse,
                 type_comment,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -1208,7 +1225,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::While { test, body, orelse } => {
+            rustpython_parser::ast::StmtKind::While(ast::StmtWhile { test, body, orelse }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -1256,11 +1273,11 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::With {
+            rustpython_parser::ast::StmtKind::With(ast::StmtWith {
                 items,
                 body,
                 type_comment,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -1293,11 +1310,11 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::AsyncWith {
+            rustpython_parser::ast::StmtKind::AsyncWith(ast::StmtAsyncWith {
                 items,
                 body,
                 type_comment,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -1330,7 +1347,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::Match { subject, cases } => Stmt {
+            rustpython_parser::ast::StmtKind::Match(ast::StmtMatch { subject, cases }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Match {
                     subject: Box::new((*subject, locator).into()),
@@ -1342,7 +1359,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::Raise { exc, cause } => Stmt {
+            rustpython_parser::ast::StmtKind::Raise(ast::StmtRaise { exc, cause }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Raise {
                     exc: exc.map(|exc| Box::new((*exc, locator).into())),
@@ -1351,12 +1368,12 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::Try {
+            rustpython_parser::ast::StmtKind::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -1383,7 +1400,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 // Find the start and end of the `orelse`.
                 let orelse = (!orelse.is_empty()).then(|| {
                     let orelse_range = expand_indented_block(
-                        handlers.last().map_or(body.end(), Located::end),
+                        handlers.last().map_or(body.end(), Attributed::end),
                         orelse.last().unwrap().end(),
                         locator,
                     );
@@ -1402,8 +1419,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 let finalbody = (!finalbody.is_empty()).then(|| {
                     let finalbody_range = expand_indented_block(
                         orelse.as_ref().map_or(
-                            handlers.last().map_or(body.end(), Located::end),
-                            Located::end,
+                            handlers.last().map_or(body.end(), Attributed::end),
+                            Attributed::end,
                         ),
                         finalbody.last().unwrap().end(),
                         locator,
@@ -1421,10 +1438,10 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
 
                 let end_location = finalbody.as_ref().map_or(
                     orelse.as_ref().map_or(
-                        handlers.last().map_or(body.end(), Located::end),
-                        Located::end,
+                        handlers.last().map_or(body.end(), Attributed::end),
+                        Attributed::end,
                     ),
-                    Located::end,
+                    Attributed::end,
                 );
 
                 Stmt {
@@ -1439,12 +1456,12 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::TryStar {
+            rustpython_parser::ast::StmtKind::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => {
+            }) => {
                 // Find the start and end of the `body`.
                 let body = {
                     let body_range = expand_indented_block(
@@ -1471,7 +1488,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 // Find the start and end of the `orelse`.
                 let orelse = (!orelse.is_empty()).then(|| {
                     let orelse_range = expand_indented_block(
-                        handlers.last().map_or(body.end(), Located::end),
+                        handlers.last().map_or(body.end(), Attributed::end),
                         orelse.last().unwrap().end(),
                         locator,
                     );
@@ -1490,8 +1507,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 let finalbody = (!finalbody.is_empty()).then(|| {
                     let finalbody_range = expand_indented_block(
                         orelse.as_ref().map_or(
-                            handlers.last().map_or(body.end(), Located::end),
-                            Located::end,
+                            handlers.last().map_or(body.end(), Attributed::end),
+                            Attributed::end,
                         ),
                         finalbody.last().unwrap().end(),
                         locator,
@@ -1509,10 +1526,10 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
 
                 let end_location = finalbody.as_ref().map_or(
                     orelse.as_ref().map_or(
-                        handlers.last().map_or(body.end(), Located::end),
-                        Located::end,
+                        handlers.last().map_or(body.end(), Attributed::end),
+                        Attributed::end,
                     ),
-                    Located::end,
+                    Attributed::end,
                 );
 
                 Stmt {
@@ -1527,7 +1544,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::StmtKind::Import { names } => Stmt {
+            rustpython_parser::ast::StmtKind::Import(ast::StmtImport { names }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::Import {
                     names: names
@@ -1538,32 +1555,36 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::ImportFrom {
+            rustpython_parser::ast::StmtKind::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
-            } => Stmt {
+            }) => Stmt {
                 range: stmt.range,
                 node: StmtKind::ImportFrom {
-                    module,
+                    module: module.map(Into::into),
                     names: names
                         .into_iter()
                         .map(|node| (node, locator).into())
                         .collect(),
-                    level,
+                    level: level.map(|level| level.to_u32()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::Global { names } => Stmt {
+            rustpython_parser::ast::StmtKind::Global(ast::StmtGlobal { names }) => Stmt {
                 range: stmt.range,
-                node: StmtKind::Global { names },
+                node: StmtKind::Global {
+                    names: names.into_iter().map(Into::into).collect(),
+                },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::Nonlocal { names } => Stmt {
+            rustpython_parser::ast::StmtKind::Nonlocal(ast::StmtNonlocal { names }) => Stmt {
                 range: stmt.range,
-                node: StmtKind::Nonlocal { names },
+                node: StmtKind::Nonlocal {
+                    names: names.into_iter().map(Into::into).collect(),
+                },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
@@ -1588,7 +1609,7 @@ impl From<(rustpython_parser::ast::Keyword, &Locator<'_>)> for Keyword {
         Keyword {
             range: keyword.range(),
             node: KeywordData {
-                arg: keyword.node.arg,
+                arg: keyword.node.arg.map(Into::into),
                 value: (keyword.node.value, locator).into(),
             },
             trivia: vec![],
@@ -1602,7 +1623,7 @@ impl From<(rustpython_parser::ast::Arg, &Locator<'_>)> for Arg {
         Arg {
             range: arg.range(),
             node: ArgData {
-                arg: arg.node.arg,
+                arg: arg.node.arg.into(),
                 annotation: arg
                     .node
                     .annotation
@@ -1663,7 +1684,7 @@ impl From<(rustpython_parser::ast::Comprehension, &Locator<'_>)> for Comprehensi
                 .into_iter()
                 .map(|node| (node, locator).into())
                 .collect(),
-            is_async: comprehension.is_async,
+            is_async: usize::from(comprehension.is_async),
         }
     }
 }
@@ -1671,16 +1692,16 @@ impl From<(rustpython_parser::ast::Comprehension, &Locator<'_>)> for Comprehensi
 impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
     fn from((expr, locator): (rustpython_parser::ast::Expr, &Locator)) -> Self {
         match expr.node {
-            rustpython_parser::ast::ExprKind::Name { id, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Name(ast::ExprName { id, ctx }) => Expr {
                 range: expr.range,
                 node: ExprKind::Name {
-                    id,
+                    id: id.into(),
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::BoolOp { op, values } => Expr {
+            rustpython_parser::ast::ExprKind::BoolOp(ast::ExprBoolOp { op, values }) => Expr {
                 range: expr.range,
                 node: ExprKind::BoolOp {
                     ops: values
@@ -1707,16 +1728,18 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::NamedExpr { target, value } => Expr {
-                range: expr.range,
-                node: ExprKind::NamedExpr {
-                    target: Box::new((*target, locator).into()),
-                    value: Box::new((*value, locator).into()),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
-            rustpython_parser::ast::ExprKind::BinOp { left, op, right } => Expr {
+            rustpython_parser::ast::ExprKind::NamedExpr(ast::ExprNamedExpr { target, value }) => {
+                Expr {
+                    range: expr.range,
+                    node: ExprKind::NamedExpr {
+                        target: Box::new((*target, locator).into()),
+                        value: Box::new((*value, locator).into()),
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
+            rustpython_parser::ast::ExprKind::BinOp(ast::ExprBinOp { left, op, right }) => Expr {
                 range: expr.range,
                 node: ExprKind::BinOp {
                     op: {
@@ -1761,7 +1784,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::UnaryOp { op, operand } => Expr {
+            rustpython_parser::ast::ExprKind::UnaryOp(ast::ExprUnaryOp { op, operand }) => Expr {
                 range: expr.range,
                 node: ExprKind::UnaryOp {
                     op: {
@@ -1785,7 +1808,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Lambda { args, body } => Expr {
+            rustpython_parser::ast::ExprKind::Lambda(ast::ExprLambda { args, body }) => Expr {
                 range: expr.range,
                 node: ExprKind::Lambda {
                     args: Box::new((*args, locator).into()),
@@ -1794,17 +1817,19 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::IfExp { test, body, orelse } => Expr {
-                range: expr.range,
-                node: ExprKind::IfExp {
-                    test: Box::new((*test, locator).into()),
-                    body: Box::new((*body, locator).into()),
-                    orelse: Box::new((*orelse, locator).into()),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
-            rustpython_parser::ast::ExprKind::Dict { keys, values } => Expr {
+            rustpython_parser::ast::ExprKind::IfExp(ast::ExprIfExp { test, body, orelse }) => {
+                Expr {
+                    range: expr.range,
+                    node: ExprKind::IfExp {
+                        test: Box::new((*test, locator).into()),
+                        body: Box::new((*body, locator).into()),
+                        orelse: Box::new((*orelse, locator).into()),
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
+            rustpython_parser::ast::ExprKind::Dict(ast::ExprDict { keys, values }) => Expr {
                 range: expr.range,
                 node: ExprKind::Dict {
                     keys: keys
@@ -1819,7 +1844,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Set { elts } => Expr {
+            rustpython_parser::ast::ExprKind::Set(ast::ExprSet { elts }) => Expr {
                 range: expr.range,
                 node: ExprKind::Set {
                     elts: elts
@@ -1830,35 +1855,39 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::ListComp { elt, generators } => Expr {
-                range: expr.range,
-                node: ExprKind::ListComp {
-                    elt: Box::new((*elt, locator).into()),
-                    generators: generators
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
-            rustpython_parser::ast::ExprKind::SetComp { elt, generators } => Expr {
-                range: expr.range,
-                node: ExprKind::SetComp {
-                    elt: Box::new((*elt, locator).into()),
-                    generators: generators
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
-            rustpython_parser::ast::ExprKind::DictComp {
+            rustpython_parser::ast::ExprKind::ListComp(ast::ExprListComp { elt, generators }) => {
+                Expr {
+                    range: expr.range,
+                    node: ExprKind::ListComp {
+                        elt: Box::new((*elt, locator).into()),
+                        generators: generators
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
+            rustpython_parser::ast::ExprKind::SetComp(ast::ExprSetComp { elt, generators }) => {
+                Expr {
+                    range: expr.range,
+                    node: ExprKind::SetComp {
+                        elt: Box::new((*elt, locator).into()),
+                        generators: generators
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
+            rustpython_parser::ast::ExprKind::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
-            } => Expr {
+            }) => Expr {
                 range: expr.range,
                 node: ExprKind::DictComp {
                     key: Box::new((*key, locator).into()),
@@ -1871,7 +1900,10 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::GeneratorExp { elt, generators } => Expr {
+            rustpython_parser::ast::ExprKind::GeneratorExp(ast::ExprGeneratorExp {
+                elt,
+                generators,
+            }) => Expr {
                 range: expr.range,
                 node: ExprKind::GeneratorExp {
                     elt: Box::new((*elt, locator).into()),
@@ -1883,7 +1915,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Await { value } => Expr {
+            rustpython_parser::ast::ExprKind::Await(ast::ExprAwait { value }) => Expr {
                 range: expr.range,
                 node: ExprKind::Await {
                     value: Box::new((*value, locator).into()),
@@ -1891,7 +1923,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Yield { value } => Expr {
+            rustpython_parser::ast::ExprKind::Yield(ast::ExprYield { value }) => Expr {
                 range: expr.range,
                 node: ExprKind::Yield {
                     value: value.map(|v| Box::new((*v, locator).into())),
@@ -1899,7 +1931,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::YieldFrom { value } => Expr {
+            rustpython_parser::ast::ExprKind::YieldFrom(ast::ExprYieldFrom { value }) => Expr {
                 range: expr.range,
                 node: ExprKind::YieldFrom {
                     value: Box::new((*value, locator).into()),
@@ -1907,11 +1939,11 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Compare {
+            rustpython_parser::ast::ExprKind::Compare(ast::ExprCompare {
                 left,
                 ops,
                 comparators,
-            } => Expr {
+            }) => Expr {
                 range: expr.range,
                 node: ExprKind::Compare {
                     ops: iter::once(left.as_ref())
@@ -1960,11 +1992,11 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Call {
+            rustpython_parser::ast::ExprKind::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
-            } => Expr {
+            }) => Expr {
                 range: expr.range,
                 node: ExprKind::Call {
                     func: Box::new((*func, locator).into()),
@@ -1980,21 +2012,21 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::FormattedValue {
+            rustpython_parser::ast::ExprKind::FormattedValue(ast::ExprFormattedValue {
                 value,
                 conversion,
                 format_spec,
-            } => Expr {
+            }) => Expr {
                 range: expr.range,
                 node: ExprKind::FormattedValue {
                     value: Box::new((*value, locator).into()),
-                    conversion,
+                    conversion: conversion.to_usize(),
                     format_spec: format_spec.map(|f| Box::new((*f, locator).into())),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::JoinedStr { values } => Expr {
+            rustpython_parser::ast::ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => Expr {
                 range: expr.range,
                 node: ExprKind::JoinedStr {
                     values: values
@@ -2005,23 +2037,31 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Constant { value, kind } => Expr {
+            rustpython_parser::ast::ExprKind::Constant(ast::ExprConstant { value, kind }) => Expr {
                 range: expr.range,
                 node: ExprKind::Constant { value, kind },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Attribute { value, attr, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Attribute(ast::ExprAttribute {
+                value,
+                attr,
+                ctx,
+            }) => Expr {
                 range: expr.range,
                 node: ExprKind::Attribute {
                     value: Box::new((*value, locator).into()),
-                    attr,
+                    attr: attr.into(),
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Subscript { value, slice, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Subscript(ast::ExprSubscript {
+                value,
+                slice,
+                ctx,
+            }) => Expr {
                 range: expr.range,
                 node: ExprKind::Subscript {
                     value: Box::new((*value, locator).into()),
@@ -2031,7 +2071,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Starred { value, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Starred(ast::ExprStarred { value, ctx }) => Expr {
                 range: expr.range,
                 node: ExprKind::Starred {
                     value: Box::new((*value, locator).into()),
@@ -2040,7 +2080,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::List { elts, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::List(ast::ExprList { elts, ctx }) => Expr {
                 range: expr.range,
                 node: ExprKind::List {
                     elts: elts
@@ -2052,7 +2092,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Tuple { elts, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Tuple(ast::ExprTuple { elts, ctx }) => Expr {
                 range: expr.range,
                 node: ExprKind::Tuple {
                     elts: elts
@@ -2064,9 +2104,9 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Slice { lower, upper, step } => {
+            rustpython_parser::ast::ExprKind::Slice(ast::ExprSlice { lower, upper, step }) => {
                 // Locate the colon tokens, which indicate the number of index segments.
-                let tokens = rustpython_parser::lexer::lex_located(
+                let tokens = rustpython_parser::lexer::lex_starts_at(
                     &locator.contents()[expr.range],
                     Mode::Module,
                     expr.range.start(),

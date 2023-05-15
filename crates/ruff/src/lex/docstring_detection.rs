@@ -25,13 +25,13 @@ enum State {
 }
 
 #[derive(Default)]
-pub struct StateMachine {
+pub(crate) struct StateMachine {
     state: State,
     bracket_count: usize,
 }
 
 impl StateMachine {
-    pub fn consume(&mut self, tok: &Tok) -> bool {
+    pub(crate) fn consume(&mut self, tok: &Tok) -> bool {
         match tok {
             Tok::NonLogicalNewline
             | Tok::Newline

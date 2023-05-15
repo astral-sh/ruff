@@ -1,13 +1,13 @@
 use ruff_text_size::TextLen;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
 use crate::docstrings::sections::SectionKind;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::logical_line;
 
@@ -26,7 +26,7 @@ impl AlwaysAutofixableViolation for EndsInPunctuation {
 }
 
 /// D415
-pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if let Some(first_line) = body.trim().universal_newlines().next() {
@@ -61,10 +61,11 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
             let mut diagnostic = Diagnostic::new(EndsInPunctuation, docstring.range());
             // Best-effort autofix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule()) && !trimmed.ends_with([':', ';']) {
-                diagnostic.set_fix(Edit::insertion(
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::insertion(
                     ".".to_string(),
                     line.start() + trimmed.text_len(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         };

@@ -4,7 +4,7 @@ use once_cell::unsync::Lazy;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Cmpop, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 
@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum IsCmpop {
+pub(crate) enum IsCmpop {
     Is,
     IsNot,
 }
@@ -29,7 +29,7 @@ impl From<&Cmpop> for IsCmpop {
 
 #[violation]
 pub struct IsLiteral {
-    pub cmpop: IsCmpop,
+    cmpop: IsCmpop,
 }
 
 impl AlwaysAutofixableViolation for IsLiteral {
@@ -52,7 +52,7 @@ impl AlwaysAutofixableViolation for IsLiteral {
 }
 
 /// F632
-pub fn invalid_literal_comparison(
+pub(crate) fn invalid_literal_comparison(
     checker: &mut Checker,
     left: &Expr,
     ops: &[Cmpop],
@@ -78,10 +78,11 @@ pub fn invalid_literal_comparison(
                             None
                         }
                     } {
-                        diagnostic.set_fix(Edit::range_replacement(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             content,
                             located_op.range() + location.start(),
-                        ));
+                        )));
                     }
                 } else {
                     error!("Failed to fix invalid comparison due to missing op");

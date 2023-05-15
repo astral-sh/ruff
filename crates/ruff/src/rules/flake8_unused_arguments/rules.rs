@@ -36,7 +36,7 @@ use super::types::Argumentable;
 /// ```
 #[violation]
 pub struct UnusedFunctionArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedFunctionArgument {
@@ -65,10 +65,11 @@ impl Violation for UnusedFunctionArgument {
 /// ```python
 /// class MyClass:
 ///     def my_method(self, arg1):
+///         print(arg1)
 /// ```
 #[violation]
 pub struct UnusedMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedMethodArgument {
@@ -109,7 +110,7 @@ impl Violation for UnusedMethodArgument {
 /// ```
 #[violation]
 pub struct UnusedClassMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedClassMethodArgument {
@@ -150,7 +151,7 @@ impl Violation for UnusedClassMethodArgument {
 /// ```
 #[violation]
 pub struct UnusedStaticMethodArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedStaticMethodArgument {
@@ -182,7 +183,7 @@ impl Violation for UnusedStaticMethodArgument {
 /// ```
 #[violation]
 pub struct UnusedLambdaArgument {
-    pub name: String,
+    pub(super) name: String,
 }
 
 impl Violation for UnusedLambdaArgument {
@@ -276,7 +277,7 @@ fn call<'a>(
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
-pub fn unused_arguments(
+pub(crate) fn unused_arguments(
     checker: &Checker,
     parent: &Scope,
     scope: &Scope,

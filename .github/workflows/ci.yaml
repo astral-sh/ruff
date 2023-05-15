@@ -15,6 +15,8 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  PACKAGE_NAME: ruff
+  PYTHON_VERSION: "3.7" # to build abi3 wheels
 
 jobs:
   cargo-fmt:
@@ -194,6 +196,28 @@ jobs:
             exit 1
           fi
 
+  python-package:
+    name: "python package"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@v1
+        with:
+          manylinux: auto
+          args: --out dist
+      - name: "Test wheel"
+        run: |
+          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          ruff --help
+          python -m ruff --help
+
   pre-commit:
     name: "pre-commit"
     runs-on: ubuntu-latest
@@ -237,5 +261,7 @@ jobs:
         run: python scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
         run: python scripts/generate_mkdocs.py
+      - name: "Check docs formatting"
+        run: python scripts/check_docs_formatted.py
       - name: "Build docs"
         run: mkdocs build --strict

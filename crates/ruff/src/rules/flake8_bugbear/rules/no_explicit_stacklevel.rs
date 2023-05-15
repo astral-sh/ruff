@@ -38,7 +38,7 @@ impl Violation for NoExplicitStacklevel {
 }
 
 /// B028
-pub fn no_explicit_stacklevel(
+pub(crate) fn no_explicit_stacklevel(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],

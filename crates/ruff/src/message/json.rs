@@ -1,10 +1,10 @@
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::{SourceCode, SourceLocation};
+use ruff_python_ast::source_code::SourceCode;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::io::Write;
 
 #[derive(Default)]
@@ -37,14 +37,13 @@ impl Serialize for ExpandedMessages<'_> {
         for message in self.messages {
             let source_code = message.file.to_source_code();
 
-            let fix = if message.fix.is_empty() {
-                None
-            } else {
-                Some(json!({
+            let fix = message.fix.as_ref().map(|fix| {
+                json!({
+                    "applicability": fix.applicability(),
                     "message": message.kind.suggestion.as_deref(),
-                    "edits": &ExpandedEdits { edits: message.fix.edits(), source_code: &source_code },
-                }))
-            };
+                    "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code },
+                })
+            });
 
             let start_location = source_code.source_location(message.start());
             let end_location = source_code.source_location(message.end());
@@ -80,12 +79,10 @@ impl Serialize for ExpandedEdits<'_> {
         let mut s = serializer.serialize_seq(Some(self.edits.len()))?;
 
         for edit in self.edits {
-            let start_location = self.source_code.source_location(edit.start());
-            let end_location = self.source_code.source_location(edit.end());
             let value = json!({
                 "content": edit.content().unwrap_or_default(),
-                "location": to_zero_indexed_column(&start_location),
-                "end_location": to_zero_indexed_column(&end_location)
+                "location": self.source_code.source_location(edit.start()),
+                "end_location": self.source_code.source_location(edit.end())
             });
 
             s.serialize_element(&value)?;
@@ -93,13 +90,6 @@ impl Serialize for ExpandedEdits<'_> {
 
         s.end()
     }
-}
-
-fn to_zero_indexed_column(location: &SourceLocation) -> Value {
-    json!({
-        "row": location.row,
-        "column": location.column.to_zero_indexed()
-    })
 }
 
 #[cfg(test)]

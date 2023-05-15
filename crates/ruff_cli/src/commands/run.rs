@@ -26,7 +26,7 @@ use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
-pub fn run(
+pub(crate) fn run(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
@@ -310,6 +310,8 @@ mod test {
             LogLevel::Default,
             FixMode::None,
             Flags::SHOW_VIOLATIONS,
+            #[cfg(feature = "ecosystem_ci")]
+            false,
         );
         let mut writer: Vec<u8> = Vec::new();
         // Mute the terminal color codes

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,7 +42,7 @@ impl From<&rustpython_parser::ast::Boolop> for Boolop {
 /// ```python
 /// try:
 ///     pass
-/// except (A ,B):
+/// except (A, B):
 ///     pass
 /// ```
 #[violation]
@@ -62,14 +62,15 @@ impl Violation for BinaryOpException {
 }
 
 /// PLW0711
-pub fn binary_op_exception(checker: &mut Checker, excepthandler: &Excepthandler) {
-    let ExcepthandlerKind::ExceptHandler { type_, .. } = &excepthandler.node;
+pub(crate) fn binary_op_exception(checker: &mut Checker, excepthandler: &Excepthandler) {
+    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
+        &excepthandler.node;
 
     let Some(type_) = type_ else {
         return;
     };
 
-    let ExprKind::BoolOp { op, .. } = &type_.node else {
+    let ExprKind::BoolOp(ast::ExprBoolOp { op, .. }) = &type_.node else {
         return;
     };
 

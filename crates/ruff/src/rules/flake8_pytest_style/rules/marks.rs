@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 
@@ -12,9 +12,9 @@ use super::helpers::get_mark_decorators;
 
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
-    pub mark_name: String,
-    pub expected_parens: String,
-    pub actual_parens: String,
+    mark_name: String,
+    expected_parens: String,
+    actual_parens: String,
 }
 
 impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
@@ -54,7 +54,7 @@ fn pytest_mark_parentheses(
     checker: &mut Checker,
     decorator: &Expr,
     call_path: &CallPath,
-    fix: Edit,
+    fix: Fix,
     preferred: &str,
     actual: &str,
 ) {
@@ -74,23 +74,24 @@ fn pytest_mark_parentheses(
 
 fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &CallPath) {
     match &decorator.node {
-        ExprKind::Call {
+        ExprKind::Call(ast::ExprCall {
             func,
             args,
             keywords,
-            ..
-        } => {
+        }) => {
             if !checker.settings.flake8_pytest_style.mark_parentheses
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Edit::deletion(func.end(), decorator.end());
+                #[allow(deprecated)]
+                let fix = Fix::unspecified(Edit::deletion(func.end(), decorator.end()));
                 pytest_mark_parentheses(checker, decorator, call_path, fix, "", "()");
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
-                let fix = Edit::insertion("()".to_string(), decorator.end());
+                #[allow(deprecated)]
+                let fix = Fix::unspecified(Edit::insertion("()".to_string(), decorator.end()));
                 pytest_mark_parentheses(checker, decorator, call_path, fix, "()", "");
             }
         }
@@ -104,7 +105,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
 
     let mut has_parameters = false;
 
-    if let ExprKind::Call { args, keywords, .. } = &decorator.node {
+    if let ExprKind::Call(ast::ExprCall { args, keywords, .. }) = &decorator.node {
         if !args.is_empty() || !keywords.is_empty() {
             has_parameters = true;
         }
@@ -113,15 +114,16 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
     if !has_parameters {
         let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::range_deletion(
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
                 decorator.range().sub_start(TextSize::from(1)),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }
 }
 
-pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
+pub(crate) fn marks(checker: &mut Checker, decorators: &[Expr]) {
     let enforce_parentheses = checker
         .settings
         .rules

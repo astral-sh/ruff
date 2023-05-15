@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -11,7 +11,7 @@ use super::helpers;
 /// ## What it does
 /// Checks for unnecessary list comprehensions.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It's unnecessary to use a list comprehension inside a call to `dict`,
 /// since there is an equivalent comprehension for this type.
 ///
@@ -39,7 +39,7 @@ impl AlwaysAutofixableViolation for UnnecessaryListComprehensionDict {
 }
 
 /// C404 (`dict([...])`)
-pub fn unnecessary_list_comprehension_dict(
+pub(crate) fn unnecessary_list_comprehension_dict(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -52,10 +52,10 @@ pub fn unnecessary_list_comprehension_dict(
     if !checker.ctx.is_builtin("dict") {
         return;
     }
-    let ExprKind::ListComp { elt, .. } = &argument else {
+    let ExprKind::ListComp(ast::ExprListComp { elt, .. }) = &argument else {
         return;
     };
-    let ExprKind::Tuple { elts, .. } = &elt.node else {
+    let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &elt.node else {
         return;
     };
     if elts.len() != 2 {
@@ -63,7 +63,8 @@ pub fn unnecessary_list_comprehension_dict(
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)
         });
     }

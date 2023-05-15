@@ -1,20 +1,17 @@
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
 
 /// Return `true` if a function's return statement include at least one
 /// non-`None` value.
-pub fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
+pub(crate) fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
     returns.iter().any(|(_, expr)| {
         expr.map(|expr| {
             !matches!(
                 expr.node,
-                ExprKind::Constant {
-                    value: Constant::None,
-                    ..
-                }
+                ExprKind::Constant(ref constant) if constant.value.is_none()
             )
         })
         .unwrap_or(false)
@@ -28,7 +25,7 @@ pub fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
 ///
 /// This method assumes that the statement is the last statement in its body; specifically, that
 /// the statement isn't followed by a semicolon, followed by a multi-line statement.
-pub fn end_of_last_statement(stmt: &Stmt, locator: &Locator) -> TextSize {
+pub(crate) fn end_of_last_statement(stmt: &Stmt, locator: &Locator) -> TextSize {
     // End-of-file, so just return the end of the statement.
     if stmt.end() == locator.text_len() {
         stmt.end()

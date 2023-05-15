@@ -11,7 +11,7 @@ pub struct FormatAlias<'a> {
     item: &'a Alias,
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Alias {
+impl AsFormat<ASTFormatContext> for Alias {
     type Format<'a> = FormatAlias<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -19,7 +19,7 @@ impl AsFormat<ASTFormatContext<'_>> for Alias {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatAlias<'_> {
+impl Format<ASTFormatContext> for FormatAlias<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let alias = self.item;
 

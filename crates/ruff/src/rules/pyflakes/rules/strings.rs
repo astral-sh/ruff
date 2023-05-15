@@ -2,7 +2,7 @@ use ruff_text_size::TextRange;
 use std::string::ToString;
 
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Identifier, Keyword, KeywordData};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -19,7 +19,7 @@ use super::super::format::FormatSummary;
 
 #[violation]
 pub struct PercentFormatInvalidFormat {
-    pub message: String,
+    pub(crate) message: String,
 }
 
 impl Violation for PercentFormatInvalidFormat {
@@ -52,7 +52,7 @@ impl Violation for PercentFormatExpectedSequence {
 
 #[violation]
 pub struct PercentFormatExtraNamedArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
@@ -72,7 +72,7 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
 
 #[violation]
 pub struct PercentFormatMissingArgument {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl Violation for PercentFormatMissingArgument {
@@ -96,8 +96,8 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 
 #[violation]
 pub struct PercentFormatPositionalCountMismatch {
-    pub wanted: usize,
-    pub got: usize,
+    wanted: usize,
+    got: usize,
 }
 
 impl Violation for PercentFormatPositionalCountMismatch {
@@ -120,7 +120,7 @@ impl Violation for PercentFormatStarRequiresSequence {
 
 #[violation]
 pub struct PercentFormatUnsupportedFormatCharacter {
-    pub char: char,
+    pub(crate) char: char,
 }
 
 impl Violation for PercentFormatUnsupportedFormatCharacter {
@@ -133,7 +133,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 
 #[violation]
 pub struct StringDotFormatInvalidFormat {
-    pub message: String,
+    pub(crate) message: String,
 }
 
 impl Violation for StringDotFormatInvalidFormat {
@@ -146,7 +146,7 @@ impl Violation for StringDotFormatInvalidFormat {
 
 #[violation]
 pub struct StringDotFormatExtraNamedArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
@@ -166,7 +166,7 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
 
 #[violation]
 pub struct StringDotFormatExtraPositionalArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
@@ -186,7 +186,7 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
 
 #[violation]
 pub struct StringDotFormatMissingArguments {
-    pub missing: Vec<String>,
+    missing: Vec<String>,
 }
 
 impl Violation for StringDotFormatMissingArguments {
@@ -217,7 +217,7 @@ fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
 
 fn has_star_args(args: &[Expr]) -> bool {
     args.iter()
-        .any(|arg| matches!(&arg.node, ExprKind::Starred { .. }))
+        .any(|arg| matches!(&arg.node, ExprKind::Starred(_)))
 }
 
 /// F502
@@ -230,12 +230,12 @@ pub(crate) fn percent_format_expected_mapping(
     if !summary.keywords.is_empty() {
         // Tuple, List, Set (+comprehensions)
         match right.node {
-            ExprKind::List { .. }
-            | ExprKind::Tuple { .. }
-            | ExprKind::Set { .. }
-            | ExprKind::ListComp { .. }
-            | ExprKind::SetComp { .. }
-            | ExprKind::GeneratorExp { .. } => checker
+            ExprKind::List(_)
+            | ExprKind::Tuple(_)
+            | ExprKind::Set(_)
+            | ExprKind::ListComp(_)
+            | ExprKind::SetComp(_)
+            | ExprKind::GeneratorExp(_) => checker
                 .diagnostics
                 .push(Diagnostic::new(PercentFormatExpectedMapping, location)),
             _ => {}
@@ -250,11 +250,7 @@ pub(crate) fn percent_format_expected_sequence(
     right: &Expr,
     location: TextRange,
 ) {
-    if summary.num_positional > 1
-        && matches!(
-            right.node,
-            ExprKind::Dict { .. } | ExprKind::DictComp { .. }
-        )
+    if summary.num_positional > 1 && matches!(right.node, ExprKind::Dict(_) | ExprKind::DictComp(_))
     {
         checker
             .diagnostics
@@ -272,7 +268,7 @@ pub(crate) fn percent_format_extra_named_arguments(
     if summary.num_positional > 0 {
         return;
     }
-    let ExprKind::Dict { keys, .. } = &right.node else {
+    let ExprKind::Dict(ast::ExprDict { keys, .. }) = &right.node else {
         return;
     };
     if keys.iter().any(std::option::Option::is_none) {
@@ -284,10 +280,10 @@ pub(crate) fn percent_format_extra_named_arguments(
         .filter_map(|k| match k {
             Some(Expr {
                 node:
-                    ExprKind::Constant {
+                    ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
-                    },
+                    }),
                 ..
             }) => {
                 if summary.keywords.contains(value) {
@@ -311,7 +307,8 @@ pub(crate) fn percent_format_extra_named_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             remove_unused_format_arguments_from_dict(
                 &missing,
                 right,
@@ -334,7 +331,7 @@ pub(crate) fn percent_format_missing_arguments(
         return;
     }
 
-    if let ExprKind::Dict { keys, .. } = &right.node {
+    if let ExprKind::Dict(ast::ExprDict { keys, .. }) = &right.node {
         if keys.iter().any(std::option::Option::is_none) {
             return; // contains **x splat
         }
@@ -342,10 +339,10 @@ pub(crate) fn percent_format_missing_arguments(
         let mut keywords = FxHashSet::default();
         for key in keys.iter().flatten() {
             match &key.node {
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Str(value),
                     ..
-                } => {
+                }) => {
                     keywords.insert(value);
                 }
                 _ => {
@@ -397,10 +394,12 @@ pub(crate) fn percent_format_positional_count_mismatch(
     }
 
     match &right.node {
-        ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } | ExprKind::Set { elts, .. } => {
+        ExprKind::List(ast::ExprList { elts, .. })
+        | ExprKind::Tuple(ast::ExprTuple { elts, .. })
+        | ExprKind::Set(ast::ExprSet { elts }) => {
             let mut found = 0;
             for elt in elts {
-                if let ExprKind::Starred { .. } = &elt.node {
+                if let ExprKind::Starred(_) = &elt.node {
                     return;
                 }
                 found += 1;
@@ -429,7 +428,7 @@ pub(crate) fn percent_format_star_requires_sequence(
 ) {
     if summary.starred {
         match &right.node {
-            ExprKind::Dict { .. } | ExprKind::DictComp { .. } => checker
+            ExprKind::Dict(_) | ExprKind::DictComp(_) => checker
                 .diagnostics
                 .push(Diagnostic::new(PercentFormatStarRequiresSequence, location)),
             _ => {}
@@ -455,7 +454,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 
     let missing: Vec<&str> = keywords
         .filter_map(|arg| {
-            if summary.keywords.contains(arg) {
+            if summary.keywords.contains(arg.as_ref()) {
                 None
             } else {
                 Some(arg.as_str())
@@ -474,7 +473,8 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             remove_unused_keyword_arguments_from_format_call(
                 &missing,
                 location,
@@ -497,7 +497,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         .iter()
         .enumerate()
         .filter(|(i, arg)| {
-            !(matches!(arg.node, ExprKind::Starred { .. })
+            !(matches!(arg.node, ExprKind::Starred(_))
                 || summary.autos.contains(i)
                 || summary.indices.contains(i))
         })
@@ -518,7 +518,8 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             remove_unused_positional_arguments_from_format_call(
                 &missing,
                 location,
@@ -547,7 +548,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .iter()
         .filter_map(|k| {
             let KeywordData { arg, .. } = &k.node;
-            arg.as_ref()
+            arg.as_ref().map(Identifier::as_str)
         })
         .collect();
 
@@ -561,7 +562,7 @@ pub(crate) fn string_dot_format_missing_argument(
             summary
                 .keywords
                 .iter()
-                .filter(|k| !keywords.contains(k))
+                .filter(|k| !keywords.contains(k.as_str()))
                 .cloned(),
         )
         .collect();

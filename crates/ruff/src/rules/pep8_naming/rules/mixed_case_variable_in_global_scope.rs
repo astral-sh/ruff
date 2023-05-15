@@ -48,7 +48,7 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/#global-variable-names
 #[violation]
 pub struct MixedCaseVariableInGlobalScope {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MixedCaseVariableInGlobalScope {
@@ -60,7 +60,7 @@ impl Violation for MixedCaseVariableInGlobalScope {
 }
 
 /// N816
-pub fn mixed_case_variable_in_global_scope(
+pub(crate) fn mixed_case_variable_in_global_scope(
     checker: &mut Checker,
     expr: &Expr,
     stmt: &Stmt,

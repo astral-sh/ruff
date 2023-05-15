@@ -1,11 +1,13 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_text_size::{TextRange, TextSize};
+
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_semantic::definition::{Definition, Member};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
@@ -37,7 +39,7 @@ impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
 }
 
 /// D212, D213
-pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 
@@ -67,10 +69,11 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 // Delete until first non-whitespace char.
                 for line in content_lines {
                     if let Some(end_column) = line.find(|c: char| !c.is_whitespace()) {
-                        diagnostic.set_fix(Edit::deletion(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                             first_line.end(),
                             line.start() + TextSize::try_from(end_column).unwrap(),
-                        ));
+                        )));
                         break;
                     }
                 }
@@ -90,22 +93,17 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 if !indentation.chars().all(char::is_whitespace) {
                     fixable = false;
 
-                    // If the docstring isn't on its own line, look at the parent indentation, and
-                    // add the default indentation to get the "right" level.
-                    if let DefinitionKind::Class(parent)
-                    | DefinitionKind::NestedClass(parent)
-                    | DefinitionKind::Function(parent)
-                    | DefinitionKind::NestedFunction(parent)
-                    | DefinitionKind::Method(parent) = &docstring.kind
-                    {
-                        let parent_line_start = checker.locator.line_start(parent.start());
-                        let parent_indentation = checker
+                    // If the docstring isn't on its own line, look at the statement indentation,
+                    // and add the default indentation to get the "right" level.
+                    if let Definition::Member(Member { stmt, .. }) = &docstring.definition {
+                        let stmt_line_start = checker.locator.line_start(stmt.start());
+                        let stmt_indentation = checker
                             .locator
-                            .slice(TextRange::new(parent_line_start, parent.start()));
+                            .slice(TextRange::new(stmt_line_start, stmt.start()));
 
-                        if parent_indentation.chars().all(char::is_whitespace) {
+                        if stmt_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();
-                            indentation.push_str(parent_indentation);
+                            indentation.push_str(stmt_indentation);
                             indentation.push_str(checker.stylist.indentation());
                             fixable = true;
                         }
@@ -123,7 +121,12 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                         first_line.strip_prefix(prefix).unwrap().trim_start()
                     );
 
-                    diagnostic.set_fix(Edit::replacement(repl, body.start(), first_line.end()));
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::replacement(
+                        repl,
+                        body.start(),
+                        first_line.end(),
+                    )));
                 }
             }
             checker.diagnostics.push(diagnostic);

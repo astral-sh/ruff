@@ -36,7 +36,7 @@ use super::helpers;
 /// ```
 #[violation]
 pub struct UnnecessaryCollectionCall {
-    pub obj_type: String,
+    obj_type: String,
 }
 
 impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
@@ -52,7 +52,7 @@ impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
 }
 
 /// C408
-pub fn unnecessary_collection_call(
+pub(crate) fn unnecessary_collection_call(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -89,7 +89,8 @@ pub fn unnecessary_collection_call(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
+        #[allow(deprecated)]
+        diagnostic.try_set_fix_from_edit(|| {
             fixes::fix_unnecessary_collection_call(checker.locator, checker.stylist, expr)
         });
     }

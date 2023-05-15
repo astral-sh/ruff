@@ -3,14 +3,14 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use rustc_hash::FxHashSet;
-use rustpython_common::cformat::{
+use rustpython_format::cformat::{
     CFormatError, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatSpec, CFormatString,
 };
 
 pub(crate) struct CFormatSummary {
-    pub starred: bool,
-    pub num_positional: usize,
-    pub keywords: FxHashSet<String>,
+    pub(crate) starred: bool,
+    pub(crate) num_positional: usize,
+    pub(crate) keywords: FxHashSet<String>,
 }
 
 impl From<&CFormatString> for CFormatSummary {

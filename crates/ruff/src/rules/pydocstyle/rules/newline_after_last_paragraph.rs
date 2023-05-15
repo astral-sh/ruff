@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
 use ruff_python_ast::whitespace;
 use ruff_text_size::{TextLen, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 #[violation]
@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for NewLineAfterLastParagraph {
 }
 
 /// D209
-pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body();
 
@@ -56,11 +56,12 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             checker.stylist.line_ending().as_str(),
                             whitespace::clean(docstring.indentation)
                         );
-                        diagnostic.set_fix(Edit::replacement(
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                             content,
                             docstring.expr.end() - num_trailing_quotes - num_trailing_spaces,
                             docstring.expr.end() - num_trailing_quotes,
-                        ));
+                        )));
                     }
                     checker.diagnostics.push(diagnostic);
                 }
