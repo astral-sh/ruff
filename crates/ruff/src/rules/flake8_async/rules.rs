@@ -64,7 +64,7 @@ const BLOCKING_HTTP_CALLS: &[&[&str]] = &[
     &["requests", "trace"],
 ];
 
-/// ASY100
+/// ASYNC100
 pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
     if in_async_function(&checker.ctx) {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
@@ -130,7 +130,7 @@ const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
     &["os", "waitpid"],
 ];
 
-/// ASY101
+/// ASYNC101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
     if in_async_function(&checker.ctx) {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
@@ -194,7 +194,7 @@ const UNSAFE_OS_METHODS: &[&[&str]] = &[
     &["os", "system"],
 ];
 
-/// ASY102
+/// ASYNC102
 pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
     if in_async_function(&checker.ctx) {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
