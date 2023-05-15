@@ -450,6 +450,7 @@ where
     }
 
     /// Lex a single comment.
+    #[cfg(feature = "full-lexer")]
     fn lex_comment(&mut self) -> LexResult {
         let start_pos = self.get_pos();
         let mut value = String::new();
@@ -462,6 +463,20 @@ where
                 Some(_) => {}
             }
             value.push(self.next_char().unwrap());
+        }
+    }
+
+    /// Discard comment if full-lexer is not enabled.
+    #[cfg(not(feature = "full-lexer"))]
+    fn lex_comment(&mut self) {
+        loop {
+            match self.window[0] {
+                Some('\n' | '\r') | None => {
+                    return;
+                }
+                Some(_) => {}
+            }
+            self.next_char().unwrap();
         }
     }
 
@@ -611,8 +626,9 @@ where
                     tabs += 1;
                 }
                 Some('#') => {
-                    let comment = self.lex_comment()?;
-                    self.emit(comment);
+                    let _comment = self.lex_comment();
+                    #[cfg(feature = "full-lexer")]
+                    self.emit(_comment?);
                     spaces = 0;
                     tabs = 0;
                 }
@@ -753,8 +769,9 @@ where
                 self.emit(number);
             }
             '#' => {
-                let comment = self.lex_comment()?;
-                self.emit(comment);
+                let _comment = self.lex_comment();
+                #[cfg(feature = "full-lexer")]
+                self.emit(_comment?);
             }
             '"' | '\'' => {
                 let string = self.lex_string(StringKind::String)?;
@@ -1101,6 +1118,7 @@ where
                     self.at_begin_of_line = true;
                     self.emit((Tok::Newline, TextRange::new(tok_start, tok_end)));
                 } else {
+                    #[cfg(feature = "full-lexer")]
                     self.emit((Tok::NonLogicalNewline, TextRange::new(tok_start, tok_end)));
                 }
             }
@@ -1408,6 +1426,7 @@ mod tests {
         ($($name:ident: $eol:expr,)*) => {
             $(
             #[test]
+            #[cfg(feature = "full-lexer")]
             fn $name() {
                 let source = format!(r"99232  # {}", $eol);
                 let tokens = lex_source(&source);
@@ -1428,6 +1447,7 @@ mod tests {
         ($($name:ident: $eol:expr,)*) => {
             $(
             #[test]
+            #[cfg(feature = "full-lexer")]
             fn $name() {
                 let source = format!("123  # Foo{}456", $eol);
                 let tokens = lex_source(&source);
@@ -1607,6 +1627,7 @@ mod tests {
         ($($name:ident: $eol:expr,)*) => {
         $(
             #[test]
+            #[cfg(feature = "full-lexer")]
             fn $name() {
                 let source = r"x = [
 
@@ -1669,6 +1690,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "full-lexer")]
     fn test_non_logical_newline_in_string_continuation() {
         let source = r"(
     'a'
@@ -1698,6 +1720,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "full-lexer")]
     fn test_logical_newline_line_comment() {
         let source = "#Hello\n#World";
         let tokens = lex_source(source);

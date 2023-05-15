@@ -43,11 +43,13 @@ pub enum Tok {
         triple_quoted: bool,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
+    #[cfg(feature = "full-lexer")]
     Comment(String),
     /// Token value for a newline.
     Newline,
     /// Token value for a newline that is not a logical line break. These are filtered out of
     /// the token stream prior to parsing.
+    #[cfg(feature = "full-lexer")]
     NonLogicalNewline,
     /// Token value for an indent.
     Indent,
@@ -223,6 +225,7 @@ impl fmt::Display for Tok {
                 write!(f, "{kind}{quotes}{value}{quotes}")
             }
             Newline => f.write_str("Newline"),
+            #[cfg(feature = "full-lexer")]
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
@@ -236,6 +239,7 @@ impl fmt::Display for Tok {
             Rsqb => f.write_str("']'"),
             Colon => f.write_str("':'"),
             Comma => f.write_str("','"),
+            #[cfg(feature = "full-lexer")]
             Comment(value) => f.write_str(value),
             Semi => f.write_str("';'"),
             Plus => f.write_str("'+'"),

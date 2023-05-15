@@ -13,6 +13,7 @@ default = ["location"]
 location = ["rustpython-ast/location", "rustpython-parser-core/location"]
 serde = ["dep:serde", "rustpython-parser-core/serde"]
 all-nodes-with-ranges = ["rustpython-ast/all-nodes-with-ranges"]
+full-lexer = []
 
 [build-dependencies]
 anyhow = { workspace = true }

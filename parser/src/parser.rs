@@ -190,9 +190,10 @@ pub fn parse_tokens(
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
     let marker_token = (Tok::start_marker(mode), Default::default());
-    let lexer = iter::once(Ok(marker_token))
-        .chain(lxr)
-        .filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
+    let lexer = iter::once(Ok(marker_token)).chain(lxr);
+    #[cfg(feature = "full-lexer")]
+    let lexer =
+        lexer.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
     python::TopParser::new()
         .parse(
             lexer

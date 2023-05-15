@@ -86,18 +86,19 @@ where
 
         self.start_of_line = next.as_ref().map_or(false, |lex_result| {
             lex_result.as_ref().map_or(false, |(tok, _)| {
+                #[cfg(feature = "full-lexer")]
                 if matches!(tok, Tok::NonLogicalNewline | Tok::Comment { .. }) {
-                    self.start_of_line
-                } else {
-                    matches!(
-                        tok,
-                        Tok::StartModule
-                            | Tok::StartInteractive
-                            | Tok::Newline
-                            | Tok::Indent
-                            | Tok::Dedent
-                    )
+                    return self.start_of_line;
                 }
+
+                matches!(
+                    tok,
+                    Tok::StartModule
+                        | Tok::StartInteractive
+                        | Tok::Newline
+                        | Tok::Indent
+                        | Tok::Dedent
+                )
             })
         });
 
