@@ -3,112 +3,82 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..28,
-        custom: (),
-        node: If(
-            StmtIf {
-                test: Attributed {
+    If(
+        StmtIf {
+            range: 0..28,
+            test: Constant(
+                ExprConstant {
                     range: 3..4,
-                    custom: (),
-                    node: Constant(
-                        ExprConstant {
-                            value: Int(
-                                1,
-                            ),
-                            kind: None,
-                        },
+                    value: Int(
+                        1,
                     ),
+                    kind: None,
                 },
-                body: [
-                    Attributed {
+            ),
+            body: [
+                Expr(
+                    StmtExpr {
                         range: 6..8,
-                        custom: (),
-                        node: Expr(
-                            StmtExpr {
-                                value: Attributed {
-                                    range: 6..8,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                10,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
+                        value: Constant(
+                            ExprConstant {
+                                range: 6..8,
+                                value: Int(
+                                    10,
+                                ),
+                                kind: None,
                             },
                         ),
                     },
-                ],
-                orelse: [
-                    Attributed {
+                ),
+            ],
+            orelse: [
+                If(
+                    StmtIf {
                         range: 9..28,
-                        custom: (),
-                        node: If(
-                            StmtIf {
-                                test: Attributed {
-                                    range: 14..15,
-                                    custom: (),
-                                    node: Constant(
+                        test: Constant(
+                            ExprConstant {
+                                range: 14..15,
+                                value: Int(
+                                    2,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 17..19,
+                                    value: Constant(
                                         ExprConstant {
+                                            range: 17..19,
                                             value: Int(
-                                                2,
+                                                20,
                                             ),
                                             kind: None,
                                         },
                                     ),
                                 },
-                                body: [
-                                    Attributed {
-                                        range: 17..19,
-                                        custom: (),
-                                        node: Expr(
-                                            StmtExpr {
-                                                value: Attributed {
-                                                    range: 17..19,
-                                                    custom: (),
-                                                    node: Constant(
-                                                        ExprConstant {
-                                                            value: Int(
-                                                                20,
-                                                            ),
-                                                            kind: None,
-                                                        },
-                                                    ),
-                                                },
-                                            },
-                                        ),
-                                    },
-                                ],
-                                orelse: [
-                                    Attributed {
-                                        range: 26..28,
-                                        custom: (),
-                                        node: Expr(
-                                            StmtExpr {
-                                                value: Attributed {
-                                                    range: 26..28,
-                                                    custom: (),
-                                                    node: Constant(
-                                                        ExprConstant {
-                                                            value: Int(
-                                                                30,
-                                                            ),
-                                                            kind: None,
-                                                        },
-                                                    ),
-                                                },
-                                            },
-                                        ),
-                                    },
-                                ],
-                            },
-                        ),
+                            ),
+                        ],
+                        orelse: [
+                            Expr(
+                                StmtExpr {
+                                    range: 26..28,
+                                    value: Constant(
+                                        ExprConstant {
+                                            range: 26..28,
+                                            value: Int(
+                                                30,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
                     },
-                ],
-            },
-        ),
-    },
+                ),
+            ],
+        },
+    ),
 ]

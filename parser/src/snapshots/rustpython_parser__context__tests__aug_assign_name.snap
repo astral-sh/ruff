@@ -3,37 +3,28 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..6,
-        custom: (),
-        node: AugAssign(
-            StmtAugAssign {
-                target: Attributed {
+    AugAssign(
+        StmtAugAssign {
+            range: 0..6,
+            target: Name(
+                ExprName {
                     range: 0..1,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "x",
-                            ),
-                            ctx: Store,
-                        },
+                    id: Identifier(
+                        "x",
                     ),
+                    ctx: Store,
                 },
-                op: Add,
-                value: Attributed {
+            ),
+            op: Add,
+            value: Constant(
+                ExprConstant {
                     range: 5..6,
-                    custom: (),
-                    node: Constant(
-                        ExprConstant {
-                            value: Int(
-                                1,
-                            ),
-                            kind: None,
-                        },
+                    value: Int(
+                        1,
                     ),
+                    kind: None,
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

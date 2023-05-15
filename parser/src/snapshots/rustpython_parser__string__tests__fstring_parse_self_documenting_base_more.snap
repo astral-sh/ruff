@@ -3,124 +3,94 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "mix ",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "user=",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: FormattedValue(
-            ExprFormattedValue {
-                value: Attributed {
+    Constant(
+        ExprConstant {
+            range: 0..38,
+            value: Str(
+                "mix ",
+            ),
+            kind: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 0..38,
+            value: Str(
+                "user=",
+            ),
+            kind: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 0..38,
+            value: Str(
+                "",
+            ),
+            kind: None,
+        },
+    ),
+    FormattedValue(
+        ExprFormattedValue {
+            range: 0..38,
+            value: Name(
+                ExprName {
                     range: 7..11,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "user",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "user",
                     ),
+                    ctx: Load,
                 },
-                conversion: Int(
-                    114,
-                ),
-                format_spec: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    " with text and ",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "second=",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..38,
-        custom: (),
-        node: FormattedValue(
-            ExprFormattedValue {
-                value: Attributed {
+            ),
+            conversion: Int(
+                114,
+            ),
+            format_spec: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 0..38,
+            value: Str(
+                " with text and ",
+            ),
+            kind: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 0..38,
+            value: Str(
+                "second=",
+            ),
+            kind: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 0..38,
+            value: Str(
+                "",
+            ),
+            kind: None,
+        },
+    ),
+    FormattedValue(
+        ExprFormattedValue {
+            range: 0..38,
+            value: Name(
+                ExprName {
                     range: 29..35,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "second",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "second",
                     ),
+                    ctx: Load,
                 },
-                conversion: Int(
-                    114,
-                ),
-                format_spec: None,
-            },
-        ),
-    },
+            ),
+            conversion: Int(
+                114,
+            ),
+            format_spec: None,
+        },
+    ),
 ]

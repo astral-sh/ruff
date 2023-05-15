@@ -3,124 +3,95 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 1..49,
-        custom: (),
-        node: FunctionDef(
-            StmtFunctionDef {
-                name: Identifier(
-                    "args_to_tuple",
-                ),
-                args: Arguments {
-                    posonlyargs: [],
-                    args: [],
-                    vararg: Some(
-                        Attributed {
-                            range: 20..29,
-                            custom: (),
-                            node: ArgData {
-                                arg: Identifier(
-                                    "args",
-                                ),
-                                annotation: Some(
-                                    Attributed {
-                                        range: 26..29,
-                                        custom: (),
-                                        node: Starred(
-                                            ExprStarred {
-                                                value: Attributed {
-                                                    range: 27..29,
-                                                    custom: (),
-                                                    node: Name(
-                                                        ExprName {
-                                                            id: Identifier(
-                                                                "Ts",
-                                                            ),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                },
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
-                                type_comment: None,
-                            },
-                        },
-                    ),
-                    kwonlyargs: [],
-                    kw_defaults: [],
-                    kwarg: None,
-                    defaults: [],
-                },
-                body: [
-                    Attributed {
-                        range: 46..49,
-                        custom: (),
-                        node: Expr(
-                            StmtExpr {
-                                value: Attributed {
-                                    range: 46..49,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Ellipsis,
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                            },
+    FunctionDef(
+        StmtFunctionDef {
+            range: 1..49,
+            name: Identifier(
+                "args_to_tuple",
+            ),
+            args: Arguments {
+                posonlyargs: [],
+                args: [],
+                vararg: Some(
+                    Arg {
+                        arg: Identifier(
+                            "args",
                         ),
-                    },
-                ],
-                decorator_list: [],
-                returns: Some(
-                    Attributed {
-                        range: 34..44,
-                        custom: (),
-                        node: Subscript(
-                            ExprSubscript {
-                                value: Attributed {
-                                    range: 34..39,
-                                    custom: (),
-                                    node: Name(
+                        annotation: Some(
+                            Starred(
+                                ExprStarred {
+                                    range: 26..29,
+                                    value: Name(
                                         ExprName {
+                                            range: 27..29,
                                             id: Identifier(
-                                                "Tuple",
+                                                "Ts",
                                             ),
                                             ctx: Load,
                                         },
                                     ),
+                                    ctx: Load,
                                 },
-                                slice: Attributed {
-                                    range: 40..43,
-                                    custom: (),
-                                    node: Starred(
-                                        ExprStarred {
-                                            value: Attributed {
-                                                range: 41..43,
-                                                custom: (),
-                                                node: Name(
-                                                    ExprName {
-                                                        id: Identifier(
-                                                            "Ts",
-                                                        ),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                ctx: Load,
+                            ),
+                        ),
+                        type_comment: None,
+                        range: 20..29,
+                    },
+                ),
+                kwonlyargs: [],
+                kw_defaults: [],
+                kwarg: None,
+                defaults: [],
+                range: (),
+            },
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 46..49,
+                        value: Constant(
+                            ExprConstant {
+                                range: 46..49,
+                                value: Ellipsis,
+                                kind: None,
                             },
                         ),
                     },
                 ),
-                type_comment: None,
-            },
-        ),
-    },
+            ],
+            decorator_list: [],
+            returns: Some(
+                Subscript(
+                    ExprSubscript {
+                        range: 34..44,
+                        value: Name(
+                            ExprName {
+                                range: 34..39,
+                                id: Identifier(
+                                    "Tuple",
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        slice: Starred(
+                            ExprStarred {
+                                range: 40..43,
+                                value: Name(
+                                    ExprName {
+                                        range: 41..43,
+                                        id: Identifier(
+                                            "Ts",
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        ctx: Load,
+                    },
+                ),
+            ),
+            type_comment: None,
+        },
+    ),
 ]

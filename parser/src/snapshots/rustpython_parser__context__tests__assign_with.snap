@@ -3,50 +3,42 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..17,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+    With(
+        StmtWith {
+            range: 0..17,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 5..6,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        1,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                1,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 10..11,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "x",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 13..17,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
 ]

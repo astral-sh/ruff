@@ -8,6 +8,7 @@ mod generic {
     include!("gen/generic.rs");
 }
 mod impls;
+mod ranged;
 #[cfg(feature = "location")]
 mod source_locator;
 #[cfg(feature = "unparse")]
@@ -15,13 +16,13 @@ mod unparse;
 
 pub use builtin::*;
 pub use generic::*;
+pub use ranged::{EmptyRange, OptionalRange, Ranged, Suite};
 pub use rustpython_parser_core::{text_size, ConversionFlag};
-
-pub type Suite<U = ()> = Vec<Stmt<U>>;
 
 #[cfg(feature = "fold")]
 pub mod fold {
     use super::generic::*;
+
     include!("gen/fold.rs");
 }
 
@@ -33,9 +34,7 @@ mod visitor {
 }
 
 #[cfg(feature = "location")]
-pub mod located {
-    include!("gen/located.rs");
-}
+pub mod located;
 
 #[cfg(feature = "location")]
 pub use rustpython_parser_core::source_code;

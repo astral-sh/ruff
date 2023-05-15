@@ -4,42 +4,34 @@ expression: parse_ast
 ---
 Ok(
     [
-        Attributed {
-            range: 0..9,
-            custom: (),
-            node: Expr(
-                StmtExpr {
-                    value: Attributed {
+        Expr(
+            StmtExpr {
+                range: 0..9,
+                value: Lambda(
+                    ExprLambda {
                         range: 0..9,
-                        custom: (),
-                        node: Lambda(
-                            ExprLambda {
-                                args: Arguments {
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kw_defaults: [],
-                                    kwarg: None,
-                                    defaults: [],
-                                },
-                                body: Attributed {
-                                    range: 8..9,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                1,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [],
+                            range: (),
+                        },
+                        body: Constant(
+                            ExprConstant {
+                                range: 8..9,
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
                             },
                         ),
                     },
-                },
-            ),
-        },
+                ),
+            },
+        ),
     ],
 )

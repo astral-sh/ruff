@@ -4,99 +4,76 @@ expression: parse_ast
 ---
 Ok(
     [
-        Attributed {
-            range: 0..26,
-            custom: (),
-            node: Expr(
-                StmtExpr {
-                    value: Attributed {
+        Expr(
+            StmtExpr {
+                range: 0..26,
+                value: Lambda(
+                    ExprLambda {
                         range: 0..26,
-                        custom: (),
-                        node: Lambda(
-                            ExprLambda {
-                                args: Arguments {
-                                    posonlyargs: [],
-                                    args: [
-                                        Attributed {
-                                            range: 7..8,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "a",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                        Attributed {
-                                            range: 10..11,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "b",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                        Attributed {
-                                            range: 13..14,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "c",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                    ],
-                                    vararg: None,
-                                    kwonlyargs: [
-                                        Attributed {
-                                            range: 19..20,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "d",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                        Attributed {
-                                            range: 22..23,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "e",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                    ],
-                                    kw_defaults: [],
-                                    kwarg: None,
-                                    defaults: [],
-                                },
-                                body: Attributed {
-                                    range: 25..26,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                0,
-                                            ),
-                                            kind: None,
-                                        },
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [
+                                Arg {
+                                    arg: Identifier(
+                                        "a",
                                     ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 7..8,
                                 },
+                                Arg {
+                                    arg: Identifier(
+                                        "b",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 10..11,
+                                },
+                                Arg {
+                                    arg: Identifier(
+                                        "c",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 13..14,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [
+                                Arg {
+                                    arg: Identifier(
+                                        "d",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 19..20,
+                                },
+                                Arg {
+                                    arg: Identifier(
+                                        "e",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 22..23,
+                                },
+                            ],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [],
+                            range: (),
+                        },
+                        body: Constant(
+                            ExprConstant {
+                                range: 25..26,
+                                value: Int(
+                                    0,
+                                ),
+                                kind: None,
                             },
                         ),
                     },
-                },
-            ),
-        },
+                ),
+            },
+        ),
     ],
 )

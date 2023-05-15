@@ -4,94 +4,77 @@ expression: parse_ast
 ---
 Ok(
     [
-        Attributed {
-            range: 0..26,
-            custom: (),
-            node: FunctionDef(
-                StmtFunctionDef {
-                    name: Identifier(
-                        "f",
-                    ),
-                    args: Arguments {
-                        posonlyargs: [],
-                        args: [
-                            Attributed {
-                                range: 6..7,
-                                custom: (),
-                                node: ArgData {
-                                    arg: Identifier(
-                                        "a",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
-                                },
-                            },
-                            Attributed {
-                                range: 9..10,
-                                custom: (),
-                                node: ArgData {
-                                    arg: Identifier(
-                                        "b",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
-                                },
-                            },
-                            Attributed {
-                                range: 15..16,
-                                custom: (),
-                                node: ArgData {
-                                    arg: Identifier(
-                                        "c",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
-                                },
-                            },
-                        ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kw_defaults: [],
-                        kwarg: None,
-                        defaults: [
-                            Attributed {
-                                range: 11..13,
-                                custom: (),
-                                node: Constant(
-                                    ExprConstant {
-                                        value: Int(
-                                            20,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            },
-                            Attributed {
-                                range: 17..19,
-                                custom: (),
-                                node: Constant(
-                                    ExprConstant {
-                                        value: Int(
-                                            30,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            },
-                        ],
-                    },
-                    body: [
-                        Attributed {
-                            range: 22..26,
-                            custom: (),
-                            node: Pass,
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..26,
+                name: Identifier(
+                    "f",
+                ),
+                args: Arguments {
+                    posonlyargs: [],
+                    args: [
+                        Arg {
+                            arg: Identifier(
+                                "a",
+                            ),
+                            annotation: None,
+                            type_comment: None,
+                            range: 6..7,
+                        },
+                        Arg {
+                            arg: Identifier(
+                                "b",
+                            ),
+                            annotation: None,
+                            type_comment: None,
+                            range: 9..10,
+                        },
+                        Arg {
+                            arg: Identifier(
+                                "c",
+                            ),
+                            annotation: None,
+                            type_comment: None,
+                            range: 15..16,
                         },
                     ],
-                    decorator_list: [],
-                    returns: None,
-                    type_comment: None,
+                    vararg: None,
+                    kwonlyargs: [],
+                    kw_defaults: [],
+                    kwarg: None,
+                    defaults: [
+                        Constant(
+                            ExprConstant {
+                                range: 11..13,
+                                value: Int(
+                                    20,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 17..19,
+                                value: Int(
+                                    30,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
+                    range: (),
                 },
-            ),
-        },
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 22..26,
+                        },
+                    ),
+                ],
+                decorator_list: [],
+                returns: None,
+                type_comment: None,
+            },
+        ),
     ],
 )

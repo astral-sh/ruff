@@ -17,7 +17,7 @@ members = [
 
 [workspace.dependencies]
 rustpython-ast = { path = "ast", default-features = false }
-rustpython-parser-core = { path = "core", default-features = false }
+rustpython-parser-core = { path = "core", features = [] }
 rustpython-literal = { path = "literal" }
 
 ahash = "0.7.6"

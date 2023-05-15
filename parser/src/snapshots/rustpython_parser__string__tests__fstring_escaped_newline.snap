@@ -3,58 +3,43 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..8,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+    Expr(
+        StmtExpr {
+            range: 0..8,
+            value: JoinedStr(
+                ExprJoinedStr {
                     range: 0..8,
-                    custom: (),
-                    node: JoinedStr(
-                        ExprJoinedStr {
-                            values: [
-                                Attributed {
-                                    range: 0..8,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Str(
-                                                "\n",
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                                Attributed {
-                                    range: 0..8,
-                                    custom: (),
-                                    node: FormattedValue(
-                                        ExprFormattedValue {
-                                            value: Attributed {
-                                                range: 5..6,
-                                                custom: (),
-                                                node: Name(
-                                                    ExprName {
-                                                        id: Identifier(
-                                                            "x",
-                                                        ),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                            conversion: Int(
-                                                0,
-                                            ),
-                                            format_spec: None,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 0..8,
+                                value: Str(
+                                    "\n",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 0..8,
+                                value: Name(
+                                    ExprName {
+                                        range: 5..6,
+                                        id: Identifier(
+                                            "x",
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                conversion: Int(
+                                    0,
+                                ),
+                                format_spec: None,
+                            },
+                        ),
+                    ],
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

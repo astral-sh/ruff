@@ -3,26 +3,20 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..20,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+    Expr(
+        StmtExpr {
+            range: 0..20,
+            value: Constant(
+                ExprConstant {
                     range: 0..20,
-                    custom: (),
-                    node: Constant(
-                        ExprConstant {
-                            value: Str(
-                                "Hello, world!",
-                            ),
-                            kind: Some(
-                                "u",
-                            ),
-                        },
+                    value: Str(
+                        "Hello, world!",
+                    ),
+                    kind: Some(
+                        "u",
                     ),
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

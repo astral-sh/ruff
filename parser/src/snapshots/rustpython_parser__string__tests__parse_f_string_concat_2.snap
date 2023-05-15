@@ -3,34 +3,25 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..17,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+    Expr(
+        StmtExpr {
+            range: 0..17,
+            value: JoinedStr(
+                ExprJoinedStr {
                     range: 0..17,
-                    custom: (),
-                    node: JoinedStr(
-                        ExprJoinedStr {
-                            values: [
-                                Attributed {
-                                    range: 0..17,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Str(
-                                                "Hello world",
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
+                    values: [
+                        Constant(
+                            ExprConstant {
+                                range: 0..17,
+                                value: Str(
+                                    "Hello world",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

@@ -1,7 +1,5 @@
 use crate::ConversionFlag;
-use crate::{
-    Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, ExprKind, Identifier, Operator,
-};
+use crate::{Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, Identifier, Operator};
 use std::fmt;
 
 mod precedence {
@@ -73,8 +71,12 @@ impl<'a> Unparser<'a> {
                 ret
             }};
         }
-        match &ast.node {
-            ExprKind::BoolOp(crate::ExprBoolOp { op, values }) => {
+        match &ast {
+            Expr::BoolOp(crate::ExprBoolOp {
+                op,
+                values,
+                range: _range,
+            }) => {
                 let (op, prec) = op_prec!(bin, op, Boolop, And("and", AND), Or("or", OR));
                 group_if!(prec, {
                     let mut first = true;
@@ -84,14 +86,23 @@ impl<'a> Unparser<'a> {
                     }
                 })
             }
-            ExprKind::NamedExpr(crate::ExprNamedExpr { target, value }) => {
+            Expr::NamedExpr(crate::ExprNamedExpr {
+                target,
+                value,
+                range: _range,
+            }) => {
                 group_if!(precedence::TUPLE, {
                     self.unparse_expr(target, precedence::ATOM)?;
                     self.p(" := ")?;
                     self.unparse_expr(value, precedence::ATOM)?;
                 })
             }
-            ExprKind::BinOp(crate::ExprBinOp { left, op, right }) => {
+            Expr::BinOp(crate::ExprBinOp {
+                left,
+                op,
+                right,
+                range: _range,
+            }) => {
                 let right_associative = matches!(op, Operator::Pow);
                 let (op, prec) = op_prec!(
                     bin,
@@ -117,7 +128,11 @@ impl<'a> Unparser<'a> {
                     self.unparse_expr(right, prec + !right_associative as u8)?;
                 })
             }
-            ExprKind::UnaryOp(crate::ExprUnaryOp { op, operand }) => {
+            Expr::UnaryOp(crate::ExprUnaryOp {
+                op,
+                operand,
+                range: _range,
+            }) => {
                 let (op, prec) = op_prec!(
                     un,
                     op,
@@ -132,7 +147,11 @@ impl<'a> Unparser<'a> {
                     self.unparse_expr(operand, prec)?;
                 })
             }
-            ExprKind::Lambda(crate::ExprLambda { args, body }) => {
+            Expr::Lambda(crate::ExprLambda {
+                args,
+                body,
+                range: _range,
+            }) => {
                 group_if!(precedence::TEST, {
                     let pos = args.args.len() + args.posonlyargs.len();
                     self.p(if pos > 0 { "lambda " } else { "lambda" })?;
@@ -140,7 +159,12 @@ impl<'a> Unparser<'a> {
                     write!(self, ": {}", **body)?;
                 })
             }
-            ExprKind::IfExp(crate::ExprIfExp { test, body, orelse }) => {
+            Expr::IfExp(crate::ExprIfExp {
+                test,
+                body,
+                orelse,
+                range: _range,
+            }) => {
                 group_if!(precedence::TEST, {
                     self.unparse_expr(body, precedence::TEST + 1)?;
                     self.p(" if ")?;
@@ -149,7 +173,11 @@ impl<'a> Unparser<'a> {
                     self.unparse_expr(orelse, precedence::TEST)?;
                 })
             }
-            ExprKind::Dict(crate::ExprDict { keys, values }) => {
+            Expr::Dict(crate::ExprDict {
+                keys,
+                values,
+                range: _range,
+            }) => {
                 self.p("{")?;
                 let mut first = true;
                 let (packed, unpacked) = values.split_at(keys.len());
@@ -167,7 +195,10 @@ impl<'a> Unparser<'a> {
                 }
                 self.p("}")?;
             }
-            ExprKind::Set(crate::ExprSet { elts }) => {
+            Expr::Set(crate::ExprSet {
+                elts,
+                range: _range,
+            }) => {
                 self.p("{")?;
                 let mut first = true;
                 for v in elts {
@@ -176,22 +207,31 @@ impl<'a> Unparser<'a> {
                 }
                 self.p("}")?;
             }
-            ExprKind::ListComp(crate::ExprListComp { elt, generators }) => {
+            Expr::ListComp(crate::ExprListComp {
+                elt,
+                generators,
+                range: _range,
+            }) => {
                 self.p("[")?;
                 self.unparse_expr(elt, precedence::TEST)?;
                 self.unparse_comp(generators)?;
                 self.p("]")?;
             }
-            ExprKind::SetComp(crate::ExprSetComp { elt, generators }) => {
+            Expr::SetComp(crate::ExprSetComp {
+                elt,
+                generators,
+                range: _range,
+            }) => {
                 self.p("{")?;
                 self.unparse_expr(elt, precedence::TEST)?;
                 self.unparse_comp(generators)?;
                 self.p("}")?;
             }
-            ExprKind::DictComp(crate::ExprDictComp {
+            Expr::DictComp(crate::ExprDictComp {
                 key,
                 value,
                 generators,
+                range: _range,
             }) => {
                 self.p("{")?;
                 self.unparse_expr(key, precedence::TEST)?;
@@ -200,32 +240,46 @@ impl<'a> Unparser<'a> {
                 self.unparse_comp(generators)?;
                 self.p("}")?;
             }
-            ExprKind::GeneratorExp(crate::ExprGeneratorExp { elt, generators }) => {
+            Expr::GeneratorExp(crate::ExprGeneratorExp {
+                elt,
+                generators,
+                range: _range,
+            }) => {
                 self.p("(")?;
                 self.unparse_expr(elt, precedence::TEST)?;
                 self.unparse_comp(generators)?;
                 self.p(")")?;
             }
-            ExprKind::Await(crate::ExprAwait { value }) => {
+            Expr::Await(crate::ExprAwait {
+                value,
+                range: _range,
+            }) => {
                 group_if!(precedence::AWAIT, {
                     self.p("await ")?;
                     self.unparse_expr(value, precedence::ATOM)?;
                 })
             }
-            ExprKind::Yield(crate::ExprYield { value }) => {
+            Expr::Yield(crate::ExprYield {
+                value,
+                range: _range,
+            }) => {
                 if let Some(value) = value {
                     write!(self, "(yield {})", **value)?;
                 } else {
                     self.p("(yield)")?;
                 }
             }
-            ExprKind::YieldFrom(crate::ExprYieldFrom { value }) => {
+            Expr::YieldFrom(crate::ExprYieldFrom {
+                value,
+                range: _range,
+            }) => {
                 write!(self, "(yield from {})", **value)?;
             }
-            ExprKind::Compare(crate::ExprCompare {
+            Expr::Compare(crate::ExprCompare {
                 left,
                 ops,
                 comparators,
+                range: _range,
             }) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
@@ -248,18 +302,20 @@ impl<'a> Unparser<'a> {
                     }
                 })
             }
-            ExprKind::Call(crate::ExprCall {
+            Expr::Call(crate::ExprCall {
                 func,
                 args,
                 keywords,
+                range: _range,
             }) => {
                 self.unparse_expr(func, precedence::ATOM)?;
                 self.p("(")?;
                 if let (
-                    [Expr {
-                        node: ExprKind::GeneratorExp(crate::ExprGeneratorExp { elt, generators }),
-                        ..
-                    }],
+                    [Expr::GeneratorExp(crate::ExprGeneratorExp {
+                        elt,
+                        generators,
+                        range: _range,
+                    })],
                     [],
                 ) = (&**args, &**keywords)
                 {
@@ -274,26 +330,32 @@ impl<'a> Unparser<'a> {
                     }
                     for kw in keywords {
                         self.p_delim(&mut first, ", ")?;
-                        if let Some(arg) = &kw.node.arg {
+                        if let Some(arg) = &kw.arg {
                             self.p_id(arg)?;
                             self.p("=")?;
                         } else {
                             self.p("**")?;
                         }
-                        self.unparse_expr(&kw.node.value, precedence::TEST)?;
+                        self.unparse_expr(&kw.value, precedence::TEST)?;
                     }
                 }
                 self.p(")")?;
             }
-            ExprKind::FormattedValue(crate::ExprFormattedValue {
+            Expr::FormattedValue(crate::ExprFormattedValue {
                 value,
                 conversion,
                 format_spec,
+                range: _range,
             }) => self.unparse_formatted(value, conversion.to_u32(), format_spec.as_deref())?,
-            ExprKind::JoinedStr(crate::ExprJoinedStr { values }) => {
-                self.unparse_joined_str(values, false)?
-            }
-            ExprKind::Constant(crate::ExprConstant { value, kind }) => {
+            Expr::JoinedStr(crate::ExprJoinedStr {
+                values,
+                range: _range,
+            }) => self.unparse_joined_str(values, false)?,
+            Expr::Constant(crate::ExprConstant {
+                value,
+                kind,
+                range: _range,
+            }) => {
                 if let Some(kind) = kind {
                     self.p(kind)?;
                 }
@@ -309,12 +371,12 @@ impl<'a> Unparser<'a> {
                     _ => fmt::Display::fmt(value, &mut self.f)?,
                 }
             }
-            ExprKind::Attribute(crate::ExprAttribute { value, attr, .. }) => {
+            Expr::Attribute(crate::ExprAttribute { value, attr, .. }) => {
                 self.unparse_expr(value, precedence::ATOM)?;
-                let period = if let ExprKind::Constant(crate::ExprConstant {
+                let period = if let Expr::Constant(crate::ExprConstant {
                     value: Constant::Int(_),
                     ..
-                }) = &value.node
+                }) = value.as_ref()
                 {
                     " ."
                 } else {
@@ -323,14 +385,11 @@ impl<'a> Unparser<'a> {
                 self.p(period)?;
                 self.p_id(attr)?;
             }
-            ExprKind::Subscript(crate::ExprSubscript { value, slice, .. }) => {
+            Expr::Subscript(crate::ExprSubscript { value, slice, .. }) => {
                 self.unparse_expr(value, precedence::ATOM)?;
                 let mut lvl = precedence::TUPLE;
-                if let ExprKind::Tuple(crate::ExprTuple { elts, .. }) = &slice.node {
-                    if elts
-                        .iter()
-                        .any(|expr| matches!(expr.node, ExprKind::Starred { .. }))
-                    {
+                if let Expr::Tuple(crate::ExprTuple { elts, .. }) = slice.as_ref() {
+                    if elts.iter().any(|expr| expr.is_starred_expr()) {
                         lvl += 1
                     }
                 }
@@ -338,12 +397,12 @@ impl<'a> Unparser<'a> {
                 self.unparse_expr(slice, lvl)?;
                 self.p("]")?;
             }
-            ExprKind::Starred(crate::ExprStarred { value, .. }) => {
+            Expr::Starred(crate::ExprStarred { value, .. }) => {
                 self.p("*")?;
                 self.unparse_expr(value, precedence::EXPR)?;
             }
-            ExprKind::Name(crate::ExprName { id, .. }) => self.p_id(id)?,
-            ExprKind::List(crate::ExprList { elts, .. }) => {
+            Expr::Name(crate::ExprName { id, .. }) => self.p_id(id)?,
+            Expr::List(crate::ExprList { elts, .. }) => {
                 self.p("[")?;
                 let mut first = true;
                 for elt in elts {
@@ -352,7 +411,7 @@ impl<'a> Unparser<'a> {
                 }
                 self.p("]")?;
             }
-            ExprKind::Tuple(crate::ExprTuple { elts, .. }) => {
+            Expr::Tuple(crate::ExprTuple { elts, .. }) => {
                 if elts.is_empty() {
                     self.p("()")?;
                 } else {
@@ -366,7 +425,12 @@ impl<'a> Unparser<'a> {
                     })
                 }
             }
-            ExprKind::Slice(crate::ExprSlice { lower, upper, step }) => {
+            Expr::Slice(crate::ExprSlice {
+                lower,
+                upper,
+                step,
+                range: _range,
+            }) => {
                 if let Some(lower) = lower {
                     self.unparse_expr(lower, precedence::TEST)?;
                 }
@@ -420,8 +484,8 @@ impl<'a> Unparser<'a> {
         Ok(())
     }
     fn unparse_arg<U>(&mut self, arg: &Arg<U>) -> fmt::Result {
-        self.p_id(&arg.node.arg)?;
-        if let Some(ann) = &arg.node.annotation {
+        self.p_id(&arg.arg)?;
+        if let Some(ann) = &arg.annotation {
             write!(self, ": {}", **ann)?;
         }
         Ok(())
@@ -487,21 +551,23 @@ impl<'a> Unparser<'a> {
     }
 
     fn unparse_fstring_elem<U>(&mut self, expr: &Expr<U>, is_spec: bool) -> fmt::Result {
-        match &expr.node {
-            ExprKind::Constant(crate::ExprConstant { value, .. }) => {
+        match &expr {
+            Expr::Constant(crate::ExprConstant { value, .. }) => {
                 if let Constant::Str(s) = value {
                     self.unparse_fstring_str(s)
                 } else {
                     unreachable!()
                 }
             }
-            ExprKind::JoinedStr(crate::ExprJoinedStr { values }) => {
-                self.unparse_joined_str(values, is_spec)
-            }
-            ExprKind::FormattedValue(crate::ExprFormattedValue {
+            Expr::JoinedStr(crate::ExprJoinedStr {
+                values,
+                range: _range,
+            }) => self.unparse_joined_str(values, is_spec),
+            Expr::FormattedValue(crate::ExprFormattedValue {
                 value,
                 conversion,
                 format_spec,
+                range: _range,
             }) => self.unparse_formatted(value, conversion.to_u32(), format_spec.as_deref()),
             _ => unreachable!(),
         }

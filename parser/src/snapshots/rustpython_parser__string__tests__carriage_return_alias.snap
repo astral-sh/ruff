@@ -3,24 +3,18 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..21,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+    Expr(
+        StmtExpr {
+            range: 0..21,
+            value: Constant(
+                ExprConstant {
                     range: 0..21,
-                    custom: (),
-                    node: Constant(
-                        ExprConstant {
-                            value: Str(
-                                "\r",
-                            ),
-                            kind: None,
-                        },
+                    value: Str(
+                        "\r",
                     ),
+                    kind: None,
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

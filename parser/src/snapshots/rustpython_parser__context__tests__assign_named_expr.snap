@@ -3,52 +3,40 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..14,
-        custom: (),
-        node: If(
-            StmtIf {
-                test: Attributed {
+    If(
+        StmtIf {
+            range: 0..14,
+            test: NamedExpr(
+                ExprNamedExpr {
                     range: 3..8,
-                    custom: (),
-                    node: NamedExpr(
-                        ExprNamedExpr {
-                            target: Attributed {
-                                range: 3..4,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                            value: Attributed {
-                                range: 7..8,
-                                custom: (),
-                                node: Constant(
-                                    ExprConstant {
-                                        value: Int(
-                                            1,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            },
+                    target: Name(
+                        ExprName {
+                            range: 3..4,
+                            id: Identifier(
+                                "x",
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    value: Constant(
+                        ExprConstant {
+                            range: 7..8,
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
                         },
                     ),
                 },
-                body: [
-                    Attributed {
+            ),
+            body: [
+                Pass(
+                    StmtPass {
                         range: 10..14,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                orelse: [],
-            },
-        ),
-    },
+                ),
+            ],
+            orelse: [],
+        },
+    ),
 ]

@@ -3,52 +3,40 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..10,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "user=",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..10,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "",
-                ),
-                kind: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..10,
-        custom: (),
-        node: FormattedValue(
-            ExprFormattedValue {
-                value: Attributed {
+    Constant(
+        ExprConstant {
+            range: 0..10,
+            value: Str(
+                "user=",
+            ),
+            kind: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 0..10,
+            value: Str(
+                "",
+            ),
+            kind: None,
+        },
+    ),
+    FormattedValue(
+        ExprFormattedValue {
+            range: 0..10,
+            value: Name(
+                ExprName {
                     range: 3..7,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "user",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "user",
                     ),
+                    ctx: Load,
                 },
-                conversion: Int(
-                    114,
-                ),
-                format_spec: None,
-            },
-        ),
-    },
+            ),
+            conversion: Int(
+                114,
+            ),
+            format_spec: None,
+        },
+    ),
 ]

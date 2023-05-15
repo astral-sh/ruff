@@ -3,51 +3,39 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..10,
-        custom: (),
-        node: AnnAssign(
-            StmtAnnAssign {
-                target: Attributed {
+    AnnAssign(
+        StmtAnnAssign {
+            range: 0..10,
+            target: Name(
+                ExprName {
                     range: 0..1,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "x",
-                            ),
-                            ctx: Store,
-                        },
+                    id: Identifier(
+                        "x",
                     ),
+                    ctx: Store,
                 },
-                annotation: Attributed {
+            ),
+            annotation: Name(
+                ExprName {
                     range: 3..6,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "int",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "int",
                     ),
+                    ctx: Load,
                 },
-                value: Some(
-                    Attributed {
+            ),
+            value: Some(
+                Constant(
+                    ExprConstant {
                         range: 9..10,
-                        custom: (),
-                        node: Constant(
-                            ExprConstant {
-                                value: Int(
-                                    1,
-                                ),
-                                kind: None,
-                            },
+                        value: Int(
+                            1,
                         ),
+                        kind: None,
                     },
                 ),
-                simple: true,
-            },
-        ),
-    },
+            ),
+            simple: true,
+        },
+    ),
 ]

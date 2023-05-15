@@ -3,289 +3,931 @@ source: parser/src/parser.rs
 expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
-    Attributed {
-        range: 0..12,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+    With(
+        StmtWith {
+            range: 0..12,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 5..6,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 8..12,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 13..30,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 13..30,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 18..19,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 23..24,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "x",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 26..30,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 31..46,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 31..46,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 36..37,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: None,
-                    },
-                    Withitem {
-                        context_expr: Attributed {
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 39..40,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        1,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                1,
                             ),
+                            kind: None,
                         },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 42..46,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 47..72,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 47..72,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 52..53,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 57..58,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "x",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                    Withitem {
-                        context_expr: Attributed {
+                    ),
+                    range: (),
+                },
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 60..61,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        1,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                1,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 65..66,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "y",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "y",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 68..72,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 73..97,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 73..97,
+            items: [
+                Withitem {
+                    context_expr: IfExp(
+                        ExprIfExp {
                             range: 78..91,
-                            custom: (),
-                            node: IfExp(
-                                ExprIfExp {
-                                    test: Attributed {
-                                        range: 83..84,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    1,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
-                                    body: Attributed {
-                                        range: 78..79,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    0,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
-                                    orelse: Attributed {
-                                        range: 90..91,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    2,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
+                            test: Constant(
+                                ExprConstant {
+                                    range: 83..84,
+                                    value: Int(
+                                        1,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                            body: Constant(
+                                ExprConstant {
+                                    range: 78..79,
+                                    value: Int(
+                                        0,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                            orelse: Constant(
+                                ExprConstant {
+                                    range: 90..91,
+                                    value: Int(
+                                        2,
+                                    ),
+                                    kind: None,
                                 },
                             ),
                         },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 93..97,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 98..127,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 98..127,
+            items: [
+                Withitem {
+                    context_expr: IfExp(
+                        ExprIfExp {
                             range: 103..116,
-                            custom: (),
-                            node: IfExp(
-                                ExprIfExp {
-                                    test: Attributed {
-                                        range: 108..109,
-                                        custom: (),
-                                        node: Constant(
+                            test: Constant(
+                                ExprConstant {
+                                    range: 108..109,
+                                    value: Int(
+                                        1,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                            body: Constant(
+                                ExprConstant {
+                                    range: 103..104,
+                                    value: Int(
+                                        0,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                            orelse: Constant(
+                                ExprConstant {
+                                    range: 115..116,
+                                    value: Int(
+                                        2,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 120..121,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 123..127,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 128..141,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 133..135,
+                            elts: [],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 137..141,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 142..160,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 147..149,
+                            elts: [],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 153..154,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 156..160,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 161..175,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 167..168,
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 171..175,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 176..195,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 182..183,
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 188..189,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 191..195,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 196..211,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 202..203,
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 207..211,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 212..232,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 217..221,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 218..219,
+                                        value: Int(
+                                            0,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 225..226,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 228..232,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 233..250,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 239..240,
+                            value: Int(
+                                0,
+                            ),
+                            kind: None,
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
+                            range: 242..243,
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 246..250,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 251..273,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 256..262,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 257..258,
+                                        value: Int(
+                                            0,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                Constant(
+                                    ExprConstant {
+                                        range: 260..261,
+                                        value: Int(
+                                            1,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 266..267,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 269..273,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 274..290,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 279..284,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 280..282,
+                                        value: Name(
+                                            ExprName {
+                                                range: 281..282,
+                                                id: Identifier(
+                                                    "a",
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 286..290,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 291..312,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 296..301,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 297..299,
+                                        value: Name(
+                                            ExprName {
+                                                range: 298..299,
+                                                id: Identifier(
+                                                    "a",
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 305..306,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 308..312,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 313..331,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 318..325,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 319..320,
+                                        value: Int(
+                                            0,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 322..324,
+                                        value: Name(
+                                            ExprName {
+                                                range: 323..324,
+                                                id: Identifier(
+                                                    "a",
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 327..331,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 332..355,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 337..344,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 338..339,
+                                        value: Int(
+                                            0,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 341..343,
+                                        value: Name(
+                                            ExprName {
+                                                range: 342..343,
+                                                id: Identifier(
+                                                    "a",
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 348..349,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 351..355,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 356..375,
+            items: [
+                Withitem {
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 362..368,
+                            target: Name(
+                                ExprName {
+                                    range: 362..363,
+                                    id: Identifier(
+                                        "a",
+                                    ),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 367..368,
+                                    value: Int(
+                                        0,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 371..375,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 376..400,
+            items: [
+                Withitem {
+                    context_expr: NamedExpr(
+                        ExprNamedExpr {
+                            range: 382..388,
+                            target: Name(
+                                ExprName {
+                                    range: 382..383,
+                                    id: Identifier(
+                                        "a",
+                                    ),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Constant(
+                                ExprConstant {
+                                    range: 387..388,
+                                    value: Int(
+                                        0,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                        },
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
+                                range: 393..394,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 396..400,
+                    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 401..428,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
+                            range: 406..422,
+                            elts: [
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 407..413,
+                                        target: Name(
+                                            ExprName {
+                                                range: 407..408,
+                                                id: Identifier(
+                                                    "a",
+                                                ),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
                                             ExprConstant {
+                                                range: 412..413,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 415..421,
+                                        target: Name(
+                                            ExprName {
+                                                range: 415..416,
+                                                id: Identifier(
+                                                    "b",
+                                                ),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 420..421,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -293,1245 +935,304 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         ),
                                     },
-                                    body: Attributed {
-                                        range: 103..104,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    0,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
-                                    orelse: Attributed {
-                                        range: 115..116,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    2,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 120..121,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
                                 ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 123..127,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 128..141,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 133..135,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [],
-                                    ctx: Load,
-                                },
-                            ),
+                            ],
+                            ctx: Load,
                         },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 137..141,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 142..160,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 147..149,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 153..154,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 156..160,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 161..175,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 167..168,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 171..175,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 176..195,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 182..183,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 188..189,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 191..195,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 196..211,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 202..203,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 207..211,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 212..232,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 217..221,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 218..219,
-                                            custom: (),
-                                            node: Constant(
-                                                ExprConstant {
-                                                    value: Int(
-                                                        0,
-                                                    ),
-                                                    kind: None,
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 225..226,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 228..232,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 233..250,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 239..240,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 242..243,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        1,
-                                    ),
-                                    kind: None,
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 246..250,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 251..273,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 256..262,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 257..258,
-                                            custom: (),
-                                            node: Constant(
-                                                ExprConstant {
-                                                    value: Int(
-                                                        0,
-                                                    ),
-                                                    kind: None,
-                                                },
-                                            ),
-                                        },
-                                        Attributed {
-                                            range: 260..261,
-                                            custom: (),
-                                            node: Constant(
-                                                ExprConstant {
-                                                    value: Int(
-                                                        1,
-                                                    ),
-                                                    kind: None,
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 266..267,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 269..273,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 274..290,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 279..284,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 280..282,
-                                            custom: (),
-                                            node: Starred(
-                                                ExprStarred {
-                                                    value: Attributed {
-                                                        range: 281..282,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "a",
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 286..290,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 291..312,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 296..301,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 297..299,
-                                            custom: (),
-                                            node: Starred(
-                                                ExprStarred {
-                                                    value: Attributed {
-                                                        range: 298..299,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "a",
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 305..306,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 308..312,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 313..331,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 318..325,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 319..320,
-                                            custom: (),
-                                            node: Constant(
-                                                ExprConstant {
-                                                    value: Int(
-                                                        0,
-                                                    ),
-                                                    kind: None,
-                                                },
-                                            ),
-                                        },
-                                        Attributed {
-                                            range: 322..324,
-                                            custom: (),
-                                            node: Starred(
-                                                ExprStarred {
-                                                    value: Attributed {
-                                                        range: 323..324,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "a",
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 327..331,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 332..355,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 337..344,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 338..339,
-                                            custom: (),
-                                            node: Constant(
-                                                ExprConstant {
-                                                    value: Int(
-                                                        0,
-                                                    ),
-                                                    kind: None,
-                                                },
-                                            ),
-                                        },
-                                        Attributed {
-                                            range: 341..343,
-                                            custom: (),
-                                            node: Starred(
-                                                ExprStarred {
-                                                    value: Attributed {
-                                                        range: 342..343,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "a",
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 348..349,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 351..355,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 356..375,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 362..368,
-                            custom: (),
-                            node: NamedExpr(
-                                ExprNamedExpr {
-                                    target: Attributed {
-                                        range: 362..363,
-                                        custom: (),
-                                        node: Name(
-                                            ExprName {
-                                                id: Identifier(
-                                                    "a",
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                    },
-                                    value: Attributed {
-                                        range: 367..368,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    0,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 371..375,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 376..400,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 382..388,
-                            custom: (),
-                            node: NamedExpr(
-                                ExprNamedExpr {
-                                    target: Attributed {
-                                        range: 382..383,
-                                        custom: (),
-                                        node: Name(
-                                            ExprName {
-                                                id: Identifier(
-                                                    "a",
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                    },
-                                    value: Attributed {
-                                        range: 387..388,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    0,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
-                                },
-                            ),
-                        },
-                        optional_vars: Some(
-                            Attributed {
-                                range: 393..394,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
-                ],
-                body: [
-                    Attributed {
-                        range: 396..400,
-                        custom: (),
-                        node: Pass,
-                    },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 401..428,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
-                            range: 406..422,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 407..413,
-                                            custom: (),
-                                            node: NamedExpr(
-                                                ExprNamedExpr {
-                                                    target: Attributed {
-                                                        range: 407..408,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "a",
-                                                                ),
-                                                                ctx: Store,
-                                                            },
-                                                        ),
-                                                    },
-                                                    value: Attributed {
-                                                        range: 412..413,
-                                                        custom: (),
-                                                        node: Constant(
-                                                            ExprConstant {
-                                                                value: Int(
-                                                                    0,
-                                                                ),
-                                                                kind: None,
-                                                            },
-                                                        ),
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                        Attributed {
-                                            range: 415..421,
-                                            custom: (),
-                                            node: NamedExpr(
-                                                ExprNamedExpr {
-                                                    target: Attributed {
-                                                        range: 415..416,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "b",
-                                                                ),
-                                                                ctx: Store,
-                                                            },
-                                                        ),
-                                                    },
-                                                    value: Attributed {
-                                                        range: 420..421,
-                                                        custom: (),
-                                                        node: Constant(
-                                                            ExprConstant {
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                                kind: None,
-                                                            },
-                                                        ),
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        optional_vars: None,
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    optional_vars: None,
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 424..428,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 429..461,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 429..461,
+            items: [
+                Withitem {
+                    context_expr: Tuple(
+                        ExprTuple {
                             range: 434..450,
-                            custom: (),
-                            node: Tuple(
-                                ExprTuple {
-                                    elts: [
-                                        Attributed {
-                                            range: 435..441,
-                                            custom: (),
-                                            node: NamedExpr(
-                                                ExprNamedExpr {
-                                                    target: Attributed {
-                                                        range: 435..436,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "a",
-                                                                ),
-                                                                ctx: Store,
-                                                            },
-                                                        ),
-                                                    },
-                                                    value: Attributed {
-                                                        range: 440..441,
-                                                        custom: (),
-                                                        node: Constant(
-                                                            ExprConstant {
-                                                                value: Int(
-                                                                    0,
-                                                                ),
-                                                                kind: None,
-                                                            },
-                                                        ),
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                        Attributed {
-                                            range: 443..449,
-                                            custom: (),
-                                            node: NamedExpr(
-                                                ExprNamedExpr {
-                                                    target: Attributed {
-                                                        range: 443..444,
-                                                        custom: (),
-                                                        node: Name(
-                                                            ExprName {
-                                                                id: Identifier(
-                                                                    "b",
-                                                                ),
-                                                                ctx: Store,
-                                                            },
-                                                        ),
-                                                    },
-                                                    value: Attributed {
-                                                        range: 448..449,
-                                                        custom: (),
-                                                        node: Constant(
-                                                            ExprConstant {
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                                kind: None,
-                                                            },
-                                                        ),
-                                                    },
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                    ctx: Load,
-                                },
-                            ),
+                            elts: [
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 435..441,
+                                        target: Name(
+                                            ExprName {
+                                                range: 435..436,
+                                                id: Identifier(
+                                                    "a",
+                                                ),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 440..441,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 443..449,
+                                        target: Name(
+                                            ExprName {
+                                                range: 443..444,
+                                                id: Identifier(
+                                                    "b",
+                                                ),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Constant(
+                                            ExprConstant {
+                                                range: 448..449,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 454..455,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "x",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "x",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 457..461,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 462..481,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 462..481,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 468..469,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 473..474,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "a",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "a",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 477..481,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 482..502,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 482..502,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 488..489,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 493..494,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "a",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "a",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 498..502,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 503..530,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 503..530,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 509..510,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 514..515,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "a",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "a",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                    Withitem {
-                        context_expr: Attributed {
+                    ),
+                    range: (),
+                },
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 517..518,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        1,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                1,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 522..523,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "b",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "b",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 526..530,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 531..559,
-        custom: (),
-        node: With(
-            StmtWith {
-                items: [
-                    Withitem {
-                        context_expr: Attributed {
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
+    With(
+        StmtWith {
+            range: 531..559,
+            items: [
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 537..538,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        0,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                0,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 542..543,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "a",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "a",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                    Withitem {
-                        context_expr: Attributed {
+                    ),
+                    range: (),
+                },
+                Withitem {
+                    context_expr: Constant(
+                        ExprConstant {
                             range: 545..546,
-                            custom: (),
-                            node: Constant(
-                                ExprConstant {
-                                    value: Int(
-                                        1,
-                                    ),
-                                    kind: None,
-                                },
+                            value: Int(
+                                1,
                             ),
+                            kind: None,
                         },
-                        optional_vars: Some(
-                            Attributed {
+                    ),
+                    optional_vars: Some(
+                        Name(
+                            ExprName {
                                 range: 550..551,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "b",
-                                        ),
-                                        ctx: Store,
-                                    },
+                                id: Identifier(
+                                    "b",
                                 ),
+                                ctx: Store,
                             },
                         ),
-                    },
-                ],
-                body: [
-                    Attributed {
+                    ),
+                    range: (),
+                },
+            ],
+            body: [
+                Pass(
+                    StmtPass {
                         range: 555..559,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                type_comment: None,
-            },
-        ),
-    },
+                ),
+            ],
+            type_comment: None,
+        },
+    ),
 ]

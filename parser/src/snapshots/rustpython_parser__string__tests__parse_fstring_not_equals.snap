@@ -3,53 +3,41 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..11,
-        custom: (),
-        node: FormattedValue(
-            ExprFormattedValue {
-                value: Attributed {
+    FormattedValue(
+        ExprFormattedValue {
+            range: 0..11,
+            value: Compare(
+                ExprCompare {
                     range: 3..9,
-                    custom: (),
-                    node: Compare(
-                        ExprCompare {
-                            left: Attributed {
-                                range: 3..4,
-                                custom: (),
-                                node: Constant(
-                                    ExprConstant {
-                                        value: Int(
-                                            1,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            },
-                            ops: [
-                                NotEq,
-                            ],
-                            comparators: [
-                                Attributed {
-                                    range: 8..9,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                2,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                            ],
+                    left: Constant(
+                        ExprConstant {
+                            range: 3..4,
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
                         },
                     ),
+                    ops: [
+                        NotEq,
+                    ],
+                    comparators: [
+                        Constant(
+                            ExprConstant {
+                                range: 8..9,
+                                value: Int(
+                                    2,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
                 },
-                conversion: Int(
-                    0,
-                ),
-                format_spec: None,
-            },
-        ),
-    },
+            ),
+            conversion: Int(
+                0,
+            ),
+            format_spec: None,
+        },
+    ),
 ]

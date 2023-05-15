@@ -2,65 +2,51 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Attributed {
-    range: 0..19,
-    custom: (),
-    node: DictComp(
-        ExprDictComp {
-            key: Attributed {
+DictComp(
+    ExprDictComp {
+        range: 0..19,
+        key: Name(
+            ExprName {
                 range: 1..3,
-                custom: (),
-                node: Name(
-                    ExprName {
-                        id: Identifier(
-                            "x1",
-                        ),
-                        ctx: Load,
-                    },
+                id: Identifier(
+                    "x1",
                 ),
+                ctx: Load,
             },
-            value: Attributed {
+        ),
+        value: Name(
+            ExprName {
                 range: 5..7,
-                custom: (),
-                node: Name(
+                id: Identifier(
+                    "x2",
+                ),
+                ctx: Load,
+            },
+        ),
+        generators: [
+            Comprehension {
+                target: Name(
                     ExprName {
+                        range: 12..13,
                         id: Identifier(
-                            "x2",
+                            "y",
+                        ),
+                        ctx: Store,
+                    },
+                ),
+                iter: Name(
+                    ExprName {
+                        range: 17..18,
+                        id: Identifier(
+                            "z",
                         ),
                         ctx: Load,
                     },
                 ),
+                ifs: [],
+                is_async: false,
+                range: (),
             },
-            generators: [
-                Comprehension {
-                    target: Attributed {
-                        range: 12..13,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "y",
-                                ),
-                                ctx: Store,
-                            },
-                        ),
-                    },
-                    iter: Attributed {
-                        range: 17..18,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "z",
-                                ),
-                                ctx: Load,
-                            },
-                        ),
-                    },
-                    ifs: [],
-                    is_async: false,
-                },
-            ],
-        },
-    ),
-}
+        ],
+    },
+)

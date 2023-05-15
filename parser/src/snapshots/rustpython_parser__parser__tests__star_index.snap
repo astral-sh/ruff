@@ -3,402 +3,291 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..36,
-        custom: (),
-        node: Assign(
-            StmtAssign {
-                targets: [
-                    Attributed {
+    Assign(
+        StmtAssign {
+            range: 0..36,
+            targets: [
+                Name(
+                    ExprName {
                         range: 0..11,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "array_slice",
-                                ),
-                                ctx: Store,
-                            },
+                        id: Identifier(
+                            "array_slice",
                         ),
+                        ctx: Store,
                     },
-                ],
-                value: Attributed {
+                ),
+            ],
+            value: Subscript(
+                ExprSubscript {
                     range: 14..36,
-                    custom: (),
-                    node: Subscript(
-                        ExprSubscript {
-                            value: Attributed {
-                                range: 14..19,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "array",
-                                        ),
-                                        ctx: Load,
-                                    },
-                                ),
-                            },
-                            slice: Attributed {
-                                range: 20..35,
-                                custom: (),
-                                node: Tuple(
-                                    ExprTuple {
-                                        elts: [
-                                            Attributed {
-                                                range: 20..21,
-                                                custom: (),
-                                                node: Constant(
-                                                    ExprConstant {
-                                                        value: Int(
-                                                            0,
-                                                        ),
-                                                        kind: None,
-                                                    },
-                                                ),
-                                            },
-                                            Attributed {
-                                                range: 23..31,
-                                                custom: (),
-                                                node: Starred(
-                                                    ExprStarred {
-                                                        value: Attributed {
-                                                            range: 24..31,
-                                                            custom: (),
-                                                            node: Name(
-                                                                ExprName {
-                                                                    id: Identifier(
-                                                                        "indexes",
-                                                                    ),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                        },
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                            Attributed {
-                                                range: 33..35,
-                                                custom: (),
-                                                node: UnaryOp(
-                                                    ExprUnaryOp {
-                                                        op: USub,
-                                                        operand: Attributed {
-                                                            range: 34..35,
-                                                            custom: (),
-                                                            node: Constant(
-                                                                ExprConstant {
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
-                                                                    kind: None,
-                                                                },
-                                                            ),
-                                                        },
-                                                    },
-                                                ),
-                                            },
-                                        ],
-                                        ctx: Load,
-                                    },
-                                ),
-                            },
-                            ctx: Load,
-                        },
-                    ),
-                },
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 37..73,
-        custom: (),
-        node: Assign(
-            StmtAssign {
-                targets: [
-                    Attributed {
-                        range: 37..59,
-                        custom: (),
-                        node: Subscript(
-                            ExprSubscript {
-                                value: Attributed {
-                                    range: 37..42,
-                                    custom: (),
-                                    node: Name(
-                                        ExprName {
-                                            id: Identifier(
-                                                "array",
-                                            ),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                slice: Attributed {
-                                    range: 43..58,
-                                    custom: (),
-                                    node: Tuple(
-                                        ExprTuple {
-                                            elts: [
-                                                Attributed {
-                                                    range: 43..44,
-                                                    custom: (),
-                                                    node: Constant(
-                                                        ExprConstant {
-                                                            value: Int(
-                                                                0,
-                                                            ),
-                                                            kind: None,
-                                                        },
-                                                    ),
-                                                },
-                                                Attributed {
-                                                    range: 46..54,
-                                                    custom: (),
-                                                    node: Starred(
-                                                        ExprStarred {
-                                                            value: Attributed {
-                                                                range: 47..54,
-                                                                custom: (),
-                                                                node: Name(
-                                                                    ExprName {
-                                                                        id: Identifier(
-                                                                            "indexes",
-                                                                        ),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                            },
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                },
-                                                Attributed {
-                                                    range: 56..58,
-                                                    custom: (),
-                                                    node: UnaryOp(
-                                                        ExprUnaryOp {
-                                                            op: USub,
-                                                            operand: Attributed {
-                                                                range: 57..58,
-                                                                custom: (),
-                                                                node: Constant(
-                                                                    ExprConstant {
-                                                                        value: Int(
-                                                                            1,
-                                                                        ),
-                                                                        kind: None,
-                                                                    },
-                                                                ),
-                                                            },
-                                                        },
-                                                    ),
-                                                },
-                                            ],
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                ctx: Store,
-                            },
-                        ),
-                    },
-                ],
-                value: Attributed {
-                    range: 62..73,
-                    custom: (),
-                    node: Name(
+                    value: Name(
                         ExprName {
+                            range: 14..19,
                             id: Identifier(
-                                "array_slice",
+                                "array",
                             ),
                             ctx: Load,
                         },
                     ),
+                    slice: Tuple(
+                        ExprTuple {
+                            range: 20..35,
+                            elts: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 20..21,
+                                        value: Int(
+                                            0,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 23..31,
+                                        value: Name(
+                                            ExprName {
+                                                range: 24..31,
+                                                id: Identifier(
+                                                    "indexes",
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                UnaryOp(
+                                    ExprUnaryOp {
+                                        range: 33..35,
+                                        op: USub,
+                                        operand: Constant(
+                                            ExprConstant {
+                                                range: 34..35,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                    ctx: Load,
                 },
-                type_comment: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 74..119,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+            ),
+            type_comment: None,
+        },
+    ),
+    Assign(
+        StmtAssign {
+            range: 37..73,
+            targets: [
+                Subscript(
+                    ExprSubscript {
+                        range: 37..59,
+                        value: Name(
+                            ExprName {
+                                range: 37..42,
+                                id: Identifier(
+                                    "array",
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        slice: Tuple(
+                            ExprTuple {
+                                range: 43..58,
+                                elts: [
+                                    Constant(
+                                        ExprConstant {
+                                            range: 43..44,
+                                            value: Int(
+                                                0,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                    Starred(
+                                        ExprStarred {
+                                            range: 46..54,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 47..54,
+                                                    id: Identifier(
+                                                        "indexes",
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    UnaryOp(
+                                        ExprUnaryOp {
+                                            range: 56..58,
+                                            op: USub,
+                                            operand: Constant(
+                                                ExprConstant {
+                                                    range: 57..58,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                            },
+                        ),
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Name(
+                ExprName {
+                    range: 62..73,
+                    id: Identifier(
+                        "array_slice",
+                    ),
+                    ctx: Load,
+                },
+            ),
+            type_comment: None,
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 74..119,
+            value: Subscript(
+                ExprSubscript {
                     range: 74..119,
-                    custom: (),
-                    node: Subscript(
-                        ExprSubscript {
-                            value: Attributed {
-                                range: 74..79,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "array",
+                    value: Name(
+                        ExprName {
+                            range: 74..79,
+                            id: Identifier(
+                                "array",
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    slice: Tuple(
+                        ExprTuple {
+                            range: 80..118,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 80..98,
+                                        value: Name(
+                                            ExprName {
+                                                range: 81..98,
+                                                id: Identifier(
+                                                    "indexes_to_select",
+                                                ),
+                                                ctx: Load,
+                                            },
                                         ),
                                         ctx: Load,
                                     },
                                 ),
-                            },
-                            slice: Attributed {
-                                range: 80..118,
-                                custom: (),
-                                node: Tuple(
-                                    ExprTuple {
-                                        elts: [
-                                            Attributed {
-                                                range: 80..98,
-                                                custom: (),
-                                                node: Starred(
-                                                    ExprStarred {
-                                                        value: Attributed {
-                                                            range: 81..98,
-                                                            custom: (),
-                                                            node: Name(
-                                                                ExprName {
-                                                                    id: Identifier(
-                                                                        "indexes_to_select",
-                                                                    ),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                        },
-                                                        ctx: Load,
-                                                    },
+                                Starred(
+                                    ExprStarred {
+                                        range: 100..118,
+                                        value: Name(
+                                            ExprName {
+                                                range: 101..118,
+                                                id: Identifier(
+                                                    "indexes_to_select",
                                                 ),
+                                                ctx: Load,
                                             },
-                                            Attributed {
-                                                range: 100..118,
-                                                custom: (),
-                                                node: Starred(
-                                                    ExprStarred {
-                                                        value: Attributed {
-                                                            range: 101..118,
-                                                            custom: (),
-                                                            node: Name(
-                                                                ExprName {
-                                                                    id: Identifier(
-                                                                        "indexes_to_select",
-                                                                    ),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                        },
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ],
+                                        ),
                                         ctx: Load,
                                     },
                                 ),
-                            },
+                            ],
                             ctx: Load,
                         },
                     ),
+                    ctx: Load,
                 },
-            },
-        ),
-    },
-    Attributed {
-        range: 120..150,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 120..150,
+            value: Subscript(
+                ExprSubscript {
                     range: 120..150,
-                    custom: (),
-                    node: Subscript(
-                        ExprSubscript {
-                            value: Attributed {
-                                range: 120..125,
-                                custom: (),
-                                node: Name(
-                                    ExprName {
-                                        id: Identifier(
-                                            "array",
+                    value: Name(
+                        ExprName {
+                            range: 120..125,
+                            id: Identifier(
+                                "array",
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    slice: Tuple(
+                        ExprTuple {
+                            range: 126..149,
+                            elts: [
+                                Slice(
+                                    ExprSlice {
+                                        range: 126..129,
+                                        lower: Some(
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 126..127,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ),
+                                        upper: Some(
+                                            Constant(
+                                                ExprConstant {
+                                                    range: 128..129,
+                                                    value: Int(
+                                                        5,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        ),
+                                        step: None,
+                                    },
+                                ),
+                                Starred(
+                                    ExprStarred {
+                                        range: 131..149,
+                                        value: Name(
+                                            ExprName {
+                                                range: 132..149,
+                                                id: Identifier(
+                                                    "indexes_to_select",
+                                                ),
+                                                ctx: Load,
+                                            },
                                         ),
                                         ctx: Load,
                                     },
                                 ),
-                            },
-                            slice: Attributed {
-                                range: 126..149,
-                                custom: (),
-                                node: Tuple(
-                                    ExprTuple {
-                                        elts: [
-                                            Attributed {
-                                                range: 126..129,
-                                                custom: (),
-                                                node: Slice(
-                                                    ExprSlice {
-                                                        lower: Some(
-                                                            Attributed {
-                                                                range: 126..127,
-                                                                custom: (),
-                                                                node: Constant(
-                                                                    ExprConstant {
-                                                                        value: Int(
-                                                                            3,
-                                                                        ),
-                                                                        kind: None,
-                                                                    },
-                                                                ),
-                                                            },
-                                                        ),
-                                                        upper: Some(
-                                                            Attributed {
-                                                                range: 128..129,
-                                                                custom: (),
-                                                                node: Constant(
-                                                                    ExprConstant {
-                                                                        value: Int(
-                                                                            5,
-                                                                        ),
-                                                                        kind: None,
-                                                                    },
-                                                                ),
-                                                            },
-                                                        ),
-                                                        step: None,
-                                                    },
-                                                ),
-                                            },
-                                            Attributed {
-                                                range: 131..149,
-                                                custom: (),
-                                                node: Starred(
-                                                    ExprStarred {
-                                                        value: Attributed {
-                                                            range: 132..149,
-                                                            custom: (),
-                                                            node: Name(
-                                                                ExprName {
-                                                                    id: Identifier(
-                                                                        "indexes_to_select",
-                                                                    ),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                        },
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ],
-                                        ctx: Load,
-                                    },
-                                ),
-                            },
+                            ],
                             ctx: Load,
                         },
                     ),
+                    ctx: Load,
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

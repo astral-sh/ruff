@@ -2,74 +2,56 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Attributed {
-    range: 0..8,
-    custom: (),
-    node: Subscript(
-        ExprSubscript {
-            value: Attributed {
+Subscript(
+    ExprSubscript {
+        range: 0..8,
+        value: Name(
+            ExprName {
                 range: 0..1,
-                custom: (),
-                node: Name(
-                    ExprName {
-                        id: Identifier(
-                            "x",
-                        ),
-                        ctx: Load,
-                    },
+                id: Identifier(
+                    "x",
                 ),
+                ctx: Load,
             },
-            slice: Attributed {
+        ),
+        slice: Slice(
+            ExprSlice {
                 range: 2..7,
-                custom: (),
-                node: Slice(
-                    ExprSlice {
-                        lower: Some(
-                            Attributed {
-                                range: 2..3,
-                                custom: (),
-                                node: Constant(
-                                    ExprConstant {
-                                        value: Int(
-                                            1,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            },
-                        ),
-                        upper: Some(
-                            Attributed {
-                                range: 4..5,
-                                custom: (),
-                                node: Constant(
-                                    ExprConstant {
-                                        value: Int(
-                                            2,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            },
-                        ),
-                        step: Some(
-                            Attributed {
-                                range: 6..7,
-                                custom: (),
-                                node: Constant(
-                                    ExprConstant {
-                                        value: Int(
-                                            3,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            },
-                        ),
-                    },
+                lower: Some(
+                    Constant(
+                        ExprConstant {
+                            range: 2..3,
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    ),
+                ),
+                upper: Some(
+                    Constant(
+                        ExprConstant {
+                            range: 4..5,
+                            value: Int(
+                                2,
+                            ),
+                            kind: None,
+                        },
+                    ),
+                ),
+                step: Some(
+                    Constant(
+                        ExprConstant {
+                            range: 6..7,
+                            value: Int(
+                                3,
+                            ),
+                            kind: None,
+                        },
+                    ),
                 ),
             },
-            ctx: Load,
-        },
-    ),
-}
+        ),
+        ctx: Load,
+    },
+)

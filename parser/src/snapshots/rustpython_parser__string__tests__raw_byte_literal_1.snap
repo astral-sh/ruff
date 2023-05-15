@@ -3,29 +3,23 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..8,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+    Expr(
+        StmtExpr {
+            range: 0..8,
+            value: Constant(
+                ExprConstant {
                     range: 0..8,
-                    custom: (),
-                    node: Constant(
-                        ExprConstant {
-                            value: Bytes(
-                                [
-                                    92,
-                                    120,
-                                    49,
-                                    122,
-                                ],
-                            ),
-                            kind: None,
-                        },
+                    value: Bytes(
+                        [
+                            92,
+                            120,
+                            49,
+                            122,
+                        ],
                     ),
+                    kind: None,
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

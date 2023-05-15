@@ -3,46 +3,34 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..11,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+    Expr(
+        StmtExpr {
+            range: 0..11,
+            value: JoinedStr(
+                ExprJoinedStr {
                     range: 0..11,
-                    custom: (),
-                    node: JoinedStr(
-                        ExprJoinedStr {
-                            values: [
-                                Attributed {
-                                    range: 0..11,
-                                    custom: (),
-                                    node: FormattedValue(
-                                        ExprFormattedValue {
-                                            value: Attributed {
-                                                range: 6..7,
-                                                custom: (),
-                                                node: Name(
-                                                    ExprName {
-                                                        id: Identifier(
-                                                            "x",
-                                                        ),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                            conversion: Int(
-                                                0,
-                                            ),
-                                            format_spec: None,
-                                        },
-                                    ),
-                                },
-                            ],
-                        },
-                    ),
+                    values: [
+                        FormattedValue(
+                            ExprFormattedValue {
+                                range: 0..11,
+                                value: Name(
+                                    ExprName {
+                                        range: 6..7,
+                                        id: Identifier(
+                                            "x",
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                conversion: Int(
+                                    0,
+                                ),
+                                format_spec: None,
+                            },
+                        ),
+                    ],
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

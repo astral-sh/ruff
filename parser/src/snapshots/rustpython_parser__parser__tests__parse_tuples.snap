@@ -3,85 +3,64 @@ source: parser/src/parser.rs
 expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
-    Attributed {
-        range: 0..11,
-        custom: (),
-        node: Assign(
-            StmtAssign {
-                targets: [
-                    Attributed {
+    Assign(
+        StmtAssign {
+            range: 0..11,
+            targets: [
+                Tuple(
+                    ExprTuple {
                         range: 0..4,
-                        custom: (),
-                        node: Tuple(
-                            ExprTuple {
-                                elts: [
-                                    Attributed {
-                                        range: 0..1,
-                                        custom: (),
-                                        node: Name(
-                                            ExprName {
-                                                id: Identifier(
-                                                    "a",
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                    },
-                                    Attributed {
-                                        range: 3..4,
-                                        custom: (),
-                                        node: Name(
-                                            ExprName {
-                                                id: Identifier(
-                                                    "b",
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                    },
-                                ],
-                                ctx: Store,
+                        elts: [
+                            Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: Identifier(
+                                        "a",
+                                    ),
+                                    ctx: Store,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 3..4,
+                                    id: Identifier(
+                                        "b",
+                                    ),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: Tuple(
+                ExprTuple {
+                    range: 7..11,
+                    elts: [
+                        Constant(
+                            ExprConstant {
+                                range: 7..8,
+                                value: Int(
+                                    4,
+                                ),
+                                kind: None,
                             },
                         ),
-                    },
-                ],
-                value: Attributed {
-                    range: 7..11,
-                    custom: (),
-                    node: Tuple(
-                        ExprTuple {
-                            elts: [
-                                Attributed {
-                                    range: 7..8,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                4,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                                Attributed {
-                                    range: 10..11,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                5,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                            ],
-                            ctx: Load,
-                        },
-                    ),
+                        Constant(
+                            ExprConstant {
+                                range: 10..11,
+                                value: Int(
+                                    5,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
                 },
-                type_comment: None,
-            },
-        ),
-    },
+            ),
+            type_comment: None,
+        },
+    ),
 ]

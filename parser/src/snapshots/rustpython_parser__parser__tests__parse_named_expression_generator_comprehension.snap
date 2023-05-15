@@ -2,94 +2,71 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Attributed {
-    range: 0..23,
-    custom: (),
-    node: GeneratorExp(
-        ExprGeneratorExp {
-            elt: Attributed {
+GeneratorExp(
+    ExprGeneratorExp {
+        range: 0..23,
+        elt: NamedExpr(
+            ExprNamedExpr {
                 range: 1..11,
-                custom: (),
-                node: NamedExpr(
-                    ExprNamedExpr {
-                        target: Attributed {
-                            range: 1..2,
-                            custom: (),
-                            node: Name(
-                                ExprName {
-                                    id: Identifier(
-                                        "x",
-                                    ),
-                                    ctx: Store,
-                                },
-                            ),
-                        },
-                        value: Attributed {
-                            range: 6..11,
-                            custom: (),
-                            node: BinOp(
-                                ExprBinOp {
-                                    left: Attributed {
-                                        range: 6..7,
-                                        custom: (),
-                                        node: Name(
-                                            ExprName {
-                                                id: Identifier(
-                                                    "y",
-                                                ),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                    op: Add,
-                                    right: Attributed {
-                                        range: 10..11,
-                                        custom: (),
-                                        node: Constant(
-                                            ExprConstant {
-                                                value: Int(
-                                                    1,
-                                                ),
-                                                kind: None,
-                                            },
-                                        ),
-                                    },
-                                },
-                            ),
-                        },
+                target: Name(
+                    ExprName {
+                        range: 1..2,
+                        id: Identifier(
+                            "x",
+                        ),
+                        ctx: Store,
                     },
                 ),
-            },
-            generators: [
-                Comprehension {
-                    target: Attributed {
-                        range: 16..17,
-                        custom: (),
-                        node: Name(
+                value: BinOp(
+                    ExprBinOp {
+                        range: 6..11,
+                        left: Name(
                             ExprName {
+                                range: 6..7,
                                 id: Identifier(
                                     "y",
-                                ),
-                                ctx: Store,
-                            },
-                        ),
-                    },
-                    iter: Attributed {
-                        range: 21..22,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "z",
                                 ),
                                 ctx: Load,
                             },
                         ),
+                        op: Add,
+                        right: Constant(
+                            ExprConstant {
+                                range: 10..11,
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
+                            },
+                        ),
                     },
-                    ifs: [],
-                    is_async: false,
-                },
-            ],
-        },
-    ),
-}
+                ),
+            },
+        ),
+        generators: [
+            Comprehension {
+                target: Name(
+                    ExprName {
+                        range: 16..17,
+                        id: Identifier(
+                            "y",
+                        ),
+                        ctx: Store,
+                    },
+                ),
+                iter: Name(
+                    ExprName {
+                        range: 21..22,
+                        id: Identifier(
+                            "z",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+                ifs: [],
+                is_async: false,
+                range: (),
+            },
+        ],
+    },
+)

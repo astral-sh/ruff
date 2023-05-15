@@ -2,53 +2,42 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Attributed {
-    range: 0..14,
-    custom: (),
-    node: GeneratorExp(
-        ExprGeneratorExp {
-            elt: Attributed {
+GeneratorExp(
+    ExprGeneratorExp {
+        range: 0..14,
+        elt: Name(
+            ExprName {
                 range: 1..2,
-                custom: (),
-                node: Name(
+                id: Identifier(
+                    "x",
+                ),
+                ctx: Load,
+            },
+        ),
+        generators: [
+            Comprehension {
+                target: Name(
                     ExprName {
+                        range: 7..8,
                         id: Identifier(
-                            "x",
+                            "y",
+                        ),
+                        ctx: Store,
+                    },
+                ),
+                iter: Name(
+                    ExprName {
+                        range: 12..13,
+                        id: Identifier(
+                            "z",
                         ),
                         ctx: Load,
                     },
                 ),
+                ifs: [],
+                is_async: false,
+                range: (),
             },
-            generators: [
-                Comprehension {
-                    target: Attributed {
-                        range: 7..8,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "y",
-                                ),
-                                ctx: Store,
-                            },
-                        ),
-                    },
-                    iter: Attributed {
-                        range: 12..13,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "z",
-                                ),
-                                ctx: Load,
-                            },
-                        ),
-                    },
-                    ifs: [],
-                    is_async: false,
-                },
-            ],
-        },
-    ),
-}
+        ],
+    },
+)

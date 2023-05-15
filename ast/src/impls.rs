@@ -1,19 +1,17 @@
-use crate::{Constant, ExprKind};
+use crate::{Constant, Excepthandler, Expr, Pattern, Stmt};
 
-impl<U> ExprKind<U> {
+impl<R> Expr<R> {
     /// Returns a short name for the node suitable for use in error messages.
     pub fn python_name(&self) -> &'static str {
         match self {
-            ExprKind::BoolOp { .. } | ExprKind::BinOp { .. } | ExprKind::UnaryOp { .. } => {
-                "operator"
-            }
-            ExprKind::Subscript { .. } => "subscript",
-            ExprKind::Await { .. } => "await expression",
-            ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } => "yield expression",
-            ExprKind::Compare { .. } => "comparison",
-            ExprKind::Attribute { .. } => "attribute",
-            ExprKind::Call { .. } => "function call",
-            ExprKind::Constant(crate::ExprConstant { value, .. }) => match value {
+            Expr::BoolOp { .. } | Expr::BinOp { .. } | Expr::UnaryOp { .. } => "operator",
+            Expr::Subscript { .. } => "subscript",
+            Expr::Await { .. } => "await expression",
+            Expr::Yield { .. } | Expr::YieldFrom { .. } => "yield expression",
+            Expr::Compare { .. } => "comparison",
+            Expr::Attribute { .. } => "attribute",
+            Expr::Call { .. } => "function call",
+            Expr::Constant(crate::ExprConstant { value, .. }) => match value {
                 Constant::Str(_)
                 | Constant::Int(_)
                 | Constant::Float(_)
@@ -30,31 +28,37 @@ impl<U> ExprKind<U> {
                 Constant::None => "None",
                 Constant::Ellipsis => "ellipsis",
             },
-            ExprKind::List { .. } => "list",
-            ExprKind::Tuple { .. } => "tuple",
-            ExprKind::Dict { .. } => "dict display",
-            ExprKind::Set { .. } => "set display",
-            ExprKind::ListComp { .. } => "list comprehension",
-            ExprKind::DictComp { .. } => "dict comprehension",
-            ExprKind::SetComp { .. } => "set comprehension",
-            ExprKind::GeneratorExp { .. } => "generator expression",
-            ExprKind::Starred { .. } => "starred",
-            ExprKind::Slice { .. } => "slice",
-            ExprKind::JoinedStr(crate::ExprJoinedStr { values }) => {
-                if values
-                    .iter()
-                    .any(|e| matches!(e.node, ExprKind::JoinedStr { .. }))
-                {
+            Expr::List { .. } => "list",
+            Expr::Tuple { .. } => "tuple",
+            Expr::Dict { .. } => "dict display",
+            Expr::Set { .. } => "set display",
+            Expr::ListComp { .. } => "list comprehension",
+            Expr::DictComp { .. } => "dict comprehension",
+            Expr::SetComp { .. } => "set comprehension",
+            Expr::GeneratorExp { .. } => "generator expression",
+            Expr::Starred { .. } => "starred",
+            Expr::Slice { .. } => "slice",
+            Expr::JoinedStr(crate::ExprJoinedStr { values, .. }) => {
+                if values.iter().any(|e| e.is_joined_str_expr()) {
                     "f-string expression"
                 } else {
                     "literal"
                 }
             }
-            ExprKind::FormattedValue { .. } => "f-string expression",
-            ExprKind::Name { .. } => "name",
-            ExprKind::Lambda { .. } => "lambda",
-            ExprKind::IfExp { .. } => "conditional expression",
-            ExprKind::NamedExpr { .. } => "named expression",
+            Expr::FormattedValue { .. } => "f-string expression",
+            Expr::Name { .. } => "name",
+            Expr::Lambda { .. } => "lambda",
+            Expr::IfExp { .. } => "conditional expression",
+            Expr::NamedExpr { .. } => "named expression",
         }
     }
 }
+
+#[cfg(target_arch = "x86_64")]
+static_assertions::assert_eq_size!(Expr, [u8; 72]);
+#[cfg(target_arch = "x86_64")]
+static_assertions::assert_eq_size!(Stmt, [u8; 136]);
+#[cfg(target_arch = "x86_64")]
+static_assertions::assert_eq_size!(Pattern, [u8; 96]);
+#[cfg(target_arch = "x86_64")]
+static_assertions::assert_eq_size!(Excepthandler, [u8; 64]);

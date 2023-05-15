@@ -3,7 +3,7 @@ pub use ruff_source_location::*;
 
 pub type LineNumber = OneIndexed;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct SourceRange {
     pub start: SourceLocation,
     pub end: Option<SourceLocation>,

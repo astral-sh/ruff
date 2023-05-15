@@ -16,4 +16,4 @@ serde = { version = "1.0.133", optional = true, default-features = false, featur
 
 [features]
 default = []
-location = ["ruff_source_location"]
+location = ["dep:ruff_source_location"]

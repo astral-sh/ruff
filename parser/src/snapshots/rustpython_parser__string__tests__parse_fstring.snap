@@ -3,64 +3,49 @@ source: parser/src/string.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..18,
-        custom: (),
-        node: FormattedValue(
-            ExprFormattedValue {
-                value: Attributed {
+    FormattedValue(
+        ExprFormattedValue {
+            range: 0..18,
+            value: Name(
+                ExprName {
                     range: 3..4,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "a",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "a",
                     ),
+                    ctx: Load,
                 },
-                conversion: Int(
-                    0,
-                ),
-                format_spec: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..18,
-        custom: (),
-        node: FormattedValue(
-            ExprFormattedValue {
-                value: Attributed {
+            ),
+            conversion: Int(
+                0,
+            ),
+            format_spec: None,
+        },
+    ),
+    FormattedValue(
+        ExprFormattedValue {
+            range: 0..18,
+            value: Name(
+                ExprName {
                     range: 7..8,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "b",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "b",
                     ),
+                    ctx: Load,
                 },
-                conversion: Int(
-                    0,
-                ),
-                format_spec: None,
-            },
-        ),
-    },
-    Attributed {
-        range: 0..18,
-        custom: (),
-        node: Constant(
-            ExprConstant {
-                value: Str(
-                    "{foo}",
-                ),
-                kind: None,
-            },
-        ),
-    },
+            ),
+            conversion: Int(
+                0,
+            ),
+            format_spec: None,
+        },
+    ),
+    Constant(
+        ExprConstant {
+            range: 0..18,
+            value: Str(
+                "{foo}",
+            ),
+            kind: None,
+        },
+    ),
 ]

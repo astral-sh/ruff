@@ -2,38 +2,29 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Attributed {
-    range: 0..7,
-    custom: (),
-    node: BoolOp(
-        ExprBoolOp {
-            op: And,
-            values: [
-                Attributed {
+BoolOp(
+    ExprBoolOp {
+        range: 0..7,
+        op: And,
+        values: [
+            Name(
+                ExprName {
                     range: 0..1,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "x",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "x",
                     ),
+                    ctx: Load,
                 },
-                Attributed {
+            ),
+            Name(
+                ExprName {
                     range: 6..7,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "y",
-                            ),
-                            ctx: Load,
-                        },
+                    id: Identifier(
+                        "y",
                     ),
+                    ctx: Load,
                 },
-            ],
-        },
-    ),
-}
+            ),
+        ],
+    },
+)

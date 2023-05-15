@@ -3,47 +3,35 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..8,
-        custom: (),
-        node: Delete(
-            StmtDelete {
-                targets: [
-                    Attributed {
+    Delete(
+        StmtDelete {
+            range: 0..8,
+            targets: [
+                Subscript(
+                    ExprSubscript {
                         range: 4..8,
-                        custom: (),
-                        node: Subscript(
-                            ExprSubscript {
-                                value: Attributed {
-                                    range: 4..5,
-                                    custom: (),
-                                    node: Name(
-                                        ExprName {
-                                            id: Identifier(
-                                                "x",
-                                            ),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                slice: Attributed {
-                                    range: 6..7,
-                                    custom: (),
-                                    node: Name(
-                                        ExprName {
-                                            id: Identifier(
-                                                "y",
-                                            ),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                                ctx: Del,
+                        value: Name(
+                            ExprName {
+                                range: 4..5,
+                                id: Identifier(
+                                    "x",
+                                ),
+                                ctx: Load,
                             },
                         ),
+                        slice: Name(
+                            ExprName {
+                                range: 6..7,
+                                id: Identifier(
+                                    "y",
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        ctx: Del,
                     },
-                ],
-            },
-        ),
-    },
+                ),
+            ],
+        },
+    ),
 ]

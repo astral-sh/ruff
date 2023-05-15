@@ -2,85 +2,65 @@
 source: parser/src/parser.rs
 expression: parse_ast
 ---
-Attributed {
-    range: 0..26,
-    custom: (),
-    node: GeneratorExp(
-        ExprGeneratorExp {
-            elt: Attributed {
+GeneratorExp(
+    ExprGeneratorExp {
+        range: 0..26,
+        elt: IfExp(
+            ExprIfExp {
                 range: 1..14,
-                custom: (),
-                node: IfExp(
-                    ExprIfExp {
-                        test: Attributed {
-                            range: 6..7,
-                            custom: (),
-                            node: Name(
-                                ExprName {
-                                    id: Identifier(
-                                        "y",
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        body: Attributed {
-                            range: 1..2,
-                            custom: (),
-                            node: Name(
-                                ExprName {
-                                    id: Identifier(
-                                        "x",
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                        orelse: Attributed {
-                            range: 13..14,
-                            custom: (),
-                            node: Name(
-                                ExprName {
-                                    id: Identifier(
-                                        "y",
-                                    ),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
+                test: Name(
+                    ExprName {
+                        range: 6..7,
+                        id: Identifier(
+                            "y",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+                body: Name(
+                    ExprName {
+                        range: 1..2,
+                        id: Identifier(
+                            "x",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+                orelse: Name(
+                    ExprName {
+                        range: 13..14,
+                        id: Identifier(
+                            "y",
+                        ),
+                        ctx: Load,
                     },
                 ),
             },
-            generators: [
-                Comprehension {
-                    target: Attributed {
+        ),
+        generators: [
+            Comprehension {
+                target: Name(
+                    ExprName {
                         range: 19..20,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "y",
-                                ),
-                                ctx: Store,
-                            },
+                        id: Identifier(
+                            "y",
                         ),
+                        ctx: Store,
                     },
-                    iter: Attributed {
+                ),
+                iter: Name(
+                    ExprName {
                         range: 24..25,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "z",
-                                ),
-                                ctx: Load,
-                            },
+                        id: Identifier(
+                            "z",
                         ),
+                        ctx: Load,
                     },
-                    ifs: [],
-                    is_async: false,
-                },
-            ],
-        },
-    ),
-}
+                ),
+                ifs: [],
+                is_async: false,
+                range: (),
+            },
+        ],
+    },
+)

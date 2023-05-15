@@ -1,11 +1,13 @@
 // Contains functions that perform validation and parsing of arguments and parameters.
 // Checks apply both to functions and to lambdas.
+use crate::text_size::TextRange;
 use crate::{
     ast,
     lexer::{LexicalError, LexicalErrorType},
     text_size::TextSize,
 };
 use rustc_hash::FxHashSet;
+use rustpython_ast::Ranged;
 
 pub(crate) struct ArgumentList {
     pub args: Vec<ast::Expr>,
@@ -19,7 +21,7 @@ type ParameterDef = (ast::Arg, Option<ast::Expr>);
 pub(crate) fn validate_arguments(
     arguments: ast::Arguments,
 ) -> Result<ast::Arguments, LexicalError> {
-    let mut all_args: Vec<&ast::Attributed<ast::ArgData>> = vec![];
+    let mut all_args: Vec<&ast::Arg> = vec![];
 
     all_args.extend(arguments.posonlyargs.iter());
     all_args.extend(arguments.args.iter());
@@ -116,13 +118,11 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
                     double_starred = true;
                 }
 
-                keywords.push(ast::Keyword::new(
-                    start..end,
-                    ast::KeywordData {
-                        arg: name.map(ast::Identifier::new),
-                        value,
-                    },
-                ));
+                keywords.push(ast::Keyword {
+                    arg: name.map(ast::Identifier::new),
+                    value,
+                    range: TextRange::new(start, end),
+                });
             }
             None => {
                 // Positional arguments mustn't follow keyword arguments.
@@ -148,8 +148,8 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
 }
 
 // Check if an expression is a starred expression.
-fn is_starred(exp: &ast::Expr) -> bool {
-    matches!(exp.node, ast::ExprKind::Starred { .. })
+const fn is_starred(exp: &ast::Expr) -> bool {
+    exp.is_starred_expr()
 }
 
 #[cfg(test)]
@@ -157,6 +157,7 @@ mod tests {
     use super::*;
     use crate::parser::{parse_program, ParseErrorType};
 
+    #[cfg(not(feature = "all-nodes-with-ranges"))]
     macro_rules! function_and_lambda {
         ($($name:ident: $code:expr,)*) => {
             $(
@@ -169,6 +170,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "all-nodes-with-ranges"))]
     function_and_lambda! {
         test_function_no_args: "def f(): pass",
         test_function_pos_args: "def f(a, b, c): pass",

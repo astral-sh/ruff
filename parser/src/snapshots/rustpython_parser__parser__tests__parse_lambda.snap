@@ -3,85 +3,65 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..18,
-        custom: (),
-        node: Expr(
-            StmtExpr {
-                value: Attributed {
+    Expr(
+        StmtExpr {
+            range: 0..18,
+            value: Lambda(
+                ExprLambda {
                     range: 0..18,
-                    custom: (),
-                    node: Lambda(
-                        ExprLambda {
-                            args: Arguments {
-                                posonlyargs: [],
-                                args: [
-                                    Attributed {
-                                        range: 7..8,
-                                        custom: (),
-                                        node: ArgData {
-                                            arg: Identifier(
-                                                "x",
-                                            ),
-                                            annotation: None,
-                                            type_comment: None,
-                                        },
-                                    },
-                                    Attributed {
-                                        range: 10..11,
-                                        custom: (),
-                                        node: ArgData {
-                                            arg: Identifier(
-                                                "y",
-                                            ),
-                                            annotation: None,
-                                            type_comment: None,
-                                        },
-                                    },
-                                ],
-                                vararg: None,
-                                kwonlyargs: [],
-                                kw_defaults: [],
-                                kwarg: None,
-                                defaults: [],
-                            },
-                            body: Attributed {
-                                range: 13..18,
-                                custom: (),
-                                node: BinOp(
-                                    ExprBinOp {
-                                        left: Attributed {
-                                            range: 13..14,
-                                            custom: (),
-                                            node: Name(
-                                                ExprName {
-                                                    id: Identifier(
-                                                        "x",
-                                                    ),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                        op: Mult,
-                                        right: Attributed {
-                                            range: 17..18,
-                                            custom: (),
-                                            node: Name(
-                                                ExprName {
-                                                    id: Identifier(
-                                                        "y",
-                                                    ),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    },
+                    args: Arguments {
+                        posonlyargs: [],
+                        args: [
+                            Arg {
+                                arg: Identifier(
+                                    "x",
                                 ),
+                                annotation: None,
+                                type_comment: None,
+                                range: 7..8,
                             },
+                            Arg {
+                                arg: Identifier(
+                                    "y",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                                range: 10..11,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kw_defaults: [],
+                        kwarg: None,
+                        defaults: [],
+                        range: (),
+                    },
+                    body: BinOp(
+                        ExprBinOp {
+                            range: 13..18,
+                            left: Name(
+                                ExprName {
+                                    range: 13..14,
+                                    id: Identifier(
+                                        "x",
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            op: Mult,
+                            right: Name(
+                                ExprName {
+                                    range: 17..18,
+                                    id: Identifier(
+                                        "y",
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
                         },
                     ),
                 },
-            },
-        ),
-    },
+            ),
+        },
+    ),
 ]

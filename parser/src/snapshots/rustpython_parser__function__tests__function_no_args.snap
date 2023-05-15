@@ -4,35 +4,33 @@ expression: parse_ast
 ---
 Ok(
     [
-        Attributed {
-            range: 0..13,
-            custom: (),
-            node: FunctionDef(
-                StmtFunctionDef {
-                    name: Identifier(
-                        "f",
-                    ),
-                    args: Arguments {
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kw_defaults: [],
-                        kwarg: None,
-                        defaults: [],
-                    },
-                    body: [
-                        Attributed {
-                            range: 9..13,
-                            custom: (),
-                            node: Pass,
-                        },
-                    ],
-                    decorator_list: [],
-                    returns: None,
-                    type_comment: None,
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..13,
+                name: Identifier(
+                    "f",
+                ),
+                args: Arguments {
+                    posonlyargs: [],
+                    args: [],
+                    vararg: None,
+                    kwonlyargs: [],
+                    kw_defaults: [],
+                    kwarg: None,
+                    defaults: [],
+                    range: (),
                 },
-            ),
-        },
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 9..13,
+                        },
+                    ),
+                ],
+                decorator_list: [],
+                returns: None,
+                type_comment: None,
+            },
+        ),
     ],
 )

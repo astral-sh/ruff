@@ -3,80 +3,62 @@ source: parser/src/context.rs
 expression: parse_ast
 ---
 [
-    Attributed {
-        range: 0..24,
-        custom: (),
-        node: For(
-            StmtFor {
-                target: Attributed {
+    For(
+        StmtFor {
+            range: 0..24,
+            target: Name(
+                ExprName {
                     range: 4..5,
-                    custom: (),
-                    node: Name(
-                        ExprName {
-                            id: Identifier(
-                                "x",
-                            ),
-                            ctx: Store,
-                        },
+                    id: Identifier(
+                        "x",
                     ),
+                    ctx: Store,
                 },
-                iter: Attributed {
+            ),
+            iter: Tuple(
+                ExprTuple {
                     range: 9..18,
-                    custom: (),
-                    node: Tuple(
-                        ExprTuple {
-                            elts: [
-                                Attributed {
-                                    range: 10..11,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                1,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                                Attributed {
-                                    range: 13..14,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                2,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                                Attributed {
-                                    range: 16..17,
-                                    custom: (),
-                                    node: Constant(
-                                        ExprConstant {
-                                            value: Int(
-                                                3,
-                                            ),
-                                            kind: None,
-                                        },
-                                    ),
-                                },
-                            ],
-                            ctx: Load,
-                        },
-                    ),
+                    elts: [
+                        Constant(
+                            ExprConstant {
+                                range: 10..11,
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 13..14,
+                                value: Int(
+                                    2,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                        Constant(
+                            ExprConstant {
+                                range: 16..17,
+                                value: Int(
+                                    3,
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
                 },
-                body: [
-                    Attributed {
+            ),
+            body: [
+                Pass(
+                    StmtPass {
                         range: 20..24,
-                        custom: (),
-                        node: Pass,
                     },
-                ],
-                orelse: [],
-                type_comment: None,
-            },
-        ),
-    },
+                ),
+            ],
+            orelse: [],
+            type_comment: None,
+        },
+    ),
 ]

@@ -3,153 +3,128 @@ source: parser/src/parser.rs
 expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
-    Attributed {
-        range: 0..98,
-        custom: (),
-        node: ClassDef(
-            StmtClassDef {
-                name: Identifier(
-                    "Foo",
-                ),
-                bases: [
-                    Attributed {
+    ClassDef(
+        StmtClassDef {
+            range: 0..98,
+            name: Identifier(
+                "Foo",
+            ),
+            bases: [
+                Name(
+                    ExprName {
                         range: 10..11,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "A",
-                                ),
-                                ctx: Load,
-                            },
+                        id: Identifier(
+                            "A",
                         ),
+                        ctx: Load,
                     },
-                    Attributed {
+                ),
+                Name(
+                    ExprName {
                         range: 13..14,
-                        custom: (),
-                        node: Name(
-                            ExprName {
-                                id: Identifier(
-                                    "B",
-                                ),
-                                ctx: Load,
-                            },
+                        id: Identifier(
+                            "B",
                         ),
+                        ctx: Load,
                     },
-                ],
-                keywords: [],
-                body: [
-                    Attributed {
+                ),
+            ],
+            keywords: [],
+            body: [
+                FunctionDef(
+                    StmtFunctionDef {
                         range: 18..44,
-                        custom: (),
-                        node: FunctionDef(
-                            StmtFunctionDef {
-                                name: Identifier(
-                                    "__init__",
-                                ),
-                                args: Arguments {
-                                    posonlyargs: [],
-                                    args: [
-                                        Attributed {
-                                            range: 31..35,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "self",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                    ],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kw_defaults: [],
-                                    kwarg: None,
-                                    defaults: [],
-                                },
-                                body: [
-                                    Attributed {
-                                        range: 40..44,
-                                        custom: (),
-                                        node: Pass,
-                                    },
-                                ],
-                                decorator_list: [],
-                                returns: None,
-                                type_comment: None,
-                            },
+                        name: Identifier(
+                            "__init__",
                         ),
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [
+                                Arg {
+                                    arg: Identifier(
+                                        "self",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 31..35,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [],
+                            range: (),
+                        },
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 40..44,
+                                },
+                            ),
+                        ],
+                        decorator_list: [],
+                        returns: None,
+                        type_comment: None,
                     },
-                    Attributed {
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
                         range: 46..98,
-                        custom: (),
-                        node: FunctionDef(
-                            StmtFunctionDef {
-                                name: Identifier(
-                                    "method_with_default",
-                                ),
-                                args: Arguments {
-                                    posonlyargs: [],
-                                    args: [
-                                        Attributed {
-                                            range: 70..74,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "self",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                        Attributed {
-                                            range: 76..79,
-                                            custom: (),
-                                            node: ArgData {
-                                                arg: Identifier(
-                                                    "arg",
-                                                ),
-                                                annotation: None,
-                                                type_comment: None,
-                                            },
-                                        },
-                                    ],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kw_defaults: [],
-                                    kwarg: None,
-                                    defaults: [
-                                        Attributed {
-                                            range: 80..89,
-                                            custom: (),
-                                            node: Constant(
-                                                ExprConstant {
-                                                    value: Str(
-                                                        "default",
-                                                    ),
-                                                    kind: None,
-                                                },
-                                            ),
-                                        },
-                                    ],
-                                },
-                                body: [
-                                    Attributed {
-                                        range: 94..98,
-                                        custom: (),
-                                        node: Pass,
-                                    },
-                                ],
-                                decorator_list: [],
-                                returns: None,
-                                type_comment: None,
-                            },
+                        name: Identifier(
+                            "method_with_default",
                         ),
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [
+                                Arg {
+                                    arg: Identifier(
+                                        "self",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 70..74,
+                                },
+                                Arg {
+                                    arg: Identifier(
+                                        "arg",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                    range: 76..79,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [
+                                Constant(
+                                    ExprConstant {
+                                        range: 80..89,
+                                        value: Str(
+                                            "default",
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            ],
+                            range: (),
+                        },
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 94..98,
+                                },
+                            ),
+                        ],
+                        decorator_list: [],
+                        returns: None,
+                        type_comment: None,
                     },
-                ],
-                decorator_list: [],
-            },
-        ),
-    },
+                ),
+            ],
+            decorator_list: [],
+        },
+    ),
 ]

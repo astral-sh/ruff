@@ -1,49 +1,48 @@
-use crate::ast::{self, Expr, ExprContext, ExprKind};
+use crate::ast::{self, Expr, ExprContext};
 
 pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
-    match expr.node {
-        ExprKind::Name(ast::ExprName { id, .. }) => Expr {
-            node: ast::ExprName { id, ctx }.into(),
-            ..expr
-        },
-        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => Expr {
-            node: ast::ExprTuple {
-                elts: elts
-                    .into_iter()
-                    .map(|elt| set_context(elt, ctx.clone()))
-                    .collect(),
-                ctx,
-            }
-            .into(),
-            ..expr
-        },
-        ExprKind::List(ast::ExprList { elts, .. }) => Expr {
-            node: ast::ExprList {
-                elts: elts
-                    .into_iter()
-                    .map(|elt| set_context(elt, ctx.clone()))
-                    .collect(),
-                ctx,
-            }
-            .into(),
-            ..expr
-        },
-        ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) => Expr {
-            node: ast::ExprAttribute { value, attr, ctx }.into(),
-            ..expr
-        },
-        ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) => Expr {
-            node: ast::ExprSubscript { value, slice, ctx }.into(),
-            ..expr
-        },
-        ExprKind::Starred(ast::ExprStarred { value, .. }) => Expr {
-            node: ast::ExprStarred {
-                value: Box::new(set_context(*value, ctx.clone())),
-                ctx,
-            }
-            .into(),
-            ..expr
-        },
+    match expr {
+        Expr::Name(ast::ExprName { id, range, .. }) => ast::ExprName { id, ctx, range }.into(),
+        Expr::Tuple(ast::ExprTuple { elts, range, .. }) => ast::ExprTuple {
+            elts: elts.into_iter().map(|elt| set_context(elt, ctx)).collect(),
+            range,
+            ctx,
+        }
+        .into(),
+
+        Expr::List(ast::ExprList { elts, range, .. }) => ast::ExprList {
+            elts: elts.into_iter().map(|elt| set_context(elt, ctx)).collect(),
+            range,
+            ctx,
+        }
+        .into(),
+        Expr::Attribute(ast::ExprAttribute {
+            value, attr, range, ..
+        }) => ast::ExprAttribute {
+            value,
+            attr,
+            range,
+            ctx,
+        }
+        .into(),
+        Expr::Subscript(ast::ExprSubscript {
+            value,
+            slice,
+            range,
+            ..
+        }) => ast::ExprSubscript {
+            value,
+            slice,
+            range,
+            ctx,
+        }
+        .into(),
+        Expr::Starred(ast::ExprStarred { value, range, .. }) => ast::ExprStarred {
+            value: Box::new(set_context(*value, ctx)),
+            range,
+            ctx,
+        }
+        .into(),
         _ => expr,
     }
 }
@@ -67,6 +66,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "all-nodes-with-ranges"))]
     fn test_assign_list() {
         let source = "[x, y] = (1, 2, 3)";
         let parse_ast = parse_program(source, "<test>").unwrap();
@@ -102,6 +102,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "all-nodes-with-ranges"))]
     fn test_assign_list_comp() {
         let source = "x = [y for y in (1, 2, 3)]";
         let parse_ast = parse_program(source, "<test>").unwrap();
@@ -109,6 +110,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "all-nodes-with-ranges"))]
     fn test_assign_set_comp() {
         let source = "x = {y for y in (1, 2, 3)}";
         let parse_ast = parse_program(source, "<test>").unwrap();
@@ -116,6 +118,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "all-nodes-with-ranges"))]
     fn test_assign_with() {
         let source = "with 1 as x: pass";
         let parse_ast = parse_program(source, "<test>").unwrap();
