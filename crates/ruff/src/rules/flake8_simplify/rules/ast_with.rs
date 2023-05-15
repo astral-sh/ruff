@@ -60,7 +60,7 @@ impl Violation for MultipleWithStatements {
     }
 }
 
-fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
+fn find_last_with(body: &[Stmt]) -> Option<(&[Withitem], &[Stmt])> {
     let [Stmt::With(ast::StmtWith { items, body, .. })] = body else { return None };
     find_last_with(body).or(Some((items, body)))
 }

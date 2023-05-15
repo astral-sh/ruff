@@ -30,7 +30,7 @@ where
         }
     }
 
-    fn extract_elts<F>(expr: &Expr, is_builtin: F) -> (Option<&Vec<Expr>>, AllNamesFlags)
+    fn extract_elts<F>(expr: &Expr, is_builtin: F) -> (Option<&[Expr]>, AllNamesFlags)
     where
         F: Fn(&str) -> bool,
     {

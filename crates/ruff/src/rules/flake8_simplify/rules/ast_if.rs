@@ -757,8 +757,8 @@ pub(crate) fn use_dict_get_with_default(
     checker: &mut Checker,
     stmt: &Stmt,
     test: &Expr,
-    body: &Vec<Stmt>,
-    orelse: &Vec<Stmt>,
+    body: &[Stmt],
+    orelse: &[Stmt],
     parent: Option<&Stmt>,
 ) {
     if body.len() != 1 || orelse.len() != 1 {
