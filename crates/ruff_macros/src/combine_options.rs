@@ -52,11 +52,6 @@ fn handle_field(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
             }) if type_ident == "Option" => Ok(quote_spanned!(
                 ident.span() => #ident: self.#ident.or(other.#ident)
             )),
-            Some(PathSegment {
-                ident: type_ident, ..
-            }) if type_ident == "Vec" => Ok(quote_spanned!(
-                ident.span() => #ident: other.#ident.into_iter().chain(self.#ident.into_iter()).collect()
-            )),
             _ => Err(syn::Error::new(
                 ident.span(),
                 "Expected `Option<_>` or `Vec<_>` as type.",
