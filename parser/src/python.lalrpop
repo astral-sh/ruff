@@ -48,9 +48,8 @@ Statement: ast::Suite = {
 };
 
 SimpleStatement: ast::Suite = {
-    <s1:SmallStatement> <s2:(";" SmallStatement)*> ";"? "\n" => {
-        let mut statements = vec![s1];
-        statements.extend(s2.into_iter().map(|e| e.1));
+    <mut statements:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        statements.push(last);
         statements
     }
 };
@@ -199,9 +198,9 @@ RaiseStatement: ast::Stmt = {
             ast::StmtRaise { exc: None, cause: None, range: (location..end_location).into() }
         )
     },
-    <location:@L> "raise" <t:Test<"all">> <c:("from" Test<"all">)?> <end_location:@R> => {
+    <location:@L> "raise" <t:Test<"all">> <c:("from" <Test<"all">>)?> <end_location:@R> => {
         ast::Stmt::Raise(
-            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(|x| Box::new(x.1)), range: (location..end_location).into() }
+            ast::StmtRaise { exc: Some(Box::new(t)), cause: c.map(|x| Box::new(x)), range: (location..end_location).into() }
         )
     },
 };
@@ -251,7 +250,7 @@ ImportAsNames: Vec<ast::Alias> = {
 
 #[inline]
 ImportAsAlias<I>: ast::Alias = {
-    <location:@L> <name:I> <a: ("as" Identifier)?> <end_location:@R> => ast::Alias { name, asname: a.map(|a| a.1), range: (location..end_location).into() },
+    <location:@L> <name:I> <a: ("as" <Identifier>)?> <end_location:@R> => ast::Alias { name, asname: a, range: (location..end_location).into() },
 }
 
 // A name like abc or abc.def.ghi
@@ -284,11 +283,11 @@ NonlocalStatement: ast::Stmt = {
 };
 
 AssertStatement: ast::Stmt = {
-    <location:@L> "assert" <test:Test<"all">> <msg: ("," Test<"all">)?> <end_location:@R> => {
+    <location:@L> "assert" <test:Test<"all">> <msg: ("," <Test<"all">>)?> <end_location:@R> => {
         ast::Stmt::Assert(
             ast::StmtAssert {
                 test: Box::new(test),
-                msg: msg.map(|e| Box::new(e.1)),
+                msg: msg.map(|e| Box::new(e)),
                 range: (location..end_location).into()
             }
         )
@@ -339,7 +338,7 @@ MatchStatement: ast::Stmt = {
             }
         )
     },
-    <location:@L> "match" <subject:TestOrStarNamedExpr> "," <subjects:OneOrMore<TestOrStarNamedExpr>> ","? ":" "\n" Indent <cases:MatchCase+> Dedent => {
+    <location:@L> "match" <subjects:TwoOrMore<TestOrStarNamedExpr, ",">> ","? ":" "\n" Indent <cases:MatchCase+> Dedent => {
         let end_location = cases
             .last()
             .unwrap()
@@ -347,8 +346,6 @@ MatchStatement: ast::Stmt = {
             .last()
             .unwrap()
             .end();
-        let mut subjects = subjects;
-        subjects.insert(0, subject);
         ast::Stmt::Match(
             ast::StmtMatch {
                 subject: Box::new(ast::Expr::Tuple(
@@ -389,9 +386,7 @@ Patterns: ast::Pattern = {
             range: (location..end_location).into()
         },
     ),
-    <location:@L> <pattern:Pattern> "," <patterns:OneOrMore<Pattern>> ","? <end_location:@R> => {
-        let mut patterns = patterns;
-        patterns.insert(0, pattern);
+    <location:@L> <patterns:TwoOrMore<Pattern, ",">> ","? <end_location:@R> => {
         ast::Pattern::MatchSequence(
             ast::PatternMatchSequence {
                 patterns,
@@ -428,9 +423,7 @@ AsPattern: ast::Pattern = {
 
 OrPattern: ast::Pattern = {
     <pattern:ClosedPattern> => pattern,
-    <location:@L> <pattern:ClosedPattern> <patterns:("|" <ClosedPattern>)+> <end_location:@R> => {
-        let mut patterns = patterns;
-        patterns.insert(0, pattern);
+    <location:@L> <patterns:TwoOrMore<ClosedPattern, "|">> <end_location:@R> => {
         ast::Pattern::MatchOr(
             ast::PatternMatchOr { patterns, range: (location..end_location).into() }
         )
@@ -454,9 +447,15 @@ SequencePattern: ast::Pattern = {
         patterns: vec![],
         range: (location..end_location).into()
     }.into(),
-    <location:@L> "(" <pattern:Pattern> "," <patterns:Comma<Pattern>> ")" <end_location:@R> => {
+    <location:@L> "(" <pattern:Pattern> "," ")" <end_location:@R> => {
+            ast::PatternMatchSequence {
+                patterns: vec![pattern],
+                range: (location..end_location).into()
+            }.into()
+        },
+    <location:@L> "(" <patterns:(<Pattern> ",")+> <last:Pattern> ","? ")" <end_location:@R> => {
         let mut patterns = patterns;
-        patterns.insert(0, pattern);
+        patterns.push(last);
         ast::PatternMatchSequence {
             patterns,
             range: (location..end_location).into()
@@ -942,9 +941,9 @@ WithItem<Goal>: ast::Withitem = {
 };
 
 FuncDef: ast::Stmt = {
-    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" Test<"all">)?> ":" <body:Suite>  => {
+    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite>  => {
         let args = Box::new(args);
-        let returns = r.map(|x| Box::new(x.1));
+        let returns = r.map(|x| Box::new(x));
         let end_location = body.last().unwrap().end();
         let type_comment = None;
         if is_async.is_some() {
@@ -977,11 +976,11 @@ Parameters: ast::Arguments = {
 // Note that this is a macro which is used once for function defs, and
 // once for lambda defs.
 ParameterList<ArgType, StarArgType>: ast::Arguments = {
-    <location:@L> <param1:ParameterDefs<ArgType>> <args2:("," ParameterListStarArgs<ArgType, StarArgType>)?> ","? <end_location:@R> =>? {
+    <location:@L> <param1:ParameterDefs<ArgType>> <args2:("," <ParameterListStarArgs<ArgType, StarArgType>>)?> ","? <end_location:@R> =>? {
         let (posonlyargs, args, defaults) = parse_params(param1)?;
 
         // Now gather rest of parameters:
-        let (vararg, kwonlyargs, kw_defaults, kwarg) = args2.map_or((None, vec![], vec![], None), |x| x.1);
+        let (vararg, kwonlyargs, kw_defaults, kwarg) = args2.unwrap_or((None, vec![], vec![], None));
 
         Ok(ast::Arguments {
             posonlyargs,
@@ -994,14 +993,14 @@ ParameterList<ArgType, StarArgType>: ast::Arguments = {
             range: optional_range(location, end_location)
         })
     },
-    <location:@L> <param1:ParameterDefs<ArgType>> <kw:("," KwargParameter<ArgType>)> ","? <end_location:@R> =>? {
+    <location:@L> <param1:ParameterDefs<ArgType>> <kw:("," <KwargParameter<ArgType>>)> ","? <end_location:@R> =>? {
         let (posonlyargs, args, defaults) = parse_params(param1)?;
 
         // Now gather rest of parameters:
         let vararg = None;
         let kwonlyargs = vec![];
         let kw_defaults = vec![];
-        let kwarg = kw.1;
+        let kwarg = kw;
 
         Ok(ast::Arguments {
             posonlyargs,
@@ -1047,8 +1046,8 @@ ParameterDefs<ArgType>: (Vec<(ast::Arg, Option<ast::Expr>)>, Vec<(ast::Arg, Opti
     <args:OneOrMore<ParameterDef<ArgType>>> => {
         (vec![], args)
     },
-    <pos_args:OneOrMore<ParameterDef<ArgType>>> "," "/" <args:("," ParameterDef<ArgType>)*>  => {
-        (pos_args, args.into_iter().map(|e| e.1).collect())
+    <pos_args:OneOrMore<ParameterDef<ArgType>>> "," "/" <args:("," <ParameterDef<ArgType>>)*>  => {
+        (pos_args, args)
     },
 };
 
@@ -1062,15 +1061,15 @@ UntypedParameter: ast::Arg = {
 };
 
 TypedParameter: ast::Arg = {
-    <location:@L> <arg:Identifier> <a:(":" Test<"all">)?> <end_location:@R> => {
-        let annotation = a.map(|x| Box::new(x.1));
+    <location:@L> <arg:Identifier> <a:(":" <Test<"all">>)?> <end_location:@R> => {
+        let annotation = a.map(|x| Box::new(x));
         ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() }
     },
 };
 
 StarTypedParameter: ast::Arg = {
-    <location:@L> <arg:Identifier> <a:(":" TestOrStarExpr)?> <end_location:@R> => {
-        let annotation = a.map(|x| Box::new(x.1));
+    <location:@L> <arg:Identifier> <a:(":" <TestOrStarExpr>)?> <end_location:@R> => {
+        let annotation = a.map(|x| Box::new(x));
         ast::Arg { arg, annotation, type_comment: None, range: (location..end_location).into() }
     },
 };
@@ -1079,12 +1078,12 @@ StarTypedParameter: ast::Arg = {
 // TODO: figure out another grammar that makes this inline no longer required.
 #[inline]
 ParameterListStarArgs<ArgType, StarArgType>: (Option<Box<ast::Arg>>, Vec<ast::Arg>, Vec<ast::Expr>, Option<Box<ast::Arg>>) = {
-    <location:@L> "*" <va:StarArgType?> <kw:("," ParameterDef<ArgType>)*> <kwarg:("," KwargParameter<ArgType>)?> =>? {
+    <location:@L> "*" <va:StarArgType?> <kw:("," <ParameterDef<ArgType>>)*> <kwarg:("," <KwargParameter<ArgType>>)?> =>? {
         // Extract keyword arguments:
         let mut kwonlyargs = Vec::new();
         let mut kw_defaults = Vec::new();
-        let mut kwargs = Vec::new();
-        for (name, value) in kw.into_iter().map(|x| x.1) {
+        let mut kwargs = Vec::with_capacity(kw.len());
+        for (name, value) in kw {
             if let Some(value) = value {
                 kwonlyargs.push(name);
                 kw_defaults.push(value);
@@ -1101,7 +1100,7 @@ ParameterListStarArgs<ArgType, StarArgType>: (Option<Box<ast::Arg>>, Vec<ast::Ar
             })?
         }
 
-        let kwarg = kwarg.map(|n| n.1).flatten();
+        let kwarg = kwarg.flatten();
         let va = va.map(Box::new);
 
         Ok((va, kwargs, kw_defaults, kwarg))
@@ -1210,9 +1209,8 @@ LambdaDef: ast::Expr = {
 }
 
 OrTest<Goal>: ast::Expr = {
-    <location:@L> <e1:AndTest<"all">> <e2:("or" AndTest<"all">)+> <end_location:@R> => {
-        let mut values = vec![e1];
-        values.extend(e2.into_iter().map(|e| e.1));
+    <location:@L> <mut values:(<AndTest<"all">> "or")+> <last: AndTest<"all">> <end_location:@R> => {
+        values.push(last);
         ast::Expr::BoolOp(
             ast::ExprBoolOp { op: ast::Boolop::Or, values, range: (location..end_location).into() }
         )
@@ -1221,9 +1219,8 @@ OrTest<Goal>: ast::Expr = {
 };
 
 AndTest<Goal>: ast::Expr = {
-    <location:@L> <e1:NotTest<"all">> <e2:("and" NotTest<"all">)+> <end_location:@R> => {
-        let mut values = vec![e1];
-        values.extend(e2.into_iter().map(|e| e.1));
+    <location:@L> <mut values:(<NotTest<"all">> "and")+> <last:NotTest<"all">> <end_location:@R> => {
+        values.push(last);
         ast::Expr::BoolOp(
             ast::ExprBoolOp { op: ast::Boolop::And, values, range: (location..end_location).into() }
         )
@@ -1366,19 +1363,18 @@ AtomExpr2<Goal>: ast::Expr = {
 };
 
 SubscriptList: ast::Expr = {
-    <location:@L> <s1:Subscript> <s2:("," Subscript)*> <trailing_comma:","?> <end_location:@R> => {
-        if s2.is_empty() && trailing_comma.is_none() {
-            s1
-        } else {
-            let mut dims = vec![s1];
-            for x in s2 {
-                dims.push(x.1)
-            }
-
-            ast::Expr::Tuple(
-                ast::ExprTuple { elts: dims, ctx: ast::ExprContext::Load, range: (location..end_location).into() },
-            )
-        }
+    <location:@L> <s1:Subscript> <end_location:@R> => {
+        s1
+    },
+    <location:@L> <s1:Subscript> "," <end_location:@R> => {
+        ast::Expr::Tuple(
+            ast::ExprTuple { elts: vec![s1], ctx: ast::ExprContext::Load, range: (location..end_location).into() },
+        )
+    },
+    <location:@L> <elts:TwoOrMore<Subscript, ",">> ","? <end_location:@R> => {
+        ast::Expr::Tuple(
+            ast::ExprTuple { elts, ctx: ast::ExprContext::Load, range: (location..end_location).into() },
+        )
     }
 };
 
@@ -1603,21 +1599,32 @@ FunctionArgument: (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::E
     <location:@L> "**" <e:Test<"all">> <end_location:@R> => (Some((location, end_location, None)), e),
 };
 
+/// Comma separated sequence that allows an optional trailing comma.
 #[inline]
 Comma<T>: Vec<T> = {
-    <items: (<T> ",")*> <last: T?> => {
-        let mut items = items;
-        items.extend(last);
-        items
+    <mut v:(<T> ",")*> <last:T?> => {
+        if let Some(element) = last {
+            v.push(element);
+        }
+        v
     }
 };
 
-#[inline]
+/// One ore more items that are separated by a comma.
 OneOrMore<T>: Vec<T> = {
-    <i1: T> <i2:("," T)*> => {
-        let mut items = vec![i1];
-        items.extend(i2.into_iter().map(|e| e.1));
-        items
+    <e:T> => vec![e],
+    <mut v: OneOrMore<T>> "," <e:T> => {
+        v.push(e);
+        v
+    }
+};
+
+/// Two or more items that are separted by `Sep`
+TwoOrMore<T, Sep>: Vec<T> = {
+    <e1:T> Sep <e2:T> => vec![e1, e2],
+    <mut v: TwoOrMore<T, Sep>> Sep <e:T> => {
+        v.push(e);
+        v
     }
 };
 
