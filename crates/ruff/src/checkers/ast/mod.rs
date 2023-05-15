@@ -2590,21 +2590,21 @@ where
                     .rules
                     .enabled(Rule::BlockingHttpCallInsideAsyncDef)
                 {
-                    flake8_async::rules::blocking_http_call_inside_async_def(self, expr);
+                    flake8_async::rules::blocking_http_call(self, expr);
                 }
                 if self
                     .settings
                     .rules
                     .enabled(Rule::OpenSleepOrSubprocessInsideAsyncDef)
                 {
-                    flake8_async::rules::open_sleep_or_subprocess_inside_async_def(self, expr);
+                    flake8_async::rules::open_sleep_or_subprocess_call(self, expr);
                 }
                 if self
                     .settings
                     .rules
                     .enabled(Rule::UnsafeOsMethodInsideAsyncDef)
                 {
-                    flake8_async::rules::unsafe_os_method_inside_async_def(self, expr);
+                    flake8_async::rules::blocking_os_call(self, expr);
                 }
 
                 // flake8-print
