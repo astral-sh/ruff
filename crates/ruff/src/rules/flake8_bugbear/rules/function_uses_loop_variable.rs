@@ -34,7 +34,7 @@ struct LoadedNamesVisitor<'a> {
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr {
+        match expr {
             Expr::Name(ast::ExprName { id, ctx, range: _ }) => match ctx {
                 ExprContext::Load => self.loaded.push((id, expr)),
                 ExprContext::Store => self.stored.push((id, expr)),
@@ -55,7 +55,7 @@ struct SuspiciousVariablesVisitor<'a> {
 /// functions, but not bound as arguments).
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { args, body, .. })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { args, body, .. }) => {
                 // Collect all loaded variable names.
@@ -90,7 +90,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr {
+        match expr {
             Expr::Call(ast::ExprCall {
                 func,
                 args,
@@ -171,7 +171,7 @@ struct NamesFromAssignmentsVisitor<'a> {
 /// `Visitor` to collect all names used in an assignment expression.
 impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr {
+        match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 self.names.insert(id.as_str());
             }
@@ -201,7 +201,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
             return;
         }
 
-        match &stmt {
+        match stmt {
             Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
                 for expr in targets {

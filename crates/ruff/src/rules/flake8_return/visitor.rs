@@ -26,7 +26,7 @@ pub(crate) struct ReturnVisitor<'a> {
 
 impl<'a> ReturnVisitor<'a> {
     fn visit_assign_target(&mut self, expr: &'a Expr) {
-        match &expr {
+        match expr {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for elt in elts {
                     self.visit_assign_target(elt);
@@ -61,7 +61,7 @@ impl<'a> ReturnVisitor<'a> {
 
 impl<'a> Visitor<'a> for ReturnVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ })
             | Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
                 self.stack
@@ -168,7 +168,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr {
+        match expr {
             Expr::Call(_) => {
                 // Arbitrary function calls can have side effects, so we conservatively treat
                 // every function call as a reference to every known variable.

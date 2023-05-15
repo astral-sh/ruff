@@ -69,7 +69,7 @@ static PYSTAT_MAPPING: Lazy<FxHashMap<&'static str, u16>> = Lazy::new(|| {
 });
 
 fn get_int_value(expr: &Expr) -> Option<u16> {
-    match &expr {
+    match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..

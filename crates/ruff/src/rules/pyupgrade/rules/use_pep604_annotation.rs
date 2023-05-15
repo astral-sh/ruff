@@ -52,7 +52,7 @@ fn union(elts: &[Expr]) -> Expr {
 
 /// Returns `true` if any argument in the slice is a string.
 fn any_arg_is_str(slice: &Expr) -> bool {
-    match &slice {
+    match slice {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
@@ -112,7 +112,7 @@ pub(crate) fn use_pep604_annotation(
         TypingMember::Union => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                match &slice {
+                match slice {
                     Expr::Slice(_) => {
                         // Invalid type annotation.
                     }

@@ -193,7 +193,7 @@ pub enum ComparablePattern<'a> {
 
 impl<'a> From<&'a Pattern> for ComparablePattern<'a> {
     fn from(pattern: &'a Pattern) -> Self {
-        match &pattern {
+        match pattern {
             Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => Self::MatchValue {
                 value: value.into(),
             },
@@ -538,7 +538,7 @@ impl<'a> From<&'a Box<Expr>> for ComparableExpr<'a> {
 
 impl<'a> From<&'a Expr> for ComparableExpr<'a> {
     fn from(expr: &'a Expr) -> Self {
-        match &expr {
+        match expr {
             Expr::BoolOp(ast::ExprBoolOp {
                 op,
                 values,
@@ -899,7 +899,7 @@ pub enum ComparableStmt<'a> {
 
 impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
     fn from(stmt: &'a Stmt) -> Self {
-        match &stmt {
+        match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
                 args,

@@ -21,7 +21,7 @@ impl AlwaysAutofixableViolation for RaiseNotImplemented {
 }
 
 fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
-    match &expr {
+    match expr {
         Expr::Call(ast::ExprCall { func, .. }) => {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                 if id == "NotImplemented" {

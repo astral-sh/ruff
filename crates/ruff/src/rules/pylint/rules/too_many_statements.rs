@@ -25,7 +25,7 @@ impl Violation for TooManyStatements {
 fn num_statements(stmts: &[Stmt]) -> usize {
     let mut count = 0;
     for stmt in stmts {
-        match &stmt {
+        match stmt {
             Stmt::If(ast::StmtIf { body, orelse, .. }) => {
                 count += 1;
                 count += num_statements(body);

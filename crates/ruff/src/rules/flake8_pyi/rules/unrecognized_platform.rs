@@ -125,7 +125,7 @@ pub(crate) fn unrecognized_platform(
         return;
     }
 
-    match &right {
+    match right {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(value),
             ..

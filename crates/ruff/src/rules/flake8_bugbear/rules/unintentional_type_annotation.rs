@@ -43,7 +43,7 @@ pub(crate) fn unintentional_type_annotation(
     if value.is_some() {
         return;
     }
-    match &target {
+    match target {
         Expr::Subscript(ast::ExprSubscript { value, .. }) => {
             if value.is_name_expr() {
                 checker

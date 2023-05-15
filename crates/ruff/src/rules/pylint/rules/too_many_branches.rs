@@ -26,7 +26,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
     stmts
         .iter()
         .map(|stmt| {
-            match &stmt {
+            match stmt {
                 Stmt::If(ast::StmtIf { body, orelse, .. }) => {
                     1 + num_branches(body)
                         + (if let Some(stmt) = orelse.first() {

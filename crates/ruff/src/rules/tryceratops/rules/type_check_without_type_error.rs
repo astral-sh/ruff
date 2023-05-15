@@ -55,7 +55,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
@@ -88,7 +88,7 @@ fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
 
 /// Returns `true` if an [`Expr`] is a test to check types (e.g. via isinstance)
 fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
-    match &test {
+    match test {
         Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values
             .iter()
             .all(|expr| check_type_check_test(checker, expr)),
@@ -128,7 +128,7 @@ fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
 
 /// Returns `true` if an [`Expr`] is a reference to a builtin exception.
 fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
-    match &exc {
+    match exc {
         Expr::Name(_) => is_builtin_exception(checker, exc),
         Expr::Call(ast::ExprCall { func, .. }) => {
             if let Expr::Name(_) = func.as_ref() {
@@ -167,7 +167,7 @@ fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
         if has_control_flow(item) {
             return;
         }
-        match &item {
+        match item {
             Stmt::If(ast::StmtIf { test, .. }) => {
                 if !check_type_check_test(checker, test) {
                     return;

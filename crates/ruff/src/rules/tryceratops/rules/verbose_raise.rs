@@ -50,7 +50,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::Raise(ast::StmtRaise {
                 exc,
                 cause,

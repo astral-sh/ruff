@@ -79,7 +79,7 @@ pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt])
 }
 
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
-    match &stmt {
+    match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             args,
             body,
@@ -314,7 +314,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
 }
 
 pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
-    match &expr {
+    match expr {
         Expr::BoolOp(ast::ExprBoolOp {
             op,
             values,
@@ -579,7 +579,7 @@ pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
     visitor: &mut V,
     excepthandler: &'a Excepthandler,
 ) {
-    match &excepthandler {
+    match excepthandler {
         Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, body, .. }) => {
             if let Some(expr) = type_ {
                 visitor.visit_expr(expr);
@@ -639,7 +639,7 @@ pub fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, match_case:
 }
 
 pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a Pattern) {
-    match &pattern {
+    match pattern {
         Pattern::MatchValue(ast::PatternMatchValue {
             value,
             range: _range,

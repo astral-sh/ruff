@@ -76,7 +76,7 @@ pub(crate) fn all_with_model_form(
                 let Expr::Constant(ast::ExprConstant { value, .. }) = value.as_ref() else {
                     continue;
                 };
-                match &value {
+                match value {
                     Constant::Str(s) => {
                         if s == "__all__" {
                             return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));

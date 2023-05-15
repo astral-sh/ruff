@@ -133,7 +133,7 @@ where
     if func(expr) {
         return true;
     }
-    match &expr {
+    match expr {
         Expr::BoolOp(ast::ExprBoolOp {
             values,
             range: _range,
@@ -291,7 +291,7 @@ pub fn any_over_pattern<F>(pattern: &Pattern, func: &F) -> bool
 where
     F: Fn(&Expr) -> bool,
 {
-    match &pattern {
+    match pattern {
         Pattern::MatchValue(ast::PatternMatchValue {
             value,
             range: _range,
@@ -340,7 +340,7 @@ pub fn any_over_stmt<F>(stmt: &Stmt, func: &F) -> bool
 where
     F: Fn(&Expr) -> bool,
 {
-    match &stmt {
+    match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             args,
             body,
@@ -569,7 +569,7 @@ static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
     // annotation. This is what pycodestyle (as of 2.9.1) does.
-    match &stmt {
+    match stmt {
         Stmt::Assign(ast::StmtAssign { targets, .. }) => {
             if targets.len() != 1 {
                 return false;
@@ -601,7 +601,7 @@ pub const fn is_singleton(expr: &Expr) -> bool {
 
 /// Return `true` if the [`Expr`] is a constant or tuple of constants.
 pub fn is_constant(expr: &Expr) -> bool {
-    match &expr {
+    match expr {
         Expr::Constant(_) => true,
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant),
         _ => false,
@@ -658,7 +658,7 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
 pub fn extract_handled_exceptions(handlers: &[Excepthandler]) -> Vec<&Expr> {
     let mut handled_exceptions = Vec::new();
     for handler in handlers {
-        match &handler {
+        match handler {
             Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) => {
                 if let Some(type_) = type_ {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_.as_ref() {
@@ -917,7 +917,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 // Don't recurse.
             }
@@ -941,7 +941,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::Raise(ast::StmtRaise {
                 exc,
                 cause,
@@ -983,7 +983,7 @@ struct GlobalStatementVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for GlobalStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::Global(ast::StmtGlobal {
                 names,
                 range: _range,
@@ -1185,7 +1185,7 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> TextRange {
 
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
 pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    match &stmt {
+    match stmt {
         Stmt::For(ast::StmtFor { body, orelse, .. })
         | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | Stmt::While(ast::StmtWhile { body, orelse, .. })
@@ -1383,7 +1383,7 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
 
 /// Check if a node represents an unpacking assignment.
 pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
-    match &parent {
+    match parent {
         Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
             if let Some(optional_vars) = &item.optional_vars {
                 if matches!(optional_vars.as_ref(), Expr::Tuple(_)) {
@@ -1565,7 +1565,7 @@ impl Truthiness {
     where
         F: Fn(&str) -> bool,
     {
-        match &expr {
+        match expr {
             Expr::Constant(ast::ExprConstant { value, .. }) => match value {
                 Constant::Bool(value) => Some(*value),
                 Constant::None => Some(false),

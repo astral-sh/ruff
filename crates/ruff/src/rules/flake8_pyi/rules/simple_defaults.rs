@@ -79,7 +79,7 @@ fn is_valid_default_value_with_annotation(
     checker: &Checker,
     allow_container: bool,
 ) -> bool {
-    match &default {
+    match default {
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::Set(ast::ExprSet { elts, range: _ }) => {
@@ -229,7 +229,7 @@ fn is_valid_default_value_with_annotation(
 
 /// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
 fn is_valid_pep_604_union(annotation: &Expr) -> bool {
-    match &annotation {
+    match annotation {
         Expr::BinOp(ast::ExprBinOp {
             left,
             op: Operator::BitOr,

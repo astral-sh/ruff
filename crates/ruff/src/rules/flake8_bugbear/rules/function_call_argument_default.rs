@@ -83,7 +83,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr {
+        match expr {
             Expr::Call(ast::ExprCall { func, args, .. }) => {
                 if !is_mutable_func(self.checker, func)
                     && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)

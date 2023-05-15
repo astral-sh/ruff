@@ -80,7 +80,7 @@ pub fn is_pep604_builtin(expr: &Expr, context: &Context) -> bool {
 }
 
 pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
-    match &expr {
+    match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
             context.resolve_call_path(expr).map_or(false, |call_path| {
                 IMMUTABLE_TYPES

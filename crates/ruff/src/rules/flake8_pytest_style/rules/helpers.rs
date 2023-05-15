@@ -60,7 +60,7 @@ pub(super) fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
 }
 
 pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
-    match &expr {
+    match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(string),
             ..

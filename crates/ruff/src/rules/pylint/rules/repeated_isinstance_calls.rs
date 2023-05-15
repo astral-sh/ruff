@@ -52,7 +52,7 @@ pub(crate) fn repeated_isinstance_calls(
             .or_insert_with(|| (0, FxHashSet::default()));
 
         *num_calls += 1;
-        matches.extend(match &types {
+        matches.extend(match types {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 elts.iter().map(HashableExpr::from_expr).collect()
             }

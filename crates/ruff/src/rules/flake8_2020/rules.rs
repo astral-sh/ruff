@@ -123,7 +123,7 @@ fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
 /// YTT101, YTT102, YTT301, YTT303
 pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
     if is_sys(checker, value, "version") {
-        match &slice {
+        match slice {
             Expr::Slice(ast::ExprSlice {
                 lower: None,
                 upper: Some(upper),
@@ -174,7 +174,7 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
 pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
-    match &left {
+    match left {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(checker, value, "version_info") =>
         {

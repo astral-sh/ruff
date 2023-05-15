@@ -28,7 +28,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
     let num_imports = blocks.iter().map(|block| block.imports.len()).sum();
     let mut module_imports = Vec::with_capacity(num_imports);
     for stmt in blocks.iter().flat_map(|block| &block.imports) {
-        match &stmt {
+        match stmt {
             Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 module_imports.extend(
                     names

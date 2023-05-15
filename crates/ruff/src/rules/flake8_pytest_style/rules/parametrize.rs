@@ -131,7 +131,7 @@ fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) 
 fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
-    match &expr {
+    match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(string),
             ..
@@ -328,7 +328,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         true
     };
 
-    match &values {
+    match values {
         Expr::List(ast::ExprList { elts, .. }) => {
             if values_type != types::ParametrizeValuesType::List {
                 checker.diagnostics.push(Diagnostic::new(
@@ -387,7 +387,7 @@ fn handle_value_rows(
     values_row_type: types::ParametrizeValuesRowType,
 ) {
     for elt in elts {
-        match &elt {
+        match elt {
             Expr::Tuple(_) => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
                     checker.diagnostics.push(Diagnostic::new(

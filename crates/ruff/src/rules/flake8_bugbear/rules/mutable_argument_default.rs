@@ -37,7 +37,7 @@ pub(crate) fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
 }
 
 fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
-    match &expr {
+    match expr {
         Expr::List(_)
         | Expr::Dict(_)
         | Expr::Set(_)

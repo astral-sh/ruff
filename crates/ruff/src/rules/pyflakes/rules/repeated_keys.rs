@@ -73,7 +73,7 @@ enum DictionaryKey<'a> {
 }
 
 fn into_dictionary_key(expr: &Expr) -> Option<DictionaryKey> {
-    match &expr {
+    match expr {
         Expr::Constant(ast::ExprConstant { value, .. }) => {
             Some(DictionaryKey::Constant(value.into()))
         }

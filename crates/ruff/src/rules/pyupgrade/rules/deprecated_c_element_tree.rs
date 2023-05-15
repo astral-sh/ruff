@@ -38,7 +38,7 @@ where
 
 /// UP023
 pub(crate) fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
-    match &stmt {
+    match stmt {
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             // Ex) `import xml.etree.cElementTree as ET`
             for name in names {

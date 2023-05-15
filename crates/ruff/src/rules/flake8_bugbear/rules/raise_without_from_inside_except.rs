@@ -32,7 +32,7 @@ pub(crate) fn raise_without_from_inside_except(checker: &mut Checker, body: &[St
     for (range, exc, cause) in raises {
         if cause.is_none() {
             if let Some(exc) = exc {
-                match &exc {
+                match exc {
                     Expr::Name(ast::ExprName { id, .. }) if is_lower(id) => {}
                     _ => {
                         checker

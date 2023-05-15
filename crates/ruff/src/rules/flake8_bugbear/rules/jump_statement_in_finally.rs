@@ -23,7 +23,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
         if f(stmt) {
             checker.diagnostics.push(Diagnostic::new(
                 JumpStatementInFinally {
-                    name: match &stmt {
+                    name: match stmt {
                         Stmt::Break(_) => "break",
                         Stmt::Continue(_) => "continue",
                         Stmt::Return(_) => "return",
@@ -34,7 +34,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
                 stmt.range(),
             ));
         }
-        match &stmt {
+        match stmt {
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::For(ast::StmtFor { body, .. })
             | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. }) => {

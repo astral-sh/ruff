@@ -217,7 +217,7 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
 /// RUF008
 pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     for statement in body {
-        match &statement {
+        match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 annotation,
                 value: Some(value),

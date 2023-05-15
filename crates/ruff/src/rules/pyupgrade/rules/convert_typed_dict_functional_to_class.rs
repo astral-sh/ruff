@@ -194,7 +194,7 @@ fn match_properties_and_total<'a>(
     // ```
     if let Some(dict) = args.get(1) {
         let total = match_total_from_only_keyword(keywords);
-        match &dict {
+        match dict {
             Expr::Dict(ast::ExprDict {
                 keys,
                 values,

@@ -53,7 +53,7 @@ fn matches_sql_statement(string: &str) -> bool {
 }
 
 fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Option<String> {
-    match &expr {
+    match expr {
         // "select * from table where val = " + "str" + ...
         // "select * from table where val = %s" % ...
         Expr::BinOp(ast::ExprBinOp {

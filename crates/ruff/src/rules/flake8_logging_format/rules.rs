@@ -40,7 +40,7 @@ const RESERVED_ATTRS: &[&str; 22] = &[
 
 /// Check logging messages for violations.
 fn check_msg(checker: &mut Checker, msg: &Expr) {
-    match &msg {
+    match msg {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {

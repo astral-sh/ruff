@@ -728,7 +728,7 @@ pub(crate) fn manual_dict_lookup(
 
         constants.insert(constant.into());
         if let Some(orelse) = orelse.first() {
-            match &orelse {
+            match orelse {
                 Stmt::If(_) => {
                     child = Some(orelse);
                 }
