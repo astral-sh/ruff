@@ -8,7 +8,7 @@ pub fn name(stmt: &Stmt) -> &str {
     }
 }
 
-pub fn decorator_list(stmt: &Stmt) -> &Vec<Expr> {
+pub fn decorator_list(stmt: &Stmt) -> &[Expr] {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { decorator_list, .. }) => {

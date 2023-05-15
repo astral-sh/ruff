@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 
 pub(super) fn match_function_def(
     stmt: &Stmt,
-) -> (&str, &Arguments, Option<&Expr>, &Vec<Stmt>, &Vec<Expr>) {
+) -> (&str, &Arguments, Option<&Expr>, &[Stmt], &[Expr]) {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             name,

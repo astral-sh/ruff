@@ -449,7 +449,7 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
 
-                let mut orelse_: &Vec<Stmt<U>> = orelse;
+                let mut orelse_: &[Stmt<U>] = orelse;
                 loop {
                     if orelse_.len() == 1 && matches!(orelse_[0], Stmt::If(_)) {
                         if let Stmt::If(ast::StmtIf {

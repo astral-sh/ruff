@@ -5181,11 +5181,13 @@ impl<'a> Checker<'a> {
         // Mark anything referenced in `__all__` as used.
         let all_bindings: Option<(Vec<BindingId>, TextRange)> = {
             let global_scope = self.ctx.global_scope();
-            let all_names: Option<(&Vec<&str>, TextRange)> = global_scope
+            let all_names: Option<(&[&str], TextRange)> = global_scope
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
-                    BindingKind::Export(Export { names }) => Some((names, binding.range)),
+                    BindingKind::Export(Export { names }) => {
+                        Some((names.as_slice(), binding.range))
+                    }
                     _ => None,
                 });
 
