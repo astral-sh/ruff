@@ -74,6 +74,41 @@ impl ExpectedParams {
     }
 }
 
+/// ## What it does
+/// Checks for special methods that have an unexpected method signature.
+///
+/// ## Why is this bad?
+/// Special methods have a specific signature. If the signature is not as
+/// expected, it might not work.
+///
+/// ## Example
+/// ```python
+/// class Bookshelf:
+///     def __init__(self):
+///         self._books = ["Foo", "Bar", "Baz"]
+///
+///     def __len__(self, index):  # __len__ does not except an index parameter
+///         return len(self._books)
+///
+///     def __getitem__(self, index):
+///         return self._books[index]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Bookshelf:
+///     def __init__(self):
+///         self._books = ["Foo", "Bar", "Baz"]
+///
+///     def __len__(self):
+///         return len(self._books)
+///
+///     def __getitem__(self, index):
+///         return self._books[index]
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/datamodel.html)
 #[violation]
 pub struct UnexpectedSpecialMethodSignature {
     method_name: String,

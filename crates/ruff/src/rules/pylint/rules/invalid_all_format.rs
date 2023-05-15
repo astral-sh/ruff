@@ -3,6 +3,24 @@ use rustpython_parser::ast::Expr;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for invalid formats for `__all__`.
+///
+/// ## Why is this bad?
+/// `__all__` should be a `tuple` or `list`.
+///
+/// ## Example
+/// ```python
+/// __all__ = "Foo"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// __all__ = ("Foo",)
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 #[violation]
 pub struct InvalidAllFormat;
 

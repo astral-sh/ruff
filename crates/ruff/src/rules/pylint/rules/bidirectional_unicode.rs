@@ -22,6 +22,21 @@ const BIDI_UNICODE: [char; 10] = [
                 // to hide code
 ];
 
+/// ## What it does
+/// Checks for bidirectional unicode characters.
+///
+/// ## Why is this bad?
+/// Bidirectional unicode characters can be used to obfuscate code.
+///
+/// ## Example
+/// ```python
+/// s = "א" * 100 #    "א" is assigned
+/// print(s)  # prints a 100-character string
+/// ```
+///
+/// ## References
+/// - [Trojan Source](https://trojansource.codes/)
+/// - [PEP 672](https://peps.python.org/pep-0672/#bidirectional-text)
 #[violation]
 pub struct BidirectionalUnicode;
 

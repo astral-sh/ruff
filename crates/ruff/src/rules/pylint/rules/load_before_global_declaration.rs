@@ -7,6 +7,37 @@ use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for usages of names prior to `global` declaration.
+///
+/// ## Why is this bad?
+/// The `global` keyword applies to the entire scope. Using a name in a scope
+/// prior to declaring it as `global` results in an error.
+///
+/// ## Example
+/// ```python
+/// counter = 1
+///
+///
+/// def increment():
+///     print(f"Adding 1 to {counter}")
+///     global counter
+///     counter += 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// counter = 1
+///
+///
+/// def increment():
+///     global counter
+///     print(f"Adding 1 to {counter}")
+///     counter += 1
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[violation]
 pub struct LoadBeforeGlobalDeclaration {
     name: String,
