@@ -641,7 +641,10 @@ where
                 }
                 Some('\n' | '\r') => {
                     // Empty line!
+                    let tok_start = self.get_pos();
                     self.next_char();
+                    let tok_end = self.get_pos();
+                    self.emit((Tok::NonLogicalNewline, TextRange::new(tok_start, tok_end)));
                     spaces = 0;
                     tabs = 0;
                 }
@@ -1139,7 +1142,7 @@ where
                         return Err(LexicalError {
                             error: LexicalErrorType::LineContinuationError,
                             location: self.get_pos(),
-                        })
+                        });
                     }
                 }
 
@@ -1521,6 +1524,7 @@ mod tests {
                         Tok::Return,
                         Tok::Int { value: BigInt::from(99) },
                         Tok::Newline,
+                        Tok::NonLogicalNewline,
                         Tok::Dedent,
                     ]
                 );
@@ -1560,10 +1564,12 @@ mod tests {
                         },
                         Tok::Colon,
                         Tok::Newline,
+                        Tok::NonLogicalNewline,
                         Tok::Indent,
                         Tok::Return,
                         Tok::Int { value: BigInt::from(99) },
                         Tok::Newline,
+                        Tok::NonLogicalNewline,
                         Tok::Dedent,
                         Tok::Dedent,
                     ]
@@ -1598,10 +1604,12 @@ mod tests {
                         },
                         Tok::Colon,
                         Tok::Newline,
+                        Tok::NonLogicalNewline,
                         Tok::Indent,
                         Tok::Return,
                         Tok::Int { value: BigInt::from(99) },
                         Tok::Newline,
+                        Tok::NonLogicalNewline,
                         Tok::Dedent,
                         Tok::Dedent,
                     ]
@@ -1722,15 +1730,15 @@ mod tests {
     #[test]
     #[cfg(feature = "full-lexer")]
     fn test_logical_newline_line_comment() {
-        let source = "#Hello\n#World";
+        let source = "#Hello\n#World\n";
         let tokens = lex_source(source);
         assert_eq!(
             tokens,
             vec![
                 Tok::Comment("#Hello".to_owned()),
-                // tokenize.py does put an NL here...
+                Tok::NonLogicalNewline,
                 Tok::Comment("#World".to_owned()),
-                // ... and here, but doesn't seem very useful.
+                Tok::NonLogicalNewline,
             ]
         );
     }
