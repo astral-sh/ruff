@@ -279,7 +279,7 @@ class StructVisitor(EmitVisitor):
         if has_attributes:
             self.emit("pub range: R,", depth + 1)
         else:
-            self.emit("pub range: crate::ranged::OptionalRange<R>,", depth + 1)
+            self.emit("pub range: OptionalRange<R>,", depth + 1)
 
     def simple_sum(self, sum, name, depth):
         rust_name = rust_type_name(name)
