@@ -30,7 +30,7 @@ const BIDI_UNICODE: [char; 10] = [
 ///
 /// ## Example
 /// ```python
-/// s = "א" * 100 #     "א" is assigned
+/// s = "א" * 100  # "א" is assigned
 /// print(s)  # prints a 100-character string
 /// ```
 ///
