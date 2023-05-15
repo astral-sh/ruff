@@ -49,7 +49,7 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
         iter,
         orelse,
         ..
-    }) = &stmt else {
+    }) = stmt else {
         return None;
     };
 
@@ -114,7 +114,7 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
         iter,
         orelse,
         ..
-    }) = &stmt else {
+    }) = stmt else {
         return None;
     };
 

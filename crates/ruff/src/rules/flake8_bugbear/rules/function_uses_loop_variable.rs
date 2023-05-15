@@ -196,7 +196,7 @@ struct AssignedNamesVisitor<'a> {
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if matches!(&stmt, Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)) {
+        if matches!(stmt, Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)) {
             // Don't recurse.
             return;
         }
@@ -224,7 +224,7 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if matches!(&expr, Expr::Lambda(_)) {
+        if matches!(expr, Expr::Lambda(_)) {
             // Don't recurse.
             return;
         }

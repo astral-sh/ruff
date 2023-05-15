@@ -142,7 +142,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
 /// UP028
 pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
     // Intentionally omit async functions.
-    if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) = &stmt {
+    if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) = stmt {
         let yields = {
             let mut visitor = YieldFromVisitor::default();
             visitor.visit_body(body);

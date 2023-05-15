@@ -17,7 +17,7 @@ impl Violation for CannotRaiseLiteral {
 
 /// B016
 pub(crate) fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
-    let Expr::Constant ( _) = &expr else {
+    let Expr::Constant ( _) = expr else {
         return;
     };
     checker

@@ -44,7 +44,7 @@ pub(crate) fn unary_prefix_increment(
     if !matches!(op, Unaryop::UAdd) {
         return;
     }
-    let Expr::UnaryOp(ast::ExprUnaryOp { op, .. })= &operand else {
+    let Expr::UnaryOp(ast::ExprUnaryOp { op, .. })= operand else {
             return;
         };
     if !matches!(op, Unaryop::UAdd) {

@@ -63,7 +63,7 @@ where
             args,
             keywords,
             range: _range,
-        }) = &expr
+        }) = expr
         {
             if args.is_empty() && keywords.is_empty() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
@@ -76,7 +76,7 @@ where
         }
 
         // Avoid false positive for overloaded operators.
-        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = &expr {
+        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
             if !matches!(
                 left.as_ref(),
                 Expr::Constant(_)
@@ -505,7 +505,7 @@ where
                         type_,
                         body,
                         ..
-                    }) = &handler;
+                    }) = handler;
                     type_
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
@@ -617,7 +617,7 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
 /// [`Keyword`] arguments.
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
-        let Keyword { arg, .. } = &keyword;
+        let Keyword { arg, .. } = keyword;
         arg.as_ref().map_or(false, |arg| arg == keyword_name)
     })
 }
@@ -625,7 +625,7 @@ pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&
 /// Return `true` if an [`Expr`] is `None`.
 pub const fn is_const_none(expr: &Expr) -> bool {
     matches!(
-        &expr,
+        expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
             kind: None,
@@ -637,7 +637,7 @@ pub const fn is_const_none(expr: &Expr) -> bool {
 /// Return `true` if an [`Expr`] is `True`.
 pub const fn is_const_true(expr: &Expr) -> bool {
     matches!(
-        &expr,
+        expr,
         Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(true),
             kind: None,
@@ -649,7 +649,7 @@ pub const fn is_const_true(expr: &Expr) -> bool {
 /// Return `true` if a keyword argument is present with a non-`None` value.
 pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
     find_keyword(keywords, keyword).map_or(false, |keyword| {
-        let Keyword { value, .. } = &keyword;
+        let Keyword { value, .. } = keyword;
         !is_const_none(value)
     })
 }
@@ -700,7 +700,7 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 /// be used with or without explicit call syntax), return the underlying
 /// callable.
 pub fn map_callable(decorator: &Expr) -> &Expr {
-    if let Expr::Call(ast::ExprCall { func, .. }) = &decorator {
+    if let Expr::Call(ast::ExprCall { func, .. }) = decorator {
         func
     } else {
         decorator
@@ -753,7 +753,7 @@ where
     F: Fn(&str) -> bool,
 {
     any_over_body(body, &|expr| {
-        if let Expr::Call(ast::ExprCall { func, .. }) = &expr {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                 if matches!(id.as_str(), "locals" | "globals" | "vars" | "exec" | "eval") {
                     if is_builtin(id.as_str()) {
@@ -1147,7 +1147,7 @@ pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> O
         type_,
         body,
         range: _range,
-    }) = &handler;
+    }) = handler;
 
     match (name, type_) {
         (Some(_), Some(type_)) => {
@@ -1167,8 +1167,7 @@ pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> O
 
 /// Return the `Range` of `except` in `Excepthandler`.
 pub fn except_range(handler: &Excepthandler, locator: &Locator) -> TextRange {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, type_, .. }) =
-        &handler;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, type_, .. }) = handler;
     let end = if let Some(type_) = type_ {
         type_.end()
     } else {
@@ -1219,7 +1218,7 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
 pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    let Stmt::If(ast::StmtIf { body, orelse, .. } )= &stmt else {
+    let Stmt::If(ast::StmtIf { body, orelse, .. } )= stmt else {
         return None;
     };
 
@@ -1284,7 +1283,7 @@ pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     if let Stmt::Expr(ast::StmtExpr {
         value,
         range: _range,
-    }) = &stmt
+    }) = stmt
     {
         matches!(
             value.as_ref(),
@@ -1318,7 +1317,7 @@ impl<'a> SimpleCallArgs<'a> {
         let kwargs = keywords
             .into_iter()
             .filter_map(|keyword| {
-                let node = &keyword;
+                let node = keyword;
                 node.arg.as_ref().map(|arg| (arg.as_str(), &node.value))
             })
             .collect();
@@ -1361,7 +1360,7 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
         if let Stmt::Expr(ast::StmtExpr {
             value,
             range: _range,
-        }) = &parent
+        }) = parent
         {
             if matches!(value.as_ref(), Expr::IfExp(_)) {
                 return true;

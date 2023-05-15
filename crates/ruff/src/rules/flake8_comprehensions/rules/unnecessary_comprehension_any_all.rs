@@ -66,7 +66,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
     if !keywords.is_empty() {
         return;
     }
-    let Expr::Name(ast::ExprName { id, .. } )= &func  else {
+    let Expr::Name(ast::ExprName { id, .. } )= func  else {
         return;
     };
     if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {

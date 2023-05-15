@@ -55,14 +55,14 @@ impl Violation for ErrorInsteadOfException {
 /// TRY400
 pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = &handler;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
         let calls = {
             let mut visitor = LoggerCandidateVisitor::new(&checker.ctx);
             visitor.visit_body(body);
             visitor.calls
         };
         for (expr, func) in calls {
-            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &func {
+            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
                 if attr == "error" {
                     checker
                         .diagnostics

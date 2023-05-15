@@ -106,7 +106,7 @@ where
 }
 
 fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = &expr else {
+    let Expr::Name(ast::ExprName { id, .. }) = expr else {
         return false;
     };
     if id != "float" {
@@ -118,7 +118,7 @@ fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } )= &arg else {
+    } )= arg else {
         return false;
     };
     let lowercased = value.to_lowercase();

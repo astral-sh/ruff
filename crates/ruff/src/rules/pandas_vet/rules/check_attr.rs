@@ -72,7 +72,7 @@ pub(crate) fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_e
 
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like imports).
-    if let Expr::Name(ast::ExprName { id, .. }) = &value {
+    if let Expr::Name(ast::ExprName { id, .. }) = value {
         if checker.ctx.find_binding(id).map_or(true, |binding| {
             matches!(
                 binding.kind,

@@ -7,7 +7,7 @@ use ruff_python_ast::source_code::Locator;
 use crate::autofix::actions::remove_argument;
 
 fn match_name(expr: &Expr) -> Option<&str> {
-    if let Expr::Call(ast::ExprCall { func, .. }) = &expr {
+    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
         if let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                 return Some(id);

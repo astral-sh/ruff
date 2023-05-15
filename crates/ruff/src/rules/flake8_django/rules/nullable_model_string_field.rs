@@ -64,7 +64,7 @@ const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
 pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     for statement in body.iter() {
-        let Stmt::Assign(ast::StmtAssign {value, ..}) = &statement else {
+        let Stmt::Assign(ast::StmtAssign {value, ..}) = statement else {
             continue
         };
         if let Some(field_name) = is_nullable_field(checker, value) {
@@ -80,7 +80,7 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> V
 }
 
 fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
-    let Expr::Call(ast::ExprCall {func, keywords, ..}) = &value else {
+    let Expr::Call(ast::ExprCall {func, keywords, ..}) = value else {
         return None;
     };
 

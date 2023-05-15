@@ -93,7 +93,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::Name(ast::ExprName { id, .. }) = &expr {
+        if let Expr::Name(ast::ExprName { id, .. }) = expr {
             self.names.insert(id, expr);
         }
         visitor::walk_expr(self, expr);

@@ -33,7 +33,7 @@ impl SliceInfo {
 
 /// Return the argument name, lower bound, and  upper bound for an expression, if it's a slice.
 fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &expr else {
+    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return None;
     };
 
@@ -89,7 +89,7 @@ fn to_bound(expr: &Expr) -> Option<i64> {
 
 /// RUF007
 pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
-    let Expr::Name(ast::ExprName { id, .. }) = &func else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
 

@@ -41,7 +41,7 @@ fn match_typed_dict_assign<'a>(
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
-    let Expr::Name(ast::ExprName { id: class_name, .. }) = &target else {
+    let Expr::Name(ast::ExprName { id: class_name, .. }) = target else {
         return None;
     };
     let Expr::Call(ast::ExprCall {
@@ -49,7 +49,7 @@ fn match_typed_dict_assign<'a>(
         args,
         keywords,
         range: _
-    }) = &value else {
+    }) = value else {
         return None;
     };
     if !checker
@@ -133,7 +133,7 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
 }
 
 fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<Stmt>> {
-    let Expr::Name(ast::ExprName { id, .. }) = &func else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         bail!("Expected `func` to be `Expr::Name`")
     };
     if id != "dict" {

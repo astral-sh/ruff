@@ -175,7 +175,7 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 fn is_main_check(expr: &Expr) -> bool {
     if let Expr::Compare(ast::ExprCompare {
         left, comparators, ..
-    }) = &expr
+    }) = expr
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
             if id == "__name__" {
@@ -335,7 +335,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 
 /// SIM103
 pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ }) = &stmt else {
+    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ }) = stmt else {
         return;
     };
     let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(body), is_one_line_return_bool(orelse)) else {
@@ -421,7 +421,7 @@ fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
 
 /// SIM108
 pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
-    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ } )= &stmt else {
+    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ } )= stmt else {
         return;
     };
     if body.len() != 1 || orelse.len() != 1 {
@@ -554,7 +554,7 @@ fn get_if_body_pairs<'a>(
 
 /// SIM114
 pub(crate) fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
-    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ }) = &stmt else {
+    let Stmt::If(ast::StmtIf { test, body, orelse, range: _ }) = stmt else {
         return;
     };
 

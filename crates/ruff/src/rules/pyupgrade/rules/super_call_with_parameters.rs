@@ -24,7 +24,7 @@ impl AlwaysAutofixableViolation for SuperCallWithParameters {
 
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = &func {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         id == "super" && !args.is_empty()
     } else {
         false
@@ -89,7 +89,7 @@ pub(crate) fn super_call_with_parameters(
         Expr::Name(ast::ExprName {
             id: second_arg_id, ..
         }),
-    ) = (&first_arg, &second_arg) else {
+    ) = (first_arg, second_arg) else {
         return;
     };
 

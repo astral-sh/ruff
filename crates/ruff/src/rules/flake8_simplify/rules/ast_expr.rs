@@ -72,19 +72,19 @@ impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
 /// SIM112
 pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     // Ex) `os.environ['foo']`
-    if let Expr::Subscript(_) = &expr {
+    if let Expr::Subscript(_) = expr {
         check_os_environ_subscript(checker, expr);
         return;
     }
 
     // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
-    let Expr::Call(ast::ExprCall { func, args, .. }) = &expr else {
+    let Expr::Call(ast::ExprCall { func, args, .. }) = expr else {
         return;
     };
     let Some(arg) = args.get(0) else {
         return;
     };
-    let Expr::Constant(ast::ExprConstant { value: Constant::Str(env_var), .. }) = &arg else {
+    let Expr::Constant(ast::ExprConstant { value: Constant::Str(env_var), .. }) = arg else {
         return;
     };
     if !checker
@@ -113,7 +113,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
 }
 
 fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &expr else {
+    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };
     let Expr::Attribute(ast::ExprAttribute { value: attr_value, attr, .. }) = value.as_ref() else {
@@ -158,7 +158,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 
 /// SIM910
 pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = &expr else {
+    let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = expr else {
         return;
     };
     if !keywords.is_empty() {

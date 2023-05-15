@@ -84,7 +84,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                     count += 1;
                     let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                         body, ..
-                    }) = &handler;
+                    }) = handler;
                     count += num_statements(body);
                 }
             }

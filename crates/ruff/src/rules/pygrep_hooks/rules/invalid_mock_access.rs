@@ -49,7 +49,7 @@ impl Violation for InvalidMockAccess {
 
 /// PGH005
 pub(crate) fn uncalled_mock_method(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &expr {
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr {
         if matches!(
             attr.as_str(),
             "assert_any_call"

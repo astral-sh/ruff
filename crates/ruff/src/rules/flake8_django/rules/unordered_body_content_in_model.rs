@@ -110,7 +110,7 @@ fn get_element_type(checker: &Checker, element: &Stmt) -> Option<ContentType> {
             let Some(expr) = targets.first() else {
                 return None;
             };
-            let Expr::Name(ast::ExprName { id, .. }) = &expr else {
+            let Expr::Name(ast::ExprName { id, .. }) = expr else {
                 return None;
             };
             if id == "objects" {

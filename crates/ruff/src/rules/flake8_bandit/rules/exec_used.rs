@@ -15,7 +15,7 @@ impl Violation for ExecBuiltin {
 
 /// S102
 pub(crate) fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
-    let Expr::Name(ast::ExprName { id, .. }) = &func else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return None;
     };
     if id != "exec" {

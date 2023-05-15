@@ -81,7 +81,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
             name: Some(exception_name),
             body,
             ..
-        }) = &handler
+        }) = handler
         {
             let raises = {
                 let mut visitor = RaiseStatementVisitor::default();
@@ -94,7 +94,7 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
                 }
                 if let Some(exc) = exc {
                     // ...and the raised object is bound to the same name...
-                    if let Expr::Name(ast::ExprName { id, .. }) = &exc {
+                    if let Expr::Name(ast::ExprName { id, .. }) = exc {
                         if id == exception_name {
                             checker
                                 .diagnostics

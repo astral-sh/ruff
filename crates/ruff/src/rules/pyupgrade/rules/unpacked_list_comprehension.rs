@@ -119,7 +119,7 @@ pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr
             elt,
             generators,
             range: _,
-        }) = &value
+        }) = value
         {
             if generators.iter().any(|generator| generator.is_async) || contains_await(elt) {
                 return;

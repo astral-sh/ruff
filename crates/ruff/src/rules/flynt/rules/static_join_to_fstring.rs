@@ -59,7 +59,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         args,
         keywords,
         ..
-    })= &expr else {
+    })= expr else {
         return;
     };
 

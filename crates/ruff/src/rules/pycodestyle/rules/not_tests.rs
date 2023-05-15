@@ -88,7 +88,7 @@ pub(crate) fn not_tests(
             ops,
             comparators,
             range: _,
-        }) = &operand
+        }) = operand
         {
             if !matches!(&ops[..], [Cmpop::In | Cmpop::Is]) {
                 return;

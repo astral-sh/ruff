@@ -593,7 +593,7 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
 
 /// RET504
 fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
-    if let Expr::Name(ast::ExprName { id, .. }) = &expr {
+    if let Expr::Name(ast::ExprName { id, .. }) = expr {
         if !stack.assignments.contains_key(id.as_str()) {
             return;
         }
@@ -624,7 +624,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
 
 /// RET505, RET506, RET507, RET508
 fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> bool {
-    let Stmt::If(ast::StmtIf { body, .. }) = &stmt else {
+    let Stmt::If(ast::StmtIf { body, .. }) = stmt else {
         return false;
     };
     for child in body {

@@ -50,7 +50,7 @@ pub(crate) fn native_literals(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = &func else { return; };
+    let Expr::Name(ast::ExprName { id, .. }) = func else { return; };
 
     if !keywords.is_empty() || args.len() > 1 {
         return;

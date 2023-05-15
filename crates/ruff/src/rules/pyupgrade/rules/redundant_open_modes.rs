@@ -92,7 +92,7 @@ fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
         args,
         keywords,
         range: _,
-    }) = &expr
+    }) = expr
     {
         if matches!(func.as_ref(), Expr::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
             // Return the "open mode" parameter and keywords.

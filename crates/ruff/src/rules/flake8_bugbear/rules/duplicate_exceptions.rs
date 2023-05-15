@@ -115,7 +115,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthand
     let mut seen: FxHashSet<CallPath> = FxHashSet::default();
     let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = &handler else {
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = handler else {
             continue;
         };
         match type_.as_ref() {

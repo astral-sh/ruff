@@ -27,7 +27,7 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     }) = docstring.definition else {
         return;
     };
-    let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = &stmt else {
+    let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = stmt else {
         return;
     };
 

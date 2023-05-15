@@ -77,7 +77,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, target.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let Expr::Tuple(ast::ExprTuple { elts, ..}) = &target else {
+        let Expr::Tuple(ast::ExprTuple { elts, ..}) = target else {
             panic!("Expected Expr::Tuple");
         };
 
@@ -128,7 +128,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
 /// UP024
 pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = &handler;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = handler;
         let Some(expr) = type_.as_ref() else {
             continue;
         };

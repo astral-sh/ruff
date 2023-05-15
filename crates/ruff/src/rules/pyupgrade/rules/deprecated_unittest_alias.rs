@@ -49,10 +49,10 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
 
 /// UP005
 pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &expr else {
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
         return;
     };
-    let Some(&target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
+    let Some(target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
         return;
     };
     let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
@@ -64,7 +64,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
     let mut diagnostic = Diagnostic::new(
         DeprecatedUnittestAlias {
             alias: attr.to_string(),
-            target: target.to_string(),
+            target: (*target).to_string(),
         },
         expr.range(),
     );

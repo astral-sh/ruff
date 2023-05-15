@@ -42,7 +42,7 @@ pub(crate) fn getattr_with_constant(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Expr::Name(ast::ExprName { id, .. } )= &func else {
+    let Expr::Name(ast::ExprName { id, .. } )= func else {
         return;
     };
     if id != "getattr" {
@@ -54,7 +54,7 @@ pub(crate) fn getattr_with_constant(
     let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } )= &arg else {
+    } )= arg else {
         return;
     };
     if !is_identifier(value) {

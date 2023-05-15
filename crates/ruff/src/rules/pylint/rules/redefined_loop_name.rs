@@ -241,10 +241,10 @@ where
 /// x = cast(int, x)
 /// ```
 fn assignment_is_cast_expr(context: &Context, value: &Expr, target: &Expr) -> bool {
-    let Expr::Call(ast::ExprCall { func, args, .. }) = &value else {
+    let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
         return false;
     };
-    let Expr::Name(ast::ExprName { id: target_id, .. }) = &target else {
+    let Expr::Name(ast::ExprName { id: target_id, .. }) = target else {
         return false;
     };
     if args.len() != 2 {

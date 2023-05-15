@@ -415,7 +415,7 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
         .enabled(Rule::PytestUselessYieldFixture)
     {
         if let Some(stmt) = body.last() {
-            if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &stmt {
+            if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
                 if value.is_yield_expr() {
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(

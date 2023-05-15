@@ -63,8 +63,7 @@ impl Violation for BinaryOpException {
 
 /// PLW0711
 pub(crate) fn binary_op_exception(checker: &mut Checker, excepthandler: &Excepthandler) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
-        &excepthandler;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
 
     let Some(type_) = type_ else {
         return;

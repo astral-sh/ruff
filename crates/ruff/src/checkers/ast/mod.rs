@@ -173,7 +173,7 @@ where
         }
 
         // Track each top-level import, to guide import insertions.
-        if matches!(&stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
+        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
             if self.ctx.at_top_level() {
                 self.importer.visit_import(stmt);
             }
@@ -1724,7 +1724,7 @@ where
 
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
-                        if let Expr::Name(ast::ExprName { id, .. }) = &target {
+                        if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
                     }
@@ -1841,7 +1841,7 @@ where
             Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
-                        if let Expr::Name(ast::ExprName { id, .. }) = &target {
+                        if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
                     }
@@ -2255,7 +2255,7 @@ where
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
-            }) = &expr
+            }) = expr
             {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
@@ -4343,7 +4343,7 @@ where
         })
         | Pattern::MatchMapping(ast::PatternMatchMapping {
             rest: Some(name), ..
-        }) = &pattern
+        }) = pattern
         {
             self.add_binding(
                 name,
@@ -4603,7 +4603,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= &expr else {
+        let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
         let id = id.as_str();
@@ -4892,7 +4892,7 @@ impl<'a> Checker<'a> {
                         extract_all_names(parent, |name| self.ctx.is_builtin(name));
 
                     // Grab the existing bound __all__ values.
-                    if let Stmt::AugAssign(_) = &parent {
+                    if let Stmt::AugAssign(_) = parent {
                         if let Some(index) = scope.get("__all__") {
                             if let BindingKind::Export(Export { names: existing }) =
                                 &self.ctx.bindings[*index].kind
@@ -4973,7 +4973,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let Expr::Name(ast::ExprName { id, .. } )= &expr else {
+        let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
         if helpers::on_conditional_branch(&mut self.ctx.parents()) {
@@ -5086,7 +5086,7 @@ impl<'a> Checker<'a> {
                     args,
                     body,
                     range: _,
-                }) = &expr
+                }) = expr
                 {
                     self.visit_arguments(args);
                     self.visit_expr(body);
@@ -5279,11 +5279,11 @@ impl<'a> Checker<'a> {
                             .dedup()
                             .collect();
                         if !sources.is_empty() {
-                            for &name in names.iter() {
+                            for name in names.iter() {
                                 if !scope.defines(name) {
                                     diagnostics.push(Diagnostic::new(
                                         pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                            name: name.to_string(),
+                                            name: (*name).to_string(),
                                             sources: sources.clone(),
                                         },
                                         *range,

@@ -466,7 +466,7 @@ const SUSPICIOUS_MODULES: &[SuspiciousModule] = &[
 
 /// S001
 pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall { func, .. }) = &expr else {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return;
     };
 

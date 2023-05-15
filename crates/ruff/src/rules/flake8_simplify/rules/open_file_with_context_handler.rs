@@ -45,7 +45,7 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
     let Some(expr) = checker.ctx.expr_grandparent() else {
         return false;
     };
-    let Expr::Await(ast::ExprAwait { value, range: _ }) = &expr else {
+    let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func,  .. }) = value.as_ref() else {
@@ -93,7 +93,7 @@ fn match_exit_stack(checker: &Checker) -> bool {
         return false;
     }
     for parent in checker.ctx.parents() {
-        if let Stmt::With(ast::StmtWith { items, .. }) = &parent {
+        if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if checker

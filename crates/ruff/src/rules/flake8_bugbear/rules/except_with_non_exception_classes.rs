@@ -21,7 +21,7 @@ impl Violation for ExceptWithNonExceptionClasses {
 /// This should leave any unstarred iterables alone (subsequently raising a
 /// warning for B029).
 fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
-    let Expr::Tuple(ast::ExprTuple { elts, .. } )= &expr else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. } )= expr else {
         return vec![expr];
     };
     let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(elts.len());
@@ -46,14 +46,13 @@ pub(crate) fn except_with_non_exception_classes(
     checker: &mut Checker,
     excepthandler: &Excepthandler,
 ) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
-        &excepthandler;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
     let Some(type_) = type_ else {
         return;
     };
     for expr in flatten_starred_iterables(type_) {
         if !matches!(
-            &expr,
+            expr,
             Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
         ) {
             checker

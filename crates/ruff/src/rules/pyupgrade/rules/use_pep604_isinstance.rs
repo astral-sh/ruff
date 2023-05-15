@@ -71,7 +71,7 @@ pub(crate) fn use_pep604_isinstance(
     func: &Expr,
     args: &[Expr],
 ) {
-    if let Expr::Name(ast::ExprName { id, .. }) = &func {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };

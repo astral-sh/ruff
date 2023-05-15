@@ -59,7 +59,7 @@ pub(crate) fn suppressible_exception(
         return;
     }
     let handler = &handlers[0];
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = &handler;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
     if body.len() == 1 {
         let node = &body[0];
         if node.is_pass_stmt()

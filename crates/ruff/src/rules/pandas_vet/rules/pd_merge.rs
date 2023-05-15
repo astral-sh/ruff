@@ -18,7 +18,7 @@ impl Violation for PandasUseOfPdMerge {
 
 /// PD015
 pub(crate) fn use_of_pd_merge(func: &Expr) -> Option<Diagnostic> {
-    if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = &func {
+    if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func {
         if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
             if id == "pd" && attr == "merge" {
                 return Some(Diagnostic::new(PandasUseOfPdMerge, func.range()));

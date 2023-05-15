@@ -58,7 +58,7 @@ fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
             .into_iter()
             .chain(handlers.iter().map(|handler| {
                 let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-                    &handler;
+                    handler;
                 body.iter().collect()
             }))
             .collect(),

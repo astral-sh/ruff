@@ -85,7 +85,7 @@ pub(crate) fn asyncio_dangling_task<'a, F>(
 where
     F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
 {
-    if let Expr::Call(ast::ExprCall { func, .. }) = &expr {
+    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
         match resolve_call_path(func).as_deref() {
             Some(["asyncio", "create_task"]) => Some(Diagnostic::new(
                 AsyncioDanglingTask {

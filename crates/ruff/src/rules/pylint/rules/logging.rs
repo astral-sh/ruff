@@ -106,7 +106,7 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &func {
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
         if LoggingLevel::from_attribute(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
             if let Some(Expr::Constant(ast::ExprConstant {

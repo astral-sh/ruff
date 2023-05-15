@@ -216,7 +216,7 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
 
 /// EM101, EM102, EM103
 pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr) {
-    if let Expr::Call(ast::ExprCall { args, .. }) = &exc {
+    if let Expr::Call(ast::ExprCall { args, .. }) = exc {
         if let Some(first) = args.first() {
             match first {
                 // Check for string literals

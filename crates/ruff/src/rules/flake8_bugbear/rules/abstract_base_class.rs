@@ -87,7 +87,7 @@ pub(crate) fn abstract_base_class(
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
         // Ignore abc's that declares a class attribute that must be set
-        if let Stmt::AnnAssign(_) | Stmt::Assign(_) = &stmt {
+        if let Stmt::AnnAssign(_) | Stmt::Assign(_) = stmt {
             has_abstract_method = true;
             continue;
         }
@@ -104,7 +104,7 @@ pub(crate) fn abstract_base_class(
                 name: method_name,
                 ..
             })
-        ) = &stmt else {
+        ) = stmt else {
             continue;
         };
 

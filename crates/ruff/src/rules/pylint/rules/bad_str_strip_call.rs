@@ -127,7 +127,7 @@ fn has_duplicates(s: &str) -> bool {
 
 /// PLE1310
 pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
-    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &func {
+    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
         if matches!(
             value.as_ref(),
             Expr::Constant(ast::ExprConstant {

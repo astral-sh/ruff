@@ -83,7 +83,7 @@ pub(crate) fn locals_in_render_function(
 }
 
 fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. }) = &expr else {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false
     };
     checker

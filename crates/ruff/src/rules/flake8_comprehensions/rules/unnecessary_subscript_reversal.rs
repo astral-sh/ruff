@@ -60,7 +60,7 @@ pub(crate) fn unnecessary_subscript_reversal(
     if !checker.ctx.is_builtin(id) {
         return;
     }
-    let Expr::Subscript(ast::ExprSubscript { slice, .. }) = &first_arg else {
+    let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {
         return;
     };
     let Expr::Slice(ast::ExprSlice { lower, upper, step, range: _ }) = slice.as_ref() else {

@@ -18,8 +18,7 @@ impl Violation for ExceptWithEmptyTuple {
 
 /// B029
 pub(crate) fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Excepthandler) {
-    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
-        &excepthandler;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
     let Some(type_) = type_ else {
         return;
     };

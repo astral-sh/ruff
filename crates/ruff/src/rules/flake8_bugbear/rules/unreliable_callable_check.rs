@@ -25,7 +25,7 @@ pub(crate) fn unreliable_callable_check(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = &func else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
     if id != "getattr" && id != "hasattr" {

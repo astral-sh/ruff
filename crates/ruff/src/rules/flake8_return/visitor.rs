@@ -100,7 +100,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
             }
             Stmt::If(ast::StmtIf { orelse, .. }) => {
                 let is_elif_arm = self.parents.iter().any(|parent| {
-                    if let Stmt::If(ast::StmtIf { orelse, .. }) = &parent {
+                    if let Stmt::If(ast::StmtIf { orelse, .. }) = parent {
                         orelse.len() == 1 && &orelse[0] == stmt
                     } else {
                         false

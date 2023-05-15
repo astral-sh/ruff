@@ -246,7 +246,7 @@ fn format_import_from(
 
 /// UP026
 pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Attribute(ast::ExprAttribute { value, .. }) = &expr {
+    if let Expr::Attribute(ast::ExprAttribute { value, .. }) = expr {
         if collect_call_path(value)
             .map_or(false, |call_path| call_path.as_slice() == ["mock", "mock"])
         {

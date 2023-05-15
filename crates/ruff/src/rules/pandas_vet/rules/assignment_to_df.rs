@@ -19,7 +19,7 @@ pub(crate) fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
         return None;
     }
     let target = &targets[0];
-    let Expr::Name(ast::ExprName { id, .. }) = &target else {
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
         return None;
     };
     if id != "df" {

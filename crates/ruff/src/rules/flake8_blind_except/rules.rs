@@ -37,7 +37,7 @@ pub(crate) fn blind_except(
         if id == exception && checker.ctx.is_builtin(exception) {
             // If the exception is re-raised, don't flag an error.
             if body.iter().any(|stmt| {
-                if let Stmt::Raise(ast::StmtRaise { exc, .. }) = &stmt {
+                if let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt {
                     if let Some(exc) = exc {
                         if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                             name.map_or(false, |name| id == name)

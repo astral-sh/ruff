@@ -34,7 +34,7 @@ fn rule(targets: &[Expr], value: &Expr, location: TextRange) -> Option<Diagnosti
     if id != "__metaclass__" {
         return None;
     }
-    let Expr::Name(ast::ExprName { id, .. }) = &value else {
+    let Expr::Name(ast::ExprName { id, .. }) = value else {
         return None;
     };
     if id != "type" {

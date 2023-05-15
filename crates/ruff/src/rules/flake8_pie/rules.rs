@@ -302,7 +302,7 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
         // redundant. Consider removing all `pass` statements instead.
         let docstring_stmt = &body[0];
         let pass_stmt = &body[1];
-        let Stmt::Expr(ast::StmtExpr { value, range: _ } )= &docstring_stmt else {
+        let Stmt::Expr(ast::StmtExpr { value, range: _ } )= docstring_stmt else {
             return;
         };
         if matches!(
@@ -411,7 +411,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 ) where
     'b: 'a,
 {
-    let Stmt::ClassDef(ast::StmtClassDef { bases, .. }) = &parent else {
+    let Stmt::ClassDef(ast::StmtClassDef { bases, .. }) = parent else {
         return;
     };
 
@@ -426,7 +426,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
     let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
     for stmt in body {
-        let Stmt::Assign(ast::StmtAssign { value, .. }) = &stmt else {
+        let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
             continue;
         };
 
@@ -471,7 +471,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
     if let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    }) = &key
+    }) = key
     {
         is_identifier(value)
     } else {
@@ -500,7 +500,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
 
 /// PIE810
 pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = &expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = expr else {
         return;
     };
 
@@ -550,7 +550,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let Expr::Call(ast::ExprCall { func: _, args, keywords: _, range: _}) = &expr else {
+                        let Expr::Call(ast::ExprCall { func: _, args, keywords: _, range: _}) = expr else {
                             unreachable!("{}", format!("Indices should only contain `{attr_name}` calls"))
                         };
                         args.get(0)
@@ -562,7 +562,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     elts: words
                         .iter()
                         .flat_map(|value| {
-                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &value {
+                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
                                 Left(elts.iter())
                             } else {
                                 Right(iter::once(*value))

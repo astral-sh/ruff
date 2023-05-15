@@ -51,7 +51,7 @@ fn is_valid_default(expr: &Expr) -> bool {
         right,
         op: Operator::Add,
         range: _,
-    }) = &expr
+    }) = expr
     {
         return is_valid_default(left) && is_valid_default(right);
     }
@@ -61,7 +61,7 @@ fn is_valid_default(expr: &Expr) -> bool {
         left,
         op: Operator::Mod,
         ..
-    }) = &expr
+    }) = expr
     {
         return is_valid_default(left);
     }

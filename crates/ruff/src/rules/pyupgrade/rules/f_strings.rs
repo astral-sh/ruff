@@ -42,7 +42,7 @@ impl<'a> FormatSummaryValues<'a> {
     fn try_from_expr(checker: &'a Checker, expr: &'a Expr) -> Option<Self> {
         let mut extracted_args: Vec<String> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, String> = FxHashMap::default();
-        if let Expr::Call(ast::ExprCall { args, keywords, .. }) = &expr {
+        if let Expr::Call(ast::ExprCall { args, keywords, .. }) = expr {
             for arg in args {
                 let arg = checker.locator.slice(arg.range());
                 if contains_invalids(arg) {
@@ -55,7 +55,7 @@ impl<'a> FormatSummaryValues<'a> {
                     arg,
                     value,
                     range: _,
-                } = &keyword;
+                } = keyword;
                 if let Some(key) = arg {
                     let kwarg = checker.locator.slice(value.range());
                     if contains_invalids(kwarg) {
