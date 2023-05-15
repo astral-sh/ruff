@@ -7,7 +7,7 @@ use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `await` outside of an `async` function.
+/// Checks for usages of `await` outside of `async` functions.
 ///
 /// ## Why is this bad?
 /// Using `await` outside of an `async` function is a syntax error.

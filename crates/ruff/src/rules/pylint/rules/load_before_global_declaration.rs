@@ -8,11 +8,13 @@ use ruff_python_semantic::scope::ScopeKind;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for usages of names prior to `global` declaration.
+/// Checks for usages of names that are declared as `global` prior to the
+/// relevant `global` declaration.
 ///
 /// ## Why is this bad?
-/// The `global` keyword applies to the entire scope. Using a name in a scope
-/// prior to declaring it as `global` results in an error.
+/// The `global` declaration applies to the entire scope. Using a name that's
+/// declared as `global` in a given scope prior to the relevant `global`
+/// declaration is a syntax error.
 ///
 /// ## Example
 /// ```python

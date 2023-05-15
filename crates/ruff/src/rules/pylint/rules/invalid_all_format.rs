@@ -4,10 +4,14 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 /// ## What it does
-/// Checks for invalid formats for `__all__`.
+/// Checks for invalid assignments to `__all__`.
 ///
 /// ## Why is this bad?
-/// `__all__` should be a `tuple` or `list`.
+/// In Python, `__all__` should contain a sequence of strings that represent
+/// the names of all "public" symbols exported by a module.
+///
+/// Assigning anything other than a `tuple` or `list` of strings to `__all__`
+/// is invalid.
 ///
 /// ## Example
 /// ```python

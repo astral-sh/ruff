@@ -75,11 +75,13 @@ impl ExpectedParams {
 }
 
 /// ## What it does
-/// Checks for special methods that have an unexpected method signature.
+/// Checks for "special" methods that have an unexpected method signature.
 ///
 /// ## Why is this bad?
-/// Special methods have a specific signature. If the signature is not as
-/// expected, it might not work.
+/// "Special" methods, like `__len__`, are expected to adhere to a specific,
+/// standard function signature. Implementing a "special" method using a
+/// non-standard function signature can lead to unexpected and surprising
+/// behavior for users of a given class.
 ///
 /// ## Example
 /// ```python

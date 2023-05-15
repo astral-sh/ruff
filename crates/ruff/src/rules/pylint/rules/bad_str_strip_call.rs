@@ -10,11 +10,12 @@ use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
-/// Checks duplicate characters in `str.strip` calls.
+/// Checks duplicate characters in `str#strip` calls.
 ///
 /// ## Why is this bad?
-/// All characters in `str.strip` calls are removed from the leading and trailing
-/// ends of the string. It is redundant to include duplicate characters.
+/// All characters in `str#strip` calls are removed from both the leading and
+/// trailing ends of the string. Including duplicate characters in the call
+/// is redundant and often indicative of a mistake.
 ///
 /// ## Example
 /// ```python
