@@ -712,8 +712,10 @@
       "properties": {
         "extend-function-names": {
           "description": "Additional function names to consider as internationalization calls, in addition to those included in `function-names`.",
-          "default": [],
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
