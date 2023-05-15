@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-future_annotations.py:34:18: UP006 [*] Use `list` instead of `typing.List` for type annotation
+future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type annotation
    |
 34 | def f(x: int) -> List[int]:
    |                  ^^^^ UP006
@@ -10,7 +10,7 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `typing.List` for t
    |
    = help: Replace with `list`
 
-ℹ Suggested fix
+ℹ Fix
 31 31 |         return cls(x=0, y=0)
 32 32 | 
 33 33 | 
@@ -20,7 +20,7 @@ future_annotations.py:34:18: UP006 [*] Use `list` instead of `typing.List` for t
 36 36 |     y.append(x)
 37 37 |     return y
 
-future_annotations.py:35:9: UP006 [*] Use `list` instead of `typing.List` for type annotation
+future_annotations.py:35:9: UP006 [*] Use `list` instead of `List` for type annotation
    |
 35 | def f(x: int) -> List[int]:
 36 |     y = List[int]()
@@ -30,7 +30,7 @@ future_annotations.py:35:9: UP006 [*] Use `list` instead of `typing.List` for ty
    |
    = help: Replace with `list`
 
-ℹ Suggested fix
+ℹ Fix
 32 32 | 
 33 33 | 
 34 34 | def f(x: int) -> List[int]:
@@ -40,7 +40,7 @@ future_annotations.py:35:9: UP006 [*] Use `list` instead of `typing.List` for ty
 37 37 |     return y
 38 38 | 
 
-future_annotations.py:42:27: UP006 [*] Use `list` instead of `typing.List` for type annotation
+future_annotations.py:42:27: UP006 [*] Use `list` instead of `List` for type annotation
    |
 42 | x: Optional[int] = None
 43 | 
@@ -49,14 +49,14 @@ future_annotations.py:42:27: UP006 [*] Use `list` instead of `typing.List` for t
    |
    = help: Replace with `list`
 
-ℹ Suggested fix
+ℹ Fix
 39 39 | 
 40 40 | x: Optional[int] = None
 41 41 | 
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = Union[list[int], List[str]]
 
-future_annotations.py:42:38: UP006 [*] Use `list` instead of `typing.List` for type annotation
+future_annotations.py:42:38: UP006 [*] Use `list` instead of `List` for type annotation
    |
 42 | x: Optional[int] = None
 43 | 
@@ -65,7 +65,7 @@ future_annotations.py:42:38: UP006 [*] Use `list` instead of `typing.List` for t
    |
    = help: Replace with `list`
 
-ℹ Suggested fix
+ℹ Fix
 39 39 | 
 40 40 | x: Optional[int] = None
 41 41 | 
