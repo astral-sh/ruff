@@ -19,6 +19,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```python
 /// class Foo:
 ///     bar = 1
+///
 ///     def get_bar(self):
 ///         nonlocal bar
 ///         ...
