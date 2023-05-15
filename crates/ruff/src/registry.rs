@@ -191,6 +191,10 @@ ruff_macros::register_rules!(
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
     rules::pylint::rules::DuplicateBases,
+    // flake8-async
+    rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
+    rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
+    rules::flake8_async::rules::BlockingOsCallInAsyncFunction,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -735,6 +739,9 @@ pub enum Linter {
     /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
+    /// [flake8-async](https://pypi.org/project/flake8-async/)
+    #[prefix = "ASYNC"]
+    Flake8Async,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
