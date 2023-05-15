@@ -2,6 +2,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
     self, Cmpop, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt, Unaryop,
 };
+use thin_vec::thin_vec;
 use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -174,10 +175,10 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
 fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Stylist) -> String {
     let node = ast::ExprGeneratorExp {
         elt: Box::new(test.clone()),
-        generators: vec![Comprehension {
+        generators: thin_vec![Comprehension {
             target: target.clone(),
             iter: iter.clone(),
-            ifs: vec![],
+            ifs: thin_vec![],
             is_async: false,
             range: TextRange::default(),
         }],
@@ -190,8 +191,8 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Styl
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
-        args: vec![node.into()],
-        keywords: vec![],
+        args: thin_vec![node.into()],
+        keywords: thin_vec![],
         range: TextRange::default(),
     };
     let node3 = ast::StmtReturn {
@@ -283,8 +284,8 @@ pub(crate) fn convert_for_loop_to_any_all(
                             };
                             let node = ast::ExprCompare {
                                 left: left.clone(),
-                                ops: vec![op],
-                                comparators: vec![comparator.clone()],
+                                ops: thin_vec![op],
+                                comparators: thin_vec![comparator.clone()],
                                 range: TextRange::default(),
                             };
                             node.into()

@@ -1776,6 +1776,7 @@ dependencies = [
  "strum_macros",
  "test-case",
  "textwrap",
+ "thin-vec",
  "thiserror",
  "toml",
  "typed-arena",
@@ -1934,6 +1935,7 @@ dependencies = [
  "rustpython-parser",
  "serde",
  "smallvec",
+ "thin-vec",
 ]
 
 [[package]]
@@ -1955,6 +1957,7 @@ dependencies = [
  "rustpython-parser",
  "similar",
  "test-case",
+ "thin-vec",
 ]
 
 [[package]]
@@ -1991,7 +1994,6 @@ dependencies = [
 [[package]]
 name = "ruff_source_location"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=718354673eb2cc9645d63fc0c50b4ad08e5595c2#718354673eb2cc9645d63fc0c50b4ad08e5595c2"
 dependencies = [
  "memchr",
  "once_cell",
@@ -2011,7 +2013,6 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=718354673eb2cc9645d63fc0c50b4ad08e5595c2#718354673eb2cc9645d63fc0c50b4ad08e5595c2"
 dependencies = [
  "schemars",
  "serde",
@@ -2082,18 +2083,17 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=718354673eb2cc9645d63fc0c50b4ad08e5595c2#718354673eb2cc9645d63fc0c50b4ad08e5595c2"
 dependencies = [
  "is-macro",
  "num-bigint",
  "rustpython-parser-core",
  "static_assertions",
+ "thin-vec",
 ]
 
 [[package]]
 name = "rustpython-format"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=718354673eb2cc9645d63fc0c50b4ad08e5595c2#718354673eb2cc9645d63fc0c50b4ad08e5595c2"
 dependencies = [
  "bitflags 2.2.1",
  "itertools",
@@ -2105,7 +2105,6 @@ dependencies = [
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=718354673eb2cc9645d63fc0c50b4ad08e5595c2#718354673eb2cc9645d63fc0c50b4ad08e5595c2"
 dependencies = [
  "hexf-parse",
  "lexical-parse-float",
@@ -2116,7 +2115,6 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=718354673eb2cc9645d63fc0c50b4ad08e5595c2#718354673eb2cc9645d63fc0c50b4ad08e5595c2"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2129,6 +2127,7 @@ dependencies = [
  "rustc-hash",
  "rustpython-ast",
  "rustpython-parser-core",
+ "thin-vec",
  "tiny-keccak",
  "unic-emoji-char",
  "unic-ucd-ident",
@@ -2138,7 +2137,6 @@ dependencies = [
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=718354673eb2cc9645d63fc0c50b4ad08e5595c2#718354673eb2cc9645d63fc0c50b4ad08e5595c2"
 dependencies = [
  "ruff_source_location",
  "ruff_text_size",
@@ -2461,6 +2459,12 @@ dependencies = [
  "unicode-linebreak",
  "unicode-width",
 ]
+
+[[package]]
+name = "thin-vec"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aac81b6fd6beb5884b0cf3321b8117e6e5d47ecb6fc89f414cfdcca8b2fe2dd8"
 
 [[package]]
 name = "thiserror"

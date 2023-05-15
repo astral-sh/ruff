@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{self, Boolop, Cmpop, Expr, ExprContext, Ranged, Unaryop};
+use thin_vec::thin_vec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -344,8 +345,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
-                    args: vec![target.clone(), node.into()],
-                    keywords: vec![],
+                    args: thin_vec![target.clone(), node.into()],
+                    keywords: thin_vec![],
                     range: TextRange::default(),
                 };
                 let call = node2.into();
@@ -450,8 +451,8 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
-            ops: vec![Cmpop::In],
-            comparators: vec![node.into()],
+            ops: thin_vec![Cmpop::In],
+            comparators: thin_vec![node.into()],
             range: TextRange::default(),
         };
         let in_expr = node2.into();

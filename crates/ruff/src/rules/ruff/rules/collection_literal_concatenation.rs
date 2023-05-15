@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
+use thin_vec::ThinVec;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -32,8 +33,8 @@ fn make_splat_elts(
     splat_element: &Expr,
     other_elements: &[Expr],
     splat_at_left: bool,
-) -> Vec<Expr> {
-    let mut new_elts = other_elements.to_owned();
+) -> ThinVec<Expr> {
+    let mut new_elts = ThinVec::from(other_elements);
     let node = ast::ExprStarred {
         value: Box::from(splat_element.clone()),
         ctx: ExprContext::Load,

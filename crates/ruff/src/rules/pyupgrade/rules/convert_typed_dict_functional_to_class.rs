@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
+use thin_vec::{thin_vec, ThinVec};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -87,31 +88,31 @@ fn create_property_assignment_stmt(property: &str, annotation: &Expr) -> Stmt {
 /// keywords and base class.
 fn create_class_def_stmt(
     class_name: &str,
-    body: Vec<Stmt>,
+    body: ThinVec<Stmt>,
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
 ) -> Stmt {
     let keywords = match total_keyword {
-        Some(keyword) => vec![keyword.clone()],
-        None => vec![],
+        Some(keyword) => thin_vec![keyword.clone()],
+        None => thin_vec![],
     };
     let node = ast::StmtClassDef {
         name: class_name.into(),
-        bases: vec![base_class.clone()],
+        bases: thin_vec![base_class.clone()],
         keywords,
         body,
-        decorator_list: vec![],
+        decorator_list: thin_vec![],
         range: TextRange::default(),
     };
     node.into()
 }
 
-fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
+fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<ThinVec<Stmt>> {
     if keys.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        return Ok(vec![node]);
+        return Ok(thin_vec![node]);
     }
 
     keys.iter()
@@ -132,7 +133,7 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
         .collect()
 }
 
-fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<Stmt>> {
+fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<ThinVec<Stmt>> {
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         bail!("Expected `func` to be `Expr::Name`")
     };
@@ -143,19 +144,19 @@ fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<St
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        return Ok(vec![node]);
+        return Ok(thin_vec![node]);
     }
 
     properties_from_keywords(keywords)
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
-fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
+fn properties_from_keywords(keywords: &[Keyword]) -> Result<ThinVec<Stmt>> {
     if keywords.is_empty() {
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        return Ok(vec![node]);
+        return Ok(thin_vec![node]);
     }
 
     keywords
@@ -186,7 +187,7 @@ fn match_total_from_only_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
 fn match_properties_and_total<'a>(
     args: &'a [Expr],
     keywords: &'a [Keyword],
-) -> Result<(Vec<Stmt>, Option<&'a Keyword>)> {
+) -> Result<(ThinVec<Stmt>, Option<&'a Keyword>)> {
     // We don't have to manage the hybrid case because it's not possible to have a
     // dict and keywords. For example, the following is illegal:
     // ```
@@ -211,7 +212,7 @@ fn match_properties_and_total<'a>(
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        Ok((vec![node], None))
+        Ok((thin_vec![node], None))
     }
 }
 
@@ -219,7 +220,7 @@ fn match_properties_and_total<'a>(
 fn convert_to_class(
     stmt: &Stmt,
     class_name: &str,
-    body: Vec<Stmt>,
+    body: ThinVec<Stmt>,
     total_keyword: Option<&Keyword>,
     base_class: &Expr,
     stylist: &Stylist,

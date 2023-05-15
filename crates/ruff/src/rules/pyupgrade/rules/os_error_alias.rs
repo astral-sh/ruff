@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
+use thin_vec::ThinVec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -82,7 +83,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         };
 
         // Filter out any `OSErrors` aliases.
-        let mut remaining: Vec<Expr> = elts
+        let mut remaining: ThinVec<Expr> = elts
             .iter()
             .filter_map(|elt| {
                 if aliases.contains(&elt) {

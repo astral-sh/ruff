@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
+use thin_vec::{thin_vec, ThinVec};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -105,10 +106,10 @@ fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
 }
 
 /// Create a list of property assignments from the `NamedTuple` arguments.
-fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
+fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<ThinVec<Stmt>> {
     let Some(fields) = args.get(1) else {
         let node = Stmt::Pass(ast::StmtPass { range: TextRange::default()});
-        return Ok(vec![node]);
+        return Ok(thin_vec![node]);
     };
     let Expr::List(ast::ExprList { elts, .. } )= &fields else {
         bail!("Expected argument to be `Expr::List`");
@@ -117,7 +118,7 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
         let node = Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
         });
-        return Ok(vec![node]);
+        return Ok(thin_vec![node]);
     }
     let padded_defaults = if elts.len() >= defaults.len() {
         std::iter::repeat(None)
@@ -153,13 +154,13 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
-fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
+fn create_class_def_stmt(typename: &str, body: ThinVec<Stmt>, base_class: &Expr) -> Stmt {
     let node = ast::StmtClassDef {
         name: typename.into(),
-        bases: vec![base_class.clone()],
-        keywords: vec![],
+        bases: thin_vec![base_class.clone()],
+        keywords: thin_vec![],
         body,
-        decorator_list: vec![],
+        decorator_list: thin_vec![],
         range: TextRange::default(),
     };
     node.into()
@@ -169,7 +170,7 @@ fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> 
 fn convert_to_class(
     stmt: &Stmt,
     typename: &str,
-    body: Vec<Stmt>,
+    body: ThinVec<Stmt>,
     base_class: &Expr,
     stylist: &Stylist,
 ) -> Fix {

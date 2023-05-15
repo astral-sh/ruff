@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
+use thin_vec::thin_vec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -32,11 +33,11 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 range: TextRange::default(),
             })),
             args: if let Some(msg) = msg {
-                vec![msg.clone()]
+                thin_vec![msg.clone()]
             } else {
-                vec![]
+                thin_vec![]
             },
-            keywords: vec![],
+            keywords: thin_vec![],
             range: TextRange::default(),
         }))),
         cause: None,

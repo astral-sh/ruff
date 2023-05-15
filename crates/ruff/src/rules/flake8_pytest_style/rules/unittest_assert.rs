@@ -4,6 +4,7 @@ use anyhow::{anyhow, bail, Result};
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Keyword, Stmt, Unaryop};
+use thin_vec::thin_vec;
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -152,8 +153,8 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
 fn compare(left: &Expr, cmpop: Cmpop, right: &Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
         left: Box::new(left.clone()),
-        ops: vec![cmpop],
-        comparators: vec![right.clone()],
+        ops: thin_vec![cmpop],
+        comparators: thin_vec![right.clone()],
         range: TextRange::default(),
     })
 }
@@ -355,8 +356,8 @@ impl UnittestAssert {
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
-                    args: vec![(**obj).clone(), (**cls).clone()],
-                    keywords: vec![],
+                    args: thin_vec![(**obj).clone(), (**cls).clone()],
+                    keywords: thin_vec![],
                     range: TextRange::default(),
                 };
                 let isinstance = node1.into();
@@ -396,8 +397,8 @@ impl UnittestAssert {
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
-                    args: vec![(**regex).clone(), (**text).clone()],
-                    keywords: vec![],
+                    args: thin_vec![(**regex).clone(), (**text).clone()],
+                    keywords: thin_vec![],
                     range: TextRange::default(),
                 };
                 let re_search = node2.into();

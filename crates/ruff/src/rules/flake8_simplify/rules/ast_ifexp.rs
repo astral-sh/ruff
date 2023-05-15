@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Unaryop};
+use thin_vec::thin_vec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -116,8 +117,8 @@ pub(crate) fn explicit_true_false_in_ifexpr(
             };
             let node1 = ast::ExprCall {
                 func: Box::new(node.into()),
-                args: vec![test.clone()],
-                keywords: vec![],
+                args: thin_vec![test.clone()],
+                keywords: thin_vec![],
                 range: TextRange::default(),
             };
             #[allow(deprecated)]

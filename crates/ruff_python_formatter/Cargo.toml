@@ -18,6 +18,7 @@ itertools = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
+thin-vec = "0.2.12"
 
 [dev-dependencies]
 ruff_testing_macros = { path = "../ruff_testing_macros" }

@@ -8,6 +8,7 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
     self, Boolop, Constant, Expr, ExprContext, ExprLambda, Keyword, Ranged, Stmt,
 };
+use thin_vec::thin_vec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -586,8 +587,8 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
                 let node3 = Expr::Call(ast::ExprCall {
                     func: Box::new(node2),
-                    args: vec![node],
-                    keywords: vec![],
+                    args: thin_vec![node],
+                    keywords: thin_vec![],
                     range: TextRange::default(),
                 });
                 let call = node3;

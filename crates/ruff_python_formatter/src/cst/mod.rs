@@ -7,6 +7,7 @@ use itertools::Itertools;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Constant, Ranged};
 use rustpython_parser::{ast, Mode};
+use thin_vec::ThinVec;
 
 use ruff_python_ast::source_code::Locator;
 
@@ -191,10 +192,10 @@ impl From<&rustpython_parser::ast::Cmpop> for CmpOpKind {
     }
 }
 
-pub(crate) type Body = Attributed<Vec<Stmt>>;
+pub(crate) type Body = Attributed<ThinVec<Stmt>>;
 
-impl From<(Vec<rustpython_parser::ast::Stmt>, &Locator<'_>)> for Body {
-    fn from((body, locator): (Vec<rustpython_parser::ast::Stmt>, &Locator)) -> Self {
+impl From<(ThinVec<rustpython_parser::ast::Stmt>, &Locator<'_>)> for Body {
+    fn from((body, locator): (ThinVec<rustpython_parser::ast::Stmt>, &Locator)) -> Self {
         Body {
             range: body.first().unwrap().range(),
             node: body

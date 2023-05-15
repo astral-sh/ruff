@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
+use thin_vec::thin_vec;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -190,7 +191,7 @@ fn generate_fix(stylist: &Stylist, stmt: &Stmt, exc_arg: &Expr, indentation: &st
         range: TextRange::default(),
     });
     let node1 = Stmt::Assign(ast::StmtAssign {
-        targets: vec![node],
+        targets: thin_vec![node],
         value: Box::new(exc_arg.clone()),
         type_comment: None,
         range: TextRange::default(),

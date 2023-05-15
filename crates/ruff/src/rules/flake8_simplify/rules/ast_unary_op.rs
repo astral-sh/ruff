@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Cmpop, Expr, ExprContext, Ranged, Stmt, Unaryop};
+use thin_vec::thin_vec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -115,7 +116,7 @@ pub(crate) fn negation_with_equal_op(
     if checker.patch(diagnostic.kind.rule()) {
         let node = ast::ExprCompare {
             left: left.clone(),
-            ops: vec![Cmpop::NotEq],
+            ops: thin_vec![Cmpop::NotEq],
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
@@ -165,7 +166,7 @@ pub(crate) fn negation_with_not_equal_op(
     if checker.patch(diagnostic.kind.rule()) {
         let node = ast::ExprCompare {
             left: left.clone(),
-            ops: vec![Cmpop::Eq],
+            ops: thin_vec![Cmpop::Eq],
             comparators: comparators.clone(),
             range: TextRange::default(),
         };
@@ -211,8 +212,8 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, o
             };
             let node1 = ast::ExprCall {
                 func: Box::new(node.into()),
-                args: vec![*operand.clone()],
-                keywords: vec![],
+                args: thin_vec![*operand.clone()],
+                keywords: thin_vec![],
                 range: TextRange::default(),
             };
             #[allow(deprecated)]

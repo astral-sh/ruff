@@ -31,10 +31,10 @@ proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
-ruff_text_size = { git = "https://github.com/RustPython/Parser.git", rev = "718354673eb2cc9645d63fc0c50b4ad08e5595c2" }
-rustpython-format = { git = "https://github.com/RustPython/Parser.git", rev = "718354673eb2cc9645d63fc0c50b4ad08e5595c2" }
-rustpython-literal = { git = "https://github.com/RustPython/Parser.git", rev = "718354673eb2cc9645d63fc0c50b4ad08e5595c2" }
-rustpython-parser = { git = "https://github.com/RustPython/Parser.git", rev = "718354673eb2cc9645d63fc0c50b4ad08e5595c2" , features = ["all-nodes-with-ranges"]}
+ruff_text_size = { path="../RustPython-parser/ruff_text_size" }
+rustpython-format = { path="../RustPython-parser/format" }
+rustpython-literal = { path="../RustPython-parser/literal" }
+rustpython-parser = { path="../RustPython-parser/parser" , features = ["all-nodes-with-ranges"]}
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }

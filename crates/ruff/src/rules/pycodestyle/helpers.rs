@@ -3,6 +3,7 @@ use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Stylist;
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{self, Cmpop, Expr};
+use thin_vec::ThinVec;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
@@ -17,8 +18,8 @@ pub(crate) fn compare(
 ) -> String {
     let node = ast::ExprCompare {
         left: Box::new(left.clone()),
-        ops: ops.to_vec(),
-        comparators: comparators.to_vec(),
+        ops: ThinVec::from(ops),
+        comparators: ThinVec::from(comparators),
         range: TextRange::default(),
     };
     unparse_expr(&node.into(), stylist)

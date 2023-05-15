@@ -8,6 +8,7 @@ use ruff_python_semantic::context::Context;
 use ruff_python_semantic::scope::ScopeKind;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt};
+use thin_vec::{thin_vec, ThinVec};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -117,7 +118,7 @@ pub(crate) fn lambda_assignment(
 /// The `Callable` import can be from either `collections.abc` or `typing`.
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
-fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
+fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(ThinVec<Expr>, Expr)> {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
         return None;
     };
@@ -142,7 +143,7 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
         Expr::Constant(ast::ExprConstant {
             value: Constant::Ellipsis,
             ..
-        }) => vec![],
+        }) => thin_vec![],
         _ => return None,
     };
 
@@ -178,7 +179,7 @@ fn function(
                         .map(|arg_type| Box::new(arg_type.clone())),
                     ..arg.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ThinVec<_>>();
             let new_args = args
                 .args
                 .iter()
@@ -189,7 +190,7 @@ fn function(
                         .map(|arg_type| Box::new(arg_type.clone())),
                     ..arg.clone()
                 })
-                .collect::<Vec<_>>();
+                .collect::<ThinVec<_>>();
             let func = Stmt::FunctionDef(ast::StmtFunctionDef {
                 name: name.into(),
                 args: Box::new(Arguments {
@@ -197,8 +198,8 @@ fn function(
                     args: new_args,
                     ..args.clone()
                 }),
-                body: vec![body],
-                decorator_list: vec![],
+                body: thin_vec![body],
+                decorator_list: thin_vec![],
                 returns: Some(Box::new(return_type)),
                 type_comment: None,
                 range: TextRange::default(),
@@ -209,8 +210,8 @@ fn function(
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
         name: name.into(),
         args: Box::new(args.clone()),
-        body: vec![body],
-        decorator_list: vec![],
+        body: thin_vec![body],
+        decorator_list: thin_vec![],
         returns: None,
         type_comment: None,
         range: TextRange::default(),

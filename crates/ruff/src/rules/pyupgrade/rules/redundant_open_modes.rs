@@ -96,7 +96,7 @@ fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
     {
         if matches!(func.as_ref(), Expr::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
             // Return the "open mode" parameter and keywords.
-            return (args.get(1), keywords.clone());
+            return (args.get(1), keywords.to_vec());
         }
     }
     (None, vec![])

@@ -25,6 +25,7 @@ rustpython-literal = { workspace = true }
 rustpython-parser = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+thin-vec = "0.2.12"
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

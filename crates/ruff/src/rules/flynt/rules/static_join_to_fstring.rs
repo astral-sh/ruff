@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, Ranged};
+use thin_vec::ThinVec;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -32,7 +33,7 @@ fn is_static_length(elts: &[Expr]) -> bool {
 }
 
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
-    let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
+    let mut fstring_elems = ThinVec::with_capacity(joinees.len() * 2);
     let mut first = true;
 
     for expr in joinees {

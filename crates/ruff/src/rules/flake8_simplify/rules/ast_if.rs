@@ -2,6 +2,7 @@ use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
+use thin_vec::thin_vec;
 use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -377,8 +378,8 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             };
             let node1 = ast::ExprCall {
                 func: Box::new(node.into()),
-                args: vec![(**test).clone()],
-                keywords: vec![],
+                args: thin_vec![(**test).clone()],
+                keywords: thin_vec![],
                 range: TextRange::default(),
             };
             let node2 = ast::StmtReturn {
@@ -403,7 +404,7 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
         range: TextRange::default(),
     };
     let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
+        targets: thin_vec![target_var.clone()],
         value: Box::new(node.into()),
         type_comment: None,
         range: TextRange::default(),
@@ -848,13 +849,13 @@ pub(crate) fn use_dict_get_with_default(
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
-        args: vec![node1, node],
-        keywords: vec![],
+        args: thin_vec![node1, node],
+        keywords: thin_vec![],
         range: TextRange::default(),
     };
     let node4 = expected_var.clone();
     let node5 = ast::StmtAssign {
-        targets: vec![node4],
+        targets: thin_vec![node4],
         value: Box::new(node3.into()),
         type_comment: None,
         range: TextRange::default(),

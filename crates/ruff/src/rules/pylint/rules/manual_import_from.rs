@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Alias, Int, Ranged, Stmt};
+use thin_vec::thin_vec;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,7 +58,7 @@ pub(crate) fn manual_from_import(
     if fixable && checker.patch(diagnostic.kind.rule()) {
         let node = ast::StmtImportFrom {
             module: Some(module.into()),
-            names: vec![Alias {
+            names: thin_vec![Alias {
                 name: asname.clone(),
                 asname: None,
                 range: TextRange::default(),

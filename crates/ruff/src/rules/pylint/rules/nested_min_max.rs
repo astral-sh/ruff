@@ -1,5 +1,6 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use thin_vec::ThinVec;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -63,8 +64,8 @@ impl std::fmt::Display for MinMax {
 
 /// Collect a new set of arguments to by either accepting existing args as-is or
 /// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec<Expr> {
-    fn inner(context: &Context, min_max: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
+fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> ThinVec<Expr> {
+    fn inner(context: &Context, min_max: MinMax, args: &[Expr], new_args: &mut ThinVec<Expr>) {
         for arg in args {
             if let Expr::Call(ast::ExprCall {
                 func,
@@ -91,7 +92,7 @@ fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec
         }
     }
 
-    let mut new_args = Vec::with_capacity(args.len());
+    let mut new_args = ThinVec::with_capacity(args.len());
     inner(context, min_max, args, &mut new_args);
     new_args
 }
@@ -120,7 +121,7 @@ pub(crate) fn nested_min_max(
             let flattened_expr = Expr::Call(ast::ExprCall {
                 func: Box::new(func.clone()),
                 args: collect_nested_args(&checker.ctx, min_max, args),
-                keywords: keywords.to_owned(),
+                keywords: ThinVec::from(keywords),
                 range: TextRange::default(),
             });
             #[allow(deprecated)]
