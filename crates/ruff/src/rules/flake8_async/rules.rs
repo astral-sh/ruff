@@ -18,31 +18,36 @@ impl<'a> ViolatingCalls<'a> {
 }
 
 /// ## What it does
-/// Checks that async functions do not contain a blocking HTTP call
+/// Checks that async functions do not contain blocking HTTP calls.
 ///
 /// ## Why is this bad?
-/// Because blocking an async function makes the asynchronous nature of the function useless and
-/// could confuse a reader or user
+/// Blocking an async function via a blocking HTTP call will block the entire
+/// event loop, preventing it from executing other tasks while waiting for the
+/// HTTP response, negating the benefits of asynchronous programming.
+///
+/// Instead of making a blocking HTTP call, use an asynchronous HTTP client
+/// library such as `aiohttp` or `httpx`.
 ///
 /// ## Example
-/// async def foo():
-///    urllib.request.urlopen("http://example.com/foo/bar").read()
+/// ```python
+/// async def fetch():
+///     urllib.request.urlopen("https://example.com/foo/bar").read()
+/// ```
 ///
 /// Use instead:
-/// Many options, but e.g.:
-///
-/// async def foo():
-///    async with aiohttp.ClientSession() as session:
-///        async with session.get("http://example.com/foo/bar") as resp:
-///            result = await resp.json()
-///            print(result)
+/// ```python
+/// async def fetch():
+///     async with aiohttp.ClientSession() as session:
+///         async with session.get("https://example.com/foo/bar") as resp:
+///             ...
+/// ```
 #[violation]
 pub struct BlockingHttpCallInsideAsyncDef;
 
 impl Violation for BlockingHttpCallInsideAsyncDef {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not call a blocking HTTP method")
+        format!("Async functions should not call blocking HTTP methods")
     }
 }
 
@@ -99,29 +104,35 @@ pub(crate) fn blocking_http_call_inside_async_def(checker: &mut Checker, expr: &
 }
 
 /// ## What it does
-/// Checks that async functions do not contain a call to `open`, `time.sleep` or `subprocess`
-/// methods
+/// Checks that async functions do not contain calls to `open`, `time.sleep`,
+/// or `subprocess` methods.
 ///
 /// ## Why is this bad?
-/// Calling these functions in an async process can lead to unexpected behaviour
+/// Blocking an async function via a blocking call will block the entire
+/// event loop, preventing it from executing other tasks while waiting for the
+/// call to complete, negating the benefits of asynchronous programming.
+///
+/// Instead of making a blocking call, use an equivalent asynchronous library
+/// or function.
 ///
 /// ## Example
+/// ```python
 /// async def foo():
 ///     time.sleep(1000)
+/// ```
 ///
 /// Use instead:
-/// def foo():
-///     time.sleep(1000)
+/// ```python
+/// async def foo():
+///     await asyncio.sleep(1000)
+/// ```
 #[violation]
 pub struct OpenSleepOrSubprocessInsideAsyncDef;
 
 impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Async functions should not contain a call to `open`, `time.sleep` or any \
-             subprocess method"
-        )
+        format!("Async functions should not call `open`, `time.sleep`, or `subprocess` methods")
     }
 }
 
@@ -175,26 +186,35 @@ pub(crate) fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, e
 }
 
 /// ## What it does
-/// Checks that async functions do not contain a call to an unsafe `os` method
+/// Checks that async functions do not contain calls to blocking synchronous
+/// process calls via the `os` module.
 ///
 /// ## Why is this bad?
-/// Calling unsafe 'os' methods can lead to unpredictable behaviour mid process and/or state
-/// changes
+/// Blocking an async function via a blocking call will block the entire
+/// event loop, preventing it from executing other tasks while waiting for the
+/// call to complete, negating the benefits of asynchronous programming.
+///
+/// Instead of making a blocking call, use an equivalent asynchronous library
+/// or function.
 ///
 /// ## Example
+/// ```python
 /// async def foo():
 ///     os.popen()
+/// ```
 ///
 /// Use instead:
+/// ```python
 /// def foo():
 ///     os.popen()
+/// ```
 #[violation]
 pub struct UnsafeOsMethodInsideAsyncDef;
 
 impl Violation for UnsafeOsMethodInsideAsyncDef {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async functions should not contain a call to unsafe `os` methods")
+        format!("Async functions should not call synchronous `os` methods")
     }
 }
 

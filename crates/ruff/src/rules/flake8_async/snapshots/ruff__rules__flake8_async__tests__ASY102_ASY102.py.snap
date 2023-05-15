@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_async/mod.rs
 ---
-ASY102.py:5:5: ASY102 Async functions should not contain a call to unsafe `os` methods
+ASY102.py:5:5: ASY102 Async functions should not call synchronous `os` methods
   |
 5 | async def foo():
 6 |     os.popen()
   |     ^^^^^^^^ ASY102
   |
 
-ASY102.py:9:5: ASY102 Async functions should not contain a call to unsafe `os` methods
+ASY102.py:9:5: ASY102 Async functions should not call synchronous `os` methods
    |
  9 | async def foo():
 10 |     os.spawnl()
