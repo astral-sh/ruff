@@ -249,6 +249,7 @@ quality tools, including:
 - [eradicate](https://pypi.org/project/eradicate/)
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
 - [flake8-annotations](https://pypi.org/project/flake8-annotations/)
+- [flake8-async](https://pypi.org/project/flake8-async)
 - [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
 - [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
 - [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)

@@ -2,6 +2,7 @@
 pub mod eradicate;
 pub mod flake8_2020;
 pub mod flake8_annotations;
+pub mod flake8_async;
 pub mod flake8_bandit;
 pub mod flake8_blind_except;
 pub mod flake8_boolean_trap;
