@@ -150,7 +150,7 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 
 fn is_mutable_expr(expr: &Expr) -> bool {
     matches!(
-        &expr,
+        expr,
         Expr::List(_)
             | Expr::Dict(_)
             | Expr::Set(_)
@@ -193,7 +193,7 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
             annotation,
             value: Some(expr),
             ..
-        }) = &statement
+        }) = statement
         {
             if is_class_var_annotation(&checker.ctx, annotation) {
                 continue;

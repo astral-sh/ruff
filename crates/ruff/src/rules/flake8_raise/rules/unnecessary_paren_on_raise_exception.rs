@@ -28,7 +28,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
         args,
         keywords,
         range: _,
-    }) = &expr
+    }) = expr
     {
         if args.is_empty() && keywords.is_empty() {
             let range = match_parens(func.end(), checker.locator)

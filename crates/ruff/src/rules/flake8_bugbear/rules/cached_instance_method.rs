@@ -36,7 +36,7 @@ pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Ex
     for decorator in decorator_list {
         // TODO(charlie): This should take into account `classmethod-decorators` and
         // `staticmethod-decorators`.
-        if let Expr::Name(ast::ExprName { id, .. }) = &decorator {
+        if let Expr::Name(ast::ExprName { id, .. }) = decorator {
             if id == "classmethod" || id == "staticmethod" {
                 return;
             }

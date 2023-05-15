@@ -52,7 +52,7 @@ pub(crate) fn unnecessary_list_comprehension_dict(
     if !checker.ctx.is_builtin("dict") {
         return;
     }
-    let Expr::ListComp(ast::ExprListComp { elt, .. }) = &argument else {
+    let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {
         return;
     };
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = elt.as_ref() else {

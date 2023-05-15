@@ -106,7 +106,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
 
     let mut has_parameters = false;
 
-    if let Expr::Call(ast::ExprCall { args, keywords, .. }) = &decorator {
+    if let Expr::Call(ast::ExprCall { args, keywords, .. }) = decorator {
         if !args.is_empty() || !keywords.is_empty() {
             has_parameters = true;
         }

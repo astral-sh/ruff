@@ -399,7 +399,7 @@ impl<'a> From<&'a Excepthandler> for ComparableExcepthandler<'a> {
     fn from(excepthandler: &'a Excepthandler) -> Self {
         let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
             type_, name, body, ..
-        }) = &excepthandler;
+        }) = excepthandler;
         Self::ExceptHandler {
             type_: type_.as_ref().map(Into::into),
             name: name.as_deref(),

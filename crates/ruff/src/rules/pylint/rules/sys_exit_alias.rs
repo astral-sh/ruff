@@ -29,7 +29,7 @@ impl Violation for SysExitAlias {
 
 /// PLR1722
 pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
-    let Expr::Name(ast::ExprName { id, .. }) = &func else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
     for name in ["exit", "quit"] {

@@ -65,7 +65,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = &arg else {
+    let Expr::Call(ast::ExprCall { func, .. }) = arg else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {

@@ -40,7 +40,7 @@ fn match_named_tuple_assign<'a>(
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
-    let Expr::Name(ast::ExprName { id: typename, .. }) = &target else {
+    let Expr::Name(ast::ExprName { id: typename, .. }) = target else {
         return None;
     };
     let Expr::Call(ast::ExprCall {
@@ -48,7 +48,7 @@ fn match_named_tuple_assign<'a>(
         args,
         keywords,
         range: _,
-    }) = &value else {
+    }) = value else {
         return None;
     };
     if !checker

@@ -249,7 +249,7 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
 
 /// SIM101
 pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ } )= &expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ } )= expr else {
         return;
     };
 
@@ -298,7 +298,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
-                    name: if let Expr::Name(ast::ExprName { id, .. }) = &target {
+                    name: if let Expr::Name(ast::ExprName { id, .. }) = target {
                         Some(id.to_string())
                     } else {
                         None
@@ -313,7 +313,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     .iter()
                     .map(|index| &values[*index])
                     .map(|expr| {
-                        let Expr::Call(ast::ExprCall { args, ..}) = &expr else {
+                        let Expr::Call(ast::ExprCall { args, ..}) = expr else {
                             unreachable!("Indices should only contain `isinstance` calls")
                         };
                         args.get(1).expect("`isinstance` should have two arguments")
@@ -326,7 +326,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     elts: types
                         .iter()
                         .flat_map(|value| {
-                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &value {
+                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
                                 Left(elts.iter())
                             } else {
                                 Right(iter::once(*value))
@@ -380,7 +380,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 }
 
 fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
-    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _ } )= &expr else {
+    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _ } )= expr else {
         return None;
     };
     if ops.len() != 1 || comparators.len() != 1 {
@@ -401,7 +401,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
 
 /// SIM109
 pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = &expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _ }) = expr else {
         return;
     };
 
@@ -491,7 +491,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 
 /// SIM220
 pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::And, values, range: _, }) = &expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::And, values, range: _, }) = expr else {
         return;
     };
     if values.len() < 2 {
@@ -506,7 +506,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
             op: Unaryop::Not,
             operand,
             range: _,
-        }) = &expr
+        }) = expr
         {
             negated_expr.push(operand);
         } else {
@@ -546,7 +546,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
 
 /// SIM221
 pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _, }) = &expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op: Boolop::Or, values, range: _, }) = expr else {
         return;
     };
     if values.len() < 2 {
@@ -561,7 +561,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
             op: Unaryop::Not,
             operand,
             range: _,
-        }) = &expr
+        }) = expr
         {
             negated_expr.push(operand);
         } else {
@@ -626,7 +626,7 @@ fn is_short_circuit(
     context: &Context,
     stylist: &Stylist,
 ) -> Option<(Edit, ContentAround)> {
-    let Expr::BoolOp(ast::ExprBoolOp { op, values, range: _, }) = &expr else {
+    let Expr::BoolOp(ast::ExprBoolOp { op, values, range: _, }) = expr else {
         return None;
     };
     if *op != expected_op {

@@ -48,7 +48,7 @@ fn is_valid_key(expr: &Expr) -> bool {
         right,
         op: Operator::Add,
         range: _,
-    }) = &expr
+    }) = expr
     {
         return is_valid_key(left) && is_valid_key(right);
     }
@@ -58,7 +58,7 @@ fn is_valid_key(expr: &Expr) -> bool {
         left,
         op: Operator::Mod,
         ..
-    }) = &expr
+    }) = expr
     {
         return is_valid_key(left);
     }

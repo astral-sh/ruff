@@ -340,8 +340,8 @@ pub(crate) fn call_datetime_strptime_without_zone(
         return;
     };
 
-    if let Expr::Call(ast::ExprCall { keywords, .. }) = &grandparent {
-        if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &parent {
+    if let Expr::Call(ast::ExprCall { keywords, .. }) = grandparent {
+        if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = parent {
             let attr = attr.as_str();
             // Ex) `datetime.strptime(...).astimezone()`
             if attr == "astimezone" {

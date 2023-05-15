@@ -224,7 +224,7 @@ fn is_valid_dict(
         if let Expr::Constant(ast::ExprConstant {
             value: Constant::Str(mapping_key),
             ..
-        }) = &key
+        }) = key
         {
             let Some(format) = formats_hash.get(mapping_key.as_str()) else {
                 return true;

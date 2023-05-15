@@ -62,7 +62,7 @@ pub(crate) fn return_in_try_except_finally(
 ) {
     let try_has_return = find_return(body).is_some();
     let except_has_return = handlers.iter().any(|handler| {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = &handler;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
         find_return(body).is_some()
     });
 

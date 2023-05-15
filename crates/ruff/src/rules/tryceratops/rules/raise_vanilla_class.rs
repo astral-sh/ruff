@@ -64,7 +64,7 @@ impl Violation for RaiseVanillaClass {
 pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
     if checker
         .ctx
-        .resolve_call_path(if let Expr::Call(ast::ExprCall { func, .. }) = &expr {
+        .resolve_call_path(if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             func
         } else {
             expr

@@ -62,7 +62,7 @@ impl Violation for PrivateMemberAccess {
 
 /// SLF001
 pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &expr {
+    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr {
         if (attr.starts_with("__") && !attr.ends_with("__"))
             || (attr.starts_with('_') && !attr.starts_with("__"))
         {

@@ -67,7 +67,7 @@ where
 pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
         let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { name, body, .. }) =
-            &handler;
+            handler;
         let Some(target) = name else {
             continue;
         };
@@ -80,10 +80,10 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandl
         };
 
         for (expr, func) in calls {
-            let Expr::Call(ast::ExprCall { args, .. }) = &expr else {
+            let Expr::Call(ast::ExprCall { args, .. }) = expr else {
                 continue;
             };
-            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &func {
+            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
                 if attr == "exception" {
                     // Collect all referenced names in the `logging.exception` call.
                     let names: Vec<(&str, &Expr)> = {

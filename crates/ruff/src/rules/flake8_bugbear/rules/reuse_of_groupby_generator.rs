@@ -84,7 +84,7 @@ impl<'a> GroupNameFinder<'a> {
     }
 
     fn name_matches(&self, expr: &Expr) -> bool {
-        if let Expr::Name(ast::ExprName { id, .. }) = &expr {
+        if let Expr::Name(ast::ExprName { id, .. }) = expr {
             id == self.group_name
         } else {
             false
@@ -151,7 +151,7 @@ where
             }) => {
                 // Determine whether we're on an `if` arm (as opposed to an `elif`).
                 let is_if_arm = !self.parent_ifs.iter().any(|parent| {
-                    if let Stmt::If(ast::StmtIf { orelse, .. }) = &parent {
+                    if let Stmt::If(ast::StmtIf { orelse, .. }) = parent {
                         orelse.len() == 1 && &orelse[0] == stmt
                     } else {
                         false
@@ -250,7 +250,7 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::NamedExpr(ast::ExprNamedExpr { target, .. }) = &expr {
+        if let Expr::NamedExpr(ast::ExprNamedExpr { target, .. }) = expr {
             if self.name_matches(target) {
                 self.overridden = true;
             }
@@ -329,7 +329,7 @@ pub(crate) fn reuse_of_groupby_generator(
     let Expr::Call(ast::ExprCall { func, .. }) = &iter else {
         return;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = &target else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
         // Ignore any `groupby()` invocation that isn't unpacked
         return;
     };

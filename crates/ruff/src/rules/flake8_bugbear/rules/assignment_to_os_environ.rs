@@ -20,7 +20,7 @@ pub(crate) fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) 
         return;
     }
     let target = &targets[0];
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &target else {
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = target else {
         return;
     };
     if attr != "environ" {

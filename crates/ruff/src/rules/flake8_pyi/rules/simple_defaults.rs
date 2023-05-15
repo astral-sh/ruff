@@ -250,7 +250,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
 /// Returns `true` if an [`Expr`] appears to be a valid default value without an annotation.
 fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
     matches!(
-        &default,
+        default,
         Expr::Call(_)
             | Expr::Name(_)
             | Expr::Attribute(_)
@@ -265,7 +265,7 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
 /// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
 /// call.
 fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. } )= &expr else {
+    let Expr::Call(ast::ExprCall { func, .. } )= expr else {
         return false;
     };
     context.resolve_call_path(func).map_or(false, |call_path| {
@@ -282,7 +282,7 @@ fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
 /// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
 /// `__all__`).
 fn is_special_assignment(context: &Context, target: &Expr) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = &target {
+    if let Expr::Name(ast::ExprName { id, .. }) = target {
         match id.as_str() {
             "__all__" => context.scope().kind.is_module(),
             "__match_args__" | "__slots__" => context.scope().kind.is_class(),

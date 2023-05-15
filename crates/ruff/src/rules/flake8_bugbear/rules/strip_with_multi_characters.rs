@@ -23,7 +23,7 @@ pub(crate) fn strip_with_multi_characters(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &func else {
+    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
         return;
     };
     if !matches!(attr.as_str(), "strip" | "lstrip" | "rstrip") {

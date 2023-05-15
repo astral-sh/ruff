@@ -1,7 +1,7 @@
 use rustpython_parser::ast::{self, Expr, Keyword};
 
 pub(crate) fn expr_name(func: &Expr) -> Option<&str> {
-    if let Expr::Name(ast::ExprName { id, .. }) = &func {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         Some(id)
     } else {
         None

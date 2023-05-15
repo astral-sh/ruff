@@ -92,7 +92,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                     if let Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(string),
                         ..
-                    }) = &key
+                    }) = key
                     {
                         if RESERVED_ATTRS.contains(&string.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
@@ -155,7 +155,7 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &func {
+    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
         if let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
             let level_call_range = TextRange::new(value.end() + TextSize::from(1), func.end());

@@ -79,7 +79,7 @@ struct StringLinesVisitor<'a> {
 
 impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &stmt {
+        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(..),
                 ..

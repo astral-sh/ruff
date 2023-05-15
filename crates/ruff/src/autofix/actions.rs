@@ -27,7 +27,7 @@ fn has_single_child(body: &[Stmt], deleted: &[&Stmt]) -> bool {
 
 /// Determine if a child is the only statement in its body.
 fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool> {
-    match &parent {
+    match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
         | Stmt::ClassDef(ast::StmtClassDef { body, .. })
@@ -71,7 +71,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 Ok(has_single_child(orelse, deleted))
             } else if finalbody.iter().contains(child) {
                 Ok(has_single_child(finalbody, deleted))
-            } else if let Some(body) = handlers.iter().find_map(|handler| match &handler {
+            } else if let Some(body) = handlers.iter().find_map(|handler| match handler {
                 Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) => {
                     if body.iter().contains(child) {
                         Some(body)

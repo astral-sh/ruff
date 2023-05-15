@@ -26,7 +26,7 @@ const WEAK_HASHES: [&str; 4] = ["md4", "md5", "sha", "sha1"];
 fn is_used_for_security(call_args: &SimpleCallArgs) -> bool {
     match call_args.keyword_argument("usedforsecurity") {
         Some(expr) => !matches!(
-            &expr,
+            expr,
             Expr::Constant(ast::ExprConstant {
                 value: Constant::Bool(false),
                 ..

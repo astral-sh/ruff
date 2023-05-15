@@ -151,9 +151,9 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             let node = Expr::Tuple(ast::ExprTuple {
                                 elts: names
                                     .iter()
-                                    .map(|&name| {
+                                    .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
-                                            value: Constant::Str(name.to_string()),
+                                            value: Constant::Str((*name).to_string()),
                                             kind: None,
                                             range: TextRange::default(),
                                         })
@@ -182,9 +182,9 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             let node = Expr::List(ast::ExprList {
                                 elts: names
                                     .iter()
-                                    .map(|&name| {
+                                    .map(|name| {
                                         Expr::Constant(ast::ExprConstant {
-                                            value: Constant::Str(name.to_string()),
+                                            value: Constant::Str((*name).to_string()),
                                             kind: None,
                                             range: TextRange::default(),
                                         })
@@ -418,7 +418,7 @@ fn handle_value_rows(
 pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     for decorator in decorators {
         if is_pytest_parametrize(&checker.ctx, decorator) {
-            if let Expr::Call(ast::ExprCall { args, .. }) = &decorator {
+            if let Expr::Call(ast::ExprCall { args, .. }) = decorator {
                 if checker
                     .settings
                     .rules

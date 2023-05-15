@@ -69,7 +69,7 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
         }
     };
 
-    if let Expr::Call(ast::ExprCall { func, .. }) = &value {
+    if let Expr::Call(ast::ExprCall { func, .. }) = value {
         let Some(kind) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
             if checker.ctx.match_typing_call_path(&call_path, "ParamSpec") {
                 Some(VarKind::ParamSpec)

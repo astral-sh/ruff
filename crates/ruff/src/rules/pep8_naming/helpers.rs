@@ -23,7 +23,7 @@ pub(crate) fn is_acronym(name: &str, asname: &str) -> bool {
 }
 
 pub(crate) fn is_named_tuple_assignment(context: &Context, stmt: &Stmt) -> bool {
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = &stmt else {
+    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
@@ -38,7 +38,7 @@ pub(crate) fn is_named_tuple_assignment(context: &Context, stmt: &Stmt) -> bool 
 }
 
 pub(crate) fn is_typed_dict_assignment(context: &Context, stmt: &Stmt) -> bool {
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = &stmt else {
+    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
@@ -50,7 +50,7 @@ pub(crate) fn is_typed_dict_assignment(context: &Context, stmt: &Stmt) -> bool {
 }
 
 pub(crate) fn is_type_var_assignment(context: &Context, stmt: &Stmt) -> bool {
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = &stmt else {
+    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {

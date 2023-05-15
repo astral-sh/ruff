@@ -119,7 +119,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += 1;
                     let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                         body, ..
-                    }) = &handler;
+                    }) = handler;
                     complexity += get_complexity_number(body);
                 }
             }

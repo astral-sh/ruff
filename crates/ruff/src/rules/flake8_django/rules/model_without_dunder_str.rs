@@ -94,18 +94,18 @@ fn checker_applies(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> bool {
 /// Check if class is abstract, in terms of Django model inheritance.
 fn is_model_abstract(body: &[Stmt]) -> bool {
     for element in body.iter() {
-        let Stmt::ClassDef(ast::StmtClassDef {name, body, ..}) = &element else {
+        let Stmt::ClassDef(ast::StmtClassDef {name, body, ..}) = element else {
             continue
         };
         if name != "Meta" {
             continue;
         }
         for element in body.iter() {
-            let Stmt::Assign(ast::StmtAssign {targets, value, ..}) = &element else {
+            let Stmt::Assign(ast::StmtAssign {targets, value, ..}) = element else {
                 continue;
             };
             for target in targets.iter() {
-                let Expr::Name(ast::ExprName {id , ..}) = &target else {
+                let Expr::Name(ast::ExprName {id , ..}) = target else {
                     continue;
                 };
                 if id != "abstract" {

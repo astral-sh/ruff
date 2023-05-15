@@ -63,8 +63,8 @@ pub(crate) fn lambda_assignment(
     annotation: Option<&Expr>,
     stmt: &Stmt,
 ) {
-    if let Expr::Name(ast::ExprName { id, .. }) = &target {
-        if let Expr::Lambda(ast::ExprLambda { args, body, .. }) = &value {
+    if let Expr::Name(ast::ExprName { id, .. }) = target {
+        if let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value {
             // If the assignment is in a class body, it might not be safe
             // to replace it because the assignment might be
             // carrying a type annotation that will be used by some

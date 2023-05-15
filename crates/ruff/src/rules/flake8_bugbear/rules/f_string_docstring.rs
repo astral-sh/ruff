@@ -23,7 +23,7 @@ pub(crate) fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {
     let Some(stmt) = body.first() else {
         return;
     };
-    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &stmt else {
+    let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
         return;
     };
     let Expr::JoinedStr ( _) = value.as_ref() else {

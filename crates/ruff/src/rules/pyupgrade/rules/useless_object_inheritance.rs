@@ -28,7 +28,7 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 
 fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Option<Diagnostic> {
     for expr in bases {
-        let Expr::Name(ast::ExprName { id, .. }) = &expr else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             continue;
         };
         if id != "object" {

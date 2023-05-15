@@ -71,11 +71,11 @@ const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
 fn allow_boolean_trap(func: &Expr) -> bool {
-    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = &func {
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&attr.as_ref());
     }
 
-    if let Expr::Name(ast::ExprName { id, .. }) = &func {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&id.as_ref());
     }
 

@@ -200,7 +200,7 @@ fn remove_unused_variable(
     checker: &Checker,
 ) -> Option<(DeletionKind, Fix)> {
     // First case: simple assignment (`x = 1`)
-    if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = &stmt {
+    if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
             if target.is_name_expr() {
                 return if targets.len() > 1
@@ -246,7 +246,7 @@ fn remove_unused_variable(
         target,
         value: Some(value),
         ..
-    }) = &stmt
+    }) = stmt
     {
         if target.is_name_expr() {
             return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
@@ -284,7 +284,7 @@ fn remove_unused_variable(
     }
 
     // Third case: withitem (`with foo() as x:`)
-    if let Stmt::With(ast::StmtWith { items, .. }) = &stmt {
+    if let Stmt::With(ast::StmtWith { items, .. }) = stmt {
         // Find the binding that matches the given `Range`.
         // TODO(charlie): Store the `Withitem` in the `Binding`.
         for item in items {

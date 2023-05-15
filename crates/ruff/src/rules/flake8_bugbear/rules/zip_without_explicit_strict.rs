@@ -21,7 +21,7 @@ pub(crate) fn zip_without_explicit_strict(
     func: &Expr,
     kwargs: &[Keyword],
 ) {
-    if let Expr::Name(ast::ExprName { id, .. }) = &func {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         if id == "zip"
             && checker.ctx.is_builtin("zip")
             && !kwargs

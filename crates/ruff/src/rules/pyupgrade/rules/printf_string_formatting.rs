@@ -180,7 +180,7 @@ fn clean_params_dictionary(
                     if let Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(key_string),
                         ..
-                    }) = &key
+                    }) = key
                     {
                         // If the dictionary key is not a valid variable name, abort.
                         if !is_identifier(key_string) {

@@ -21,7 +21,7 @@ pub(crate) fn default_except_not_last(
     locator: &Locator,
 ) -> Option<Diagnostic> {
     for (idx, handler) in handlers.iter().enumerate() {
-        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = &handler;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = handler;
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Diagnostic::new(
                 DefaultExceptNotLast,

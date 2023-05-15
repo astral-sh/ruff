@@ -50,7 +50,7 @@ fn traverse_union<'a>(
         left,
         right,
         range: _,
-    }) = &expr
+    }) = expr
     {
         // Traverse left subtree, then the right subtree, propagating the previous node.
         traverse_union(seen_nodes, checker, left, Some(expr));
@@ -73,7 +73,7 @@ fn traverse_union<'a>(
             let parent = parent.expect("Parent node must exist");
 
             // SAFETY: Parent node must have been a `BinOp` in order for us to have traversed it.
-            let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = &parent else {
+            let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = parent else {
                 panic!("Parent node must be a BinOp");
             };
 

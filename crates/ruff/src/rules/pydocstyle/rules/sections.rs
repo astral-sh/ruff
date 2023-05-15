@@ -745,7 +745,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             args: arguments, ..
         })
-    ) = &stmt else {
+    ) = stmt else {
         return;
     };
 

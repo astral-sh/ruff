@@ -270,7 +270,7 @@ where
         self.nested = true;
 
         let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-            &excepthandler;
+            excepthandler;
         for stmt in body {
             self.visit_stmt(stmt);
         }

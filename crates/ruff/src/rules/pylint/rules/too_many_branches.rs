@@ -85,7 +85,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                                 1 + {
                                     let Excepthandler::ExceptHandler(
                                         ast::ExcepthandlerExceptHandler { body, .. },
-                                    ) = &handler;
+                                    ) = handler;
                                     num_branches(body)
                                 }
                             })
