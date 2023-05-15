@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -84,7 +83,7 @@ pub(crate) fn blocking_http_call_inside_async_def(checker: &mut Checker, expr: &
         .unwrap_or(false)
     {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
-            if let Some(call_path) = collect_call_path(func) {
+            if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 for v_call in BLOCKING_HTTP_CALLS {
                     for member in v_call.members {
                         if call_path.as_slice() == *member {
@@ -127,7 +126,7 @@ impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
 }
 
 const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[ViolatingCalls] = &[ViolatingCalls::new(&[
-    &["open"],
+    &["", "open"],
     &["time", "sleep"],
     &["subprocess", "run"],
     &["subprocess", "Popen"],
@@ -159,7 +158,7 @@ pub(crate) fn open_sleep_or_subprocess_inside_async_def(checker: &mut Checker, e
         .unwrap_or(false)
     {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
-            if let Some(call_path) = collect_call_path(func) {
+            if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 for v_call in OPEN_SLEEP_OR_SUBPROCESS_CALL {
                     for member in v_call.members {
                         if call_path.as_slice() == *member {
@@ -229,7 +228,7 @@ pub(crate) fn unsafe_os_method_inside_async_def(checker: &mut Checker, expr: &Ex
         .unwrap_or(false)
     {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
-            if let Some(call_path) = collect_call_path(func) {
+            if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 for v_call in UNSAFE_OS_METHODS {
                     for member in v_call.members {
                         if call_path.as_slice() == *member {
