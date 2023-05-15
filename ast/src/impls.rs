@@ -1,4 +1,4 @@
-use crate::{Constant, Excepthandler, Expr, Pattern, Stmt};
+use crate::{Constant, Expr};
 
 impl<R> Expr<R> {
     /// Returns a short name for the node suitable for use in error messages.
@@ -55,10 +55,10 @@ impl<R> Expr<R> {
 }
 
 #[cfg(target_arch = "x86_64")]
-static_assertions::assert_eq_size!(Expr, [u8; 72]);
+static_assertions::assert_eq_size!(crate::Expr, [u8; 72]);
 #[cfg(target_arch = "x86_64")]
-static_assertions::assert_eq_size!(Stmt, [u8; 136]);
+static_assertions::assert_eq_size!(crate::Stmt, [u8; 136]);
 #[cfg(target_arch = "x86_64")]
-static_assertions::assert_eq_size!(Pattern, [u8; 96]);
+static_assertions::assert_eq_size!(crate::Pattern, [u8; 96]);
 #[cfg(target_arch = "x86_64")]
-static_assertions::assert_eq_size!(Excepthandler, [u8; 64]);
+static_assertions::assert_eq_size!(crate::Excepthandler, [u8; 64]);
