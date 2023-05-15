@@ -13,9 +13,9 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASY100.py"); "ASY100")]
-    #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASY101.py"); "ASY101")]
-    #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASY102.py"); "ASY102")]
+    #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC100.py"); "ASYNC100")]
+    #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC101.py"); "ASYNC101")]
+    #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASYNC102.py"); "ASYNC102")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

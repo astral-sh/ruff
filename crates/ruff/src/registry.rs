@@ -740,7 +740,7 @@ pub enum Linter {
     #[prefix = "ANN"]
     Flake8Annotations,
     /// [flake8-async](https://pypi.org/project/flake8-async/)
-    #[prefix = "ASY"]
+    #[prefix = "ASYNC"]
     Flake8Async,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
