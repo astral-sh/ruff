@@ -151,7 +151,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
-        match &stmt {
+        match stmt {
             // For and async for.
             Stmt::For(ast::StmtFor { target, .. })
             | Stmt::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
@@ -219,7 +219,7 @@ where
             _ => {}
         }
         // Decide whether to recurse.
-        match &stmt {
+        match stmt {
             // Don't recurse into blocks that create a new scope.
             Stmt::ClassDef(_) => {}
             Stmt::FunctionDef(_) => {}
@@ -266,7 +266,7 @@ fn assignment_targets_from_expr<'a, U>(
     // The Box is necessary to ensure the match arms have the same return type - we can't use
     // a cast to "impl Iterator", since at the time of writing that is only allowed for
     // return types and argument types.
-    match &expr {
+    match expr {
         Expr::Attribute(ast::ExprAttribute {
             ctx: ExprContext::Store,
             ..
@@ -338,7 +338,7 @@ fn assignment_targets_from_assign_targets<'a, U>(
 /// PLW2901
 pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>) {
     let (outer_assignment_targets, inner_assignment_targets) = match node {
-        Node::Stmt(stmt) => match &stmt {
+        Node::Stmt(stmt) => match stmt {
             // With.
             Stmt::With(ast::StmtWith { items, body, .. }) => {
                 let outer_assignment_targets: Vec<ExprWithOuterBindingKind<'a>> =

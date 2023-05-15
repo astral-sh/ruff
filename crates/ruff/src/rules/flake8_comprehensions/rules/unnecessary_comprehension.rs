@@ -50,7 +50,7 @@ impl AlwaysAutofixableViolation for UnnecessaryComprehension {
 
 /// Add diagnostic for C416 based on the expression node id.
 fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
-    let id = match &expr {
+    let id = match expr {
         Expr::ListComp(_) => "list",
         Expr::SetComp(_) => "set",
         Expr::DictComp(_) => "dict",

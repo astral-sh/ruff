@@ -70,7 +70,7 @@ pub(crate) fn invalid_literal_comparison(
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(located_op.op, *op);
-                    if let Some(content) = match &located_op.op {
+                    if let Some(content) = match located_op.op {
                         Cmpop::Is => Some("==".to_string()),
                         Cmpop::IsNot => Some("!=".to_string()),
                         node => {

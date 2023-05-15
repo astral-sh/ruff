@@ -115,7 +115,7 @@ pub(crate) fn complex_raises(
         if body.len() > 1 {
             is_too_complex = true;
         } else if let Some(first_stmt) = body.first() {
-            match &first_stmt {
+            match first_stmt {
                 Stmt::With(ast::StmtWith { body, .. })
                 | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                     if is_non_trivial_with_body(body) {

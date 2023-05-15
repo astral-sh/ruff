@@ -43,7 +43,7 @@ fn is_same_expr(a: &Expr, b: &Expr) -> bool {
 /// Collect all named variables in an expression consisting solely of tuples and
 /// names.
 fn collect_names(expr: &Expr) -> Vec<&str> {
-    match &expr {
+    match expr {
         Expr::Name(ast::ExprName { id, .. }) => vec![id],
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().flat_map(collect_names).collect(),
         _ => panic!("Expected: Expr::Name | Expr::Tuple"),
@@ -65,7 +65,7 @@ struct YieldFromVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for YieldFromVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt {
+        match stmt {
             Stmt::For(ast::StmtFor {
                 target,
                 body,
@@ -123,7 +123,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr {
+        match expr {
             Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 if matches!(ctx, ExprContext::Load | ExprContext::Del) {
                     if let Some(parent) = self.parent {

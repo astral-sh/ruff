@@ -270,7 +270,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
 
 /// UP026
 pub(crate) fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
-    match &stmt {
+    match stmt {
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             // Find all `mock` imports.
             if names

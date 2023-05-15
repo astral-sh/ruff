@@ -402,7 +402,7 @@ fn is_noreturn_func(context: &Context, func: &Expr) -> bool {
 
 /// RET503
 fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
-    match &stmt {
+    match stmt {
         Stmt::If(ast::StmtIf { body, orelse, .. }) => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);

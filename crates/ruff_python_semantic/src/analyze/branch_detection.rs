@@ -41,7 +41,7 @@ fn common_ancestor(
 
 /// Return the alternative branches for a given node.
 fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
-    match &stmt {
+    match stmt {
         Stmt::If(ast::StmtIf { body, .. }) => vec![body.iter().collect()],
         Stmt::Try(ast::StmtTry {
             body,

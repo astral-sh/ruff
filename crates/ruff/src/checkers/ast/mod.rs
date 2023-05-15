@@ -144,7 +144,7 @@ where
         self.ctx.push_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
-        match &stmt {
+        match stmt {
             Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
                 // Allow __future__ imports until we see a non-__future__ import.
                 if let Some("__future__") = module.as_deref() {
@@ -184,7 +184,7 @@ where
         let flags_snapshot = self.ctx.flags;
 
         // Pre-visit.
-        match &stmt {
+        match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
                 if !self.ctx.scope_id.is_global() {
@@ -1869,7 +1869,7 @@ where
         }
 
         // Recurse.
-        match &stmt {
+        match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
                 name,
@@ -2210,7 +2210,7 @@ where
         };
 
         // Post-visit.
-        match &stmt {
+        match stmt {
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 self.ctx.pop_scope();
                 self.ctx.pop_definition();
@@ -2290,7 +2290,7 @@ where
         }
 
         // Pre-visit.
-        match &expr {
+        match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.settings.rules.any_enabled(&[
@@ -3795,7 +3795,7 @@ where
         };
 
         // Recurse.
-        match &expr {
+        match expr {
             Expr::Lambda(_) => {
                 self.deferred.lambdas.push((expr, self.ctx.snapshot()));
             }
@@ -3879,7 +3879,7 @@ where
                                 arg,
                                 value,
                                 range: _,
-                            } = &keyword;
+                            } = keyword;
                             if let Some(id) = arg {
                                 if id == "bound" {
                                     self.visit_type_definition(value);
@@ -3898,7 +3898,7 @@ where
                                 Expr::List(ast::ExprList { elts, .. })
                                 | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                                     for elt in elts {
-                                        match &elt {
+                                        match elt {
                                             Expr::List(ast::ExprList { elts, .. })
                                             | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                                                 if elts.len() == 2 {
@@ -3916,7 +3916,7 @@ where
 
                         // Ex) NamedTuple("a", a=int)
                         for keyword in keywords {
-                            let Keyword { value, .. } = &keyword;
+                            let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
                     }
@@ -3942,7 +3942,7 @@ where
 
                         // Ex) TypedDict("a", a=int)
                         for keyword in keywords {
-                            let Keyword { value, .. } = &keyword;
+                            let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
                     }
@@ -3957,7 +3957,7 @@ where
                                 self.visit_non_type_definition(arg);
                             }
                             for keyword in keywords {
-                                let Keyword { value, .. } = &keyword;
+                                let Keyword { value, .. } = keyword;
                                 self.visit_non_type_definition(value);
                             }
                         } else {
@@ -3967,7 +3967,7 @@ where
                                     value,
                                     arg,
                                     range: _,
-                                } = &keyword;
+                                } = keyword;
                                 if arg.as_ref().map_or(false, |arg| arg == "type") {
                                     self.visit_type_definition(value);
                                 } else {
@@ -3985,7 +3985,7 @@ where
                             self.visit_non_type_definition(arg);
                         }
                         for keyword in keywords {
-                            let Keyword { value, .. } = &keyword;
+                            let Keyword { value, .. } = keyword;
                             self.visit_non_type_definition(value);
                         }
                     }
@@ -4059,7 +4059,7 @@ where
         }
 
         // Post-visit.
-        match &expr {
+        match expr {
             Expr::Lambda(_)
             | Expr::GeneratorExp(_)
             | Expr::ListComp(_)
@@ -4237,7 +4237,7 @@ where
     }
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
-        match &format_spec {
+        match format_spec {
             Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
                 for value in values {
                     self.visit_expr(value);
@@ -4863,7 +4863,7 @@ impl<'a> Checker<'a> {
                 Stmt::Assign(_) | Stmt::AugAssign(_) | Stmt::AnnAssign(_)
             )
         {
-            if match &parent {
+            if match parent {
                 Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                     if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
                         id == "__all__"

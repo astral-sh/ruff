@@ -351,7 +351,7 @@ pub(crate) fn duplicate_class_field_definition<'a, 'b>(
     let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
-        let target = match &stmt {
+        let target = match stmt {
             Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                 if targets.len() != 1 {
                     continue;

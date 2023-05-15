@@ -47,7 +47,7 @@ pub(crate) fn type_comparison(
         if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
             continue;
         }
-        match &right {
+        match right {
             Expr::Call(ast::ExprCall { func, args, .. }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     // Ex) `type(False)`

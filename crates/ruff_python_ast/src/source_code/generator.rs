@@ -181,7 +181,7 @@ impl<'a> Generator<'a> {
             }};
         }
 
-        match &ast {
+        match ast {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
                 args,
@@ -701,7 +701,7 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>, star: bool) {
-        match &ast {
+        match ast {
             Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                 type_,
                 name,
@@ -727,7 +727,7 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_pattern<U>(&mut self, ast: &Pattern<U>) {
-        match &ast {
+        match ast {
             Pattern::MatchValue(ast::PatternMatchValue {
                 value,
                 range: _range,
@@ -847,7 +847,7 @@ impl<'a> Generator<'a> {
                 ret
             }};
         }
-        match &ast {
+        match ast {
             Expr::BoolOp(ast::ExprBoolOp {
                 op,
                 values,
@@ -1367,7 +1367,7 @@ impl<'a> Generator<'a> {
     }
 
     fn unparse_fstring_elem<U>(&mut self, expr: &Expr<U>, is_spec: bool) {
-        match &expr {
+        match expr {
             Expr::Constant(ast::ExprConstant { value, .. }) => {
                 if let Constant::Str(s) = value {
                     self.unparse_fstring_str(s);

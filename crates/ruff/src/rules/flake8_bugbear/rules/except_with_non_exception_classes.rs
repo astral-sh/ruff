@@ -27,7 +27,7 @@ fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
     let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(elts.len());
     let mut exprs_to_process: VecDeque<&Expr> = elts.iter().collect();
     while let Some(expr) = exprs_to_process.pop_front() {
-        match &expr {
+        match expr {
             Expr::Starred(ast::ExprStarred { value, .. }) => match value.as_ref() {
                 Expr::Tuple(ast::ExprTuple { elts, .. })
                 | Expr::List(ast::ExprList { elts, .. }) => {

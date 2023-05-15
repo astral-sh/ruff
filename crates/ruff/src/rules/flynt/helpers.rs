@@ -25,7 +25,7 @@ pub(crate) fn to_constant_string(s: &str) -> Expr {
 /// Figure out if `expr` represents a "simple" call
 /// (i.e. one that can be safely converted to a formatted value).
 fn is_simple_call(expr: &Expr) -> bool {
-    match &expr {
+    match expr {
         Expr::Call(ast::ExprCall {
             func,
             args,
@@ -39,7 +39,7 @@ fn is_simple_call(expr: &Expr) -> bool {
 /// Figure out if `func` represents a "simple" callee (a bare name, or a chain of simple
 /// attribute accesses).
 fn is_simple_callee(func: &Expr) -> bool {
-    match &func {
+    match func {
         Expr::Name(_) => true,
         Expr::Attribute(ast::ExprAttribute { value, .. }) => is_simple_callee(value),
         _ => false,
@@ -48,7 +48,7 @@ fn is_simple_callee(func: &Expr) -> bool {
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
 pub(crate) fn to_fstring_elem(expr: &Expr) -> Option<Expr> {
-    match &expr {
+    match expr {
         // These are directly handled by `unparse_fstring_elem`:
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(_),

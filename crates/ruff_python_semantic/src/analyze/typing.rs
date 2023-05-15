@@ -146,7 +146,7 @@ pub fn to_pep604_operator(value: &Expr, slice: &Expr, context: &Context) -> Opti
 /// Return `true` if `Expr` represents a reference to a type annotation that resolves to an
 /// immutable type.
 pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
-    match &expr {
+    match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
             context.resolve_call_path(expr).map_or(false, |call_path| {
                 IMMUTABLE_TYPES

@@ -45,7 +45,7 @@ pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Ex
     for decorator in decorator_list {
         if is_cache_func(
             checker,
-            match &decorator {
+            match decorator {
                 Expr::Call(ast::ExprCall { func, .. }) => func,
                 _ => decorator,
             },

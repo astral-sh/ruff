@@ -88,7 +88,7 @@ where
     let mut names: Vec<&str> = vec![];
     let mut flags = AllNamesFlags::empty();
 
-    if let Some(value) = match &stmt {
+    if let Some(value) = match stmt {
         Stmt::Assign(ast::StmtAssign { value, .. }) => Some(value),
         Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_ref(),
         Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),

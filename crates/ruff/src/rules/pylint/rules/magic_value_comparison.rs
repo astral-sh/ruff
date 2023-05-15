@@ -25,7 +25,7 @@ impl Violation for MagicValueComparison {
 
 /// If an [`Expr`] is a constant (or unary operation on a constant), return the [`Constant`].
 fn as_constant(expr: &Expr) -> Option<&Constant> {
-    match &expr {
+    match expr {
         Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,

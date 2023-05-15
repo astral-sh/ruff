@@ -75,7 +75,7 @@ impl<'a> ImportTracker<'a> {
             // least one blank line. In that case, we treat it as a regular
             // sibling (i.e., as if the comment is the next statement, as
             // opposed to the class or function).
-            match &stmt {
+            match stmt {
                 Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
@@ -147,7 +147,7 @@ where
         // Track scope.
         let prev_nested = self.nested;
         self.nested = true;
-        match &stmt {
+        match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
                 for stmt in body {
                     self.visit_stmt(stmt);

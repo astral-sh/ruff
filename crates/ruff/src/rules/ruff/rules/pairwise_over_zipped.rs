@@ -63,7 +63,7 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 }
 
 fn to_bound(expr: &Expr) -> Option<i64> {
-    match &expr {
+    match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..

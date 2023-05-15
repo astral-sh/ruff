@@ -22,7 +22,7 @@ impl AlwaysAutofixableViolation for UnpackedListComprehension {
 
 /// Returns `true` if `expr` contains an `Expr::Await`.
 fn contains_await(expr: &Expr) -> bool {
-    match &expr {
+    match expr {
         Expr::Await(_) => true,
         Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().any(contains_await),
         Expr::NamedExpr(ast::ExprNamedExpr {

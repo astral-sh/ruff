@@ -76,7 +76,7 @@ pub(crate) fn use_pep604_annotation(
         Pep604Operator::Union => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                match &slice {
+                match slice {
                     Expr::Slice(_) => {
                         // Invalid type annotation.
                     }

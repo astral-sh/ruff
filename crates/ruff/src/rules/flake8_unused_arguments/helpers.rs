@@ -5,7 +5,7 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 /// Return `true` if a `Stmt` is a "empty": a `pass`, `...`, `raise
 /// NotImplementedError`, or `raise NotImplemented` (with or without arguments).
 fn is_empty_stmt(stmt: &Stmt) -> bool {
-    match &stmt {
+    match stmt {
         Stmt::Pass(_) => return true,
         Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
             return matches!(
@@ -39,7 +39,7 @@ fn is_empty_stmt(stmt: &Stmt) -> bool {
 }
 
 pub(crate) fn is_empty(body: &[Stmt]) -> bool {
-    match &body {
+    match body {
         [] => true,
         [stmt] => is_docstring_stmt(stmt) || is_empty_stmt(stmt),
         [docstring, stmt] => is_docstring_stmt(docstring) && is_empty_stmt(stmt),

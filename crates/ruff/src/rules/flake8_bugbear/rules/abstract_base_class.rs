@@ -51,7 +51,7 @@ fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
-    body.iter().all(|stmt| match &stmt {
+    body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
         Stmt::Expr(ast::StmtExpr {
             value,

@@ -68,7 +68,7 @@ impl Violation for ComplexStructure {
 fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
     for stmt in stmts {
-        match &stmt {
+        match stmt {
             Stmt::If(ast::StmtIf { body, orelse, .. }) => {
                 complexity += 1;
                 complexity += get_complexity_number(body);

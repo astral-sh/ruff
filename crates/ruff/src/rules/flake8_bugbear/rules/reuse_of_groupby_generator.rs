@@ -112,7 +112,7 @@ where
         if self.overridden {
             return;
         }
-        match &stmt {
+        match stmt {
             Stmt::For(ast::StmtFor {
                 target, iter, body, ..
             }) => {
@@ -259,7 +259,7 @@ where
             return;
         }
 
-        match &expr {
+        match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt,
                 generators,

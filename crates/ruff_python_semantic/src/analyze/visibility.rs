@@ -164,7 +164,7 @@ impl ModuleSource<'_> {
 }
 
 pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
-    match &stmt {
+    match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
             if name.starts_with('_') {
@@ -178,7 +178,7 @@ pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
 }
 
 pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
-    match &stmt {
+    match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             name,
             decorator_list,
@@ -216,7 +216,7 @@ pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
 }
 
 pub(crate) fn class_visibility(stmt: &Stmt) -> Visibility {
-    match &stmt {
+    match stmt {
         Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private

@@ -268,8 +268,8 @@ pub(crate) fn convert_for_loop_to_any_all(
                         range: _,
                     }) = &loop_info.test
                     {
-                        if ops.len() == 1 && comparators.len() == 1 {
-                            let op = match &ops[0] {
+                        if let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) {
+                            let op = match op {
                                 Cmpop::Eq => Cmpop::NotEq,
                                 Cmpop::NotEq => Cmpop::Eq,
                                 Cmpop::Lt => Cmpop::GtE,
@@ -284,7 +284,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                             let node = ast::ExprCompare {
                                 left: left.clone(),
                                 ops: vec![op],
-                                comparators: vec![comparators[0].clone()],
+                                comparators: vec![comparator.clone()],
                                 range: TextRange::default(),
                             };
                             node.into()

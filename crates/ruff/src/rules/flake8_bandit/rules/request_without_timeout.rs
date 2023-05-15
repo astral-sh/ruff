@@ -44,7 +44,7 @@ pub(crate) fn request_without_timeout(
     {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(timeout_arg) = call_args.keyword_argument("timeout") {
-            if let Some(timeout) = match &timeout_arg {
+            if let Some(timeout) = match timeout_arg {
                 Expr::Constant(ast::ExprConstant {
                     value: value @ Constant::None,
                     ..

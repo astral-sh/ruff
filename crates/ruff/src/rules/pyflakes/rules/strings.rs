@@ -332,7 +332,7 @@ pub(crate) fn percent_format_missing_arguments(
 
         let mut keywords = FxHashSet::default();
         for key in keys.iter().flatten() {
-            match &key {
+            match key {
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(value),
                     ..
@@ -387,7 +387,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
         return;
     }
 
-    match &right {
+    match right {
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::Set(ast::ExprSet { elts, .. }) => {
@@ -421,7 +421,7 @@ pub(crate) fn percent_format_star_requires_sequence(
     location: TextRange,
 ) {
     if summary.starred {
-        match &right {
+        match right {
             Expr::Dict(_) | Expr::DictComp(_) => checker
                 .diagnostics
                 .push(Diagnostic::new(PercentFormatStarRequiresSequence, location)),

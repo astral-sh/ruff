@@ -156,7 +156,7 @@ pub(crate) fn add_required_imports(
                 return vec![];
             }
             let stmt = &body[0];
-            match &stmt {
+            match stmt {
                 Stmt::ImportFrom(ast::StmtImportFrom {
                     module,
                     names,

@@ -162,7 +162,7 @@ fn shell_call_seems_safe(arg: &Expr) -> bool {
 
 /// Return the [`Expr`] as a string literal, if it's a string or a list of strings.
 fn try_string_literal(expr: &Expr) -> Option<&str> {
-    match &expr {
+    match expr {
         Expr::List(ast::ExprList { elts, .. }) => {
             if elts.is_empty() {
                 None

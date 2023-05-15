@@ -25,7 +25,7 @@ pub fn walk_body<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, body: &'
 }
 
 pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
-    match &stmt {
+    match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
             visitor.visit_body(body);
         }
@@ -98,7 +98,7 @@ pub fn walk_excepthandler<'a, V: StatementVisitor<'a> + ?Sized>(
     visitor: &mut V,
     excepthandler: &'a Excepthandler,
 ) {
-    match &excepthandler {
+    match excepthandler {
         Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) => {
             visitor.visit_body(body);
         }

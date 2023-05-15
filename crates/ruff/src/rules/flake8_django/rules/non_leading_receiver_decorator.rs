@@ -58,7 +58,7 @@ where
     let mut diagnostics = vec![];
     let mut seen_receiver = false;
     for (i, decorator) in decorator_list.iter().enumerate() {
-        let is_receiver = match &decorator {
+        let is_receiver = match decorator {
             Expr::Call(ast::ExprCall { func, .. }) => resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["django", "dispatch", "receiver"]

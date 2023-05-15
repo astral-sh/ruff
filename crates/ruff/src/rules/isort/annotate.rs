@@ -19,7 +19,7 @@ pub(crate) fn annotate_imports<'a>(
     imports
         .iter()
         .map(|import| {
-            match &import {
+            match import {
                 Stmt::Import(ast::StmtImport { names, range }) => {
                     // Find comments above.
                     let mut atop = vec![];

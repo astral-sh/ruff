@@ -139,7 +139,7 @@ pub(crate) fn unnecessary_encode_utf8(
     let Some(variable) = match_encoded_variable(func) else {
         return;
     };
-    match &variable {
+    match variable {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(literal),
             ..

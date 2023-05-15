@@ -43,7 +43,7 @@ impl Violation for AssertOnStringLiteral {
 
 /// PLW0129
 pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
-    match &test {
+    match test {
         Expr::Constant(ast::ExprConstant { value, .. }) => match value {
             Constant::Str(value, ..) => {
                 checker.diagnostics.push(Diagnostic::new(
@@ -74,7 +74,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
         Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
-                    kind: if values.iter().all(|value| match &value {
+                    kind: if values.iter().all(|value| match value {
                         Expr::Constant(ast::ExprConstant { value, .. }) => match value {
                             Constant::Str(value, ..) => value.is_empty(),
                             Constant::Bytes(value) => value.is_empty(),
@@ -83,7 +83,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                         _ => false,
                     }) {
                         Kind::Empty
-                    } else if values.iter().any(|value| match &value {
+                    } else if values.iter().any(|value| match value {
                         Expr::Constant(ast::ExprConstant { value, .. }) => match value {
                             Constant::Str(value, ..) => !value.is_empty(),
                             Constant::Bytes(value) => !value.is_empty(),

@@ -73,7 +73,7 @@ fn pytest_mark_parentheses(
 }
 
 fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &CallPath) {
-    match &decorator {
+    match decorator {
         Expr::Call(ast::ExprCall {
             func,
             args,

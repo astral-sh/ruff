@@ -31,7 +31,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr {
+        match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
                 self.names.insert(id, expr);
             }

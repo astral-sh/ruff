@@ -21,7 +21,7 @@ pub(crate) fn break_outside_loop<'a>(
     let mut allowed: bool = false;
     let mut child = stmt;
     for parent in parents {
-        match &parent {
+        match parent {
             Stmt::For(ast::StmtFor { orelse, .. })
             | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
             | Stmt::While(ast::StmtWhile { orelse, .. }) => {

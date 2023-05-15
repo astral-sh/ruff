@@ -9,7 +9,7 @@ static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 pub(crate) fn string_literal(expr: &Expr) -> Option<&str> {
-    match &expr {
+    match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(string),
             ..

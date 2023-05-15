@@ -20,7 +20,7 @@ impl Violation for UselessElseOnLoop {
 }
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
-    body.iter().any(|stmt| match &stmt {
+    body.iter().any(|stmt| match stmt {
         Stmt::If(ast::StmtIf { body, orelse, .. }) => {
             loop_exits_early(body) || loop_exits_early(orelse)
         }
@@ -46,7 +46,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
             loop_exits_early(body)
                 || loop_exits_early(orelse)
                 || loop_exits_early(finalbody)
-                || handlers.iter().any(|handler| match &handler {
+                || handlers.iter().any(|handler| match handler {
                     Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                         body, ..
                     }) => loop_exits_early(body),

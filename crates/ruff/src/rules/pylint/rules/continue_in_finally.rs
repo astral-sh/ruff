@@ -50,7 +50,7 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
                 .push(Diagnostic::new(ContinueInFinally, stmt.range()));
         }
 
-        match &stmt {
+        match stmt {
             Stmt::If(ast::StmtIf { body, orelse, .. })
             | Stmt::Try(ast::StmtTry { body, orelse, .. })
             | Stmt::TryStar(ast::StmtTryStar { body, orelse, .. }) => {

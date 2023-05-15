@@ -68,7 +68,7 @@ pub(crate) fn model_without_dunder_str(
 }
 
 fn has_dunder_method(body: &[Stmt]) -> bool {
-    body.iter().any(|val| match &val {
+    body.iter().any(|val| match val {
         Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
             if name == "__str__" {
                 return true;

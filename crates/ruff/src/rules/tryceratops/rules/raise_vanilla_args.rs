@@ -53,7 +53,7 @@ fn any_string<F>(expr: &Expr, predicate: F) -> bool
 where
     F: (Fn(&str) -> bool) + Copy,
 {
-    match &expr {
+    match expr {
         Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
             for value in values {
                 if any_string(value, predicate) {

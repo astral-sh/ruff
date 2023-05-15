@@ -49,7 +49,7 @@ enum DataType {
 
 impl From<&Expr> for DataType {
     fn from(expr: &Expr) -> Self {
-        match &expr {
+        match expr {
             Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => (&**value).into(),
             Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => (&**operand).into(),
             Expr::Dict(_) => DataType::Object,
@@ -275,7 +275,7 @@ pub(crate) fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: 
     }
 
     // Parse the parameters.
-    let is_valid = match &right {
+    let is_valid = match right {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
         Expr::Dict(ast::ExprDict {
             keys,
