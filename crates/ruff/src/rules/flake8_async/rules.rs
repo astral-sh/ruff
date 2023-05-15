@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::context::Context;
 use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -65,18 +66,7 @@ const BLOCKING_HTTP_CALLS: &[&[&str]] = &[
 
 /// ASY100
 pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
-    if checker
-        .ctx
-        .scopes()
-        .find_map(|scope| {
-            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
-                Some(*async_)
-            } else {
-                None
-            }
-        })
-        .unwrap_or(false)
-    {
+    if in_async_function(&checker.ctx) {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
             if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 if BLOCKING_HTTP_CALLS.contains(&call_path.as_slice()) {
@@ -142,18 +132,7 @@ const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
 
 /// ASY101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
-    if checker
-        .ctx
-        .scopes()
-        .find_map(|scope| {
-            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
-                Some(*async_)
-            } else {
-                None
-            }
-        })
-        .unwrap_or(false)
-    {
+    if in_async_function(&checker.ctx) {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
             if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 if OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&call_path.as_slice()) {
@@ -217,18 +196,7 @@ const UNSAFE_OS_METHODS: &[&[&str]] = &[
 
 /// ASY102
 pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
-    if checker
-        .ctx
-        .scopes()
-        .find_map(|scope| {
-            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
-                Some(*async_)
-            } else {
-                None
-            }
-        })
-        .unwrap_or(false)
-    {
+    if in_async_function(&checker.ctx) {
         if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
             if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 if UNSAFE_OS_METHODS.contains(&call_path.as_slice()) {
@@ -239,4 +207,18 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
             }
         }
     }
+}
+
+/// Return `true` if the [`Context`] is inside an async function definition.
+fn in_async_function(context: &Context) -> bool {
+    context
+        .scopes()
+        .find_map(|scope| {
+            if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
+                Some(*async_)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(false)
 }
