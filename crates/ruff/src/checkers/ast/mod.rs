@@ -2588,21 +2588,21 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::BlockingHttpCallInsideAsyncDef)
+                    .enabled(Rule::BlockingHttpCallInAsyncFunction)
                 {
                     flake8_async::rules::blocking_http_call(self, expr);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::OpenSleepOrSubprocessInsideAsyncDef)
+                    .enabled(Rule::OpenSleepOrSubprocessInAsyncFunction)
                 {
                     flake8_async::rules::open_sleep_or_subprocess_call(self, expr);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::UnsafeOsMethodInsideAsyncDef)
+                    .enabled(Rule::BlockingOsCallInAsyncFunction)
                 {
                     flake8_async::rules::blocking_os_call(self, expr);
                 }

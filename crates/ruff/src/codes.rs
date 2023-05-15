@@ -216,9 +216,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E0241") => Rule::DuplicateBases,
 
         // flake8-async
-        (Flake8Async, "100") => Rule::BlockingHttpCallInsideAsyncDef,
-        (Flake8Async, "101") => Rule::OpenSleepOrSubprocessInsideAsyncDef,
-        (Flake8Async, "102") => Rule::UnsafeOsMethodInsideAsyncDef,
+        (Flake8Async, "100") => Rule::BlockingHttpCallInAsyncFunction,
+        (Flake8Async, "101") => Rule::OpenSleepOrSubprocessInAsyncFunction,
+        (Flake8Async, "102") => Rule::BlockingOsCallInAsyncFunction,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,

@@ -32,9 +32,9 @@ use crate::checkers::ast::Checker;
 ///             ...
 /// ```
 #[violation]
-pub struct BlockingHttpCallInsideAsyncDef;
+pub struct BlockingHttpCallInAsyncFunction;
 
-impl Violation for BlockingHttpCallInsideAsyncDef {
+impl Violation for BlockingHttpCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Async functions should not call blocking HTTP methods")
@@ -82,7 +82,7 @@ pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
                 if BLOCKING_HTTP_CALLS.contains(&call_path.as_slice()) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BlockingHttpCallInsideAsyncDef, func.range));
+                        .push(Diagnostic::new(BlockingHttpCallInAsyncFunction, func.range));
                 }
             }
         }
@@ -113,9 +113,9 @@ pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
 ///     await asyncio.sleep(1000)
 /// ```
 #[violation]
-pub struct OpenSleepOrSubprocessInsideAsyncDef;
+pub struct OpenSleepOrSubprocessInAsyncFunction;
 
-impl Violation for OpenSleepOrSubprocessInsideAsyncDef {
+impl Violation for OpenSleepOrSubprocessInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Async functions should not call `open`, `time.sleep`, or `subprocess` methods")
@@ -158,7 +158,7 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) 
             if let Some(call_path) = checker.ctx.resolve_call_path(func) {
                 if OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&call_path.as_slice()) {
                     checker.diagnostics.push(Diagnostic::new(
-                        OpenSleepOrSubprocessInsideAsyncDef,
+                        OpenSleepOrSubprocessInAsyncFunction,
                         func.range,
                     ));
                 }
@@ -191,9 +191,9 @@ pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) 
 ///     os.popen()
 /// ```
 #[violation]
-pub struct UnsafeOsMethodInsideAsyncDef;
+pub struct BlockingOsCallInAsyncFunction;
 
-impl Violation for UnsafeOsMethodInsideAsyncDef {
+impl Violation for BlockingOsCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Async functions should not call synchronous `os` methods")
@@ -234,7 +234,7 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
                 if UNSAFE_OS_METHODS.contains(&call_path.as_slice()) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(UnsafeOsMethodInsideAsyncDef, func.range));
+                        .push(Diagnostic::new(BlockingOsCallInAsyncFunction, func.range));
                 }
             }
         }

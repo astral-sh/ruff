@@ -192,9 +192,9 @@ ruff_macros::register_rules!(
     rules::pylint::rules::NestedMinMax,
     rules::pylint::rules::DuplicateBases,
     // flake8-async
-    rules::flake8_async::rules::BlockingHttpCallInsideAsyncDef,
-    rules::flake8_async::rules::OpenSleepOrSubprocessInsideAsyncDef,
-    rules::flake8_async::rules::UnsafeOsMethodInsideAsyncDef,
+    rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
+    rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
+    rules::flake8_async::rules::BlockingOsCallInAsyncFunction,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
