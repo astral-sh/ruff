@@ -67,8 +67,11 @@ pub(crate) fn explicit_f_string_type_conversion(
         return;
     };
 
-    if !matches!(id.as_str(), "str" | "repr" | "ascii") {
-        return;
+    let conversion = match id.as_str() {
+        "ascii" => 'a',
+        "str" => 's',
+        "repr" => 'r',
+        _ => return,
     };
 
     if !checker.ctx.is_builtin(id) {
@@ -79,13 +82,6 @@ pub(crate) fn explicit_f_string_type_conversion(
     let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, formatted_value_range);
 
     if checker.patch(diagnostic.kind.rule()) {
-        let conversion = match id.as_str() {
-            "ascii" => "a",
-            "str" => "s",
-            "repr" => "r",
-            &_ => unreachable!(),
-        };
-
         let arg_range = args[0].range();
         let remove_call = Edit::deletion(formatted_value_range.start(), arg_range.start());
         let add_conversion = Edit::replacement(
