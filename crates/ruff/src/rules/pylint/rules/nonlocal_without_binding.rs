@@ -1,11 +1,6 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-#[violation]
-pub struct NonlocalWithoutBinding {
-    pub(crate) name: String,
-}
-
 /// ## What it does
 /// Checks for `nonlocal` names without bindings.
 ///
@@ -32,6 +27,11 @@ pub struct NonlocalWithoutBinding {
 /// ## References
 /// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#nonlocal)
 /// - [PEP 3104](https://peps.python.org/pep-3104/)
+#[violation]
+pub struct NonlocalWithoutBinding {
+    pub(crate) name: String,
+}
+
 impl Violation for NonlocalWithoutBinding {
     #[derive_message_formats]
     fn message(&self) -> String {
