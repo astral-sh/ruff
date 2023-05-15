@@ -81,8 +81,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, args[0].range());
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
+            diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)
             });
         }
