@@ -61,6 +61,7 @@ mod tests {
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"); "PLW2901")]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"); "PLE0101")]
+    #[test_case(Rule::BadSuperCall, Path::new("bad_super_call.py"); "PLE1003")]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]

@@ -160,6 +160,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
     rules::pylint::rules::DuplicateBases,
+    rules::pylint::rules::BadSuperCall,
     // flake8-async
     rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
     rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,

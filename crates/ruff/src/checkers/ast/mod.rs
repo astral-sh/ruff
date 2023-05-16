@@ -2662,6 +2662,10 @@ where
                     }
                 }
 
+                // Mine
+                if self.settings.rules.enabled(Rule::BadSuperCall) {
+                    pylint::rules::bad_super_call(self, expr, func, args);
+                }
                 // pyupgrade
                 if self.settings.rules.enabled(Rule::TypeOfPrimitive) {
                     pyupgrade::rules::type_of_primitive(self, expr, func, args);

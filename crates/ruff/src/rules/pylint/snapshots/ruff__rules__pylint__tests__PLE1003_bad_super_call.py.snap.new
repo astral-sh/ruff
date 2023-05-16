@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+assertion_line: 83
+---
+bad_super_call.py:9:9: PLE1003 Bad Super Call: first argument `Tree` does not match inherited parent `Feline`
+   |
+ 9 | class Feline(Animal):
+10 |     def __init__(self):
+11 |         super(Tree, self).__init__()  # error
+   |         ^^^^^^^^^^^^^^^^^ PLE1003
+12 |         super(Animal, self).__init__() # ok
+13 |         # inherits from parent
+   |
+
+bad_super_call.py:16:9: PLE1003 Bad Super Call: first argument `Tree` does not match inherited parent `Cat`
+   |
+16 | class Cat(Feline):
+17 |     def __init__(self):
+18 |         super(Tree, self).__init__()  # error
+   |         ^^^^^^^^^^^^^^^^^ PLE1003
+19 |         super(Feline, self).__init__() # ok 
+20 |         # inherited parent
+   |
+
+bad_super_call.py:21:9: PLE1003 Bad Super Call: first argument `Animal` does not match inherited parent `Cat`
+   |
+21 |         super(Cat, self).__init__() # ok
+22 |         # own class
+23 |         super(Animal, self).__init__() # error 
+   |         ^^^^^^^^^^^^^^^^^^^ PLE1003
+24 |         # TODO: false negative
+25 |         # Since Feline inherits Animal, it should be ok
+   |
+
+
