@@ -250,5 +250,20 @@ f()"#
             "f()",
         ];
         assert_eq!(actual, expected);
+
+        let contents = r#"
+if False:
+
+    print()
+"#
+        .trim();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let locator = Locator::new(contents);
+        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+            .into_iter()
+            .map(|line| line.text_trimmed().to_string())
+            .collect();
+        let expected = vec!["if False:", "print()", ""];
+        assert_eq!(actual, expected);
     }
 }

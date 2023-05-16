@@ -500,11 +500,16 @@ impl LogicalLinesBuilder {
     fn finish_line(&mut self) {
         let end = self.tokens.len() as u32;
         if self.current_line.tokens_start < end {
-            self.lines.push(Line {
-                flags: self.current_line.flags,
-                tokens_start: self.current_line.tokens_start,
-                tokens_end: end,
-            });
+            let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
+                .iter()
+                .all(|token| token.kind.is_newline());
+            if !is_empty {
+                self.lines.push(Line {
+                    flags: self.current_line.flags,
+                    tokens_start: self.current_line.tokens_start,
+                    tokens_end: end,
+                });
+            }
 
             self.current_line = CurrentLine {
                 flags: TokenFlags::default(),
