@@ -272,6 +272,17 @@ class StructVisitor(EmitVisitor):
         else:
             self.sum_with_constructors(sum, name, depth)
 
+        (generics_applied,) = self.apply_generics(name, "R")
+        self.emit(
+            f"""
+            impl{generics_applied} Node for {rust_type_name(name)}{generics_applied}  {{
+                const NAME: &'static str = "{name}";
+                const FIELD_NAMES: &'static [&'static str] = &[];
+            }}
+            """,
+            depth,
+        )
+
     def emit_attrs(self, depth):
         self.emit("#[derive(Clone, Debug, PartialEq)]", depth)
 
@@ -327,9 +338,14 @@ class StructVisitor(EmitVisitor):
         )
 
         self.emit("}", depth)
+        field_names = [f'"{f.name}"' for f in t.fields]
         self.emit(
             textwrap.dedent(
                 f"""
+                impl<R> Node for {payload_name}<R> {{
+                    const NAME: &'static str = "{t.name}";
+                    const FIELD_NAMES: &'static [&'static str] = &[{', '.join(field_names)}];
+                }}
                 impl<R> From<{payload_name}<R>> for {rust_name}<R> {{
                     fn from(payload: {payload_name}<R>) -> Self {{
                         {rust_name}::{t.name}(payload)
@@ -389,7 +405,19 @@ class StructVisitor(EmitVisitor):
         assert bool(product.attributes) == type_info.no_cfg(self.type_info)
         self.emit_range(product.attributes, depth + 1)
         self.emit("}", depth)
-        self.emit("", depth)
+
+        field_names = [f'"{f.name}"' for f in product.fields]
+        self.emit(
+            f"""
+            impl<R> Node for {product_name}<R>  {{
+                const NAME: &'static str = "{name}";
+                const FIELD_NAMES: &'static [&'static str] = &[
+                {', '.join(field_names)}
+                ];
+            }}
+            """,
+            depth,
+        )
 
 
 class FoldTraitDefVisitor(EmitVisitor):
@@ -574,6 +602,12 @@ class VisitorTraitDefVisitor(StructVisitor):
 
     def visitType(self, type, depth=0):
         self.visit(type.value, type.name, depth)
+
+    def visitSum(self, sum, name, depth):
+        if is_simple(sum):
+            self.simple_sum(sum, name, depth)
+        else:
+            self.sum_with_constructors(sum, name, depth)
 
     def emit_visitor(self, nodename, depth, has_node=True):
         type_info = self.type_info[nodename]

@@ -10,6 +10,11 @@ pub use generic::*;
 pub use ranged::Ranged;
 pub use rustpython_parser_core::{text_size, ConversionFlag};
 
+pub trait Node {
+    const NAME: &'static str;
+    const FIELD_NAMES: &'static [&'static str];
+}
+
 #[cfg(feature = "fold")]
 mod fold_helpers;
 #[cfg(feature = "fold")]
@@ -18,6 +23,8 @@ pub mod fold {
 
     include!("gen/fold.rs");
 }
+#[cfg(feature = "fold")]
+pub use fold::Fold;
 
 #[cfg(feature = "visitor")]
 mod visitor {
