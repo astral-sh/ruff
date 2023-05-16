@@ -560,13 +560,77 @@ impl Located for Expr {
 
 pub type ExprContext = crate::generic::ExprContext;
 
+pub type ExprContextLoad = crate::generic::ExprContextLoad;
+
+pub type ExprContextStore = crate::generic::ExprContextStore;
+
+pub type ExprContextDel = crate::generic::ExprContextDel;
+
 pub type Boolop = crate::generic::Boolop;
+
+pub type BoolopAnd = crate::generic::BoolopAnd;
+
+pub type BoolopOr = crate::generic::BoolopOr;
 
 pub type Operator = crate::generic::Operator;
 
+pub type OperatorAdd = crate::generic::OperatorAdd;
+
+pub type OperatorSub = crate::generic::OperatorSub;
+
+pub type OperatorMult = crate::generic::OperatorMult;
+
+pub type OperatorMatMult = crate::generic::OperatorMatMult;
+
+pub type OperatorDiv = crate::generic::OperatorDiv;
+
+pub type OperatorMod = crate::generic::OperatorMod;
+
+pub type OperatorPow = crate::generic::OperatorPow;
+
+pub type OperatorLShift = crate::generic::OperatorLShift;
+
+pub type OperatorRShift = crate::generic::OperatorRShift;
+
+pub type OperatorBitOr = crate::generic::OperatorBitOr;
+
+pub type OperatorBitXor = crate::generic::OperatorBitXor;
+
+pub type OperatorBitAnd = crate::generic::OperatorBitAnd;
+
+pub type OperatorFloorDiv = crate::generic::OperatorFloorDiv;
+
 pub type Unaryop = crate::generic::Unaryop;
 
+pub type UnaryopInvert = crate::generic::UnaryopInvert;
+
+pub type UnaryopNot = crate::generic::UnaryopNot;
+
+pub type UnaryopUAdd = crate::generic::UnaryopUAdd;
+
+pub type UnaryopUSub = crate::generic::UnaryopUSub;
+
 pub type Cmpop = crate::generic::Cmpop;
+
+pub type CmpopEq = crate::generic::CmpopEq;
+
+pub type CmpopNotEq = crate::generic::CmpopNotEq;
+
+pub type CmpopLt = crate::generic::CmpopLt;
+
+pub type CmpopLtE = crate::generic::CmpopLtE;
+
+pub type CmpopGt = crate::generic::CmpopGt;
+
+pub type CmpopGtE = crate::generic::CmpopGtE;
+
+pub type CmpopIs = crate::generic::CmpopIs;
+
+pub type CmpopIsNot = crate::generic::CmpopIsNot;
+
+pub type CmpopIn = crate::generic::CmpopIn;
+
+pub type CmpopNotIn = crate::generic::CmpopNotIn;
 
 pub type Comprehension = crate::generic::Comprehension<SourceRange>;
 

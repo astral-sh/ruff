@@ -1169,6 +1169,82 @@ pub enum ExprContext {
     Store,
     Del,
 }
+impl ExprContext {
+    #[inline]
+    pub const fn load(&self) -> Option<ExprContextLoad> {
+        match self {
+            ExprContext::Load => Some(ExprContextLoad),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn store(&self) -> Option<ExprContextStore> {
+        match self {
+            ExprContext::Store => Some(ExprContextStore),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn del(&self) -> Option<ExprContextDel> {
+        match self {
+            ExprContext::Del => Some(ExprContextDel),
+            _ => None,
+        }
+    }
+}
+
+pub struct ExprContextLoad;
+impl From<ExprContextLoad> for ExprContext {
+    fn from(_: ExprContextLoad) -> Self {
+        ExprContext::Load
+    }
+}
+impl Node for ExprContextLoad {
+    const NAME: &'static str = "Load";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<ExprContext> for ExprContextLoad {
+    #[inline]
+    fn eq(&self, other: &ExprContext) -> bool {
+        matches!(other, ExprContext::Load)
+    }
+}
+
+pub struct ExprContextStore;
+impl From<ExprContextStore> for ExprContext {
+    fn from(_: ExprContextStore) -> Self {
+        ExprContext::Store
+    }
+}
+impl Node for ExprContextStore {
+    const NAME: &'static str = "Store";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<ExprContext> for ExprContextStore {
+    #[inline]
+    fn eq(&self, other: &ExprContext) -> bool {
+        matches!(other, ExprContext::Store)
+    }
+}
+
+pub struct ExprContextDel;
+impl From<ExprContextDel> for ExprContext {
+    fn from(_: ExprContextDel) -> Self {
+        ExprContext::Del
+    }
+}
+impl Node for ExprContextDel {
+    const NAME: &'static str = "Del";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<ExprContext> for ExprContextDel {
+    #[inline]
+    fn eq(&self, other: &ExprContext) -> bool {
+        matches!(other, ExprContext::Del)
+    }
+}
 
 impl Node for ExprContext {
     const NAME: &'static str = "expr_context";
@@ -1179,6 +1255,57 @@ impl Node for ExprContext {
 pub enum Boolop {
     And,
     Or,
+}
+impl Boolop {
+    #[inline]
+    pub const fn and(&self) -> Option<BoolopAnd> {
+        match self {
+            Boolop::And => Some(BoolopAnd),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn or(&self) -> Option<BoolopOr> {
+        match self {
+            Boolop::Or => Some(BoolopOr),
+            _ => None,
+        }
+    }
+}
+
+pub struct BoolopAnd;
+impl From<BoolopAnd> for Boolop {
+    fn from(_: BoolopAnd) -> Self {
+        Boolop::And
+    }
+}
+impl Node for BoolopAnd {
+    const NAME: &'static str = "And";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Boolop> for BoolopAnd {
+    #[inline]
+    fn eq(&self, other: &Boolop) -> bool {
+        matches!(other, Boolop::And)
+    }
+}
+
+pub struct BoolopOr;
+impl From<BoolopOr> for Boolop {
+    fn from(_: BoolopOr) -> Self {
+        Boolop::Or
+    }
+}
+impl Node for BoolopOr {
+    const NAME: &'static str = "Or";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Boolop> for BoolopOr {
+    #[inline]
+    fn eq(&self, other: &Boolop) -> bool {
+        matches!(other, Boolop::Or)
+    }
 }
 
 impl Node for Boolop {
@@ -1202,6 +1329,332 @@ pub enum Operator {
     BitAnd,
     FloorDiv,
 }
+impl Operator {
+    #[inline]
+    pub const fn operator_add(&self) -> Option<OperatorAdd> {
+        match self {
+            Operator::Add => Some(OperatorAdd),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_sub(&self) -> Option<OperatorSub> {
+        match self {
+            Operator::Sub => Some(OperatorSub),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_mult(&self) -> Option<OperatorMult> {
+        match self {
+            Operator::Mult => Some(OperatorMult),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_mat_mult(&self) -> Option<OperatorMatMult> {
+        match self {
+            Operator::MatMult => Some(OperatorMatMult),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_div(&self) -> Option<OperatorDiv> {
+        match self {
+            Operator::Div => Some(OperatorDiv),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_mod(&self) -> Option<OperatorMod> {
+        match self {
+            Operator::Mod => Some(OperatorMod),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_pow(&self) -> Option<OperatorPow> {
+        match self {
+            Operator::Pow => Some(OperatorPow),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_l_shift(&self) -> Option<OperatorLShift> {
+        match self {
+            Operator::LShift => Some(OperatorLShift),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_r_shift(&self) -> Option<OperatorRShift> {
+        match self {
+            Operator::RShift => Some(OperatorRShift),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_bit_or(&self) -> Option<OperatorBitOr> {
+        match self {
+            Operator::BitOr => Some(OperatorBitOr),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_bit_xor(&self) -> Option<OperatorBitXor> {
+        match self {
+            Operator::BitXor => Some(OperatorBitXor),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_bit_and(&self) -> Option<OperatorBitAnd> {
+        match self {
+            Operator::BitAnd => Some(OperatorBitAnd),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn operator_floor_div(&self) -> Option<OperatorFloorDiv> {
+        match self {
+            Operator::FloorDiv => Some(OperatorFloorDiv),
+            _ => None,
+        }
+    }
+}
+
+pub struct OperatorAdd;
+impl From<OperatorAdd> for Operator {
+    fn from(_: OperatorAdd) -> Self {
+        Operator::Add
+    }
+}
+impl Node for OperatorAdd {
+    const NAME: &'static str = "Add";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorAdd {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::Add)
+    }
+}
+
+pub struct OperatorSub;
+impl From<OperatorSub> for Operator {
+    fn from(_: OperatorSub) -> Self {
+        Operator::Sub
+    }
+}
+impl Node for OperatorSub {
+    const NAME: &'static str = "Sub";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorSub {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::Sub)
+    }
+}
+
+pub struct OperatorMult;
+impl From<OperatorMult> for Operator {
+    fn from(_: OperatorMult) -> Self {
+        Operator::Mult
+    }
+}
+impl Node for OperatorMult {
+    const NAME: &'static str = "Mult";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorMult {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::Mult)
+    }
+}
+
+pub struct OperatorMatMult;
+impl From<OperatorMatMult> for Operator {
+    fn from(_: OperatorMatMult) -> Self {
+        Operator::MatMult
+    }
+}
+impl Node for OperatorMatMult {
+    const NAME: &'static str = "MatMult";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorMatMult {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::MatMult)
+    }
+}
+
+pub struct OperatorDiv;
+impl From<OperatorDiv> for Operator {
+    fn from(_: OperatorDiv) -> Self {
+        Operator::Div
+    }
+}
+impl Node for OperatorDiv {
+    const NAME: &'static str = "Div";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorDiv {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::Div)
+    }
+}
+
+pub struct OperatorMod;
+impl From<OperatorMod> for Operator {
+    fn from(_: OperatorMod) -> Self {
+        Operator::Mod
+    }
+}
+impl Node for OperatorMod {
+    const NAME: &'static str = "Mod";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorMod {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::Mod)
+    }
+}
+
+pub struct OperatorPow;
+impl From<OperatorPow> for Operator {
+    fn from(_: OperatorPow) -> Self {
+        Operator::Pow
+    }
+}
+impl Node for OperatorPow {
+    const NAME: &'static str = "Pow";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorPow {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::Pow)
+    }
+}
+
+pub struct OperatorLShift;
+impl From<OperatorLShift> for Operator {
+    fn from(_: OperatorLShift) -> Self {
+        Operator::LShift
+    }
+}
+impl Node for OperatorLShift {
+    const NAME: &'static str = "LShift";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorLShift {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::LShift)
+    }
+}
+
+pub struct OperatorRShift;
+impl From<OperatorRShift> for Operator {
+    fn from(_: OperatorRShift) -> Self {
+        Operator::RShift
+    }
+}
+impl Node for OperatorRShift {
+    const NAME: &'static str = "RShift";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorRShift {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::RShift)
+    }
+}
+
+pub struct OperatorBitOr;
+impl From<OperatorBitOr> for Operator {
+    fn from(_: OperatorBitOr) -> Self {
+        Operator::BitOr
+    }
+}
+impl Node for OperatorBitOr {
+    const NAME: &'static str = "BitOr";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorBitOr {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::BitOr)
+    }
+}
+
+pub struct OperatorBitXor;
+impl From<OperatorBitXor> for Operator {
+    fn from(_: OperatorBitXor) -> Self {
+        Operator::BitXor
+    }
+}
+impl Node for OperatorBitXor {
+    const NAME: &'static str = "BitXor";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorBitXor {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::BitXor)
+    }
+}
+
+pub struct OperatorBitAnd;
+impl From<OperatorBitAnd> for Operator {
+    fn from(_: OperatorBitAnd) -> Self {
+        Operator::BitAnd
+    }
+}
+impl Node for OperatorBitAnd {
+    const NAME: &'static str = "BitAnd";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorBitAnd {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::BitAnd)
+    }
+}
+
+pub struct OperatorFloorDiv;
+impl From<OperatorFloorDiv> for Operator {
+    fn from(_: OperatorFloorDiv) -> Self {
+        Operator::FloorDiv
+    }
+}
+impl Node for OperatorFloorDiv {
+    const NAME: &'static str = "FloorDiv";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Operator> for OperatorFloorDiv {
+    #[inline]
+    fn eq(&self, other: &Operator) -> bool {
+        matches!(other, Operator::FloorDiv)
+    }
+}
 
 impl Node for Operator {
     const NAME: &'static str = "operator";
@@ -1214,6 +1667,107 @@ pub enum Unaryop {
     Not,
     UAdd,
     USub,
+}
+impl Unaryop {
+    #[inline]
+    pub const fn invert(&self) -> Option<UnaryopInvert> {
+        match self {
+            Unaryop::Invert => Some(UnaryopInvert),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn not(&self) -> Option<UnaryopNot> {
+        match self {
+            Unaryop::Not => Some(UnaryopNot),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn u_add(&self) -> Option<UnaryopUAdd> {
+        match self {
+            Unaryop::UAdd => Some(UnaryopUAdd),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn u_sub(&self) -> Option<UnaryopUSub> {
+        match self {
+            Unaryop::USub => Some(UnaryopUSub),
+            _ => None,
+        }
+    }
+}
+
+pub struct UnaryopInvert;
+impl From<UnaryopInvert> for Unaryop {
+    fn from(_: UnaryopInvert) -> Self {
+        Unaryop::Invert
+    }
+}
+impl Node for UnaryopInvert {
+    const NAME: &'static str = "Invert";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Unaryop> for UnaryopInvert {
+    #[inline]
+    fn eq(&self, other: &Unaryop) -> bool {
+        matches!(other, Unaryop::Invert)
+    }
+}
+
+pub struct UnaryopNot;
+impl From<UnaryopNot> for Unaryop {
+    fn from(_: UnaryopNot) -> Self {
+        Unaryop::Not
+    }
+}
+impl Node for UnaryopNot {
+    const NAME: &'static str = "Not";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Unaryop> for UnaryopNot {
+    #[inline]
+    fn eq(&self, other: &Unaryop) -> bool {
+        matches!(other, Unaryop::Not)
+    }
+}
+
+pub struct UnaryopUAdd;
+impl From<UnaryopUAdd> for Unaryop {
+    fn from(_: UnaryopUAdd) -> Self {
+        Unaryop::UAdd
+    }
+}
+impl Node for UnaryopUAdd {
+    const NAME: &'static str = "UAdd";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Unaryop> for UnaryopUAdd {
+    #[inline]
+    fn eq(&self, other: &Unaryop) -> bool {
+        matches!(other, Unaryop::UAdd)
+    }
+}
+
+pub struct UnaryopUSub;
+impl From<UnaryopUSub> for Unaryop {
+    fn from(_: UnaryopUSub) -> Self {
+        Unaryop::USub
+    }
+}
+impl Node for UnaryopUSub {
+    const NAME: &'static str = "USub";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Unaryop> for UnaryopUSub {
+    #[inline]
+    fn eq(&self, other: &Unaryop) -> bool {
+        matches!(other, Unaryop::USub)
+    }
 }
 
 impl Node for Unaryop {
@@ -1233,6 +1787,257 @@ pub enum Cmpop {
     IsNot,
     In,
     NotIn,
+}
+impl Cmpop {
+    #[inline]
+    pub const fn cmpop_eq(&self) -> Option<CmpopEq> {
+        match self {
+            Cmpop::Eq => Some(CmpopEq),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_not_eq(&self) -> Option<CmpopNotEq> {
+        match self {
+            Cmpop::NotEq => Some(CmpopNotEq),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_lt(&self) -> Option<CmpopLt> {
+        match self {
+            Cmpop::Lt => Some(CmpopLt),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_lt_e(&self) -> Option<CmpopLtE> {
+        match self {
+            Cmpop::LtE => Some(CmpopLtE),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_gt(&self) -> Option<CmpopGt> {
+        match self {
+            Cmpop::Gt => Some(CmpopGt),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_gt_e(&self) -> Option<CmpopGtE> {
+        match self {
+            Cmpop::GtE => Some(CmpopGtE),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_is(&self) -> Option<CmpopIs> {
+        match self {
+            Cmpop::Is => Some(CmpopIs),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_is_not(&self) -> Option<CmpopIsNot> {
+        match self {
+            Cmpop::IsNot => Some(CmpopIsNot),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_in(&self) -> Option<CmpopIn> {
+        match self {
+            Cmpop::In => Some(CmpopIn),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    pub const fn cmpop_not_in(&self) -> Option<CmpopNotIn> {
+        match self {
+            Cmpop::NotIn => Some(CmpopNotIn),
+            _ => None,
+        }
+    }
+}
+
+pub struct CmpopEq;
+impl From<CmpopEq> for Cmpop {
+    fn from(_: CmpopEq) -> Self {
+        Cmpop::Eq
+    }
+}
+impl Node for CmpopEq {
+    const NAME: &'static str = "Eq";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopEq {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::Eq)
+    }
+}
+
+pub struct CmpopNotEq;
+impl From<CmpopNotEq> for Cmpop {
+    fn from(_: CmpopNotEq) -> Self {
+        Cmpop::NotEq
+    }
+}
+impl Node for CmpopNotEq {
+    const NAME: &'static str = "NotEq";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopNotEq {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::NotEq)
+    }
+}
+
+pub struct CmpopLt;
+impl From<CmpopLt> for Cmpop {
+    fn from(_: CmpopLt) -> Self {
+        Cmpop::Lt
+    }
+}
+impl Node for CmpopLt {
+    const NAME: &'static str = "Lt";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopLt {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::Lt)
+    }
+}
+
+pub struct CmpopLtE;
+impl From<CmpopLtE> for Cmpop {
+    fn from(_: CmpopLtE) -> Self {
+        Cmpop::LtE
+    }
+}
+impl Node for CmpopLtE {
+    const NAME: &'static str = "LtE";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopLtE {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::LtE)
+    }
+}
+
+pub struct CmpopGt;
+impl From<CmpopGt> for Cmpop {
+    fn from(_: CmpopGt) -> Self {
+        Cmpop::Gt
+    }
+}
+impl Node for CmpopGt {
+    const NAME: &'static str = "Gt";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopGt {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::Gt)
+    }
+}
+
+pub struct CmpopGtE;
+impl From<CmpopGtE> for Cmpop {
+    fn from(_: CmpopGtE) -> Self {
+        Cmpop::GtE
+    }
+}
+impl Node for CmpopGtE {
+    const NAME: &'static str = "GtE";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopGtE {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::GtE)
+    }
+}
+
+pub struct CmpopIs;
+impl From<CmpopIs> for Cmpop {
+    fn from(_: CmpopIs) -> Self {
+        Cmpop::Is
+    }
+}
+impl Node for CmpopIs {
+    const NAME: &'static str = "Is";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopIs {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::Is)
+    }
+}
+
+pub struct CmpopIsNot;
+impl From<CmpopIsNot> for Cmpop {
+    fn from(_: CmpopIsNot) -> Self {
+        Cmpop::IsNot
+    }
+}
+impl Node for CmpopIsNot {
+    const NAME: &'static str = "IsNot";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopIsNot {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::IsNot)
+    }
+}
+
+pub struct CmpopIn;
+impl From<CmpopIn> for Cmpop {
+    fn from(_: CmpopIn) -> Self {
+        Cmpop::In
+    }
+}
+impl Node for CmpopIn {
+    const NAME: &'static str = "In";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopIn {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::In)
+    }
+}
+
+pub struct CmpopNotIn;
+impl From<CmpopNotIn> for Cmpop {
+    fn from(_: CmpopNotIn) -> Self {
+        Cmpop::NotIn
+    }
+}
+impl Node for CmpopNotIn {
+    const NAME: &'static str = "NotIn";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+impl std::cmp::PartialEq<Cmpop> for CmpopNotIn {
+    #[inline]
+    fn eq(&self, other: &Cmpop) -> bool {
+        matches!(other, Cmpop::NotIn)
+    }
 }
 
 impl Node for Cmpop {
