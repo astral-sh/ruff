@@ -160,6 +160,7 @@ if alpha[:-i]:
     *a, b = (1, 2, 3)
 
 
+@decorator
 def squares(n):
     return (i**2 for i in range(n))
 
