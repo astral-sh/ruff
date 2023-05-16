@@ -200,7 +200,7 @@ mod tests {
                         group(&format_args![
                             if_group_breaks(&text("\"")),
                             soft_line_break_or_space(),
-                            if_group_breaks(&text("\""))
+                            if_group_breaks(&text("\" "))
                         ])
                         .fmt(f)
                     });

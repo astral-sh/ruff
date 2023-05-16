@@ -5,5 +5,5 @@ expression: "output.print().expect(\"Printing to succeed\").as_code()"
 "aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"
 (
 	"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg"
-	"hh"
+	" hh"
 )
