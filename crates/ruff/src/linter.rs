@@ -88,7 +88,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(&tokens, locator));
+        doc_lines.extend(doc_lines_from_tokens(&tokens));
     }
 
     // Run the token-based rules.

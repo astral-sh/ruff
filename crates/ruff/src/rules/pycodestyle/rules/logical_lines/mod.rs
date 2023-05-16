@@ -89,8 +89,7 @@ impl<'a> LogicalLines<'a> {
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
         let mut parens: u32 = 0;
 
-        let mut iter = tokens.iter().flatten().peekable();
-        while let Some((token, range)) = iter.next() {
+        for (token, range) in tokens.iter().flatten() {
             let token_kind = TokenKind::from_token(token);
             builder.push_token(token_kind, *range);
 
@@ -100,24 +99,6 @@ impl<'a> LogicalLines<'a> {
                 }
                 TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
                     parens -= 1;
-                }
-                TokenKind::Comment if parens == 0 => {
-                    // If a comment is followed by a newline, ignore it, and we'll build the line
-                    // when we process the newline. Otherwise, we'll end up creating one logical
-                    // line here, and then another, empty logical line when we process the newline.
-                    //
-                    // The lexer will always emit a newline after a comment _unless_ the comment
-                    // appears at the start of a logical line.
-                    if let Some((token, ..)) = iter.peek() {
-                        let token_kind = TokenKind::from_token(token);
-                        if matches!(
-                            token_kind,
-                            TokenKind::Newline | TokenKind::NonLogicalNewline
-                        ) {
-                            continue;
-                        }
-                    }
-                    builder.finish_line();
                 }
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     builder.finish_line();
