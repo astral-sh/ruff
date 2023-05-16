@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 
 
 /// ## What it does
-/// Checks for uses of `raise` directly after a `rescue`
+/// Checks for uses of `raise` directly after a `rescue`.
 ///
 /// ## Why is this bad?
 /// Catching an error just to reraise it is pointless. Instead, remove error-handling and let the error propogate naturally

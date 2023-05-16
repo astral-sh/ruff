@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/tryceratops/mod.rs
+---
+TRY302.py:13:9: TRY302 Remove this exception handler as the error is immediately re-raised
+   |
+13 |         process()
+14 |     except Exception:
+15 |         raise
+   |         ^^^^^ TRY302
+16 | 
+17 | def bad():
+   |
+
+TRY302.py:20:9: TRY302 Remove this exception handler as the error is immediately re-raised
+   |
+20 |     except:
+21 |         # I am a comment, not a statement!
+22 |         raise
+   |         ^^^^^ TRY302
+23 | 
+24 | def fine():
+   |
+
+
