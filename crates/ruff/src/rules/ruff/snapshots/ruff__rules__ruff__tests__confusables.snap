@@ -1,13 +1,13 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-confusables.py:1:6: RUF001 [*] String contains ambiguous unicode character `𝐁` (did you mean `B`?)
+confusables.py:1:6: RUF001 [*] String contains ambiguous MATHEMATICAL BOLD CAPITAL B `𝐁`. Did you mean LATIN CAPITAL LETTER B `B`?
   |
 1 | x = "𝐁ad string"
   |      ^ RUF001
 2 | y = "−"
   |
-  = help: Replace `𝐁` with `B`
+  = help: Replace MATHEMATICAL BOLD CAPITAL B `𝐁` with LATIN CAPITAL LETTER B `B`
 
 ℹ Suggested fix
 1   |-x = "𝐁ad string"

@@ -9,6 +9,8 @@ use crate::rules::ruff::rules::confusables::CONFUSABLES;
 use crate::rules::ruff::rules::Context;
 use crate::settings::Settings;
 
+extern crate unicode_names2;
+
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
     confusable: char,
@@ -23,8 +25,11 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             representant,
         } = self;
         format!(
-            "String contains ambiguous unicode character `{confusable}` (did you mean \
-             `{representant}`?)"
+            "String contains ambiguous {} `{}`. Did you mean {} `{}`?",
+            unicode_names2::name(*confusable).unwrap(),
+            confusable,
+            unicode_names2::name(*representant).unwrap(),
+            representant,
         )
     }
 
@@ -33,7 +38,13 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             confusable,
             representant,
         } = self;
-        format!("Replace `{confusable}` with `{representant}`")
+        format!(
+            "Replace {} `{}` with {} `{}`",
+            unicode_names2::name(*confusable).unwrap(),
+            confusable,
+            unicode_names2::name(*representant).unwrap(),
+            representant,
+        )
     }
 }
 
