@@ -1,13 +1,13 @@
-use ruff_python_ast::helpers::RaiseStatementVisitor;
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, ExprKind, Stmt, StmtKind};
+
+
+use rustpython_parser::ast::{self, Excepthandler, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor::Visitor;
+
 
 use crate::checkers::ast::Checker;
-use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
+
 
 /// ## What it does
 /// Checks for uses of `raise` directly after a `rescue`
