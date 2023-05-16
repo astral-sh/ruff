@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{self, Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::context::Context;
+use ruff_python_semantic::scope::{ClassDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -46,6 +47,19 @@ impl AlwaysAutofixableViolation for AssignmentDefaultInStub {
 
     fn autofix_title(&self) -> String {
         "Replace default value with `...`".to_string()
+    }
+}
+
+#[violation]
+pub struct UnannotatedAssignmentInStub {
+    name: String,
+}
+
+impl Violation for UnannotatedAssignmentInStub {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnannotatedAssignmentInStub { name } = self;
+        format!("Need type annotation for `{name}`")
     }
 }
 
@@ -285,6 +299,21 @@ fn is_special_assignment(context: &Context, target: &Expr) -> bool {
     }
 }
 
+/// Returns `true` if the a class is an enum, based on its base classes.
+fn is_enum(context: &Context, bases: &[Expr]) -> bool {
+    return bases.iter().any(|expr| {
+        context.resolve_call_path(expr).map_or(false, |call_path| {
+            matches!(
+                call_path.as_slice(),
+                [
+                    "enum",
+                    "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
+                ]
+            )
+        })
+    });
+}
+
 /// PYI011
 pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
     if !args.defaults.is_empty() {
@@ -401,7 +430,14 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
 
 /// PYI015
 pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    if targets.len() == 1 && is_special_assignment(&checker.ctx, &targets[0]) {
+    if targets.len() != 1 {
+        return;
+    }
+    let target = &targets[0];
+    if !matches!(target.node, ExprKind::Name(..)) {
+        return;
+    }
+    if is_special_assignment(&checker.ctx, target) {
         return;
     }
     if is_type_var_like_call(&checker.ctx, value) {
@@ -454,4 +490,43 @@ pub(crate) fn annotated_assignment_default_in_stub(
         )));
     }
     checker.diagnostics.push(diagnostic);
+}
+
+/// PYI052
+pub(crate) fn unannotated_assignment_in_stub(
+    checker: &mut Checker,
+    targets: &[Expr],
+    value: &Expr,
+) {
+    if targets.len() != 1 {
+        return;
+    }
+    let target = &targets[0];
+    let ExprKind::Name(ast::ExprName { id, .. }) = &target.node else {
+        return;
+    };
+    if is_special_assignment(&checker.ctx, target) {
+        return;
+    }
+    if is_type_var_like_call(&checker.ctx, value) {
+        return;
+    }
+    if is_valid_default_value_without_annotation(value) {
+        return;
+    }
+    if !is_valid_default_value_with_annotation(value, checker, true) {
+        return;
+    }
+
+    if let ScopeKind::Class(ClassDef { bases, .. }) = &checker.ctx.scope().kind {
+        if is_enum(&checker.ctx, bases) {
+            return;
+        }
+    }
+    checker.diagnostics.push(Diagnostic::new(
+        UnannotatedAssignmentInStub {
+            name: id.to_string(),
+        },
+        value.range(),
+    ));
 }

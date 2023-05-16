@@ -610,6 +610,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
         (Flake8Pyi, "042") => Rule::SnakeCaseTypeAlias,
         (Flake8Pyi, "043") => Rule::TSuffixedTypeAlias,
+        (Flake8Pyi, "052") => Rule::UnannotatedAssignmentInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::PytestFixtureIncorrectParenthesesStyle,
