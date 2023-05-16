@@ -50,3 +50,5 @@ pub use optimizer::ConstantOptimizer;
 
 #[cfg(feature = "pyo3")]
 pub mod pyo3;
+#[cfg(feature = "pyo3-wrapper")]
+pub mod pyo3_wrapper;

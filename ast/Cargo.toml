@@ -17,6 +17,10 @@ visitor = []
 all-nodes-with-ranges = []
 pyo3 = ["dep:pyo3", "num-complex", "once_cell"]
 
+# This feature is experimental
+# It reimplements AST types, but currently both slower than python AST types and limited to use in other API
+pyo3-wrapper = ["pyo3"]
+
 [dependencies]
 rustpython-parser-core = { workspace = true }
 rustpython-literal = { workspace = true, optional = true }

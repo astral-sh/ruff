@@ -1,8 +1,10 @@
 use crate::{source_code::SourceRange, text_size::TextRange, ConversionFlag, Node};
 use num_complex::Complex64;
 use once_cell::sync::OnceCell;
-use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyList, PyTuple};
+use pyo3::{
+    prelude::*,
+    types::{PyBytes, PyList, PyString, PyTuple},
+};
 
 pub trait Pyo3Node {
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
@@ -113,11 +115,39 @@ impl AST {
 }
 
 fn cache_py_type<N: Pyo3Node + Node>(ast_module: &PyAny) -> PyResult<()> {
-    let class = ast_module.getattr(N::NAME).unwrap();
-    let base = class.getattr("__new__").unwrap();
+    let class = ast_module.getattr(N::NAME)?;
+    let base = if std::mem::size_of::<N>() == 0 {
+        class.call0()?
+    } else {
+        class.getattr("__new__")?
+    };
     N::py_type_cache().get_or_init(|| (class.into(), base.into()));
-
     Ok(())
+}
+
+struct AstKeyCache {
+    lineno: Py<PyString>,
+    col_offset: Py<PyString>,
+    end_lineno: Py<PyString>,
+    end_col_offset: Py<PyString>,
+}
+
+fn ast_key_cache() -> &'static OnceCell<AstKeyCache> {
+    {
+        static PY_TYPE: OnceCell<AstKeyCache> = OnceCell::new();
+        &PY_TYPE
+    }
+}
+
+pub fn init(py: Python) -> PyResult<()> {
+    ast_key_cache().get_or_init(|| AstKeyCache {
+        lineno: pyo3::intern!(py, "lineno").into_py(py),
+        col_offset: pyo3::intern!(py, "col_offset").into_py(py),
+        end_lineno: pyo3::intern!(py, "end_lineno").into_py(py),
+        end_col_offset: pyo3::intern!(py, "end_col_offset").into_py(py),
+    });
+
+    init_types(py)
 }
 
 include!("gen/to_pyo3.rs");
