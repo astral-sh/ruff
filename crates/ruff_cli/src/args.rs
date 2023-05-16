@@ -57,6 +57,12 @@ pub enum Command {
     /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
+    /// Format the given files, or stdin when using `-`.
+    #[doc(hidden)]
+    Format {
+        /// List of files or directories to format or `-` for stdin
+        files: Vec<PathBuf>,
+    },
 }
 
 #[derive(Debug, clap::Args)]

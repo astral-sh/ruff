@@ -1,9 +1,9 @@
-use std::io::{self, BufWriter};
+use std::io::{self, stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::CommandFactory;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
@@ -13,6 +13,7 @@ use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
 
 use crate::args::{Args, CheckArgs, Command};
+use crate::commands::run_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -117,8 +118,31 @@ quoting the executed command, along with the relevant file contents and `pyproje
             shell.generate(&mut Args::command(), &mut io::stdout());
         }
         Command::Check(args) => return check(args, log_level),
+        Command::Format { files } => return format(&files),
     }
 
+    Ok(ExitStatus::Success)
+}
+
+#[cfg_attr(not(feature = "format"), allow(unused))]
+fn format(files: &[PathBuf]) -> Result<ExitStatus> {
+    // dummy
+    let format_code = |code: &str| code.replace("# DEL", "");
+
+    let is_stdin = files == vec![PathBuf::from("-")];
+    if is_stdin {
+        let unformatted = read_from_stdin()?;
+        let formatted = format_code(&unformatted);
+        stdout().lock().write_all(formatted.as_bytes())?;
+    } else {
+        for file in files {
+            let unformatted = std::fs::read_to_string(file)
+                .with_context(|| format!("Could not read {}: ", file.display()))?;
+            let formatted = format_code(&unformatted);
+            std::fs::write(file, formatted)
+                .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
+        }
+    }
     Ok(ExitStatus::Success)
 }
 
