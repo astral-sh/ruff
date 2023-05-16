@@ -30,6 +30,7 @@ log = "0.4.16"
 num-complex = "0.4.0"
 num-bigint = "0.4.3"
 num-traits = "0.2"
+pyo3 = { version = "0.18.3" }
 rand = "0.8.5"
 serde = "1.0"
 static_assertions = "1.1"

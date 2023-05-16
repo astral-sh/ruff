@@ -47,3 +47,6 @@ pub use visitor::Visitor;
 mod optimizer;
 #[cfg(feature = "constant-optimization")]
 pub use optimizer::ConstantOptimizer;
+
+#[cfg(feature = "pyo3")]
+pub mod pyo3;

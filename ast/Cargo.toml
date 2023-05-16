@@ -23,3 +23,6 @@ rustpython-literal = { workspace = true, optional = true }
 is-macro = { workspace = true }
 num-bigint = { workspace = true }
 static_assertions = "1.1.0"
+num-complex = { workspace = true }
+once_cell = { workspace = true }
+pyo3 = { workspace = true, optional = true, features = ["num-bigint", "num-complex"] }
