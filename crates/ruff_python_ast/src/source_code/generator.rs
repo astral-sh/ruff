@@ -5,7 +5,7 @@ use std::ops::Deref;
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
-    Excepthandler, Expr, Identifier, Int, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
+    Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
 };
 
 use crate::newlines::LineEnding;
@@ -1340,7 +1340,12 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_formatted<U>(&mut self, val: &Expr<U>, conversion: Int, spec: Option<&Expr<U>>) {
+    fn unparse_formatted<U>(
+        &mut self,
+        val: &Expr<U>,
+        conversion: ConversionFlag,
+        spec: Option<&Expr<U>>,
+    ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
@@ -1352,10 +1357,10 @@ impl<'a> Generator<'a> {
         self.p(brace);
         self.buffer += &generator.buffer;
 
-        if conversion.to_u32() != ConversionFlag::None as u32 {
+        if !conversion.is_none() {
             self.p("!");
             #[allow(clippy::cast_possible_truncation)]
-            self.p(&format!("{}", conversion.to_u32() as u8 as char));
+            self.p(&format!("{}", conversion as u8 as char));
         }
 
         if let Some(spec) = spec {

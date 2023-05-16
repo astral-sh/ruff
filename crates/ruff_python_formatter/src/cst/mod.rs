@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 use itertools::Itertools;
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{Constant, Ranged};
+use rustpython_parser::ast::{Constant, ConversionFlag, Ranged};
 use rustpython_parser::{ast, Mode};
 
 use ruff_python_ast::source_code::Locator;
@@ -410,7 +410,7 @@ pub enum ExprKind {
     },
     FormattedValue {
         value: Box<Expr>,
-        conversion: usize,
+        conversion: ConversionFlag,
         format_spec: Option<Box<Expr>>,
     },
     JoinedStr {
@@ -2038,7 +2038,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 range,
                 node: ExprKind::FormattedValue {
                     value: Box::new((*value, locator).into()),
-                    conversion: conversion.to_usize(),
+                    conversion,
                     format_spec: format_spec.map(|f| Box::new((*f, locator).into())),
                 },
                 trivia: vec![],

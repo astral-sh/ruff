@@ -31,10 +31,10 @@ proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
-ruff_text_size = { git = "https://github.com/RustPython/Parser.git", rev = "735c06d5f43da05d191f32442224f082f1d202ee" }
-rustpython-format = { git = "https://github.com/RustPython/Parser.git", rev = "735c06d5f43da05d191f32442224f082f1d202ee" }
-rustpython-literal = { git = "https://github.com/RustPython/Parser.git", rev = "735c06d5f43da05d191f32442224f082f1d202ee" }
-rustpython-parser = { git = "https://github.com/RustPython/Parser.git", rev = "735c06d5f43da05d191f32442224f082f1d202ee", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
+ruff_text_size = { git = "https://github.com/RustPython/Parser.git", rev = "e820928f11a2453314ad4d5ce23f066d1d3faf73" }
+rustpython-format = { git = "https://github.com/RustPython/Parser.git", rev = "e820928f11a2453314ad4d5ce23f066d1d3faf73" }
+rustpython-literal = { git = "https://github.com/RustPython/Parser.git", rev = "e820928f11a2453314ad4d5ce23f066d1d3faf73" }
+rustpython-parser = { git = "https://github.com/RustPython/Parser.git", rev = "e820928f11a2453314ad4d5ce23f066d1d3faf73", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }
