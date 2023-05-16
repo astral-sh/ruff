@@ -304,6 +304,7 @@ fn find_highest_common_ancestor_module(module: &Module) -> &Module {
     }
 }
 
+#[derive(Debug)]
 struct Test {
     path: PathBuf,
     test_fn: ItemFn,
@@ -316,7 +317,7 @@ impl Test {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Module {
     children: BTreeMap<String, Child>,
 }
@@ -341,6 +342,7 @@ impl Module {
     }
 }
 
+#[derive(Debug)]
 enum Child {
     Module(Module),
     Test(Test),
@@ -355,7 +357,7 @@ impl Child {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Modules {
     root: Module,
 }
