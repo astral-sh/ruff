@@ -1,6 +1,6 @@
 
 
-use rustpython_parser::ast::{self, Excepthandler, Stmt, StmtKind, ExcepthandlerKind};
+use rustpython_parser::ast::{self, Excepthandler, StmtKind, ExcepthandlerKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
