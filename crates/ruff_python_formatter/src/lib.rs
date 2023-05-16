@@ -61,19 +61,14 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
 mod tests {
     use std::fmt::{Formatter, Write};
     use std::fs;
-    use std::hash::Hasher;
     use std::path::Path;
 
     use anyhow::Result;
     use insta::assert_snapshot;
-    use ruff_formatter::prelude::{
-        format_once, format_with, group, if_group_breaks, soft_block_indent,
-    };
-    use ruff_formatter::{Format, FormatResult, SimpleFormatContext};
-    use ruff_text_size::TextSize;
-    use similar::TextDiff;
 
     use ruff_testing_macros::fixture;
+    use ruff_text_size::TextSize;
+    use similar::TextDiff;
 
     use crate::fmt;
 
@@ -188,12 +183,6 @@ mod tests {
         use ruff_formatter::prelude::*;
         use ruff_formatter::{format, format_args, write};
 
-        // 77 after g group (leading quote)
-        let fits =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"#;
-        let breaks =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh"#;
-
         struct FormatString<'a>(&'a str);
 
         impl Format<SimpleFormatContext> for FormatString<'_> {
@@ -217,10 +206,11 @@ mod tests {
                     });
 
                     while let Some(word) = words.next() {
-                        let format_word = format_once(|f| {
+                        let is_last = words.peek().is_none();
+                        let format_word = format_with(|f| {
                             write!(f, [dynamic_text(word, TextSize::default())])?;
 
-                            if words.peek().is_none() {
+                            if is_last {
                                 write!(f, [text("\"")])?;
                             }
 
@@ -244,17 +234,19 @@ mod tests {
             }
         }
 
+        // 77 after g group (leading quote)
+        let fits =
+            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"#;
+        let breaks =
+            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh"#;
+
         let output = format!(
             SimpleFormatContext::default(),
-            [
-                FormatString(&fits),
-                hard_line_break(),
-                FormatString(&breaks)
-            ]
+            [FormatString(fits), hard_line_break(), FormatString(breaks)]
         )
         .expect("Formatting to succeed");
 
-        assert_snapshot!(output.print().expect("Printing to succeed").as_code())
+        assert_snapshot!(output.print().expect("Printing to succeed").as_code());
     }
 
     struct Header<'a> {
