@@ -86,13 +86,19 @@ pub(crate) fn missing_whitespace_around_operator(
             );
 
             NeedsSpace::from(!slash_in_func)
-        } else if kind.is_unary() || kind == TokenKind::DoubleStar {
+        } else if kind.is_unary()
+            || matches!(
+                kind,
+                TokenKind::Star | TokenKind::DoubleStar | TokenKind::At
+            )
+        {
             let is_binary = prev_token.map_or(false, |prev_token| {
                 let prev_kind = prev_token.kind();
 
                 // Check if the operator is used as a binary operator.
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
+                // Allow decorators: @foo, @foo(1)
                 matches!(
                     prev_kind,
                     TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
