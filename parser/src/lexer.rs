@@ -641,9 +641,12 @@ where
                 }
                 Some('\n' | '\r') => {
                     // Empty line!
+                    #[cfg(feature = "full-lexer")]
                     let tok_start = self.get_pos();
                     self.next_char();
+                    #[cfg(feature = "full-lexer")]
                     let tok_end = self.get_pos();
+                    #[cfg(feature = "full-lexer")]
                     self.emit((Tok::NonLogicalNewline, TextRange::new(tok_start, tok_end)));
                     spaces = 0;
                     tabs = 0;
@@ -1506,6 +1509,7 @@ mod tests {
         ($($name:ident: $eol:expr,)*) => {
             $(
             #[test]
+            #[cfg(feature = "full-lexer")]
             fn $name() {
                 let source = format!("def foo():{}   return 99{}{}", $eol, $eol, $eol);
                 let tokens = lex_source(&source);
@@ -1543,6 +1547,7 @@ mod tests {
         ($($name:ident: $eol:expr,)*) => {
         $(
             #[test]
+            #[cfg(feature = "full-lexer")]
             fn $name() {
                 let source = format!("def foo():{} if x:{}{}  return 99{}{}", $eol, $eol, $eol, $eol, $eol);
                 let tokens = lex_source(&source);
@@ -1583,6 +1588,7 @@ mod tests {
         ($($name:ident: $eol:expr,)*) => {
         $(
             #[test]
+            #[cfg(feature = "full-lexer")]
             fn $name() {
                 let source = format!("def foo():{}\tif x:{}{}\t return 99{}{}", $eol, $eol, $eol, $eol, $eol);
                 let tokens = lex_source(&source);
