@@ -82,7 +82,7 @@ impl Serialize for SerializedMessages<'_> {
             let value = json!({
                 "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
                 "severity": "major",
-                "fingerprint": fingerprint(message, start_location, end_location),
+                "fingerprint": fingerprint(message, &start_location, &end_location),
                 "location": {
                     "path": path,
                     "lines": lines
@@ -99,8 +99,8 @@ impl Serialize for SerializedMessages<'_> {
 /// Generate a unique fingerprint to identify a violation.
 fn fingerprint(
     message: &Message,
-    start_location: SourceLocation,
-    end_location: SourceLocation,
+    start_location: &SourceLocation,
+    end_location: &SourceLocation,
 ) -> String {
     let Message {
         kind,
