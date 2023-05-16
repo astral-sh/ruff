@@ -1,6 +1,6 @@
 
 
-use rustpython_parser::ast::{self, Excepthandler, StmtKind, ExcepthandlerKind};
+use rustpython_parser::ast::{self, Excepthandler, StmtKind, ExcepthandlerKind, Stmt, Attributed, Expr, ExprKind, ExprName, Identifier};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -43,16 +43,28 @@ impl Violation for PointlessRaise {
 
 /// TRY302
 pub(crate) fn pointless_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
-    for handler in handlers {
+    let handler_errs = handlers.iter().map(|handler| {
         let ExcepthandlerKind::ExceptHandler(handler) = &handler.node;
         let body = &handler.body;
 
-        if let Some(stmt) = body.first() {
-            if let StmtKind::Raise(ast::StmtRaise { exc: None, .. }) = &stmt.node {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(PointlessRaise, stmt.range()));
+        // Match if the body consists of a single `raise` statement and nothing else
+        if let [stmt @ Stmt { node: StmtKind::Raise(raise), .. }] = body.as_slice() {
+            //dbg!(&stmt, &raise);
+            //dbg!(&handler);
+            match raise.exc.as_ref().map(|e| &e.node) {
+                None => Some(Diagnostic::new(PointlessRaise, stmt.range())),
+                Some(ExprKind::Name(ExprName { id, .. })) if Some(id) == handler.name.as_ref() => Some(Diagnostic::new(PointlessRaise, stmt.range())),
+                _ => None
             }
+        } else {
+            None
+        }
+    }).collect::<Vec<_>>();
+
+    if handler_errs.iter().all(Option::is_some) {
+        // All handlers have diagnostics
+        for err in handler_errs {
+            checker.diagnostics.push(err.unwrap());
         }
     }
 }

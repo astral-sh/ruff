@@ -19,6 +19,62 @@ def bad():
         # I am a comment, not a statement!
         raise
 
+def bad():
+    try:
+        process()
+    except Exception:
+        raise
+
+def bad():
+    try:
+        process()
+    except Exception as e:
+        raise
+
+def bad():
+    try:
+        process()
+    except Exception as e:
+        raise e
+
+def bad():
+    try:
+        process()
+    except MyException:
+        raise
+    except Exception:
+        raise
+
+def bad():
+    try:
+        process()
+    except MyException as e:
+        raise e
+    except Exception as e:
+        raise e
+
+def bad():
+    try:
+        process()
+    except MyException as ex:
+        raise ex
+    except Exception as e:
+        raise e
+
+def fine():
+    try:
+        process()
+    except Exception as e:
+        raise ex
+
+def fine():
+    try:
+        process()
+    except MyException:
+        raise
+    except Exception:
+        print("bar")
+
 def fine():
     try:
         process()
@@ -38,7 +94,6 @@ def fine():
     except Exception:
         if True:
             raise
-
 
 def fine():
     try:
