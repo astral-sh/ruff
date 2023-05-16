@@ -196,14 +196,15 @@ pub(crate) const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use crate::registry::RuleNamespace;
-    use crate::rule_selector::{Linter, Rule, RuleCodePrefix};
-    use crate::RuleSelector;
     use itertools::Itertools;
+    use schemars::JsonSchema;
     use schemars::_serde_json::Value;
     use schemars::schema::{InstanceType, Schema, SchemaObject};
-    use schemars::JsonSchema;
     use strum::IntoEnumIterator;
+
+    use crate::registry::RuleNamespace;
+    use crate::rule_selector::{Linter, RuleCodePrefix};
+    use crate::RuleSelector;
 
     impl JsonSchema for RuleSelector {
         fn schema_name() -> String {
@@ -228,20 +229,6 @@ mod schema {
                     .into_iter()
                     .chain(
                         RuleCodePrefix::iter()
-                            .filter(|p| {
-                                // Once logical lines are active by default, please remove this.
-                                // This is here because generate-all output otherwise depends on
-                                // the feature sets which makes the test running with
-                                // `--all-features` fail
-                                !Rule::from_code(&format!(
-                                    "{}{}",
-                                    p.linter().common_prefix(),
-                                    p.short_code()
-                                ))
-                                .unwrap()
-                                .lint_source()
-                                .is_logical_lines()
-                            })
                             .map(|p| {
                                 let prefix = p.linter().common_prefix();
                                 let code = p.short_code();
