@@ -327,7 +327,7 @@ impl fmt::Display for Tok {
 /// section of the Python reference.
 ///
 /// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)] // TODO: is_macro::Is
 pub enum StringKind {
     /// A normal string literal with no prefix.
     String,
@@ -398,14 +398,14 @@ impl StringKind {
 
     /// Returns true if the string is an f-string, i,e one of
     /// [`StringKind::FString`] or [`StringKind::RawFString`].
-    pub fn is_fstring(&self) -> bool {
+    pub fn is_any_fstring(&self) -> bool {
         use StringKind::{FString, RawFString};
         matches!(self, FString | RawFString)
     }
 
     /// Returns true if the string is a byte string, i,e one of
     /// [`StringKind::Bytes`] or [`StringKind::RawBytes`].
-    pub fn is_bytes(&self) -> bool {
+    pub fn is_any_bytes(&self) -> bool {
         use StringKind::{Bytes, RawBytes};
         matches!(self, Bytes | RawBytes)
     }

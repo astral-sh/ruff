@@ -9,6 +9,7 @@ license = "MIT"
 
 [dependencies]
 hexf-parse = "0.2.1"
+is-macro.workspace = true
 lexical-parse-float = { version = "0.8.0", features = ["format"] }
 num-traits = { workspace = true }
 unic-ucd-category = "0.9"

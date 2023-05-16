@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, is_macro::Is)]
 pub enum Quote {
     Single,
     Double,

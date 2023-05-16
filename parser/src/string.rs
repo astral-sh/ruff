@@ -156,13 +156,13 @@ impl<'a> StringParser<'a> {
                     'v' => '\x0b',
                     o @ '0'..='7' => self.parse_octet(o),
                     'x' => self.parse_unicode_literal(2)?,
-                    'u' if !self.kind.is_bytes() => self.parse_unicode_literal(4)?,
-                    'U' if !self.kind.is_bytes() => self.parse_unicode_literal(8)?,
-                    'N' if !self.kind.is_bytes() => self.parse_unicode_name()?,
+                    'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
+                    'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
+                    'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
                     // Special cases where the escape sequence is not a single character
                     '\n' => return Ok("".to_string()),
                     c => {
-                        if self.kind.is_bytes() && !c.is_ascii() {
+                        if self.kind.is_any_bytes() && !c.is_ascii() {
                             return Err(LexicalError {
                                 error: LexicalErrorType::OtherError(
                                     "bytes can only contain ASCII literal characters".to_owned(),
@@ -578,9 +578,9 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse(&mut self) -> Result<Vec<Expr>, LexicalError> {
-        if self.kind.is_fstring() {
+        if self.kind.is_any_fstring() {
             self.parse_fstring(0)
-        } else if self.kind.is_bytes() {
+        } else if self.kind.is_any_bytes() {
             self.parse_bytes().map(|expr| vec![expr])
         } else {
             self.parse_string().map(|expr| vec![expr])
@@ -611,10 +611,12 @@ pub(crate) fn parse_strings(
     let initial_start = values[0].0;
     let last_end = values.last().unwrap().2;
     let initial_kind = (values[0].1 .1 == StringKind::Unicode).then(|| "u".to_owned());
-    let has_fstring = values.iter().any(|(_, (_, kind, ..), _)| kind.is_fstring());
+    let has_fstring = values
+        .iter()
+        .any(|(_, (_, kind, ..), _)| kind.is_any_fstring());
     let num_bytes = values
         .iter()
-        .filter(|(_, (_, kind, ..), _)| kind.is_bytes())
+        .filter(|(_, (_, kind, ..), _)| kind.is_any_bytes())
         .count();
     let has_bytes = num_bytes > 0;
 

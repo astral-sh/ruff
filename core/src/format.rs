@@ -11,3 +11,15 @@ pub enum ConversionFlag {
     /// Converts by calling `repr(<value>)`.
     Repr = b'r' as i8,
 }
+
+impl ConversionFlag {
+    pub fn to_byte(&self) -> Option<u8> {
+        match self {
+            Self::None => None,
+            flag => Some(*flag as u8),
+        }
+    }
+    pub fn to_char(&self) -> Option<char> {
+        Some(self.to_byte()? as char)
+    }
+}
