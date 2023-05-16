@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, Expr, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,20 +17,20 @@ impl Violation for ExceptWithNonExceptionClasses {
     }
 }
 
-/// Given an [`Expr`], flatten any [`ExprKind::Starred`] expressions.
+/// Given an [`Expr`], flatten any [`Expr::Starred`] expressions.
 /// This should leave any unstarred iterables alone (subsequently raising a
 /// warning for B029).
 fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
-    let ExprKind::Tuple(ast::ExprTuple { elts, .. } )= &expr.node else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. } )= expr else {
         return vec![expr];
     };
     let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(elts.len());
     let mut exprs_to_process: VecDeque<&Expr> = elts.iter().collect();
     while let Some(expr) = exprs_to_process.pop_front() {
-        match &expr.node {
-            ExprKind::Starred(ast::ExprStarred { value, .. }) => match &value.node {
-                ExprKind::Tuple(ast::ExprTuple { elts, .. })
-                | ExprKind::List(ast::ExprList { elts, .. }) => {
+        match expr {
+            Expr::Starred(ast::ExprStarred { value, .. }) => match value.as_ref() {
+                Expr::Tuple(ast::ExprTuple { elts, .. })
+                | Expr::List(ast::ExprList { elts, .. }) => {
                     exprs_to_process.append(&mut elts.iter().collect());
                 }
                 _ => flattened_exprs.push(value),
@@ -46,15 +46,14 @@ pub(crate) fn except_with_non_exception_classes(
     checker: &mut Checker,
     excepthandler: &Excepthandler,
 ) {
-    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
-        &excepthandler.node;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = excepthandler;
     let Some(type_) = type_ else {
         return;
     };
     for expr in flatten_starred_iterables(type_) {
         if !matches!(
-            &expr.node,
-            ExprKind::Subscript(_) | ExprKind::Attribute(_) | ExprKind::Name(_) | ExprKind::Call(_),
+            expr,
+            Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
         ) {
             checker
                 .diagnostics

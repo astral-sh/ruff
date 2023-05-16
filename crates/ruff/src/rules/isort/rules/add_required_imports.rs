@@ -1,7 +1,7 @@
 use log::error;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser as parser;
-use rustpython_parser::ast::{self, StmtKind, Suite};
+use rustpython_parser::ast::{self, Stmt, Suite};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -56,29 +56,31 @@ impl AlwaysAutofixableViolation for MissingRequiredImport {
 fn contains(block: &Block, required_import: &AnyImport) -> bool {
     block.imports.iter().any(|import| match required_import {
         AnyImport::Import(required_import) => {
-            let StmtKind::Import(ast::StmtImport {
+            let Stmt::Import(ast::StmtImport {
                 names,
-            }) = &import.node else {
+                 range: _,
+            }) = &import else {
                 return false;
             };
             names.iter().any(|alias| {
-                &alias.node.name == required_import.name.name
-                    && alias.node.asname.as_deref() == required_import.name.as_name
+                &alias.name == required_import.name.name
+                    && alias.asname.as_deref() == required_import.name.as_name
             })
         }
         AnyImport::ImportFrom(required_import) => {
-            let StmtKind::ImportFrom(ast::StmtImportFrom {
+            let Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
-            }) = &import.node else {
+                 range: _,
+            }) = &import else {
                 return false;
             };
             module.as_deref() == required_import.module
                 && level.map(|level| level.to_u32()) == required_import.level
                 && names.iter().any(|alias| {
-                    &alias.node.name == required_import.name.name
-                        && alias.node.asname.as_deref() == required_import.name.as_name
+                    &alias.name == required_import.name.name
+                        && alias.asname.as_deref() == required_import.name.as_name
                 })
         }
     })
@@ -154,11 +156,12 @@ pub(crate) fn add_required_imports(
                 return vec![];
             }
             let stmt = &body[0];
-            match &stmt.node {
-                StmtKind::ImportFrom(ast::StmtImportFrom {
+            match stmt {
+                Stmt::ImportFrom(ast::StmtImportFrom {
                     module,
                     names,
                     level,
+                    range: _,
                 }) => names
                     .iter()
                     .filter_map(|name| {
@@ -166,8 +169,8 @@ pub(crate) fn add_required_imports(
                             &AnyImport::ImportFrom(ImportFrom {
                                 module: module.as_deref(),
                                 name: Alias {
-                                    name: name.node.name.as_str(),
-                                    as_name: name.node.asname.as_deref(),
+                                    name: name.name.as_str(),
+                                    as_name: name.asname.as_deref(),
                                 },
                                 level: level.map(|level| level.to_u32()),
                             }),
@@ -180,14 +183,14 @@ pub(crate) fn add_required_imports(
                         )
                     })
                     .collect(),
-                StmtKind::Import(ast::StmtImport { names }) => names
+                Stmt::Import(ast::StmtImport { names, range: _ }) => names
                     .iter()
                     .filter_map(|name| {
                         add_required_import(
                             &AnyImport::Import(Import {
                                 name: Alias {
-                                    name: name.node.name.as_str(),
-                                    as_name: name.node.asname.as_deref(),
+                                    name: name.name.as_str(),
+                                    as_name: name.asname.as_deref(),
                                 },
                             }),
                             blocks,

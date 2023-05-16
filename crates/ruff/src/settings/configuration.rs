@@ -19,7 +19,6 @@ use crate::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -87,7 +86,6 @@ pub struct Configuration {
     pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
     pub pylint: Option<pylint::settings::Options>,
-    pub pyupgrade: Option<pyupgrade::settings::Options>,
 }
 
 impl Configuration {
@@ -222,7 +220,6 @@ impl Configuration {
             pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
             pylint: options.pylint,
-            pyupgrade: options.pyupgrade,
         })
     }
 
@@ -271,34 +268,53 @@ impl Configuration {
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
             // Plugins
-            flake8_annotations: self.flake8_annotations.or(config.flake8_annotations),
-            flake8_bandit: self.flake8_bandit.or(config.flake8_bandit),
-            flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
-            flake8_builtins: self.flake8_builtins.or(config.flake8_builtins),
-            flake8_comprehensions: self.flake8_comprehensions.or(config.flake8_comprehensions),
-            flake8_errmsg: self.flake8_errmsg.or(config.flake8_errmsg),
-            flake8_gettext: self.flake8_gettext.or(config.flake8_gettext),
+            flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),
+            flake8_bandit: self.flake8_bandit.combine(config.flake8_bandit),
+            flake8_bugbear: self.flake8_bugbear.combine(config.flake8_bugbear),
+            flake8_builtins: self.flake8_builtins.combine(config.flake8_builtins),
+            flake8_comprehensions: self
+                .flake8_comprehensions
+                .combine(config.flake8_comprehensions),
+            flake8_errmsg: self.flake8_errmsg.combine(config.flake8_errmsg),
+            flake8_gettext: self.flake8_gettext.combine(config.flake8_gettext),
             flake8_implicit_str_concat: self
                 .flake8_implicit_str_concat
-                .or(config.flake8_implicit_str_concat),
+                .combine(config.flake8_implicit_str_concat),
             flake8_import_conventions: self
                 .flake8_import_conventions
-                .or(config.flake8_import_conventions),
-            flake8_pytest_style: self.flake8_pytest_style.or(config.flake8_pytest_style),
-            flake8_quotes: self.flake8_quotes.or(config.flake8_quotes),
-            flake8_self: self.flake8_self.or(config.flake8_self),
-            flake8_tidy_imports: self.flake8_tidy_imports.or(config.flake8_tidy_imports),
-            flake8_type_checking: self.flake8_type_checking.or(config.flake8_type_checking),
+                .combine(config.flake8_import_conventions),
+            flake8_pytest_style: self.flake8_pytest_style.combine(config.flake8_pytest_style),
+            flake8_quotes: self.flake8_quotes.combine(config.flake8_quotes),
+            flake8_self: self.flake8_self.combine(config.flake8_self),
+            flake8_tidy_imports: self.flake8_tidy_imports.combine(config.flake8_tidy_imports),
+            flake8_type_checking: self
+                .flake8_type_checking
+                .combine(config.flake8_type_checking),
             flake8_unused_arguments: self
                 .flake8_unused_arguments
-                .or(config.flake8_unused_arguments),
-            isort: self.isort.or(config.isort),
-            mccabe: self.mccabe.or(config.mccabe),
-            pep8_naming: self.pep8_naming.or(config.pep8_naming),
-            pycodestyle: self.pycodestyle.or(config.pycodestyle),
-            pydocstyle: self.pydocstyle.or(config.pydocstyle),
-            pylint: self.pylint.or(config.pylint),
-            pyupgrade: self.pyupgrade.or(config.pyupgrade),
+                .combine(config.flake8_unused_arguments),
+            isort: self.isort.combine(config.isort),
+            mccabe: self.mccabe.combine(config.mccabe),
+            pep8_naming: self.pep8_naming.combine(config.pep8_naming),
+            pycodestyle: self.pycodestyle.combine(config.pycodestyle),
+            pydocstyle: self.pydocstyle.combine(config.pydocstyle),
+            pylint: self.pylint.combine(config.pylint),
+        }
+    }
+}
+
+pub trait CombinePluginOptions {
+    #[must_use]
+    fn combine(self, other: Self) -> Self;
+}
+
+impl<T: CombinePluginOptions> CombinePluginOptions for Option<T> {
+    fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Some(base), Some(other)) => Some(base.combine(other)),
+            (Some(base), None) => Some(base),
+            (None, Some(other)) => Some(other),
+            (None, None) => None,
         }
     }
 }

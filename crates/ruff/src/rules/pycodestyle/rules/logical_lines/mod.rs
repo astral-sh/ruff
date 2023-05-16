@@ -100,9 +100,7 @@ impl<'a> LogicalLines<'a> {
                 TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
                     parens -= 1;
                 }
-                TokenKind::Newline | TokenKind::NonLogicalNewline | TokenKind::Comment
-                    if parens == 0 =>
-                {
+                TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     builder.finish_line();
                 }
                 _ => {}

@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::Alias;
+use rustpython_parser::ast::{Alias, Ranged};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Violation};
@@ -136,10 +136,10 @@ impl Violation for FutureFeatureNotDefined {
 }
 
 pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
-    if !ALL_FEATURE_NAMES.contains(&alias.node.name.as_str()) {
+    if !ALL_FEATURE_NAMES.contains(&alias.name.as_str()) {
         checker.diagnostics.push(Diagnostic::new(
             FutureFeatureNotDefined {
-                name: alias.node.name.to_string(),
+                name: alias.name.to_string(),
             },
             alias.range(),
         ));

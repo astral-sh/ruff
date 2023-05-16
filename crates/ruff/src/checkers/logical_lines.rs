@@ -168,7 +168,8 @@ mod tests {
         let contents = r#"
 x = 1
 y = 2
-z = x + 1"#;
+z = x + 1"#
+            .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
@@ -189,7 +190,8 @@ x = [
   3,
 ]
 y = 2
-z = x + 1"#;
+z = x + 1"#
+            .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
@@ -216,7 +218,8 @@ z = x + 1"#;
         let contents = r#"
 def f():
   x = 1
-f()"#;
+f()"#
+            .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
@@ -231,7 +234,8 @@ def f():
   """Docstring goes here."""
   # Comment goes here.
   x = 1
-f()"#;
+f()"#
+            .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)

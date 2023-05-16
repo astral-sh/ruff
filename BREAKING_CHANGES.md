@@ -1,6 +1,15 @@
 # Breaking Changes
 
-## 0.0.266
+## 0.0.268
+
+### The `keep-runtime-typing` setting has been removed ([#4427](https://github.com/charliermarsh/ruff/pull/4427))
+
+Enabling the `keep-runtime-typing` option, located under the `pyupgrade` section, is equivalent
+to ignoring the `UP006` and `UP007` rules via Ruff's standard `ignore` mechanism. As there's no
+need for a dedicated setting to disable these rules, the `keep-runtime-typing` option has been
+removed.
+
+## 0.0.267
 
 ### `update-check` is no longer a valid configuration option ([#4313](https://github.com/charliermarsh/ruff/pull/4313))
 

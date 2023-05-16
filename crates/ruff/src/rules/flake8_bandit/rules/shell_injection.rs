@@ -2,7 +2,7 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -141,15 +141,9 @@ struct ShellKeyword<'a> {
 fn find_shell_keyword<'a>(ctx: &Context, keywords: &'a [Keyword]) -> Option<ShellKeyword<'a>> {
     keywords
         .iter()
-        .find(|keyword| {
-            keyword
-                .node
-                .arg
-                .as_ref()
-                .map_or(false, |arg| arg == "shell")
-        })
+        .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "shell"))
         .map(|keyword| ShellKeyword {
-            truthiness: Truthiness::from_expr(&keyword.node.value, |id| ctx.is_builtin(id)),
+            truthiness: Truthiness::from_expr(&keyword.value, |id| ctx.is_builtin(id)),
             keyword,
         })
 }
@@ -158,8 +152,8 @@ fn find_shell_keyword<'a>(ctx: &Context, keywords: &'a [Keyword]) -> Option<Shel
 /// definition: string literals are considered okay, but dynamically-computed values are not.
 fn shell_call_seems_safe(arg: &Expr) -> bool {
     matches!(
-        arg.node,
-        ExprKind::Constant(ast::ExprConstant {
+        arg,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Str(_),
             ..
         })
@@ -168,8 +162,8 @@ fn shell_call_seems_safe(arg: &Expr) -> bool {
 
 /// Return the [`Expr`] as a string literal, if it's a string or a list of strings.
 fn try_string_literal(expr: &Expr) -> Option<&str> {
-    match &expr.node {
-        ExprKind::List(ast::ExprList { elts, .. }) => {
+    match expr {
+        Expr::List(ast::ExprList { elts, .. }) => {
             if elts.is_empty() {
                 None
             } else {

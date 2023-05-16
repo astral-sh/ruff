@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
 use ruff_python_ast::whitespace;
 use ruff_text_size::{TextLen, TextSize};
+use rustpython_parser::ast::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;

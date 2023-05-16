@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -53,10 +53,10 @@ fn matches_sql_statement(string: &str) -> bool {
 }
 
 fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Option<String> {
-    match &expr.node {
+    match expr {
         // "select * from table where val = " + "str" + ...
         // "select * from table where val = %s" % ...
-        ExprKind::BinOp(ast::ExprBinOp {
+        Expr::BinOp(ast::ExprBinOp {
             op: Operator::Add | Operator::Mod,
             ..
         }) => {
@@ -67,7 +67,7 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
                 return None;
             };
             // Only evaluate the full BinOp, not the nested components.
-            let ExprKind::BinOp(_ )= &parent.node else {
+            let Expr::BinOp(_ )= parent else {
                 if any_over_expr(expr, &has_string_literal) {
                     return Some(unparse_expr(expr, checker.stylist));
                 }
@@ -75,8 +75,8 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             };
             None
         }
-        ExprKind::Call(ast::ExprCall { func, .. }) => {
-            let ExprKind::Attribute(ast::ExprAttribute { attr, value, .. }) = &func.node else {
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
                 return None;
             };
             // "select * from table where val = {}".format(...)
@@ -86,7 +86,7 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             None
         }
         // f"select * from table where val = {val}"
-        ExprKind::JoinedStr(_) => Some(unparse_expr(expr, checker.stylist)),
+        Expr::JoinedStr(_) => Some(unparse_expr(expr, checker.stylist)),
         _ => None,
     }
 }

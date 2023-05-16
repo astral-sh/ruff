@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -60,7 +60,7 @@ fn is_t_suffixed_type_alias(name: &str) -> bool {
 
 /// PYI042
 pub(crate) fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
-    if let ExprKind::Name(ast::ExprName { id, .. }) = target.node() {
+    if let Expr::Name(ast::ExprName { id, range, .. }) = target {
         if !is_snake_case_type_alias(id) {
             return;
         }
@@ -69,14 +69,14 @@ pub(crate) fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
             SnakeCaseTypeAlias {
                 name: id.to_string(),
             },
-            target.range(),
+            *range,
         ));
     }
 }
 
 /// PYI043
 pub(crate) fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
-    if let ExprKind::Name(ast::ExprName { id, .. }) = target.node() {
+    if let Expr::Name(ast::ExprName { id, range, .. }) = target {
         if !is_t_suffixed_type_alias(id) {
             return;
         }
@@ -85,7 +85,7 @@ pub(crate) fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
             TSuffixedTypeAlias {
                 name: id.to_string(),
             },
-            target.range(),
+            *range,
         ));
     }
 }

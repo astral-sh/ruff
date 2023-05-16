@@ -23,8 +23,8 @@ impl Format<ASTFormatContext> for FormatAlias<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let alias = self.item;
 
-        write!(f, [dynamic_text(&alias.node.name, TextSize::default())])?;
-        if let Some(asname) = &alias.node.asname {
+        write!(f, [dynamic_text(&alias.name, TextSize::default())])?;
+        if let Some(asname) = &alias.asname {
             write!(f, [text(" as ")])?;
             write!(f, [dynamic_text(asname, TextSize::default())])?;
         }

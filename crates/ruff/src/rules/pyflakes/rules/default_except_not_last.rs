@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind};
+use rustpython_parser::ast::{self, Excepthandler};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -21,8 +21,7 @@ pub(crate) fn default_except_not_last(
     locator: &Locator,
 ) -> Option<Diagnostic> {
     for (idx, handler) in handlers.iter().enumerate() {
-        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) =
-            &handler.node;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) = handler;
         if type_.is_none() && idx < handlers.len() - 1 {
             return Some(Diagnostic::new(
                 DefaultExceptNotLast,

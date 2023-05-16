@@ -5,10 +5,8 @@ use libcst_native::{
     ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
-use rustpython_parser::ast::{
-    self, Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind,
-    Unaryop,
-};
+use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
+use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -135,8 +133,8 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt.node {
-            StmtKind::Assert(_) => {
+        match stmt {
+            Stmt::Assert(_) => {
                 self.current_assert = Some(stmt);
                 visitor::walk_stmt(self, stmt);
                 self.current_assert = None;
@@ -146,10 +144,10 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::Name(ast::ExprName { id, .. }) => {
+        match expr {
+            Expr::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
-                    if id == self.exception_name {
+                    if id.as_str() == self.exception_name {
                         self.errors.push(Diagnostic::new(
                             PytestAssertInExcept {
                                 name: id.to_string(),
@@ -181,12 +179,12 @@ pub(crate) fn unittest_assertion(
     args: &[Expr],
     keywords: &[Keyword],
 ) -> Option<Diagnostic> {
-    match &func.node {
-        ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => {
+    match func {
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = matches!(checker.ctx.stmt().node, StmtKind::Expr(_))
+                let fixable = checker.ctx.stmt().is_expr_stmt()
                     && checker.ctx.expr_parent().is_none()
                     && !checker.ctx.scope().kind.is_lambda()
                     && !has_comments_in(expr.range(), checker.locator);
@@ -227,11 +225,9 @@ pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 pub(crate) fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
     handlers
         .iter()
-        .flat_map(|handler| match &handler.node {
-            ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-                name,
-                body,
-                ..
+        .flat_map(|handler| match handler {
+            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                name, body, ..
             }) => {
                 if let Some(name) = name {
                     check_assert_in_except(name, body)
@@ -259,26 +255,28 @@ enum CompositionKind {
 /// For example, `a and b` or `not (a or b)`. The latter is equivalent to
 /// `not a and not b` by De Morgan's laws.
 fn is_composite_condition(test: &Expr) -> CompositionKind {
-    match &test.node {
-        ExprKind::BoolOp(ast::ExprBoolOp {
+    match test {
+        Expr::BoolOp(ast::ExprBoolOp {
             op: Boolop::And, ..
         }) => {
             return CompositionKind::Simple;
         }
-        ExprKind::UnaryOp(ast::ExprUnaryOp {
+        Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::Not,
             operand,
+            range: _,
         }) => {
-            if let ExprKind::BoolOp(ast::ExprBoolOp {
+            if let Expr::BoolOp(ast::ExprBoolOp {
                 op: Boolop::Or,
                 values,
-            }) = &operand.node
+                range: _,
+            }) = operand.as_ref()
             {
                 // Only split cases without mixed `and` and `or`.
                 return if values.iter().all(|expr| {
                     !matches!(
-                        expr.node,
-                        ExprKind::BoolOp(ast::ExprBoolOp {
+                        expr,
+                        Expr::BoolOp(ast::ExprBoolOp {
                             op: Boolop::And,
                             ..
                         })
@@ -323,15 +321,25 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     // Extract the module text.
     let contents = locator.lines(stmt.range());
 
-    // "Embed" it in a function definition, to preserve indentation while retaining valid source
-    // code. (We'll strip the prefix later on.)
-    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+    // If the block is indented, "embed" it in a function definition, to preserve
+    // indentation while retaining valid source code. (We'll strip the prefix later
+    // on.)
+    let module_text = if outer_indent.is_empty() {
+        Cow::Borrowed(contents)
+    } else {
+        Cow::Owned(format!(
+            "def f():{}{contents}",
+            stylist.line_ending().as_str()
+        ))
+    };
 
     // Parse the CST.
     let mut tree = match_module(&module_text)?;
 
     // Extract the assert statement.
-    let statements: &mut Vec<Statement> = {
+    let statements = if outer_indent.is_empty() {
+        &mut tree.body
+    } else {
         let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
             bail!("Expected statement to be embedded in a function definition")
         };
@@ -343,10 +351,12 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 
         &mut indented_block.body
     };
-    let [Statement::Simple(simple_statement_line)] = statements.as_mut_slice() else {
+
+    let [Statement::Simple(simple_statement_line)] = &statements[..] else {
         bail!("Expected one simple statement")
     };
-    let [SmallStatement::Assert(assert_statement)] = &mut *simple_statement_line.body else {
+
+    let [SmallStatement::Assert(assert_statement)] = &simple_statement_line.body[..] else {
         bail!("Expected simple statement to be an assert")
     };
 
@@ -407,10 +417,14 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 
     // Reconstruct and reformat the code.
     let module_text = state.to_string();
-    let contents = module_text
-        .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
-        .unwrap()
-        .to_string();
+    let contents = if outer_indent.is_empty() {
+        module_text
+    } else {
+        module_text
+            .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
+            .unwrap()
+            .to_string()
+    };
 
     let range = locator.full_lines_range(stmt.range());
 

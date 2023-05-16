@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -20,7 +20,9 @@ impl Default for Quote {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",

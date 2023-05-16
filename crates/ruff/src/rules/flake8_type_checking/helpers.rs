@@ -1,5 +1,5 @@
 use num_traits::Zero;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr};
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
@@ -11,8 +11,8 @@ use ruff_python_semantic::scope::ScopeKind;
 pub(crate) fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
     // Ex) `if False:`
     if matches!(
-        test.node,
-        ExprKind::Constant(ast::ExprConstant {
+        test,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(false),
             ..
         })
@@ -21,10 +21,10 @@ pub(crate) fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
     }
 
     // Ex) `if 0:`
-    if let ExprKind::Constant(ast::ExprConstant {
+    if let Expr::Constant(ast::ExprConstant {
         value: Constant::Int(value),
         ..
-    }) = &test.node
+    }) = &test
     {
         if value.is_zero() {
             return true;

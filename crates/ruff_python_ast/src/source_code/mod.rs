@@ -225,6 +225,15 @@ pub struct SourceLocation {
     pub column: OneIndexed,
 }
 
+impl Default for SourceLocation {
+    fn default() -> Self {
+        Self {
+            row: OneIndexed::MIN,
+            column: OneIndexed::MIN,
+        }
+    }
+}
+
 impl Debug for SourceLocation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SourceLocation")

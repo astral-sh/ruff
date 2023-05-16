@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Excepthandler, Stmt, StmtKind};
+use rustpython_parser::ast::{Excepthandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -63,9 +63,9 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match stmt.node {
-            StmtKind::Raise(_) => self.raises.push(stmt),
-            StmtKind::Try(_) | StmtKind::TryStar(_) => (),
+        match stmt {
+            Stmt::Raise(_) => self.raises.push(stmt),
+            Stmt::Try(_) | Stmt::TryStar(_) => (),
             _ => walk_stmt(self, stmt),
         }
     }

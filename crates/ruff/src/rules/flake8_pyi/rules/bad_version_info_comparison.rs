@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Cmpop, Expr};
+use rustpython_parser::ast::{Cmpop, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Arguments, Expr};
+use rustpython_parser::ast::{Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -76,7 +76,7 @@ pub(crate) fn invalid_first_argument_name_for_class_method(
         return None;
     }
     if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
-        if &arg.node.arg != "cls" {
+        if &arg.arg != "cls" {
             if checker
                 .settings
                 .pep8_naming

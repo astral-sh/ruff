@@ -1,12 +1,11 @@
 use anyhow::{bail, Result};
 use log::debug;
-use rustpython_parser::ast::{
-    self, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
-};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use ruff_python_ast::helpers::unparse_stmt;
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -41,14 +40,15 @@ fn match_named_tuple_assign<'a>(
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
     let target = targets.get(0)?;
-    let ExprKind::Name(ast::ExprName { id: typename, .. }) = &target.node else {
+    let Expr::Name(ast::ExprName { id: typename, .. }) = target else {
         return None;
     };
-    let ExprKind::Call(ast::ExprCall {
+    let Expr::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    }) = &value.node else {
+        range: _,
+    }) = value else {
         return None;
     };
     if !checker
@@ -63,38 +63,42 @@ fn match_named_tuple_assign<'a>(
     Some((typename, args, keywords, func))
 }
 
-/// Generate a `StmtKind::AnnAssign` representing the provided property
+/// Generate a `Stmt::AnnAssign` representing the provided property
 /// definition.
 fn create_property_assignment_stmt(
     property: &str,
     annotation: &Expr,
     value: Option<&Expr>,
 ) -> Stmt {
-    create_stmt(ast::StmtAnnAssign {
-        target: Box::new(create_expr(ast::ExprName {
-            id: property.into(),
-            ctx: ExprContext::Load,
-        })),
+    let node = ast::ExprName {
+        id: property.into(),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let node1 = ast::StmtAnnAssign {
+        target: Box::new(node.into()),
         annotation: Box::new(annotation.clone()),
         value: value.map(|value| Box::new(value.clone())),
         simple: true,
-    })
+        range: TextRange::default(),
+    };
+    node1.into()
 }
 
 /// Match the `defaults` keyword in a `NamedTuple(...)` call.
 fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
     let defaults = keywords.iter().find(|keyword| {
-        if let Some(arg) = &keyword.node.arg {
+        if let Some(arg) = &keyword.arg {
             arg == "defaults"
         } else {
             false
         }
     });
     match defaults {
-        Some(defaults) => match &defaults.node.value.node {
-            ExprKind::List(ast::ExprList { elts, .. }) => Ok(elts),
-            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => Ok(elts),
-            _ => bail!("Expected defaults to be `ExprKind::List` | `ExprKind::Tuple`"),
+        Some(defaults) => match &defaults.value {
+            Expr::List(ast::ExprList { elts, .. }) => Ok(elts),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => Ok(elts),
+            _ => bail!("Expected defaults to be `Expr::List` | `Expr::Tuple`"),
         },
         None => Ok(&[]),
     }
@@ -103,13 +107,17 @@ fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
 /// Create a list of property assignments from the `NamedTuple` arguments.
 fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
     let Some(fields) = args.get(1) else {
-        return Ok(vec![create_stmt(StmtKind::Pass)]);
+        let node = Stmt::Pass(ast::StmtPass { range: TextRange::default()});
+        return Ok(vec![node]);
     };
-    let ExprKind::List(ast::ExprList { elts, .. } )= &fields.node else {
-        bail!("Expected argument to be `ExprKind::List`");
+    let Expr::List(ast::ExprList { elts, .. } )= &fields else {
+        bail!("Expected argument to be `Expr::List`");
     };
     if elts.is_empty() {
-        return Ok(vec![create_stmt(StmtKind::Pass)]);
+        let node = Stmt::Pass(ast::StmtPass {
+            range: TextRange::default(),
+        });
+        return Ok(vec![node]);
     }
     let padded_defaults = if elts.len() >= defaults.len() {
         std::iter::repeat(None)
@@ -121,16 +129,16 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
     elts.iter()
         .zip(padded_defaults)
         .map(|(field, default)| {
-            let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &field.node else {
-                bail!("Expected `field` to be `ExprKind::Tuple`")
+            let Expr::Tuple(ast::ExprTuple { elts, .. }) = &field else {
+                bail!("Expected `field` to be `Expr::Tuple`")
             };
             let [field_name, annotation] = elts.as_slice() else {
                 bail!("Expected `elts` to have exactly two elements")
             };
-            let ExprKind::Constant(ast::ExprConstant {
+            let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(property),
                 ..
-            }) = &field_name.node else {
+            }) = &field_name else {
                 bail!("Expected `field_name` to be `Constant::Str`")
             };
             if !is_identifier(property) {
@@ -146,13 +154,15 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
 /// Generate a `StmtKind:ClassDef` statement based on the provided body and
 /// keywords.
 fn create_class_def_stmt(typename: &str, body: Vec<Stmt>, base_class: &Expr) -> Stmt {
-    create_stmt(ast::StmtClassDef {
+    let node = ast::StmtClassDef {
         name: typename.into(),
         bases: vec![base_class.clone()],
         keywords: vec![],
         body,
         decorator_list: vec![],
-    })
+        range: TextRange::default(),
+    };
+    node.into()
 }
 
 /// Generate a `Fix` to convert a `NamedTuple` assignment to a class definition.

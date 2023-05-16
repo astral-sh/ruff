@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,13 +25,14 @@ impl Violation for MagicValueComparison {
 
 /// If an [`Expr`] is a constant (or unary operation on a constant), return the [`Constant`].
 fn as_constant(expr: &Expr) -> Option<&Constant> {
-    match &expr.node {
-        ExprKind::Constant(ast::ExprConstant { value, .. }) => Some(value),
-        ExprKind::UnaryOp(ast::ExprUnaryOp {
+    match expr {
+        Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
+        Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
             operand,
-        }) => match &operand.node {
-            ExprKind::Constant(ast::ExprConstant { value, .. }) => Some(value),
+            range: _,
+        }) => match operand.as_ref() {
+            Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
             _ => None,
         },
         _ => None,

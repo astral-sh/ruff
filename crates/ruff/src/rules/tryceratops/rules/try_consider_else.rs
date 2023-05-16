@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -64,7 +64,7 @@ pub(crate) fn try_consider_else(
 ) {
     if body.len() > 1 && orelse.is_empty() && !handler.is_empty() {
         if let Some(stmt) = body.last() {
-            if let StmtKind::Return(ast::StmtReturn { value }) = &stmt.node {
+            if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
                 if let Some(value) = value {
                     if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
                         return;

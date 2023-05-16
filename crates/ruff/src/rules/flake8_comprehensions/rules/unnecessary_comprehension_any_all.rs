@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AutofixKind, Diagnostic};
@@ -66,11 +66,11 @@ pub(crate) fn unnecessary_comprehension_any_all(
     if !keywords.is_empty() {
         return;
     }
-    let ExprKind::Name(ast::ExprName { id, .. } )= &func.node  else {
+    let Expr::Name(ast::ExprName { id, .. } )= func  else {
         return;
     };
     if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
-        let (ExprKind::ListComp(ast::ExprListComp { elt, .. } )| ExprKind::SetComp(ast::ExprSetComp { elt, .. })) = &args[0].node else {
+        let (Expr::ListComp(ast::ExprListComp { elt, .. } )| Expr::SetComp(ast::ExprSetComp { elt, .. })) = &args[0] else {
             return;
         };
         if is_async_generator(elt) {
@@ -81,8 +81,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, args[0].range());
         if checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
+            diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)
             });
         }
@@ -92,5 +91,5 @@ pub(crate) fn unnecessary_comprehension_any_all(
 
 /// Return `true` if the `Expr` contains an `await` expression.
 fn is_async_generator(expr: &Expr) -> bool {
-    any_over_expr(expr, &|expr| matches!(expr.node, ExprKind::Await(_)))
+    any_over_expr(expr, &|expr| matches!(expr, Expr::Await(_)))
 }

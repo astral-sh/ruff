@@ -1,5 +1,6 @@
 use ruff_python_ast::source_code::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
 
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub(crate) fn is_radix_literal(content: &str) -> bool {
@@ -127,7 +128,7 @@ pub(crate) fn expand_indented_block(
 
 /// Return true if the `orelse` block of an `if` statement is an `elif` statement.
 pub(crate) fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
-    if orelse.len() == 1 && matches!(orelse[0].node, rustpython_parser::ast::StmtKind::If { .. }) {
+    if orelse.len() == 1 && matches!(orelse[0], rustpython_parser::ast::Stmt::If { .. }) {
         let contents = locator.after(orelse[0].start());
         if contents.starts_with("elif") {
             return true;
