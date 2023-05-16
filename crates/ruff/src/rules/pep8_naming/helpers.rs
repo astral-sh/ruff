@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_semantic::context::Context;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_python_stdlib::str::{is_lower, is_upper};
 
@@ -23,10 +23,10 @@ pub(crate) fn is_acronym(name: &str, asname: &str) -> bool {
 }
 
 pub(crate) fn is_named_tuple_assignment(context: &Context, stmt: &Stmt) -> bool {
-    let StmtKind::Assign { value, .. } = &stmt.node else {
+    let StmtKind::Assign(ast::StmtAssign { value, .. }) = &stmt.node else {
         return false;
     };
-    let ExprKind::Call {func, ..} = &value.node else {
+    let ExprKind::Call(ast::ExprCall {func, ..}) = &value.node else {
         return false;
     };
     context.resolve_call_path(func).map_or(false, |call_path| {
@@ -38,10 +38,10 @@ pub(crate) fn is_named_tuple_assignment(context: &Context, stmt: &Stmt) -> bool 
 }
 
 pub(crate) fn is_typed_dict_assignment(context: &Context, stmt: &Stmt) -> bool {
-    let StmtKind::Assign { value, .. } = &stmt.node else {
+    let StmtKind::Assign(ast::StmtAssign { value, .. }) = &stmt.node else {
         return false;
     };
-    let ExprKind::Call {func, ..} = &value.node else {
+    let ExprKind::Call(ast::ExprCall {func, ..}) = &value.node else {
         return false;
     };
     context.resolve_call_path(func).map_or(false, |call_path| {
@@ -50,10 +50,10 @@ pub(crate) fn is_typed_dict_assignment(context: &Context, stmt: &Stmt) -> bool {
 }
 
 pub(crate) fn is_type_var_assignment(context: &Context, stmt: &Stmt) -> bool {
-    let StmtKind::Assign { value, .. } = &stmt.node else {
+    let StmtKind::Assign(ast::StmtAssign { value, .. }) = &stmt.node else {
         return false;
     };
-    let ExprKind::Call {func, ..} = &value.node else {
+    let ExprKind::Call(ast::ExprCall {func, ..}) = &value.node else {
         return false;
     };
     context.resolve_call_path(func).map_or(false, |call_path| {

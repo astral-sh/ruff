@@ -5,14 +5,15 @@ use ruff_text_size::{TextLen, TextRange};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct NoBlankLineBeforeFunction {
-    pub num_lines: usize,
+    num_lines: usize,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
@@ -29,7 +30,7 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
 
 #[violation]
 pub struct NoBlankLineAfterFunction {
-    pub num_lines: usize,
+    num_lines: usize,
 }
 
 impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
@@ -48,12 +49,12 @@ static INNER_FUNCTION_OR_CLASS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s+(?:(?:class|def|async def)\s|@)").unwrap());
 
 /// D201, D202
-pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
-    let (
-        DefinitionKind::Function(parent)
-        | DefinitionKind::NestedFunction(parent)
-        | DefinitionKind::Method(parent)
-    ) = &docstring.kind else {
+pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
+    let Definition::Member(Member {
+        kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
+        stmt,
+        ..
+    }) = docstring.definition else {
         return;
     };
 
@@ -64,9 +65,9 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
     {
         let before = checker
             .locator
-            .slice(TextRange::new(parent.start(), docstring.start()));
+            .slice(TextRange::new(stmt.start(), docstring.start()));
 
-        let mut lines = UniversalNewlineIterator::with_offset(before, parent.start()).rev();
+        let mut lines = UniversalNewlineIterator::with_offset(before, stmt.start()).rev();
         let mut blank_lines_before = 0usize;
         let mut blank_lines_start = lines.next().map(|l| l.end()).unwrap_or_default();
 
@@ -88,6 +89,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line before the docstring.
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                     blank_lines_start,
                     docstring.start() - docstring.indentation.text_len(),
@@ -104,7 +106,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
     {
         let after = checker
             .locator
-            .slice(TextRange::new(docstring.end(), parent.end()));
+            .slice(TextRange::new(docstring.end(), stmt.end()));
 
         // If the docstring is only followed by blank and commented lines, abort.
         let all_blank_after = after
@@ -149,6 +151,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line after the docstring.
+                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::deletion(
                     first_line_end,
                     blank_lines_end,

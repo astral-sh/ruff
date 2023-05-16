@@ -133,14 +133,15 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
             if !after_operator {
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
-                        let start = token.start();
-                        context.push(TabBeforeOperator, TextRange::empty(start - offset));
+                        context.push(
+                            TabBeforeOperator,
+                            TextRange::at(token.start() - offset, offset),
+                        );
                     }
                     (Whitespace::Many, offset) => {
-                        let start = token.start();
                         context.push(
                             MultipleSpacesBeforeOperator,
-                            TextRange::empty(start - offset),
+                            TextRange::at(token.start() - offset, offset),
                         );
                     }
                     _ => {}
@@ -148,13 +149,11 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
             }
 
             match line.trailing_whitespace(token) {
-                Whitespace::Tab => {
-                    let end = token.end();
-                    context.push(TabAfterOperator, TextRange::empty(end));
+                (Whitespace::Tab, len) => {
+                    context.push(TabAfterOperator, TextRange::at(token.end(), len));
                 }
-                Whitespace::Many => {
-                    let end = token.end();
-                    context.push(MultipleSpacesAfterOperator, TextRange::empty(end));
+                (Whitespace::Many, len) => {
+                    context.push(MultipleSpacesAfterOperator, TextRange::at(token.end(), len));
                 }
                 _ => {}
             }

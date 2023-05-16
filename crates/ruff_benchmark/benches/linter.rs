@@ -61,7 +61,6 @@ fn benchmark_linter(mut group: BenchmarkGroup<WallTime>, settings: &Settings) {
                         None,
                         settings,
                         flags::Noqa::Enabled,
-                        flags::Autofix::Enabled,
                     );
 
                     // Assert that file contains no parse errors

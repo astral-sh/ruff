@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct UndefinedLocal {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for UndefinedLocal {
@@ -19,7 +19,7 @@ impl Violation for UndefinedLocal {
 }
 
 /// F823
-pub fn undefined_local(checker: &mut Checker, name: &str) {
+pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
     // If the name hasn't already been defined in the current scope...
     let current = checker.ctx.scope();
     if !current.kind.is_function() || current.defines(name) {

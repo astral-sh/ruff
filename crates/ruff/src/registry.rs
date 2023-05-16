@@ -190,6 +190,11 @@ ruff_macros::register_rules!(
     rules::pylint::rules::LoggingTooManyArgs,
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
+    rules::pylint::rules::DuplicateBases,
+    // flake8-async
+    rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
+    rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
+    rules::flake8_async::rules::BlockingOsCallInAsyncFunction,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -289,6 +294,8 @@ ruff_macros::register_rules!(
     rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
     rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
     rules::flake8_annotations::rules::AnyType,
+    // flake8-future-annotations
+    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImport,
     // flake8-2020
     rules::flake8_2020::rules::SysVersionSlice3,
     rules::flake8_2020::rules::SysVersion2,
@@ -506,10 +513,11 @@ ruff_macros::register_rules!(
     rules::flake8_datetimez::rules::CallDateToday,
     rules::flake8_datetimez::rules::CallDateFromtimestamp,
     // pygrep-hooks
-    rules::pygrep_hooks::rules::Eval,
-    rules::pygrep_hooks::rules::DeprecatedLogWarn,
-    rules::pygrep_hooks::rules::BlanketTypeIgnore,
     rules::pygrep_hooks::rules::BlanketNOQA,
+    rules::pygrep_hooks::rules::BlanketTypeIgnore,
+    rules::pygrep_hooks::rules::DeprecatedLogWarn,
+    rules::pygrep_hooks::rules::Eval,
+    rules::pygrep_hooks::rules::InvalidMockAccess,
     // pandas-vet
     rules::pandas_vet::rules::PandasUseOfInplaceArgument,
     rules::pandas_vet::rules::PandasUseOfDotIsNull,
@@ -663,6 +671,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::PairwiseOverZipped,
     rules::ruff::rules::MutableDataclassDefault,
     rules::ruff::rules::FunctionCallInDataclassDefaultArgument,
+    rules::ruff::rules::ExplicitFStringTypeConversion,
     // flake8-django
     rules::flake8_django::rules::DjangoNullableModelStringField,
     rules::flake8_django::rules::DjangoLocalsInRenderFunction,
@@ -671,6 +680,16 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
     rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
+    // flynt
+    rules::flynt::rules::StaticJoinToFString,
+    // flake8-todo
+    rules::flake8_todos::rules::InvalidTodoTag,
+    rules::flake8_todos::rules::MissingTodoAuthor,
+    rules::flake8_todos::rules::MissingTodoLink,
+    rules::flake8_todos::rules::MissingTodoColon,
+    rules::flake8_todos::rules::MissingTodoDescription,
+    rules::flake8_todos::rules::InvalidTodoCapitalization,
+    rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
 );
 
 pub trait AsRule {
@@ -721,6 +740,9 @@ pub enum Linter {
     /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
+    /// [flake8-async](https://pypi.org/project/flake8-async/)
+    #[prefix = "ASYNC"]
+    Flake8Async,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
@@ -757,6 +779,9 @@ pub enum Linter {
     /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
+    /// [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
+    #[prefix = "FA"]
+    Flake8FutureAnnotations,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
@@ -811,6 +836,9 @@ pub enum Linter {
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
+    #[prefix = "TD"]
+    Flake8Todo,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
@@ -826,6 +854,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flynt](https://pypi.org/project/flynt/)
+    #[prefix = "FLY"]
+    Flynt,
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,
@@ -932,7 +963,14 @@ impl Rule {
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::ProhibitedTrailingComma
-            | Rule::TypeCommentInStub => LintSource::Tokens,
+            | Rule::TypeCommentInStub
+            | Rule::InvalidTodoTag
+            | Rule::MissingTodoAuthor
+            | Rule::MissingTodoLink
+            | Rule::MissingTodoColon
+            | Rule::MissingTodoDescription
+            | Rule::InvalidTodoCapitalization
+            | Rule::MissingSpaceAfterTodoColon => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,

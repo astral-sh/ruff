@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use super::types::{AliasData, ImportBlock, ImportFromData};
 use super::AnnotatedImport;
 
-pub fn normalize_imports<'a>(
+pub(crate) fn normalize_imports<'a>(
     imports: Vec<AnnotatedImport<'a>>,
     combine_as_imports: bool,
     force_single_line: bool,

@@ -1,1 +1,1 @@
-pub mod docstring_detection;
+pub(crate) mod docstring_detection;

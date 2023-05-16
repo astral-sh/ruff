@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_builtins/mod.rs
 ---
-A003.py:2:5: A003 Class attribute `ImportError` is shadowing a python builtin
+A003.py:2:5: A003 Class attribute `ImportError` is shadowing a Python builtin
   |
 2 | class MyClass:
 3 |     ImportError = 4
@@ -10,7 +10,7 @@ A003.py:2:5: A003 Class attribute `ImportError` is shadowing a python builtin
 5 |     dir = "/"
   |
 
-A003.py:3:5: A003 Class attribute `id` is shadowing a python builtin
+A003.py:3:5: A003 Class attribute `id` is shadowing a Python builtin
   |
 3 | class MyClass:
 4 |     ImportError = 4
@@ -19,7 +19,7 @@ A003.py:3:5: A003 Class attribute `id` is shadowing a python builtin
 6 |     dir = "/"
   |
 
-A003.py:4:5: A003 Class attribute `dir` is shadowing a python builtin
+A003.py:4:5: A003 Class attribute `dir` is shadowing a Python builtin
   |
 4 |     ImportError = 4
 5 |     id = 5
@@ -29,7 +29,7 @@ A003.py:4:5: A003 Class attribute `dir` is shadowing a python builtin
 8 |     def __init__(self):
   |
 
-A003.py:11:5: A003 Class attribute `str` is shadowing a python builtin
+A003.py:11:5: A003 Class attribute `str` is shadowing a Python builtin
    |
 11 |           self.dir = "."
 12 |   

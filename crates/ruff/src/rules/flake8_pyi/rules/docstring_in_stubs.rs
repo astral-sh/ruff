@@ -16,7 +16,7 @@ impl Violation for DocstringInStub {
 }
 
 /// PYI021
-pub fn docstring_in_stubs(checker: &mut Checker, docstring: Option<&Expr>) {
+pub(crate) fn docstring_in_stubs(checker: &mut Checker, docstring: Option<&Expr>) {
     if let Some(docstr) = &docstring {
         checker
             .diagnostics

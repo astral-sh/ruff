@@ -73,7 +73,7 @@ D.py:606:5: D200 [*] One-line docstring should fit on one line
 610 608 | 
 611 609 | @expect('D200: One-line docstring should fit on one line with quotes '
 
-D.py:615:5: D200 [*] One-line docstring should fit on one line
+D.py:615:5: D200 One-line docstring should fit on one line
     |
 615 |   @expect('D212: Multi-line docstring summary should start at the first line')
 616 |   def one_liner():
@@ -85,7 +85,7 @@ D.py:615:5: D200 [*] One-line docstring should fit on one line
     |
     = help: Reformat to one line
 
-D.py:624:5: D200 [*] One-line docstring should fit on one line
+D.py:624:5: D200 One-line docstring should fit on one line
     |
 624 |   @expect('D212: Multi-line docstring summary should start at the first line')
 625 |   def one_liner():

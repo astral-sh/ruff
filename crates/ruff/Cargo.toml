@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.265"
+version = "0.0.267"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -54,9 +54,9 @@ quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
-rustpython-common = { workspace = true }
+rustpython-format = { workspace = true }
 rustpython-parser = { workspace = true }
-schemars = { workspace = true }
+schemars = { workspace = true, optional = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -80,5 +80,7 @@ colored = { workspace = true, features = ["no-color"] }
 
 [features]
 default = []
+schemars = ["dep:schemars"]
 logical_lines = []
 jupyter_notebook = []
+ecosystem_ci = []

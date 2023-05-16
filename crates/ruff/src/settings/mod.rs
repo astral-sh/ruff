@@ -20,7 +20,6 @@ use crate::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
@@ -57,7 +56,7 @@ impl AllSettings {
                 fix_only: config.fix_only.unwrap_or(false),
                 format: config.format.unwrap_or_default(),
                 show_fixes: config.show_fixes.unwrap_or(false),
-                update_check: config.update_check.unwrap_or_default(),
+                show_source: config.show_source.unwrap_or(false),
             },
             lib: Settings::from_configuration(config, project_root)?,
         })
@@ -66,15 +65,14 @@ impl AllSettings {
 
 #[derive(Debug, Default, Clone)]
 #[allow(clippy::struct_excessive_bools)]
-/// Settings that are not used by this library and
-/// only here so that `ruff_cli` can use them.
+/// Settings that are not used by this library and only here so that `ruff_cli` can use them.
 pub struct CliSettings {
     pub cache_dir: PathBuf,
     pub fix: bool,
     pub fix_only: bool,
     pub format: SerializationFormat,
     pub show_fixes: bool,
-    pub update_check: bool,
+    pub show_source: bool,
 }
 
 #[derive(Debug, CacheKey)]
@@ -83,7 +81,6 @@ pub struct Settings {
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
-    pub show_source: bool,
     pub target_version: PythonVersion,
 
     // Resolver settings
@@ -128,7 +125,6 @@ pub struct Settings {
     pub pycodestyle: pycodestyle::settings::Settings,
     pub pydocstyle: pydocstyle::settings::Settings,
     pub pylint: pylint::settings::Settings,
-    pub pyupgrade: pyupgrade::settings::Settings,
 }
 
 impl Settings {
@@ -170,7 +166,6 @@ impl Settings {
                 config.per_file_ignores.unwrap_or_default(),
             )?,
             respect_gitignore: config.respect_gitignore.unwrap_or(true),
-            show_source: config.show_source.unwrap_or_default(),
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
@@ -229,7 +224,6 @@ impl Settings {
             pycodestyle: config.pycodestyle.map(Into::into).unwrap_or_default(),
             pydocstyle: config.pydocstyle.map(Into::into).unwrap_or_default(),
             pylint: config.pylint.map(Into::into).unwrap_or_default(),
-            pyupgrade: config.pyupgrade.map(Into::into).unwrap_or_default(),
         })
     }
 
@@ -431,7 +425,7 @@ pub fn resolve_per_file_ignores(
 
 #[cfg(test)]
 mod tests {
-    use crate::codes::{self, Pycodestyle};
+    use crate::codes::Pycodestyle;
     use crate::registry::{Rule, RuleSet};
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
@@ -451,7 +445,7 @@ mod tests {
     #[test]
     fn rule_codes() {
         let actual = resolve_rules([RuleSelection {
-            select: Some(vec![codes::Pycodestyle::W.into()]),
+            select: Some(vec![Pycodestyle::W.into()]),
             ..RuleSelection::default()
         }]);
 

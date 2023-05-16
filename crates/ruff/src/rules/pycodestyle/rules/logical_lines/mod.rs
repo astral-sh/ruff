@@ -83,7 +83,7 @@ pub(crate) struct LogicalLines<'a> {
 }
 
 impl<'a> LogicalLines<'a> {
-    pub fn from_tokens(tokens: &'a [LexResult], locator: &'a Locator<'a>) -> Self {
+    pub(crate) fn from_tokens(tokens: &'a [LexResult], locator: &'a Locator<'a>) -> Self {
         assert!(u32::try_from(tokens.len()).is_ok());
 
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
@@ -154,12 +154,12 @@ pub(crate) struct LogicalLine<'a> {
 
 impl<'a> LogicalLine<'a> {
     /// Returns `true` if this is a comment only line
-    pub fn is_comment_only(&self) -> bool {
+    pub(crate) fn is_comment_only(&self) -> bool {
         self.flags() == TokenFlags::COMMENT
     }
 
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
-    pub fn text(&self) -> &'a str {
+    pub(crate) fn text(&self) -> &'a str {
         let tokens = self.tokens();
         match (tokens.first(), tokens.last()) {
             (Some(first), Some(last)) => self
@@ -172,7 +172,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text without any leading or trailing newline, comment, indent, or dedent of this line
     #[cfg(test)]
-    pub fn text_trimmed(&self) -> &'a str {
+    pub(crate) fn text_trimmed(&self) -> &'a str {
         let tokens = self.tokens_trimmed();
 
         match (tokens.first(), tokens.last()) {
@@ -184,7 +184,7 @@ impl<'a> LogicalLine<'a> {
         }
     }
 
-    pub fn tokens_trimmed(&self) -> &'a [LogicalLineToken] {
+    pub(crate) fn tokens_trimmed(&self) -> &'a [LogicalLineToken] {
         let tokens = self.tokens();
 
         let start = tokens
@@ -222,7 +222,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text after `token`
     #[inline]
-    pub fn text_after(&self, token: &'a LogicalLineToken) -> &str {
+    pub(crate) fn text_after(&self, token: &'a LogicalLineToken) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
         let last_token = self.tokens().last().unwrap();
         self.lines
@@ -232,7 +232,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text before `token`
     #[inline]
-    pub fn text_before(&self, token: &'a LogicalLineToken) -> &str {
+    pub(crate) fn text_before(&self, token: &'a LogicalLineToken) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
         let first_token = self.tokens().first().unwrap();
         self.lines
@@ -240,27 +240,30 @@ impl<'a> LogicalLine<'a> {
             .slice(TextRange::new(first_token.start(), token.start()))
     }
 
-    /// Returns the whitespace *after* the `token`
-    pub fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> Whitespace {
+    /// Returns the whitespace *after* the `token` with the byte length
+    pub(crate) fn trailing_whitespace(
+        &self,
+        token: &'a LogicalLineToken,
+    ) -> (Whitespace, TextSize) {
         Whitespace::leading(self.text_after(token))
     }
 
     /// Returns the whitespace and whitespace byte-length *before* the `token`
-    pub fn leading_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
+    pub(crate) fn leading_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
         Whitespace::trailing(self.text_before(token))
     }
 
     /// Returns all tokens of the line, including comments and trailing new lines.
-    pub fn tokens(&self) -> &'a [LogicalLineToken] {
+    pub(crate) fn tokens(&self) -> &'a [LogicalLineToken] {
         &self.lines.tokens[self.line.tokens_start as usize..self.line.tokens_end as usize]
     }
 
-    pub fn first_token(&self) -> Option<&'a LogicalLineToken> {
+    pub(crate) fn first_token(&self) -> Option<&'a LogicalLineToken> {
         self.tokens().first()
     }
 
     /// Returns the line's flags
-    pub const fn flags(&self) -> TokenFlags {
+    pub(crate) const fn flags(&self) -> TokenFlags {
         self.line.flags
     }
 }
@@ -326,25 +329,25 @@ pub(crate) struct LogicalLineToken {
 impl LogicalLineToken {
     /// Returns the token's kind
     #[inline]
-    pub const fn kind(&self) -> TokenKind {
+    pub(crate) const fn kind(&self) -> TokenKind {
         self.kind
     }
 
     /// Returns the token's start location
     #[inline]
-    pub const fn start(&self) -> TextSize {
+    pub(crate) const fn start(&self) -> TextSize {
         self.range.start()
     }
 
     /// Returns the token's end location
     #[inline]
-    pub const fn end(&self) -> TextSize {
+    pub(crate) const fn end(&self) -> TextSize {
         self.range.end()
     }
 
     /// Returns a tuple with the token's `(start, end)` locations
     #[inline]
-    pub const fn range(&self) -> TextRange {
+    pub(crate) const fn range(&self) -> TextRange {
         self.range
     }
 }
@@ -358,35 +361,45 @@ pub(crate) enum Whitespace {
 }
 
 impl Whitespace {
-    fn leading(content: &str) -> Self {
+    fn leading(content: &str) -> (Self, TextSize) {
         let mut count = 0u32;
+        let mut len = TextSize::default();
+        let mut has_tabs = false;
 
         for c in content.chars() {
             if c == '\t' {
-                return Self::Tab;
+                has_tabs = true;
+                len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
                 break;
             } else if c.is_whitespace() {
                 count += 1;
+                len += c.text_len();
             } else {
                 break;
             }
         }
 
-        match count {
-            0 => Whitespace::None,
-            1 => Whitespace::Single,
-            _ => Whitespace::Many,
+        if has_tabs {
+            (Whitespace::Tab, len)
+        } else {
+            match count {
+                0 => (Whitespace::None, len),
+                1 => (Whitespace::Single, len),
+                _ => (Whitespace::Many, len),
+            }
         }
     }
 
     fn trailing(content: &str) -> (Self, TextSize) {
         let mut len = TextSize::default();
         let mut count = 0usize;
+        let mut has_tabs = false;
 
         for c in content.chars().rev() {
             if c == '\t' {
-                return (Self::Tab, len + c.text_len());
+                has_tabs = true;
+                len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
                 // Indent
                 return (Self::None, TextSize::default());
@@ -398,15 +411,19 @@ impl Whitespace {
             }
         }
 
-        match count {
-            0 => (Self::None, TextSize::default()),
-            1 => (Self::Single, len),
-            _ => {
-                if len == content.text_len() {
-                    // All whitespace up to the start of the line -> Indent
-                    (Self::None, TextSize::default())
-                } else {
-                    (Self::Many, len)
+        if has_tabs {
+            (Self::Tab, len)
+        } else {
+            match count {
+                0 => (Self::None, TextSize::default()),
+                1 => (Self::Single, len),
+                _ => {
+                    if len == content.text_len() {
+                        // All whitespace up to the start of the line -> Indent
+                        (Self::None, TextSize::default())
+                    } else {
+                        (Self::Many, len)
+                    }
                 }
             }
         }

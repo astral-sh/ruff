@@ -1,14 +1,13 @@
 //! Settings for the `pylint` plugin.
 
 use anyhow::anyhow;
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 use rustpython_parser::ast::Constant;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum ConstantType {
     Bytes,
     Complex,
@@ -37,13 +36,14 @@ impl TryFrom<&Constant> for ConstantType {
 }
 
 #[derive(
-    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
 )]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
     rename = "PylintOptions"
 )]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
     #[option(
         default = r#"["str", "bytes"]"#,

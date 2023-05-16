@@ -57,6 +57,7 @@ SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts inst
    | |__________________^ SIM117
 17 |           print("hello")
    |
+   = help: Combine `with` statements
 
 SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |

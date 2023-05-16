@@ -226,6 +226,7 @@ RUF005.py:32:10: RUF005 Consider `[*first, 4, 5, 6]` instead of concatenation
 42 |   
 43 |   [] + foo + [
    |
+   = help: Replace with `[*first, 4, 5, 6]`
 
 RUF005.py:41:1: RUF005 [*] Consider `[*foo]` instead of concatenation
    |

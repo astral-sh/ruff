@@ -1,7 +1,7 @@
-use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments, unparse_expr};
 use ruff_python_semantic::context::Context;
@@ -9,7 +9,7 @@ use ruff_python_semantic::context::Context;
 use crate::{checkers::ast::Checker, registry::AsRule};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MinMax {
+pub(crate) enum MinMax {
     Min,
     Max,
 }
@@ -17,18 +17,19 @@ pub enum MinMax {
 #[violation]
 pub struct NestedMinMax {
     func: MinMax,
-    fixable: bool,
 }
 
 impl Violation for NestedMinMax {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Nested `{}` calls can be flattened", self.func)
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|NestedMinMax { func, .. }| format!("Flatten nested `{func}` calls"))
+    fn autofix_title(&self) -> Option<String> {
+        let NestedMinMax { func } = self;
+        Some(format!("Flatten nested `{func}` calls"))
     }
 }
 
@@ -38,7 +39,7 @@ impl MinMax {
         if !keywords.is_empty() {
             return None;
         }
-        let ExprKind::Name { id, .. } = func.node() else {
+        let ExprKind::Name(ast::ExprName { id, .. }) = func.node() else {
             return None;
         };
         if id == "min" && context.is_builtin("min") {
@@ -65,12 +66,23 @@ impl std::fmt::Display for MinMax {
 fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec<Expr> {
     fn inner(context: &Context, min_max: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
         for arg in args {
-            if let ExprKind::Call {
+            if let ExprKind::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
-            } = arg.node()
+            }) = arg.node()
             {
+                if args.len() == 1 {
+                    let new_arg = Expr::new(
+                        TextRange::default(),
+                        ast::ExprStarred {
+                            value: Box::new(args[0].clone()),
+                            ctx: ast::ExprContext::Load,
+                        },
+                    );
+                    new_args.push(new_arg);
+                    continue;
+                }
                 if MinMax::try_from_call(func, keywords, context) == Some(min_max) {
                     inner(context, min_max, args, new_args);
                     continue;
@@ -86,7 +98,7 @@ fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec
 }
 
 /// W3301
-pub fn nested_min_max(
+pub(crate) fn nested_min_max(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,
@@ -98,29 +110,23 @@ pub fn nested_min_max(
     };
 
     if args.iter().any(|arg| {
-        let ExprKind::Call { func, keywords, ..} = arg.node() else {
+        let ExprKind::Call(ast::ExprCall { func, keywords, ..} )= arg.node() else {
             return false;
         };
         MinMax::try_from_call(func, keywords, &checker.ctx) == Some(min_max)
     }) {
         let fixable = !has_comments(expr, checker.locator);
-        let mut diagnostic = Diagnostic::new(
-            NestedMinMax {
-                func: min_max,
-                fixable,
-            },
-            expr.range(),
-        );
+        let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
             let flattened_expr = Expr::new(
-                TextSize::default(),
-                TextSize::default(),
-                ExprKind::Call {
+                TextRange::default(),
+                ast::ExprCall {
                     func: Box::new(func.clone()),
                     args: collect_nested_args(&checker.ctx, min_max, args),
                     keywords: keywords.to_owned(),
                 },
             );
+            #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&flattened_expr, checker.stylist),
                 expr.range(),

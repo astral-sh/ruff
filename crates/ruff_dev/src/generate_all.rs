@@ -4,16 +4,16 @@ use anyhow::Result;
 
 use crate::{generate_cli_help, generate_docs, generate_json_schema};
 
-pub const REGENERATE_ALL_COMMAND: &str = "cargo dev generate-all";
+pub(crate) const REGENERATE_ALL_COMMAND: &str = "cargo dev generate-all";
 
 #[derive(clap::Args)]
-pub struct Args {
+pub(crate) struct Args {
     #[arg(long, default_value_t, value_enum)]
     mode: Mode,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, clap::ValueEnum, Default)]
-pub enum Mode {
+pub(crate) enum Mode {
     /// Update the content in the `configuration.md`.
     #[default]
     Write,
@@ -31,7 +31,7 @@ impl Mode {
     }
 }
 
-pub fn main(args: &Args) -> Result<()> {
+pub(crate) fn main(args: &Args) -> Result<()> {
     generate_json_schema::main(&generate_json_schema::Args { mode: args.mode })?;
     generate_cli_help::main(&generate_cli_help::Args { mode: args.mode })?;
     generate_docs::main(&generate_docs::Args {

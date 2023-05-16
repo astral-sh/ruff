@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::Expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -11,7 +11,7 @@ use super::helpers;
 /// ## What it does
 /// Checks for unnecessary `list` calls around list comprehensions.
 ///
-/// ## Why is it bad?
+/// ## Why is this bad?
 /// It is redundant to use a `list` call around a list comprehension.
 ///
 /// ## Examples
@@ -38,14 +38,19 @@ impl AlwaysAutofixableViolation for UnnecessaryListCall {
 }
 
 /// C411
-pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn unnecessary_list_call(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
     if !checker.ctx.is_builtin("list") {
         return;
     }
-    if !matches!(argument, ExprKind::ListComp { .. }) {
+    if !argument.is_list_comp_expr() {
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListCall, expr.range());

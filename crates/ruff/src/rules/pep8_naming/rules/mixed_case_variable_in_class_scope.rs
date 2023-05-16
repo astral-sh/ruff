@@ -38,7 +38,7 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
 pub struct MixedCaseVariableInClassScope {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for MixedCaseVariableInClassScope {
@@ -50,7 +50,7 @@ impl Violation for MixedCaseVariableInClassScope {
 }
 
 /// N815
-pub fn mixed_case_variable_in_class_scope(
+pub(crate) fn mixed_case_variable_in_class_scope(
     checker: &mut Checker,
     expr: &Expr,
     stmt: &Stmt,

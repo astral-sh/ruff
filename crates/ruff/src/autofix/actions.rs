@@ -5,7 +5,7 @@ use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, ExcepthandlerKind, Expr, Keyword, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -28,21 +28,21 @@ fn has_single_child(body: &[Stmt], deleted: &[&Stmt]) -> bool {
 /// Determine if a child is the only statement in its body.
 fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool> {
     match &parent.node {
-        StmtKind::FunctionDef { body, .. }
-        | StmtKind::AsyncFunctionDef { body, .. }
-        | StmtKind::ClassDef { body, .. }
-        | StmtKind::With { body, .. }
-        | StmtKind::AsyncWith { body, .. } => {
+        StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. })
+        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
+        | StmtKind::ClassDef(ast::StmtClassDef { body, .. })
+        | StmtKind::With(ast::StmtWith { body, .. })
+        | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else {
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::For { body, orelse, .. }
-        | StmtKind::AsyncFor { body, orelse, .. }
-        | StmtKind::While { body, orelse, .. }
-        | StmtKind::If { body, orelse, .. } => {
+        StmtKind::For(ast::StmtFor { body, orelse, .. })
+        | StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+        | StmtKind::While(ast::StmtWhile { body, orelse, .. })
+        | StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else if orelse.iter().contains(child) {
@@ -51,18 +51,18 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::Try {
+        StmtKind::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
-        }
-        | StmtKind::TryStar {
+        })
+        | StmtKind::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
-        } => {
+        }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else if orelse.iter().contains(child) {
@@ -70,7 +70,9 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             } else if finalbody.iter().contains(child) {
                 Ok(has_single_child(finalbody, deleted))
             } else if let Some(body) = handlers.iter().find_map(|handler| match &handler.node {
-                ExcepthandlerKind::ExceptHandler { body, .. } => {
+                ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    body, ..
+                }) => {
                     if body.iter().contains(child) {
                         Some(body)
                     } else {
@@ -83,7 +85,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::Match { cases, .. } => {
+        StmtKind::Match(ast::StmtMatch { cases, .. }) => {
             if let Some(body) = cases.iter().find_map(|case| {
                 if case.body.iter().contains(child) {
                     Some(&case.body)
@@ -166,7 +168,7 @@ fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
 ///   remove the entire start and end lines.
 /// - If the `Stmt` is the last statement in its parent body, replace it with a
 ///   `pass` instead.
-pub fn delete_stmt(
+pub(crate) fn delete_stmt(
     stmt: &Stmt,
     parent: Option<&Stmt>,
     deleted: &[&Stmt],
@@ -203,7 +205,7 @@ pub fn delete_stmt(
 }
 
 /// Generate a `Fix` to remove any unused imports from an `import` statement.
-pub fn remove_unused_imports<'a>(
+pub(crate) fn remove_unused_imports<'a>(
     unused_imports: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
@@ -328,7 +330,7 @@ pub fn remove_unused_imports<'a>(
 ///
 /// Supports the removal of parentheses when this is the only (kw)arg left.
 /// For this behavior, set `remove_parentheses` to `true`.
-pub fn remove_argument(
+pub(crate) fn remove_argument(
     locator: &Locator,
     call_at: TextSize,
     expr_range: TextRange,
@@ -350,7 +352,7 @@ pub fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -382,7 +384,7 @@ pub fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
@@ -405,7 +407,7 @@ pub fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if range.start() == expr_range.start() {
                 fix_end = Some(expr_range.end());
                 break;
@@ -432,7 +434,7 @@ pub fn remove_argument(
 /// name on which the `lru_cache` symbol would be made available (`"functools.lru_cache"`).
 ///
 /// Attempts to reuse existing imports when possible.
-pub fn get_or_import_symbol(
+pub(crate) fn get_or_import_symbol(
     module: &str,
     member: &str,
     at: TextSize,
@@ -442,8 +444,19 @@ pub fn get_or_import_symbol(
 ) -> Result<(Edit, String)> {
     if let Some((source, binding)) = context.resolve_qualified_import_name(module, member) {
         // If the symbol is already available in the current scope, use it.
-        //
-        // We also add a no-nop edit to force conflicts with any other fixes that might try to
+
+        // The exception: the symbol source (i.e., the import statement) comes after the current
+        // location. For example, we could be generating an edit within a function, and the import
+        // could be defined in the module scope, but after the function definition. In this case,
+        // it's unclear whether we can use the symbol (the function could be called between the
+        // import and the current location, and thus the symbol would not be available). It's also
+        // unclear whether should add an import statement at the top of the file, since it could
+        // be shadowed between the import and the current location.
+        if source.start() > at {
+            bail!("Unable to use existing symbol `{binding}` due to late-import");
+        }
+
+        // We also add a no-op edit to force conflicts with any other fixes that might try to
         // remove the import. Consider:
         //
         // ```py
@@ -474,10 +487,7 @@ pub fn get_or_import_symbol(
                 let import_edit = importer.add_member(stmt, member)?;
                 Ok((import_edit, member.to_string()))
             } else {
-                bail!(
-                    "Unable to insert `{}` into scope due to name conflict",
-                    member
-                )
+                bail!("Unable to insert `{member}` into scope due to name conflict")
             }
         } else {
             // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
@@ -490,10 +500,7 @@ pub fn get_or_import_symbol(
                     importer.add_import(&AnyImport::Import(Import::module(module)), at);
                 Ok((import_edit, format!("{module}.{member}")))
             } else {
-                bail!(
-                    "Unable to insert `{}` into scope due to name conflict",
-                    module
-                )
+                bail!("Unable to insert `{module}` into scope due to name conflict")
             }
         }
     }

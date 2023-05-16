@@ -13,13 +13,13 @@ static SHEBANG_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?P<spaces>\s*)#!(?P<directive>.*)").unwrap());
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ShebangDirective<'a> {
+pub(crate) enum ShebangDirective<'a> {
     None,
     // whitespace length, start of the shebang, contents
     Match(TextSize, TextSize, &'a str),
 }
 
-pub fn extract_shebang(line: &str) -> ShebangDirective {
+pub(crate) fn extract_shebang(line: &str) -> ShebangDirective {
     // Minor optimization to avoid matches in the common case.
     if !line.contains('!') {
         return ShebangDirective::None;
@@ -41,7 +41,7 @@ pub fn extract_shebang(line: &str) -> ShebangDirective {
 }
 
 #[cfg(target_family = "unix")]
-pub fn is_executable(filepath: &Path) -> Result<bool> {
+pub(crate) fn is_executable(filepath: &Path) -> Result<bool> {
     {
         let metadata = filepath.metadata()?;
         let permissions = metadata.permissions();

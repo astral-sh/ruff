@@ -8,7 +8,7 @@ PT001.py:14:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 15 | def parentheses_no_params():
 16 |     return 42
    |
-   = help: Add/remove parentheses
+   = help: Remove parentheses
 
 ℹ Suggested fix
 11 11 |     return 42
@@ -30,7 +30,7 @@ PT001.py:24:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 27 |   def parentheses_no_params_multiline():
 28 |       return 42
    |
-   = help: Add/remove parentheses
+   = help: Remove parentheses
 
 ℹ Suggested fix
 21 21 |     return 42
@@ -51,7 +51,7 @@ PT001.py:39:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 40 | def imported_from_parentheses_no_params():
 41 |     return 42
    |
-   = help: Add/remove parentheses
+   = help: Remove parentheses
 
 ℹ Suggested fix
 36 36 |     return 42
@@ -73,7 +73,7 @@ PT001.py:49:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 52 |   def imported_from_parentheses_no_params_multiline():
 53 |       return 42
    |
-   = help: Add/remove parentheses
+   = help: Remove parentheses
 
 ℹ Suggested fix
 46 46 |     return 42
@@ -94,7 +94,7 @@ PT001.py:64:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 65 | def aliased_parentheses_no_params():
 66 |     return 42
    |
-   = help: Add/remove parentheses
+   = help: Remove parentheses
 
 ℹ Suggested fix
 61 61 |     return 42
@@ -116,7 +116,7 @@ PT001.py:74:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
 77 |   def aliased_parentheses_no_params_multiline():
 78 |       return 42
    |
-   = help: Add/remove parentheses
+   = help: Remove parentheses
 
 ℹ Suggested fix
 71 71 |     return 42

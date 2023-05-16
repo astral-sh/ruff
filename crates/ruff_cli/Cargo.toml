@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.265"
+version = "0.0.267"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -66,9 +66,7 @@ ureq = { version = "2.6.2", features = [] }
 
 [features]
 jupyter_notebook = ["ruff/jupyter_notebook"]
-
-[package.metadata.maturin]
-name = "ruff"
+ecosystem_ci = ["ruff/ecosystem_ci"]
 
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = "0.1.34"

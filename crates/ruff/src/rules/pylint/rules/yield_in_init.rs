@@ -38,7 +38,7 @@ impl Violation for YieldInInit {
 }
 
 /// PLE0100
-pub fn yield_in_init(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn yield_in_init(checker: &mut Checker, expr: &Expr) {
     if in_dunder_init(checker) {
         checker
             .diagnostics

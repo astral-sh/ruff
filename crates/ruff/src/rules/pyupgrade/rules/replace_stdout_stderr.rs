@@ -38,6 +38,7 @@ fn generate_fix(
     } else {
         (stderr, stdout)
     };
+    #[allow(deprecated)]
     Ok(Fix::unspecified_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
@@ -52,7 +53,7 @@ fn generate_fix(
 }
 
 /// UP022
-pub fn replace_stdout_stderr(
+pub(crate) fn replace_stdout_stderr(
     checker: &mut Checker,
     expr: &Expr,
     func: &Expr,

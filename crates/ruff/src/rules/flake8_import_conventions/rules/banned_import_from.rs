@@ -29,7 +29,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 #[violation]
 pub struct BannedImportFrom {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for BannedImportFrom {
@@ -41,7 +41,7 @@ impl Violation for BannedImportFrom {
 }
 
 /// ICN003
-pub fn banned_import_from(
+pub(crate) fn banned_import_from(
     stmt: &Stmt,
     name: &str,
     banned_conventions: &FxHashSet<String>,

@@ -76,7 +76,7 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
+pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
     let diagnostic = {
         let call_path = checker.ctx.resolve_call_path(func);
         if call_path

@@ -6,8 +6,10 @@ use libcst_native::{
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{
-    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
+    self, Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind,
+    Unaryop,
 };
+use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,9 +53,7 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something_else
 /// ```
 #[violation]
-pub struct PytestCompositeAssertion {
-    pub fixable: bool,
-}
+pub struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -63,15 +63,14 @@ impl Violation for PytestCompositeAssertion {
         format!("Assertion should be broken down into multiple parts")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Break down assertion into multiple parts"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Break down assertion into multiple parts".to_string())
     }
 }
 
 #[violation]
 pub struct PytestAssertInExcept {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for PytestAssertInExcept {
@@ -96,8 +95,7 @@ impl Violation for PytestAssertAlwaysFalse {
 
 #[violation]
 pub struct PytestUnittestAssertion {
-    pub assertion: String,
-    pub fixable: bool,
+    assertion: String,
 }
 
 impl Violation for PytestUnittestAssertion {
@@ -105,15 +103,13 @@ impl Violation for PytestUnittestAssertion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestUnittestAssertion { assertion, .. } = self;
+        let PytestUnittestAssertion { assertion } = self;
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|PytestUnittestAssertion { assertion, .. }| {
-                format!("Replace `{assertion}(...)` with `assert ...`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let PytestUnittestAssertion { assertion } = self;
+        Some(format!("Replace `{assertion}(...)` with `assert ...`"))
     }
 }
 
@@ -141,7 +137,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
-            StmtKind::Assert { .. } => {
+            StmtKind::Assert(_) => {
                 self.current_assert = Some(stmt);
                 visitor::walk_stmt(self, stmt);
                 self.current_assert = None;
@@ -152,9 +148,9 @@ where
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match &expr.node {
-            ExprKind::Name { id, .. } => {
+            ExprKind::Name(ast::ExprName { id, .. }) => {
                 if let Some(current_assert) = self.current_assert {
-                    if id.as_str() == self.exception_name {
+                    if id == self.exception_name {
                         self.errors.push(Diagnostic::new(
                             PytestAssertInExcept {
                                 name: id.to_string(),
@@ -179,7 +175,7 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
 }
 
 /// PT009
-pub fn unittest_assertion(
+pub(crate) fn unittest_assertion(
     checker: &Checker,
     expr: &Expr,
     func: &Expr,
@@ -187,23 +183,23 @@ pub fn unittest_assertion(
     keywords: &[Keyword],
 ) -> Option<Diagnostic> {
     match &func.node {
-        ExprKind::Attribute { attr, .. } => {
+        ExprKind::Attribute(ast::ExprAttribute { attr, .. }) => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
-                    && checker.ctx.current_expr_parent().is_none()
+                let fixable = matches!(checker.ctx.stmt().node, StmtKind::Expr(_))
+                    && checker.ctx.expr_parent().is_none()
                     && !checker.ctx.scope().kind.is_lambda()
                     && !has_comments_in(expr.range(), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {
                         assertion: unittest_assert.to_string(),
-                        fixable,
                     },
                     func.range(),
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                        #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_stmt(&stmt, checker.stylist),
                             expr.range(),
@@ -220,7 +216,7 @@ pub fn unittest_assertion(
 }
 
 /// PT015
-pub fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     if Truthiness::from_expr(test, |id| checker.ctx.is_builtin(id)).is_falsey() {
         checker
             .diagnostics
@@ -229,11 +225,15 @@ pub fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
+pub(crate) fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic> {
     handlers
         .iter()
         .flat_map(|handler| match &handler.node {
-            ExcepthandlerKind::ExceptHandler { name, body, .. } => {
+            ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                name,
+                body,
+                ..
+            }) => {
                 if let Some(name) = name {
                     check_assert_in_except(name, body)
                 } else {
@@ -261,28 +261,28 @@ enum CompositionKind {
 /// `not a and not b` by De Morgan's laws.
 fn is_composite_condition(test: &Expr) -> CompositionKind {
     match &test.node {
-        ExprKind::BoolOp {
+        ExprKind::BoolOp(ast::ExprBoolOp {
             op: Boolop::And, ..
-        } => {
+        }) => {
             return CompositionKind::Simple;
         }
-        ExprKind::UnaryOp {
+        ExprKind::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::Not,
             operand,
-        } => {
-            if let ExprKind::BoolOp {
+        }) => {
+            if let ExprKind::BoolOp(ast::ExprBoolOp {
                 op: Boolop::Or,
                 values,
-            } = &operand.node
+            }) = &operand.node
             {
                 // Only split cases without mixed `and` and `or`.
                 return if values.iter().all(|expr| {
                     !matches!(
                         expr.node,
-                        ExprKind::BoolOp {
+                        ExprKind::BoolOp(ast::ExprBoolOp {
                             op: Boolop::And,
                             ..
-                        }
+                        })
                     )
                 }) {
                     CompositionKind::Simple
@@ -324,15 +324,25 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     // Extract the module text.
     let contents = locator.lines(stmt.range());
 
-    // "Embed" it in a function definition, to preserve indentation while retaining valid source
-    // code. (We'll strip the prefix later on.)
-    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+    // If the block is indented, "embed" it in a function definition, to preserve
+    // indentation while retaining valid source code. (We'll strip the prefix later
+    // on.)
+    let module_text = if outer_indent.is_empty() {
+        Cow::Borrowed(contents)
+    } else {
+        Cow::Owned(format!(
+            "def f():{}{contents}",
+            stylist.line_ending().as_str()
+        ))
+    };
 
     // Parse the CST.
     let mut tree = match_module(&module_text)?;
 
     // Extract the assert statement.
-    let statements: &mut Vec<Statement> = {
+    let statements = if outer_indent.is_empty() {
+        &mut tree.body
+    } else {
         let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
             bail!("Expected statement to be embedded in a function definition")
         };
@@ -344,10 +354,12 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 
         &mut indented_block.body
     };
-    let [Statement::Simple(simple_statement_line)] = statements.as_mut_slice() else {
+
+    let [Statement::Simple(simple_statement_line)] = &statements[..] else {
         bail!("Expected one simple statement")
     };
-    let [SmallStatement::Assert(assert_statement)] = &mut *simple_statement_line.body else {
+
+    let [SmallStatement::Assert(assert_statement)] = &simple_statement_line.body[..] else {
         bail!("Expected simple statement to be an assert")
     };
 
@@ -408,10 +420,14 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 
     // Reconstruct and reformat the code.
     let module_text = state.to_string();
-    let contents = module_text
-        .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
-        .unwrap()
-        .to_string();
+    let contents = if outer_indent.is_empty() {
+        module_text
+    } else {
+        module_text
+            .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
+            .unwrap()
+            .to_string()
+    };
 
     let range = locator.full_lines_range(stmt.range());
 
@@ -419,13 +435,18 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 }
 
 /// PT018
-pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub(crate) fn composite_condition(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    msg: Option<&Expr>,
+) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let fixable = matches!(composite, CompositionKind::Simple)
             && msg.is_none()
             && !has_comments_in(stmt.range(), checker.locator);
-        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion { fixable }, stmt.range());
+        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.try_set_fix_from_edit(|| {

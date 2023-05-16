@@ -109,8 +109,12 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
         let kind = token.kind();
         match kind {
             TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                if !matches!(line.trailing_whitespace(token), Whitespace::None) {
-                    context.push(WhitespaceAfterOpenBracket, TextRange::empty(token.end()));
+                let (trailing, trailing_len) = line.trailing_whitespace(token);
+                if !matches!(trailing, Whitespace::None) {
+                    context.push(
+                        WhitespaceAfterOpenBracket,
+                        TextRange::at(token.end(), trailing_len),
+                    );
                 }
             }
             TokenKind::Rbrace
@@ -119,10 +123,10 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
             | TokenKind::Comma
             | TokenKind::Semi
             | TokenKind::Colon => {
-                if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
-                    line.leading_whitespace(token)
-                {
-                    if !matches!(last_token, TokenKind::Comma | TokenKind::EndOfFile) {
+                if !matches!(last_token, TokenKind::Comma | TokenKind::EndOfFile) {
+                    if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
+                        line.leading_whitespace(token)
+                    {
                         let diagnostic_kind = if matches!(
                             kind,
                             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon
@@ -132,7 +136,10 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                             DiagnosticKind::from(WhitespaceBeforeCloseBracket)
                         };
 
-                        context.push(diagnostic_kind, TextRange::empty(token.start() - offset));
+                        context.push(
+                            diagnostic_kind,
+                            TextRange::at(token.start() - offset, offset),
+                        );
                     }
                 }
             }

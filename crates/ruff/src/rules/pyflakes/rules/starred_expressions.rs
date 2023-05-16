@@ -25,7 +25,7 @@ impl Violation for MultipleStarredExpressions {
 }
 
 /// F621, F622
-pub fn starred_expressions(
+pub(crate) fn starred_expressions(
     elts: &[Expr],
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,
@@ -34,7 +34,7 @@ pub fn starred_expressions(
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;
     for (index, elt) in elts.iter().enumerate() {
-        if matches!(elt.node, ExprKind::Starred { .. }) {
+        if matches!(elt.node, ExprKind::Starred(_)) {
             if has_starred && check_two_starred_expressions {
                 return Some(Diagnostic::new(MultipleStarredExpressions, location));
             }

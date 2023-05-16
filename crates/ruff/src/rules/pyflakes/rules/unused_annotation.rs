@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct UnusedAnnotation {
-    pub name: String,
+    name: String,
 }
 
 impl Violation for UnusedAnnotation {
@@ -18,7 +18,7 @@ impl Violation for UnusedAnnotation {
 }
 
 /// F842
-pub fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
+pub(crate) fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
     let scope = &checker.ctx.scopes[scope];
     for (name, binding) in scope
         .bindings()

@@ -1,10 +1,10 @@
 use ruff_text_size::TextRange;
 use std::str::FromStr;
 
-use rustpython_common::cformat::{
+use rustpython_format::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -140,7 +140,7 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) -> String {
     let mut contents = checker.locator.slice(right.range()).to_string();
-    if let ExprKind::Tuple { elts, .. } = &right.node {
+    if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &right.node {
         if elts.len() == 1 {
             if !locator.contains_line_break(right.range()) {
                 for (i, character) in contents.chars().rev().enumerate() {
@@ -165,17 +165,17 @@ fn clean_params_dictionary(
 ) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
-    if let ExprKind::Dict { keys, values } = &right.node {
+    if let ExprKind::Dict(ast::ExprDict { keys, values }) = &right.node {
         let mut arguments: Vec<String> = vec![];
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
         for (key, value) in keys.iter().zip(values.iter()) {
             match key {
                 Some(key) => {
-                    if let ExprKind::Constant {
+                    if let ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(key_string),
                         ..
-                    } = &key.node
+                    }) = &key.node
                     {
                         // If the dictionary key is not a valid variable name, abort.
                         if !is_identifier(key_string) {
@@ -291,7 +291,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
         }
 
         // All dict substitutions must be named.
-        if let ExprKind::Dict { .. } = &params.node {
+        if let ExprKind::Dict(_) = &params.node {
             if fmt.mapping_key.is_none() {
                 return false;
             }
@@ -310,7 +310,7 @@ pub(crate) fn printf_string_formatting(
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
-    for (tok, range) in lexer::lex_located(
+    for (tok, range) in lexer::lex_starts_at(
         checker.locator.slice(expr.range()),
         Mode::Module,
         expr.start(),
@@ -371,13 +371,10 @@ pub(crate) fn printf_string_formatting(
 
     // Parse the parameters.
     let params_string = match right.node {
-        ExprKind::Constant { .. } | ExprKind::JoinedStr { .. } => {
+        ExprKind::Constant(_) | ExprKind::JoinedStr(_) => {
             format!("({})", checker.locator.slice(right.range()))
         }
-        ExprKind::Name { .. }
-        | ExprKind::Attribute { .. }
-        | ExprKind::Subscript { .. }
-        | ExprKind::Call { .. } => {
+        ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_) | ExprKind::Call(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
                 format!("(**{})", checker.locator.slice(right.range()))
@@ -398,8 +395,8 @@ pub(crate) fn printf_string_formatting(
                 return;
             }
         }
-        ExprKind::Tuple { .. } => clean_params_tuple(checker, right, locator),
-        ExprKind::Dict { .. } => {
+        ExprKind::Tuple(_) => clean_params_tuple(checker, right, locator),
+        ExprKind::Dict(_) => {
             if let Some(params_string) = clean_params_dictionary(checker, right, locator) {
                 params_string
             } else {
@@ -444,6 +441,7 @@ pub(crate) fn printf_string_formatting(
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             contents,
             expr.range(),

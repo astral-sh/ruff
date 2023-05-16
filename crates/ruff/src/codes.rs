@@ -213,6 +213,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W2901") => Rule::RedefinedLoopName,
         (Pylint, "E0302") => Rule::UnexpectedSpecialMethodSignature,
         (Pylint, "W3301") => Rule::NestedMinMax,
+        (Pylint, "E0241") => Rule::DuplicateBases,
+
+        // flake8-async
+        (Flake8Async, "100") => Rule::BlockingHttpCallInAsyncFunction,
+        (Flake8Async, "101") => Rule::OpenSleepOrSubprocessInAsyncFunction,
+        (Flake8Async, "102") => Rule::BlockingOsCallInAsyncFunction,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -329,6 +335,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Annotations, "205") => Rule::MissingReturnTypeStaticMethod,
         (Flake8Annotations, "206") => Rule::MissingReturnTypeClassMethod,
         (Flake8Annotations, "401") => Rule::AnyType,
+
+        // flake8-future-annotations
+        (Flake8FutureAnnotations, "100") => Rule::MissingFutureAnnotationsImport,
 
         // flake8-2020
         (Flake82020, "101") => Rule::SysVersionSlice3,
@@ -563,6 +572,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (PygrepHooks, "002") => Rule::DeprecatedLogWarn,
         (PygrepHooks, "003") => Rule::BlanketTypeIgnore,
         (PygrepHooks, "004") => Rule::BlanketNOQA,
+        (PygrepHooks, "005") => Rule::InvalidMockAccess,
 
         // pandas-vet
         (PandasVet, "002") => Rule::PandasUseOfInplaceArgument,
@@ -727,6 +737,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "007") => Rule::PairwiseOverZipped,
         (Ruff, "008") => Rule::MutableDataclassDefault,
         (Ruff, "009") => Rule::FunctionCallInDataclassDefaultArgument,
+        (Ruff, "010") => Rule::ExplicitFStringTypeConversion,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django
@@ -738,6 +749,18 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Django, "012") => Rule::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => Rule::DjangoNonLeadingReceiverDecorator,
 
+        // flynt
+        // Reserved: (Flynt, "001") => Rule::StringConcatenationToFString,
+        (Flynt, "002") => Rule::StaticJoinToFString,
+
+        // flake8-todo
+        (Flake8Todo, "001") => Rule::InvalidTodoTag,
+        (Flake8Todo, "002") => Rule::MissingTodoAuthor,
+        (Flake8Todo, "003") => Rule::MissingTodoLink,
+        (Flake8Todo, "004") => Rule::MissingTodoColon,
+        (Flake8Todo, "005") => Rule::MissingTodoDescription,
+        (Flake8Todo, "006") => Rule::InvalidTodoCapitalization,
+        (Flake8Todo, "007") => Rule::MissingSpaceAfterTodoColon,
         _ => return None,
     })
 }

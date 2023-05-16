@@ -1,7 +1,7 @@
 //! Check for calls to suspicious functions, or calls into suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -220,7 +220,7 @@ impl Violation for SuspiciousFTPLibUsage {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Reason {
+pub(crate) enum Reason {
     Pickle,
     Marshal,
     InsecureHash,
@@ -250,7 +250,7 @@ struct SuspiciousMembers<'a> {
 }
 
 impl<'a> SuspiciousMembers<'a> {
-    pub const fn new(members: &'a [&'a [&'a str]], reason: Reason) -> Self {
+    pub(crate) const fn new(members: &'a [&'a [&'a str]], reason: Reason) -> Self {
         Self { members, reason }
     }
 }
@@ -261,7 +261,7 @@ struct SuspiciousModule<'a> {
 }
 
 impl<'a> SuspiciousModule<'a> {
-    pub const fn new(name: &'a str, reason: Reason) -> Self {
+    pub(crate) const fn new(name: &'a str, reason: Reason) -> Self {
         Self { name, reason }
     }
 }
@@ -465,8 +465,8 @@ const SUSPICIOUS_MODULES: &[SuspiciousModule] = &[
 ];
 
 /// S001
-pub fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Call { func, .. } = &expr.node else {
+pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
         return;
     };
 

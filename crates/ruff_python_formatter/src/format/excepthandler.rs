@@ -12,7 +12,7 @@ pub struct FormatExcepthandler<'a> {
     item: &'a Excepthandler,
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Excepthandler {
+impl AsFormat<ASTFormatContext> for Excepthandler {
     type Format<'a> = FormatExcepthandler<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -20,7 +20,7 @@ impl AsFormat<ASTFormatContext<'_>> for Excepthandler {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatExcepthandler<'_> {
+impl Format<ASTFormatContext> for FormatExcepthandler<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let excepthandler = self.item;
         let ExcepthandlerKind::ExceptHandler { type_, name, body } = &excepthandler.node;

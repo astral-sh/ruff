@@ -1,7 +1,7 @@
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
-use ruff_python_ast::visitor::{walk_stmt, Visitor};
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use rustpython_parser::ast::Stmt;
 use std::time::Duration;
 
@@ -40,7 +40,7 @@ struct CountVisitor {
     count: usize,
 }
 
-impl<'a> Visitor<'a> for CountVisitor {
+impl<'a> StatementVisitor<'a> for CountVisitor {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);
         self.count += 1;

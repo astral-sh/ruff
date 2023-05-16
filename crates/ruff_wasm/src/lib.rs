@@ -12,7 +12,6 @@ use ruff::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
@@ -127,7 +126,6 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         task_tags: None,
         typing_modules: None,
         unfixable: None,
-        update_check: None,
         // Use default options for all plugins.
         flake8_annotations: Some(flake8_annotations::settings::Settings::default().into()),
         flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
@@ -156,7 +154,6 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
         pylint: Some(pylint::settings::Settings::default().into()),
-        pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)
 }
 
@@ -199,7 +196,6 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &directives,
         &settings,
         flags::Noqa::Enabled,
-        flags::Autofix::Enabled,
     );
 
     let source_code = locator.to_source_code();

@@ -24,7 +24,7 @@ pub struct FormatExpr<'a> {
 }
 
 fn format_starred(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
 ) -> FormatResult<()> {
@@ -33,18 +33,14 @@ fn format_starred(
     Ok(())
 }
 
-fn format_name(
-    f: &mut Formatter<ASTFormatContext<'_>>,
-    expr: &Expr,
-    _id: &str,
-) -> FormatResult<()> {
+fn format_name(f: &mut Formatter<ASTFormatContext>, expr: &Expr, _id: &str) -> FormatResult<()> {
     write!(f, [literal(expr.range())])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
 fn format_subscript(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
     slice: &Expr,
@@ -76,7 +72,7 @@ fn format_subscript(
 }
 
 fn format_tuple(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elts: &[Expr],
 ) -> FormatResult<()> {
@@ -97,7 +93,7 @@ fn format_tuple(
         write!(
             f,
             [group(&format_with(
-                |f: &mut Formatter<ASTFormatContext<'_>>| {
+                |f: &mut Formatter<ASTFormatContext>| {
                     if expr.parentheses.is_if_expanded() {
                         write!(f, [if_group_breaks(&text("("))])?;
                     }
@@ -108,7 +104,7 @@ fn format_tuple(
                         write!(
                             f,
                             [soft_block_indent(&format_with(
-                                |f: &mut Formatter<ASTFormatContext<'_>>| {
+                                |f: &mut Formatter<ASTFormatContext>| {
                                     let magic_trailing_comma = expr
                                         .trivia
                                         .iter()
@@ -164,7 +160,7 @@ fn format_tuple(
 }
 
 fn format_slice(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     lower: &SliceIndex,
     upper: &SliceIndex,
@@ -247,7 +243,7 @@ fn format_slice(
 }
 
 fn format_formatted_value(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
     _conversion: usize,
@@ -263,7 +259,7 @@ fn format_formatted_value(
 }
 
 fn format_list(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elts: &[Expr],
 ) -> FormatResult<()> {
@@ -294,11 +290,7 @@ fn format_list(
     Ok(())
 }
 
-fn format_set(
-    f: &mut Formatter<ASTFormatContext<'_>>,
-    expr: &Expr,
-    elts: &[Expr],
-) -> FormatResult<()> {
+fn format_set(f: &mut Formatter<ASTFormatContext>, expr: &Expr, elts: &[Expr]) -> FormatResult<()> {
     if elts.is_empty() {
         write!(f, [text("set()")])?;
         Ok(())
@@ -333,7 +325,7 @@ fn format_set(
 }
 
 fn format_call(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
@@ -396,7 +388,7 @@ fn format_call(
 }
 
 fn format_list_comp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
@@ -417,7 +409,7 @@ fn format_list_comp(
 }
 
 fn format_set_comp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
@@ -438,7 +430,7 @@ fn format_set_comp(
 }
 
 fn format_dict_comp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     key: &Expr,
     value: &Expr,
@@ -463,7 +455,7 @@ fn format_dict_comp(
 }
 
 fn format_generator_exp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
@@ -482,7 +474,7 @@ fn format_generator_exp(
 }
 
 fn format_await(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
 ) -> FormatResult<()> {
@@ -504,7 +496,7 @@ fn format_await(
 }
 
 fn format_yield(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: Option<&Expr>,
 ) -> FormatResult<()> {
@@ -528,7 +520,7 @@ fn format_yield(
 }
 
 fn format_yield_from(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
 ) -> FormatResult<()> {
@@ -558,7 +550,7 @@ fn format_yield_from(
 }
 
 fn format_compare(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     left: &Expr,
     ops: &[CmpOp],
@@ -578,7 +570,7 @@ fn format_compare(
 }
 
 fn format_joined_str(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     _values: &[Expr],
 ) -> FormatResult<()> {
@@ -588,7 +580,7 @@ fn format_joined_str(
 }
 
 fn format_constant(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     constant: &Constant,
     _kind: Option<&str>,
@@ -615,7 +607,7 @@ fn format_constant(
 }
 
 fn format_dict(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     keys: &[Option<Expr>],
     values: &[Expr],
@@ -677,7 +669,7 @@ fn format_dict(
 }
 
 fn format_attribute(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
     attr: &str,
@@ -690,7 +682,7 @@ fn format_attribute(
 }
 
 fn format_named_expr(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     target: &Expr,
     value: &Expr,
@@ -704,7 +696,7 @@ fn format_named_expr(
 }
 
 fn format_bool_op(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     ops: &[BoolOp],
     values: &[Expr],
@@ -721,7 +713,7 @@ fn format_bool_op(
 }
 
 fn format_bin_op(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     left: &Expr,
     op: &Operator,
@@ -744,7 +736,7 @@ fn format_bin_op(
 }
 
 fn format_unary_op(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     op: &UnaryOp,
     operand: &Expr,
@@ -773,7 +765,7 @@ fn format_unary_op(
 }
 
 fn format_lambda(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     args: &Arguments,
     body: &Expr,
@@ -791,7 +783,7 @@ fn format_lambda(
 }
 
 fn format_if_exp(
-    f: &mut Formatter<ASTFormatContext<'_>>,
+    f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     test: &Expr,
     body: &Expr,
@@ -809,8 +801,8 @@ fn format_if_exp(
     Ok(())
 }
 
-impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<ASTFormatContext> for FormatExpr<'_> {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         if self.item.parentheses.is_always() {
             write!(f, [text("(")])?;
         }
@@ -894,7 +886,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
     }
 }
 
-impl AsFormat<ASTFormatContext<'_>> for Expr {
+impl AsFormat<ASTFormatContext> for Expr {
     type Format<'a> = FormatExpr<'a>;
 
     fn format(&self) -> Self::Format<'_> {

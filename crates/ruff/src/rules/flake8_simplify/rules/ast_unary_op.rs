@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
+use rustpython_parser::ast::{self, Cmpop, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,8 +10,8 @@ use crate::registry::AsRule;
 
 #[violation]
 pub struct NegateEqualOp {
-    pub left: String,
-    pub right: String,
+    left: String,
+    right: String,
 }
 
 impl AlwaysAutofixableViolation for NegateEqualOp {
@@ -28,8 +28,8 @@ impl AlwaysAutofixableViolation for NegateEqualOp {
 
 #[violation]
 pub struct NegateNotEqualOp {
-    pub left: String,
-    pub right: String,
+    left: String,
+    right: String,
 }
 
 impl AlwaysAutofixableViolation for NegateNotEqualOp {
@@ -46,7 +46,7 @@ impl AlwaysAutofixableViolation for NegateNotEqualOp {
 
 #[violation]
 pub struct DoubleNegation {
-    pub expr: String,
+    expr: String,
 }
 
 impl AlwaysAutofixableViolation for DoubleNegation {
@@ -65,30 +65,35 @@ impl AlwaysAutofixableViolation for DoubleNegation {
 const DUNDER_METHODS: &[&str] = &["__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"];
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let StmtKind::If {test: _, body, orelse: _} = &stmt.node else {
+    let StmtKind::If(ast::StmtIf {test: _, body, orelse: _ })= &stmt.node else {
         return false;
     };
     if body.len() != 1 {
         return false;
     }
-    if matches!(body[0].node, StmtKind::Raise { .. }) {
+    if matches!(body[0].node, StmtKind::Raise(_)) {
         return true;
     }
     false
 }
 
 /// SIM201
-pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub(crate) fn negation_with_equal_op(
+    checker: &mut Checker,
+    expr: &Expr,
+    op: &Unaryop,
+    operand: &Expr,
+) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::Compare{ left, ops, comparators} = &operand.node else {
+    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators}) = &operand.node else {
         return;
     };
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    if is_exception_check(checker.ctx.current_stmt()) {
+    if is_exception_check(checker.ctx.stmt()) {
         return;
     }
 
@@ -107,9 +112,10 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::Compare {
+                &create_expr(ast::ExprCompare {
                     left: left.clone(),
                     ops: vec![Cmpop::NotEq],
                     comparators: comparators.clone(),
@@ -123,7 +129,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
 }
 
 /// SIM202
-pub fn negation_with_not_equal_op(
+pub(crate) fn negation_with_not_equal_op(
     checker: &mut Checker,
     expr: &Expr,
     op: &Unaryop,
@@ -132,13 +138,13 @@ pub fn negation_with_not_equal_op(
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::Compare{ left, ops, comparators} = &operand.node else {
+    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators}) = &operand.node else {
         return;
     };
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    if is_exception_check(checker.ctx.current_stmt()) {
+    if is_exception_check(checker.ctx.stmt()) {
         return;
     }
 
@@ -157,9 +163,10 @@ pub fn negation_with_not_equal_op(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_expr(
-                &create_expr(ExprKind::Compare {
+                &create_expr(ast::ExprCompare {
                     left: left.clone(),
                     ops: vec![Cmpop::Eq],
                     comparators: comparators.clone(),
@@ -173,11 +180,11 @@ pub fn negation_with_not_equal_op(
 }
 
 /// SIM208
-pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::UnaryOp { op: operand_op, operand } = &operand.node else {
+    let ExprKind::UnaryOp(ast::ExprUnaryOp { op: operand_op, operand }) = &operand.node else {
         return;
     };
     if !matches!(operand_op, Unaryop::Not) {
@@ -191,10 +198,29 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(operand, checker.stylist),
-            expr.range(),
-        )));
+        if checker.ctx.in_boolean_test() {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                unparse_expr(operand, checker.stylist),
+                expr.range(),
+            )));
+        } else if checker.ctx.is_builtin("bool") {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                unparse_expr(
+                    &create_expr(ast::ExprCall {
+                        func: Box::new(create_expr(ast::ExprName {
+                            id: "bool".into(),
+                            ctx: ExprContext::Load,
+                        })),
+                        args: vec![*operand.clone()],
+                        keywords: vec![],
+                    }),
+                    checker.stylist,
+                ),
+                expr.range(),
+            )));
+        };
     }
     checker.diagnostics.push(diagnostic);
 }

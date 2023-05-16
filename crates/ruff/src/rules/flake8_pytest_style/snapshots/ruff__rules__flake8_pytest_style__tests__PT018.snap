@@ -229,6 +229,7 @@ PT018.py:30:5: PT018 Assertion should be broken down into multiple parts
 32 |     assert not (something or something_else and something_third), "with message"
 33 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
    |
+   = help: Break down assertion into multiple parts
 
 PT018.py:31:5: PT018 Assertion should be broken down into multiple parts
    |
@@ -239,6 +240,7 @@ PT018.py:31:5: PT018 Assertion should be broken down into multiple parts
 34 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
 35 |     assert not (something or something_else and something_third)
    |
+   = help: Break down assertion into multiple parts
 
 PT018.py:33:5: PT018 Assertion should be broken down into multiple parts
    |
@@ -249,8 +251,9 @@ PT018.py:33:5: PT018 Assertion should be broken down into multiple parts
 36 |     # detected, but no autofix for parenthesized conditions
 37 |     assert (
    |
+   = help: Break down assertion into multiple parts
 
-PT018.py:35:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:35:5: PT018 Assertion should be broken down into multiple parts
    |
 35 |       assert not (something or something_else and something_third)
 36 |       # detected, but no autofix for parenthesized conditions
@@ -265,5 +268,40 @@ PT018.py:35:5: PT018 [*] Assertion should be broken down into multiple parts
    | |_____^ PT018
    |
    = help: Break down assertion into multiple parts
+
+PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
+   |
+45 | assert something  # OK
+46 | assert something and something_else  # Error
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+47 | assert something and something_else and something_third  # Error
+   |
+   = help: Break down assertion into multiple parts
+
+ℹ Suggested fix
+42 42 | 
+43 43 | 
+44 44 | assert something  # OK
+45    |-assert something and something_else  # Error
+   45 |+assert something
+   46 |+assert something_else
+46 47 | assert something and something_else and something_third  # Error
+
+PT018.py:46:1: PT018 [*] Assertion should be broken down into multiple parts
+   |
+46 | assert something  # OK
+47 | assert something and something_else  # Error
+48 | assert something and something_else and something_third  # Error
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
+   |
+   = help: Break down assertion into multiple parts
+
+ℹ Suggested fix
+43 43 | 
+44 44 | assert something  # OK
+45 45 | assert something and something_else  # Error
+46    |-assert something and something_else and something_third  # Error
+   46 |+assert something and something_else
+   47 |+assert something_third
 
 

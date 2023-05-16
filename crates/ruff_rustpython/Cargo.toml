@@ -9,6 +9,4 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-once_cell = { workspace = true }
-rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }

@@ -4,21 +4,21 @@ use libcst_native::{
     ImportNames, Module, SimpleString, SmallStatement, Statement,
 };
 
-pub fn match_module(module_text: &str) -> Result<Module> {
+pub(crate) fn match_module(module_text: &str) -> Result<Module> {
     match libcst_native::parse_module(module_text, None) {
         Ok(module) => Ok(module),
         Err(_) => bail!("Failed to extract CST from source"),
     }
 }
 
-pub fn match_expression(expression_text: &str) -> Result<Expression> {
+pub(crate) fn match_expression(expression_text: &str) -> Result<Expression> {
     match libcst_native::parse_expression(expression_text) {
         Ok(expression) => Ok(expression),
-        Err(_) => bail!("Failed to extract CST from source"),
+        Err(_) => bail!("Failed to extract expression from source"),
     }
 }
 
-pub fn match_expr<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Expr<'b>> {
+pub(crate) fn match_expr<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Expr<'b>> {
     if let Some(Statement::Simple(expr)) = module.body.first_mut() {
         if let Some(SmallStatement::Expr(expr)) = expr.body.first_mut() {
             Ok(expr)
@@ -30,7 +30,7 @@ pub fn match_expr<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Expr<'b>
     }
 }
 
-pub fn match_import<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Import<'b>> {
+pub(crate) fn match_import<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Import<'b>> {
     if let Some(Statement::Simple(expr)) = module.body.first_mut() {
         if let Some(SmallStatement::Import(expr)) = expr.body.first_mut() {
             Ok(expr)
@@ -42,7 +42,9 @@ pub fn match_import<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Import
     }
 }
 
-pub fn match_import_from<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut ImportFrom<'b>> {
+pub(crate) fn match_import_from<'a, 'b>(
+    module: &'a mut Module<'b>,
+) -> Result<&'a mut ImportFrom<'b>> {
     if let Some(Statement::Simple(expr)) = module.body.first_mut() {
         if let Some(SmallStatement::ImportFrom(expr)) = expr.body.first_mut() {
             Ok(expr)
@@ -54,7 +56,7 @@ pub fn match_import_from<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut I
     }
 }
 
-pub fn match_aliases<'a, 'b>(
+pub(crate) fn match_aliases<'a, 'b>(
     import_from: &'a mut ImportFrom<'b>,
 ) -> Result<&'a mut Vec<ImportAlias<'b>>> {
     if let ImportNames::Aliases(aliases) = &mut import_from.names {
@@ -64,7 +66,7 @@ pub fn match_aliases<'a, 'b>(
     }
 }
 
-pub fn match_call<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut Call<'b>> {
+pub(crate) fn match_call<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut Call<'b>> {
     if let Expression::Call(call) = expression {
         Ok(call)
     } else {
@@ -72,7 +74,7 @@ pub fn match_call<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut 
     }
 }
 
-pub fn match_comparison<'a, 'b>(
+pub(crate) fn match_comparison<'a, 'b>(
     expression: &'a mut Expression<'b>,
 ) -> Result<&'a mut Comparison<'b>> {
     if let Expression::Comparison(comparison) = expression {
@@ -82,7 +84,7 @@ pub fn match_comparison<'a, 'b>(
     }
 }
 
-pub fn match_dict<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut Dict<'b>> {
+pub(crate) fn match_dict<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut Dict<'b>> {
     if let Expression::Dict(dict) = expression {
         Ok(dict)
     } else {
@@ -90,7 +92,7 @@ pub fn match_dict<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut 
     }
 }
 
-pub fn match_attribute<'a, 'b>(
+pub(crate) fn match_attribute<'a, 'b>(
     expression: &'a mut Expression<'b>,
 ) -> Result<&'a mut Attribute<'b>> {
     if let Expression::Attribute(attribute) = expression {
@@ -100,7 +102,7 @@ pub fn match_attribute<'a, 'b>(
     }
 }
 
-pub fn match_simple_string<'a, 'b>(
+pub(crate) fn match_simple_string<'a, 'b>(
     expression: &'a mut Expression<'b>,
 ) -> Result<&'a mut SimpleString<'b>> {
     if let Expression::SimpleString(simple_string) = expression {

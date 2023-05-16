@@ -2,15 +2,16 @@ use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 #[violation]
 pub struct FirstLineCapitalized {
-    pub first_word: String,
-    pub capitalized_word: String,
+    first_word: String,
+    capitalized_word: String,
 }
 
 impl AlwaysAutofixableViolation for FirstLineCapitalized {
@@ -31,10 +32,13 @@ impl AlwaysAutofixableViolation for FirstLineCapitalized {
 }
 
 /// D403
-pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
+pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if !matches!(
-        docstring.kind,
-        DefinitionKind::Function(_) | DefinitionKind::NestedFunction(_) | DefinitionKind::Method(_)
+        docstring.definition,
+        Definition::Member(Member {
+            kind: MemberKind::Function | MemberKind::NestedFunction | MemberKind::Method,
+            ..
+        })
     ) {
         return;
     }
@@ -71,6 +75,7 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             capitalized_word,
             TextRange::at(body.start(), first_word.text_len()),

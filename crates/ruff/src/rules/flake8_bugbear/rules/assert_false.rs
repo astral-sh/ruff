@@ -1,5 +1,5 @@
-use ruff_text_size::TextSize;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -24,20 +24,17 @@ impl AlwaysAutofixableViolation for AssertFalse {
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::new(
-        TextSize::default(),
-        TextSize::default(),
-        StmtKind::Raise {
+        TextRange::default(),
+        StmtKind::Raise(ast::StmtRaise {
             exc: Some(Box::new(Expr::new(
-                TextSize::default(),
-                TextSize::default(),
-                ExprKind::Call {
+                TextRange::default(),
+                ExprKind::Call(ast::ExprCall {
                     func: Box::new(Expr::new(
-                        TextSize::default(),
-                        TextSize::default(),
-                        ExprKind::Name {
-                            id: "AssertionError".to_string(),
+                        TextRange::default(),
+                        ExprKind::Name(ast::ExprName {
+                            id: "AssertionError".into(),
                             ctx: ExprContext::Load,
-                        },
+                        }),
                     )),
                     args: if let Some(msg) = msg {
                         vec![msg.clone()]
@@ -45,24 +42,25 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                         vec![]
                     },
                     keywords: vec![],
-                },
+                }),
             ))),
             cause: None,
-        },
+        }),
     )
 }
 
 /// B011
-pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
-    let ExprKind::Constant {
+pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+    let ExprKind::Constant(ast::ExprConstant {
         value: Constant::Bool(false),
         ..
-    } = &test.node else {
+    } )= &test.node else {
         return;
     };
 
     let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
     if checker.patch(diagnostic.kind.rule()) {
+        #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             unparse_stmt(&assertion_error(msg), checker.stylist),
             stmt.range(),

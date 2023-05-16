@@ -7,10 +7,43 @@ use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for usages of names that are declared as `global` prior to the
+/// relevant `global` declaration.
+///
+/// ## Why is this bad?
+/// The `global` declaration applies to the entire scope. Using a name that's
+/// declared as `global` in a given scope prior to the relevant `global`
+/// declaration is a syntax error.
+///
+/// ## Example
+/// ```python
+/// counter = 1
+///
+///
+/// def increment():
+///     print(f"Adding 1 to {counter}")
+///     global counter
+///     counter += 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// counter = 1
+///
+///
+/// def increment():
+///     global counter
+///     print(f"Adding 1 to {counter}")
+///     counter += 1
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[violation]
 pub struct LoadBeforeGlobalDeclaration {
-    pub name: String,
-    pub line: OneIndexed,
+    name: String,
+    line: OneIndexed,
 }
 
 impl Violation for LoadBeforeGlobalDeclaration {
@@ -21,7 +54,7 @@ impl Violation for LoadBeforeGlobalDeclaration {
     }
 }
 /// PLE0118
-pub fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
+pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
     let globals = match &checker.ctx.scope().kind {
         ScopeKind::Class(class_def) => &class_def.globals,
         ScopeKind::Function(function_def) => &function_def.globals,
