@@ -1,7 +1,7 @@
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+use ruff_python_ast::source_code::SourceLocation;
 use std::io::Write;
 
 /// Generate error workflow command in GitHub Actions format.
@@ -21,10 +21,7 @@ impl Emitter for GithubEmitter {
             let location = if context.is_jupyter_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                SourceLocation {
-                    row: OneIndexed::from_zero_indexed(0),
-                    column: OneIndexed::from_zero_indexed(0),
-                }
+                SourceLocation::default()
             } else {
                 source_location.clone()
             };
