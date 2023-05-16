@@ -1752,11 +1752,11 @@ where
                 }
 
                 if self.is_stub {
-                    if self
-                        .settings
-                        .rules
-                        .any_enabled(&[Rule::UnprefixedTypeParam, Rule::AssignmentDefaultInStub])
-                    {
+                    if self.settings.rules.any_enabled(&[
+                        Rule::UnprefixedTypeParam,
+                        Rule::AssignmentDefaultInStub,
+                        Rule::UnannotatedAssignmentInStub,
+                    ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
                         if !self.ctx.scopes().any(|scope| scope.kind.is_function()) {
                             if self.settings.rules.enabled(Rule::UnprefixedTypeParam) {
@@ -1764,6 +1764,15 @@ where
                             }
                             if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
                                 flake8_pyi::rules::assignment_default_in_stub(self, targets, value);
+                            }
+                            if self
+                                .settings
+                                .rules
+                                .enabled(Rule::UnannotatedAssignmentInStub)
+                            {
+                                flake8_pyi::rules::unannotated_assignment_in_stub(
+                                    self, targets, value,
+                                );
                             }
                         }
                     }

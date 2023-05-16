@@ -604,13 +604,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "012") => Rule::PassInClassBody,
         (Flake8Pyi, "014") => Rule::ArgumentDefaultInStub,
         (Flake8Pyi, "015") => Rule::AssignmentDefaultInStub,
-        (Flake8Pyi, "052") => Rule::UnannotatedAssignmentInStub,
         (Flake8Pyi, "016") => Rule::DuplicateUnionMember,
         (Flake8Pyi, "020") => Rule::QuotedAnnotationInStub,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
         (Flake8Pyi, "042") => Rule::SnakeCaseTypeAlias,
         (Flake8Pyi, "043") => Rule::TSuffixedTypeAlias,
+        (Flake8Pyi, "052") => Rule::UnannotatedAssignmentInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::PytestFixtureIncorrectParenthesesStyle,
