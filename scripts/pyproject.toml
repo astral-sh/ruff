@@ -11,13 +11,12 @@ line-length = 88
 line-length = 88
 select = ["ALL"]
 ignore = [
-  "C901", # McCabe complexity
-  "PL",   # pylint
-  "S",    # bandit
-  "G",    # flake8-logging
-  "T",    # flake8-print
-  "FBT",  # flake8-boolean-trap
-  "E203",
+  "C901",  # McCabe complexity
+  "PL",    # pylint
+  "S",     # bandit
+  "G",     # flake8-logging
+  "T",     # flake8-print
+  "FBT",   # flake8-boolean-trap
 ]
 
 [tool.ruff.pydocstyle]

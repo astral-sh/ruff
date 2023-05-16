@@ -181,9 +181,10 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
         while (line := next(fp)).strip() != "":
             lines.append(line)
 
-        linter_variant = pascal_case(linter)
+        variant = pascal_case(linter)
         lines.append(
-            " " * 8 + f"""({linter_variant}, "{code}") => Rule::{name},\n""",
+            " " * 8
+            + f"""({variant}, "{code}") => (RuleGroup::Unspecified, Rule::{name}),\n""",
         )
         lines.sort()
 
