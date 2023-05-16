@@ -9,7 +9,7 @@ use num_bigint::BigInt;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
