@@ -338,17 +338,15 @@ class StructVisitor(EmitVisitor):
             prefix = ""
         for cons in sum.types:
             self.emit(
-                textwrap.dedent(
-                    f"""
-                    #[inline]
-                    pub const fn {prefix}{rust_field_name(cons.name)}(&self) -> Option<{rust_name}{cons.name}> {{
-                        match self {{
-                            {rust_name}::{cons.name} => Some({rust_name}{cons.name}),
-                            _ => None,
-                        }}
+                f"""
+                #[inline]
+                pub const fn {prefix}{rust_field_name(cons.name)}(&self) -> Option<{rust_name}{cons.name}> {{
+                    match self {{
+                        {rust_name}::{cons.name} => Some({rust_name}{cons.name}),
+                        _ => None,
                     }}
-                    """
-                ),
+                }}
+                """,
                 depth,
             )
         self.emit("}", depth)
@@ -415,19 +413,17 @@ class StructVisitor(EmitVisitor):
         self.emit("}", depth)
         field_names = [f'"{f.name}"' for f in t.fields]
         self.emit(
-            textwrap.dedent(
-                f"""
-                impl<R> Node for {payload_name}<R> {{
-                    const NAME: &'static str = "{t.name}";
-                    const FIELD_NAMES: &'static [&'static str] = &[{', '.join(field_names)}];
+            f"""
+            impl<R> Node for {payload_name}<R> {{
+                const NAME: &'static str = "{t.name}";
+                const FIELD_NAMES: &'static [&'static str] = &[{', '.join(field_names)}];
+            }}
+            impl<R> From<{payload_name}<R>> for {rust_name}<R> {{
+                fn from(payload: {payload_name}<R>) -> Self {{
+                    {rust_name}::{t.name}(payload)
                 }}
-                impl<R> From<{payload_name}<R>> for {rust_name}<R> {{
-                    fn from(payload: {payload_name}<R>) -> Self {{
-                        {rust_name}::{t.name}(payload)
-                    }}
-                }}
-                """
-            ),
+            }}
+            """,
             depth,
         )
 
@@ -982,12 +978,12 @@ class ToPyo3AstVisitor(EmitVisitor):
                 #[inline]
                 fn to_pyo3_ast(&self, {"_" if simple else ""}py: Python) -> PyResult<Py<PyAny>> {{
                     let instance = match &self {{
-                        """,
+            """,
             0,
         )
         for cons in sum.types:
             self.emit(
-                f"""crate::{rust_name}::{cons.name}(cons) => cons.to_pyo3_ast(py)?,""",
+                f"crate::{rust_name}::{cons.name}(cons) => cons.to_pyo3_ast(py)?,",
                 1,
             )
         self.emit(
@@ -1036,9 +1032,7 @@ class ToPyo3AstVisitor(EmitVisitor):
                     3,
                 )
             self.emit(
-                """
-                        ))?;
-                """,
+                "))?;",
                 0,
             )
         else:
@@ -1119,42 +1113,38 @@ class Pyo3StructVisitor(EmitVisitor):
             into = f"{rust_name}(node)"
 
         self.emit(
-            textwrap.dedent(
-                f"""
-                #[pyclass(module="{self.module_name}", name="_{name}", extends={base}, frozen{subclass})]
-                #[derive(Clone, Debug)]
-                pub struct {rust_name} {body};
+            f"""
+            #[pyclass(module="{self.module_name}", name="_{name}", extends={base}, frozen{subclass})]
+            #[derive(Clone, Debug)]
+            pub struct {rust_name} {body};
 
-                impl From<{self.ref_def} crate::{rust_name}{generics}> for {rust_name} {{
-                    fn from({"" if body else "_"}node: {self.ref_def} crate::{rust_name}{generics}) -> Self {{
-                        {into}
-                    }}
+            impl From<{self.ref_def} crate::{rust_name}{generics}> for {rust_name} {{
+                fn from({"" if body else "_"}node: {self.ref_def} crate::{rust_name}{generics}) -> Self {{
+                    {into}
                 }}
-                """
-            ),
+            }}
+            """,
             0,
         )
         if subclass:
             self.emit(
-                textwrap.dedent(
-                    f"""
-                    #[pymethods]
-                    impl {rust_name} {{
-                        #[new]
-                        fn new() -> PyClassInitializer<Self> {{
-                            PyClassInitializer::from(AST)
-                                .add_subclass(Self)
-                        }}
+                f"""
+                #[pymethods]
+                impl {rust_name} {{
+                    #[new]
+                    fn new() -> PyClassInitializer<Self> {{
+                        PyClassInitializer::from(AST)
+                            .add_subclass(Self)
+                    }}
 
+                }}
+                impl ToPyObject for {rust_name} {{
+                    fn to_object(&self, py: Python) -> PyObject {{
+                        let initializer = Self::new();
+                        Py::new(py, initializer).unwrap().into_py(py)
                     }}
-                    impl ToPyObject for {rust_name} {{
-                        fn to_object(&self, py: Python) -> PyObject {{
-                            let initializer = Self::new();
-                            Py::new(py, initializer).unwrap().into_py(py)
-                        }}
-                    }}
-                    """
-                ),
+                }}
+                """,
                 0,
             )
         else:
@@ -1163,18 +1153,16 @@ class Pyo3StructVisitor(EmitVisitor):
             else:
                 add_subclass = ""
             self.emit(
-                textwrap.dedent(
-                    f"""
-                    impl ToPyObject for {rust_name} {{
-                        fn to_object(&self, py: Python) -> PyObject {{
-                            let initializer = PyClassInitializer::from(AST)
-                            {add_subclass}
-                            .add_subclass(self.clone());
-                            Py::new(py, initializer).unwrap().into_py(py)
-                        }}
+                f"""
+                impl ToPyObject for {rust_name} {{
+                    fn to_object(&self, py: Python) -> PyObject {{
+                        let initializer = PyClassInitializer::from(AST)
+                        {add_subclass}
+                        .add_subclass(self.clone());
+                        Py::new(py, initializer).unwrap().into_py(py)
                     }}
-                    """
-                ),
+                }}
+                """,
                 0,
             )
 
@@ -1183,48 +1171,40 @@ class Pyo3StructVisitor(EmitVisitor):
 
     def emit_getter(self, owner, type_name):
         self.emit(
-            textwrap.dedent(
-                f"""
-                #[pymethods]
-                impl {type_name} {{
-                """
-            ),
+            f"""
+            #[pymethods]
+            impl {type_name} {{
+            """,
             0,
         )
 
         for field in owner.fields:
             self.emit(
-                textwrap.dedent(
-                    f"""
-                    #[getter]
-                    #[inline]
-                    fn get_{field.name}(&self, py: Python) -> PyResult<PyObject> {{
-                        self.0.{rust_field(field.name)}.to_pyo3_wrapper(py)
-                    }}
-                    """
-                ),
+                f"""
+                #[getter]
+                #[inline]
+                fn get_{field.name}(&self, py: Python) -> PyResult<PyObject> {{
+                    self.0.{rust_field(field.name)}.to_pyo3_wrapper(py)
+                }}
+                """,
                 3,
             )
 
         self.emit(
-            textwrap.dedent(
-                """
+            """
                 }
-                """
-            ),
+                """,
             0,
         )
 
     def emit_getattr(self, owner, type_name):
         self.emit(
-            textwrap.dedent(
-                f"""
-                #[pymethods]
-                impl {type_name} {{
-                    fn __getattr__(&self, py: Python, key: &str) -> PyResult<PyObject> {{
-                        let object: Py<PyAny> = match key {{
-                """
-            ),
+            f"""
+            #[pymethods]
+            impl {type_name} {{
+                fn __getattr__(&self, py: Python, key: &str) -> PyResult<PyObject> {{
+                    let object: Py<PyAny> = match key {{
+            """,
             0,
         )
 
@@ -1235,15 +1215,13 @@ class Pyo3StructVisitor(EmitVisitor):
             )
 
         self.emit(
-            textwrap.dedent(
-                """
-                            _ => todo!(),
-                        };
-                        Ok(object)
-                    }
+            """
+                        _ => todo!(),
+                    };
+                    Ok(object)
                 }
-                """
-            ),
+            }
+            """,
             0,
         )
 
@@ -1309,17 +1287,17 @@ class Pyo3StructVisitor(EmitVisitor):
         if simple:
             self.emit(
                 f"""
-#[pyclass(module="{self.module_name}", name="_{cons.name}", extends={parent})]
-pub struct {parent}{cons.name};
+                #[pyclass(module="{self.module_name}", name="_{cons.name}", extends={parent})]
+                pub struct {parent}{cons.name};
 
-impl ToPyObject for {parent}{cons.name} {{
-    fn to_object(&self, py: Python) -> PyObject {{
-        let initializer = PyClassInitializer::from(AST)
-        .add_subclass({parent})
-        .add_subclass(Self);
-        Py::new(py, initializer).unwrap().into_py(py)
-    }}
-}}
+                impl ToPyObject for {parent}{cons.name} {{
+                    fn to_object(&self, py: Python) -> PyObject {{
+                        let initializer = PyClassInitializer::from(AST)
+                        .add_subclass({parent})
+                        .add_subclass(Self);
+                        Py::new(py, initializer).unwrap().into_py(py)
+                    }}
+                }}
                 """,
                 depth,
             )
@@ -1659,7 +1637,8 @@ class StdlibTraitImplVisitor(EmitVisitor):
                 let row = {row};
                 let column = {column};
                 try_location(row, column)
-            }};""",
+            }};
+            """,
             depth,
         )
 
@@ -1711,17 +1690,15 @@ def write_pyo3_node(type_info, f):
             generics = "<R>"
 
         f.write(
-            textwrap.dedent(
-                f"""
-                impl{generics} Pyo3Node for crate::generic::{rust_name}{generics} {{
-                    #[inline]
-                    fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {{
-                        static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
-                        &PY_TYPE
-                    }}
+            f"""
+            impl{generics} Pyo3Node for crate::generic::{rust_name}{generics} {{
+                #[inline]
+                fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {{
+                    static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
+                    &PY_TYPE
                 }}
-                """
-            ),
+            }}
+            """,
         )
 
     for info in type_info.values():
@@ -1832,14 +1809,12 @@ def write_pyo3_wrapper(mod, type_info, namespace, f):
 
 def write_ast_mod(mod, type_info, f):
     f.write(
-        textwrap.dedent(
-            """
-            #![allow(clippy::all)]
+        """
+        #![allow(clippy::all)]
 
-            use super::*;
-            use crate::common::ascii;
-            """
-        )
+        use super::*;
+        use crate::common::ascii;
+        """
     )
 
     c = ChainOfVisitors(
