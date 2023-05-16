@@ -34,9 +34,7 @@ expression: parse_ast
                     ],
                 },
             ),
-            conversion: Int(
-                0,
-            ),
+            conversion: None,
             format_spec: None,
         },
     ),

@@ -12,9 +12,7 @@ expression: parse_ast
                     value: None,
                 },
             ),
-            conversion: Int(
-                0,
-            ),
+            conversion: None,
             format_spec: None,
         },
     ),

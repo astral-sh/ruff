@@ -233,9 +233,7 @@ expression: parse_ast
                                                                             keywords: [],
                                                                         },
                                                                     ),
-                                                                    conversion: Int(
-                                                                        0,
-                                                                    ),
+                                                                    conversion: None,
                                                                     format_spec: None,
                                                                 },
                                                             ),
@@ -269,9 +267,7 @@ expression: parse_ast
                                                                             ctx: Load,
                                                                         },
                                                                     ),
-                                                                    conversion: Int(
-                                                                        0,
-                                                                    ),
+                                                                    conversion: None,
                                                                     format_spec: None,
                                                                 },
                                                             ),
@@ -365,9 +361,7 @@ expression: parse_ast
                                                                             keywords: [],
                                                                         },
                                                                     ),
-                                                                    conversion: Int(
-                                                                        0,
-                                                                    ),
+                                                                    conversion: None,
                                                                     format_spec: None,
                                                                 },
                                                             ),
@@ -401,9 +395,7 @@ expression: parse_ast
                                                                             ctx: Load,
                                                                         },
                                                                     ),
-                                                                    conversion: Int(
-                                                                        0,
-                                                                    ),
+                                                                    conversion: None,
                                                                     format_spec: None,
                                                                 },
                                                             ),

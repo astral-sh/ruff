@@ -1,4 +1,4 @@
-use crate::{builtin, fold::Fold};
+use crate::{builtin, fold::Fold, ConversionFlag};
 
 pub trait Foldable<T, U> {
     type Mapped;
@@ -67,5 +67,6 @@ simple_fold!(
     builtin::String,
     builtin::Identifier,
     bool,
+    ConversionFlag,
     builtin::Constant
 );

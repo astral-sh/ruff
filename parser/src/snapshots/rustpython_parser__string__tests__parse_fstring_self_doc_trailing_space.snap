@@ -33,9 +33,7 @@ expression: parse_ast
                     ctx: Load,
                 },
             ),
-            conversion: Int(
-                114,
-            ),
+            conversion: Repr,
             format_spec: None,
         },
     ),

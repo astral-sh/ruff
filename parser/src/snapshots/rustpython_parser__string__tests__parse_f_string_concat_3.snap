@@ -31,9 +31,7 @@ expression: parse_ast
                                         kind: None,
                                     },
                                 ),
-                                conversion: Int(
-                                    0,
-                                ),
+                                conversion: None,
                                 format_spec: None,
                             },
                         ),

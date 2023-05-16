@@ -5,7 +5,7 @@
 // we have to do the parsing here, manually.
 use crate::text_size::TextRange;
 use crate::{
-    ast::{self, Constant, Expr, Int},
+    ast::{self, Constant, Expr},
     lexer::{LexicalError, LexicalErrorType},
     parser::{parse_expression_starts_at, LalrpopError, ParseError, ParseErrorType},
     token::{StringKind, Tok},
@@ -320,7 +320,7 @@ impl<'a> StringParser<'a> {
                                         )
                                     })?,
                                 ),
-                                conversion: Int::new(conversion as _),
+                                conversion,
                                 format_spec: spec,
                                 range: self.range(),
                             }
@@ -354,13 +354,13 @@ impl<'a> StringParser<'a> {
                                             )
                                         })?,
                                     ),
-                                    conversion: ast::Int::new(
-                                        (if conversion == ConversionFlag::None && spec.is_none() {
-                                            ConversionFlag::Repr
-                                        } else {
-                                            conversion
-                                        }) as _,
-                                    ),
+                                    conversion: if conversion == ConversionFlag::None
+                                        && spec.is_none()
+                                    {
+                                        ConversionFlag::Repr
+                                    } else {
+                                        conversion
+                                    },
                                     format_spec: spec,
                                     range: self.range(),
                                 }

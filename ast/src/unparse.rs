@@ -346,7 +346,7 @@ impl<'a> Unparser<'a> {
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, conversion.to_u32(), format_spec.as_deref())?,
+            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref())?,
             Expr::JoinedStr(crate::ExprJoinedStr {
                 values,
                 range: _range,
@@ -519,7 +519,7 @@ impl<'a> Unparser<'a> {
     fn unparse_formatted<U>(
         &mut self,
         val: &Expr<U>,
-        conversion: u32,
+        conversion: ConversionFlag,
         spec: Option<&Expr<U>>,
     ) -> fmt::Result {
         let buffered = to_string_fmt(|f| Unparser::new(f).unparse_expr(val, precedence::TEST + 1));
@@ -533,7 +533,7 @@ impl<'a> Unparser<'a> {
         self.p(&buffered)?;
         drop(buffered);
 
-        if conversion != ConversionFlag::None as u32 {
+        if conversion != ConversionFlag::None {
             self.p("!")?;
             let buf = &[conversion as u8];
             let c = std::str::from_utf8(buf).unwrap();
@@ -568,7 +568,7 @@ impl<'a> Unparser<'a> {
                 conversion,
                 format_spec,
                 range: _range,
-            }) => self.unparse_formatted(value, conversion.to_u32(), format_spec.as_deref()),
+            }) => self.unparse_formatted(value, *conversion, format_spec.as_deref()),
             _ => unreachable!(),
         }
     }

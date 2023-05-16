@@ -931,7 +931,7 @@ impl<R> From<ExprCall<R>> for Expr<R> {
 pub struct ExprFormattedValue<R = TextRange> {
     pub range: R,
     pub value: Box<Expr<R>>,
-    pub conversion: Int,
+    pub conversion: ConversionFlag,
     pub format_spec: Option<Box<Expr<R>>>,
 }
 

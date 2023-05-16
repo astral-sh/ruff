@@ -13,6 +13,7 @@ ruff_text_size = { path = "../ruff_text_size" }
 ruff_source_location = { path = "../ruff_source_location", optional = true }
 
 serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
+is-macro.workspace = true
 
 [features]
 default = []

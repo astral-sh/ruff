@@ -1,4 +1,4 @@
-use crate::{source_code::SourceRange, text_size::TextRange, Node};
+use crate::{source_code::SourceRange, text_size::TextRange, ConversionFlag, Node};
 use num_complex::Complex64;
 use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
@@ -70,6 +70,13 @@ impl ToPyo3Ast for bool {
     #[inline]
     fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
         Ok((*self as u32).to_object(py))
+    }
+}
+
+impl ToPyo3Ast for ConversionFlag {
+    #[inline]
+    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+        Ok((*self as i8).to_object(py))
     }
 }
 

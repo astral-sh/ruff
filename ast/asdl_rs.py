@@ -28,6 +28,7 @@ assert BUILTIN_TYPE_NAMES.keys() == asdl.builtin_types
 BUILTIN_INT_NAMES = {
     "simple": "bool",
     "is_async": "bool",
+    "conversion": "ConversionFlag",
 }
 
 RUST_KEYWORDS = {

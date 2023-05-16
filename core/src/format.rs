@@ -1,13 +1,13 @@
 /// Transforms a value prior to formatting it.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(u8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, is_macro::Is)]
+#[repr(i8)]
 pub enum ConversionFlag {
     /// No conversion
-    None = 0, // CPython uses -1 but not pleasure for us
+    None = -1, // CPython uses -1
     /// Converts by calling `str(<value>)`.
-    Str = b's',
+    Str = b's' as i8,
     /// Converts by calling `ascii(<value>)`.
-    Ascii = b'a',
+    Ascii = b'a' as i8,
     /// Converts by calling `repr(<value>)`.
-    Repr = b'r',
+    Repr = b'r' as i8,
 }

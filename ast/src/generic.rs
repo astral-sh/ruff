@@ -1,5 +1,5 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
-pub use crate::{builtin::*, text_size::TextSize, Node};
+pub use crate::{builtin::*, text_size::TextSize, ConversionFlag, Node};
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 
