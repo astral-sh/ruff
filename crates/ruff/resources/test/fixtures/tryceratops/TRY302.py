@@ -15,6 +15,13 @@ def bad():
 def bad():
     try:
         process()
+    except Exception:
+        raise
+        print("this code is pointless!")
+
+def bad():
+    try:
+        process()
     except:
         # I am a comment, not a statement!
         raise

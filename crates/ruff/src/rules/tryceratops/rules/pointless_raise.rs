@@ -45,10 +45,10 @@ impl Violation for PointlessRaise {
 pub(crate) fn pointless_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
     let handler_errs = handlers.iter().map(|handler| {
         let ExcepthandlerKind::ExceptHandler(handler) = &handler.node;
-        let body = &handler.body;
+        let stmt = &handler.body.first();
 
         // Match if the body consists of a single `raise` statement and nothing else
-        if let [stmt @ Stmt { node: StmtKind::Raise(raise), .. }] = body.as_slice() {
+        if let Some(stmt @ Stmt { node: StmtKind::Raise(raise), .. }) = stmt {
             match raise.exc.as_ref().map(|e| &e.node) {
                 None => Some(Diagnostic::new(PointlessRaise, stmt.range())),
                 Some(ExprKind::Name(ExprName { id, .. })) if Some(id) == handler.name.as_ref() => Some(Diagnostic::new(PointlessRaise, stmt.range())),
