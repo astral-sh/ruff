@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rustpython_parser::ast::{self, Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
@@ -164,9 +164,9 @@ impl ModuleSource<'_> {
 }
 
 pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
-    match &stmt.node {
-        StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. })
-        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
+    match stmt {
+        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private
             } else {
@@ -178,13 +178,13 @@ pub(crate) fn function_visibility(stmt: &Stmt) -> Visibility {
 }
 
 pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
-    match &stmt.node {
-        StmtKind::FunctionDef(ast::StmtFunctionDef {
+    match stmt {
+        Stmt::FunctionDef(ast::StmtFunctionDef {
             name,
             decorator_list,
             ..
         })
-        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             name,
             decorator_list,
             ..
@@ -216,8 +216,8 @@ pub(crate) fn method_visibility(stmt: &Stmt) -> Visibility {
 }
 
 pub(crate) fn class_visibility(stmt: &Stmt) -> Visibility {
-    match &stmt.node {
-        StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => {
+    match stmt {
+        Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
             if name.starts_with('_') {
                 Visibility::Private
             } else {

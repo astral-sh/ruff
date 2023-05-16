@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Alias;
+use rustpython_parser::ast::{Alias, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -23,10 +23,10 @@ pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Opti
         return None;
     };
 
-    if alias.node.name.split('.').eq(module_path) {
+    if alias.name.split('.').eq(module_path) {
         return Some(Diagnostic::new(
             ImportSelf {
-                name: alias.node.name.to_string(),
+                name: alias.name.to_string(),
             },
             alias.range(),
         ));
@@ -55,11 +55,11 @@ pub(crate) fn import_from_self(
     {
         if let Some(alias) = names
             .iter()
-            .find(|alias| alias.node.name == module_path[module_path.len() - 1])
+            .find(|alias| alias.name == module_path[module_path.len() - 1])
         {
             return Some(Diagnostic::new(
                 ImportSelf {
-                    name: format!("{}.{}", imported_module_path, alias.node.name),
+                    name: format!("{}.{}", imported_module_path, alias.name),
                 },
                 alias.range(),
             ));

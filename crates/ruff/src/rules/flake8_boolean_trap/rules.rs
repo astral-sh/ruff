@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -71,11 +71,11 @@ const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
 fn allow_boolean_trap(func: &Expr) -> bool {
-    if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
+    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&attr.as_ref());
     }
 
-    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         return FUNC_CALL_NAME_ALLOWLIST.contains(&id.as_ref());
     }
 
@@ -84,8 +84,8 @@ fn allow_boolean_trap(func: &Expr) -> bool {
 
 const fn is_boolean_arg(arg: &Expr) -> bool {
     matches!(
-        &arg.node,
-        ExprKind::Constant(ast::ExprConstant {
+        &arg,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(_),
             ..
         })
@@ -115,17 +115,17 @@ pub(crate) fn check_positional_boolean_in_def(
     }
 
     for arg in arguments.posonlyargs.iter().chain(arguments.args.iter()) {
-        if arg.node.annotation.is_none() {
+        if arg.annotation.is_none() {
             continue;
         }
-        let Some(expr) = &arg.node.annotation else {
+        let Some(expr) = &arg.annotation else {
             continue;
         };
 
         // check for both bool (python class) and 'bool' (string annotation)
-        let hint = match &expr.node {
-            ExprKind::Name(name) => &name.id == "bool",
-            ExprKind::Constant(ast::ExprConstant {
+        let hint = match expr.as_ref() {
+            Expr::Name(name) => &name.id == "bool",
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
             }) => value == "bool",

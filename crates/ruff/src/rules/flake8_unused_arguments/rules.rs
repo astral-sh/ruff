@@ -258,16 +258,13 @@ fn call<'a>(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args {
-        if let Some(binding) = values
-            .get(arg.node.arg.as_str())
-            .map(|index| &bindings[*index])
-        {
+        if let Some(binding) = values.get(arg.arg.as_str()).map(|index| &bindings[*index]) {
             if !binding.used()
                 && binding.kind.is_argument()
-                && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
+                && !dummy_variable_rgx.is_match(arg.arg.as_str())
             {
                 diagnostics.push(Diagnostic::new(
-                    argumentable.check_for(arg.node.arg.to_string()),
+                    argumentable.check_for(arg.arg.to_string()),
                     binding.range,
                 ));
             }

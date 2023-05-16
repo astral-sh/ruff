@@ -1,6 +1,6 @@
 use itertools::izip;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -156,10 +156,11 @@ pub(crate) fn literal_comparisons(
     if !helpers::is_constant_non_singleton(next) {
         if check_none_comparisons
             && matches!(
-                comparator.node,
-                ExprKind::Constant(ast::ExprConstant {
+                comparator,
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
-                    kind: None
+                    kind: None,
+                    range: _
                 })
             )
         {
@@ -180,14 +181,15 @@ pub(crate) fn literal_comparisons(
         }
 
         if check_true_false_comparisons {
-            if let ExprKind::Constant(ast::ExprConstant {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Bool(value),
                 kind: None,
-            }) = comparator.node
+                range: _,
+            }) = comparator
             {
                 if matches!(op, Cmpop::Eq) {
                     let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(value, op.into()), comparator.range());
+                        Diagnostic::new(TrueFalseComparison(*value, op.into()), comparator.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(0, Cmpop::Is);
                     }
@@ -195,7 +197,7 @@ pub(crate) fn literal_comparisons(
                 }
                 if matches!(op, Cmpop::NotEq) {
                     let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(value, op.into()), comparator.range());
+                        Diagnostic::new(TrueFalseComparison(*value, op.into()), comparator.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(0, Cmpop::IsNot);
                     }
@@ -214,10 +216,11 @@ pub(crate) fn literal_comparisons(
 
         if check_none_comparisons
             && matches!(
-                next.node,
-                ExprKind::Constant(ast::ExprConstant {
+                next,
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::None,
-                    kind: None
+                    kind: None,
+                    range: _
                 })
             )
         {
@@ -238,22 +241,22 @@ pub(crate) fn literal_comparisons(
         }
 
         if check_true_false_comparisons {
-            if let ExprKind::Constant(ast::ExprConstant {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Bool(value),
                 kind: None,
-            }) = next.node
+                range: _,
+            }) = next
             {
-                if matches!(op, Cmpop::Eq) {
+                if op.is_eq() {
                     let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(value, op.into()), next.range());
+                        Diagnostic::new(TrueFalseComparison(*value, op.into()), next.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::Is);
                     }
                     diagnostics.push(diagnostic);
-                }
-                if matches!(op, Cmpop::NotEq) {
+                } else if op.is_not_eq() {
                     let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(value, op.into()), next.range());
+                        Diagnostic::new(TrueFalseComparison(*value, op.into()), next.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
@@ -273,7 +276,7 @@ pub(crate) fn literal_comparisons(
             .iter()
             .enumerate()
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
-            .cloned()
+            .copied()
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {

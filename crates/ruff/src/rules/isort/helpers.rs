@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::newlines::StrExt;
@@ -6,7 +6,7 @@ use ruff_python_ast::source_code::Locator;
 
 use crate::rules::isort::types::TrailingComma;
 
-/// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
+/// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.
 pub(crate) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice(stmt.range());

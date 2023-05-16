@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,12 +39,12 @@ impl MinMax {
         if !keywords.is_empty() {
             return None;
         }
-        let ExprKind::Name(ast::ExprName { id, .. }) = func.node() else {
+        let Expr::Name(ast::ExprName { id, .. }) = func else {
             return None;
         };
-        if id == "min" && context.is_builtin("min") {
+        if id.as_str() == "min" && context.is_builtin("min") {
             Some(MinMax::Min)
-        } else if id == "max" && context.is_builtin("max") {
+        } else if id.as_str() == "max" && context.is_builtin("max") {
             Some(MinMax::Max)
         } else {
             None
@@ -66,20 +66,19 @@ impl std::fmt::Display for MinMax {
 fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec<Expr> {
     fn inner(context: &Context, min_max: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
         for arg in args {
-            if let ExprKind::Call(ast::ExprCall {
+            if let Expr::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
-            }) = arg.node()
+                range: _,
+            }) = arg
             {
                 if args.len() == 1 {
-                    let new_arg = Expr::new(
-                        TextRange::default(),
-                        ast::ExprStarred {
-                            value: Box::new(args[0].clone()),
-                            ctx: ast::ExprContext::Load,
-                        },
-                    );
+                    let new_arg = Expr::Starred(ast::ExprStarred {
+                        value: Box::new(args[0].clone()),
+                        ctx: ast::ExprContext::Load,
+                        range: TextRange::default(),
+                    });
                     new_args.push(new_arg);
                     continue;
                 }
@@ -110,22 +109,20 @@ pub(crate) fn nested_min_max(
     };
 
     if args.iter().any(|arg| {
-        let ExprKind::Call(ast::ExprCall { func, keywords, ..} )= arg.node() else {
+        let Expr::Call(ast::ExprCall { func, keywords, ..} )= arg else {
             return false;
         };
-        MinMax::try_from_call(func, keywords, &checker.ctx) == Some(min_max)
+        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), &checker.ctx) == Some(min_max)
     }) {
         let fixable = !has_comments(expr, checker.locator);
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            let flattened_expr = Expr::new(
-                TextRange::default(),
-                ast::ExprCall {
-                    func: Box::new(func.clone()),
-                    args: collect_nested_args(&checker.ctx, min_max, args),
-                    keywords: keywords.to_owned(),
-                },
-            );
+            let flattened_expr = Expr::Call(ast::ExprCall {
+                func: Box::new(func.clone()),
+                args: collect_nested_args(&checker.ctx, min_max, args),
+                keywords: keywords.to_owned(),
+                range: TextRange::default(),
+            });
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&flattened_expr, checker.stylist),

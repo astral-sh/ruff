@@ -1,5 +1,5 @@
 use log::error;
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,7 +55,7 @@ pub(crate) fn empty_type_checking_block<'a, 'b>(
 ) where
     'b: 'a,
 {
-    if body.len() == 1 && matches!(body[0].node, StmtKind::Pass) {
+    if body.len() == 1 && body[0].is_pass_stmt() {
         let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, body[0].range());
 
         // Delete the entire type-checking block.

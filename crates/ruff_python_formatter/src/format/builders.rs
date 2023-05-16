@@ -14,7 +14,7 @@ pub(crate) struct Block<'a> {
 
 impl Format<ASTFormatContext> for Block<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
-        for (i, stmt) in self.body.node.iter().enumerate() {
+        for (i, stmt) in self.body.iter().enumerate() {
             if i > 0 {
                 write!(f, [hard_line_break()])?;
             }

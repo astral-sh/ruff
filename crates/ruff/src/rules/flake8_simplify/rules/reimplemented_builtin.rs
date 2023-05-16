@@ -1,12 +1,12 @@
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
-    self, Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop,
+    self, Cmpop, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt, Unaryop,
 };
 use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use ruff_python_ast::helpers::unparse_stmt;
 use ruff_python_ast::source_code::Stylist;
 
 use crate::checkers::ast::Checker;
@@ -41,15 +41,15 @@ struct Loop<'a> {
     terminal: TextSize,
 }
 
-/// Extract the returned boolean values a `StmtKind::For` with an `else` body.
+/// Extract the returned boolean values a `Stmt::For` with an `else` body.
 fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
-    let StmtKind::For(ast::StmtFor {
+    let Stmt::For(ast::StmtFor {
         body,
         target,
         iter,
         orelse,
         ..
-    }) = &stmt.node else {
+    }) = stmt else {
         return None;
     };
 
@@ -61,11 +61,11 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
     if orelse.len() != 1 {
         return None;
     }
-    let StmtKind::If(ast::StmtIf {
+    let Stmt::If(ast::StmtIf {
         body: nested_body,
         test: nested_test,
-        orelse: nested_orelse,
-    }) = &body[0].node else {
+        orelse: nested_orelse, range: _,
+    }) = &body[0] else {
         return None;
     };
     if nested_body.len() != 1 {
@@ -74,24 +74,24 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
     if !nested_orelse.is_empty() {
         return None;
     }
-    let StmtKind::Return(ast::StmtReturn { value }) = &nested_body[0].node else {
+    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &nested_body[0] else {
         return None;
     };
     let Some(value) = value else {
         return None;
     };
-    let ExprKind::Constant(ast::ExprConstant { value: Constant::Bool(value), .. }) = &value.node else {
+    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(value), .. }) = value.as_ref() else {
         return None;
     };
 
     // The `else` block has to contain a single `return True` or `return False`.
-    let StmtKind::Return(ast::StmtReturn { value: next_value }) = &orelse[0].node else {
+    let Stmt::Return(ast::StmtReturn { value: next_value, range: _ }) = &orelse[0] else {
         return None;
     };
     let Some(next_value) = next_value else {
         return None;
     };
-    let ExprKind::Constant(ast::ExprConstant { value: Constant::Bool(next_value), .. }) = &next_value.node else {
+    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(next_value), .. }) = next_value.as_ref() else {
         return None;
     };
 
@@ -105,16 +105,16 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
     })
 }
 
-/// Extract the returned boolean values from subsequent `StmtKind::For` and
-/// `StmtKind::Return` statements, or `None`.
+/// Extract the returned boolean values from subsequent `Stmt::For` and
+/// `Stmt::Return` statements, or `None`.
 fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Loop<'a>> {
-    let StmtKind::For(ast::StmtFor {
+    let Stmt::For(ast::StmtFor {
         body,
         target,
         iter,
         orelse,
         ..
-    }) = &stmt.node else {
+    }) = stmt else {
         return None;
     };
 
@@ -126,11 +126,11 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
     if !orelse.is_empty() {
         return None;
     }
-    let StmtKind::If(ast::StmtIf {
+    let Stmt::If(ast::StmtIf {
         body: nested_body,
         test: nested_test,
-        orelse: nested_orelse,
-    }) = &body[0].node else {
+        orelse: nested_orelse, range: _,
+    }) = &body[0] else {
         return None;
     };
     if nested_body.len() != 1 {
@@ -139,24 +139,24 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
     if !nested_orelse.is_empty() {
         return None;
     }
-    let StmtKind::Return(ast::StmtReturn { value }) = &nested_body[0].node else {
+    let Stmt::Return(ast::StmtReturn { value, range: _ }) = &nested_body[0] else {
         return None;
     };
     let Some(value) = value else {
         return None;
     };
-    let ExprKind::Constant(ast::ExprConstant { value: Constant::Bool(value), .. }) = &value.node else {
+    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(value), .. }) = value.as_ref() else {
         return None;
     };
 
     // The next statement has to be a `return True` or `return False`.
-    let StmtKind::Return(ast::StmtReturn { value: next_value }) = &sibling.node else {
+    let Stmt::Return(ast::StmtReturn { value: next_value, range: _ }) = &sibling else {
         return None;
     };
     let Some(next_value) = next_value else {
         return None;
     };
-    let ExprKind::Constant(ast::ExprConstant { value: Constant::Bool(next_value), .. }) = &next_value.node else {
+    let Expr::Constant(ast::ExprConstant { value: Constant::Bool(next_value), .. }) = next_value.as_ref() else {
         return None;
     };
 
@@ -172,27 +172,33 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
 fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Stylist) -> String {
-    unparse_stmt(
-        &create_stmt(ast::StmtReturn {
-            value: Some(Box::new(create_expr(ast::ExprCall {
-                func: Box::new(create_expr(ast::ExprName {
-                    id: id.into(),
-                    ctx: ExprContext::Load,
-                })),
-                args: vec![create_expr(ast::ExprGeneratorExp {
-                    elt: Box::new(test.clone()),
-                    generators: vec![Comprehension {
-                        target: target.clone(),
-                        iter: iter.clone(),
-                        ifs: vec![],
-                        is_async: false,
-                    }],
-                })],
-                keywords: vec![],
-            }))),
-        }),
-        stylist,
-    )
+    let node = ast::ExprGeneratorExp {
+        elt: Box::new(test.clone()),
+        generators: vec![Comprehension {
+            target: target.clone(),
+            iter: iter.clone(),
+            ifs: vec![],
+            is_async: false,
+            range: TextRange::default(),
+        }],
+        range: TextRange::default(),
+    };
+    let node1 = ast::ExprName {
+        id: id.into(),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let node2 = ast::ExprCall {
+        func: Box::new(node1.into()),
+        args: vec![node.into()],
+        keywords: vec![],
+        range: TextRange::default(),
+    };
+    let node3 = ast::StmtReturn {
+        value: Some(Box::new(node2.into())),
+        range: TextRange::default(),
+    };
+    unparse_stmt(&node3.into(), stylist)
 }
 
 /// SIM110, SIM111
@@ -248,20 +254,22 @@ pub(crate) fn convert_for_loop_to_any_all(
             if checker.settings.rules.enabled(Rule::ReimplementedBuiltin) {
                 // Invert the condition.
                 let test = {
-                    if let ExprKind::UnaryOp(ast::ExprUnaryOp {
+                    if let Expr::UnaryOp(ast::ExprUnaryOp {
                         op: Unaryop::Not,
                         operand,
-                    }) = &loop_info.test.node
+                        range: _,
+                    }) = &loop_info.test
                     {
                         *operand.clone()
-                    } else if let ExprKind::Compare(ast::ExprCompare {
+                    } else if let Expr::Compare(ast::ExprCompare {
                         left,
                         ops,
                         comparators,
-                    }) = &loop_info.test.node
+                        range: _,
+                    }) = &loop_info.test
                     {
-                        if ops.len() == 1 && comparators.len() == 1 {
-                            let op = match &ops[0] {
+                        if let ([op], [comparator]) = (ops.as_slice(), comparators.as_slice()) {
+                            let op = match op {
                                 Cmpop::Eq => Cmpop::NotEq,
                                 Cmpop::NotEq => Cmpop::Eq,
                                 Cmpop::Lt => Cmpop::GtE,
@@ -273,22 +281,28 @@ pub(crate) fn convert_for_loop_to_any_all(
                                 Cmpop::In => Cmpop::NotIn,
                                 Cmpop::NotIn => Cmpop::In,
                             };
-                            create_expr(ast::ExprCompare {
+                            let node = ast::ExprCompare {
                                 left: left.clone(),
                                 ops: vec![op],
-                                comparators: vec![comparators[0].clone()],
-                            })
+                                comparators: vec![comparator.clone()],
+                                range: TextRange::default(),
+                            };
+                            node.into()
                         } else {
-                            create_expr(ast::ExprUnaryOp {
+                            let node = ast::ExprUnaryOp {
                                 op: Unaryop::Not,
                                 operand: Box::new(loop_info.test.clone()),
-                            })
+                                range: TextRange::default(),
+                            };
+                            node.into()
                         }
                     } else {
-                        create_expr(ast::ExprUnaryOp {
+                        let node = ast::ExprUnaryOp {
                             op: Unaryop::Not,
                             operand: Box::new(loop_info.test.clone()),
-                        })
+                            range: TextRange::default(),
+                        };
+                        node.into()
                     }
                 };
                 let contents = return_stmt(

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -36,7 +36,7 @@ impl Violation for UnnecessaryDirectLambdaCall {
 
 /// PLC3002
 pub(crate) fn unnecessary_direct_lambda_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let ExprKind::Lambda(_) = &func.node {
+    if let Expr::Lambda(_) = func {
         checker
             .diagnostics
             .push(Diagnostic::new(UnnecessaryDirectLambdaCall, expr.range()));

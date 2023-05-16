@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -63,13 +63,13 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
     if targets.len() != 1 {
         return;
     }
-    if let ExprKind::Name(ast::ExprName { id, .. }) = &targets[0].node {
+    if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
         if id.starts_with('_') {
             return;
         }
     };
 
-    if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
+    if let Expr::Call(ast::ExprCall { func, .. }) = value {
         let Some(kind) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
             if checker.ctx.match_typing_call_path(&call_path, "ParamSpec") {
                 Some(VarKind::ParamSpec)

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Stmt};
+use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;

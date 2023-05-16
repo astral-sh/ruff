@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -26,34 +26,28 @@ impl Violation for NonPEP604Annotation {
 }
 
 fn optional(expr: &Expr) -> Expr {
-    Expr::new(
-        TextRange::default(),
-        ast::ExprBinOp {
-            left: Box::new(expr.clone()),
-            op: Operator::BitOr,
-            right: Box::new(Expr::new(
-                TextRange::default(),
-                ast::ExprConstant {
-                    value: Constant::None,
-                    kind: None,
-                },
-            )),
-        },
-    )
+    Expr::BinOp(ast::ExprBinOp {
+        left: Box::new(expr.clone()),
+        op: Operator::BitOr,
+        right: Box::new(Expr::Constant(ast::ExprConstant {
+            value: Constant::None,
+            kind: None,
+            range: TextRange::default(),
+        })),
+        range: TextRange::default(),
+    })
 }
 
 fn union(elts: &[Expr]) -> Expr {
     if elts.len() == 1 {
         elts[0].clone()
     } else {
-        Expr::new(
-            TextRange::default(),
-            ast::ExprBinOp {
-                left: Box::new(union(&elts[..elts.len() - 1])),
-                op: Operator::BitOr,
-                right: Box::new(elts[elts.len() - 1].clone()),
-            },
-        )
+        Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(union(&elts[..elts.len() - 1])),
+            op: Operator::BitOr,
+            right: Box::new(elts[elts.len() - 1].clone()),
+            range: TextRange::default(),
+        })
     }
 }
 
@@ -82,11 +76,11 @@ pub(crate) fn use_pep604_annotation(
         Pep604Operator::Union => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                match &slice.node {
-                    ExprKind::Slice(_) => {
+                match slice {
+                    Expr::Slice(_) => {
                         // Invalid type annotation.
                     }
-                    ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             unparse_expr(&union(elts), checker.stylist),

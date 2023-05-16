@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -50,11 +50,12 @@ pub(crate) fn explicit_f_string_type_conversion(
         return;
     }
 
-    let ExprKind::Call(ast::ExprCall {
+    let Expr::Call(ast::ExprCall {
         func,
         args,
         keywords,
-    }) = &formatted_value.node else {
+        range: _,
+    }) = formatted_value else {
         return;
     };
 
@@ -63,7 +64,7 @@ pub(crate) fn explicit_f_string_type_conversion(
         return;
     }
 
-    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
         return;
     };
 

@@ -7,7 +7,7 @@
 //! by the unpacked sequence, and this change of ordering can surprise and
 //! mislead readers.
 
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -34,7 +34,7 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         return;
     };
     for arg in args {
-        let ExprKind::Starred (_) = arg.node else {
+        let Expr::Starred (_) = arg else {
             continue;
         };
         if arg.start() <= keyword.start() {

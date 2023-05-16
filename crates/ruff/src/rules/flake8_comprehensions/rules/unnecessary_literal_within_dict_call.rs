@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
@@ -79,8 +79,8 @@ pub(crate) fn unnecessary_literal_within_dict_call(
         return;
     }
     let argument_kind = match argument {
-        ExprKind::DictComp(_) => DictKind::Comprehension,
-        ExprKind::Dict(_) => DictKind::Literal,
+        Expr::DictComp(_) => DictKind::Comprehension,
+        Expr::Dict(_) => DictKind::Literal,
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Ranged, Stmt};
 use textwrap::indent;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
