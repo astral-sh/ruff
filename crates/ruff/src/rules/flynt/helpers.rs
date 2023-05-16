@@ -1,11 +1,11 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, Int};
+use rustpython_parser::ast::{self, Constant, ConversionFlag, Expr};
 
 /// Wrap an expression in a `FormattedValue` with no special formatting.
 fn to_formatted_value_expr(inner: &Expr) -> Expr {
     let node = ast::ExprFormattedValue {
         value: Box::new(inner.clone()),
-        conversion: Int::new(0),
+        conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),
     };

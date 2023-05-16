@@ -3,8 +3,9 @@
 
 use num_bigint::BigInt;
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler, Expr,
-    ExprContext, Identifier, Int, Keyword, MatchCase, Operator, Pattern, Stmt, Unaryop, Withitem,
+    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
+    Excepthandler, Expr, ExprContext, Identifier, Int, Keyword, MatchCase, Operator, Pattern, Stmt,
+    Unaryop, Withitem,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -481,7 +482,7 @@ pub enum ComparableExpr<'a> {
     },
     FormattedValue {
         value: Box<ComparableExpr<'a>>,
-        conversion: Int,
+        conversion: ConversionFlag,
         format_spec: Option<Box<ComparableExpr<'a>>>,
     },
     JoinedStr {
