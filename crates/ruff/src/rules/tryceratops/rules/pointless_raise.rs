@@ -49,8 +49,6 @@ pub(crate) fn pointless_raise(checker: &mut Checker, handlers: &[Excepthandler])
 
         // Match if the body consists of a single `raise` statement and nothing else
         if let [stmt @ Stmt { node: StmtKind::Raise(raise), .. }] = body.as_slice() {
-            //dbg!(&stmt, &raise);
-            //dbg!(&handler);
             match raise.exc.as_ref().map(|e| &e.node) {
                 None => Some(Diagnostic::new(PointlessRaise, stmt.range())),
                 Some(ExprKind::Name(ExprName { id, .. })) if Some(id) == handler.name.as_ref() => Some(Diagnostic::new(PointlessRaise, stmt.range())),
