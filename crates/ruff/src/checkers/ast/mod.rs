@@ -1690,7 +1690,7 @@ where
                     tryceratops::rules::raise_within_try(self, body, handlers);
                 }
                 if self.settings.rules.enabled(Rule::PointlessRaise) {
-                    tryceratops::rules::pointless_raise(self, body, handlers);
+                    tryceratops::rules::pointless_raise(self, handlers);
                 }
                 if self.settings.rules.enabled(Rule::ErrorInsteadOfException) {
                     tryceratops::rules::error_instead_of_exception(self, handlers);

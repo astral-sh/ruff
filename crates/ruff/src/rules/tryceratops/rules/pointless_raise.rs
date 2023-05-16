@@ -1,6 +1,6 @@
 
 
-use rustpython_parser::ast::{self, Excepthandler, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Stmt, StmtKind, ExcepthandlerKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,39 +37,22 @@ pub struct PointlessRaise;
 impl Violation for PointlessRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove")
+        format!("Remove this exception handler as the error is immediately re-raised")
     }
 }
 
-// #[derive(Default)]
-// struct RaiseStatementVisitor<'a> {
-//     raises: Vec<&'a Stmt>,
-// }
-
-// impl<'a, 'b> StatementVisitor<'b> for RaiseStatementVisitor<'a>
-// where
-//     'b: 'a,
-// {
-//     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-//         match stmt.node {
-//             StmtKind::Raise(_) => self.raises.push(stmt),
-//             StmtKind::Try(_) | StmtKind::TryStar(_) => (),
-//             _ => walk_stmt(self, stmt),
-//         }
-//     }
-// }
-
 /// TRY302
-pub(crate) fn pointless_raise(checker: &mut Checker, body: &[Stmt], handlers: &[Excepthandler]) {
-    if handlers.is_empty() {
-        return;
-    }
+pub(crate) fn pointless_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
+    for handler in handlers {
+        let ExcepthandlerKind::ExceptHandler(handler) = &handler.node;
+        let body = &handler.body;
 
-    if let Some(stmt) = body.first() {
-        if let StmtKind::Raise(ast::StmtRaise { exc: None, .. }) = &stmt.node {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(PointlessRaise, stmt.range()));
+        if let Some(stmt) = body.first() {
+            if let StmtKind::Raise(ast::StmtRaise { exc: None, .. }) = &stmt.node {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PointlessRaise, stmt.range()));
+            }
         }
     }
 }
