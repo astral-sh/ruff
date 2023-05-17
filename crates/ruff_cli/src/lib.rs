@@ -5,6 +5,7 @@ use std::sync::mpsc::channel;
 
 use anyhow::{Context, Result};
 use clap::CommandFactory;
+use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff::logging::{set_up_logging, LogLevel};
@@ -124,8 +125,9 @@ quoting the executed command, along with the relevant file contents and `pyproje
     Ok(ExitStatus::Success)
 }
 
-#[cfg_attr(not(feature = "format"), allow(unused))]
 fn format(files: &[PathBuf]) -> Result<ExitStatus> {
+    warn!("This function is unfinished, broken and for internal use only!");
+
     // dummy
     let format_code = |code: &str| code.replace("# DEL", "");
 
