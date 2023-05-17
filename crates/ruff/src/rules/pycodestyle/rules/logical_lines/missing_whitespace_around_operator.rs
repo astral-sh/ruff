@@ -225,5 +225,7 @@ fn is_whitespace_needed(kind: TokenKind) -> bool {
             | TokenKind::Slash
             | TokenKind::Percent
     ) || kind.is_arithmetic()
-        || kind.is_bitwise_or_shift()
+        || (kind.is_bitwise_or_shift() &&
+            // As a special-case, pycodestyle seems to ignore whitespace around the tilde.
+            !matches!(kind, TokenKind::Tilde))
 }

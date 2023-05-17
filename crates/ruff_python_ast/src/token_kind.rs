@@ -322,6 +322,7 @@ impl TokenKind {
                 | TokenKind::VbarEqual
                 | TokenKind::CircumFlex
                 | TokenKind::CircumflexEqual
+                | TokenKind::Tilde
         )
     }
 
