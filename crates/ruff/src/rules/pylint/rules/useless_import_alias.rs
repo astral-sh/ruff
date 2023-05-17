@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Alias;
+use rustpython_parser::ast::{Alias, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,13 +37,13 @@ impl AlwaysAutofixableViolation for UselessImportAlias {
 
 /// PLC0414
 pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
-    let Some(asname) = &alias.node.asname else {
+    let Some(asname) = &alias.asname else {
         return;
     };
-    if alias.node.name.contains('.') {
+    if alias.name.contains('.') {
         return;
     }
-    if &alias.node.name != asname {
+    if &alias.name != asname {
         return;
     }
 

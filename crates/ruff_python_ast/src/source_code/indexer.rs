@@ -35,17 +35,17 @@ impl Indexer {
 
             // Get the trivia between the previous and the current token and detect any newlines.
             // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
-            // between any two tokens that form a continuation nor multiple newlines in a row.
-            // That's why we have to extract the newlines "manually".
+            // between any two tokens that form a continuation. That's why we have to extract the
+            // newlines "manually".
             for (index, text) in trivia.match_indices(['\n', '\r']) {
                 if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
                     continue;
                 }
 
-                // Newlines after a comment or new-line never form a continuation.
+                // Newlines after a newline never form a continuation.
                 if !matches!(
                     prev_token,
-                    Some(Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)) | None
+                    Some(Tok::Newline | Tok::NonLogicalNewline) | None
                 ) {
                     continuation_lines.push(line_start);
                 }

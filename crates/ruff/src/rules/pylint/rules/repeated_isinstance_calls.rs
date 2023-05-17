@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Boolop, Expr, ExprKind};
+use rustpython_parser::ast::{self, Boolop, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -28,7 +28,7 @@ impl Violation for RepeatedIsinstanceCalls {
 pub(crate) fn repeated_isinstance_calls(
     checker: &mut Checker,
     expr: &Expr,
-    op: &Boolop,
+    op: Boolop,
     values: &[Expr],
 ) {
     if !matches!(op, Boolop::Or) || !checker.ctx.is_builtin("isinstance") {
@@ -38,10 +38,10 @@ pub(crate) fn repeated_isinstance_calls(
     let mut obj_to_types: FxHashMap<HashableExpr, (usize, FxHashSet<HashableExpr>)> =
         FxHashMap::default();
     for value in values {
-        let ExprKind::Call(ast::ExprCall { func, args, .. }) = &value.node else {
+        let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
             continue;
         };
-        if !matches!(&func.node, ExprKind::Name(ast::ExprName { id, .. }) if id == "isinstance") {
+        if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if id == "isinstance") {
             continue;
         }
         let [obj, types] = &args[..] else {
@@ -52,8 +52,8 @@ pub(crate) fn repeated_isinstance_calls(
             .or_insert_with(|| (0, FxHashSet::default()));
 
         *num_calls += 1;
-        matches.extend(match &types.node {
-            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+        matches.extend(match types {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 elts.iter().map(HashableExpr::from_expr).collect()
             }
             _ => {

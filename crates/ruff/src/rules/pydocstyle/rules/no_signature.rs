@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, StmtKind};
+use rustpython_parser::ast::{self, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,7 +27,7 @@ pub(crate) fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     }) = docstring.definition else {
         return;
     };
-    let StmtKind::FunctionDef(ast::StmtFunctionDef { name, .. }) = &stmt.node else {
+    let Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) = stmt else {
         return;
     };
 

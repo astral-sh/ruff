@@ -1,7 +1,5 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{
-    self, Attributed, Constant, Excepthandler, ExcepthandlerKind, ExprKind, Stmt, StmtKind,
-};
+use rustpython_parser::ast::{self, Constant, Excepthandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,18 +43,15 @@ pub(crate) fn suppressible_exception(
 ) {
     if !matches!(
         try_body,
-        [Attributed {
-            node: StmtKind::Delete(_)
-                | StmtKind::Assign(_)
-                | StmtKind::AugAssign(_)
-                | StmtKind::AnnAssign(_)
-                | StmtKind::Assert(_)
-                | StmtKind::Import(_)
-                | StmtKind::ImportFrom(_)
-                | StmtKind::Expr(_)
-                | StmtKind::Pass,
-            ..
-        }]
+        [Stmt::Delete(_)
+            | Stmt::Assign(_)
+            | Stmt::AugAssign(_)
+            | Stmt::AnnAssign(_)
+            | Stmt::Assert(_)
+            | Stmt::Import(_)
+            | Stmt::ImportFrom(_)
+            | Stmt::Expr(_)
+            | Stmt::Pass(_)]
     ) || handlers.len() != 1
         || !orelse.is_empty()
         || !finalbody.is_empty()
@@ -64,15 +59,14 @@ pub(crate) fn suppressible_exception(
         return;
     }
     let handler = &handlers[0];
-    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-        &handler.node;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
     if body.len() == 1 {
-        let node = &body[0].node;
-        if matches!(node, StmtKind::Pass)
+        let node = &body[0];
+        if node.is_pass_stmt()
             || (matches!(
             node,
-            StmtKind::Expr(ast::StmtExpr { value })
-            if matches!(**value, Attributed { node: ExprKind::Constant(ast::ExprConstant { value: Constant::Ellipsis, .. }), ..})
+            Stmt::Expr(ast::StmtExpr { value, range: _ })
+            if matches!(**value, Expr::Constant(ast::ExprConstant { value: Constant::Ellipsis, .. }))
             ))
         {
             let handler_names: Vec<String> = helpers::extract_handled_exceptions(handlers)

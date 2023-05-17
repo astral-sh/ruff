@@ -40,3 +40,27 @@ def start():
 #: E117 W191
 def start():
 		print()
+#: E112
+if False:  #
+print()
+#:
+if False:
+    print()
+#:
+if False:  #
+    print()
+#:
+if False:
+    print()
+
+    print()
+#:
+if False:
+    print()
+    if False:
+
+        print()
+#:
+if False:
+
+    print()

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -30,16 +30,16 @@ pub(crate) fn blind_except(
     let Some(type_) = type_ else {
         return;
     };
-    let ExprKind::Name(ast::ExprName { id, .. }) = &type_.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = &type_ else {
         return;
     };
     for exception in ["BaseException", "Exception"] {
         if id == exception && checker.ctx.is_builtin(exception) {
             // If the exception is re-raised, don't flag an error.
             if body.iter().any(|stmt| {
-                if let StmtKind::Raise(ast::StmtRaise { exc, .. }) = &stmt.node {
+                if let Stmt::Raise(ast::StmtRaise { exc, .. }) = stmt {
                     if let Some(exc) = exc {
-                        if let ExprKind::Name(ast::ExprName { id, .. }) = &exc.node {
+                        if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                             name.map_or(false, |name| id == name)
                         } else {
                             false
@@ -56,17 +56,17 @@ pub(crate) fn blind_except(
 
             // If the exception is logged, don't flag an error.
             if body.iter().any(|stmt| {
-                if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
-                    if let ExprKind::Call(ast::ExprCall { func, keywords, .. }) = &value.node {
+                if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
+                    if let Expr::Call(ast::ExprCall { func, keywords, .. }) = value.as_ref() {
                         if logging::is_logger_candidate(&checker.ctx, func) {
-                            if let Some(attribute) = func.node.as_attribute_expr() {
+                            if let Some(attribute) = func.as_attribute_expr() {
                                 let attr = attribute.attr.as_str();
                                 if attr == "exception" {
                                     return true;
                                 }
                                 if attr == "error" {
                                     if let Some(keyword) = find_keyword(keywords, "exc_info") {
-                                        if is_const_true(&keyword.node.value) {
+                                        if is_const_true(&keyword.value) {
                                             return true;
                                         }
                                     }

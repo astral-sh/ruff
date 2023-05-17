@@ -127,7 +127,7 @@ impl Format<ASTFormatContext> for FormatPattern<'_> {
                 }
             }
             PatternKind::MatchStar { name } => {
-                if let Some(name) = &name {
+                if let Some(name) = name {
                     write!(f, [text("*"), dynamic_text(name, TextSize::default())])?;
                 } else {
                     write!(f, [text("*_")])?;
@@ -140,7 +140,7 @@ impl Format<ASTFormatContext> for FormatPattern<'_> {
                     write!(f, [text("as")])?;
                     write!(f, [space()])?;
                 }
-                if let Some(name) = &name {
+                if let Some(name) = name {
                     write!(f, [dynamic_text(name, TextSize::default())])?;
                 } else {
                     write!(f, [text("_")])?;

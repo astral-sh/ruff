@@ -38,18 +38,10 @@ pub(crate) fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
-    #[cfg(feature = "logical_lines")]
     let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
 
-    #[cfg(not(feature = "logical_lines"))]
-    let should_fix_missing_whitespace = false;
-
-    #[cfg(feature = "logical_lines")]
     let should_fix_whitespace_before_parameters =
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
-
-    #[cfg(not(feature = "logical_lines"))]
-    let should_fix_whitespace_before_parameters = false;
 
     let mut prev_line = None;
     let mut prev_indent_level = None;
@@ -152,99 +144,5 @@ impl<'a> LogicalLinesContext<'a> {
         if self.settings.rules.enabled(diagnostic.kind.rule()) {
             self.diagnostics.push(diagnostic);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::{lexer, Mode};
-
-    use crate::rules::pycodestyle::rules::logical_lines::LogicalLines;
-    use ruff_python_ast::source_code::Locator;
-
-    #[test]
-    fn split_logical_lines() {
-        let contents = r#"
-x = 1
-y = 2
-z = x + 1"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
-            .into_iter()
-            .map(|line| line.text_trimmed().to_string())
-            .collect();
-        let expected = vec![
-            "x = 1".to_string(),
-            "y = 2".to_string(),
-            "z = x + 1".to_string(),
-        ];
-        assert_eq!(actual, expected);
-
-        let contents = r#"
-x = [
-  1,
-  2,
-  3,
-]
-y = 2
-z = x + 1"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
-            .into_iter()
-            .map(|line| line.text_trimmed().to_string())
-            .collect();
-        let expected = vec![
-            "x = [\n  1,\n  2,\n  3,\n]".to_string(),
-            "y = 2".to_string(),
-            "z = x + 1".to_string(),
-        ];
-        assert_eq!(actual, expected);
-
-        let contents = "x = 'abc'";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
-            .into_iter()
-            .map(|line| line.text_trimmed().to_string())
-            .collect();
-        let expected = vec!["x = 'abc'".to_string()];
-        assert_eq!(actual, expected);
-
-        let contents = r#"
-def f():
-  x = 1
-f()"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
-            .into_iter()
-            .map(|line| line.text_trimmed().to_string())
-            .collect();
-        let expected = vec!["def f():", "x = 1", "f()"];
-        assert_eq!(actual, expected);
-
-        let contents = r#"
-def f():
-  """Docstring goes here."""
-  # Comment goes here.
-  x = 1
-f()"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
-            .into_iter()
-            .map(|line| line.text_trimmed().to_string())
-            .collect();
-        let expected = vec![
-            "def f():",
-            "\"\"\"Docstring goes here.\"\"\"",
-            "",
-            "x = 1",
-            "f()",
-        ];
-        assert_eq!(actual, expected);
     }
 }

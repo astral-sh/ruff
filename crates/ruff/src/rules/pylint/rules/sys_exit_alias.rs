@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -29,7 +29,7 @@ impl Violation for SysExitAlias {
 
 /// PLR1722
 pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
-    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
     for name in ["exit", "quit"] {

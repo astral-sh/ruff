@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Alias, Stmt};
+use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};

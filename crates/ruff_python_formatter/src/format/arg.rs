@@ -23,8 +23,8 @@ impl Format<ASTFormatContext> for FormatArg<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let arg = self.item;
 
-        write!(f, [dynamic_text(&arg.node.arg, TextSize::default())])?;
-        if let Some(annotation) = &arg.node.annotation {
+        write!(f, [dynamic_text(&arg.arg, TextSize::default())])?;
+        if let Some(annotation) = &arg.annotation {
             write!(f, [text(": ")])?;
             write!(f, [annotation.format()])?;
         }

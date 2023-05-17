@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum AutofixKind {
     Sometimes,
     Always,
@@ -30,7 +30,7 @@ pub trait Violation: Debug + PartialEq + Eq {
         None
     }
 
-    // TODO micha: Move `autofix_title` to `Fix`, add new `advice` method that is shown as an advice.
+    // TODO(micha): Move `autofix_title` to `Fix`, add new `advice` method that is shown as an advice.
     // Change the `Diagnostic` renderer to show the advice, and render the fix message after the `Suggested fix: <here>`
 
     /// Returns the title for the autofix. The message is also shown as an advice as part of the diagnostics.

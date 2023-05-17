@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Keyword;
+use rustpython_parser::ast::{Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -26,8 +26,8 @@ pub(crate) fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnosti
     keywords
         .iter()
         .filter_map(|keyword| {
-            string_literal(&keyword.node.value).filter(|string| !string.is_empty())?;
-            let arg = keyword.node.arg.as_ref()?;
+            string_literal(&keyword.value).filter(|string| !string.is_empty())?;
+            let arg = keyword.arg.as_ref()?;
             if !matches_password_name(arg) {
                 return None;
             }

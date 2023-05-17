@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use rustpython_parser::ast::{self, ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Stmt};
 
 use crate::node::{NodeId, Nodes};
 
@@ -41,15 +41,15 @@ fn common_ancestor(
 
 /// Return the alternative branches for a given node.
 fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
-    match &stmt.node {
-        StmtKind::If(ast::StmtIf { body, .. }) => vec![body.iter().collect()],
-        StmtKind::Try(ast::StmtTry {
+    match stmt {
+        Stmt::If(ast::StmtIf { body, .. }) => vec![body.iter().collect()],
+        Stmt::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             ..
         })
-        | StmtKind::TryStar(ast::StmtTryStar {
+        | Stmt::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
@@ -57,13 +57,12 @@ fn alternatives(stmt: &Stmt) -> Vec<Vec<&Stmt>> {
         }) => vec![body.iter().chain(orelse.iter()).collect()]
             .into_iter()
             .chain(handlers.iter().map(|handler| {
-                let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-                    body, ..
-                }) = &handler.node;
+                let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+                    handler;
                 body.iter().collect()
             }))
             .collect(),
-        StmtKind::Match(ast::StmtMatch { cases, .. }) => cases
+        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
             .iter()
             .map(|case| case.body.iter().collect())
             .collect(),

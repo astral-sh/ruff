@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,7 +17,7 @@ impl Violation for CannotRaiseLiteral {
 
 /// B016
 pub(crate) fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Constant ( _) = &expr.node else {
+    let Expr::Constant ( _) = expr else {
         return;
     };
     checker

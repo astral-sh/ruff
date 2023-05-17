@@ -56,3 +56,11 @@ def f(x: "List['Li' 'st[str]']") -> None:
 
 def f(x: "Li" "st['List[str]']") -> None:
     ...
+
+
+def f(x: typing.Deque[str]) -> None:
+    ...
+
+
+def f(x: typing.DefaultDict[str, str]) -> None:
+    ...

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

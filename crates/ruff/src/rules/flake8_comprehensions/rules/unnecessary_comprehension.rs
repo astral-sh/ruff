@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Comprehension, Expr, ExprKind};
+use rustpython_parser::ast::{self, Comprehension, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -50,10 +50,10 @@ impl AlwaysAutofixableViolation for UnnecessaryComprehension {
 
 /// Add diagnostic for C416 based on the expression node id.
 fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
-    let id = match &expr.node {
-        ExprKind::ListComp(_) => "list",
-        ExprKind::SetComp(_) => "set",
-        ExprKind::DictComp(_) => "dict",
+    let id = match expr {
+        Expr::ListComp(_) => "list",
+        Expr::SetComp(_) => "set",
+        Expr::DictComp(_) => "dict",
         _ => return,
     };
     if !checker.ctx.is_builtin(id) {
@@ -95,7 +95,7 @@ pub(crate) fn unnecessary_dict_comprehension(
     let Some(value_id) = helpers::expr_name(value) else {
         return;
     };
-    let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &generator.target.node else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
         return;
     };
     if elts.len() != 2 {

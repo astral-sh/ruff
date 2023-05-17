@@ -2,7 +2,7 @@ use ruff_text_size::TextRange;
 use std::string::ToString;
 
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Identifier, Keyword, KeywordData};
+use rustpython_parser::ast::{self, Constant, Expr, Identifier, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -210,14 +210,13 @@ impl Violation for StringDotFormatMixingAutomatic {
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     keywords.iter().any(|k| {
-        let KeywordData { arg, .. } = &k.node;
+        let Keyword { arg, .. } = &k;
         arg.is_none()
     })
 }
 
 fn has_star_args(args: &[Expr]) -> bool {
-    args.iter()
-        .any(|arg| matches!(&arg.node, ExprKind::Starred(_)))
+    args.iter().any(|arg| matches!(&arg, Expr::Starred(_)))
 }
 
 /// F502
@@ -229,13 +228,13 @@ pub(crate) fn percent_format_expected_mapping(
 ) {
     if !summary.keywords.is_empty() {
         // Tuple, List, Set (+comprehensions)
-        match right.node {
-            ExprKind::List(_)
-            | ExprKind::Tuple(_)
-            | ExprKind::Set(_)
-            | ExprKind::ListComp(_)
-            | ExprKind::SetComp(_)
-            | ExprKind::GeneratorExp(_) => checker
+        match right {
+            Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Set(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::GeneratorExp(_) => checker
                 .diagnostics
                 .push(Diagnostic::new(PercentFormatExpectedMapping, location)),
             _ => {}
@@ -250,8 +249,7 @@ pub(crate) fn percent_format_expected_sequence(
     right: &Expr,
     location: TextRange,
 ) {
-    if summary.num_positional > 1 && matches!(right.node, ExprKind::Dict(_) | ExprKind::DictComp(_))
-    {
+    if summary.num_positional > 1 && matches!(right, Expr::Dict(_) | Expr::DictComp(_)) {
         checker
             .diagnostics
             .push(Diagnostic::new(PercentFormatExpectedSequence, location));
@@ -268,7 +266,7 @@ pub(crate) fn percent_format_extra_named_arguments(
     if summary.num_positional > 0 {
         return;
     }
-    let ExprKind::Dict(ast::ExprDict { keys, .. }) = &right.node else {
+    let Expr::Dict(ast::ExprDict { keys, .. }) = &right else {
         return;
     };
     if keys.iter().any(std::option::Option::is_none) {
@@ -278,14 +276,10 @@ pub(crate) fn percent_format_extra_named_arguments(
     let missing: Vec<&str> = keys
         .iter()
         .filter_map(|k| match k {
-            Some(Expr {
-                node:
-                    ExprKind::Constant(ast::ExprConstant {
-                        value: Constant::Str(value),
-                        ..
-                    }),
+            Some(Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(value),
                 ..
-            }) => {
+            })) => {
                 if summary.keywords.contains(value) {
                     None
                 } else {
@@ -331,15 +325,15 @@ pub(crate) fn percent_format_missing_arguments(
         return;
     }
 
-    if let ExprKind::Dict(ast::ExprDict { keys, .. }) = &right.node {
+    if let Expr::Dict(ast::ExprDict { keys, .. }) = &right {
         if keys.iter().any(std::option::Option::is_none) {
             return; // contains **x splat
         }
 
         let mut keywords = FxHashSet::default();
         for key in keys.iter().flatten() {
-            match &key.node {
-                ExprKind::Constant(ast::ExprConstant {
+            match key {
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(value),
                     ..
                 }) => {
@@ -393,13 +387,13 @@ pub(crate) fn percent_format_positional_count_mismatch(
         return;
     }
 
-    match &right.node {
-        ExprKind::List(ast::ExprList { elts, .. })
-        | ExprKind::Tuple(ast::ExprTuple { elts, .. })
-        | ExprKind::Set(ast::ExprSet { elts }) => {
+    match right {
+        Expr::List(ast::ExprList { elts, .. })
+        | Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => {
             let mut found = 0;
             for elt in elts {
-                if let ExprKind::Starred(_) = &elt.node {
+                if let Expr::Starred(_) = &elt {
                     return;
                 }
                 found += 1;
@@ -427,8 +421,8 @@ pub(crate) fn percent_format_star_requires_sequence(
     location: TextRange,
 ) {
     if summary.starred {
-        match &right.node {
-            ExprKind::Dict(_) | ExprKind::DictComp(_) => checker
+        match right {
+            Expr::Dict(_) | Expr::DictComp(_) => checker
                 .diagnostics
                 .push(Diagnostic::new(PercentFormatStarRequiresSequence, location)),
             _ => {}
@@ -448,7 +442,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     }
 
     let keywords = keywords.iter().filter_map(|k| {
-        let KeywordData { arg, .. } = &k.node;
+        let Keyword { arg, .. } = &k;
         arg.as_ref()
     });
 
@@ -497,7 +491,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         .iter()
         .enumerate()
         .filter(|(i, arg)| {
-            !(matches!(arg.node, ExprKind::Starred(_))
+            !(matches!(arg, Expr::Starred(_))
                 || summary.autos.contains(i)
                 || summary.indices.contains(i))
         })
@@ -547,7 +541,7 @@ pub(crate) fn string_dot_format_missing_argument(
     let keywords: FxHashSet<_> = keywords
         .iter()
         .filter_map(|k| {
-            let KeywordData { arg, .. } = &k.node;
+            let Keyword { arg, .. } = &k;
             arg.as_ref().map(Identifier::as_str)
         })
         .collect();

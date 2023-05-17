@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Excepthandler, Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{Excepthandler, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -26,7 +26,7 @@ pub(crate) fn try_except_continue(
     check_typed_exception: bool,
 ) {
     if body.len() == 1
-        && body[0].node == StmtKind::Continue
+        && body[0].is_continue_stmt()
         && (check_typed_exception || is_untyped_exception(type_, checker))
     {
         checker

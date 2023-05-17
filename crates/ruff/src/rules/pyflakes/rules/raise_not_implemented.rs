@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -21,15 +21,15 @@ impl AlwaysAutofixableViolation for RaiseNotImplemented {
 }
 
 fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
-    match &expr.node {
-        ExprKind::Call(ast::ExprCall { func, .. }) => {
-            if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+    match expr {
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                 if id == "NotImplemented" {
                     return Some(func);
                 }
             }
         }
-        ExprKind::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(ast::ExprName { id, .. }) => {
             if id == "NotImplemented" {
                 return Some(expr);
             }

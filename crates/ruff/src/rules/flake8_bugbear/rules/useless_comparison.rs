@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,7 +20,7 @@ impl Violation for UselessComparison {
 
 /// B015
 pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
-    if matches!(expr.node, ExprKind::Compare(_)) {
+    if matches!(expr, Expr::Compare(_)) {
         checker
             .diagnostics
             .push(Diagnostic::new(UselessComparison, expr.range()));

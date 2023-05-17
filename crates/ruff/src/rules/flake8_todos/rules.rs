@@ -309,16 +309,22 @@ pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic
         // TD003
         let mut has_issue_link = false;
         while let Some((token, token_range)) = iter.peek() {
-            if let Tok::Comment(comment) = token {
-                if detect_tag(comment, token_range.start()).is_some() {
+            match token {
+                Tok::Comment(comment) => {
+                    if detect_tag(comment, token_range.start()).is_some() {
+                        break;
+                    }
+                    if ISSUE_LINK_REGEX_SET.is_match(comment) {
+                        has_issue_link = true;
+                        break;
+                    }
+                }
+                Tok::Newline | Tok::NonLogicalNewline => {
+                    continue;
+                }
+                _ => {
                     break;
                 }
-                if ISSUE_LINK_REGEX_SET.is_match(comment) {
-                    has_issue_link = true;
-                    break;
-                }
-            } else {
-                break;
             }
         }
         if !has_issue_link {

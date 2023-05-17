@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr};
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -25,7 +25,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             if logging::is_logger_candidate(self.context, func) {
                 self.calls.push((expr, func));
             }

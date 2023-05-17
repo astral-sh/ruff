@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Keyword, Stmt};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -28,7 +28,7 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
 
 fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Option<Diagnostic> {
     for expr in bases {
-        let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node else {
+        let Expr::Name(ast::ExprName { id, .. }) = expr else {
             continue;
         };
         if id != "object" {

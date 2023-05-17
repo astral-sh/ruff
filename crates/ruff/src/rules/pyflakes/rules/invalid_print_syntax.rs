@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,7 +17,7 @@ impl Violation for InvalidPrintSyntax {
 
 /// F633
 pub(crate) fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
-    let ExprKind::Name(ast::ExprName { id, .. }) = &left.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = &left else {
         return;
     };
     if id != "print" {

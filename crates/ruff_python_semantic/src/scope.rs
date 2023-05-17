@@ -115,7 +115,7 @@ pub enum ScopeKind<'a> {
 
 #[derive(Debug)]
 pub struct FunctionDef<'a> {
-    // Properties derived from StmtKind::FunctionDef.
+    // Properties derived from Stmt::FunctionDef.
     pub name: &'a str,
     pub args: &'a Arguments,
     pub body: &'a [Stmt],
@@ -130,7 +130,7 @@ pub struct FunctionDef<'a> {
 
 #[derive(Debug)]
 pub struct ClassDef<'a> {
-    // Properties derived from StmtKind::ClassDef.
+    // Properties derived from Stmt::ClassDef.
     pub name: &'a str,
     pub bases: &'a [Expr],
     pub keywords: &'a [Keyword],
