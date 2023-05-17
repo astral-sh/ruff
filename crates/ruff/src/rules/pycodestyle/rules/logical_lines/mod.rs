@@ -500,11 +500,16 @@ impl LogicalLinesBuilder {
     fn finish_line(&mut self) {
         let end = self.tokens.len() as u32;
         if self.current_line.tokens_start < end {
-            self.lines.push(Line {
-                flags: self.current_line.flags,
-                tokens_start: self.current_line.tokens_start,
-                tokens_end: end,
-            });
+            let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
+                .iter()
+                .all(|token| token.kind.is_newline());
+            if !is_empty {
+                self.lines.push(Line {
+                    flags: self.current_line.flags,
+                    tokens_start: self.current_line.tokens_start,
+                    tokens_end: end,
+                });
+            }
 
             self.current_line = CurrentLine {
                 flags: TokenFlags::default(),
@@ -529,4 +534,104 @@ struct Line {
     flags: TokenFlags,
     tokens_start: u32,
     tokens_end: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use rustpython_parser::lexer::LexResult;
+    use rustpython_parser::{lexer, Mode};
+
+    use ruff_python_ast::source_code::Locator;
+
+    use super::LogicalLines;
+
+    #[test]
+    fn multi_line() {
+        assert_logical_lines(
+            r#"
+x = 1
+y = 2
+z = x + 1"#
+                .trim(),
+            &["x = 1", "y = 2", "z = x + 1"],
+        );
+    }
+
+    #[test]
+    fn indented() {
+        assert_logical_lines(
+            r#"
+x = [
+  1,
+  2,
+  3,
+]
+y = 2
+z = x + 1"#
+                .trim(),
+            &["x = [\n  1,\n  2,\n  3,\n]", "y = 2", "z = x + 1"],
+        );
+    }
+
+    #[test]
+    fn string_assignment() {
+        assert_logical_lines("x = 'abc'".trim(), &["x = 'abc'"]);
+    }
+
+    #[test]
+    fn function_definition() {
+        assert_logical_lines(
+            r#"
+def f():
+  x = 1
+f()"#
+                .trim(),
+            &["def f():", "x = 1", "f()"],
+        );
+    }
+
+    #[test]
+    fn trivia() {
+        assert_logical_lines(
+            r#"
+def f():
+  """Docstring goes here."""
+  # Comment goes here.
+  x = 1
+f()"#
+                .trim(),
+            &[
+                "def f():",
+                "\"\"\"Docstring goes here.\"\"\"",
+                "",
+                "x = 1",
+                "f()",
+            ],
+        );
+    }
+
+    #[test]
+    fn empty_line() {
+        assert_logical_lines(
+            r#"
+if False:
+
+    print()
+"#
+            .trim(),
+            &["if False:", "print()", ""],
+        );
+    }
+
+    fn assert_logical_lines(contents: &str, expected: &[&str]) {
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let locator = Locator::new(contents);
+        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+            .into_iter()
+            .map(|line| line.text_trimmed())
+            .map(ToString::to_string)
+            .collect();
+        let expected: Vec<String> = expected.iter().map(ToString::to_string).collect();
+        assert_eq!(actual, expected);
+    }
 }

@@ -64,9 +64,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use similar::TextDiff;
+    use insta::assert_snapshot;
 
     use ruff_testing_macros::fixture;
+    use ruff_text_size::TextSize;
+    use similar::TextDiff;
 
     use crate::fmt;
 
@@ -174,6 +176,77 @@ mod tests {
     for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
 }"#
         );
+    }
+
+    #[test]
+    fn string_processing() {
+        use ruff_formatter::prelude::*;
+        use ruff_formatter::{format, format_args, write};
+
+        struct FormatString<'a>(&'a str);
+
+        impl Format<SimpleFormatContext> for FormatString<'_> {
+            fn fmt(
+                &self,
+                f: &mut ruff_formatter::formatter::Formatter<SimpleFormatContext>,
+            ) -> FormatResult<()> {
+                let format_str = format_with(|f| {
+                    write!(f, [text("\"")])?;
+
+                    let mut words = self.0.split_whitespace().peekable();
+                    let mut fill = f.fill();
+
+                    let separator = format_with(|f| {
+                        group(&format_args![
+                            if_group_breaks(&text("\"")),
+                            soft_line_break_or_space(),
+                            if_group_breaks(&text("\" "))
+                        ])
+                        .fmt(f)
+                    });
+
+                    while let Some(word) = words.next() {
+                        let is_last = words.peek().is_none();
+                        let format_word = format_with(|f| {
+                            write!(f, [dynamic_text(word, TextSize::default())])?;
+
+                            if is_last {
+                                write!(f, [text("\"")])?;
+                            }
+
+                            Ok(())
+                        });
+
+                        fill.entry(&separator, &format_word);
+                    }
+
+                    fill.finish()
+                });
+
+                write!(
+                    f,
+                    [group(&format_args![
+                        if_group_breaks(&text("(")),
+                        soft_block_indent(&format_str),
+                        if_group_breaks(&text(")"))
+                    ])]
+                )
+            }
+        }
+
+        // 77 after g group (leading quote)
+        let fits =
+            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"#;
+        let breaks =
+            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh"#;
+
+        let output = format!(
+            SimpleFormatContext::default(),
+            [FormatString(fits), hard_line_break(), FormatString(breaks)]
+        )
+        .expect("Formatting to succeed");
+
+        assert_snapshot!(output.print().expect("Printing to succeed").as_code());
     }
 
     struct Header<'a> {

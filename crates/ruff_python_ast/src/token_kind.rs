@@ -168,8 +168,13 @@ pub enum TokenKind {
 
 impl TokenKind {
     #[inline]
+    pub const fn is_newline(&self) -> bool {
+        matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
+    }
+
+    #[inline]
     pub const fn is_unary(&self) -> bool {
-        matches!(self, TokenKind::Plus | TokenKind::Minus | TokenKind::Star)
+        matches!(self, TokenKind::Plus | TokenKind::Minus)
     }
 
     #[inline]

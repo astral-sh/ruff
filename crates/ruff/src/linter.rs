@@ -116,7 +116,6 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        #[cfg(feature = "logical_lines")]
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
             &tokens, locator, stylist, settings,
         ));
