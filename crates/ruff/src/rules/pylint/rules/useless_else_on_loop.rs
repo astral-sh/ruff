@@ -6,6 +6,38 @@ use ruff_python_ast::helpers;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `else` clauses on loops without a `break` statement.
+///
+/// ## Why is this bad?
+/// An `else` clause on a loop without a `break` statement is redundant.
+///
+/// Instead, move the code inside the `else` clause from the loop body to after
+/// the loop.
+///
+/// ## Example
+/// ```python
+/// def find(target, items):
+///     for item in items:
+///         if item == target:
+///             return True
+///     else:
+///         print(f"{target} not found")
+///         return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def find(target, items):
+///     for item in items:
+///         if item == target:
+///             return True
+///     print(f"{target} not found")
+///     return False
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
 #[violation]
 pub struct UselessElseOnLoop;
 
