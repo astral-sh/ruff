@@ -30,7 +30,7 @@ jobs:
       - name: "Build sdist"
         uses: PyO3/maturin-action@v1
         with:
-          args: sdist
+          command: sdist
       - name: "Test sdist"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
