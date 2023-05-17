@@ -128,6 +128,21 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn shebang() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle/shebang.py"),
+            &settings::Settings::for_rules(vec![
+                Rule::TooFewSpacesBeforeInlineComment,
+                Rule::NoSpaceAfterInlineComment,
+                Rule::NoSpaceAfterBlockComment,
+                Rule::MultipleLeadingHashesForBlockComment,
+            ]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(false)]
     #[test_case(true)]
     fn task_tags(ignore_overlong_task_comments: bool) -> Result<()> {

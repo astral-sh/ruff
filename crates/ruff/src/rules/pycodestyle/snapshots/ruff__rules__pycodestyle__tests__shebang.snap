@@ -1,0 +1,13 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+---
+shebang.py:3:1: E265 Block comment should start with `# `
+  |
+3 | #!/usr/bin/python
+4 | #
+5 | #!
+  | ^^ E265
+6 | #:
+  |
+
+
