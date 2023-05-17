@@ -44,21 +44,20 @@ pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[Excepthandle
         .iter()
         .map(|handler| {
             let ExceptHandler(ExcepthandlerExceptHandler { name, body, .. }) = handler;
-            let stmt = &body.first()?;
-            let Stmt::Raise(ast::StmtRaise {  exc, .. }) = &stmt else {
+            let Some(Stmt::Raise(ast::StmtRaise {  exc, .. })) = &body.first() else {
                 return None;
             };
             if let Some(expr) = exc {
                 // E.g., `except ... as e: raise e`
                 if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
                     if Some(id) == name.as_ref() {
-                        return Some(Diagnostic::new(UselessTryExcept, stmt.range()));
+                        return Some(Diagnostic::new(UselessTryExcept, handler.range()));
                     }
                 }
                 None
             } else {
                 // E.g., `except ...: raise`
-                Some(Diagnostic::new(UselessTryExcept, stmt.range()))
+                Some(Diagnostic::new(UselessTryExcept, handler.range()))
             }
         })
         .collect::<Option<Vec<_>>>()
