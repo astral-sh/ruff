@@ -1,7 +1,7 @@
 import re
 
-compile("fo")  # bad
+compile("foo")  # bad
 
 
 
-re.compile("fine")  # fine
+re.compile("foo")  # fine

@@ -1,4 +1,5 @@
 #![allow(clippy::useless_format)]
+pub mod dlint;
 pub mod eradicate;
 pub mod flake8_2020;
 pub mod flake8_annotations;
@@ -49,4 +50,3 @@ pub mod pylint;
 pub mod pyupgrade;
 pub mod ruff;
 pub mod tryceratops;
-pub mod dlint;

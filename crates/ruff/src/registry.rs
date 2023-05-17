@@ -163,6 +163,8 @@ ruff_macros::register_rules!(
     rules::pylint::rules::DuplicateBases,
     rules::pylint::rules::NamedExprWithoutContext,
     // dlint
+    rules::dlint::rules::BadEvalUse,
+    rules::dlint::rules::BadExecUse,
     rules::dlint::rules::BadCompileUse,
     // flake8-async
     rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,

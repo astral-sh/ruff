@@ -2708,6 +2708,12 @@ where
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
                 // dlint
+                if self.settings.rules.enabled(Rule::BadEvalUse) {
+                    dlint::rules::bad_eval_use(self, expr);
+                }
+                if self.settings.rules.enabled(Rule::BadExecUse) {
+                    dlint::rules::bad_exec_use(self, expr);
+                }
                 if self.settings.rules.enabled(Rule::BadCompileUse) {
                     dlint::rules::bad_compile_use(self, expr);
                 }

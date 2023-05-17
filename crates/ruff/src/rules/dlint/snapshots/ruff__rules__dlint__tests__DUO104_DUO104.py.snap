@@ -1,0 +1,10 @@
+---
+source: crates/ruff/src/rules/dlint/mod.rs
+---
+DUO104.py:4:1: DUO104 Use of the `eval` command should be avoided
+  |
+4 | eval("foo")  # bad
+  | ^^^^ DUO104
+  |
+
+

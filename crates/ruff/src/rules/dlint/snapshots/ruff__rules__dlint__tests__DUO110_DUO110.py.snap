@@ -1,12 +1,11 @@
 ---
 source: crates/ruff/src/rules/dlint/mod.rs
-assertion_line: 23
 ---
 DUO110.py:3:1: DUO110 Use of the `compile` command should be avoided
   |
 3 | import re
 4 | 
-5 | compile("fo")  # bad
+5 | compile("foo")  # bad
   | ^^^^^^^ DUO110
   |
 

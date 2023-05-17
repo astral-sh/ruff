@@ -196,7 +196,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0130") => (RuleGroup::Unspecified, Rule::DuplicateValue),
 
         // dlint
+        (Dlint, "104") => (RuleGroup::Unspecified, Rule::BadEvalUse),
+        (Dlint, "105") => (RuleGroup::Unspecified, Rule::BadExecUse),
         (Dlint, "110") => (RuleGroup::Unspecified, Rule::BadCompileUse),
+
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Unspecified, Rule::BlockingHttpCallInAsyncFunction),
         (Flake8Async, "101") => (RuleGroup::Unspecified, Rule::OpenSleepOrSubprocessInAsyncFunction),
