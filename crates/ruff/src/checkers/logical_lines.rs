@@ -57,10 +57,11 @@ pub(crate) fn check_logical_lines(
 
         if line
             .flags()
-            .contains(TokenFlags::OPERATOR | TokenFlags::PUNCTUATION)
+            .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
         {
             extraneous_whitespace(&line, &mut context);
         }
+
         if line.flags().contains(TokenFlags::KEYWORD) {
             whitespace_around_keywords(&line, &mut context);
             missing_whitespace_after_keyword(&line, &mut context);

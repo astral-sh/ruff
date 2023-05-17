@@ -355,7 +355,7 @@ impl LogicalLineToken {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Whitespace {
     None,
     Single,
@@ -370,7 +370,10 @@ impl Whitespace {
         let mut has_tabs = false;
 
         for c in content.chars() {
-            if c == '\t' {
+            if c == '#' {
+                // Ignore leading whitespace between a token and an end-of-line comment
+                return (Whitespace::None, TextSize::default());
+            } else if c == '\t' {
                 has_tabs = true;
                 len += c.text_len();
             } else if matches!(c, '\n' | '\r') {
