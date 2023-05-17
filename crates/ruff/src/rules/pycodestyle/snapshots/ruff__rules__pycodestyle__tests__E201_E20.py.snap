@@ -60,4 +60,13 @@ E20.py:12:15: E201 Whitespace after '{'
 16 | spam(ham[1], {eggs: 2})
    |
 
+E20.py:81:6: E201 Whitespace after '['
+   |
+81 | #: E201:1:6
+82 | spam[ ~ham]
+   |      ^ E201
+83 | 
+84 | #: Okay
+   |
+
 

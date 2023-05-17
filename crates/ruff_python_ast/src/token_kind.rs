@@ -241,6 +241,7 @@ impl TokenKind {
                 | TokenKind::Percent
                 | TokenKind::Lbrace
                 | TokenKind::Rbrace
+                | TokenKind::EqEqual
                 | TokenKind::NotEqual
                 | TokenKind::LessEqual
                 | TokenKind::GreaterEqual
@@ -321,7 +322,6 @@ impl TokenKind {
                 | TokenKind::VbarEqual
                 | TokenKind::CircumFlex
                 | TokenKind::CircumflexEqual
-                | TokenKind::Tilde
         )
     }
 
