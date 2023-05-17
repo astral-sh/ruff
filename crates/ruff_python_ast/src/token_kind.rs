@@ -241,6 +241,7 @@ impl TokenKind {
                 | TokenKind::Percent
                 | TokenKind::Lbrace
                 | TokenKind::Rbrace
+                | TokenKind::EqEqual
                 | TokenKind::NotEqual
                 | TokenKind::LessEqual
                 | TokenKind::GreaterEqual

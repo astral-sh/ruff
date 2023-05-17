@@ -56,3 +56,7 @@ if True:
 def f():
     print((yield))
     x = (yield)
+#: Okay
+if (a and
+    b):
+    pass

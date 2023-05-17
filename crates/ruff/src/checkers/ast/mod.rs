@@ -2352,6 +2352,8 @@ where
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, expr);
                 }
+
+                pandas_vet::rules::subscript(self, value, expr);
             }
             Expr::Tuple(ast::ExprTuple {
                 elts,
@@ -2525,7 +2527,7 @@ where
                 if self.settings.rules.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
                 }
-                pandas_vet::rules::check_attr(self, attr, value, expr);
+                pandas_vet::rules::attr(self, attr, value, expr);
             }
             Expr::Call(ast::ExprCall {
                 func,
@@ -3009,7 +3011,7 @@ where
                             .into_iter(),
                     );
                 }
-                pandas_vet::rules::check_call(self, func);
+                pandas_vet::rules::call(self, func);
 
                 if self.settings.rules.enabled(Rule::PandasUseOfPdMerge) {
                     if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
