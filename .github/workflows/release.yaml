@@ -80,7 +80,7 @@ jobs:
           path: |
             *.tar.gz
             *.sha256
-#
+
   macos-universal:
     runs-on: macos-latest
     steps:
@@ -117,7 +117,7 @@ jobs:
           path: |
             *.tar.gz
             *.sha256
-#
+
   windows:
     runs-on: windows-latest
     strategy:
@@ -167,7 +167,7 @@ jobs:
           path: |
             *.zip
             *.sha256
-#
+
   linux:
     runs-on: ubuntu-latest
     strategy:
@@ -212,7 +212,7 @@ jobs:
           path: |
             *.tar.gz
             *.sha256
-#
+
   linux-cross:
     runs-on: ubuntu-latest
     strategy:
@@ -231,7 +231,7 @@ jobs:
             arch: ppc64le
           - target: powerpc64-unknown-linux-gnu
             arch: ppc64
-#
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -277,7 +277,7 @@ jobs:
           path: |
             *.tar.gz
             *.sha256
-#
+
   musllinux:
     runs-on: ubuntu-latest
     strategy:
@@ -327,7 +327,7 @@ jobs:
           path: |
             *.tar.gz
             *.sha256
-#
+
   musllinux-cross:
     runs-on: ubuntu-latest
     strategy:
@@ -338,7 +338,7 @@ jobs:
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-musleabihf
             arch: armv7
-#
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -381,7 +381,7 @@ jobs:
           path: |
             *.tar.gz
             *.sha256
-#
+
   release:
     name: Release
     runs-on: ubuntu-latest
