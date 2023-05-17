@@ -55,9 +55,9 @@ pub(crate) fn check_logical_lines(
             missing_whitespace(&line, should_fix_missing_whitespace, &mut context);
         }
 
-        if line.flags().contains(TokenFlags::OPERATOR)
-            || line.flags().contains(TokenFlags::BRACKET)
-            || line.flags().contains(TokenFlags::PUNCTUATION)
+        if line
+            .flags()
+            .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
         {
             extraneous_whitespace(&line, &mut context);
         }
