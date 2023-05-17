@@ -14,6 +14,30 @@ pub(crate) enum MinMax {
     Max,
 }
 
+/// ## What it does
+/// Checks for nested `min` and `max` calls.
+///
+/// ## Why is this bad?
+/// Nested `min` and `max` calls can be flattened into a single call to improve
+/// readability.
+///
+/// ## Example
+/// ```python
+/// minimum = min(1, 2, min(3, 4, 5))
+/// maximum = max(1, 2, max(3, 4, 5))
+/// diff = maximum - minimum
+/// ```
+///
+/// Use instead:
+/// ```python
+/// minimum = min(1, 2, 3, 4, 5)
+/// maximum = max(1, 2, 3, 4, 5)
+/// diff = maximum - minimum
+/// ```
+///
+/// ## References
+/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
+/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[violation]
 pub struct NestedMinMax {
     func: MinMax,
