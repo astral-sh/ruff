@@ -15,8 +15,12 @@ impl ConstantOptimizer {
 impl<U> crate::fold::Fold<U> for ConstantOptimizer {
     type TargetU = U;
     type Error = std::convert::Infallible;
+    type UserContext = ();
+
+    #[inline(always)]
+    fn will_map_user(&mut self, _user: &U) -> Self::UserContext {}
     #[inline]
-    fn map_user(&mut self, user: U) -> Result<Self::TargetU, Self::Error> {
+    fn map_user(&mut self, user: U, _context: ()) -> Result<Self::TargetU, Self::Error> {
         Ok(user)
     }
     fn fold_expr(&mut self, node: crate::Expr<U>) -> Result<crate::Expr<U>, Self::Error> {

@@ -16,13 +16,7 @@ pub trait Node {
 }
 
 #[cfg(feature = "fold")]
-mod fold_helpers;
-#[cfg(feature = "fold")]
-pub mod fold {
-    use super::generic::*;
-
-    include!("gen/fold.rs");
-}
+pub mod fold;
 #[cfg(feature = "fold")]
 pub use fold::Fold;
 

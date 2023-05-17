@@ -496,15 +496,29 @@ class FoldTraitDefVisitor(EmitVisitor):
         self.emit("pub trait Fold<U> {", depth)
         self.emit("type TargetU;", depth + 1)
         self.emit("type Error;", depth + 1)
+        self.emit("type UserContext;", depth + 1)
         self.emit(
             """
-            fn map_user(&mut self, user: U) -> Result<Self::TargetU, Self::Error>;
+            fn will_map_user(&mut self, user: &U) -> Self::UserContext;
             #[cfg(feature = "all-nodes-with-ranges")]
-            fn map_user_cfg(&mut self, user: U) -> Result<Self::TargetU, Self::Error> {
-                self.map_user(user)
+            fn will_map_user_cfg(&mut self, user: &U) -> Self::UserContext {
+                self.will_map_user(user)
             }
             #[cfg(not(feature = "all-nodes-with-ranges"))]
-            fn map_user_cfg(&mut self, _user: crate::EmptyRange<U>) -> Result<crate::EmptyRange<Self::TargetU>, Self::Error> {
+            fn will_map_user_cfg(&mut self, user: &crate::EmptyRange<U>) -> crate::EmptyRange<Self::TargetU> {
+                crate::EmptyRange::default()
+            }
+            fn map_user(&mut self, user: U, context: Self::UserContext) -> Result<Self::TargetU, Self::Error>;
+            #[cfg(feature = "all-nodes-with-ranges")]
+            fn map_user_cfg(&mut self, user: U, context: Self::UserContext) -> Result<Self::TargetU, Self::Error> {
+                self.map_user(user, context)
+            }
+            #[cfg(not(feature = "all-nodes-with-ranges"))]
+            fn map_user_cfg(
+                &mut self,
+                _user: crate::EmptyRange<U>,
+                _context: crate::EmptyRange<Self::TargetU>,
+            ) -> Result<crate::EmptyRange<Self::TargetU>, Self::Error> {
                 Ok(crate::EmptyRange::default())
             }
             """,
@@ -532,6 +546,21 @@ class FoldTraitDefVisitor(EmitVisitor):
         self.emit(f"fold_{name}(self, node)", depth + 1)
         self.emit("}", depth)
 
+        if isinstance(type.value, asdl.Sum) and not is_simple(type.value):
+            for cons in type.value.types:
+                self.visit(cons, type, depth)
+
+    def visitConstructor(self, cons, type, depth):
+        apply_u, apply_target_u = self.apply_generics(type.name, "U", "Self::TargetU")
+        enum_name = rust_type_name(type.name)
+        func_name = f"fold_{type.name}_{rust_field_name(cons.name)}"
+        self.emit(
+            f"fn {func_name}(&mut self, node: {enum_name}{cons.name}{apply_u}) -> Result<{enum_name}{cons.name}{apply_target_u}, Self::Error> {{",
+            depth,
+        )
+        self.emit(f"{func_name}(self, node)", depth + 1)
+        self.emit("}", depth)
+
 
 class FoldImplVisitor(EmitVisitor):
     def visitModule(self, mod, depth):
@@ -539,10 +568,10 @@ class FoldImplVisitor(EmitVisitor):
             self.visit(dfn, depth)
 
     def visitType(self, type, depth=0):
-        self.visit(type.value, type.name, depth)
+        self.visit(type.value, type, depth)
 
-    def visitSum(self, sum, name, depth):
-        type_info = self.type_info[name]
+    def visitSum(self, sum, type, depth):
+        name = type.name
         apply_t, apply_u, apply_target_u = self.apply_generics(
             name, "T", "U", "F::TargetU"
         )
@@ -568,27 +597,69 @@ class FoldImplVisitor(EmitVisitor):
             self.emit("Ok(node) }", depth + 1)
             return
 
-        self.emit("match node {", depth + 1)
+        self.emit("let folded = match node {", depth + 1)
         for cons in sum.types:
-            fields_pattern = self.make_pattern(enum_name, cons.name, cons.fields)
             self.emit(
-                f"{fields_pattern[0]} {{ {fields_pattern[1]}}} {fields_pattern[2]} => {{",
-                depth + 2,
+                f"{enum_name}::{cons.name}(cons) => {enum_name}::{cons.name}(Foldable::fold(cons, folder)?),",
+                depth + 1,
             )
 
-            map_user_suffix = "" if type_info.has_attributes else "_cfg"
-            self.emit(
-                f"let range = folder.map_user{map_user_suffix}(range)?;", depth + 3
-            )
+        self.emit("};", depth + 1)
+        self.emit("Ok(folded)", depth + 1)
+        self.emit("}", depth)
 
-            self.gen_construction(
-                fields_pattern[0], cons.fields, fields_pattern[2], depth + 3
-            )
-            self.emit("}", depth + 2)
+        for cons in sum.types:
+            self.visit(cons, type, depth)
+
+    def visitConstructor(self, cons, type, depth):
+        apply_t, apply_u, apply_target_u = self.apply_generics(
+            type.name, "T", "U", "F::TargetU"
+        )
+        enum_name = rust_type_name(type.name)
+
+        cons_type_name = f"{enum_name}{cons.name}"
+
+        self.emit(
+            f"impl<T, U> Foldable<T, U> for {cons_type_name}{apply_t} {{", depth
+        )
+        self.emit(f"type Mapped = {cons_type_name}{apply_u};", depth + 1)
+        self.emit(
+            "fn fold<F: Fold<T, TargetU = U> + ?Sized>(self, folder: &mut F) -> Result<Self::Mapped, F::Error> {",
+            depth + 1,
+        )
+        self.emit(
+            f"folder.fold_{type.name}_{rust_field_name(cons.name)}(self)", depth + 2
+        )
         self.emit("}", depth + 1)
         self.emit("}", depth)
 
-    def visitProduct(self, product, name, depth):
+        self.emit(
+            f"pub fn fold_{type.name}_{rust_field_name(cons.name)}<U, F: Fold<U> + ?Sized>(#[allow(unused)] folder: &mut F, node: {cons_type_name}{apply_u}) -> Result<{enum_name}{cons.name}{apply_target_u}, F::Error> {{",
+            depth,
+        )
+
+        type_info = self.type_info[type.name]
+
+        fields_pattern = self.make_pattern(cons.fields)
+
+        map_user_suffix = "" if type_info.has_attributes else "_cfg"
+        self.emit(
+            f"""
+            let {cons_type_name} {{ {fields_pattern} }} = node;
+            let context = folder.will_map_user{map_user_suffix}(&range);
+            """,
+            depth + 3,
+        )
+        self.fold_fields(cons.fields, depth + 3)
+        self.emit(
+            f"let range = folder.map_user{map_user_suffix}(range, context)?;",
+            depth + 3,
+        )
+        self.composite_fields(f"{cons_type_name}", cons.fields, depth + 3)
+        self.emit("}", depth + 2)
+
+    def visitProduct(self, product, type, depth):
+        name = type.name
         apply_t, apply_u, apply_target_u = self.apply_generics(
             name, "T", "U", "F::TargetU"
         )
@@ -610,41 +681,47 @@ class FoldImplVisitor(EmitVisitor):
             depth,
         )
 
-        fields_pattern = self.make_pattern(struct_name, struct_name, product.fields)
-        self.emit(f"let {struct_name} {{ {fields_pattern[1]} }} = node;", depth + 1)
+        fields_pattern = self.make_pattern(product.fields)
+        self.emit(f"let {struct_name} {{ {fields_pattern} }} = node;", depth + 1)
 
         map_user_suffix = "" if has_attributes else "_cfg"
-        self.emit(f"let range = folder.map_user{map_user_suffix}(range)?;", depth + 3)
 
-        self.gen_construction(struct_name, product.fields, "", depth + 1)
+        self.emit(
+            f"let context = folder.will_map_user{map_user_suffix}(&range);", depth + 3
+        )
+        self.fold_fields(product.fields, depth + 1)
+        self.emit(
+            f"let range = folder.map_user{map_user_suffix}(range, context)?;", depth + 3
+        )
+        self.composite_fields(struct_name, product.fields, depth + 1)
 
         self.emit("}", depth)
 
-    def make_pattern(self, rust_name, fieldname: str, fields):
-        header = f"{rust_name}::{fieldname}({rust_name}{fieldname}"
-        footer = ")"
-
+    def make_pattern(self, fields):
         body = ",".join(rust_field(f.name) for f in fields)
         if body:
             body += ","
         body += "range"
 
-        return header, body, footer
+        return body
 
-    def gen_construction(self, header, fields, footer, depth):
+    def fold_fields(self, fields, depth):
+        for field in fields:
+            name = rust_field(field.name)
+            self.emit(f"let {name} = Foldable::fold({name}, folder)?;", depth + 1)
+
+    def composite_fields(self, header, fields, depth):
         self.emit(f"Ok({header} {{", depth)
         for field in fields:
             name = rust_field(field.name)
-            self.emit(f"{name}: Foldable::fold({name}, folder)?,", depth + 1)
+            self.emit(f"{name},", depth + 1)
         self.emit("range,", depth + 1)
-
-        self.emit(f"}}{footer})", depth)
+        self.emit(f"}})", depth)
 
 
 class FoldModuleVisitor(EmitVisitor):
     def visitModule(self, mod):
         depth = 0
-        self.emit("use crate::fold_helpers::Foldable;", depth)
         FoldTraitDefVisitor(self.file, self.type_info).visit(mod, depth)
         FoldImplVisitor(self.file, self.type_info).visit(mod, depth)
 

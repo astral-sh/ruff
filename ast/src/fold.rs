@@ -1,4 +1,6 @@
-use crate::{builtin, fold::Fold, ConversionFlag};
+use super::generic::*;
+
+use crate::{builtin, ConversionFlag};
 
 pub trait Foldable<T, U> {
     type Mapped;
@@ -49,7 +51,7 @@ where
 
 macro_rules! simple_fold {
     ($($t:ty),+$(,)?) => {
-        $(impl<T, U> $crate::fold_helpers::Foldable<T, U> for $t {
+        $(impl<T, U> $crate::fold::Foldable<T, U> for $t {
             type Mapped = Self;
             #[inline]
             fn fold<F: Fold<T, TargetU = U> + ?Sized>(
@@ -70,3 +72,5 @@ simple_fold!(
     ConversionFlag,
     builtin::Constant
 );
+
+include!("gen/fold.rs");
