@@ -162,6 +162,8 @@ ruff_macros::register_rules!(
     rules::pylint::rules::DuplicateValue,
     rules::pylint::rules::DuplicateBases,
     rules::pylint::rules::NamedExprWithoutContext,
+    // dlint
+    rules::dlint::rules::BadCompileUse,
     // flake8-async
     rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
     rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
@@ -708,6 +710,9 @@ pub enum Linter {
     /// [pyupgrade](https://pypi.org/project/pyupgrade/)
     #[prefix = "UP"]
     Pyupgrade,
+    /// [dlint](https://pypi.org/project/dlint/)
+    #[prefix = "DUO"]
+    Dlint,
     /// [flake8-2020](https://pypi.org/project/flake8-2020/)
     #[prefix = "YTT"]
     Flake82020,

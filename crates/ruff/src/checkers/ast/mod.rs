@@ -42,7 +42,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
 use crate::rules::{
-    flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
+    dlint, flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
     flake8_debugger, flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
@@ -2707,7 +2707,10 @@ where
                 {
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
-
+                // dlint
+                if self.settings.rules.enabled(Rule::BadCompileUse) {
+                    dlint::rules::bad_compile_use(self, expr);
+                }
                 // flake8-async
                 if self
                     .settings

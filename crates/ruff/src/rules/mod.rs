@@ -49,3 +49,4 @@ pub mod pylint;
 pub mod pyupgrade;
 pub mod ruff;
 pub mod tryceratops;
+pub mod dlint;
