@@ -4686,26 +4686,18 @@ impl<'a> Checker<'a> {
                     {
                         if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
                             #[allow(deprecated)]
-                            let line = self.locator.compute_line_index(existing.range.start());
+                            let line = self.locator.compute_line_index(
+                                existing
+                                    .trimmed_range(self.semantic_model(), self.locator)
+                                    .start(),
+                            );
 
                             let mut diagnostic = Diagnostic::new(
                                 pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
                                     line,
                                 },
-                                matches!(
-                                    binding.kind,
-                                    BindingKind::ClassDefinition | BindingKind::FunctionDefinition
-                                )
-                                .then(|| {
-                                    binding.source.map_or(binding.range, |source| {
-                                        helpers::identifier_range(
-                                            self.semantic_model.stmts[source],
-                                            self.locator,
-                                        )
-                                    })
-                                })
-                                .unwrap_or(binding.range),
+                                binding.trimmed_range(self.semantic_model(), self.locator),
                             );
                             if let Some(parent) = binding.source {
                                 let parent = self.semantic_model.stmts[parent];
@@ -5466,27 +5458,18 @@ impl<'a> Checker<'a> {
                             for index in indices {
                                 let rebound = &self.semantic_model.bindings[*index];
                                 #[allow(deprecated)]
-                                let line = self.locator.compute_line_index(binding.range.start());
+                                let line = self.locator.compute_line_index(
+                                    binding
+                                        .trimmed_range(self.semantic_model(), self.locator)
+                                        .start(),
+                                );
 
                                 let mut diagnostic = Diagnostic::new(
                                     pyflakes::rules::RedefinedWhileUnused {
                                         name: (*name).to_string(),
                                         line,
                                     },
-                                    matches!(
-                                        rebound.kind,
-                                        BindingKind::ClassDefinition
-                                            | BindingKind::FunctionDefinition
-                                    )
-                                    .then(|| {
-                                        rebound.source.map_or(rebound.range, |source| {
-                                            helpers::identifier_range(
-                                                self.semantic_model.stmts[source],
-                                                self.locator,
-                                            )
-                                        })
-                                    })
-                                    .unwrap_or(rebound.range),
+                                    rebound.trimmed_range(self.semantic_model(), self.locator),
                                 );
                                 if let Some(source) = rebound.source {
                                     let parent = &self.semantic_model.stmts[source];
