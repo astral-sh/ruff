@@ -151,6 +151,11 @@ pub(crate) struct LogicalLine<'a> {
 }
 
 impl<'a> LogicalLine<'a> {
+    /// Returns `true` if this line is positioned at the start of the file.
+    pub(crate) const fn is_start_of_file(&self) -> bool {
+        self.line.tokens_start == 0
+    }
+
     /// Returns `true` if this is a comment only line
     pub(crate) fn is_comment_only(&self) -> bool {
         self.flags() == TokenFlags::COMMENT

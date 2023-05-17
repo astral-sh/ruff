@@ -30,4 +30,13 @@ E26.py:26:1: E266 Too many leading `#` before block comment
 30 | #########################################
    |
 
+E26.py:69:1: E266 Too many leading `#` before block comment
+   |
+69 | #: E265:5:1
+70 | ### Means test is not done yet
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E266
+71 | # E   Means test is giving error (E)
+72 | # F   Means test is failing (F)
+   |
+
 

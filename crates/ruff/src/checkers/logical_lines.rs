@@ -67,7 +67,7 @@ pub(crate) fn check_logical_lines(
         }
 
         if line.flags().contains(TokenFlags::COMMENT) {
-            whitespace_before_comment(&line, locator, prev_line.is_none(), &mut context);
+            whitespace_before_comment(&line, locator, &mut context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
