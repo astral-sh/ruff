@@ -1,5 +1,5 @@
 use std::io::{self, stdout, BufWriter, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
@@ -131,18 +131,21 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
     // dummy
     let format_code = |code: &str| code.replace("# DEL", "");
 
-    let is_stdin = files == vec![PathBuf::from("-")];
-    if is_stdin {
-        let unformatted = read_from_stdin()?;
-        let formatted = format_code(&unformatted);
-        stdout().lock().write_all(formatted.as_bytes())?;
-    } else {
-        for file in files {
-            let unformatted = std::fs::read_to_string(file)
-                .with_context(|| format!("Could not read {}: ", file.display()))?;
+    match &files {
+        // Check if we should read from stdin
+        [path] if path == Path::new("-") => {
+            let unformatted = read_from_stdin()?;
             let formatted = format_code(&unformatted);
-            std::fs::write(file, formatted)
-                .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
+            stdout().lock().write_all(formatted.as_bytes())?;
+        }
+        _ => {
+            for file in files {
+                let unformatted = std::fs::read_to_string(file)
+                    .with_context(|| format!("Could not read {}: ", file.display()))?;
+                let formatted = format_code(&unformatted);
+                std::fs::write(file, formatted)
+                    .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
+            }
         }
     }
     Ok(ExitStatus::Success)
