@@ -10,30 +10,30 @@ use crate::checkers::ast::Checker;
 /// Checks for `else` clauses on loops without a `break` statement.
 ///
 /// ## Why is this bad?
-/// An `else` clause on a loop without a `break` statement is redundant.
+/// When a loop includes an `else` statement, the code inside the `else` clause
+/// will be executed if the loop terminates "normally" (i.e., without a
+/// `break`).
 ///
-/// Instead, move the code inside the `else` clause from the loop body to after
-/// the loop.
+/// If a loop _always_ terminates "normally" (i.e., does _not_ contain a
+/// `break`), then the `else` clause is redundant, as the code inside the
+/// `else` clause will always be executed.
+///
+/// In such cases, the code inside the `else` clause can be moved outside the
+/// loop entirely, and the `else` clause can be removed.
 ///
 /// ## Example
 /// ```python
-/// def find(target, items):
-///     for item in items:
-///         if item == target:
-///             return True
-///     else:
-///         print(f"{target} not found")
-///         return False
+/// for item in items:
+///     print(item)
+/// else:
+///     print("All items printed")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def find(target, items):
-///     for item in items:
-///         if item == target:
-///             return True
-///     print(f"{target} not found")
-///     return False
+/// for item in items:
+///     print(item)
+/// print("All items printed")
 /// ```
 ///
 /// ## References
