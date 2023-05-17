@@ -126,7 +126,10 @@ quoting the executed command, along with the relevant file contents and `pyproje
 }
 
 fn format(files: &[PathBuf]) -> Result<ExitStatus> {
-    warn_user_once!("This function is unfinished, broken and for internal use only!");
+    warn_user_once!(
+        "`ruff format` is a work-in-progress, subject to change at any time, and intended for \
+        internal use only."
+    );
 
     // dummy
     let format_code = |code: &str| code.replace("# DEL", "");
