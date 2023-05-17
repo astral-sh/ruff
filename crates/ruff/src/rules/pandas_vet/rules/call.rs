@@ -3,11 +3,10 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{BindingKind, Importation};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
+use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 
 #[violation]
 pub struct PandasUseOfDotIsNull;
@@ -61,9 +60,11 @@ impl Violation for PandasUseOfDotStack {
     }
 }
 
-pub(crate) fn check_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn call(checker: &mut Checker, func: &Expr) {
     let rules = &checker.settings.rules;
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. } )= func else {return};
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. } )= func else {
+        return;
+    };
     let violation: DiagnosticKind = match attr.as_str() {
         "isnull" if rules.enabled(Rule::PandasUseOfDotIsNull) => PandasUseOfDotIsNull.into(),
         "notnull" if rules.enabled(Rule::PandasUseOfDotNotNull) => PandasUseOfDotNotNull.into(),
@@ -77,35 +78,12 @@ pub(crate) fn check_call(checker: &mut Checker, func: &Expr) {
         _ => return,
     };
 
-    if !is_dataframe_candidate(value) {
+    // Ignore irrelevant bindings (like imports).
+    if !matches!(
+        test_expression(value, &checker.ctx),
+        Resolution::RelevantLocal | Resolution::PandasModule
+    ) {
         return;
-    }
-
-    // If the target is a named variable, avoid triggering on
-    // irrelevant bindings (like non-Pandas imports).
-    if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-        if checker.ctx.find_binding(id).map_or(true, |binding| {
-            if let BindingKind::Importation(Importation {
-                full_name: module, ..
-            }) = &binding.kind
-            {
-                module != &"pandas"
-            } else {
-                matches!(
-                    binding.kind,
-                    BindingKind::Builtin
-                        | BindingKind::ClassDefinition
-                        | BindingKind::FunctionDefinition
-                        | BindingKind::Export(..)
-                        | BindingKind::FutureImportation
-                        | BindingKind::Importation(..)
-                        | BindingKind::FromImportation(..)
-                        | BindingKind::SubmoduleImportation(..)
-                )
-            }
-        }) {
-            return;
-        }
     }
 
     checker
