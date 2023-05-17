@@ -716,7 +716,7 @@ class FoldImplVisitor(EmitVisitor):
             name = rust_field(field.name)
             self.emit(f"{name},", depth + 1)
         self.emit("range,", depth + 1)
-        self.emit(f"}})", depth)
+        self.emit("})", depth)
 
 
 class FoldModuleVisitor(EmitVisitor):
