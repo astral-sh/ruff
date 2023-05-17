@@ -1699,6 +1699,9 @@ where
                 if self.settings.rules.enabled(Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body, handlers);
                 }
+                if self.settings.rules.enabled(Rule::UselessTryExcept) {
+                    tryceratops::rules::useless_try_except(self, handlers);
+                }
                 if self.settings.rules.enabled(Rule::ErrorInsteadOfException) {
                     tryceratops::rules::error_instead_of_exception(self, handlers);
                 }

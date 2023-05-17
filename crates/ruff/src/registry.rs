@@ -581,6 +581,7 @@ ruff_macros::register_rules!(
     rules::tryceratops::rules::ReraiseNoCause,
     rules::tryceratops::rules::VerboseRaise,
     rules::tryceratops::rules::TryConsiderElse,
+    rules::tryceratops::rules::UselessTryExcept,
     rules::tryceratops::rules::RaiseWithinTry,
     rules::tryceratops::rules::ErrorInsteadOfException,
     rules::tryceratops::rules::VerboseLogMessage,

@@ -656,6 +656,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tryceratops, "201") => (RuleGroup::Unspecified, Rule::VerboseRaise),
         (Tryceratops, "300") => (RuleGroup::Unspecified, Rule::TryConsiderElse),
         (Tryceratops, "301") => (RuleGroup::Unspecified, Rule::RaiseWithinTry),
+        (Tryceratops, "302") => (RuleGroup::Unspecified, Rule::UselessTryExcept),
         (Tryceratops, "400") => (RuleGroup::Unspecified, Rule::ErrorInsteadOfException),
         (Tryceratops, "401") => (RuleGroup::Unspecified, Rule::VerboseLogMessage),
 

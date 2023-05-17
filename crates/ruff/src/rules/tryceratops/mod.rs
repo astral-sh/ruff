@@ -22,6 +22,7 @@ mod tests {
     #[test_case(Rule::VerboseRaise, Path::new("TRY201.py"); "TRY201")]
     #[test_case(Rule::TryConsiderElse, Path::new("TRY300.py"); "TRY300")]
     #[test_case(Rule::RaiseWithinTry , Path::new("TRY301.py"); "TRY301")]
+    #[test_case(Rule::UselessTryExcept , Path::new("TRY302.py"); "TRY302")]
     #[test_case(Rule::ErrorInsteadOfException, Path::new("TRY400.py"); "TRY400")]
     #[test_case(Rule::VerboseLogMessage, Path::new("TRY401.py"); "TRY401")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
