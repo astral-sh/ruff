@@ -10,6 +10,26 @@ use syn::{
 
 use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_nursery};
 
+struct LinterToRuleData {
+    /// The rule identifier, e.g., `Rule::UnaryPrefixIncrement`.
+    rule_id: Path,
+    /// The rule group identifiers, e.g., `RuleGroup::Unspecified`.
+    rule_group_id: Path,
+    /// The rule attributes.
+    attrs: Vec<Attribute>,
+}
+
+struct RuleToLinterData<'a> {
+    /// The linter associated with the rule, e.g., `Flake8Bugbear`.
+    linter: &'a Ident,
+    /// The code associated with the rule, e.g., `"002"`.
+    code: &'a str,
+    /// The rule group identifier, e.g., `RuleGroup::Unspecified`.
+    rule_group_id: &'a Path,
+    /// The rule attributes.
+    attrs: &'a [Attribute],
+}
+
 pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let Some(last_stmt) = func.block.stmts.last() else {
         return Err(Error::new(func.block.span(), "expected body to end in an expression"));
@@ -24,9 +44,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
     // `(Rule::UnaryPrefixIncrement, RuleGroup::Unspecified, vec![])`).
-    #[allow(clippy::type_complexity)]
-    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, (Path, Path, Vec<Attribute>)>> =
-        BTreeMap::new();
+    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, LinterToRuleData>> = BTreeMap::new();
 
     for arm in arms {
         if matches!(arm.pat, Pat::Wild(..)) {
@@ -34,10 +52,14 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
 
         let entry = syn::parse::<Entry>(arm.into_token_stream().into())?;
-        linter_to_rules
-            .entry(entry.linter)
-            .or_default()
-            .insert(entry.code.value(), (entry.rule, entry.group, entry.attrs));
+        linter_to_rules.entry(entry.linter).or_default().insert(
+            entry.code.value(),
+            LinterToRuleData {
+                rule_id: entry.rule,
+                rule_group_id: entry.group,
+                attrs: entry.attrs,
+            },
+        );
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
@@ -66,9 +88,16 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     for (linter, rules) in &linter_to_rules {
         output.extend(super::rule_code_prefix::expand(
             linter,
-            rules
-                .iter()
-                .map(|(code, (.., group, attrs))| (code.as_str(), group, attrs)),
+            rules.iter().map(
+                |(
+                    code,
+                    LinterToRuleData {
+                        rule_group_id,
+                        attrs,
+                        ..
+                    },
+                )| (code.as_str(), rule_group_id, attrs),
+            ),
         ));
 
         output.extend(quote! {
@@ -92,11 +121,19 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
         let mut rules_by_prefix = BTreeMap::new();
 
-        for (code, (rule, group, attrs)) in rules {
+        for (
+            code,
+            LinterToRuleData {
+                rule_id,
+                rule_group_id,
+                attrs,
+            },
+        ) in rules
+        {
             // Nursery rules have to be explicitly selected, so we ignore them when looking at
             // prefixes.
-            if is_nursery(group) {
-                rules_by_prefix.insert(code.clone(), vec![(rule.clone(), attrs.clone())]);
+            if is_nursery(rule_group_id) {
+                rules_by_prefix.insert(code.clone(), vec![(rule_id.clone(), attrs.clone())]);
                 continue;
             }
 
@@ -104,19 +141,28 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 let prefix = code[..i].to_string();
                 let rules: Vec<_> = rules
                     .iter()
-                    .filter_map(|(code, (rule, group, attrs))| {
-                        // Nursery rules have to be explicitly selected, so we ignore them when
-                        // looking at prefixes.
-                        if is_nursery(group) {
-                            return None;
-                        }
+                    .filter_map(
+                        |(
+                            code,
+                            LinterToRuleData {
+                                rule_id,
+                                rule_group_id,
+                                attrs,
+                            },
+                        )| {
+                            // Nursery rules have to be explicitly selected, so we ignore them when
+                            // looking at prefixes.
+                            if is_nursery(rule_group_id) {
+                                return None;
+                            }
 
-                        if code.starts_with(&prefix) {
-                            Some((rule.clone(), attrs.clone()))
-                        } else {
-                            None
-                        }
-                    })
+                            if code.starts_with(&prefix) {
+                                Some((rule_id.clone(), attrs.clone()))
+                            } else {
+                                None
+                            }
+                        },
+                    )
                     .collect();
                 rules_by_prefix.insert(prefix, rules);
             }
@@ -191,19 +237,30 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     // to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
     // different codes). We haven't actually activated this functionality yet, but some work was
     // done to support it, so the logic exists here.
-    #[allow(clippy::type_complexity)]
-    let mut rule_to_codes: HashMap<&Path, Vec<(&Ident, &str, &Path, &[Attribute])>> =
-        HashMap::new();
+    let mut rule_to_codes: HashMap<&Path, Vec<RuleToLinterData>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
     for (linter, map) in &linter_to_rules {
-        for (code, (rule, group, attrs)) in map {
+        for (
+            code,
+            LinterToRuleData {
+                rule_id,
+                rule_group_id,
+                attrs,
+            },
+        ) in map
+        {
             rule_to_codes
-                .entry(rule)
+                .entry(rule_id)
                 .or_default()
-                .push((linter, code, group, attrs));
+                .push(RuleToLinterData {
+                    linter,
+                    code,
+                    rule_group_id,
+                    attrs,
+                });
             linter_code_for_rule_match_arms.extend(quote! {
-                #(#attrs)* (Self::#linter, #rule) => Some(#code),
+                #(#attrs)* (Self::#linter, #rule_id) => Some(#code),
             });
         }
     }
@@ -230,9 +287,14 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
             rule.segments.last().unwrap().ident
         );
 
-        let (linter, code, group, attrs) = codes
+        let RuleToLinterData {
+            linter,
+            code,
+            rule_group_id,
+            attrs,
+        } = codes
             .iter()
-            .sorted_by_key(|(l, ..)| *l == "Pylint")
+            .sorted_by_key(|data| *data.linter == "Pylint")
             .next()
             .unwrap();
 
@@ -241,7 +303,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
         });
 
         rule_group_match_arms.extend(quote! {
-            #(#attrs)* #rule => #group,
+            #(#attrs)* #rule => #rule_group_id,
         });
     }
 
@@ -282,7 +344,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
     for (linter, map) in &linter_to_rules {
         let rule_paths = map
             .values()
-            .map(|(path, .., attrs)| quote!(#(#attrs)* #path));
+            .map(|LinterToRuleData { rule_id, attrs, .. }| quote!(#(#attrs)* #rule_id));
         linter_into_iter_match_arms.extend(quote! {
             Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
         });
