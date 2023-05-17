@@ -40,35 +40,30 @@ impl Violation for UselessTryExcept {
 
 /// TRY302
 pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[Excepthandler]) {
-    let handler_errs = handlers
+    if let Some(diagnostics) = handlers
         .iter()
-        .map(
-            |ExceptHandler(ExcepthandlerExceptHandler { name, body, .. })| {
-                let stmt = &body.first()?;
-                let Stmt::Raise(ast::StmtRaise {  exc, .. }) = &stmt else {
-                    return None;
-                };
-
-                if let Some(expr) = exc {
-                    // E.g., `except ... as e: raise e`
-                    if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
-                        if Some(id) == name.as_ref() {
-                            return Some(Diagnostic::new(UselessTryExcept, stmt.range()));
-                        }
+        .map(|handler| {
+            let ExceptHandler(ExcepthandlerExceptHandler { name, body, .. }) = handler;
+            let stmt = &body.first()?;
+            let Stmt::Raise(ast::StmtRaise {  exc, .. }) = &stmt else {
+                return None;
+            };
+            if let Some(expr) = exc {
+                // E.g., `except ... as e: raise e`
+                if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
+                    if Some(id) == name.as_ref() {
+                        return Some(Diagnostic::new(UselessTryExcept, stmt.range()));
                     }
-                    None
-                } else {
-                    // E.g., `except ...: raise`
-                    Some(Diagnostic::new(UselessTryExcept, stmt.range()))
                 }
-            },
-        )
-        .collect::<Vec<_>>();
-
-    if handler_errs.iter().all(Option::is_some) {
-        // All handlers have diagnostics
-        for err in handler_errs {
-            checker.diagnostics.push(err.unwrap());
-        }
+                None
+            } else {
+                // E.g., `except ...: raise`
+                Some(Diagnostic::new(UselessTryExcept, stmt.range()))
+            }
+        })
+        .collect::<Option<Vec<_>>>()
+    {
+        // Require that all handlers are useless, but create one diagnostic per handler.
+        checker.diagnostics.extend(diagnostics);
     }
 }
