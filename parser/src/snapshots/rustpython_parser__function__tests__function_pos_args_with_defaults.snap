@@ -11,31 +11,32 @@ Ok(
                     "f",
                 ),
                 args: Arguments {
+                    range: (),
                     posonlyargs: [],
                     args: [
                         Arg {
+                            range: 6..7,
                             arg: Identifier(
                                 "a",
                             ),
                             annotation: None,
                             type_comment: None,
-                            range: 6..7,
                         },
                         Arg {
+                            range: 9..10,
                             arg: Identifier(
                                 "b",
                             ),
                             annotation: None,
                             type_comment: None,
-                            range: 9..10,
                         },
                         Arg {
+                            range: 15..16,
                             arg: Identifier(
                                 "c",
                             ),
                             annotation: None,
                             type_comment: None,
-                            range: 15..16,
                         },
                     ],
                     vararg: None,
@@ -62,7 +63,6 @@ Ok(
                             },
                         ),
                     ],
-                    range: (),
                 },
                 body: [
                     Pass(

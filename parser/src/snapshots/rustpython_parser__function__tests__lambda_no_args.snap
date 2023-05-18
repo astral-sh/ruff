@@ -11,6 +11,7 @@ Ok(
                     ExprLambda {
                         range: 0..9,
                         args: Arguments {
+                            range: (),
                             posonlyargs: [],
                             args: [],
                             vararg: None,
@@ -18,7 +19,6 @@ Ok(
                             kw_defaults: [],
                             kwarg: None,
                             defaults: [],
-                            range: (),
                         },
                         body: Constant(
                             ExprConstant {

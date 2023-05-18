@@ -11,39 +11,39 @@ Ok(
                     "f",
                 ),
                 args: Arguments {
+                    range: (),
                     posonlyargs: [],
                     args: [],
                     vararg: None,
                     kwonlyargs: [
                         Arg {
+                            range: 9..10,
                             arg: Identifier(
                                 "a",
                             ),
                             annotation: None,
                             type_comment: None,
-                            range: 9..10,
                         },
                         Arg {
+                            range: 12..13,
                             arg: Identifier(
                                 "b",
                             ),
                             annotation: None,
                             type_comment: None,
-                            range: 12..13,
                         },
                         Arg {
+                            range: 15..16,
                             arg: Identifier(
                                 "c",
                             ),
                             annotation: None,
                             type_comment: None,
-                            range: 15..16,
                         },
                     ],
                     kw_defaults: [],
                     kwarg: None,
                     defaults: [],
-                    range: (),
                 },
                 body: [
                     Pass(

@@ -45,6 +45,7 @@ GeneratorExp(
         ),
         generators: [
             Comprehension {
+                range: (),
                 target: Name(
                     ExprName {
                         range: 16..17,
@@ -65,7 +66,6 @@ GeneratorExp(
                 ),
                 ifs: [],
                 is_async: false,
-                range: (),
             },
         ],
     },

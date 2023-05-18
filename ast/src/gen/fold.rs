@@ -13,7 +13,7 @@ pub trait Fold<U> {
     #[cfg(not(feature = "all-nodes-with-ranges"))]
     fn will_map_user_cfg(
         &mut self,
-        user: &crate::EmptyRange<U>,
+        _user: &crate::EmptyRange<U>,
     ) -> crate::EmptyRange<Self::TargetU> {
         crate::EmptyRange::default()
     }

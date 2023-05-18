@@ -10,23 +10,24 @@ expression: parse_ast
                 ExprLambda {
                     range: 0..18,
                     args: Arguments {
+                        range: (),
                         posonlyargs: [],
                         args: [
                             Arg {
+                                range: 7..8,
                                 arg: Identifier(
                                     "x",
                                 ),
                                 annotation: None,
                                 type_comment: None,
-                                range: 7..8,
                             },
                             Arg {
+                                range: 10..11,
                                 arg: Identifier(
                                     "y",
                                 ),
                                 annotation: None,
                                 type_comment: None,
-                                range: 10..11,
                             },
                         ],
                         vararg: None,
@@ -34,7 +35,6 @@ expression: parse_ast
                         kw_defaults: [],
                         kwarg: None,
                         defaults: [],
-                        range: (),
                     },
                     body: BinOp(
                         ExprBinOp {

@@ -38,6 +38,7 @@ Call(
                     ),
                     generators: [
                         Comprehension {
+                            range: (),
                             target: Name(
                                 ExprName {
                                     range: 26..29,
@@ -147,7 +148,6 @@ Call(
                             ),
                             ifs: [],
                             is_async: false,
-                            range: (),
                         },
                     ],
                 },

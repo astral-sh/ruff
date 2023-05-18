@@ -11,56 +11,56 @@ Ok(
                     ExprLambda {
                         range: 0..26,
                         args: Arguments {
+                            range: (),
                             posonlyargs: [],
                             args: [
                                 Arg {
+                                    range: 7..8,
                                     arg: Identifier(
                                         "a",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 7..8,
                                 },
                                 Arg {
+                                    range: 10..11,
                                     arg: Identifier(
                                         "b",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 10..11,
                                 },
                                 Arg {
+                                    range: 13..14,
                                     arg: Identifier(
                                         "c",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 13..14,
                                 },
                             ],
                             vararg: None,
                             kwonlyargs: [
                                 Arg {
+                                    range: 19..20,
                                     arg: Identifier(
                                         "d",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 19..20,
                                 },
                                 Arg {
+                                    range: 22..23,
                                     arg: Identifier(
                                         "e",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 22..23,
                                 },
                             ],
                             kw_defaults: [],
                             kwarg: None,
                             defaults: [],
-                            range: (),
                         },
                         body: Constant(
                             ExprConstant {

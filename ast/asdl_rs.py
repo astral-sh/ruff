@@ -471,10 +471,10 @@ class StructVisitor(EmitVisitor):
         self.emit_attrs(depth)
 
         self.emit(f"pub struct {product_name}<R = TextRange> {{", depth)
+        self.emit_range(product.attributes, depth + 1)
         for f in product.fields:
             self.visit(f, type_info, "pub ", depth + 1)
         assert bool(product.attributes) == type_info.no_cfg(self.type_info)
-        self.emit_range(product.attributes, depth + 1)
         self.emit("}", depth)
 
         field_names = [f'"{f.name}"' for f in product.fields]
@@ -505,7 +505,7 @@ class FoldTraitDefVisitor(EmitVisitor):
                 self.will_map_user(user)
             }
             #[cfg(not(feature = "all-nodes-with-ranges"))]
-            fn will_map_user_cfg(&mut self, user: &crate::EmptyRange<U>) -> crate::EmptyRange<Self::TargetU> {
+            fn will_map_user_cfg(&mut self, _user: &crate::EmptyRange<U>) -> crate::EmptyRange<Self::TargetU> {
                 crate::EmptyRange::default()
             }
             fn map_user(&mut self, user: U, context: Self::UserContext) -> Result<Self::TargetU, Self::Error>;

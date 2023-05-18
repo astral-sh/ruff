@@ -38,15 +38,16 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             "__init__",
                         ),
                         args: Arguments {
+                            range: (),
                             posonlyargs: [],
                             args: [
                                 Arg {
+                                    range: 31..35,
                                     arg: Identifier(
                                         "self",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 31..35,
                                 },
                             ],
                             vararg: None,
@@ -54,7 +55,6 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             kw_defaults: [],
                             kwarg: None,
                             defaults: [],
-                            range: (),
                         },
                         body: [
                             Pass(
@@ -75,23 +75,24 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             "method_with_default",
                         ),
                         args: Arguments {
+                            range: (),
                             posonlyargs: [],
                             args: [
                                 Arg {
+                                    range: 70..74,
                                     arg: Identifier(
                                         "self",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 70..74,
                                 },
                                 Arg {
+                                    range: 76..79,
                                     arg: Identifier(
                                         "arg",
                                     ),
                                     annotation: None,
                                     type_comment: None,
-                                    range: 76..79,
                                 },
                             ],
                             vararg: None,
@@ -109,7 +110,6 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                     },
                                 ),
                             ],
-                            range: (),
                         },
                         body: [
                             Pass(

@@ -10,10 +10,12 @@ expression: parse_ast
                 "args_to_tuple",
             ),
             args: Arguments {
+                range: (),
                 posonlyargs: [],
                 args: [],
                 vararg: Some(
                     Arg {
+                        range: 20..29,
                         arg: Identifier(
                             "args",
                         ),
@@ -35,14 +37,12 @@ expression: parse_ast
                             ),
                         ),
                         type_comment: None,
-                        range: 20..29,
                     },
                 ),
                 kwonlyargs: [],
                 kw_defaults: [],
                 kwarg: None,
                 defaults: [],
-                range: (),
             },
             body: [
                 Expr(

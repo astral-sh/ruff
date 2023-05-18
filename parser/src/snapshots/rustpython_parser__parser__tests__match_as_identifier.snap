@@ -712,6 +712,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
+                    range: (),
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 549..550,
@@ -734,9 +735,9 @@ expression: parse_ast
                             },
                         ),
                     ],
-                    range: (),
                 },
                 MatchCase {
+                    range: (),
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 566..567,
@@ -759,7 +760,6 @@ expression: parse_ast
                             },
                         ),
                     ],
-                    range: (),
                 },
             ],
         },
@@ -782,15 +782,16 @@ expression: parse_ast
                 ExprLambda {
                     range: 590..618,
                     args: Arguments {
+                        range: (),
                         posonlyargs: [],
                         args: [
                             Arg {
+                                range: 597..602,
                                 arg: Identifier(
                                     "query",
                                 ),
                                 annotation: None,
                                 type_comment: None,
-                                range: 597..602,
                             },
                         ],
                         vararg: None,
@@ -798,7 +799,6 @@ expression: parse_ast
                         kw_defaults: [],
                         kwarg: None,
                         defaults: [],
-                        range: (),
                     },
                     body: Compare(
                         ExprCompare {

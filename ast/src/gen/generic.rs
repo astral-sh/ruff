@@ -2047,11 +2047,11 @@ impl Node for Cmpop {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comprehension<R = TextRange> {
+    pub range: OptionalRange<R>,
     pub target: Expr<R>,
     pub iter: Expr<R>,
     pub ifs: Vec<Expr<R>>,
     pub is_async: bool,
-    pub range: OptionalRange<R>,
 }
 
 impl<R> Node for Comprehension<R> {
@@ -2089,6 +2089,7 @@ impl<R> Node for Excepthandler<R> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments<R = TextRange> {
+    pub range: OptionalRange<R>,
     pub posonlyargs: Vec<Arg<R>>,
     pub args: Vec<Arg<R>>,
     pub vararg: Option<Box<Arg<R>>>,
@@ -2096,7 +2097,6 @@ pub struct Arguments<R = TextRange> {
     pub kw_defaults: Vec<Expr<R>>,
     pub kwarg: Option<Box<Arg<R>>>,
     pub defaults: Vec<Expr<R>>,
-    pub range: OptionalRange<R>,
 }
 
 impl<R> Node for Arguments<R> {
@@ -2114,10 +2114,10 @@ impl<R> Node for Arguments<R> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arg<R = TextRange> {
+    pub range: R,
     pub arg: Identifier,
     pub annotation: Option<Box<Expr<R>>>,
     pub type_comment: Option<String>,
-    pub range: R,
 }
 
 impl<R> Node for Arg<R> {
@@ -2127,9 +2127,9 @@ impl<R> Node for Arg<R> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Keyword<R = TextRange> {
+    pub range: R,
     pub arg: Option<Identifier>,
     pub value: Expr<R>,
-    pub range: R,
 }
 
 impl<R> Node for Keyword<R> {
@@ -2139,9 +2139,9 @@ impl<R> Node for Keyword<R> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Alias<R = TextRange> {
+    pub range: R,
     pub name: Identifier,
     pub asname: Option<Identifier>,
-    pub range: R,
 }
 
 impl<R> Node for Alias<R> {
@@ -2151,9 +2151,9 @@ impl<R> Node for Alias<R> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Withitem<R = TextRange> {
+    pub range: OptionalRange<R>,
     pub context_expr: Expr<R>,
     pub optional_vars: Option<Box<Expr<R>>>,
-    pub range: OptionalRange<R>,
 }
 
 impl<R> Node for Withitem<R> {
@@ -2163,10 +2163,10 @@ impl<R> Node for Withitem<R> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MatchCase<R = TextRange> {
+    pub range: OptionalRange<R>,
     pub pattern: Pattern<R>,
     pub guard: Option<Box<Expr<R>>>,
     pub body: Vec<Stmt<R>>,
-    pub range: OptionalRange<R>,
 }
 
 impl<R> Node for MatchCase<R> {
