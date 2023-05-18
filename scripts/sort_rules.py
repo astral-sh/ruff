@@ -9,7 +9,7 @@ Example usage:
 
 import argparse
 
-from _utils import ROOT_DIR, dir_name
+from _utils import ROOT_DIR, dir_name, key_mod, key_pub_use
 
 
 def main(*, linter: str) -> None:
@@ -55,10 +55,10 @@ def main(*, linter: str) -> None:
     parts = contents.split("\n\n")
 
     pub_use_contents = parts[0].split(";\n")
-    pub_use_contents.sort()
+    pub_use_contents.sort(key=key_pub_use)
 
     mod_contents = parts[1].splitlines()
-    mod_contents.sort()
+    mod_contents.sort(key=key_mod)
 
     new_contents = ";\n".join(pub_use_contents)
     new_contents += "\n\n"
