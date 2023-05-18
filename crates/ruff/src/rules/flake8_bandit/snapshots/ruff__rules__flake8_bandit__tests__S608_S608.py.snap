@@ -453,10 +453,28 @@ S608.py:86:30: S608 Possible SQL injection vector through string-based query con
    |
 
 S608.py:98:9: S608 Possible SQL injection vector through string-based query construction
-   |
-98 | # # INSERT without INTO (e.g. MySQL and derivatives)
-99 | query = "INSERT table VALUES (%s)" % (var,)
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-   |
+    |
+ 98 | # # INSERT without INTO (e.g. MySQL and derivatives)
+ 99 | query = "INSERT table VALUES (%s)" % (var,)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+100 | 
+101 | # # REPLACE (e.g. MySQL and derivatives, SQLite)
+    |
+
+S608.py:101:9: S608 Possible SQL injection vector through string-based query construction
+    |
+101 | # # REPLACE (e.g. MySQL and derivatives, SQLite)
+102 | query = "REPLACE INTO table VALUES (%s)" % (var,)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+103 | query = "REPLACE table VALUES (%s)" % (var,)
+    |
+
+S608.py:102:9: S608 Possible SQL injection vector through string-based query construction
+    |
+102 | # # REPLACE (e.g. MySQL and derivatives, SQLite)
+103 | query = "REPLACE INTO table VALUES (%s)" % (var,)
+104 | query = "REPLACE table VALUES (%s)" % (var,)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+    |
 
 

@@ -96,3 +96,7 @@ cursor.executemany('SELECT * FROM table WHERE id = %s', [var, var2])
 
 # # INSERT without INTO (e.g. MySQL and derivatives)
 query = "INSERT table VALUES (%s)" % (var,)
+
+# # REPLACE (e.g. MySQL and derivatives, SQLite)
+query = "REPLACE INTO table VALUES (%s)" % (var,)
+query = "REPLACE table VALUES (%s)" % (var,)
