@@ -192,7 +192,7 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
         while (line := next(fp)).strip() != "":
             lines.append(line)
 
-        variant = pascal_case(linter)
+        variant = pascal_case(dir_name(linter))
         lines.append(
             " " * 8
             + f"""({variant}, "{code}") => (RuleGroup::Unspecified, Rule::{name}),\n""",
