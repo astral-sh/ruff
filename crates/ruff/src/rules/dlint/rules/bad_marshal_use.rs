@@ -29,7 +29,7 @@ pub(crate) fn bad_marshal_use(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom {module, .. }, ..) => {
+        Stmt::ImportFrom(ast::StmtImportFrom { module, .. }, ..) => {
             if let Some(id) = module {
                 if id == "marshal" {
                     checker
