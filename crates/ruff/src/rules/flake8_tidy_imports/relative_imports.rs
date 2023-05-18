@@ -121,25 +121,20 @@ fn fix_banned_relative_import(
 }
 
 /// TID252
-pub fn banned_relative_import(
+pub(crate) fn banned_relative_import(
     checker: &Checker,
     stmt: &Stmt,
     level: Option<u32>,
     module: Option<&str>,
     module_path: Option<&[String]>,
-    strictness: &Strictness,
+    strictness: Strictness,
 ) -> Option<Diagnostic> {
     let strictness_level = match strictness {
         Strictness::All => 0,
         Strictness::Parents => 1,
     };
     if level? > strictness_level {
-        let mut diagnostic = Diagnostic::new(
-            RelativeImports {
-                strictness: *strictness,
-            },
-            stmt.range(),
-        );
+        let mut diagnostic = Diagnostic::new(RelativeImports { strictness }, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =
                 fix_banned_relative_import(stmt, level, module, module_path, checker.generator())

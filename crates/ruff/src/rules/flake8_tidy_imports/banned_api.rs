@@ -2,10 +2,11 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Ranged};
 use serde::{Deserialize, Serialize};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
 use ruff_python_ast::call_path::from_qualified_name;
+
+use crate::checkers::ast::Checker;
 
 pub type Settings = FxHashMap<String, ApiBan>;
 
@@ -49,7 +50,7 @@ impl Violation for BannedApi {
 }
 
 /// TID251
-pub fn name_is_banned<T>(checker: &mut Checker, name: String, located: &T)
+pub(crate) fn name_is_banned<T>(checker: &mut Checker, name: String, located: &T)
 where
     T: Ranged,
 {
@@ -66,7 +67,7 @@ where
 }
 
 /// TID251
-pub fn name_or_parent_is_banned<T>(checker: &mut Checker, name: &str, located: &T)
+pub(crate) fn name_or_parent_is_banned<T>(checker: &mut Checker, name: &str, located: &T)
 where
     T: Ranged,
 {
@@ -93,7 +94,7 @@ where
 }
 
 /// TID251
-pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if let Some((banned_path, ban)) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         banned_api
