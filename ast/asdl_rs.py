@@ -289,7 +289,40 @@ class StructVisitor(EmitVisitor):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
 
+    def emit_attrs(self, depth):
+        self.emit("#[derive(Clone, Debug, PartialEq)]", depth)
+
+    def emit_range(self, has_attributes, depth):
+        if has_attributes:
+            self.emit("pub range: R,", depth + 1)
+        else:
+            self.emit("pub range: OptionalRange<R>,", depth + 1)
+
     def visitModule(self, mod):
+        self.emit_attrs(0)
+        self.emit("""
+        #[derive(is_macro::Is)]
+        pub enum Ast<R=TextRange> {
+        """, 0)
+        for dfn in mod.dfns:
+            rust_name = rust_type_name(dfn.name)
+            generics = "" if self.type_info[dfn.name].is_simple else "<R>"
+            if dfn.name == "mod":
+                # This is exceptional rule to other enums.
+                # Unlike other enums, this is justified because `Mod` is only used as
+                # the top node of parsing result and never a child node of other nodes.
+                # Because it will be very rarely used in very particular applications,
+                # "ast_" prefix to everywhere seems less useful.
+                self.emit('#[is(name = "module")]', 1)
+            self.emit(f"{rust_name}({rust_name}{generics}),", 1)
+        self.emit("""
+        }
+        impl<R> Node for Ast<R> {
+            const NAME: &'static str = "AST";
+            const FIELD_NAMES: &'static [&'static str] = &[];
+        }
+        """, 0)
+
         for dfn in mod.dfns:
             self.visit(dfn)
 
@@ -312,15 +345,6 @@ class StructVisitor(EmitVisitor):
             """,
             depth,
         )
-
-    def emit_attrs(self, depth):
-        self.emit("#[derive(Clone, Debug, PartialEq)]", depth)
-
-    def emit_range(self, has_attributes, depth):
-        if has_attributes:
-            self.emit("pub range: R,", depth + 1)
-        else:
-            self.emit("pub range: OptionalRange<R>,", depth + 1)
 
     def simple_sum(self, sum, type, depth):
         rust_name = rust_type_name(type.name)

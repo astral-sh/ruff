@@ -2,6 +2,34 @@
 
 use crate::text_size::TextRange;
 #[derive(Clone, Debug, PartialEq)]
+#[derive(is_macro::Is)]
+pub enum Ast<R = TextRange> {
+    #[is(name = "module")]
+    Mod(Mod<R>),
+    Stmt(Stmt<R>),
+    Expr(Expr<R>),
+    ExprContext(ExprContext),
+    Boolop(Boolop),
+    Operator(Operator),
+    Unaryop(Unaryop),
+    Cmpop(Cmpop),
+    Comprehension(Comprehension<R>),
+    Excepthandler(Excepthandler<R>),
+    Arguments(Arguments<R>),
+    Arg(Arg<R>),
+    Keyword(Keyword<R>),
+    Alias(Alias<R>),
+    Withitem(Withitem<R>),
+    MatchCase(MatchCase<R>),
+    Pattern(Pattern<R>),
+    TypeIgnore(TypeIgnore<R>),
+}
+impl<R> Node for Ast<R> {
+    const NAME: &'static str = "AST";
+    const FIELD_NAMES: &'static [&'static str] = &[];
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ModModule<R = TextRange> {
     pub range: OptionalRange<R>,
     pub body: Vec<Stmt<R>>,
