@@ -27,7 +27,7 @@ use ruff_python_semantic::binding::{
     Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
     Importation, StarImportation, SubmoduleImportation,
 };
-use ruff_python_semantic::context::{Context, ContextFlags};
+use ruff_python_semantic::context::{Context, ContextFlags, ResolvedReference};
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
@@ -4746,40 +4746,20 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        let id = id.as_str();
-
-        let mut first_iter = true;
-        let mut import_starred = false;
-
-        for scope in self.ctx.scopes.ancestors(self.ctx.scope_id) {
-            if scope.kind.is_class() {
-                if id == "__class__" {
-                    return;
-                } else if !first_iter {
-                    continue;
-                }
-            }
-
-            if let Some(index) = scope.get(id) {
-                // Mark the binding as used.
-                let context = self.ctx.execution_context();
-                self.ctx.bindings[*index].mark_used(self.ctx.scope_id, expr.range(), context);
-
-                if !self.ctx.in_deferred_type_definition()
-                    && self.ctx.bindings[*index].kind.is_annotation()
-                {
-                    continue;
-                }
-
+        match self.ctx.resolve_reference(id, expr.range()) {
+            ResolvedReference::Resolved(scope_id, binding_id) => {
                 // If the name of the sub-importation is the same as an alias of another
                 // importation and the alias is used, that sub-importation should be
                 // marked as used too.
                 //
-                // This handles code like:
-                //   import pyarrow as pa
-                //   import pyarrow.csv
-                //   print(pa.csv.read_csv("test.csv"))
-                match &self.ctx.bindings[*index].kind {
+                // For example, mark `pa` as used in:
+                //
+                // ```python
+                // import pyarrow as pa
+                // import pyarrow.csv
+                // print(pa.csv.read_csv("test.csv"))
+                // ```
+                match &self.ctx.bindings[binding_id].kind {
                     BindingKind::Importation(Importation { name, full_name })
                     | BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) =>
                     {
@@ -4790,8 +4770,9 @@ impl<'a> Checker<'a> {
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
-                            if let Some(index) = scope.get(full_name) {
-                                self.ctx.bindings[*index].mark_used(
+                            if let Some(binding_id) = self.ctx.scopes[scope_id].get(full_name) {
+                                let context = self.ctx.execution_context();
+                                self.ctx.bindings[*binding_id].mark_used(
                                     self.ctx.scope_id,
                                     expr.range(),
                                     context,
@@ -4807,8 +4788,11 @@ impl<'a> Checker<'a> {
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
-                            if let Some(index) = scope.get(full_name.as_str()) {
-                                self.ctx.bindings[*index].mark_used(
+                            if let Some(binding_id) =
+                                self.ctx.scopes[scope_id].get(full_name.as_str())
+                            {
+                                let context = self.ctx.execution_context();
+                                self.ctx.bindings[*binding_id].mark_used(
                                     self.ctx.scope_id,
                                     expr.range(),
                                     context,
@@ -4818,72 +4802,70 @@ impl<'a> Checker<'a> {
                     }
                     _ => {}
                 }
-
-                return;
             }
-
-            first_iter = false;
-            import_starred = import_starred || scope.uses_star_imports();
-        }
-
-        if import_starred {
-            // F405
-            if self
-                .settings
-                .rules
-                .enabled(Rule::UndefinedLocalWithImportStarUsage)
-            {
-                let sources: Vec<String> = self
-                    .ctx
-                    .scopes
-                    .iter()
-                    .flat_map(Scope::star_imports)
-                    .map(|StarImportation { level, module }| {
-                        helpers::format_import_from(*level, *module)
-                    })
-                    .sorted()
-                    .dedup()
-                    .collect();
-                self.diagnostics.push(Diagnostic::new(
-                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                        name: id.to_string(),
-                        sources,
-                    },
-                    expr.range(),
-                ));
+            ResolvedReference::ImplicitGlobal => {
+                // Nothing to do.
             }
-            return;
-        }
-
-        if self.settings.rules.enabled(Rule::UndefinedName) {
-            // Allow __path__.
-            if self.path.ends_with("__init__.py") && id == "__path__" {
-                return;
+            ResolvedReference::StarImport => {
+                // F405
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UndefinedLocalWithImportStarUsage)
+                {
+                    let sources: Vec<String> = self
+                        .ctx
+                        .scopes
+                        .iter()
+                        .flat_map(Scope::star_imports)
+                        .map(|StarImportation { level, module }| {
+                            helpers::format_import_from(*level, *module)
+                        })
+                        .sorted()
+                        .dedup()
+                        .collect();
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                            name: id.to_string(),
+                            sources,
+                        },
+                        expr.range(),
+                    ));
+                }
             }
+            ResolvedReference::NotFound => {
+                // F821
+                if self.settings.rules.enabled(Rule::UndefinedName) {
+                    // Allow __path__.
+                    if self.path.ends_with("__init__.py") && id == "__path__" {
+                        return;
+                    }
 
-            // Allow "__module__" and "__qualname__" in class scopes.
-            if (id == "__module__" || id == "__qualname__")
-                && matches!(self.ctx.scope().kind, ScopeKind::Class(..))
-            {
-                return;
+                    // Allow "__module__" and "__qualname__" in class scopes.
+                    if (id == "__module__" || id == "__qualname__")
+                        && matches!(self.ctx.scope().kind, ScopeKind::Class(..))
+                    {
+                        return;
+                    }
+
+                    // Avoid flagging if `NameError` is handled.
+                    if self
+                        .ctx
+                        .handled_exceptions
+                        .iter()
+                        .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
+                    {
+                        return;
+                    }
+
+                    self.diagnostics.push(Diagnostic::new(
+                        pyflakes::rules::UndefinedName {
+                            name: id.to_string(),
+                        },
+                        expr.range(),
+                    ));
+                }
             }
-
-            // Avoid flagging if NameError is handled.
-            if self
-                .ctx
-                .handled_exceptions
-                .iter()
-                .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
-            {
-                return;
-            }
-
-            self.diagnostics.push(Diagnostic::new(
-                pyflakes::rules::UndefinedName {
-                    name: id.to_string(),
-                },
-                expr.range(),
-            ));
         }
     }
 
