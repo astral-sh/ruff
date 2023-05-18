@@ -18,6 +18,7 @@ from _utils import (
     get_indent,
     key_mod,
     key_pub_use,
+    key_test_case,
     pascal_case,
     snake_case,
 )
@@ -56,11 +57,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
                     f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py");'
                     f' "{prefix}{code}")]',
                 )
-                lines.sort(
-                    key=lambda line: line.split('Path::new("')[1]
-                    if linter != "pylint"
-                    else line.split(");")[1],
-                )
+                lines.sort(key=key_test_case(len(code)))
                 fp.write("\n".join(lines))
                 fp.write("\n")
                 lines.clear()
