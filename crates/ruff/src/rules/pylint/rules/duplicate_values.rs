@@ -1,6 +1,3 @@
-use std::{collections::HashSet, dbg, hash::BuildHasherDefault, println};
-
-use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -30,21 +27,26 @@ pub(crate) fn duplicate_values(checker: &mut Checker, targets: &[Expr], values: 
     }
     let target = &targets[0];
 
+    // FIXME: Do not call during assignment, but one "set creation" ?
+    //        Here values might be a tuple of sets for example.
+
     if let Expr::Set(ast::ExprSet { elts, .. }) = values {
         // let mut seen: FxHashSet<&Identifier> =
-        //     FxHashSet::with_capacity_and_hasher(bases.len(), BuildHasherDefault::default());
+        //     FxHashSet::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
         let mut seen: Vec<&Constant> = Vec::new();
         for elt in elts {
             if let Expr::Constant(ast::ExprConstant { value, .. }) = elt {
                 if seen.contains(&value) {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
-                        checker.diagnostics.push(Diagnostic::new(
-                            DuplicateValues {
-                                value: value.as_str().unwrap().to_string(),
-                                set: id.to_string(),
-                            },
-                            target.range(),
-                        ))
+                        if let Some(value_str) = value.as_str() {
+                            checker.diagnostics.push(Diagnostic::new(
+                                DuplicateValues {
+                                    value: value_str.to_string(),
+                                    set: id.to_string(),
+                                },
+                                target.range(),
+                            ));
+                        }
                     }
                 }
                 seen.push(value);

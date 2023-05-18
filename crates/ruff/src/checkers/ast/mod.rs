@@ -1792,8 +1792,7 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::DuplicateValues) {
-                    // pylint::rules::duplicate_values(self, value, set);
-                    pylint::rules::duplicate_values(self, targets, value)
+                    pylint::rules::duplicate_values(self, targets, value);
                 }
             }
             Stmt::AnnAssign(ast::StmtAnnAssign {
