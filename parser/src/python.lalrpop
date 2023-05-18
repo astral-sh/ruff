@@ -964,7 +964,7 @@ WithItem<Goal>: ast::Withitem = {
 };
 
 FuncDef: ast::Stmt = {
-     <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
+    <decorator_list:Decorator*> <location:@L> <is_async:"async"?> "def" <name:Identifier> <args:Parameters> <r:("->" <Test<"all">>)?> ":" <body:Suite> => {
         let args = Box::new(args);
         let returns = r.map(|x| Box::new(x));
         let end_location = body.last().unwrap().end();
