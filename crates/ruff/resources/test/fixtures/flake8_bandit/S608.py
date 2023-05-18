@@ -93,3 +93,6 @@ query = "UPDATE table SET id = 1"
 cursor.execute('SELECT * FROM table WHERE id = %s', var)
 cursor.execute('SELECT * FROM table WHERE id = 1')
 cursor.executemany('SELECT * FROM table WHERE id = %s', [var, var2])
+
+# # INSERT without INTO (e.g. MySQL and derivatives)
+query = "INSERT table VALUES (%s)" % (var,)

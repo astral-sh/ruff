@@ -452,4 +452,11 @@ S608.py:86:30: S608 Possible SQL injection vector through string-based query con
 90 | # # pass
    |
 
+S608.py:98:9: S608 Possible SQL injection vector through string-based query construction
+   |
+98 | # # INSERT without INTO (e.g. MySQL and derivatives)
+99 | query = "INSERT table VALUES (%s)" % (var,)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+   |
+
 
