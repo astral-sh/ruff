@@ -117,8 +117,8 @@ pub(crate) fn compare_to_empty_string(
                 if let Expr::Constant(ast::ExprConstant { value, .. }) = &lhs {
                     if let Constant::Str(s) = value {
                         if s.is_empty() {
-                            let constant = unparse_constant(value, checker.stylist);
-                            let expr = unparse_expr(rhs, checker.stylist);
+                            let constant = unparse_constant(value, checker.generator());
+                            let expr = unparse_expr(rhs, checker.generator());
                             let existing = format!("{constant} {op} {expr}");
                             let replacement = format!("{}{expr}", op.into_unary());
                             checker.diagnostics.push(Diagnostic::new(
@@ -137,8 +137,8 @@ pub(crate) fn compare_to_empty_string(
             if let Expr::Constant(ast::ExprConstant { value, .. }) = &rhs {
                 if let Constant::Str(s) = value {
                     if s.is_empty() {
-                        let expr = unparse_expr(lhs, checker.stylist);
-                        let constant = unparse_constant(value, checker.stylist);
+                        let expr = unparse_expr(lhs, checker.generator());
+                        let constant = unparse_constant(value, checker.generator());
                         let existing = format!("{expr} {op} {constant}");
                         let replacement = format!("{}{expr}", op.into_unary());
                         checker.diagnostics.push(Diagnostic::new(

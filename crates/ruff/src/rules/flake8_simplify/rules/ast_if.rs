@@ -348,7 +348,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    let condition = unparse_expr(test, checker.stylist);
+    let condition = unparse_expr(test, checker.generator());
     let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
@@ -364,7 +364,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_stmt(&node.into(), checker.stylist),
+                unparse_stmt(&node.into(), checker.generator()),
                 stmt.range(),
             )));
         } else {
@@ -387,7 +387,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_stmt(&node2.into(), checker.stylist),
+                unparse_stmt(&node2.into(), checker.generator()),
                 stmt.range(),
             )));
         };
@@ -504,7 +504,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
 
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
-    let contents = unparse_stmt(&ternary, checker.stylist);
+    let contents = unparse_stmt(&ternary, checker.generator());
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
@@ -859,7 +859,7 @@ pub(crate) fn use_dict_get_with_default(
         type_comment: None,
         range: TextRange::default(),
     };
-    let contents = unparse_stmt(&node5.into(), checker.stylist);
+    let contents = unparse_stmt(&node5.into(), checker.generator());
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());

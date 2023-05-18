@@ -107,8 +107,8 @@ pub(crate) fn negation_with_equal_op(
 
     let mut diagnostic = Diagnostic::new(
         NegateEqualOp {
-            left: unparse_expr(left, checker.stylist),
-            right: unparse_expr(&comparators[0], checker.stylist),
+            left: unparse_expr(left, checker.generator()),
+            right: unparse_expr(&comparators[0], checker.generator()),
         },
         expr.range(),
     );
@@ -121,7 +121,7 @@ pub(crate) fn negation_with_equal_op(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node.into(), checker.stylist),
+            unparse_expr(&node.into(), checker.generator()),
             expr.range(),
         )));
     }
@@ -157,8 +157,8 @@ pub(crate) fn negation_with_not_equal_op(
 
     let mut diagnostic = Diagnostic::new(
         NegateNotEqualOp {
-            left: unparse_expr(left, checker.stylist),
-            right: unparse_expr(&comparators[0], checker.stylist),
+            left: unparse_expr(left, checker.generator()),
+            right: unparse_expr(&comparators[0], checker.generator()),
         },
         expr.range(),
     );
@@ -171,7 +171,7 @@ pub(crate) fn negation_with_not_equal_op(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node.into(), checker.stylist),
+            unparse_expr(&node.into(), checker.generator()),
             expr.range(),
         )));
     }
@@ -192,7 +192,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, o
 
     let mut diagnostic = Diagnostic::new(
         DoubleNegation {
-            expr: unparse_expr(operand, checker.stylist),
+            expr: unparse_expr(operand, checker.generator()),
         },
         expr.range(),
     );
@@ -200,7 +200,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, o
         if checker.ctx.in_boolean_test() {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(operand, checker.stylist),
+                unparse_expr(operand, checker.generator()),
                 expr.range(),
             )));
         } else if checker.ctx.is_builtin("bool") {
@@ -217,7 +217,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, o
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&node1.into(), checker.stylist),
+                unparse_expr(&node1.into(), checker.generator()),
                 expr.range(),
             )));
         };

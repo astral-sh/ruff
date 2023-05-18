@@ -13,7 +13,8 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
+use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::{Node, RefEquality};
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
@@ -133,6 +134,53 @@ impl<'a> Checker<'a> {
             return false;
         }
         noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
+    }
+
+    /// Create a [`Generator`] to generate source code based on the current AST state.
+    pub fn generator(&self) -> Generator {
+        fn quote_style(context: &Context, locator: &Locator, indexer: &Indexer) -> Option<Quote> {
+            if !context.in_f_string() {
+                return None;
+            }
+
+            let Some(expr) = context.expr() else {
+                return None;
+            };
+
+            // Find the f-string containing the current expression.
+            let start = expr.start();
+            let string_ranges = indexer.f_string_ranges();
+            let Ok(string_range_index) = string_ranges.binary_search_by(|range| {
+                if start < range.start() {
+                    std::cmp::Ordering::Greater
+                } else if range.contains(start) {
+                    std::cmp::Ordering::Equal
+                } else {
+                    std::cmp::Ordering::Less
+                }
+            }) else {
+                return None;
+            };
+            let string_range = string_ranges[string_range_index];
+
+            // Find the quote character used to start the f-string.
+            let Some(trailing_quote) = trailing_quote(locator.slice(string_range)) else {
+                return None;
+            };
+
+            // Invert the quote character, if it's a single quote.
+            match *trailing_quote {
+                "'" => Some(Quote::Double),
+                "\"" => Some(Quote::Single),
+                _ => None,
+            }
+        }
+
+        Generator::new(
+            self.stylist.indentation(),
+            quote_style(&self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
+            self.stylist.line_ending(),
+        )
     }
 }
 

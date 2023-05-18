@@ -1,6 +1,6 @@
-use ruff_text_size::TextRange;
 use std::fmt;
 
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -94,7 +94,7 @@ pub(crate) fn use_pep604_isinstance(
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                        unparse_expr(&union(elts), checker.stylist),
+                        unparse_expr(&union(elts), checker.generator()),
                         types.range(),
                     )));
                 }

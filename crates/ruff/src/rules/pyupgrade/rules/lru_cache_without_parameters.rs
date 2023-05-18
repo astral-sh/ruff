@@ -51,7 +51,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
             if checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(func, checker.stylist),
+                    unparse_expr(func, checker.generator()),
                     expr.range(),
                 )));
             }

@@ -4,7 +4,7 @@
 use crate::source_code::Locator;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
+use rustpython_parser::{StringKind, Tok};
 
 pub struct Indexer {
     /// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
@@ -16,15 +16,20 @@ pub struct Indexer {
     /// The range of all triple quoted strings in the source document. The ranges are sorted by their
     /// [`TextRange::start`] position in increasing order. No two ranges are overlapping.
     triple_quoted_string_ranges: Vec<TextRange>,
+
+    /// The range of all f-string in the source document. The ranges are sorted by their
+    /// [`TextRange::start`] position in increasing order. No two ranges are overlapping.
+    f_string_ranges: Vec<TextRange>,
 }
 
 impl Indexer {
     pub fn from_tokens(tokens: &[LexResult], locator: &Locator) -> Self {
         assert!(TextSize::try_from(locator.contents().len()).is_ok());
 
-        let mut commented_lines = Vec::new();
+        let mut comment_ranges = Vec::new();
         let mut continuation_lines = Vec::new();
-        let mut string_ranges = Vec::new();
+        let mut triple_quoted_string_ranges = Vec::new();
+        let mut f_string_ranges = Vec::new();
         // Token, end
         let mut prev_end = TextSize::default();
         let mut prev_token: Option<&Tok> = None;
@@ -59,15 +64,23 @@ impl Indexer {
 
             match tok {
                 Tok::Comment(..) => {
-                    commented_lines.push(*range);
+                    comment_ranges.push(*range);
                 }
                 Tok::Newline | Tok::NonLogicalNewline => {
                     line_start = range.end();
                 }
                 Tok::String {
-                    triple_quoted: true,
+                    triple_quoted,
+                    kind,
                     ..
-                } => string_ranges.push(*range),
+                } => {
+                    if *triple_quoted {
+                        triple_quoted_string_ranges.push(*range);
+                    }
+                    if matches!(kind, StringKind::FString | StringKind::RawFString) {
+                        f_string_ranges.push(*range);
+                    }
+                }
                 _ => {}
             }
 
@@ -75,9 +88,10 @@ impl Indexer {
             prev_end = range.end();
         }
         Self {
-            comment_ranges: commented_lines,
+            comment_ranges,
             continuation_lines,
-            triple_quoted_string_ranges: string_ranges,
+            triple_quoted_string_ranges,
+            f_string_ranges,
         }
     }
 
@@ -95,6 +109,12 @@ impl Indexer {
     /// [`TextRange::start`] in increasing order. No two ranges are overlapping.
     pub fn triple_quoted_string_ranges(&self) -> &[TextRange] {
         &self.triple_quoted_string_ranges
+    }
+
+    /// Return a slice of all ranges that include an f- string. The ranges are sorted by
+    /// [`TextRange::start`] in increasing order. No two ranges are overlapping.
+    pub fn f_string_ranges(&self) -> &[TextRange] {
+        &self.f_string_ranges
     }
 
     pub fn is_continuation(&self, offset: TextSize, locator: &Locator) -> bool {

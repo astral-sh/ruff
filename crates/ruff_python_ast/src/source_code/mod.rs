@@ -15,7 +15,7 @@ use rustpython_parser::{lexer, Mode, ParseError};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-pub use stylist::Stylist;
+pub use stylist::{Quote, Stylist};
 
 /// Run round-trip source code generation on a given Python code.
 pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {

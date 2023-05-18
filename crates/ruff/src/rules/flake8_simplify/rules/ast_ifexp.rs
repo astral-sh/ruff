@@ -97,7 +97,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         IfExprWithTrueFalse {
-            expr: unparse_expr(test, checker.stylist),
+            expr: unparse_expr(test, checker.generator()),
         },
         expr.range(),
     );
@@ -105,7 +105,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
         if matches!(test, Expr::Compare(_)) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&test.clone(), checker.stylist),
+                unparse_expr(&test.clone(), checker.generator()),
                 expr.range(),
             )));
         } else if checker.ctx.is_builtin("bool") {
@@ -122,7 +122,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&node1.into(), checker.stylist),
+                unparse_expr(&node1.into(), checker.generator()),
                 expr.range(),
             )));
         };
@@ -153,7 +153,7 @@ pub(crate) fn explicit_false_true_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         IfExprWithFalseTrue {
-            expr: unparse_expr(test, checker.stylist),
+            expr: unparse_expr(test, checker.generator()),
         },
         expr.range(),
     );
@@ -166,7 +166,7 @@ pub(crate) fn explicit_false_true_in_ifexpr(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node1.into(), checker.stylist),
+            unparse_expr(&node1.into(), checker.generator()),
             expr.range(),
         )));
     }
@@ -201,8 +201,8 @@ pub(crate) fn twisted_arms_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         IfExprWithTwistedArms {
-            expr_body: unparse_expr(body, checker.stylist),
-            expr_else: unparse_expr(orelse, checker.stylist),
+            expr_body: unparse_expr(body, checker.generator()),
+            expr_else: unparse_expr(orelse, checker.generator()),
         },
         expr.range(),
     );
@@ -218,7 +218,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node3.into(), checker.stylist),
+            unparse_expr(&node3.into(), checker.generator()),
             expr.range(),
         )));
     }

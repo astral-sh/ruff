@@ -48,7 +48,7 @@ pub(crate) fn request_without_timeout(
                 Expr::Constant(ast::ExprConstant {
                     value: value @ Constant::None,
                     ..
-                }) => Some(unparse_constant(value, checker.stylist)),
+                }) => Some(unparse_constant(value, checker.generator())),
                 _ => None,
             } {
                 checker.diagnostics.push(Diagnostic::new(

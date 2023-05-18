@@ -45,14 +45,14 @@ pub(crate) fn redundant_tuple_in_exception_handler(
         };
         let mut diagnostic = Diagnostic::new(
             RedundantTupleInExceptionHandler {
-                name: unparse_expr(elt, checker.stylist),
+                name: unparse_expr(elt, checker.generator()),
             },
             type_.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(elt, checker.stylist),
+                unparse_expr(elt, checker.generator()),
                 type_.range(),
             )));
         }

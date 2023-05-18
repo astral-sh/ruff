@@ -1,9 +1,10 @@
-use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::newlines::Line;
-use ruff_python_ast::source_code::Stylist;
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{self, Cmpop, Expr};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::newlines::Line;
+use ruff_python_ast::source_code::Generator;
 
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -13,7 +14,7 @@ pub(crate) fn compare(
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
-    stylist: &Stylist,
+    generator: Generator,
 ) -> String {
     let node = ast::ExprCompare {
         left: Box::new(left.clone()),
@@ -21,7 +22,7 @@ pub(crate) fn compare(
         comparators: comparators.to_vec(),
         range: TextRange::default(),
     };
-    unparse_expr(&node.into(), stylist)
+    unparse_expr(&node.into(), generator)
 }
 
 pub(super) fn is_overlong(

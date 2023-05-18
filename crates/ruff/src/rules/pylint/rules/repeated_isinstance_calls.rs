@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct RepeatedIsinstanceCalls {
     obj: String,
-    pub types: Vec<String>,
+    types: Vec<String>,
 }
 
 impl Violation for RepeatedIsinstanceCalls {
@@ -66,11 +66,11 @@ pub(crate) fn repeated_isinstance_calls(
         if num_calls > 1 && types.len() > 1 {
             checker.diagnostics.push(Diagnostic::new(
                 RepeatedIsinstanceCalls {
-                    obj: unparse_expr(obj.as_expr(), checker.stylist),
+                    obj: unparse_expr(obj.as_expr(), checker.generator()),
                     types: types
                         .iter()
                         .map(HashableExpr::as_expr)
-                        .map(|expr| unparse_expr(expr, checker.stylist))
+                        .map(|expr| unparse_expr(expr, checker.generator()))
                         .sorted()
                         .collect(),
                 },

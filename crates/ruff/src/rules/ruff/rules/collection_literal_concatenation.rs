@@ -130,8 +130,8 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
 
     let contents = match kind {
         // Wrap the new expression in parentheses if it was a tuple
-        Kind::Tuple => format!("({})", unparse_expr(&new_expr, checker.stylist)),
-        Kind::List => unparse_expr(&new_expr, checker.stylist),
+        Kind::Tuple => format!("({})", unparse_expr(&new_expr, checker.generator())),
+        Kind::List => unparse_expr(&new_expr, checker.generator()),
     };
     let fixable = !has_comments(expr, checker.locator);
 

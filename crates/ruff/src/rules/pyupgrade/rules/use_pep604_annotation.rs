@@ -67,7 +67,7 @@ pub(crate) fn use_pep604_annotation(
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(&optional(slice), checker.stylist),
+                    unparse_expr(&optional(slice), checker.generator()),
                     expr.range(),
                 )));
             }
@@ -83,7 +83,7 @@ pub(crate) fn use_pep604_annotation(
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            unparse_expr(&union(elts), checker.stylist),
+                            unparse_expr(&union(elts), checker.generator()),
                             expr.range(),
                         )));
                     }
@@ -91,7 +91,7 @@ pub(crate) fn use_pep604_annotation(
                         // Single argument.
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            unparse_expr(slice, checker.stylist),
+                            unparse_expr(slice, checker.generator()),
                             expr.range(),
                         )));
                     }

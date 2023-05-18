@@ -149,7 +149,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         let new_env_var = node.into();
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&new_env_var, checker.stylist),
+            unparse_expr(&new_env_var, checker.generator()),
             slice.range(),
         )));
     }

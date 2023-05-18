@@ -6,7 +6,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged,
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_stmt;
-use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
@@ -171,11 +171,14 @@ fn convert_to_class(
     typename: &str,
     body: Vec<Stmt>,
     base_class: &Expr,
-    stylist: &Stylist,
+    generator: Generator,
 ) -> Fix {
     #[allow(deprecated)]
     Fix::unspecified(Edit::range_replacement(
-        unparse_stmt(&create_class_def_stmt(typename, body, base_class), stylist),
+        unparse_stmt(
+            &create_class_def_stmt(typename, body, base_class),
+            generator,
+        ),
         stmt.range(),
     ))
 }
@@ -216,7 +219,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             typename,
             properties,
             base_class,
-            checker.stylist,
+            checker.generator(),
         ));
     }
     checker.diagnostics.push(diagnostic);
