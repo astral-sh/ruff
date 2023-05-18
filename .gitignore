@@ -5,6 +5,7 @@ mkdocs.yml
 .overrides
 ruff-old
 github_search*.jsonl
+venv*
 
 ###
 # Rust.gitignore
@@ -148,7 +149,7 @@ celerybeat.pid
 
 # Environments
 .env
-.venv*
+.venv
 env/
 venv/
 ENV/
