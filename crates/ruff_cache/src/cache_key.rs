@@ -90,7 +90,7 @@ impl DerefMut for CacheKeyHasher {
 /// * Cache keys must be deterministic where hash keys do not have this constraint. That's why pointers don't implement [`CacheKey`] but they implement [`Hash`].
 /// * Ideally, cache keys are portable
 ///
-/// [`Hash`](std::hash::Hash)
+/// [`Hash`](Hash)
 pub trait CacheKey {
     fn cache_key(&self, state: &mut CacheKeyHasher);
 
