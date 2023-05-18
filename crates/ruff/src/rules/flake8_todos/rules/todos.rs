@@ -6,7 +6,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::{registry::Rule, settings::Settings};
+use crate::{checkers::todo_directives::TodoDirective, registry::Rule, settings::Settings};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -221,63 +221,6 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-enum Directive {
-    Todo,
-    Fixme,
-    Xxx,
-}
-
-impl Directive {
-    /// Extract a [`Directive`] from a comment.
-    ///
-    /// Returns the matching directive tag and its offset within the comment.
-    fn from_comment(comment: &str) -> Option<(Directive, TextSize)> {
-        let mut subset_opt = Some(comment);
-        let mut total_offset = TextSize::new(0);
-
-        // Loop over the comment to catch cases like `# foo # TODO`.
-        while let Some(subset) = subset_opt {
-            let trimmed = subset.trim_start_matches('#').trim_start().to_lowercase();
-
-            let offset = subset.text_len() - trimmed.text_len();
-            total_offset += offset;
-
-            let directive = if trimmed.starts_with("fixme") {
-                Some((Directive::Fixme, total_offset))
-            } else if trimmed.starts_with("xxx") {
-                Some((Directive::Xxx, total_offset))
-            } else if trimmed.starts_with("todo") {
-                Some((Directive::Todo, total_offset))
-            } else {
-                None
-            };
-
-            if directive.is_some() {
-                return directive;
-            }
-
-            // Shrink the subset to check for the next phrase starting with "#".
-            subset_opt = if let Some(new_offset) = trimmed.find('#') {
-                total_offset += TextSize::try_from(new_offset).unwrap();
-                subset.get(total_offset.to_usize()..)
-            } else {
-                None
-            };
-        }
-
-        None
-    }
-
-    /// Returns the length of the directive tag.
-    fn len(&self) -> TextSize {
-        match self {
-            Directive::Fixme => TextSize::new(5),
-            Directive::Todo => TextSize::new(4),
-            Directive::Xxx => TextSize::new(3),
-        }
-    }
-}
-
 // If this struct ever gets pushed outside of this module, it may be worth creating an enum for
 // the different tag types + other convenience methods.
 /// Represents a TODO tag or any of its variants - FIXME, XXX, TODO.
@@ -352,7 +295,7 @@ pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -
 
 /// Returns the tag pulled out of a given comment, if it exists.
 fn detect_tag(comment: &str, start: TextSize) -> Option<Tag> {
-    let (directive, offset) = Directive::from_comment(comment)?;
+    let (directive, offset) = TodoDirective::from_comment(comment)?;
     let comment_range = TextRange::at(offset, directive.len());
     let tag_range = TextRange::at(start + offset, directive.len());
     Some(Tag {
