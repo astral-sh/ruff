@@ -32,7 +32,7 @@ devel = []
 [tool.maturin]
 include = [ "...",]
 bindings = "pyo3"
-compatability = "manylinux2014"
+compatibility = "manylinux2014"
 
 [tool.pytest.ini_options]
 testpaths = [ "...",]
