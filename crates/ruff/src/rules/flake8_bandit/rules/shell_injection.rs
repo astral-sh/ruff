@@ -1,5 +1,6 @@
 //! Checks relating to shell injection.
 
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
@@ -14,6 +15,8 @@ use crate::{
 };
 
 static FULL_PATH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^([A-Za-z]:|[\\/.])").unwrap());
+static WILDCARD_COMMAND_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(^|[\s/])(chown|chmod|tar|rsync)\s.*\*").unwrap());
 
 #[violation]
 pub struct SubprocessPopenWithShellEqualsTrue {
@@ -86,6 +89,16 @@ impl Violation for StartProcessWithPartialPath {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Starting a process with a partial executable path")
+    }
+}
+
+#[violation]
+pub struct UnixCommandWildcardInjection;
+
+impl Violation for UnixCommandWildcardInjection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Possible wildcard injection in call")
     }
 }
 
@@ -174,7 +187,7 @@ fn try_string_literal(expr: &Expr) -> Option<&str> {
     }
 }
 
-/// S602, S603, S604, S605, S606, S607
+/// S602, S603, S604, S605, S606, S607, S609
 pub(crate) fn shell_injection(
     checker: &mut Checker,
     func: &Expr,
@@ -182,6 +195,7 @@ pub(crate) fn shell_injection(
     keywords: &[Keyword],
 ) {
     let call_kind = get_call_kind(func, &checker.ctx);
+    let mut subprocess_with_shell = false;
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
@@ -191,6 +205,7 @@ pub(crate) fn shell_injection(
                     truthiness: Truthiness::Truthy,
                     keyword,
                 }) => {
+                    subprocess_with_shell = true;
                     if checker
                         .settings
                         .rules
@@ -294,6 +309,30 @@ pub(crate) fn shell_injection(
                             .push(Diagnostic::new(StartProcessWithPartialPath, arg.range()));
                     }
                 }
+            }
+        }
+    }
+
+    // S609
+    if checker
+        .settings
+        .rules
+        .enabled(Rule::UnixCommandWildcardInjection)
+        && !args.is_empty()
+        && (matches!(call_kind, Some(CallKind::Shell)) || subprocess_with_shell)
+    {
+        if let Some(cmd) = args.first() {
+            let cmd_string = match cmd {
+                Expr::List(ast::ExprList { elts, .. }) => elts
+                    .iter()
+                    .map(|elt| string_literal(elt).unwrap_or(""))
+                    .join(" "),
+                _ => String::from(string_literal(cmd).unwrap_or("")),
+            };
+            if WILDCARD_COMMAND_REGEX.is_match(cmd_string.as_str()) {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(UnixCommandWildcardInjection, func.range()));
             }
         }
     }

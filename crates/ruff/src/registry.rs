@@ -433,6 +433,7 @@ ruff_macros::register_rules!(
     rules::flake8_bandit::rules::StartProcessWithAShell,
     rules::flake8_bandit::rules::StartProcessWithNoShell,
     rules::flake8_bandit::rules::StartProcessWithPartialPath,
+    rules::flake8_bandit::rules::UnixCommandWildcardInjection,
     rules::flake8_bandit::rules::SuspiciousEvalUsage,
     rules::flake8_bandit::rules::SuspiciousFTPLibUsage,
     rules::flake8_bandit::rules::SuspiciousInsecureCipherUsage,

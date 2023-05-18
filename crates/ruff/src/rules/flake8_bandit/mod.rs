@@ -42,6 +42,7 @@ mod tests {
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"); "S312")]
     #[test_case(Rule::TryExceptContinue, Path::new("S112.py"); "S112")]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
+    #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"); "S609")]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"); "S506")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
