@@ -9,6 +9,7 @@ pub(crate) use compare_to_empty_string::{compare_to_empty_string, CompareToEmpty
 pub(crate) use comparison_of_constant::{comparison_of_constant, ComparisonOfConstant};
 pub(crate) use continue_in_finally::{continue_in_finally, ContinueInFinally};
 pub(crate) use duplicate_bases::{duplicate_bases, DuplicateBases};
+pub(crate) use duplicate_values::{duplicate_values, DuplicateValues};
 pub(crate) use global_statement::{global_statement, GlobalStatement};
 pub(crate) use global_variable_not_assigned::GlobalVariableNotAssigned;
 pub(crate) use import_self::{import_from_self, import_self, ImportSelf};
@@ -59,6 +60,7 @@ mod compare_to_empty_string;
 mod comparison_of_constant;
 mod continue_in_finally;
 mod duplicate_bases;
+mod duplicate_values;
 mod global_statement;
 mod global_variable_not_assigned;
 mod import_self;
