@@ -2,6 +2,8 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_python_ast::source_code::Stylist;
 
+use crate::rules::pycodestyle::helpers::WidthWithTabs;
+
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 
 // Guess a capacity to use for string allocation.
@@ -46,6 +48,8 @@ pub(crate) fn format_import_from(
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
     line_length: usize,
+    indentation_width: usize,
+    tab_size: u8,
     stylist: &Stylist,
     force_wrap_aliases: bool,
     is_first: bool,
@@ -56,8 +60,15 @@ pub(crate) fn format_import_from(
             .iter()
             .all(|(alias, _)| alias.name == "*" && alias.asname.is_none())
     {
-        let (single_line, ..) =
-            format_single_line(import_from, comments, aliases, is_first, stylist);
+        let (single_line, ..) = format_single_line(
+            import_from,
+            comments,
+            aliases,
+            is_first,
+            stylist,
+            tab_size,
+            indentation_width,
+        );
         return single_line;
     }
 
@@ -71,9 +82,15 @@ pub(crate) fn format_import_from(
             || aliases.len() == 1
             || aliases.iter().all(|(alias, _)| alias.asname.is_none()))
     {
-        let (single_line, import_width) =
-            format_single_line(import_from, comments, aliases, is_first, stylist);
-        // TODO(jonathan): handle tabs
+        let (single_line, import_width) = format_single_line(
+            import_from,
+            comments,
+            aliases,
+            is_first,
+            stylist,
+            tab_size,
+            indentation_width,
+        );
         if import_width <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
             return single_line;
         }
@@ -91,9 +108,11 @@ fn format_single_line(
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
     stylist: &Stylist,
+    tab_size: u8,
+    indentation_width: usize,
 ) -> (String, usize) {
     let mut output = String::with_capacity(CAPACITY);
-    let mut line_width = 0;
+    let mut line_width = indentation_width;
 
     if !is_first && !comments.atop.is_empty() {
         output.push_str(&stylist.line_ending());
@@ -128,7 +147,7 @@ fn format_single_line(
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width += 2 + comment.width();
+            line_width = comment.width_with_tabs(tab_size, Some(line_width + 2));
         }
     }
 
@@ -136,7 +155,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width += 2 + comment.width();
+        line_width = comment.width_with_tabs(tab_size, Some(line_width + 2));
     }
 
     output.push_str(&stylist.line_ending());

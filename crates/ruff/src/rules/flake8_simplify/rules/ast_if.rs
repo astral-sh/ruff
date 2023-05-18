@@ -2,7 +2,6 @@ use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
-use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -16,6 +15,7 @@ use ruff_python_semantic::model::SemanticModel;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
+use crate::rules::pycodestyle::helpers::WidthWithTabs;
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)
@@ -288,8 +288,10 @@ pub(crate) fn nested_if_statements(
                     .content()
                     .unwrap_or_default()
                     .universal_newlines()
-                    // TODO(jonathan): handle tabs
-                    .all(|line| line.width() <= checker.settings.line_length)
+                    .all(|line| {
+                        line.width_with_tabs(checker.settings.tab_size, None)
+                            <= checker.settings.line_length
+                    })
                 {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(edit));
@@ -509,11 +511,11 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    // TODO(jonathan): handle tabs
-    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-        + contents.width()
-        > checker.settings.line_length
-    {
+    let tab_size = checker.settings.tab_size;
+    let mut width = checker.locator.contents()[TextRange::new(line_start, stmt.start())]
+        .width_with_tabs(tab_size, None);
+    width = contents.width_with_tabs(tab_size, Some(width));
+    if width > checker.settings.line_length {
         return;
     }
 
@@ -865,11 +867,11 @@ pub(crate) fn use_dict_get_with_default(
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    // TODO(jonathan): handle tabs
-    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-        + contents.width()
-        > checker.settings.line_length
-    {
+    let tab_size = checker.settings.tab_size;
+    let mut width = checker.locator.contents()[TextRange::new(line_start, stmt.start())]
+        .width_with_tabs(tab_size, None);
+    width = contents.width_with_tabs(tab_size, Some(width));
+    if width > checker.settings.line_length {
         return;
     }
 

@@ -2,7 +2,6 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
     self, Cmpop, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt, Unaryop,
 };
-use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -10,6 +9,7 @@ use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
+use crate::rules::pycodestyle::helpers::WidthWithTabs;
 
 #[violation]
 pub struct ReimplementedBuiltin {
@@ -224,11 +224,12 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                // TODO(jonathan): handle tabs
-                if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-                    + contents.width()
-                    > checker.settings.line_length
-                {
+                let tab_size = checker.settings.tab_size;
+                let mut width = checker.locator.contents()
+                    [TextRange::new(line_start, stmt.start())]
+                .width_with_tabs(tab_size, None);
+                width = contents.width_with_tabs(tab_size, Some(width));
+                if width > checker.settings.line_length {
                     return;
                 }
 
@@ -317,11 +318,12 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                // TODO(jonathan): handle tabs
-                if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-                    + contents.width()
-                    > checker.settings.line_length
-                {
+                let tab_size = checker.settings.tab_size;
+                let mut width = checker.locator.contents()
+                    [TextRange::new(line_start, stmt.start())]
+                .width_with_tabs(tab_size, None);
+                width = contents.width_with_tabs(tab_size, Some(width));
+                if width > checker.settings.line_length {
                     return;
                 }
 

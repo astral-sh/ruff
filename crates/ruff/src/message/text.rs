@@ -237,7 +237,7 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `pycodestyle.tab-size`
+    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `tab-size`
 
     let mut result = String::new();
     let mut last_end = 0;

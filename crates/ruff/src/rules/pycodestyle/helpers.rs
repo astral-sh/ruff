@@ -94,3 +94,22 @@ impl Overlong {
         self.width
     }
 }
+
+pub(crate) trait WidthWithTabs {
+    fn width_with_tabs(&self, tab_size: u8, current_width: Option<usize>) -> usize;
+}
+
+impl WidthWithTabs for str {
+    fn width_with_tabs(&self, tab_size: u8, current_width: Option<usize>) -> usize {
+        let tab_size = tab_size as usize;
+        let current_width = current_width.unwrap_or(0);
+        self.chars().fold(current_width, |width, c| {
+            width
+                + if matches!(c, '\t') {
+                    tab_size - (width % tab_size)
+                } else {
+                    c.width().unwrap_or(0)
+                }
+        })
+    }
+}

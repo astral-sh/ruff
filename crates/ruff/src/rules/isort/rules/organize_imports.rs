@@ -14,6 +14,7 @@ use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::whitespace::leading_space;
 
 use crate::registry::AsRule;
+use crate::rules::pycodestyle::helpers::WidthWithTabs;
 use crate::settings::Settings;
 
 use super::super::block::Block;
@@ -116,8 +117,9 @@ pub(crate) fn organize_imports(
         block,
         comments,
         locator,
-        // TODO(jonathan): handle tabs
-        settings.line_length - indentation.len(),
+        settings.line_length,
+        indentation.width_with_tabs(settings.tab_size, None),
+        settings.tab_size,
         stylist,
         &settings.src,
         package,
