@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
-use ruff_python_ast::helpers::unparse_expr;
+
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -117,7 +117,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                format!("({})", unparse_expr(&node.into(), checker.generator())),
+                format!("({})", checker.generator().expr(&node.into())),
                 target.range(),
             )));
         }

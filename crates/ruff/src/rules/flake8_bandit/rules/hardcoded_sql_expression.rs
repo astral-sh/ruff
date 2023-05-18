@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{any_over_expr, unparse_expr};
+use ruff_python_ast::helpers::any_over_expr;
 
 use crate::checkers::ast::Checker;
 
@@ -62,14 +62,14 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
         }) => {
             let Some(parent) = checker.ctx.expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.generator()));
+                    return Some(checker.generator().expr(expr));
                 }
                 return None;
             };
             // Only evaluate the full BinOp, not the nested components.
             let Expr::BinOp(_ )= parent else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.generator()));
+                    return Some(checker.generator().expr(expr));
                 }
                 return None;
             };
@@ -81,12 +81,12 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             };
             // "select * from table where val = {}".format(...)
             if attr == "format" && string_literal(value).is_some() {
-                return Some(unparse_expr(expr, checker.generator()));
+                return Some(checker.generator().expr(expr));
             };
             None
         }
         // f"select * from table where val = {val}"
-        Expr::JoinedStr(_) => Some(unparse_expr(expr, checker.generator())),
+        Expr::JoinedStr(_) => Some(checker.generator().expr(expr)),
         _ => None,
     }
 }

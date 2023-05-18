@@ -17,26 +17,8 @@ use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
 use crate::newlines::UniversalNewlineIterator;
-use crate::source_code::{Generator, Indexer, Locator};
+use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
-
-/// Generate source code from an [`Expr`].
-pub fn unparse_expr(expr: &Expr, mut generator: Generator) -> String {
-    generator.unparse_expr(expr, 0);
-    generator.generate()
-}
-
-/// Generate source code from a [`Stmt`].
-pub fn unparse_stmt(stmt: &Stmt, mut generator: Generator) -> String {
-    generator.unparse_stmt(stmt);
-    generator.generate()
-}
-
-/// Generate source code from an [`Constant`].
-pub fn unparse_constant(constant: &Constant, mut generator: Generator) -> String {
-    generator.unparse_constant(constant);
-    generator.generate()
-}
 
 fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
 where

@@ -5,7 +5,6 @@ use rustpython_parser::ast::{self, Boolop, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 
@@ -66,11 +65,11 @@ pub(crate) fn repeated_isinstance_calls(
         if num_calls > 1 && types.len() > 1 {
             checker.diagnostics.push(Diagnostic::new(
                 RepeatedIsinstanceCalls {
-                    obj: unparse_expr(obj.as_expr(), checker.generator()),
+                    obj: checker.generator().expr(obj.as_expr()),
                     types: types
                         .iter()
                         .map(HashableExpr::as_expr)
-                        .map(|expr| unparse_expr(expr, checker.generator()))
+                        .map(|expr| checker.generator().expr(expr))
                         .sorted()
                         .collect(),
                 },

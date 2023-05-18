@@ -8,8 +8,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
-    any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in, unparse_expr,
-    unparse_stmt,
+    any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_semantic::context::Context;
@@ -348,7 +347,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
-    let condition = unparse_expr(test, checker.generator());
+    let condition = checker.generator().expr(test);
     let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
@@ -364,7 +363,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_stmt(&node.into(), checker.generator()),
+                checker.generator().stmt(&node.into()),
                 stmt.range(),
             )));
         } else {
@@ -387,7 +386,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_stmt(&node2.into(), checker.generator()),
+                checker.generator().stmt(&node2.into()),
                 stmt.range(),
             )));
         };
@@ -504,7 +503,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
 
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
-    let contents = unparse_stmt(&ternary, checker.generator());
+    let contents = checker.generator().stmt(&ternary);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
@@ -859,7 +858,7 @@ pub(crate) fn use_dict_get_with_default(
         type_comment: None,
         range: TextRange::default(),
     };
-    let contents = unparse_stmt(&node5.into(), checker.generator());
+    let contents = checker.generator().stmt(&node5.into());
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());

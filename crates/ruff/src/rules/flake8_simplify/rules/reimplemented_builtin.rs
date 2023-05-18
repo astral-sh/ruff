@@ -6,7 +6,7 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
+
 use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
@@ -198,7 +198,7 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
     };
-    unparse_stmt(&node3.into(), generator)
+    generator.stmt(&node3.into())
 }
 
 /// SIM110, SIM111

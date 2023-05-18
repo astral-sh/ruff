@@ -4,7 +4,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_constant;
+
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::checkers::ast::Checker;
@@ -70,7 +70,7 @@ pub(crate) fn native_literals(
                 } else {
                     Constant::Str(String::new())
                 };
-                let content = unparse_constant(&constant, checker.generator());
+                let content = checker.generator().constant(&constant);
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     content,

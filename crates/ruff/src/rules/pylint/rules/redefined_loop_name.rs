@@ -6,7 +6,7 @@ use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt, Withitem};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::unparse_expr;
+
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::context::Context;
@@ -393,7 +393,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
             {
                 checker.diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
-                        name: unparse_expr(outer_assignment_target.expr, checker.generator()),
+                        name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },
