@@ -1,19 +1,14 @@
-use std::fs;
-use std::path::Path;
-
 use anyhow::Result;
 use pyproject_toml::PyProjectToml;
 use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::SourceFileBuilder;
+use ruff_python_ast::source_code::SourceFile;
 
 use crate::message::Message;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 
-pub fn lint_pyproject_toml(path: &Path) -> Result<Vec<Message>> {
-    let contents = fs::read_to_string(path)?;
-    let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
     let err = match toml::from_str::<PyProjectToml>(source_file.source_text()) {
         Ok(_) => return Ok(Vec::default()),
         Err(err) => err,

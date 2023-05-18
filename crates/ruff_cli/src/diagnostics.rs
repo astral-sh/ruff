@@ -134,7 +134,9 @@ pub(crate) fn lint_path(
 
     // We have to special case this here since the python tokenizer doesn't work with toml
     if is_project_toml(path) {
-        let messages = lint_pyproject_toml(path)?;
+        let contents = std::fs::read_to_string(path)?;
+        let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+        let messages = lint_pyproject_toml(source_file)?;
         return Ok(Diagnostics {
             messages,
             fixed: FxHashMap::default(),

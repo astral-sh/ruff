@@ -4,11 +4,14 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::path::Path;
 
     use anyhow::Result;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
+
+    use ruff_python_ast::source_code::SourceFileBuilder;
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
@@ -187,7 +190,9 @@ mod tests {
             .join("pyproject_toml")
             .join(path)
             .join("pyproject.toml");
-        let messages = lint_pyproject_toml(&path)?;
+        let contents = fs::read_to_string(path)?;
+        let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
+        let messages = lint_pyproject_toml(source_file)?;
         assert_messages!(snapshot, messages);
         Ok(())
     }

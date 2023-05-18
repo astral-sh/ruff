@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-./resources/test/fixtures/ruff/pyproject_toml/invalid_author/pyproject.toml:6:30: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+pyproject.toml:6:30: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
   |
 6 | # Ensure that the spans from toml handle utf-8 correctly
 7 | authors = [
