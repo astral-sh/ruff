@@ -27,6 +27,7 @@ enum TokenType {
     Def,
     Lambda,
     Colon,
+    String,
 }
 
 /// Simplified token specialized for the task.
@@ -55,7 +56,7 @@ impl<'tok> Token<'tok> {
             // Import treated like a function.
             Tok::Import => TokenType::Named,
             Tok::Name { .. } => TokenType::Named,
-            Tok::String { .. } => TokenType::Named,
+            Tok::String { .. } => TokenType::String,
             Tok::Comma => TokenType::Comma,
             Tok::Lpar => TokenType::OpeningBracket,
             Tok::Lsqb => TokenType::OpeningSquareBracket,
@@ -266,7 +267,7 @@ pub(crate) fn trailing_commas(
                 }
             },
             TokenType::OpeningSquareBracket => match prev.type_ {
-                TokenType::ClosingBracket | TokenType::Named => {
+                TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
                     stack.push(Context::new(ContextType::Subscript));
                 }
                 _ => {
