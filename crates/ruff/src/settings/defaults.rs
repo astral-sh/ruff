@@ -62,8 +62,7 @@ pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     vec![
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
-        FilePattern::Builtin("pyproject.toml"),
-        FilePattern::Builtin("*.toml"),
+        FilePattern::Builtin("**/pyproject.toml"),
     ]
 });
 
