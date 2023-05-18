@@ -406,9 +406,9 @@ S608.py:77:9: S608 Possible SQL injection vector through string-based query cons
    |
 77 |   def query41():
 78 |       return (
-79 |           "SELECT *"
+79 |           "SELECT * "
    |  _________^
-80 | |         "FROM table"
+80 | |         "FROM table "
 81 | |         f"WHERE var = {var}"
    | |____________________________^ S608
 82 |       )
@@ -475,6 +475,8 @@ S608.py:102:9: S608 Possible SQL injection vector through string-based query con
 103 | query = "REPLACE INTO table VALUES (%s)" % (var,)
 104 | query = "REPLACE table VALUES (%s)" % (var,)
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+105 | 
+106 | query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
     |
 
 

@@ -74,8 +74,8 @@ def query40():
 
 def query41():
     return (
-        "SELECT *"
-        "FROM table"
+        "SELECT * "
+        "FROM table "
         f"WHERE var = {var}"
     )
 
@@ -100,3 +100,5 @@ query = "INSERT table VALUES (%s)" % (var,)
 # # REPLACE (e.g. MySQL and derivatives, SQLite)
 query = "REPLACE INTO table VALUES (%s)" % (var,)
 query = "REPLACE table VALUES (%s)" % (var,)
+
+query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"

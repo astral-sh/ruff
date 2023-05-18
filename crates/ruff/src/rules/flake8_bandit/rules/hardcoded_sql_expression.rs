@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 use super::super::helpers::string_literal;
 
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(select\s.*from\s|delete\s+from\s|(insert|replace)\s.*values\s|update\s.*set\s)")
+    Regex::new(r"(?i)\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)")
         .unwrap()
 });
 
