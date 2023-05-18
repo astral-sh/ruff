@@ -297,7 +297,7 @@ pub(crate) fn trailing_commas(
             && match context.type_ {
                 ContextType::No => false,
                 ContextType::FunctionParameters => true,
-                ContextType::CallArguments => true,
+                ContextType::CallArguments => context.num_commas != 0,
                 // `(1)` is not equivalent to `(1,)`.
                 ContextType::Tuple => context.num_commas != 0,
                 // `x[1]` is not equivalent to `x[1,]`.
