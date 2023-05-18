@@ -1,0 +1,16 @@
+---
+source: crates/ruff/src/rules/dlint/mod.rs
+---
+DUO120.py:1:1: DUO120 Use of the `marshal` module should be avoided
+  |
+1 | import marshal
+  | ^^^^^^^^^^^^^^ DUO120
+  |
+
+DUO120.py:4:1: DUO120 Use of the `marshal` module should be avoided
+  |
+4 | from marshal import load
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ DUO120
+  |
+
+

@@ -200,6 +200,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Dlint, "105") => (RuleGroup::Unspecified, Rule::BadExecUse),
         (Dlint, "110") => (RuleGroup::Unspecified, Rule::BadCompileUse),
         (Dlint, "119") => (RuleGroup::Unspecified, Rule::BadShelveUse),
+        (Dlint, "120") => (RuleGroup::Unspecified, Rule::BadMarshalUse),
 
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Unspecified, Rule::BlockingHttpCallInAsyncFunction),

@@ -813,6 +813,9 @@ where
                 if self.settings.rules.enabled(Rule::BadShelveUse) {
                     dlint::rules::bad_shelve_use(self, stmt);
                 }
+                if self.settings.rules.enabled(Rule::BadMarshalUse) {
+                    dlint::rules::bad_marshal_use(self, stmt);
+                }
 
                 if self
                     .settings
@@ -1103,6 +1106,9 @@ where
                 //dlint
                 if self.settings.rules.enabled(Rule::BadShelveUse) {
                     dlint::rules::bad_shelve_use(self, stmt);
+                }
+                if self.settings.rules.enabled(Rule::BadMarshalUse) {
+                    dlint::rules::bad_marshal_use(self, stmt);
                 }
 
                 if self.settings.rules.enabled(Rule::UnnecessaryFutureImport)

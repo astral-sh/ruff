@@ -16,6 +16,7 @@ impl Violation for BadEvalUse {
     }
 }
 
+// TODO: Consider helper func if more of these pop up
 /// DUO104
 pub(crate) fn bad_eval_use(checker: &mut Checker, expr: &Expr) {
     if let Expr::Call(ast::ExprCall { func, .. }) = expr {

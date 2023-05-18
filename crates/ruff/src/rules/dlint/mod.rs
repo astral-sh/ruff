@@ -17,6 +17,7 @@ mod tests {
     #[test_case(Rule::BadExecUse, Path::new("DUO105.py"); "DUO105")]
     #[test_case(Rule::BadCompileUse, Path::new("DUO110.py"); "DUO110")]
     #[test_case(Rule::BadShelveUse, Path::new("DUO119.py"); "DUO119")]
+    #[test_case(Rule::BadMarshalUse, Path::new("DUO120.py"); "DUO120")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

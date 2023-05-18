@@ -167,6 +167,7 @@ ruff_macros::register_rules!(
     rules::dlint::rules::BadExecUse,
     rules::dlint::rules::BadCompileUse,
     rules::dlint::rules::BadShelveUse,
+    rules::dlint::rules::BadMarshalUse,
     // flake8-async
     rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
     rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
