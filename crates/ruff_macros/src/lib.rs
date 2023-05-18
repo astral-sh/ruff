@@ -24,7 +24,7 @@ pub fn derive_config(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_derive(CombineOptions)]
-pub fn derive_combine_options(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_combine_options(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     combine_options::derive_impl(input)

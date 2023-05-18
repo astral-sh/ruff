@@ -4096,7 +4096,7 @@ where
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match excepthandler {
-            ast::Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                 type_,
                 name,
                 body,
