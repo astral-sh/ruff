@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Callable
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,3 +23,24 @@ def snake_case(name: str) -> str:
 
 def get_indent(line: str) -> str:
     return re.match(r"^\s*", line).group()  # type: ignore[union-attr]
+
+
+def key_test_case(nb_digit: int) -> Callable[[str], tuple[str, int, int]]:
+    def key(line: str) -> tuple[str, int, int]:
+        match = re.search(r'"([A-Z]+)([0-9]+)(_[0-9]+)?(?:.py)?"', line)
+        print(line)
+        prefix = match.group(1)
+        code = match.group(2)
+        code = int(code + "0" * (nb_digit - len(code)))
+        subcode = int(match.group(3)[1:]) if match.group(3) else -1
+        return prefix, code, subcode
+
+    return key
+
+
+def key_pub_use(line: str) -> str:
+    return line.replace("(crate)", "")
+
+
+def key_mod(line: str) -> str:
+    return line.replace("pub(crate) ", "")
