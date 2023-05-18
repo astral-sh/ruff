@@ -448,7 +448,7 @@ S608.py:86:30: S608 Possible SQL injection vector through string-based query con
 87 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
 88 | query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
-89 |  
+89 | 
 90 | # # pass
    |
 

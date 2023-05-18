@@ -84,7 +84,7 @@ query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
 query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
 query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
 query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
- 
+
 # # pass
 query = "SELECT * FROM table WHERE id = 1"
 query = "DELETE FROM table WHERE id = 1"
