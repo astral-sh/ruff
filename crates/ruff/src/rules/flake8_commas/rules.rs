@@ -55,6 +55,7 @@ impl<'tok> Token<'tok> {
             // Import treated like a function.
             Tok::Import => TokenType::Named,
             Tok::Name { .. } => TokenType::Named,
+            Tok::String { .. } => TokenType::Named,
             Tok::Comma => TokenType::Comma,
             Tok::Lpar => TokenType::OpeningBracket,
             Tok::Lsqb => TokenType::OpeningSquareBracket,
