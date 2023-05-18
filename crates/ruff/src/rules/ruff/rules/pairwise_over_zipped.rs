@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -33,15 +33,15 @@ impl SliceInfo {
 
 /// Return the argument name, lower bound, and  upper bound for an expression, if it's a slice.
 fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
-    let ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) = &expr.node else {
+    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return None;
     };
 
-    let ExprKind::Name(ast::ExprName { id: arg_id, .. }) = &value.node else {
+    let Expr::Name(ast::ExprName { id: arg_id, .. }) = value.as_ref() else {
         return None;
     };
 
-    let ExprKind::Slice(ast::ExprSlice { lower,  step, .. }) = &slice.node else {
+    let Expr::Slice(ast::ExprSlice { lower,  step, .. }) = slice.as_ref() else {
         return None;
     };
 
@@ -63,19 +63,20 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 }
 
 fn to_bound(expr: &Expr) -> Option<i64> {
-    match &expr.node {
-        ExprKind::Constant(ast::ExprConstant {
+    match expr {
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Int(value),
             ..
         }) => value.to_i64(),
-        ExprKind::UnaryOp(ast::ExprUnaryOp {
+        Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::USub | Unaryop::Invert,
             operand,
+            range: _,
         }) => {
-            if let ExprKind::Constant(ast::ExprConstant {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(value),
                 ..
-            }) = &operand.node
+            }) = operand.as_ref()
             {
                 value.to_i64().map(|v| -v)
             } else {
@@ -88,7 +89,7 @@ fn to_bound(expr: &Expr) -> Option<i64> {
 
 /// RUF007
 pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
-    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
 
@@ -98,16 +99,13 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     }
 
     // Require the function to be the builtin `zip`.
-    if id != "zip" {
-        return;
-    }
-    if !checker.ctx.is_builtin(id) {
+    if !(id == "zip" && checker.ctx.is_builtin(id)) {
         return;
     }
 
     // Allow the first argument to be a `Name` or `Subscript`.
     let Some(first_arg_info) = ({
-        if let ExprKind::Name(ast::ExprName { id, .. }) = &args[0].node {
+        if let Expr::Name(ast::ExprName { id, .. }) = &args[0] {
             Some(SliceInfo::new(id.to_string(), None))
         } else {
             match_slice_info(&args[0])
@@ -117,9 +115,9 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     };
 
     // Require second argument to be a `Subscript`.
-    let ExprKind::Subscript (_) = &args[1].node else {
+    if !matches!(&args[1], Expr::Subscript(_)) {
         return;
-    };
+    }
     let Some(second_arg_info) = match_slice_info(&args[1]) else {
         return;
     };

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -65,7 +65,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     let Some(arg) = args.first() else {
         return;
     };
-    let ExprKind::Call(ast::ExprCall { func, .. }) = &arg.node else {
+    let Expr::Call(ast::ExprCall { func, .. }) = arg else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {

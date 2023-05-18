@@ -35,7 +35,7 @@ impl Format<ASTFormatContext> for FormatArguments<'_> {
                 [group(&format_args![format_with(|f| {
                     write!(f, [arg.format()])?;
                     if let Some(i) = i.checked_sub(defaults_start) {
-                        if arg.node.annotation.is_some() {
+                        if arg.annotation.is_some() {
                             write!(f, [space()])?;
                             write!(f, [text("=")])?;
                             write!(f, [space()])?;
@@ -91,7 +91,7 @@ impl Format<ASTFormatContext> for FormatArguments<'_> {
                         .checked_sub(defaults_start)
                         .and_then(|i| args.kw_defaults.get(i))
                     {
-                        if kwarg.node.annotation.is_some() {
+                        if kwarg.annotation.is_some() {
                             write!(f, [space()])?;
                             write!(f, [text("=")])?;
                             write!(f, [space()])?;

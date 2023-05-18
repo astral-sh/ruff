@@ -336,6 +336,11 @@ impl<'a> Context<'a> {
         Some(self.stmts[parent_id])
     }
 
+    /// Return the current `Expr`.
+    pub fn expr(&self) -> Option<&'a Expr> {
+        self.exprs.iter().last().copied()
+    }
+
     /// Return the parent `Expr` of the current `Expr`.
     pub fn expr_parent(&self) -> Option<&'a Expr> {
         self.exprs.iter().rev().nth(1).copied()

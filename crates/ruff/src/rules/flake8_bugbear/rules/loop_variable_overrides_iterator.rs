@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -31,22 +31,26 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        match &expr.node {
-            ExprKind::Name(ast::ExprName { id, .. }) => {
+        match expr {
+            Expr::Name(ast::ExprName { id, .. }) => {
                 self.names.insert(id, expr);
             }
-            ExprKind::ListComp(ast::ExprListComp { generators, .. })
-            | ExprKind::DictComp(ast::ExprDictComp { generators, .. })
-            | ExprKind::SetComp(ast::ExprSetComp { generators, .. })
-            | ExprKind::GeneratorExp(ast::ExprGeneratorExp { generators, .. }) => {
+            Expr::ListComp(ast::ExprListComp { generators, .. })
+            | Expr::DictComp(ast::ExprDictComp { generators, .. })
+            | Expr::SetComp(ast::ExprSetComp { generators, .. })
+            | Expr::GeneratorExp(ast::ExprGeneratorExp { generators, .. }) => {
                 for comp in generators {
                     self.visit_expr(&comp.iter);
                 }
             }
-            ExprKind::Lambda(ast::ExprLambda { args, body }) => {
+            Expr::Lambda(ast::ExprLambda {
+                args,
+                body,
+                range: _,
+            }) => {
                 visitor::walk_expr(self, body);
                 for arg in &args.args {
-                    self.names.remove(arg.node.arg.as_str());
+                    self.names.remove(arg.arg.as_str());
                 }
             }
             _ => visitor::walk_expr(self, expr),

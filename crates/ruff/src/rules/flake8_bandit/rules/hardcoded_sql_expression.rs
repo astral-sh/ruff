@@ -1,10 +1,10 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{any_over_expr, unparse_expr};
+use ruff_python_ast::helpers::any_over_expr;
 
 use crate::checkers::ast::Checker;
 
@@ -53,40 +53,40 @@ fn matches_sql_statement(string: &str) -> bool {
 }
 
 fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Option<String> {
-    match &expr.node {
+    match expr {
         // "select * from table where val = " + "str" + ...
         // "select * from table where val = %s" % ...
-        ExprKind::BinOp(ast::ExprBinOp {
+        Expr::BinOp(ast::ExprBinOp {
             op: Operator::Add | Operator::Mod,
             ..
         }) => {
             let Some(parent) = checker.ctx.expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.stylist));
+                    return Some(checker.generator().expr(expr));
                 }
                 return None;
             };
             // Only evaluate the full BinOp, not the nested components.
-            let ExprKind::BinOp(_ )= &parent.node else {
+            let Expr::BinOp(_ )= parent else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.stylist));
+                    return Some(checker.generator().expr(expr));
                 }
                 return None;
             };
             None
         }
-        ExprKind::Call(ast::ExprCall { func, .. }) => {
-            let ExprKind::Attribute(ast::ExprAttribute { attr, value, .. }) = &func.node else {
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
                 return None;
             };
             // "select * from table where val = {}".format(...)
             if attr == "format" && string_literal(value).is_some() {
-                return Some(unparse_expr(expr, checker.stylist));
+                return Some(checker.generator().expr(expr));
             };
             None
         }
         // f"select * from table where val = {val}"
-        ExprKind::JoinedStr(_) => Some(unparse_expr(expr, checker.stylist)),
+        Expr::JoinedStr(_) => Some(checker.generator().expr(expr)),
         _ => None,
     }
 }

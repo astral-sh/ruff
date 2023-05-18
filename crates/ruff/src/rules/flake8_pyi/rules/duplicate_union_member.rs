@@ -1,10 +1,9 @@
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -45,11 +44,12 @@ fn traverse_union<'a>(
     //
     // So we have to traverse both branches in order (left, then right), to report duplicates
     // in the order they appear in the source code.
-    if let ExprKind::BinOp(ast::ExprBinOp {
+    if let Expr::BinOp(ast::ExprBinOp {
         op: Operator::BitOr,
         left,
         right,
-    }) = &expr.node
+        range: _,
+    }) = expr
     {
         // Traverse left subtree, then the right subtree, propagating the previous node.
         traverse_union(seen_nodes, checker, left, Some(expr));
@@ -60,7 +60,7 @@ fn traverse_union<'a>(
     if !seen_nodes.insert(expr.into()) {
         let mut diagnostic = Diagnostic::new(
             DuplicateUnionMember {
-                duplicate_name: unparse_expr(expr, checker.stylist),
+                duplicate_name: checker.generator().expr(expr),
             },
             expr.range(),
         );
@@ -72,17 +72,16 @@ fn traverse_union<'a>(
             let parent = parent.expect("Parent node must exist");
 
             // SAFETY: Parent node must have been a `BinOp` in order for us to have traversed it.
-            let ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) = &parent.node else {
+            let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = parent else {
                 panic!("Parent node must be a BinOp");
             };
 
             // Replace the parent with its non-duplicate child.
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(
-                    if expr.node == left.node { right } else { left },
-                    checker.stylist,
-                ),
+                checker
+                    .generator()
+                    .expr(if expr == left.as_ref() { right } else { left }),
                 parent.range(),
             )));
         }

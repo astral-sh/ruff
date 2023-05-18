@@ -6,15 +6,15 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    self, Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr,
-    ExprContext, ExprKind, KeywordData, Operator, Pattern, PatternKind, Stmt, StmtKind, Suite,
-    Unaryop,
+    self, Arg, Arguments, Comprehension, Constant, Excepthandler, Expr, ExprContext, Keyword,
+    Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
 };
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
+use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::{Node, RefEquality};
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
@@ -135,6 +135,33 @@ impl<'a> Checker<'a> {
         }
         noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
     }
+
+    /// Create a [`Generator`] to generate source code based on the current AST state.
+    pub fn generator(&self) -> Generator {
+        fn quote_style(context: &Context, locator: &Locator, indexer: &Indexer) -> Option<Quote> {
+            if !context.in_f_string() {
+                return None;
+            }
+
+            // Find the quote character used to start the containing f-string.
+            let expr = context.expr()?;
+            let string_range = indexer.f_string_range(expr.start())?;
+            let trailing_quote = trailing_quote(locator.slice(string_range))?;
+
+            // Invert the quote character, if it's a single quote.
+            match *trailing_quote {
+                "'" => Some(Quote::Double),
+                "\"" => Some(Quote::Single),
+                _ => None,
+            }
+        }
+
+        Generator::new(
+            self.stylist.indentation(),
+            quote_style(&self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
+            self.stylist.line_ending(),
+        )
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for Checker<'a>
@@ -145,13 +172,13 @@ where
         self.ctx.push_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
-        match &stmt.node {
-            StmtKind::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+        match stmt {
+            Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
                 // Allow __future__ imports until we see a non-__future__ import.
                 if let Some("__future__") = module.as_deref() {
                     if names
                         .iter()
-                        .any(|alias| alias.node.name.as_str() == "annotations")
+                        .any(|alias| alias.name.as_str() == "annotations")
                     {
                         self.ctx.flags |= ContextFlags::FUTURE_ANNOTATIONS;
                     }
@@ -159,7 +186,7 @@ where
                     self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
                 }
             }
-            StmtKind::Import(_) => {
+            Stmt::Import(_) => {
                 self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
             }
             _ => {
@@ -174,7 +201,7 @@ where
         }
 
         // Track each top-level import, to guide import insertions.
-        if matches!(&stmt.node, StmtKind::Import(_) | StmtKind::ImportFrom(_)) {
+        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
             if self.ctx.at_top_level() {
                 self.importer.visit_import(stmt);
             }
@@ -185,8 +212,8 @@ where
         let flags_snapshot = self.ctx.flags;
 
         // Pre-visit.
-        match &stmt.node {
-            StmtKind::Global(ast::StmtGlobal { names }) => {
+        match stmt {
+            Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
                 if !self.ctx.scope_id.is_global() {
                     // Add the binding to the current scope.
@@ -216,7 +243,7 @@ where
                         }));
                 }
             }
-            StmtKind::Nonlocal(ast::StmtNonlocal { names }) => {
+            Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
                 if !self.ctx.scope_id.is_global() {
                     let context = self.ctx.execution_context();
@@ -272,7 +299,7 @@ where
                         }));
                 }
             }
-            StmtKind::Break => {
+            Stmt::Break(_) => {
                 if self.settings.rules.enabled(Rule::BreakOutsideLoop) {
                     if let Some(diagnostic) =
                         pyflakes::rules::break_outside_loop(stmt, &mut self.ctx.parents().skip(1))
@@ -281,7 +308,7 @@ where
                     }
                 }
             }
-            StmtKind::Continue => {
+            Stmt::Continue(_) => {
                 if self.settings.rules.enabled(Rule::ContinueOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                         stmt,
@@ -291,7 +318,7 @@ where
                     }
                 }
             }
-            StmtKind::FunctionDef(ast::StmtFunctionDef {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
                 decorator_list,
                 returns,
@@ -299,7 +326,7 @@ where
                 body,
                 ..
             })
-            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
                 decorator_list,
                 returns,
@@ -597,7 +624,7 @@ where
                     }
                 }
             }
-            StmtKind::Return(_) => {
+            Stmt::Return(_) => {
                 if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
                     pyflakes::rules::return_outside_function(self, stmt);
                 }
@@ -605,12 +632,13 @@ where
                     pylint::rules::return_in_init(self, stmt);
                 }
             }
-            StmtKind::ClassDef(ast::StmtClassDef {
+            Stmt::ClassDef(ast::StmtClassDef {
                 name,
                 bases,
                 keywords,
                 decorator_list,
                 body,
+                range: _,
             }) => {
                 if self
                     .settings
@@ -766,7 +794,7 @@ where
                     pylint::rules::duplicate_bases(self, name, bases);
                 }
             }
-            StmtKind::Import(ast::StmtImport { names }) => {
+            Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 if self.settings.rules.enabled(Rule::MultipleImportsOnOneLine) {
                     pycodestyle::rules::multiple_imports_on_one_line(self, stmt, names);
                 }
@@ -780,10 +808,10 @@ where
 
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for name in names.iter() {
-                        if let Some(asname) = name.node.asname.as_ref() {
+                        if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
-                            pylint::rules::global_statement(self, &name.node.name);
+                            pylint::rules::global_statement(self, &name.name);
                         }
                     }
                 }
@@ -796,8 +824,8 @@ where
                 }
 
                 for alias in names {
-                    if &alias.node.name == "__future__" {
-                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                    if &alias.name == "__future__" {
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
                             Binding {
@@ -821,11 +849,11 @@ where
                                 ));
                             }
                         }
-                    } else if alias.node.name.contains('.') && alias.node.asname.is_none() {
+                    } else if alias.name.contains('.') && alias.asname.is_none() {
                         // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
                         // "foo.bar".
-                        let name = alias.node.name.split('.').next().unwrap();
-                        let full_name = &alias.node.name;
+                        let name = alias.name.split('.').next().unwrap();
+                        let full_name = &alias.name;
                         self.add_binding(
                             name,
                             Binding {
@@ -846,13 +874,12 @@ where
                         // Treat explicit re-export as usage (e.g., `from .applications
                         // import FastAPI as FastAPI`).
                         let is_explicit_reexport = alias
-                            .node
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname == &alias.node.name);
+                            .map_or(false, |asname| asname == &alias.name);
 
-                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
-                        let full_name = &alias.node.name;
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let full_name = &alias.name;
                         self.add_binding(
                             name,
                             Binding {
@@ -871,7 +898,7 @@ where
                             },
                         );
 
-                        if let Some(asname) = &alias.node.asname {
+                        if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
                                     self, asname, stmt,
@@ -883,7 +910,7 @@ where
                     // flake8-debugger
                     if self.settings.rules.enabled(Rule::Debugger) {
                         if let Some(diagnostic) =
-                            flake8_debugger::rules::debugger_import(stmt, None, &alias.node.name)
+                            flake8_debugger::rules::debugger_import(stmt, None, &alias.name)
                         {
                             self.diagnostics.push(diagnostic);
                         }
@@ -893,7 +920,7 @@ where
                     if self.settings.rules.enabled(Rule::BannedApi) {
                         flake8_tidy_imports::banned_api::name_or_parent_is_banned(
                             self,
-                            &alias.node.name,
+                            &alias.name,
                             alias,
                         );
                     }
@@ -915,8 +942,8 @@ where
                         }
                     }
 
-                    if let Some(asname) = &alias.node.asname {
-                        let name = alias.node.name.split('.').last().unwrap();
+                    if let Some(asname) = &alias.asname {
+                        let name = alias.name.split('.').last().unwrap();
                         if self
                             .settings
                             .rules
@@ -992,8 +1019,8 @@ where
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::conventional_import_alias(
                                 stmt,
-                                &alias.node.name,
-                                alias.node.asname.as_deref(),
+                                &alias.name,
+                                alias.asname.as_deref(),
                                 &self.settings.flake8_import_conventions.aliases,
                             )
                         {
@@ -1002,11 +1029,11 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::BannedImportAlias) {
-                        if let Some(asname) = &alias.node.asname {
+                        if let Some(asname) = &alias.asname {
                             if let Some(diagnostic) =
                                 flake8_import_conventions::rules::banned_import_alias(
                                     stmt,
-                                    &alias.node.name,
+                                    &alias.name,
                                     asname,
                                     &self.settings.flake8_import_conventions.banned_aliases,
                                 )
@@ -1023,18 +1050,19 @@ where
                     {
                         if let Some(diagnostic) = flake8_pytest_style::rules::import(
                             stmt,
-                            &alias.node.name,
-                            alias.node.asname.as_deref(),
+                            &alias.name,
+                            alias.asname.as_deref(),
                         ) {
                             self.diagnostics.push(diagnostic);
                         }
                     }
                 }
             }
-            StmtKind::ImportFrom(ast::StmtImportFrom {
+            Stmt::ImportFrom(ast::StmtImportFrom {
                 names,
                 module,
                 level,
+                range: _,
             }) => {
                 let module = module.as_deref();
                 let level = level.map(|level| level.to_u32());
@@ -1048,10 +1076,10 @@ where
 
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for name in names.iter() {
-                        if let Some(asname) = name.node.asname.as_ref() {
+                        if let Some(asname) = name.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
                         } else {
-                            pylint::rules::global_statement(self, &name.node.name);
+                            pylint::rules::global_statement(self, &name.name);
                         }
                     }
                 }
@@ -1086,12 +1114,12 @@ where
                         );
 
                         for alias in names {
-                            if &alias.node.name == "*" {
+                            if &alias.name == "*" {
                                 continue;
                             }
                             flake8_tidy_imports::banned_api::name_is_banned(
                                 self,
-                                format!("{module}.{}", alias.node.name),
+                                format!("{module}.{}", alias.name),
                                 alias,
                             );
                         }
@@ -1112,7 +1140,7 @@ where
 
                 for alias in names {
                     if let Some("__future__") = module {
-                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
                             Binding {
@@ -1140,7 +1168,7 @@ where
                                 ));
                             }
                         }
-                    } else if &alias.node.name == "*" {
+                    } else if &alias.name == "*" {
                         self.ctx
                             .scope_mut()
                             .add_star_import(StarImportation { level, module });
@@ -1174,7 +1202,7 @@ where
                             ));
                         }
                     } else {
-                        if let Some(asname) = &alias.node.asname {
+                        if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
                                     self, asname, stmt,
@@ -1185,17 +1213,16 @@ where
                         // Treat explicit re-export as usage (e.g., `from .applications
                         // import FastAPI as FastAPI`).
                         let is_explicit_reexport = alias
-                            .node
                             .asname
                             .as_ref()
-                            .map_or(false, |asname| asname == &alias.node.name);
+                            .map_or(false, |asname| asname == &alias.name);
 
                         // Given `from foo import bar`, `name` would be "bar" and `full_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `full_name` would be "foo.bar".
-                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let full_name =
-                            helpers::format_import_from_member(level, module, &alias.node.name);
+                            helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
                             Binding {
@@ -1236,7 +1263,7 @@ where
                     // flake8-debugger
                     if self.settings.rules.enabled(Rule::Debugger) {
                         if let Some(diagnostic) =
-                            flake8_debugger::rules::debugger_import(stmt, module, &alias.node.name)
+                            flake8_debugger::rules::debugger_import(stmt, module, &alias.name)
                         {
                             self.diagnostics.push(diagnostic);
                         }
@@ -1244,12 +1271,12 @@ where
 
                     if self.settings.rules.enabled(Rule::UnconventionalImportAlias) {
                         let full_name =
-                            helpers::format_import_from_member(level, module, &alias.node.name);
+                            helpers::format_import_from_member(level, module, &alias.name);
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::conventional_import_alias(
                                 stmt,
                                 &full_name,
-                                alias.node.asname.as_deref(),
+                                alias.asname.as_deref(),
                                 &self.settings.flake8_import_conventions.aliases,
                             )
                         {
@@ -1258,9 +1285,9 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::BannedImportAlias) {
-                        if let Some(asname) = &alias.node.asname {
+                        if let Some(asname) = &alias.asname {
                             let full_name =
-                                helpers::format_import_from_member(level, module, &alias.node.name);
+                                helpers::format_import_from_member(level, module, &alias.name);
                             if let Some(diagnostic) =
                                 flake8_import_conventions::rules::banned_import_alias(
                                     stmt,
@@ -1274,7 +1301,7 @@ where
                         }
                     }
 
-                    if let Some(asname) = &alias.node.asname {
+                    if let Some(asname) = &alias.asname {
                         if self
                             .settings
                             .rules
@@ -1282,7 +1309,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    &alias.node.name,
+                                    &alias.name,
                                     asname,
                                     alias,
                                     stmt,
@@ -1299,7 +1326,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    &alias.node.name,
+                                    &alias.name,
                                     asname,
                                     alias,
                                     stmt,
@@ -1316,7 +1343,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    &alias.node.name,
+                                    &alias.name,
                                     asname,
                                     alias,
                                     stmt,
@@ -1333,7 +1360,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    &alias.node.name,
+                                    &alias.name,
                                     asname,
                                     alias,
                                     stmt,
@@ -1350,7 +1377,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    &alias.node.name,
+                                    &alias.name,
                                     asname,
                                     alias,
                                     stmt,
@@ -1387,7 +1414,7 @@ where
                     }
                 }
             }
-            StmtKind::Raise(ast::StmtRaise { exc, .. }) => {
+            Stmt::Raise(ast::StmtRaise { exc, .. }) => {
                 if self.settings.rules.enabled(Rule::RaiseNotImplemented) {
                     if let Some(expr) = exc {
                         pyflakes::rules::raise_not_implemented(self, expr);
@@ -1432,16 +1459,21 @@ where
                     }
                 }
             }
-            StmtKind::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
                 self.handle_node_load(target);
 
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
-                    if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+                    if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                         pylint::rules::global_statement(self, id);
                     }
                 }
             }
-            StmtKind::If(ast::StmtIf { test, body, orelse }) => {
+            Stmt::If(ast::StmtIf {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
                 if self.settings.rules.enabled(Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
@@ -1516,7 +1548,11 @@ where
                     }
                 }
             }
-            StmtKind::Assert(ast::StmtAssert { test, msg }) => {
+            Stmt::Assert(ast::StmtAssert {
+                test,
+                msg,
+                range: _,
+            }) => {
                 if !self.ctx.in_type_checking_block() {
                     if self.settings.rules.enabled(Rule::Assert) {
                         self.diagnostics
@@ -1547,7 +1583,7 @@ where
                     pygrep_hooks::rules::non_existent_mock_method(self, test);
                 }
             }
-            StmtKind::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body, .. }) => {
                 if self.settings.rules.enabled(Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
@@ -1570,7 +1606,7 @@ where
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
             }
-            StmtKind::While(ast::StmtWhile { body, orelse, .. }) => {
+            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
@@ -1578,14 +1614,14 @@ where
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
             }
-            StmtKind::For(ast::StmtFor {
+            Stmt::For(ast::StmtFor {
                 target,
                 body,
                 iter,
                 orelse,
                 ..
             })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor {
+            | Stmt::AsyncFor(ast::StmtAsyncFor {
                 target,
                 body,
                 iter,
@@ -1614,7 +1650,7 @@ where
                 if self.settings.rules.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
-                if matches!(stmt.node, StmtKind::For(_)) {
+                if matches!(stmt, Stmt::For(_)) {
                     if self.settings.rules.enabled(Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
@@ -1627,17 +1663,19 @@ where
                     }
                 }
             }
-            StmtKind::Try(ast::StmtTry {
+            Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             })
-            | StmtKind::TryStar(ast::StmtTryStar {
+            | Stmt::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             }) => {
                 if self.settings.rules.enabled(Rule::DefaultExceptNotLast) {
                     if let Some(diagnostic) =
@@ -1689,11 +1727,14 @@ where
                 if self.settings.rules.enabled(Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body, handlers);
                 }
+                if self.settings.rules.enabled(Rule::UselessTryExcept) {
+                    tryceratops::rules::useless_try_except(self, handlers);
+                }
                 if self.settings.rules.enabled(Rule::ErrorInsteadOfException) {
                     tryceratops::rules::error_instead_of_exception(self, handlers);
                 }
             }
-            StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 if self.settings.rules.enabled(Rule::LambdaAssignment) {
                     if let [target] = &targets[..] {
                         pycodestyle::rules::lambda_assignment(self, target, value, None, stmt);
@@ -1714,7 +1755,7 @@ where
 
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
-                        if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+                        if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
                     }
@@ -1752,11 +1793,11 @@ where
                 }
 
                 if self.is_stub {
-                    if self
-                        .settings
-                        .rules
-                        .any_enabled(&[Rule::UnprefixedTypeParam, Rule::AssignmentDefaultInStub])
-                    {
+                    if self.settings.rules.any_enabled(&[
+                        Rule::UnprefixedTypeParam,
+                        Rule::AssignmentDefaultInStub,
+                        Rule::UnannotatedAssignmentInStub,
+                    ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
                         if !self.ctx.scopes().any(|scope| scope.kind.is_function()) {
                             if self.settings.rules.enabled(Rule::UnprefixedTypeParam) {
@@ -1765,11 +1806,20 @@ where
                             if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
                                 flake8_pyi::rules::assignment_default_in_stub(self, targets, value);
                             }
+                            if self
+                                .settings
+                                .rules
+                                .enabled(Rule::UnannotatedAssignmentInStub)
+                            {
+                                flake8_pyi::rules::unannotated_assignment_in_stub(
+                                    self, targets, value,
+                                );
+                            }
                         }
                     }
                 }
             }
-            StmtKind::AnnAssign(ast::StmtAnnAssign {
+            Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
                 value,
                 annotation,
@@ -1819,16 +1869,16 @@ where
                     }
                 }
             }
-            StmtKind::Delete(ast::StmtDelete { targets }) => {
+            Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
-                        if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+                        if let Expr::Name(ast::ExprName { id, .. }) = target {
                             pylint::rules::global_statement(self, id);
                         }
                     }
                 }
             }
-            StmtKind::Expr(ast::StmtExpr { value }) => {
+            Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
                 if self.settings.rules.enabled(Rule::UselessComparison) {
                     flake8_bugbear::rules::useless_comparison(self, value);
                 }
@@ -1850,8 +1900,8 @@ where
         }
 
         // Recurse.
-        match &stmt.node {
-            StmtKind::FunctionDef(ast::StmtFunctionDef {
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
                 body,
                 name,
                 args,
@@ -1859,7 +1909,7 @@ where
                 returns,
                 ..
             })
-            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 body,
                 name,
                 args,
@@ -1878,7 +1928,7 @@ where
                 let runtime_annotation = !self.ctx.future_annotations();
 
                 for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
+                    if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
                         } else {
@@ -1887,7 +1937,7 @@ where
                     }
                 }
                 for arg in &args.args {
-                    if let Some(expr) = &arg.node.annotation {
+                    if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
                         } else {
@@ -1896,7 +1946,7 @@ where
                     }
                 }
                 if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.node.annotation {
+                    if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
                         } else {
@@ -1905,7 +1955,7 @@ where
                     }
                 }
                 for arg in &args.kwonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
+                    if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
                         } else {
@@ -1914,7 +1964,7 @@ where
                     }
                 }
                 if let Some(arg) = &args.kwarg {
-                    if let Some(expr) = &arg.node.annotation {
+                    if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
                             self.visit_type_definition(expr);
                         } else {
@@ -1986,18 +2036,19 @@ where
                     body,
                     args,
                     decorator_list,
-                    async_: matches!(stmt.node, StmtKind::AsyncFunctionDef(_)),
+                    async_: matches!(stmt, Stmt::AsyncFunctionDef(_)),
                     globals,
                 }));
 
                 self.deferred.functions.push(self.ctx.snapshot());
             }
-            StmtKind::ClassDef(ast::StmtClassDef {
+            Stmt::ClassDef(ast::StmtClassDef {
                 body,
                 name,
                 bases,
                 keywords,
                 decorator_list,
+                range: _,
             }) => {
                 for expr in bases {
                     self.visit_expr(expr);
@@ -2050,17 +2101,19 @@ where
 
                 self.visit_body(body);
             }
-            StmtKind::Try(ast::StmtTry {
+            Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             })
-            | StmtKind::TryStar(ast::StmtTryStar {
+            | Stmt::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
+                range: _,
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
@@ -2096,7 +2149,7 @@ where
                 self.visit_body(orelse);
                 self.visit_body(finalbody);
             }
-            StmtKind::AnnAssign(ast::StmtAnnAssign {
+            Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
                 annotation,
                 value,
@@ -2144,18 +2197,32 @@ where
                 }
                 self.visit_expr(target);
             }
-            StmtKind::Assert(ast::StmtAssert { test, msg }) => {
+            Stmt::Assert(ast::StmtAssert {
+                test,
+                msg,
+                range: _,
+            }) => {
                 self.visit_boolean_test(test);
                 if let Some(expr) = msg {
                     self.visit_expr(expr);
                 }
             }
-            StmtKind::While(ast::StmtWhile { test, body, orelse }) => {
+            Stmt::While(ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
                 self.visit_body(orelse);
             }
-            StmtKind::If(ast::StmtIf { test, body, orelse }) => {
+            Stmt::If(ast::StmtIf {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
                 self.visit_boolean_test(test);
 
                 if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
@@ -2174,12 +2241,12 @@ where
         };
 
         // Post-visit.
-        match &stmt.node {
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {
+        match stmt {
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 self.ctx.pop_scope();
                 self.ctx.pop_definition();
             }
-            StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => {
+            Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
                 self.ctx.pop_scope();
                 self.ctx.pop_definition();
                 self.add_binding(
@@ -2216,10 +2283,10 @@ where
             && self.ctx.in_type_definition()
             && self.ctx.future_annotations()
         {
-            if let ExprKind::Constant(ast::ExprConstant {
+            if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 ..
-            }) = &expr.node
+            }) = expr
             {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
@@ -2240,12 +2307,12 @@ where
         // the node.
         let flags_snapshot = self.ctx.flags;
 
-        // If we're in a boolean test (e.g., the `test` of a `StmtKind::If`), but now within a
+        // If we're in a boolean test (e.g., the `test` of a `Stmt::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
         if !matches!(
-            expr.node,
-            ExprKind::BoolOp(_)
-                | ExprKind::UnaryOp(ast::ExprUnaryOp {
+            expr,
+            Expr::BoolOp(_)
+                | Expr::UnaryOp(ast::ExprUnaryOp {
                     op: Unaryop::Not,
                     ..
                 })
@@ -2254,8 +2321,8 @@ where
         }
 
         // Pre-visit.
-        match &expr.node {
-            ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        match expr {
+            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.settings.rules.any_enabled(&[
                     Rule::MissingFutureAnnotationsImport,
@@ -2313,9 +2380,19 @@ where
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, expr);
                 }
+
+                pandas_vet::rules::subscript(self, value, expr);
             }
-            ExprKind::Tuple(ast::ExprTuple { elts, ctx })
-            | ExprKind::List(ast::ExprList { elts, ctx }) => {
+            Expr::Tuple(ast::ExprTuple {
+                elts,
+                ctx,
+                range: _,
+            })
+            | Expr::List(ast::ExprList {
+                elts,
+                ctx,
+                range: _,
+            }) => {
                 if matches!(ctx, ExprContext::Store) {
                     let check_too_many_expressions = self
                         .settings
@@ -2335,7 +2412,7 @@ where
                     }
                 }
             }
-            ExprKind::Name(ast::ExprName { id, ctx }) => {
+            Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 match ctx {
                     ExprContext::Load => {
                         if self.settings.rules.enabled(Rule::TypingTextStrAlias) {
@@ -2422,7 +2499,7 @@ where
                     pylint::rules::load_before_global_declaration(self, id, expr);
                 }
             }
-            ExprKind::Attribute(ast::ExprAttribute { attr, value, .. }) => {
+            Expr::Attribute(ast::ExprAttribute { attr, value, .. }) => {
                 // Ex) typing.List[...]
                 if self.settings.rules.any_enabled(&[
                     Rule::MissingFutureAnnotationsImport,
@@ -2478,12 +2555,13 @@ where
                 if self.settings.rules.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
                 }
-                pandas_vet::rules::check_attr(self, attr, value, expr);
+                pandas_vet::rules::attr(self, attr, value, expr);
             }
-            ExprKind::Call(ast::ExprCall {
+            Expr::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
+                range: _,
             }) => {
                 if self.settings.rules.any_enabled(&[
                     // pyflakes
@@ -2498,13 +2576,12 @@ where
                     // flynt
                     Rule::StaticJoinToFString,
                 ]) {
-                    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node
-                    {
+                    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                         let attr = attr.as_str();
-                        if let ExprKind::Constant(ast::ExprConstant {
+                        if let Expr::Constant(ast::ExprConstant {
                             value: Constant::Str(value),
                             ..
-                        }) = &value.node
+                        }) = value.as_ref()
                         {
                             if attr == "join" {
                                 // "...".join(...) call
@@ -2939,7 +3016,7 @@ where
                         self, args, func,
                     );
                 }
-                if let ExprKind::Name(ast::ExprName { id, ctx }) = &func.node {
+                if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = self.ctx.scope_mut();
                         scope.uses_locals = true;
@@ -2962,7 +3039,7 @@ where
                             .into_iter(),
                     );
                 }
-                pandas_vet::rules::check_call(self, func);
+                pandas_vet::rules::call(self, func);
 
                 if self.settings.rules.enabled(Rule::PandasUseOfPdMerge) {
                     if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
@@ -3214,7 +3291,11 @@ where
                     flake8_django::rules::locals_in_render_function(self, func, args, keywords);
                 }
             }
-            ExprKind::Dict(ast::ExprDict { keys, values }) => {
+            Expr::Dict(ast::ExprDict {
+                keys,
+                values,
+                range: _,
+            }) => {
                 if self.settings.rules.any_enabled(&[
                     Rule::MultiValueRepeatedKeyLiteral,
                     Rule::MultiValueRepeatedKeyVariable,
@@ -3226,7 +3307,7 @@ where
                     flake8_pie::rules::unnecessary_spread(self, keys, values);
                 }
             }
-            ExprKind::Yield(_) => {
+            Expr::Yield(_) => {
                 if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
@@ -3234,7 +3315,7 @@ where
                     pylint::rules::yield_in_init(self, expr);
                 }
             }
-            ExprKind::YieldFrom(_) => {
+            Expr::YieldFrom(_) => {
                 if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
@@ -3242,7 +3323,7 @@ where
                     pylint::rules::yield_in_init(self, expr);
                 }
             }
-            ExprKind::Await(_) => {
+            Expr::Await(_) => {
                 if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
@@ -3250,7 +3331,7 @@ where
                     pylint::rules::await_outside_async(self, expr);
                 }
             }
-            ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
+            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
                 if self
                     .settings
                     .rules
@@ -3262,7 +3343,7 @@ where
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
-            ExprKind::BinOp(ast::ExprBinOp {
+            Expr::BinOp(ast::ExprBinOp {
                 left,
                 op: Operator::RShift,
                 ..
@@ -3271,15 +3352,16 @@ where
                     pyflakes::rules::invalid_print_syntax(self, left);
                 }
             }
-            ExprKind::BinOp(ast::ExprBinOp {
+            Expr::BinOp(ast::ExprBinOp {
                 left,
                 op: Operator::Mod,
                 right,
+                range: _,
             }) => {
-                if let ExprKind::Constant(ast::ExprConstant {
+                if let Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(value),
                     ..
-                }) = &left.node
+                }) = left.as_ref()
                 {
                     if self.settings.rules.any_enabled(&[
                         Rule::PercentFormatInvalidFormat,
@@ -3404,7 +3486,7 @@ where
                     }
                 }
             }
-            ExprKind::BinOp(ast::ExprBinOp {
+            Expr::BinOp(ast::ExprBinOp {
                 op: Operator::Add, ..
             }) => {
                 if self
@@ -3427,7 +3509,7 @@ where
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
-            ExprKind::BinOp(ast::ExprBinOp {
+            Expr::BinOp(ast::ExprBinOp {
                 op: Operator::BitOr,
                 ..
             }) => {
@@ -3436,8 +3518,8 @@ where
                         && self.ctx.in_type_definition()
                         && self.ctx.expr_parent().map_or(true, |parent| {
                             !matches!(
-                                parent.node,
-                                ExprKind::BinOp(ast::ExprBinOp {
+                                parent,
+                                Expr::BinOp(ast::ExprBinOp {
                                     op: Operator::BitOr,
                                     ..
                                 })
@@ -3448,14 +3530,18 @@ where
                     }
                 }
             }
-            ExprKind::UnaryOp(ast::ExprUnaryOp { op, operand }) => {
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op,
+                operand,
+                range: _,
+            }) => {
                 let check_not_in = self.settings.rules.enabled(Rule::NotInTest);
                 let check_not_is = self.settings.rules.enabled(Rule::NotIsTest);
                 if check_not_in || check_not_is {
                     pycodestyle::rules::not_tests(
                         self,
                         expr,
-                        op,
+                        *op,
                         operand,
                         check_not_in,
                         check_not_is,
@@ -3463,23 +3549,24 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::UnaryPrefixIncrement) {
-                    flake8_bugbear::rules::unary_prefix_increment(self, expr, op, operand);
+                    flake8_bugbear::rules::unary_prefix_increment(self, expr, *op, operand);
                 }
 
                 if self.settings.rules.enabled(Rule::NegateEqualOp) {
-                    flake8_simplify::rules::negation_with_equal_op(self, expr, op, operand);
+                    flake8_simplify::rules::negation_with_equal_op(self, expr, *op, operand);
                 }
                 if self.settings.rules.enabled(Rule::NegateNotEqualOp) {
-                    flake8_simplify::rules::negation_with_not_equal_op(self, expr, op, operand);
+                    flake8_simplify::rules::negation_with_not_equal_op(self, expr, *op, operand);
                 }
                 if self.settings.rules.enabled(Rule::DoubleNegation) {
-                    flake8_simplify::rules::double_negation(self, expr, op, operand);
+                    flake8_simplify::rules::double_negation(self, expr, *op, operand);
                 }
             }
-            ExprKind::Compare(ast::ExprCompare {
+            Expr::Compare(ast::ExprCompare {
                 left,
                 ops,
                 comparators,
+                range: _,
             }) => {
                 let check_none_comparisons = self.settings.rules.enabled(Rule::NoneComparison);
                 let check_true_false_comparisons =
@@ -3574,9 +3661,10 @@ where
                     }
                 }
             }
-            ExprKind::Constant(ast::ExprConstant {
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 kind,
+                range: _,
             }) => {
                 if self.ctx.in_type_definition()
                     && !self.ctx.in_literal()
@@ -3612,9 +3700,15 @@ where
                     pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
                 }
             }
-            ExprKind::Lambda(ast::ExprLambda { args, body }) => {
+            Expr::Lambda(
+                lambda @ ast::ExprLambda {
+                    args,
+                    body,
+                    range: _,
+                },
+            ) => {
                 if self.settings.rules.enabled(Rule::ReimplementedListBuiltin) {
-                    flake8_pie::rules::reimplemented_list_builtin(self, expr);
+                    flake8_pie::rules::reimplemented_list_builtin(self, lambda);
                 }
 
                 // Visit the default arguments, but avoid the body, which will be deferred.
@@ -3627,7 +3721,12 @@ where
                 self.ctx
                     .push_scope(ScopeKind::Lambda(Lambda { args, body }));
             }
-            ExprKind::IfExp(ast::ExprIfExp { test, body, orelse }) => {
+            Expr::IfExp(ast::ExprIfExp {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
                 if self.settings.rules.enabled(Rule::IfExprWithTrueFalse) {
                     flake8_simplify::rules::explicit_true_false_in_ifexpr(
                         self, expr, test, body, orelse,
@@ -3642,8 +3741,16 @@ where
                     flake8_simplify::rules::twisted_arms_in_ifexpr(self, expr, test, body, orelse);
                 }
             }
-            ExprKind::ListComp(ast::ExprListComp { elt, generators })
-            | ExprKind::SetComp(ast::ExprSetComp { elt, generators }) => {
+            Expr::ListComp(ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::SetComp(ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+            }) => {
                 if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
                     flake8_comprehensions::rules::unnecessary_list_set_comprehension(
                         self, expr, elt, generators,
@@ -3652,12 +3759,21 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
-            ExprKind::DictComp(ast::ExprDictComp {
+            Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
+                range: _,
             }) => {
                 if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
                     flake8_comprehensions::rules::unnecessary_dict_comprehension(
@@ -3667,17 +3783,41 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
-            ExprKind::GeneratorExp(_) => {
+            Expr::GeneratorExp(ast::ExprGeneratorExp {
+                generators,
+                elt: _,
+                range: _,
+            }) => {
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
-            ExprKind::BoolOp(ast::ExprBoolOp { op, values }) => {
+            Expr::BoolOp(ast::ExprBoolOp {
+                op,
+                values,
+                range: _,
+            }) => {
                 if self.settings.rules.enabled(Rule::RepeatedIsinstanceCalls) {
-                    pylint::rules::repeated_isinstance_calls(self, expr, op, values);
+                    pylint::rules::repeated_isinstance_calls(self, expr, *op, values);
                 }
                 if self.settings.rules.enabled(Rule::MultipleStartsEndsWith) {
                     flake8_pie::rules::multiple_starts_ends_with(self, expr);
@@ -3701,7 +3841,7 @@ where
                     flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
-            ExprKind::FormattedValue(ast::ExprFormattedValue {
+            Expr::FormattedValue(ast::ExprFormattedValue {
                 value, conversion, ..
             }) => {
                 if self
@@ -3716,19 +3856,53 @@ where
         };
 
         // Recurse.
-        match &expr.node {
-            ExprKind::Lambda(_) => {
+        match expr {
+            Expr::ListComp(ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::SetComp(ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::GeneratorExp(ast::ExprGeneratorExp {
+                elt,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(elt);
+            }
+            Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(key);
+                self.visit_expr(value);
+            }
+            Expr::Lambda(_) => {
                 self.deferred.lambdas.push((expr, self.ctx.snapshot()));
             }
-            ExprKind::IfExp(ast::ExprIfExp { test, body, orelse }) => {
+            Expr::IfExp(ast::ExprIfExp {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
                 self.visit_boolean_test(test);
                 self.visit_expr(body);
                 self.visit_expr(orelse);
             }
-            ExprKind::Call(ast::ExprCall {
+            Expr::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
+                range: _,
             }) => {
                 let callable = self.ctx.resolve_call_path(func).and_then(|call_path| {
                     if self.ctx.match_typing_call_path(&call_path, "cast") {
@@ -3790,7 +3964,11 @@ where
                             self.visit_type_definition(expr);
                         }
                         for keyword in keywords {
-                            let KeywordData { arg, value } = &keyword.node;
+                            let Keyword {
+                                arg,
+                                value,
+                                range: _,
+                            } = keyword;
                             if let Some(id) = arg {
                                 if id == "bound" {
                                     self.visit_type_definition(value);
@@ -3805,13 +3983,13 @@ where
 
                         // Ex) NamedTuple("a", [("a", int)])
                         if args.len() > 1 {
-                            match &args[1].node {
-                                ExprKind::List(ast::ExprList { elts, .. })
-                                | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+                            match &args[1] {
+                                Expr::List(ast::ExprList { elts, .. })
+                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                                     for elt in elts {
-                                        match &elt.node {
-                                            ExprKind::List(ast::ExprList { elts, .. })
-                                            | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+                                        match elt {
+                                            Expr::List(ast::ExprList { elts, .. })
+                                            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                                                 if elts.len() == 2 {
                                                     self.visit_non_type_definition(&elts[0]);
                                                     self.visit_type_definition(&elts[1]);
@@ -3827,7 +4005,7 @@ where
 
                         // Ex) NamedTuple("a", a=int)
                         for keyword in keywords {
-                            let KeywordData { value, .. } = &keyword.node;
+                            let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
                     }
@@ -3836,7 +4014,12 @@ where
 
                         // Ex) TypedDict("a", {"a": int})
                         if args.len() > 1 {
-                            if let ExprKind::Dict(ast::ExprDict { keys, values }) = &args[1].node {
+                            if let Expr::Dict(ast::ExprDict {
+                                keys,
+                                values,
+                                range: _,
+                            }) = &args[1]
+                            {
                                 for key in keys.iter().flatten() {
                                     self.visit_non_type_definition(key);
                                 }
@@ -3848,7 +4031,7 @@ where
 
                         // Ex) TypedDict("a", a=int)
                         for keyword in keywords {
-                            let KeywordData { value, .. } = &keyword.node;
+                            let Keyword { value, .. } = keyword;
                             self.visit_type_definition(value);
                         }
                     }
@@ -3863,13 +4046,17 @@ where
                                 self.visit_non_type_definition(arg);
                             }
                             for keyword in keywords {
-                                let KeywordData { value, .. } = &keyword.node;
+                                let Keyword { value, .. } = keyword;
                                 self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
                             for keyword in keywords {
-                                let KeywordData { value, arg } = &keyword.node;
+                                let Keyword {
+                                    value,
+                                    arg,
+                                    range: _,
+                                } = keyword;
                                 if arg.as_ref().map_or(false, |arg| arg == "type") {
                                     self.visit_type_definition(value);
                                 } else {
@@ -3887,13 +4074,18 @@ where
                             self.visit_non_type_definition(arg);
                         }
                         for keyword in keywords {
-                            let KeywordData { value, .. } = &keyword.node;
+                            let Keyword { value, .. } = keyword;
                             self.visit_non_type_definition(value);
                         }
                     }
                 }
             }
-            ExprKind::Subscript(ast::ExprSubscript { value, slice, ctx }) => {
+            Expr::Subscript(ast::ExprSubscript {
+                value,
+                slice,
+                ctx,
+                range: _,
+            }) => {
                 // Only allow annotations in `ExprContext::Load`. If we have, e.g.,
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
                 // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
@@ -3922,8 +4114,11 @@ where
                                     // First argument is a type (including forward references); the
                                     // rest are arbitrary Python objects.
                                     self.visit_expr(value);
-                                    if let ExprKind::Tuple(ast::ExprTuple { elts, ctx }) =
-                                        &slice.node
+                                    if let Expr::Tuple(ast::ExprTuple {
+                                        elts,
+                                        ctx,
+                                        range: _,
+                                    }) = slice.as_ref()
                                     {
                                         if let Some(expr) = elts.first() {
                                             self.visit_expr(expr);
@@ -3934,7 +4129,7 @@ where
                                         }
                                     } else {
                                         error!(
-                                            "Found non-ExprKind::Tuple argument to PEP 593 \
+                                            "Found non-Expr::Tuple argument to PEP 593 \
                                              Annotation."
                                         );
                                     }
@@ -3945,7 +4140,7 @@ where
                     }
                 }
             }
-            ExprKind::JoinedStr(_) => {
+            Expr::JoinedStr(_) => {
                 self.ctx.flags |= ContextFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
@@ -3953,12 +4148,12 @@ where
         }
 
         // Post-visit.
-        match &expr.node {
-            ExprKind::Lambda(_)
-            | ExprKind::GeneratorExp(_)
-            | ExprKind::ListComp(_)
-            | ExprKind::DictComp(_)
-            | ExprKind::SetComp(_) => {
+        match expr {
+            Expr::Lambda(_)
+            | Expr::GeneratorExp(_)
+            | Expr::ListComp(_)
+            | Expr::DictComp(_)
+            | Expr::SetComp(_) => {
                 self.ctx.pop_scope();
             }
             _ => {}
@@ -3968,27 +4163,13 @@ where
         self.ctx.pop_expr();
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
-        if self.settings.rules.enabled(Rule::InDictKeys) {
-            flake8_simplify::rules::key_in_dict_for(
-                self,
-                &comprehension.target,
-                &comprehension.iter,
-            );
-        }
-        self.visit_expr(&comprehension.iter);
-        self.visit_expr(&comprehension.target);
-        for expr in &comprehension.ifs {
-            self.visit_boolean_test(expr);
-        }
-    }
-
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
-        match &excepthandler.node {
-            ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
+        match excepthandler {
+            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                 type_,
                 name,
                 body,
+                range: _,
             }) => {
                 let name = name.as_deref();
                 if self.settings.rules.enabled(Rule::BareExcept) {
@@ -4074,26 +4255,22 @@ where
                         if self.ctx.scope().defines(name) {
                             self.handle_node_store(
                                 name,
-                                &Expr::new(
-                                    name_range,
-                                    ExprKind::Name(ast::ExprName {
-                                        id: name.into(),
-                                        ctx: ExprContext::Store,
-                                    }),
-                                ),
+                                &Expr::Name(ast::ExprName {
+                                    id: name.into(),
+                                    ctx: ExprContext::Store,
+                                    range: name_range,
+                                }),
                             );
                         }
 
                         let definition = self.ctx.scope().get(name).copied();
                         self.handle_node_store(
                             name,
-                            &Expr::new(
-                                name_range,
-                                ExprKind::Name(ast::ExprName {
-                                    id: name.into(),
-                                    ctx: ExprContext::Store,
-                                }),
-                            ),
+                            &Expr::Name(ast::ExprName {
+                                id: name.into(),
+                                ctx: ExprContext::Store,
+                                range: name_range,
+                            }),
                         );
 
                         walk_excepthandler(self, excepthandler);
@@ -4134,8 +4311,8 @@ where
     }
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
-        match &format_spec.node {
-            ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
+        match format_spec {
+            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _ }) => {
                 for value in values {
                     self.visit_expr(value);
                 }
@@ -4194,7 +4371,7 @@ where
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
-            &arg.node.arg,
+            &arg.arg,
             Binding {
                 kind: BindingKind::Argument,
                 runtime_usage: None,
@@ -4209,7 +4386,7 @@ where
 
         if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
             if let Some(diagnostic) =
-                pycodestyle::rules::ambiguous_variable_name(&arg.node.arg, arg.range())
+                pycodestyle::rules::ambiguous_variable_name(&arg.arg, arg.range())
             {
                 self.diagnostics.push(diagnostic);
             }
@@ -4217,7 +4394,7 @@ where
 
         if self.settings.rules.enabled(Rule::InvalidArgumentName) {
             if let Some(diagnostic) = pep8_naming::rules::invalid_argument_name(
-                &arg.node.arg,
+                &arg.arg,
                 arg,
                 &self.settings.pep8_naming.ignore_names,
             ) {
@@ -4226,18 +4403,21 @@ where
         }
 
         if self.settings.rules.enabled(Rule::BuiltinArgumentShadowing) {
-            flake8_builtins::rules::builtin_argument_shadowing(self, &arg.node.arg, arg);
+            flake8_builtins::rules::builtin_argument_shadowing(self, &arg.arg, arg);
         }
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
-        if let PatternKind::MatchAs(ast::PatternMatchAs {
+        if let Pattern::MatchAs(ast::PatternMatchAs {
             name: Some(name), ..
         })
-        | PatternKind::MatchStar(ast::PatternMatchStar { name: Some(name) })
-        | PatternKind::MatchMapping(ast::PatternMatchMapping {
+        | Pattern::MatchStar(ast::PatternMatchStar {
+            name: Some(name),
+            range: _,
+        })
+        | Pattern::MatchMapping(ast::PatternMatchMapping {
             rest: Some(name), ..
-        }) = &pattern.node
+        }) = pattern
         {
             self.add_binding(
                 name,
@@ -4285,6 +4465,58 @@ impl<'a> Checker<'a> {
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
         docstring.is_some()
+    }
+
+    /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
+    /// generator expression, like a list or set comprehension.
+    fn visit_generators(&mut self, generators: &'a [Comprehension]) {
+        let mut generators = generators.iter();
+
+        let Some(generator) = generators.next() else {
+            unreachable!("Generator expression must contain at least one generator");
+        };
+
+        // Generators are compiled as nested functions. (This may change with PEP 709.)
+        // As such, the `iter` of the first generator is evaluated in the outer scope, while all
+        // subsequent nodes are evaluated in the inner scope.
+        //
+        // For example, given:
+        // ```py
+        // class A:
+        //     T = range(10)
+        //
+        //     L = [x for x in T for y in T]
+        // ```
+        //
+        // Conceptually, this is compiled as:
+        // ```py
+        // class A:
+        //     T = range(10)
+        //
+        //     def foo(x=T):
+        //         def bar(y=T):
+        //             pass
+        //         return bar()
+        //     foo()
+        // ```
+        //
+        // Following Python's scoping rules, the `T` in `x=T` is thus evaluated in the outer scope,
+        // while all subsequent reads and writes are evaluated in the inner scope. In particular,
+        // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
+        self.visit_expr(&generator.iter);
+        self.ctx.push_scope(ScopeKind::Generator);
+        self.visit_expr(&generator.target);
+        for expr in &generator.ifs {
+            self.visit_boolean_test(expr);
+        }
+
+        for generator in generators {
+            self.visit_expr(&generator.iter);
+            self.visit_expr(&generator.target);
+            for expr in &generator.ifs {
+                self.visit_boolean_test(expr);
+            }
+        }
     }
 
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
@@ -4397,7 +4629,7 @@ impl<'a> Checker<'a> {
                             );
                             if let Some(parent) = binding.source {
                                 let parent = self.ctx.stmts[parent];
-                                if matches!(parent.node, StmtKind::ImportFrom(_))
+                                if matches!(parent, Stmt::ImportFrom(_))
                                     && parent.range().contains_range(binding.range)
                                 {
                                     diagnostic.set_parent(parent.start());
@@ -4497,20 +4729,19 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        let ExprKind::Name(ast::ExprName { id, .. } )= &expr.node else {
+        let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
         let id = id.as_str();
 
         let mut first_iter = true;
-        let mut in_generator = false;
         let mut import_starred = false;
 
         for scope in self.ctx.scopes.ancestors(self.ctx.scope_id) {
             if scope.kind.is_class() {
                 if id == "__class__" {
                     return;
-                } else if !first_iter && !in_generator {
+                } else if !first_iter {
                     continue;
                 }
             }
@@ -4578,7 +4809,6 @@ impl<'a> Checker<'a> {
             }
 
             first_iter = false;
-            in_generator = matches!(scope.kind, ScopeKind::Generator);
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -4695,8 +4925,8 @@ impl<'a> Checker<'a> {
         }
 
         if matches!(
-            parent.node,
-            StmtKind::AnnAssign(ast::StmtAnnAssign { value: None, .. })
+            parent,
+            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
         ) {
             self.add_binding(
                 id,
@@ -4714,7 +4944,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if matches!(parent.node, StmtKind::For(_) | StmtKind::AsyncFor(_)) {
+        if matches!(parent, Stmt::For(_) | Stmt::AsyncFor(_)) {
             self.add_binding(
                 id,
                 Binding {
@@ -4753,29 +4983,27 @@ impl<'a> Checker<'a> {
         if id == "__all__"
             && scope.kind.is_module()
             && matches!(
-                parent.node,
-                StmtKind::Assign(_) | StmtKind::AugAssign(_) | StmtKind::AnnAssign(_)
+                parent,
+                Stmt::Assign(_) | Stmt::AugAssign(_) | Stmt::AnnAssign(_)
             )
         {
-            if match &parent.node {
-                StmtKind::Assign(ast::StmtAssign { targets, .. }) => {
-                    if let Some(ExprKind::Name(ast::ExprName { id, .. })) =
-                        targets.first().map(|target| &target.node)
-                    {
+            if match parent {
+                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                    if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
                         id == "__all__"
                     } else {
                         false
                     }
                 }
-                StmtKind::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                    if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+                Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+                    if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                         id == "__all__"
                     } else {
                         false
                     }
                 }
-                StmtKind::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                    if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+                    if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                         id == "__all__"
                     } else {
                         false
@@ -4788,7 +5016,7 @@ impl<'a> Checker<'a> {
                         extract_all_names(parent, |name| self.ctx.is_builtin(name));
 
                     // Grab the existing bound __all__ values.
-                    if let StmtKind::AugAssign(_) = &parent.node {
+                    if let Stmt::AugAssign(_) = parent {
                         if let Some(index) = scope.get("__all__") {
                             if let BindingKind::Export(Export { names: existing }) =
                                 &self.ctx.bindings[*index].kind
@@ -4835,7 +5063,7 @@ impl<'a> Checker<'a> {
         if self
             .ctx
             .expr_ancestors()
-            .any(|expr| matches!(expr.node, ExprKind::NamedExpr(_)))
+            .any(|expr| matches!(expr, Expr::NamedExpr(_)))
         {
             self.add_binding(
                 id,
@@ -4869,7 +5097,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let ExprKind::Name(ast::ExprName { id, .. } )= &expr.node else {
+        let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
         if helpers::on_conditional_branch(&mut self.ctx.parents()) {
@@ -4956,16 +5184,14 @@ impl<'a> Checker<'a> {
             for snapshot in deferred_functions {
                 self.ctx.restore(snapshot);
 
-                match &self.ctx.stmt().node {
-                    StmtKind::FunctionDef(ast::StmtFunctionDef { body, args, .. })
-                    | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                        body, args, ..
-                    }) => {
+                match &self.ctx.stmt() {
+                    Stmt::FunctionDef(ast::StmtFunctionDef { body, args, .. })
+                    | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, args, .. }) => {
                         self.visit_arguments(args);
                         self.visit_body(body);
                     }
                     _ => {
-                        unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef")
+                        unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef")
                     }
                 }
 
@@ -4980,11 +5206,16 @@ impl<'a> Checker<'a> {
             for (expr, snapshot) in lambdas {
                 self.ctx.restore(snapshot);
 
-                if let ExprKind::Lambda(ast::ExprLambda { args, body }) = &expr.node {
+                if let Expr::Lambda(ast::ExprLambda {
+                    args,
+                    body,
+                    range: _,
+                }) = expr
+                {
                     self.visit_arguments(args);
                     self.visit_expr(body);
                 } else {
-                    unreachable!("Expected ExprKind::Lambda");
+                    unreachable!("Expected Expr::Lambda");
                 }
 
                 self.deferred.assignments.push(snapshot);
@@ -5037,15 +5268,14 @@ impl<'a> Checker<'a> {
             for snapshot in for_loops {
                 self.ctx.restore(snapshot);
 
-                if let StmtKind::For(ast::StmtFor { target, body, .. })
-                | StmtKind::AsyncFor(ast::StmtAsyncFor { target, body, .. }) =
-                    &self.ctx.stmt().node
+                if let Stmt::For(ast::StmtFor { target, body, .. })
+                | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) = &self.ctx.stmt()
                 {
                     if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                         flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
                     }
                 } else {
-                    unreachable!("Expected ExprKind::For | ExprKind::AsyncFor");
+                    unreachable!("Expected Expr::For | Expr::AsyncFor");
                 }
             }
         }
@@ -5075,11 +5305,13 @@ impl<'a> Checker<'a> {
         // Mark anything referenced in `__all__` as used.
         let all_bindings: Option<(Vec<BindingId>, TextRange)> = {
             let global_scope = self.ctx.global_scope();
-            let all_names: Option<(&Vec<&str>, TextRange)> = global_scope
+            let all_names: Option<(&[&str], TextRange)> = global_scope
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
-                    BindingKind::Export(Export { names }) => Some((names, binding.range)),
+                    BindingKind::Export(Export { names }) => {
+                        Some((names.as_slice(), binding.range))
+                    }
                     _ => None,
                 });
 
@@ -5171,11 +5403,11 @@ impl<'a> Checker<'a> {
                             .dedup()
                             .collect();
                         if !sources.is_empty() {
-                            for &name in names.iter() {
+                            for name in names.iter() {
                                 if !scope.defines(name) {
                                     diagnostics.push(Diagnostic::new(
                                         pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                            name: name.to_string(),
+                                            name: (*name).to_string(),
                                             sources: sources.clone(),
                                         },
                                         *range,
@@ -5194,7 +5426,7 @@ impl<'a> Checker<'a> {
                     if binding.kind.is_global() {
                         if let Some(source) = binding.source {
                             let stmt = &self.ctx.stmts[source];
-                            if matches!(stmt.node, StmtKind::Global(_)) {
+                            if matches!(stmt, Stmt::Global(_)) {
                                 diagnostics.push(Diagnostic::new(
                                     pylint::rules::GlobalVariableNotAssigned {
                                         name: (*name).to_string(),
@@ -5258,7 +5490,7 @@ impl<'a> Checker<'a> {
                                 );
                                 if let Some(source) = rebound.source {
                                     let parent = &self.ctx.stmts[source];
-                                    if matches!(parent.node, StmtKind::ImportFrom(_))
+                                    if matches!(parent, Stmt::ImportFrom(_))
                                         && parent.range().contains_range(rebound.range)
                                     {
                                         diagnostic.set_parent(parent.start());
@@ -5342,7 +5574,7 @@ impl<'a> Checker<'a> {
                     let exceptions = binding.exceptions;
                     let diagnostic_offset = binding.range.start();
                     let child = &self.ctx.stmts[child_id];
-                    let parent_offset = if matches!(child.node, StmtKind::ImportFrom(_)) {
+                    let parent_offset = if matches!(child, Stmt::ImportFrom(_)) {
                         Some(child.start())
                     } else {
                         None
@@ -5418,7 +5650,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom(_)) {
+                        if matches!(child, Stmt::ImportFrom(_)) {
                             diagnostic.set_parent(child.start());
                         }
 
@@ -5452,7 +5684,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom(_)) {
+                        if matches!(child, Stmt::ImportFrom(_)) {
                             diagnostic.set_parent(child.start());
                         }
                         diagnostics.push(diagnostic);

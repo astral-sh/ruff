@@ -106,6 +106,7 @@ UP018.py:25:1: UP018 [*] Unnecessary call to `bytes`
    25 |+b"foo"
 26 26 | bytes(b"""
 27 27 | foo""")
+28 28 | f"{str()}"
 
 UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
    |
@@ -114,6 +115,7 @@ UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
 28 | / bytes(b"""
 29 | | foo""")
    | |_______^ UP018
+30 |   f"{str()}"
    |
    = help: Replace with `bytes`
 
@@ -125,5 +127,22 @@ UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
 27    |-foo""")
    26 |+b"""
    27 |+foo"""
+28 28 | f"{str()}"
+
+UP018.py:28:4: UP018 [*] Unnecessary call to `str`
+   |
+28 | bytes(b"""
+29 | foo""")
+30 | f"{str()}"
+   |    ^^^^^ UP018
+   |
+   = help: Replace with `str`
+
+ℹ Suggested fix
+25 25 | bytes(b"foo")
+26 26 | bytes(b"""
+27 27 | foo""")
+28    |-f"{str()}"
+   28 |+f"{''}"
 
 

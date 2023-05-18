@@ -11,4 +11,14 @@ E11.py:9:1: E112 Expected an indented block
 13 | print()
    |
 
+E11.py:45:1: E112 Expected an indented block
+   |
+45 | #: E112
+46 | if False:  #
+47 | print()
+   |  E112
+48 | #:
+49 | if False:
+   |
+
 

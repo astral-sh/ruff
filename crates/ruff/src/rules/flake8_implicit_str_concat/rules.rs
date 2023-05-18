@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -153,19 +153,25 @@ pub(crate) fn implicit(
 
 /// ISC003
 pub(crate) fn explicit(expr: &Expr) -> Option<Diagnostic> {
-    if let ExprKind::BinOp(ast::ExprBinOp { left, op, right }) = &expr.node {
+    if let Expr::BinOp(ast::ExprBinOp {
+        left,
+        op,
+        right,
+        range: _,
+    }) = expr
+    {
         if matches!(op, Operator::Add) {
             if matches!(
-                left.node,
-                ExprKind::JoinedStr(_)
-                    | ExprKind::Constant(ast::ExprConstant {
+                left.as_ref(),
+                Expr::JoinedStr(_)
+                    | Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..
                     })
             ) && matches!(
-                right.node,
-                ExprKind::JoinedStr(_)
-                    | ExprKind::Constant(ast::ExprConstant {
+                right.as_ref(),
+                Expr::JoinedStr(_)
+                    | Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(..) | Constant::Bytes(..),
                         ..
                     })

@@ -1,12 +1,12 @@
 use std::{fmt, iter};
 
 use regex::Regex;
-use rustpython_parser::ast::{self, Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt, Withitem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::unparse_expr;
+
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::context::Context;
@@ -151,10 +151,10 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
-        match &stmt.node {
+        match stmt {
             // For and async for.
-            StmtKind::For(ast::StmtFor { target, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
+            Stmt::For(ast::StmtFor { target, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { target, .. }) => {
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
@@ -165,7 +165,7 @@ where
                 );
             }
             // With.
-            StmtKind::With(ast::StmtWith { items, .. }) => {
+            Stmt::With(ast::StmtWith { items, .. }) => {
                 self.assignment_targets.extend(
                     assignment_targets_from_with_items(items, self.dummy_variable_rgx).map(
                         |expr| ExprWithInnerBindingKind {
@@ -176,7 +176,7 @@ where
                 );
             }
             // Assignment, augmented assignment, and annotated assignment.
-            StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 // Check for single-target assignments which are of the
                 // form `x = cast(..., x)`.
                 if targets.first().map_or(false, |target| {
@@ -193,7 +193,7 @@ where
                     ),
                 );
             }
-            StmtKind::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
@@ -203,7 +203,7 @@ where
                     }),
                 );
             }
-            StmtKind::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 if value.is_none() {
                     return;
                 }
@@ -219,10 +219,10 @@ where
             _ => {}
         }
         // Decide whether to recurse.
-        match &stmt.node {
+        match stmt {
             // Don't recurse into blocks that create a new scope.
-            StmtKind::ClassDef(_) => {}
-            StmtKind::FunctionDef(_) => {}
+            Stmt::ClassDef(_) => {}
+            Stmt::FunctionDef(_) => {}
             // Otherwise, do recurse.
             _ => {
                 walk_stmt(self, stmt);
@@ -241,16 +241,16 @@ where
 /// x = cast(int, x)
 /// ```
 fn assignment_is_cast_expr(context: &Context, value: &Expr, target: &Expr) -> bool {
-    let ExprKind::Call(ast::ExprCall { func, args, .. }) = &value.node else {
+    let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
         return false;
     };
-    let ExprKind::Name(ast::ExprName { id: target_id, .. }) = &target.node else {
+    let Expr::Name(ast::ExprName { id: target_id, .. }) = target else {
         return false;
     };
     if args.len() != 2 {
         return false;
     }
-    let ExprKind::Name(ast::ExprName { id: arg_id, .. }) = &args[1].node else {
+    let Expr::Name(ast::ExprName { id: arg_id, .. }) = &args[1] else {
         return false;
     };
     if arg_id != target_id {
@@ -266,22 +266,24 @@ fn assignment_targets_from_expr<'a, U>(
     // The Box is necessary to ensure the match arms have the same return type - we can't use
     // a cast to "impl Iterator", since at the time of writing that is only allowed for
     // return types and argument types.
-    match &expr.node {
-        ExprKind::Attribute(ast::ExprAttribute {
+    match expr {
+        Expr::Attribute(ast::ExprAttribute {
             ctx: ExprContext::Store,
             ..
         }) => Box::new(iter::once(expr)),
-        ExprKind::Subscript(ast::ExprSubscript {
+        Expr::Subscript(ast::ExprSubscript {
             ctx: ExprContext::Store,
             ..
         }) => Box::new(iter::once(expr)),
-        ExprKind::Starred(ast::ExprStarred {
+        Expr::Starred(ast::ExprStarred {
             ctx: ExprContext::Store,
             value,
+            range: _,
         }) => Box::new(iter::once(&**value)),
-        ExprKind::Name(ast::ExprName {
+        Expr::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,
+            range: _,
         }) => {
             // Ignore dummy variables.
             if dummy_variable_rgx.is_match(id) {
@@ -290,16 +292,18 @@ fn assignment_targets_from_expr<'a, U>(
                 Box::new(iter::once(expr))
             }
         }
-        ExprKind::List(ast::ExprList {
+        Expr::List(ast::ExprList {
             ctx: ExprContext::Store,
             elts,
+            range: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
         ),
-        ExprKind::Tuple(ast::ExprTuple {
+        Expr::Tuple(ast::ExprTuple {
             ctx: ExprContext::Store,
             elts,
+            range: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
@@ -334,9 +338,9 @@ fn assignment_targets_from_assign_targets<'a, U>(
 /// PLW2901
 pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>) {
     let (outer_assignment_targets, inner_assignment_targets) = match node {
-        Node::Stmt(stmt) => match &stmt.node {
+        Node::Stmt(stmt) => match stmt {
             // With.
-            StmtKind::With(ast::StmtWith { items, body, .. }) => {
+            Stmt::With(ast::StmtWith { items, body, .. }) => {
                 let outer_assignment_targets: Vec<ExprWithOuterBindingKind<'a>> =
                     assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
                         .map(|expr| ExprWithOuterBindingKind {
@@ -355,8 +359,8 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
                 (outer_assignment_targets, visitor.assignment_targets)
             }
             // For and async for.
-            StmtKind::For(ast::StmtFor { target, body, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { target, body, .. }) => {
+            Stmt::For(ast::StmtFor { target, body, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) => {
                 let outer_assignment_targets: Vec<ExprWithOuterBindingKind<'a>> =
                     assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
                         .map(|expr| ExprWithOuterBindingKind {
@@ -389,7 +393,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
             {
                 checker.diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
-                        name: unparse_expr(outer_assignment_target.expr, checker.stylist),
+                        name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },

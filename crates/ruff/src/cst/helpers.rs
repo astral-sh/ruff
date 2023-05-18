@@ -1,7 +1,7 @@
 use libcst_native::{Expression, NameOrAttribute};
 
 fn compose_call_path_inner<'a>(expr: &'a Expression, parts: &mut Vec<&'a str>) {
-    match &expr {
+    match expr {
         Expression::Call(expr) => {
             compose_call_path_inner(&expr.func, parts);
         }

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -23,35 +23,31 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
         if f(stmt) {
             checker.diagnostics.push(Diagnostic::new(
                 JumpStatementInFinally {
-                    name: match &stmt.node {
-                        StmtKind::Break => "break",
-                        StmtKind::Continue => "continue",
-                        StmtKind::Return(_) => "return",
-                        _ => unreachable!(
-                            "Expected StmtKind::Break | StmtKind::Continue | StmtKind::Return"
-                        ),
+                    name: match stmt {
+                        Stmt::Break(_) => "break",
+                        Stmt::Continue(_) => "continue",
+                        Stmt::Return(_) => "return",
+                        _ => unreachable!("Expected Stmt::Break | Stmt::Continue | Stmt::Return"),
                     }
                     .to_owned(),
                 },
                 stmt.range(),
             ));
         }
-        match &stmt.node {
-            StmtKind::While(ast::StmtWhile { body, .. })
-            | StmtKind::For(ast::StmtFor { body, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
-                walk_stmt(checker, body, |stmt| {
-                    matches!(stmt.node, StmtKind::Return(_))
-                });
+        match stmt {
+            Stmt::While(ast::StmtWhile { body, .. })
+            | Stmt::For(ast::StmtFor { body, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
+                walk_stmt(checker, body, |stmt| matches!(stmt, Stmt::Return(_)));
             }
-            StmtKind::If(ast::StmtIf { body, .. })
-            | StmtKind::Try(ast::StmtTry { body, .. })
-            | StmtKind::TryStar(ast::StmtTryStar { body, .. })
-            | StmtKind::With(ast::StmtWith { body, .. })
-            | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            Stmt::If(ast::StmtIf { body, .. })
+            | Stmt::Try(ast::StmtTry { body, .. })
+            | Stmt::TryStar(ast::StmtTryStar { body, .. })
+            | Stmt::With(ast::StmtWith { body, .. })
+            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                 walk_stmt(checker, body, f);
             }
-            StmtKind::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
                     walk_stmt(checker, &case.body, f);
                 }
@@ -64,9 +60,6 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
 /// B012
 pub(crate) fn jump_statement_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
     walk_stmt(checker, finalbody, |stmt| {
-        matches!(
-            stmt.node,
-            StmtKind::Break | StmtKind::Continue | StmtKind::Return(_)
-        )
+        matches!(stmt, Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return(_))
     });
 }

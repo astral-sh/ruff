@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,15 +55,14 @@ impl Violation for ErrorInsteadOfException {
 /// TRY400
 pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
-            &handler.node;
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
         let calls = {
             let mut visitor = LoggerCandidateVisitor::new(&checker.ctx);
             visitor.visit_body(body);
             visitor.calls
         };
         for (expr, func) in calls {
-            if let ExprKind::Attribute(ast::ExprAttribute { attr, .. }) = &func.node {
+            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
                 if attr == "error" {
                     checker
                         .diagnostics

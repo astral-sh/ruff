@@ -27,7 +27,7 @@ pub(crate) fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: 
         .iter()
         .chain(args.kwonlyargs.iter())
         .chain(args.posonlyargs.iter())
-        .filter(|arg| !checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
+        .filter(|arg| !checker.settings.dummy_variable_rgx.is_match(&arg.arg))
         .count();
     if num_args > checker.settings.pylint.max_args {
         checker.diagnostics.push(Diagnostic::new(

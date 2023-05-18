@@ -1,12 +1,11 @@
 use std::hash::{BuildHasherDefault, Hash};
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -73,11 +72,11 @@ enum DictionaryKey<'a> {
 }
 
 fn into_dictionary_key(expr: &Expr) -> Option<DictionaryKey> {
-    match &expr.node {
-        ExprKind::Constant(ast::ExprConstant { value, .. }) => {
+    match expr {
+        Expr::Constant(ast::ExprConstant { value, .. }) => {
             Some(DictionaryKey::Constant(value.into()))
         }
-        ExprKind::Name(ast::ExprName { id, .. }) => Some(DictionaryKey::Variable(id)),
+        Expr::Name(ast::ExprName { id, .. }) => Some(DictionaryKey::Variable(id)),
         _ => None,
     }
 }
@@ -106,7 +105,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
                                 MultiValueRepeatedKeyLiteral {
-                                    name: unparse_expr(key, checker.stylist),
+                                    name: checker.generator().expr(key),
                                     repeated_value: is_duplicate_value,
                                 },
                                 key.range(),

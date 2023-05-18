@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Identifier, Keyword, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{self, Expr, Identifier, Keyword, Ranged, Stmt, Withitem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -59,7 +59,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     if body.len() > 1 {
         true
     } else if let Some(first_body_stmt) = body.first() {
-        !matches!(first_body_stmt.node, StmtKind::Pass)
+        !first_body_stmt.is_pass_stmt()
     } else {
         false
     }
@@ -82,11 +82,11 @@ pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], key
         if checker.settings.rules.enabled(Rule::PytestRaisesTooBroad) {
             let match_keyword = keywords
                 .iter()
-                .find(|kw| kw.node.arg == Some(Identifier::new("match")));
+                .find(|kw| kw.arg == Some(Identifier::new("match")));
 
             if let Some(exception) = args.first() {
                 if let Some(match_keyword) = match_keyword {
-                    if is_empty_or_null_string(&match_keyword.node.value) {
+                    if is_empty_or_null_string(&match_keyword.value) {
                         exception_needs_match(checker, exception);
                     }
                 } else {
@@ -105,8 +105,8 @@ pub(crate) fn complex_raises(
 ) {
     let mut is_too_complex = false;
 
-    let raises_called = items.iter().any(|item| match &item.context_expr.node {
-        ExprKind::Call(ast::ExprCall { func, .. }) => is_pytest_raises(checker, func),
+    let raises_called = items.iter().any(|item| match &item.context_expr {
+        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(checker, func),
         _ => false,
     });
 
@@ -115,20 +115,20 @@ pub(crate) fn complex_raises(
         if body.len() > 1 {
             is_too_complex = true;
         } else if let Some(first_stmt) = body.first() {
-            match &first_stmt.node {
-                StmtKind::With(ast::StmtWith { body, .. })
-                | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+            match first_stmt {
+                Stmt::With(ast::StmtWith { body, .. })
+                | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
                     if is_non_trivial_with_body(body) {
                         is_too_complex = true;
                     }
                 }
-                StmtKind::If(_)
-                | StmtKind::For(_)
-                | StmtKind::Match(_)
-                | StmtKind::AsyncFor(_)
-                | StmtKind::While(_)
-                | StmtKind::Try(_)
-                | StmtKind::TryStar(_) => {
+                Stmt::If(_)
+                | Stmt::For(_)
+                | Stmt::Match(_)
+                | Stmt::AsyncFor(_)
+                | Stmt::While(_)
+                | Stmt::Try(_)
+                | Stmt::TryStar(_) => {
                     is_too_complex = true;
                 }
                 _ => {}

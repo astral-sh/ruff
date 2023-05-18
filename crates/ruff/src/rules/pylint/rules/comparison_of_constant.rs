@@ -1,11 +1,10 @@
 use std::fmt;
 
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Attributed, Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_constant;
 
 use crate::checkers::ast::Checker;
 
@@ -90,25 +89,25 @@ pub(crate) fn comparison_of_constant(
 ) {
     for ((left, right), op) in std::iter::once(left)
         .chain(comparators.iter())
-        .tuple_windows::<(&Attributed<_>, &Attributed<_>)>()
+        .tuple_windows()
         .zip(ops)
     {
         if let (
-            ExprKind::Constant(ast::ExprConstant {
+            Expr::Constant(ast::ExprConstant {
                 value: left_constant,
                 ..
             }),
-            ExprKind::Constant(ast::ExprConstant {
+            Expr::Constant(ast::ExprConstant {
                 value: right_constant,
                 ..
             }),
-        ) = (&left.node, &right.node)
+        ) = (&left, &right)
         {
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
-                    left_constant: unparse_constant(left_constant, checker.stylist),
+                    left_constant: checker.generator().constant(left_constant),
                     op: op.into(),
-                    right_constant: unparse_constant(right_constant, checker.stylist),
+                    right_constant: checker.generator().constant(right_constant),
                 },
                 left.range(),
             );

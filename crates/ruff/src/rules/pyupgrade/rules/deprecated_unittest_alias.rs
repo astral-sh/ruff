@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,13 +49,13 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
 
 /// UP005
 pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &expr.node else {
+    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
         return;
     };
-    let Some(&target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
+    let Some(target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
         return;
     };
-    let ExprKind::Name(ast::ExprName { id, .. }) = &value.node else {
+    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
         return;
     };
     if id != "self" {
@@ -64,7 +64,7 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
     let mut diagnostic = Diagnostic::new(
         DeprecatedUnittestAlias {
             alias: attr.to_string(),
-            target: target.to_string(),
+            target: (*target).to_string(),
         },
         expr.range(),
     );

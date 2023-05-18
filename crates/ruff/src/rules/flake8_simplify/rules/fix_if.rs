@@ -4,6 +4,7 @@ use libcst_native::{
     LeftParen, ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace,
     Statement, Suite,
 };
+use rustpython_parser::ast::Ranged;
 use std::borrow::Cow;
 
 use ruff_diagnostics::Edit;

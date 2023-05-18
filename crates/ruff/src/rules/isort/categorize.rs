@@ -144,7 +144,7 @@ pub(crate) fn categorize_imports<'a>(
     target_version: PythonVersion,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
-    // Categorize `StmtKind::Import`.
+    // Categorize `Stmt::Import`.
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_name(),
@@ -160,7 +160,7 @@ pub(crate) fn categorize_imports<'a>(
             .import
             .insert(alias, comments);
     }
-    // Categorize `StmtKind::ImportFrom` (without re-export).
+    // Categorize `Stmt::ImportFrom` (without re-export).
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_name(),
@@ -176,7 +176,7 @@ pub(crate) fn categorize_imports<'a>(
             .import_from
             .insert(import_from, aliases);
     }
-    // Categorize `StmtKind::ImportFrom` (with re-export).
+    // Categorize `Stmt::ImportFrom` (with re-export).
     for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
             &import_from.module_name(),
@@ -192,7 +192,7 @@ pub(crate) fn categorize_imports<'a>(
             .import_from_as
             .insert((import_from, alias), aliases);
     }
-    // Categorize `StmtKind::ImportFrom` (with star).
+    // Categorize `Stmt::ImportFrom` (with star).
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
             &import_from.module_name(),

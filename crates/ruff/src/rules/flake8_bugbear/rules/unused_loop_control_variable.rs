@@ -19,7 +19,7 @@
 //! ```
 
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -74,7 +74,7 @@ impl Violation for UnusedLoopControlVariable {
     }
 }
 
-/// Identify all `ExprKind::Name` nodes in an AST.
+/// Identify all `Expr::Name` nodes in an AST.
 struct NameFinder<'a> {
     /// A map from identifier to defining expression.
     names: FxHashMap<&'a str, &'a Expr>,
@@ -93,7 +93,7 @@ where
     'b: 'a,
 {
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node {
+        if let Expr::Name(ast::ExprName { id, .. }) = expr {
             self.names.insert(id, expr);
         }
         visitor::walk_expr(self, expr);

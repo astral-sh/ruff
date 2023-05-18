@@ -1,30 +1,30 @@
-use rustpython_parser::ast::{self, Constant, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, Stmt};
 
 use ruff_python_ast::helpers::is_docstring_stmt;
 
 /// Return `true` if a `Stmt` is a "empty": a `pass`, `...`, `raise
 /// NotImplementedError`, or `raise NotImplemented` (with or without arguments).
 fn is_empty_stmt(stmt: &Stmt) -> bool {
-    match &stmt.node {
-        StmtKind::Pass => return true,
-        StmtKind::Expr(ast::StmtExpr { value }) => {
+    match stmt {
+        Stmt::Pass(_) => return true,
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
             return matches!(
-                value.node,
-                ExprKind::Constant(ast::ExprConstant {
+                value.as_ref(),
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Ellipsis,
                     ..
                 })
             )
         }
-        StmtKind::Raise(ast::StmtRaise { exc, cause }) => {
+        Stmt::Raise(ast::StmtRaise { exc, cause, .. }) => {
             if cause.is_none() {
                 if let Some(exc) = exc {
-                    match &exc.node {
-                        ExprKind::Name(ast::ExprName { id, .. }) => {
+                    match exc.as_ref() {
+                        Expr::Name(ast::ExprName { id, .. }) => {
                             return id == "NotImplementedError" || id == "NotImplemented";
                         }
-                        ExprKind::Call(ast::ExprCall { func, .. }) => {
-                            if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+                        Expr::Call(ast::ExprCall { func, .. }) => {
+                            if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                                 return id == "NotImplementedError" || id == "NotImplemented";
                             }
                         }
@@ -39,7 +39,7 @@ fn is_empty_stmt(stmt: &Stmt) -> bool {
 }
 
 pub(crate) fn is_empty(body: &[Stmt]) -> bool {
-    match &body {
+    match body {
         [] => true,
         [stmt] => is_docstring_stmt(stmt) || is_empty_stmt(stmt),
         [docstring, stmt] => is_docstring_stmt(docstring) && is_empty_stmt(stmt),

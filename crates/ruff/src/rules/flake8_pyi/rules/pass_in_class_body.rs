@@ -7,7 +7,7 @@ use ruff_python_ast::types::RefEquality;
 use crate::checkers::ast::Checker;
 
 use crate::registry::AsRule;
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Ranged, Stmt};
 
 #[violation]
 pub struct PassInClassBody;
@@ -35,7 +35,7 @@ pub(crate) fn pass_in_class_body<'a>(
     }
 
     for stmt in body {
-        if matches!(stmt.node, StmtKind::Pass) {
+        if stmt.is_pass_stmt() {
             let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
 
             if checker.patch(diagnostic.kind.rule()) {

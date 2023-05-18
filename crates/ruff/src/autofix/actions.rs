@@ -5,7 +5,7 @@ use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::ast::{self, ExcepthandlerKind, Expr, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Excepthandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -27,22 +27,22 @@ fn has_single_child(body: &[Stmt], deleted: &[&Stmt]) -> bool {
 
 /// Determine if a child is the only statement in its body.
 fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool> {
-    match &parent.node {
-        StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. })
-        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
-        | StmtKind::ClassDef(ast::StmtClassDef { body, .. })
-        | StmtKind::With(ast::StmtWith { body, .. })
-        | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+    match parent {
+        Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
+        | Stmt::ClassDef(ast::StmtClassDef { body, .. })
+        | Stmt::With(ast::StmtWith { body, .. })
+        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else {
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::For(ast::StmtFor { body, orelse, .. })
-        | StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | StmtKind::While(ast::StmtWhile { body, orelse, .. })
-        | StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+        Stmt::For(ast::StmtFor { body, orelse, .. })
+        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+        | Stmt::While(ast::StmtWhile { body, orelse, .. })
+        | Stmt::If(ast::StmtIf { body, orelse, .. }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
             } else if orelse.iter().contains(child) {
@@ -51,17 +51,19 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::Try(ast::StmtTry {
+        Stmt::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
+            range: _,
         })
-        | StmtKind::TryStar(ast::StmtTryStar {
+        | Stmt::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
+            range: _,
         }) => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
@@ -69,10 +71,8 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 Ok(has_single_child(orelse, deleted))
             } else if finalbody.iter().contains(child) {
                 Ok(has_single_child(finalbody, deleted))
-            } else if let Some(body) = handlers.iter().find_map(|handler| match &handler.node {
-                ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
-                    body, ..
-                }) => {
+            } else if let Some(body) = handlers.iter().find_map(|handler| match handler {
+                Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) => {
                     if body.iter().contains(child) {
                         Some(body)
                     } else {
@@ -85,7 +85,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 bail!("Unable to find child in parent body")
             }
         }
-        StmtKind::Match(ast::StmtMatch { cases, .. }) => {
+        Stmt::Match(ast::StmtMatch { cases, .. }) => {
             if let Some(body) = cases.iter().find_map(|case| {
                 if case.body.iter().contains(child) {
                     Some(&case.body)
@@ -268,10 +268,7 @@ pub(crate) fn remove_unused_imports<'a>(
                     let module = module.map(compose_module_path);
                     let member = compose_module_path(&alias.name);
                     let mut full_name = String::with_capacity(
-                        relative.len()
-                            + module.as_ref().map_or(0, std::string::String::len)
-                            + member.len()
-                            + 1,
+                        relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
                     );
                     for _ in 0..relative.len() {
                         full_name.push('.');

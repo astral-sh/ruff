@@ -1,5 +1,5 @@
 use log::error;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -64,7 +64,7 @@ pub(crate) fn useless_return<'a>(
 
     // Find the last statement in the function.
     let last_stmt = body.last().unwrap();
-    if !matches!(last_stmt.node, StmtKind::Return(_)) {
+    if !matches!(last_stmt, Stmt::Return(_)) {
         return;
     }
 
@@ -75,10 +75,10 @@ pub(crate) fn useless_return<'a>(
 
     // Skip functions that consist of a docstring and a return statement.
     if body.len() == 2 {
-        if let StmtKind::Expr(ast::StmtExpr { value }) = &body[0].node {
+        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body[0] {
             if matches!(
-                value.node,
-                ExprKind::Constant(ast::ExprConstant {
+                value.as_ref(),
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(_),
                     ..
                 })
@@ -89,7 +89,7 @@ pub(crate) fn useless_return<'a>(
     }
 
     // Verify that the last statement is a return statement.
-    let StmtKind::Return(ast::StmtReturn { value}) = &last_stmt.node else {
+    let Stmt::Return(ast::StmtReturn { value, range: _}) = &last_stmt else {
         return;
     };
 

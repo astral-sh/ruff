@@ -1,6 +1,6 @@
 #![allow(unused_variables, clippy::too_many_arguments)]
 
-use rustpython_parser::ast::Constant;
+use rustpython_parser::ast::{Constant, ConversionFlag};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
@@ -246,7 +246,7 @@ fn format_formatted_value(
     f: &mut Formatter<ASTFormatContext>,
     expr: &Expr,
     value: &Expr,
-    _conversion: usize,
+    _conversion: ConversionFlag,
     format_spec: Option<&Expr>,
 ) -> FormatResult<()> {
     write!(f, [text("!")])?;

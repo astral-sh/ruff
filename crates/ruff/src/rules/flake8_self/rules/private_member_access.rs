@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -62,7 +62,7 @@ impl Violation for PrivateMemberAccess {
 
 /// SLF001
 pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
-    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &expr.node {
+    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr {
         if (attr.starts_with("__") && !attr.ends_with("__"))
             || (attr.starts_with('_') && !attr.starts_with("__"))
         {
@@ -75,7 +75,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                 return;
             }
 
-            if let ExprKind::Call(ast::ExprCall { func, .. }) = &value.node {
+            if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                 // Ignore `super()` calls.
                 if let Some(call_path) = collect_call_path(func) {
                     if call_path.as_slice() == ["super"] {

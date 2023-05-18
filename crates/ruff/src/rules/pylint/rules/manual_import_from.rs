@@ -1,8 +1,8 @@
-use rustpython_parser::ast::{self, Alias, AliasData, Attributed, Int, Stmt};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Alias, Int, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{create_stmt, unparse_stmt};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -35,10 +35,10 @@ pub(crate) fn manual_from_import(
     alias: &Alias,
     names: &[Alias],
 ) {
-    let Some(asname) = &alias.node.asname else {
+    let Some(asname) = &alias.asname else {
         return;
     };
-    let Some((module, name)) = alias.node.name.rsplit_once('.') else {
+    let Some((module, name)) = alias.name.rsplit_once('.') else {
         return;
     };
     if asname != name {
@@ -54,22 +54,19 @@ pub(crate) fn manual_from_import(
         alias.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
+        let node = ast::StmtImportFrom {
+            module: Some(module.into()),
+            names: vec![Alias {
+                name: asname.clone(),
+                asname: None,
+                range: TextRange::default(),
+            }],
+            level: Some(Int::new(0)),
+            range: TextRange::default(),
+        };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_stmt(
-                &create_stmt(ast::StmtImportFrom {
-                    module: Some(module.into()),
-                    names: vec![Attributed::new(
-                        stmt.range(),
-                        AliasData {
-                            name: asname.clone(),
-                            asname: None,
-                        },
-                    )],
-                    level: Some(Int::new(0)),
-                }),
-                checker.stylist,
-            ),
+            checker.generator().stmt(&node.into()),
             stmt.range(),
         )));
     }

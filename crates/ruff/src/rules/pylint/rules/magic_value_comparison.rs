@@ -1,9 +1,8 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
@@ -25,13 +24,14 @@ impl Violation for MagicValueComparison {
 
 /// If an [`Expr`] is a constant (or unary operation on a constant), return the [`Constant`].
 fn as_constant(expr: &Expr) -> Option<&Constant> {
-    match &expr.node {
-        ExprKind::Constant(ast::ExprConstant { value, .. }) => Some(value),
-        ExprKind::UnaryOp(ast::ExprUnaryOp {
+    match expr {
+        Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
+        Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
             operand,
-        }) => match &operand.node {
-            ExprKind::Constant(ast::ExprConstant { value, .. }) => Some(value),
+            range: _,
+        }) => match operand.as_ref() {
+            Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
             _ => None,
         },
         _ => None,
@@ -78,7 +78,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: unparse_expr(comparison_expr, checker.stylist),
+                        value: checker.generator().expr(comparison_expr),
                     },
                     comparison_expr.range(),
                 ));

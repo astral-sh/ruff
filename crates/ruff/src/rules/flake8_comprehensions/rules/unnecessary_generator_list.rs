@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,7 +55,7 @@ pub(crate) fn unnecessary_generator_list(
     if !checker.ctx.is_builtin("list") {
         return;
     }
-    if let ExprKind::GeneratorExp(_) = argument {
+    if let Expr::GeneratorExp(_) = argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorList, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]

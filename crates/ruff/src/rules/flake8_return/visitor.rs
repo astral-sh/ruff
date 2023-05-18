@@ -1,6 +1,6 @@
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Expr, ExprKind, Identifier, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Expr, Identifier, Ranged, Stmt};
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
@@ -26,14 +26,14 @@ pub(crate) struct ReturnVisitor<'a> {
 
 impl<'a> ReturnVisitor<'a> {
     fn visit_assign_target(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+        match expr {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for elt in elts {
                     self.visit_assign_target(elt);
                 }
                 return;
             }
-            ExprKind::Name(ast::ExprName { id, .. }) => {
+            Expr::Name(ast::ExprName { id, .. }) => {
                 self.stack
                     .assignments
                     .entry(id)
@@ -41,7 +41,7 @@ impl<'a> ReturnVisitor<'a> {
                     .push(expr.start());
                 return;
             }
-            ExprKind::Attribute(_) => {
+            Expr::Attribute(_) => {
                 // Attribute assignments are often side-effects (e.g., `self.property = value`),
                 // so we conservatively treat them as references to every known
                 // variable.
@@ -61,20 +61,20 @@ impl<'a> ReturnVisitor<'a> {
 
 impl<'a> Visitor<'a> for ReturnVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt.node {
-            StmtKind::Global(ast::StmtGlobal { names })
-            | StmtKind::Nonlocal(ast::StmtNonlocal { names }) => {
+        match stmt {
+            Stmt::Global(ast::StmtGlobal { names, range: _ })
+            | Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
                 self.stack
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));
             }
-            StmtKind::FunctionDef(ast::StmtFunctionDef {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
                 decorator_list,
                 args,
                 returns,
                 ..
             })
-            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 decorator_list,
                 args,
                 returns,
@@ -89,7 +89,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 }
                 visitor::walk_arguments(self, args);
             }
-            StmtKind::Return(ast::StmtReturn { value }) => {
+            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
                 self.stack
                     .returns
                     .push((stmt, value.as_ref().map(|expr| &**expr)));
@@ -98,9 +98,9 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 visitor::walk_stmt(self, stmt);
                 self.parents.pop();
             }
-            StmtKind::If(ast::StmtIf { orelse, .. }) => {
+            Stmt::If(ast::StmtIf { orelse, .. }) => {
                 let is_elif_arm = self.parents.iter().any(|parent| {
-                    if let StmtKind::If(ast::StmtIf { orelse, .. }) = &parent.node {
+                    if let Stmt::If(ast::StmtIf { orelse, .. }) = parent {
                         orelse.len() == 1 && &orelse[0] == stmt
                     } else {
                         false
@@ -108,8 +108,8 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 });
 
                 if !is_elif_arm {
-                    let has_elif = orelse.len() == 1
-                        && matches!(orelse.first().unwrap().node, StmtKind::If(_));
+                    let has_elif =
+                        orelse.len() == 1 && matches!(orelse.first().unwrap(), Stmt::If(_));
                     let has_else = !orelse.is_empty();
 
                     if has_elif {
@@ -125,8 +125,8 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 visitor::walk_stmt(self, stmt);
                 self.parents.pop();
             }
-            StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
-                if let ExprKind::Name(ast::ExprName { id, .. }) = &value.node {
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                     self.stack
                         .references
                         .entry(id)
@@ -138,23 +138,21 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
 
                 if let Some(target) = targets.first() {
                     // Skip unpacking assignments, like `x, y = my_object`.
-                    if matches!(target.node, ExprKind::Tuple(_))
-                        && !matches!(value.node, ExprKind::Tuple(_))
-                    {
+                    if matches!(target, Expr::Tuple(_)) && !value.is_tuple_expr() {
                         return;
                     }
 
                     self.visit_assign_target(target);
                 }
             }
-            StmtKind::For(_) | StmtKind::AsyncFor(_) | StmtKind::While(_) => {
+            Stmt::For(_) | Stmt::AsyncFor(_) | Stmt::While(_) => {
                 self.stack.loops.push(stmt.range());
 
                 self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);
                 self.parents.pop();
             }
-            StmtKind::Try(_) | StmtKind::TryStar(_) => {
+            Stmt::Try(_) | Stmt::TryStar(_) => {
                 self.stack.tries.push(stmt.range());
 
                 self.parents.push(stmt);
@@ -170,8 +168,8 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        match &expr.node {
-            ExprKind::Call(_) => {
+        match expr {
+            Expr::Call(_) => {
                 // Arbitrary function calls can have side effects, so we conservatively treat
                 // every function call as a reference to every known variable.
                 for name in self.stack.assignments.keys() {
@@ -182,14 +180,14 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         .push(expr.start());
                 }
             }
-            ExprKind::Name(ast::ExprName { id, .. }) => {
+            Expr::Name(ast::ExprName { id, .. }) => {
                 self.stack
                     .references
                     .entry(id)
                     .or_insert_with(Vec::new)
                     .push(expr.start());
             }
-            ExprKind::YieldFrom(_) | ExprKind::Yield(_) => {
+            Expr::YieldFrom(_) | Expr::Yield(_) => {
                 self.stack.yields.push(expr);
             }
             _ => visitor::walk_expr(self, expr),

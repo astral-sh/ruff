@@ -1,9 +1,9 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprContext, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
+
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;
@@ -26,14 +26,13 @@ impl AlwaysAutofixableViolation for GetAttrWithConstant {
     }
 }
 fn attribute(value: &Expr, attr: &str) -> Expr {
-    Expr::new(
-        TextRange::default(),
-        ast::ExprAttribute {
-            value: Box::new(value.clone()),
-            attr: attr.into(),
-            ctx: ExprContext::Load,
-        },
-    )
+    ast::ExprAttribute {
+        value: Box::new(value.clone()),
+        attr: attr.into(),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    }
+    .into()
 }
 
 /// B009
@@ -43,7 +42,7 @@ pub(crate) fn getattr_with_constant(
     func: &Expr,
     args: &[Expr],
 ) {
-    let ExprKind::Name(ast::ExprName { id, .. } )= &func.node else {
+    let Expr::Name(ast::ExprName { id, .. } )= func else {
         return;
     };
     if id != "getattr" {
@@ -52,10 +51,10 @@ pub(crate) fn getattr_with_constant(
     let [obj, arg] = args else {
         return;
     };
-    let ExprKind::Constant(ast::ExprConstant {
+    let Expr::Constant(ast::ExprConstant {
         value: Constant::Str(value),
         ..
-    } )= &arg.node else {
+    } )= arg else {
         return;
     };
     if !is_identifier(value) {
@@ -70,7 +69,7 @@ pub(crate) fn getattr_with_constant(
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&attribute(obj, value), checker.stylist),
+            checker.generator().expr(&attribute(obj, value)),
             expr.range(),
         )));
     }

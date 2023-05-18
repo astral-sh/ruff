@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Keyword};
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -87,16 +87,17 @@ pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = keywords
                 .iter()
-                .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg == "file"))
+                .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "file"))
             {
-                if !is_const_none(&keyword.node.value) {
-                    if checker.ctx.resolve_call_path(&keyword.node.value).map_or(
-                        true,
-                        |call_path| {
+                if !is_const_none(&keyword.value) {
+                    if checker
+                        .ctx
+                        .resolve_call_path(&keyword.value)
+                        .map_or(true, |call_path| {
                             call_path.as_slice() != ["sys", "stdout"]
                                 && call_path.as_slice() != ["sys", "stderr"]
-                        },
-                    ) {
+                        })
+                    {
                         return;
                     }
                 }
