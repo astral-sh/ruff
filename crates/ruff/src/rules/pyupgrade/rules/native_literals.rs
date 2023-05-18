@@ -38,7 +38,10 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 
     fn autofix_title(&self) -> String {
         let NativeLiterals { literal_type } = self;
-        format!("Replace with `{literal_type}`")
+        match literal_type {
+            LiteralType::Str => "Replace with empty string".to_string(),
+            LiteralType::Bytes => "Replace with empty bytes".to_string(),
+        }
     }
 }
 
@@ -53,6 +56,11 @@ pub(crate) fn native_literals(
     let Expr::Name(ast::ExprName { id, .. }) = func else { return; };
 
     if !keywords.is_empty() || args.len() > 1 {
+        return;
+    }
+
+    // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
+    if checker.ctx.in_nested_f_string() {
         return;
     }
 
