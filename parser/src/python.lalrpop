@@ -26,32 +26,56 @@ pub Top: ast::Mod = {
 };
 
 Program: ast::Suite = {
-    <lines:FileLine*> => {
-        lines.into_iter().flatten().collect()
+    => vec![],
+    // Compound statements
+    <mut statements:Program> <next:CompoundStatement> => {
+        statements.push(next);
+        statements
     },
-};
 
-// A file line either has a declaration, or an empty newline:
-FileLine: ast::Suite = {
-    Statement,
-    "\n" => vec![],
+    // Small statements
+    <mut statements:Program> <small:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        statements.extend(small);
+        statements.push(last);
+        statements
+    },
+
+    // Empty lines
+    <s:Program> "\n" => s,
 };
 
 Suite: ast::Suite = {
-    SimpleStatement,
-    "\n" Indent <s:Statement+> Dedent => s.into_iter().flatten().collect(),
-};
-
-Statement: ast::Suite = {
-    SimpleStatement,
-    <s:CompoundStatement> => vec![s],
-};
-
-SimpleStatement: ast::Suite = {
     <mut statements:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
         statements.push(last);
         statements
-    }
+    },
+    "\n" Indent <s:Statements> Dedent => s,
+};
+
+
+// One or more statements
+Statements: Vec<ast::Stmt> = {
+    // First simple statement
+    <mut head:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        head.push(last);
+        head
+    },
+
+    // The first compound statement
+    <s:CompoundStatement> => vec![s],
+
+    // Any subsequent compound statements
+    <mut statements:Statements> <next:CompoundStatement> => {
+        statements.push(next);
+        statements
+    },
+
+    // Any subsequent small statements
+    <mut statements:Statements> <small:(<SmallStatement> ";")*> <last:SmallStatement> ";"? "\n" => {
+        statements.extend(small);
+        statements.push(last);
+        statements
+    },
 };
 
 SmallStatement: ast::Stmt = {
