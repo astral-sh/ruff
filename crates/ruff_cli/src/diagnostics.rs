@@ -18,9 +18,11 @@ use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
 use ruff::message::Message;
+use ruff::pyproject_toml::lint_pyproject_toml;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
+use ruff_python_stdlib::path::is_project_toml;
 
 use crate::cache;
 
@@ -129,6 +131,17 @@ pub(crate) fn lint_path(
     };
 
     debug!("Checking: {}", path.display());
+
+    // We have to special case this here since the python tokenizer doesn't work with toml
+    if is_project_toml(path) {
+        let messages = lint_pyproject_toml(path)?;
+        return Ok(Diagnostics {
+            messages,
+            fixed: FxHashMap::default(),
+            imports: ImportMap::default(),
+            jupyter_index: FxHashMap::default(),
+        });
+    }
 
     // Read the file from disk
     let (contents, jupyter_index) = if is_jupyter_notebook(path) {

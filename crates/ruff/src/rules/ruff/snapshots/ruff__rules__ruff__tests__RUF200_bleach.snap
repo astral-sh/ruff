@@ -1,0 +1,17 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+./resources/test/fixtures/ruff/pyproject_toml/bleach/pyproject.toml:5:16: RUF200 Failed to parse pyproject.toml: Version specifier `>=1.1.0<1.2` doesn't match PEP 440 rules
+tinycss2>=1.1.0<1.2
+        ^^^^^^^^^^^
+  |
+5 |   version = "0.1.0"
+6 |   # There's a comma missing here
+7 |   dependencies = [
+  |  ________________^
+8 | |   "tinycss2>=1.1.0<1.2",
+9 | | ]
+  | |_^ RUF200
+  |
+
+

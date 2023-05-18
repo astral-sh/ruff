@@ -10,10 +10,11 @@ mod tests {
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
+    use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
     use crate::settings::types::PerFileIgnore;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"); "RUF010")]
@@ -172,6 +173,22 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("bleach"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("invalid_author"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin_gh_1615"))]
+    fn invalid_pyproject_toml(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let path = test_resource_path("fixtures")
+            .join("ruff")
+            .join("pyproject_toml")
+            .join(path)
+            .join("pyproject.toml");
+        let messages = lint_pyproject_toml(&path)?;
+        assert_messages!(snapshot, messages);
         Ok(())
     }
 }
