@@ -672,6 +672,11 @@ ruff_macros::register_rules!(
     rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
     // airflow
     rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
+    // flake8-fixme
+    rules::flake8_fixme::rules::LineContainsTodo,
+    rules::flake8_fixme::rules::LineContainsHack,
+    rules::flake8_fixme::rules::LineContainsXxx,
+    rules::flake8_fixme::rules::LineContainsFixme,
 );
 
 pub trait AsRule {
@@ -821,6 +826,9 @@ pub enum Linter {
     /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
     #[prefix = "TD"]
     Flake8Todos,
+    /// [flake8-fixme](https://github.com/tommilligan/flake8-fixme)
+    #[prefix = "T"]
+    Flake8Fixme,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
