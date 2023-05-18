@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
+
 use ruff_python_ast::source_code::{Generator, Stylist};
 use ruff_python_ast::whitespace;
 
@@ -201,7 +201,7 @@ fn generate_fix(
         type_comment: None,
         range: TextRange::default(),
     });
-    let assignment = unparse_stmt(&node1, generator);
+    let assignment = generator.stmt(&node1);
     #[allow(deprecated)]
     Fix::unspecified_edits(
         Edit::insertion(
@@ -225,7 +225,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
     if let Expr::Call(ast::ExprCall { args, .. }) = exc {
         if let Some(first) = args.first() {
             match first {
-                // Check for string literals
+                // Check for string literals.
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(string),
                     ..
@@ -257,7 +257,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                         }
                     }
                 }
-                // Check for f-strings
+                // Check for f-strings.
                 Expr::JoinedStr(_) => {
                     if checker.settings.rules.enabled(Rule::FStringInException) {
                         let indentation = whitespace::indentation(checker.locator, stmt).and_then(
@@ -284,7 +284,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                         checker.diagnostics.push(diagnostic);
                     }
                 }
-                // Check for .format() calls
+                // Check for .format() calls.
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     if checker.settings.rules.enabled(Rule::DotFormatInException) {
                         if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =

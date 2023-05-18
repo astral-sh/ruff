@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
+
 use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
@@ -39,7 +39,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
         type_comment: None,
         range: TextRange::default(),
     });
-    unparse_stmt(&stmt, generator)
+    generator.stmt(&stmt)
 }
 
 /// B010

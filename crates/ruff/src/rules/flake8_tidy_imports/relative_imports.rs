@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
-use ruff_python_ast::helpers::{resolve_imported_module_path, unparse_stmt};
+use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -112,7 +112,7 @@ fn fix_banned_relative_import(
         level: Some(Int::new(0)),
         range: TextRange::default(),
     };
-    let content = unparse_stmt(&node.into(), generator);
+    let content = generator.stmt(&node.into());
     #[allow(deprecated)]
     Some(Fix::unspecified(Edit::range_replacement(
         content,

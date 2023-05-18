@@ -2,7 +2,6 @@ use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{self, Cmpop, Expr};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Generator;
 
@@ -22,7 +21,7 @@ pub(crate) fn compare(
         comparators: comparators.to_vec(),
         range: TextRange::default(),
     };
-    unparse_expr(&node.into(), generator)
+    generator.expr(&node.into())
 }
 
 pub(super) fn is_overlong(

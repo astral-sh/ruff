@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged,
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
+
 use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -226,10 +226,12 @@ fn convert_to_class(
 ) -> Fix {
     #[allow(deprecated)]
     Fix::unspecified(Edit::range_replacement(
-        unparse_stmt(
-            &create_class_def_stmt(class_name, body, total_keyword, base_class),
-            generator,
-        ),
+        generator.stmt(&create_class_def_stmt(
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+        )),
         stmt.range(),
     ))
 }

@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments, unparse_expr};
+use ruff_python_ast::helpers::has_comments;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -130,8 +130,8 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
 
     let contents = match kind {
         // Wrap the new expression in parentheses if it was a tuple
-        Kind::Tuple => format!("({})", unparse_expr(&new_expr, checker.generator())),
-        Kind::List => unparse_expr(&new_expr, checker.generator()),
+        Kind::Tuple => format!("({})", checker.generator().expr(&new_expr)),
+        Kind::List => checker.generator().expr(&new_expr),
     };
     let fixable = !has_comments(expr, checker.locator);
 

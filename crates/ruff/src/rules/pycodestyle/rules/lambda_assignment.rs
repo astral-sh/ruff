@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt}
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_leading_content, has_trailing_content, unparse_stmt};
+use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_ast::whitespace::leading_space;
@@ -210,7 +210,7 @@ fn function(
                 type_comment: None,
                 range: TextRange::default(),
             });
-            return unparse_stmt(&func, generator);
+            return generator.stmt(&func);
         }
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -222,5 +222,5 @@ fn function(
         type_comment: None,
         range: TextRange::default(),
     });
-    unparse_stmt(&func, generator)
+    generator.stmt(&func)
 }

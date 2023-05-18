@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments, unparse_expr};
+use ruff_python_ast::helpers::has_comments;
 use ruff_python_semantic::context::Context;
 
 use crate::{checkers::ast::Checker, registry::AsRule};
@@ -149,7 +149,7 @@ pub(crate) fn nested_min_max(
             });
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&flattened_expr, checker.generator()),
+                checker.generator().expr(&flattened_expr),
                 expr.range(),
             )));
         }

@@ -10,7 +10,7 @@ use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments_in, unparse_stmt, Truthiness};
+use ruff_python_ast::helpers::{has_comments_in, Truthiness};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
@@ -198,7 +198,7 @@ pub(crate) fn unittest_assertion(
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            unparse_stmt(&stmt, checker.generator()),
+                            checker.generator().stmt(&stmt),
                             expr.range(),
                         )));
                     }
