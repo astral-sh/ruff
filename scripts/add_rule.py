@@ -141,7 +141,7 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
         while (line := next(fp)).strip() != "":
             lines.append(line)
 
-        variant = pascal_case(linter)
+        variant = pascal_case(dir_name(linter))
         rule = f"""rules::{linter.split(" ")[0]}::rules::{name}"""
         lines.append(
             " " * 8
