@@ -16,9 +16,11 @@ time docker run --rm -it \
   -v "${SCRIPT_DIR}/../ecosystem_all.py:/app/ecosystem_all.py" \
   -v "${SCRIPT_DIR}/../github_search.jsonl:/app/github_search.jsonl" \
   -v "${SCRIPT_DIR}/../.venv-3.11:/app/.venv" \
-  -v ./ecosystem_fix_all_check_entrypoint.sh:/app/ecosystem_fix_all_check_entrypoint.sh \
-  -v ./ecosystem_fix_all_check.py:/app/ecosystem_fix_all_check.py \
+  -v "${SCRIPT_DIR}/ecosystem_fix_all_check_entrypoint.sh:/app/ecosystem_fix_all_check_entrypoint.sh" \
+  -v "${SCRIPT_DIR}/ecosystem_fix_all_check.py:/app/ecosystem_fix_all_check.py" \
   python:3.11 ./ecosystem_fix_all_check_entrypoint.sh
 
 # grep the autofix errors
-rg "the rule codes" "${SCRIPT_DIR}/../target/ecosystem_fix_all_results" > "${SCRIPT_DIR}/../target/autofix-errors.txt"
+grep -R "the rule codes" "${SCRIPT_DIR}/../target/ecosystem_fix_all_results" > "${SCRIPT_DIR}/../target/autofix-errors.txt"
+# Make sure we didn't have an early exit
+echo "Done"

@@ -25,7 +25,8 @@ def main() -> None:
     checkouts = Path("checkouts")
     out_dir = Path("ecosystem_fix_all_results")
     github_search_json = Path("github_search.jsonl")
-    ruff = Path("ruff")
+    # Somehow it doesn't like plain ruff
+    ruff = Path.cwd().joinpath("ruff")
 
     out_dir.mkdir(parents=True, exist_ok=True)
 

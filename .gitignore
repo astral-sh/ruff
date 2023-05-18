@@ -5,7 +5,7 @@ mkdocs.yml
 .overrides
 ruff-old
 github_search*.jsonl
-venv*
+.venv*
 
 ###
 # Rust.gitignore
