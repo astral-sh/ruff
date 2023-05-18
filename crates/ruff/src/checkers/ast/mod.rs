@@ -57,7 +57,7 @@ use crate::{autofix, docstrings, noqa, warn_user};
 
 mod deferred;
 
-pub struct Checker<'a> {
+pub(crate) struct Checker<'a> {
     // Settings, static metadata, etc.
     path: &'a Path,
     module_path: Option<&'a [String]>,
@@ -65,23 +65,23 @@ pub struct Checker<'a> {
     is_stub: bool,
     noqa: flags::Noqa,
     noqa_line_for: &'a NoqaMapping,
-    pub settings: &'a Settings,
-    pub locator: &'a Locator<'a>,
-    pub stylist: &'a Stylist<'a>,
-    pub indexer: &'a Indexer,
-    pub importer: Importer<'a>,
+    pub(crate) settings: &'a Settings,
+    pub(crate) locator: &'a Locator<'a>,
+    pub(crate) stylist: &'a Stylist<'a>,
+    pub(crate) indexer: &'a Indexer,
+    pub(crate) importer: Importer<'a>,
     // Stateful fields.
-    pub ctx: Context<'a>,
-    pub diagnostics: Vec<Diagnostic>,
-    pub deletions: FxHashSet<RefEquality<'a, Stmt>>,
+    pub(crate) ctx: Context<'a>,
+    pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
     deferred: Deferred<'a>,
     // Check-specific state.
-    pub flake8_bugbear_seen: Vec<&'a Expr>,
+    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
 
 impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         settings: &'a Settings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -117,12 +117,12 @@ impl<'a> Checker<'a> {
 impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
-    pub fn patch(&self, code: Rule) -> bool {
+    pub(crate) fn patch(&self, code: Rule) -> bool {
         self.settings.rules.should_fix(code)
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
-    pub fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
+    pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
@@ -137,7 +137,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
-    pub fn generator(&self) -> Generator {
+    pub(crate) fn generator(&self) -> Generator {
         fn quote_style(context: &Context, locator: &Locator, indexer: &Indexer) -> Option<Quote> {
             if !context.in_f_string() {
                 return None;
@@ -1253,7 +1253,7 @@ where
                                 level,
                                 module,
                                 self.module_path,
-                                &self.settings.flake8_tidy_imports.ban_relative_imports,
+                                self.settings.flake8_tidy_imports.ban_relative_imports,
                             )
                         {
                             self.diagnostics.push(diagnostic);
@@ -4528,7 +4528,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
-    pub fn visit_type_definition(&mut self, expr: &'a Expr) {
+    pub(crate) fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.ctx.flags;
         self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -4536,7 +4536,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
-    pub fn visit_non_type_definition(&mut self, expr: &'a Expr) {
+    pub(crate) fn visit_non_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.ctx.flags;
         self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -4546,7 +4546,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
-    pub fn visit_boolean_test(&mut self, expr: &'a Expr) {
+    pub(crate) fn visit_boolean_test(&mut self, expr: &'a Expr) {
         let snapshot = self.ctx.flags;
         self.ctx.flags |= ContextFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
