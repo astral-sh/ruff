@@ -3731,7 +3731,15 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -3747,13 +3755,33 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
-            Expr::GeneratorExp(_) => {
+            Expr::GeneratorExp(ast::ExprGeneratorExp {
+                generators,
+                elt: _,
+                range: _,
+            }) => {
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
             Expr::BoolOp(ast::ExprBoolOp {
                 op,
@@ -3801,6 +3829,34 @@ where
 
         // Recurse.
         match expr {
+            Expr::ListComp(ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::SetComp(ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::GeneratorExp(ast::ExprGeneratorExp {
+                elt,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(elt);
+            }
+            Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(key);
+                self.visit_expr(value);
+            }
             Expr::Lambda(_) => {
                 self.deferred.lambdas.push((expr, self.ctx.snapshot()));
             }
@@ -4077,21 +4133,6 @@ where
 
         self.ctx.flags = flags_snapshot;
         self.ctx.pop_expr();
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
-        if self.settings.rules.enabled(Rule::InDictKeys) {
-            flake8_simplify::rules::key_in_dict_for(
-                self,
-                &comprehension.target,
-                &comprehension.iter,
-            );
-        }
-        self.visit_expr(&comprehension.iter);
-        self.visit_expr(&comprehension.target);
-        for expr in &comprehension.ifs {
-            self.visit_boolean_test(expr);
-        }
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
@@ -4398,6 +4439,58 @@ impl<'a> Checker<'a> {
         docstring.is_some()
     }
 
+    /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
+    /// generator expression, like a list or set comprehension.
+    fn visit_generators(&mut self, generators: &'a [Comprehension]) {
+        let mut generators = generators.iter();
+
+        let Some(generator) = generators.next() else {
+            unreachable!("Generator expression must contain at least one generator");
+        };
+
+        // Generators are compiled as nested functions. (This may change with PEP 709.)
+        // As such, the `iter` of the first generator is evaluated in the outer scope, while all
+        // subsequent nodes are evaluated in the inner scope.
+        //
+        // For example, given:
+        // ```py
+        // class A:
+        //     T = range(10)
+        //
+        //     L = [x for x in T for y in T]
+        // ```
+        //
+        // Conceptually, this is compiled as:
+        // ```py
+        // class A:
+        //     T = range(10)
+        //
+        //     def foo(x=T):
+        //         def bar(y=T):
+        //             pass
+        //         return bar()
+        //     foo()
+        // ```
+        //
+        // Following Python's scoping rules, the `T` in `x=T` is thus evaluated in the outer scope,
+        // while all subsequent reads and writes are evaluated in the inner scope. In particular,
+        // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
+        self.visit_expr(&generator.iter);
+        self.ctx.push_scope(ScopeKind::Generator);
+        self.visit_expr(&generator.target);
+        for expr in &generator.ifs {
+            self.visit_boolean_test(expr);
+        }
+
+        for generator in generators {
+            self.visit_expr(&generator.iter);
+            self.visit_expr(&generator.target);
+            for expr in &generator.ifs {
+                self.visit_boolean_test(expr);
+            }
+        }
+    }
+
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
         let snapshot = self.ctx.flags;
@@ -4614,14 +4707,13 @@ impl<'a> Checker<'a> {
         let id = id.as_str();
 
         let mut first_iter = true;
-        let mut in_generator = false;
         let mut import_starred = false;
 
         for scope in self.ctx.scopes.ancestors(self.ctx.scope_id) {
             if scope.kind.is_class() {
                 if id == "__class__" {
                     return;
-                } else if !first_iter && !in_generator {
+                } else if !first_iter {
                     continue;
                 }
             }
@@ -4689,7 +4781,6 @@ impl<'a> Checker<'a> {
             }
 
             first_iter = false;
-            in_generator = matches!(scope.kind, ScopeKind::Generator);
             import_starred = import_starred || scope.uses_star_imports();
         }
 

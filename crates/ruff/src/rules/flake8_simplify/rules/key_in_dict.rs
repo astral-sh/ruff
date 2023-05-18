@@ -35,7 +35,7 @@ impl AlwaysAutofixableViolation for InDictKeys {
 fn get_value_content_for_key_in_dict(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_parser::ast::Expr,
+    expr: &Expr,
 ) -> Result<String> {
     let content = locator.slice(expr.range());
     let mut expression = match_expression(content)?;
