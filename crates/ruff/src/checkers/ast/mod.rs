@@ -143,30 +143,10 @@ impl<'a> Checker<'a> {
                 return None;
             }
 
-            let Some(expr) = context.expr() else {
-                return None;
-            };
-
-            // Find the f-string containing the current expression.
-            let start = expr.start();
-            let string_ranges = indexer.f_string_ranges();
-            let Ok(string_range_index) = string_ranges.binary_search_by(|range| {
-                if start < range.start() {
-                    std::cmp::Ordering::Greater
-                } else if range.contains(start) {
-                    std::cmp::Ordering::Equal
-                } else {
-                    std::cmp::Ordering::Less
-                }
-            }) else {
-                return None;
-            };
-            let string_range = string_ranges[string_range_index];
-
-            // Find the quote character used to start the f-string.
-            let Some(trailing_quote) = trailing_quote(locator.slice(string_range)) else {
-                return None;
-            };
+            // Find the quote character used to start the containing f-string.
+            let expr = context.expr()?;
+            let string_range = indexer.f_string_range(expr.start())?;
+            let trailing_quote = trailing_quote(locator.slice(string_range))?;
 
             // Invert the quote character, if it's a single quote.
             match *trailing_quote {

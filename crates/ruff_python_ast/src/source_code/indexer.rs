@@ -70,16 +70,16 @@ impl Indexer {
                     line_start = range.end();
                 }
                 Tok::String {
-                    triple_quoted,
-                    kind,
+                    triple_quoted: true,
                     ..
                 } => {
-                    if *triple_quoted {
-                        triple_quoted_string_ranges.push(*range);
-                    }
-                    if matches!(kind, StringKind::FString | StringKind::RawFString) {
-                        f_string_ranges.push(*range);
-                    }
+                    triple_quoted_string_ranges.push(*range);
+                }
+                Tok::String {
+                    kind: StringKind::FString | StringKind::RawFString,
+                    ..
+                } => {
+                    f_string_ranges.push(*range);
                 }
                 _ => {}
             }
@@ -111,15 +111,26 @@ impl Indexer {
         &self.triple_quoted_string_ranges
     }
 
-    /// Return a slice of all ranges that include an f- string. The ranges are sorted by
-    /// [`TextRange::start`] in increasing order. No two ranges are overlapping.
-    pub fn f_string_ranges(&self) -> &[TextRange] {
-        &self.f_string_ranges
-    }
-
+    /// Returns `true` if the given offset is part of a continuation line.
     pub fn is_continuation(&self, offset: TextSize, locator: &Locator) -> bool {
         let line_start = locator.line_start(offset);
         self.continuation_lines.binary_search(&line_start).is_ok()
+    }
+
+    /// Return the [`TextRange`] of the f-string containing a given offset.
+    pub fn f_string_range(&self, offset: TextSize) -> Option<TextRange> {
+        let Ok(string_range_index) = self.f_string_ranges.binary_search_by(|range| {
+            if offset < range.start() {
+                std::cmp::Ordering::Greater
+            } else if range.contains(offset) {
+                std::cmp::Ordering::Equal
+            } else {
+                std::cmp::Ordering::Less
+            }
+        }) else {
+            return None;
+        };
+        Some(self.f_string_ranges[string_range_index])
     }
 }
 
