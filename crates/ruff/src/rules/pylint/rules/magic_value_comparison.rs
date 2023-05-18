@@ -79,7 +79,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: unparse_expr(comparison_expr, checker.stylist),
+                        value: unparse_expr(comparison_expr, checker.generator()),
                     },
                     comparison_expr.range(),
                 ));

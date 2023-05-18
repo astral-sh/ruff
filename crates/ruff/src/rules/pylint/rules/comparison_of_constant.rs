@@ -106,9 +106,9 @@ pub(crate) fn comparison_of_constant(
         {
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
-                    left_constant: unparse_constant(left_constant, checker.stylist),
+                    left_constant: unparse_constant(left_constant, checker.generator()),
                     op: op.into(),
-                    right_constant: unparse_constant(right_constant, checker.stylist),
+                    right_constant: unparse_constant(right_constant, checker.generator()),
                 },
                 left.range(),
             );

@@ -62,14 +62,14 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
         }) => {
             let Some(parent) = checker.ctx.expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.stylist));
+                    return Some(unparse_expr(expr, checker.generator()));
                 }
                 return None;
             };
             // Only evaluate the full BinOp, not the nested components.
             let Expr::BinOp(_ )= parent else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.stylist));
+                    return Some(unparse_expr(expr, checker.generator()));
                 }
                 return None;
             };
@@ -81,12 +81,12 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             };
             // "select * from table where val = {}".format(...)
             if attr == "format" && string_literal(value).is_some() {
-                return Some(unparse_expr(expr, checker.stylist));
+                return Some(unparse_expr(expr, checker.generator()));
             };
             None
         }
         // f"select * from table where val = {val}"
-        Expr::JoinedStr(_) => Some(unparse_expr(expr, checker.stylist)),
+        Expr::JoinedStr(_) => Some(unparse_expr(expr, checker.generator())),
         _ => None,
     }
 }

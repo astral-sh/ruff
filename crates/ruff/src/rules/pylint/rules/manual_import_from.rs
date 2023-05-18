@@ -67,7 +67,7 @@ pub(crate) fn manual_from_import(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_stmt(&node.into(), checker.stylist),
+            unparse_stmt(&node.into(), checker.generator()),
             stmt.range(),
         )));
     }

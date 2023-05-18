@@ -393,7 +393,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
             {
                 checker.diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
-                        name: unparse_expr(outer_assignment_target.expr, checker.stylist),
+                        name: unparse_expr(outer_assignment_target.expr, checker.generator()),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },

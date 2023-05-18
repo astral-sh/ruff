@@ -198,7 +198,7 @@ pub(crate) fn unittest_assertion(
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            unparse_stmt(&stmt, checker.stylist),
+                            unparse_stmt(&stmt, checker.generator()),
                             expr.range(),
                         )));
                     }

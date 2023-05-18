@@ -80,7 +80,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     // convertible to f-string parts).
     let Some(new_expr) = build_fstring(joiner, joinees) else { return };
 
-    let contents = unparse_expr(&new_expr, checker.stylist);
+    let contents = unparse_expr(&new_expr, checker.generator());
 
     let mut diagnostic = Diagnostic::new(
         StaticJoinToFString {

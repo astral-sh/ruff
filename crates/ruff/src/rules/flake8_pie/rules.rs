@@ -443,7 +443,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
         if !seen_targets.insert(ComparableExpr::from(value)) {
             let diagnostic = Diagnostic::new(
                 NonUniqueEnums {
-                    value: unparse_expr(value, checker.stylist),
+                    value: unparse_expr(value, checker.generator()),
                 },
                 stmt.range(),
             );
@@ -612,7 +612,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 let bool_op = node;
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(&bool_op, checker.stylist),
+                    unparse_expr(&bool_op, checker.generator()),
                     expr.range(),
                 )));
             }

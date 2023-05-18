@@ -43,3 +43,6 @@ second = first + [
 
 [] + foo + [  # This will be preserved, but doesn't prevent the fix
 ]
+
+# Uses the non-preferred quote style, which should be retained.
+f"{[*a(), 'b']}"

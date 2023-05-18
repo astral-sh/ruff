@@ -13,7 +13,8 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
+use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::{Node, RefEquality};
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
@@ -133,6 +134,33 @@ impl<'a> Checker<'a> {
             return false;
         }
         noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
+    }
+
+    /// Create a [`Generator`] to generate source code based on the current AST state.
+    pub fn generator(&self) -> Generator {
+        fn quote_style(context: &Context, locator: &Locator, indexer: &Indexer) -> Option<Quote> {
+            if !context.in_f_string() {
+                return None;
+            }
+
+            // Find the quote character used to start the containing f-string.
+            let expr = context.expr()?;
+            let string_range = indexer.f_string_range(expr.start())?;
+            let trailing_quote = trailing_quote(locator.slice(string_range))?;
+
+            // Invert the quote character, if it's a single quote.
+            match *trailing_quote {
+                "'" => Some(Quote::Double),
+                "\"" => Some(Quote::Single),
+                _ => None,
+            }
+        }
+
+        Generator::new(
+            self.stylist.indentation(),
+            quote_style(&self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
+            self.stylist.line_ending(),
+        )
     }
 }
 

@@ -97,9 +97,9 @@ fn duplicate_handler_exceptions<'a>(
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     if unique_elts.len() == 1 {
-                        unparse_expr(unique_elts[0], checker.stylist)
+                        unparse_expr(unique_elts[0], checker.generator())
                     } else {
-                        unparse_expr(&type_pattern(unique_elts), checker.stylist)
+                        unparse_expr(&type_pattern(unique_elts), checker.generator())
                     },
                     expr.range(),
                 )));

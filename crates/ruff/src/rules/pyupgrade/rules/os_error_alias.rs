@@ -117,7 +117,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                format!("({})", unparse_expr(&node.into(), checker.stylist,)),
+                format!("({})", unparse_expr(&node.into(), checker.generator())),
                 target.range(),
             )));
         }

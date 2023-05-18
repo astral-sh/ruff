@@ -4,6 +4,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_constant;
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::checkers::ast::Checker;
@@ -64,20 +65,15 @@ pub(crate) fn native_literals(
                 LiteralType::Bytes
             }}, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
+                let constant = if id == "bytes" {
+                    Constant::Bytes(vec![])
+                } else {
+                    Constant::Str(String::new())
+                };
+                let content = unparse_constant(&constant, checker.generator());
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    if id == "bytes" {
-                        let mut content = String::with_capacity(3);
-                        content.push('b');
-                        content.push(checker.stylist.quote().into());
-                        content.push(checker.stylist.quote().into());
-                        content
-                    } else {
-                        let mut content = String::with_capacity(2);
-                        content.push(checker.stylist.quote().into());
-                        content.push(checker.stylist.quote().into());
-                        content
-                    },
+                    content,
                     expr.range(),
                 )));
             }

@@ -56,7 +56,7 @@ pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_stmt(&assertion_error(msg), checker.stylist),
+            unparse_stmt(&assertion_error(msg), checker.generator()),
             stmt.range(),
         )));
     }

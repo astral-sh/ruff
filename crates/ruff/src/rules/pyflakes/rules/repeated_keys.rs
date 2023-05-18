@@ -106,7 +106,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
                                 MultiValueRepeatedKeyLiteral {
-                                    name: unparse_expr(key, checker.stylist),
+                                    name: unparse_expr(key, checker.generator()),
                                     repeated_value: is_duplicate_value,
                                 },
                                 key.range(),

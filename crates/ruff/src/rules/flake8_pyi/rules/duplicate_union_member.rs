@@ -61,7 +61,7 @@ fn traverse_union<'a>(
     if !seen_nodes.insert(expr.into()) {
         let mut diagnostic = Diagnostic::new(
             DuplicateUnionMember {
-                duplicate_name: unparse_expr(expr, checker.stylist),
+                duplicate_name: unparse_expr(expr, checker.generator()),
             },
             expr.range(),
         );
@@ -82,7 +82,7 @@ fn traverse_union<'a>(
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(
                     if expr == left.as_ref() { right } else { left },
-                    checker.stylist,
+                    checker.generator(),
                 ),
                 parent.range(),
             )));

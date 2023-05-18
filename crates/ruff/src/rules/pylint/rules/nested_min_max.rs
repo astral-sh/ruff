@@ -149,7 +149,7 @@ pub(crate) fn nested_min_max(
             });
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&flattened_expr, checker.stylist),
+                unparse_expr(&flattened_expr, checker.generator()),
                 expr.range(),
             )));
         }
