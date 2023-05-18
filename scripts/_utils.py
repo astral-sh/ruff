@@ -5,7 +5,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 def dir_name(linter_name: str) -> str:
-    return linter_name.replace("-", "_")
+    return linter_name.replace("-", "_").split(" ")[0]
 
 
 def pascal_case(linter_name: str) -> str:
