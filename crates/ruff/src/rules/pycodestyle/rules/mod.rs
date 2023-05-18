@@ -13,7 +13,6 @@ pub(crate) use imports::{
     module_import_not_at_top_of_file, multiple_imports_on_one_line, ModuleImportNotAtTopOfFile,
     MultipleImportsOnOneLine,
 };
-
 pub(crate) use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence};
 pub(crate) use lambda_assignment::{lambda_assignment, LambdaAssignment};
 pub(crate) use line_too_long::{line_too_long, LineTooLong};
