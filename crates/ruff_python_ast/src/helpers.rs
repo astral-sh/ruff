@@ -542,7 +542,7 @@ where
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
-static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
+static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^__[^\s]+__$").unwrap());
 
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
