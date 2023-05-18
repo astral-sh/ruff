@@ -809,6 +809,11 @@ where
                 if self.settings.rules.enabled(Rule::MultipleImportsOnOneLine) {
                     pycodestyle::rules::multiple_imports_on_one_line(self, stmt, names);
                 }
+                //dlint
+                if self.settings.rules.enabled(Rule::BadShelveUse) {
+                    dlint::rules::bad_shelve_use(self, stmt);
+                }
+
                 if self
                     .settings
                     .rules
@@ -1093,6 +1098,11 @@ where
                             pylint::rules::global_statement(self, &name.name);
                         }
                     }
+                }
+
+                //dlint
+                if self.settings.rules.enabled(Rule::BadShelveUse) {
+                    dlint::rules::bad_shelve_use(self, stmt);
                 }
 
                 if self.settings.rules.enabled(Rule::UnnecessaryFutureImport)

@@ -1,0 +1,16 @@
+---
+source: crates/ruff/src/rules/dlint/mod.rs
+---
+DUO119.py:1:1: DUO119 Use of the `shelve` module should be avoided
+  |
+1 | import shelve
+  | ^^^^^^^^^^^^^ DUO119
+  |
+
+DUO119.py:4:1: DUO119 Use of the `shelve` module should be avoided
+  |
+4 | from shelve import open
+  | ^^^^^^^^^^^^^^^^^^^^^^^ DUO119
+  |
+
+
