@@ -9,10 +9,10 @@ Example usage:
 
 import argparse
 
-from _utils import ROOT_DIR, dir_name, key_mod, key_pub_use
+from _utils import ROOT_DIR, dir_name, key_mod, key_pub_use, key_test_case
 
 
-def main(*, linter: str) -> None:
+def main(*, linter: str, nb_digit: int) -> None:
     """Generate boilerplate for a new rule."""
     plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
 
@@ -27,11 +27,7 @@ def main(*, linter: str) -> None:
             if not has_added_testcase and (
                 line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
             ):
-                lines.sort(
-                    key=lambda line: line.split('Path::new("')[1]
-                    if linter != "pylint"
-                    else line.split(");")[1],
-                )
+                lines.sort(key=key_test_case(nb_digit))
                 fp.write("\n".join(lines))
                 fp.write("\n")
                 lines.clear()
@@ -150,6 +146,12 @@ if __name__ == "__main__":
         required=True,
         help="The source with which the check originated (e.g., 'flake8-pie').",
     )
+    parser.add_argument(
+        "--nb-digit",
+        type=int,
+        default=3,
+        help="The number of digits in the rule code (e.g., '3').",
+    )
     args = parser.parse_args()
 
-    main(linter=args.linter)
+    main(linter=args.linter, nb_digit=args.nb_digit)
