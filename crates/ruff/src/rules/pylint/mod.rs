@@ -57,6 +57,7 @@ mod tests {
     #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"); "PLE1206")]
     #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"); "PLE1205")]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
+    #[test_case(Rule::NamedExprWithoutContext, Path::new("named_expr_without_context.py"); "PLW0131")]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"); "PLE0117")]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"); "PLW2901")]

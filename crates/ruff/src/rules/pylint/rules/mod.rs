@@ -26,6 +26,7 @@ pub(crate) use load_before_global_declaration::{
 pub(crate) use logging::{logging_call, LoggingTooFewArgs, LoggingTooManyArgs};
 pub(crate) use magic_value_comparison::{magic_value_comparison, MagicValueComparison};
 pub(crate) use manual_import_from::{manual_from_import, ManualFromImport};
+pub(crate) use named_expr_without_context::{named_expr_without_context, NamedExprWithoutContext};
 pub(crate) use nested_min_max::{nested_min_max, NestedMinMax};
 pub(crate) use nonlocal_without_binding::NonlocalWithoutBinding;
 pub(crate) use property_with_parameters::{property_with_parameters, PropertyWithParameters};
@@ -71,6 +72,7 @@ mod load_before_global_declaration;
 mod logging;
 mod magic_value_comparison;
 mod manual_import_from;
+mod named_expr_without_context;
 mod nested_min_max;
 mod nonlocal_without_binding;
 mod property_with_parameters;
