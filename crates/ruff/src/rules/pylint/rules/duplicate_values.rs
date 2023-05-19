@@ -1,4 +1,8 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::unparse_constant;
+use rustc_hash::FxHashSet;
+use rustpython_parser::ast::{self, Expr, Ranged};
+use std::hash::BuildHasherDefault;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -8,49 +12,37 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct DuplicateValues {
     value: String,
-    set: String,
 }
 
 impl Violation for DuplicateValues {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateValues { value, set } = self;
-        format!("Duplicate value `{value}` in set `{set}`")
+        let DuplicateValues { value } = self;
+        format!("Duplicate value `{value}` in set.")
     }
 }
 
 /// PLW0130
 /// "This message is emitted when a set contains the same value two or more times.",
-pub(crate) fn duplicate_values(checker: &mut Checker, targets: &[Expr], values: &Expr) {
-    if targets.len() != 1 {
-        return;
-    }
-    let target = &targets[0];
+pub(crate) fn duplicate_values(checker: &mut Checker, elts: &Vec<Expr>) {
+    let mut seen_values: FxHashSet<ComparableExpr> =
+        FxHashSet::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
 
-    // FIXME: Do not call during assignment, but one "set creation" ?
-    //        Here values might be a tuple of sets for example.
+    for elt in elts {
+        if let Expr::Constant(ast::ExprConstant { value, .. }) = elt {
+            // dbg!(value);
+            let comparable_value: ComparableExpr = elt.into();
+            // dbg!(&comparable_value);
 
-    if let Expr::Set(ast::ExprSet { elts, .. }) = values {
-        // let mut seen: FxHashSet<&Identifier> =
-        //     FxHashSet::with_capacity_and_hasher(elts.len(), BuildHasherDefault::default());
-        let mut seen: Vec<&Constant> = Vec::new();
-        for elt in elts {
-            if let Expr::Constant(ast::ExprConstant { value, .. }) = elt {
-                if seen.contains(&value) {
-                    if let Expr::Name(ast::ExprName { id, .. }) = target {
-                        if let Some(value_str) = value.as_str() {
-                            checker.diagnostics.push(Diagnostic::new(
-                                DuplicateValues {
-                                    value: value_str.to_string(),
-                                    set: id.to_string(),
-                                },
-                                target.range(),
-                            ));
-                        }
-                    }
-                }
-                seen.push(value);
-            };
-        }
+            if seen_values.contains(&comparable_value) {
+                checker.diagnostics.push(Diagnostic::new(
+                    DuplicateValues {
+                        value: unparse_constant(value, checker.stylist),
+                    },
+                    elt.range(),
+                ));
+            }
+            seen_values.insert(comparable_value);
+        };
     }
 }

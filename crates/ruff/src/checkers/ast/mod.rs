@@ -1790,10 +1790,6 @@ where
                         }
                     }
                 }
-
-                if self.settings.rules.enabled(Rule::DuplicateValues) {
-                    pylint::rules::duplicate_values(self, targets, value);
-                }
             }
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
@@ -3281,6 +3277,11 @@ where
 
                 if self.settings.rules.enabled(Rule::UnnecessarySpread) {
                     flake8_pie::rules::unnecessary_spread(self, keys, values);
+                }
+            }
+            Expr::Set(ast::ExprSet { elts, range: _ }) => {
+                if self.settings.rules.enabled(Rule::DuplicateValues) {
+                    pylint::rules::duplicate_values(self, elts);
                 }
             }
             Expr::Yield(_) => {
