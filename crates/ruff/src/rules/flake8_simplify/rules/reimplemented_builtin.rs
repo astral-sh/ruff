@@ -6,8 +6,8 @@ use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
-use ruff_python_ast::source_code::Stylist;
+
+use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -171,7 +171,7 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Stylist) -> String {
+fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
     let node = ast::ExprGeneratorExp {
         elt: Box::new(test.clone()),
         generators: vec![Comprehension {
@@ -198,7 +198,7 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Styl
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
     };
-    unparse_stmt(&node3.into(), stylist)
+    generator.stmt(&node3.into())
 }
 
 /// SIM110, SIM111
@@ -220,7 +220,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                     loop_info.test,
                     loop_info.target,
                     loop_info.iter,
-                    checker.stylist,
+                    checker.generator(),
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
@@ -310,7 +310,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                     &test,
                     loop_info.target,
                     loop_info.iter,
-                    checker.stylist,
+                    checker.generator(),
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.

@@ -200,11 +200,11 @@ struct TruncateAtNewline<'a>(&'a dyn Display);
 impl Display for TruncateAtNewline<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         struct TruncateAdapter<'a> {
-            inner: &'a mut dyn std::fmt::Write,
+            inner: &'a mut dyn Write,
             after_new_line: bool,
         }
 
-        impl std::fmt::Write for TruncateAdapter<'_> {
+        impl Write for TruncateAdapter<'_> {
             fn write_str(&mut self, s: &str) -> std::fmt::Result {
                 if self.after_new_line {
                     Ok(())

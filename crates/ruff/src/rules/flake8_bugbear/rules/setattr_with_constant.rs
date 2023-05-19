@@ -3,8 +3,8 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
-use ruff_python_ast::source_code::Stylist;
+
+use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;
@@ -27,7 +27,7 @@ impl AlwaysAutofixableViolation for SetAttrWithConstant {
     }
 }
 
-fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
+fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> String {
     let stmt = Stmt::Assign(ast::StmtAssign {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
             value: Box::new(obj.clone()),
@@ -39,7 +39,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String
         type_comment: None,
         range: TextRange::default(),
     });
-    unparse_stmt(&stmt, stylist)
+    generator.stmt(&stmt)
 }
 
 /// B010
@@ -84,7 +84,7 @@ pub(crate) fn setattr_with_constant(
             if checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    assignment(obj, name, value, checker.stylist),
+                    assignment(obj, name, value, checker.generator()),
                     expr.range(),
                 )));
             }

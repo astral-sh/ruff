@@ -4,7 +4,6 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -78,7 +77,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         kind: None,
         range: TextRange::default(),
     });
-    Some(unparse_expr(&node, checker.stylist))
+    Some(checker.generator().expr(&node))
 }
 
 /// Returns the range of the `name` argument of `@pytest.mark.parametrize`.
@@ -164,7 +163,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             });
                             #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                format!("({})", unparse_expr(&node, checker.stylist,)),
+                                format!("({})", checker.generator().expr(&node)),
                                 name_range,
                             )));
                         }
@@ -195,7 +194,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             });
                             #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                unparse_expr(&node, checker.stylist),
+                                checker.generator().expr(&node),
                                 name_range,
                             )));
                         }
@@ -228,7 +227,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             });
                             #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                unparse_expr(&node, checker.stylist),
+                                checker.generator().expr(&node),
                                 expr.range(),
                             )));
                         }
@@ -278,7 +277,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             });
                             #[allow(deprecated)]
                             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                format!("({})", unparse_expr(&node, checker.stylist,)),
+                                format!("({})", checker.generator().expr(&node)),
                                 expr.range(),
                             )));
                         }
@@ -373,7 +372,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         let node = value.clone();
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node, checker.stylist),
+            checker.generator().expr(&node),
             expr.range(),
         )));
     }

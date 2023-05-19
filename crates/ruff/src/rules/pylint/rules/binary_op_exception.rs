@@ -11,11 +11,11 @@ enum Boolop {
     Or,
 }
 
-impl From<&rustpython_parser::ast::Boolop> for Boolop {
-    fn from(op: &rustpython_parser::ast::Boolop) -> Self {
+impl From<&ast::Boolop> for Boolop {
+    fn from(op: &ast::Boolop) -> Self {
         match op {
-            rustpython_parser::ast::Boolop::And => Boolop::And,
-            rustpython_parser::ast::Boolop::Or => Boolop::Or,
+            ast::Boolop::And => Boolop::And,
+            ast::Boolop::Or => Boolop::Or,
         }
     }
 }

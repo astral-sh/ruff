@@ -3,7 +3,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
 use syn::{Block, Expr, ItemFn, Stmt};
 
-pub(crate) fn derive_message_formats(func: &ItemFn) -> proc_macro2::TokenStream {
+pub(crate) fn derive_message_formats(func: &ItemFn) -> TokenStream {
     let mut strings = quote!();
 
     if let Err(err) = parse_block(&func.block, &mut strings) {

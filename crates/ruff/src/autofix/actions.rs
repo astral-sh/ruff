@@ -268,10 +268,7 @@ pub(crate) fn remove_unused_imports<'a>(
                     let module = module.map(compose_module_path);
                     let member = compose_module_path(&alias.name);
                     let mut full_name = String::with_capacity(
-                        relative.len()
-                            + module.as_ref().map_or(0, std::string::String::len)
-                            + member.len()
-                            + 1,
+                        relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
                     );
                     for _ in 0..relative.len() {
                         full_name.push('.');

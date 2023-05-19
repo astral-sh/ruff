@@ -260,5 +260,8 @@ RUF100_0.py:90:92: RUF100 [*] Unused `noqa` directive (unused: `F401`)
 89 89 | 
 90    |-"shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
    90 |+"shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"
+91 91 | 
+92 92 | 
+93 93 | def f():
 
 

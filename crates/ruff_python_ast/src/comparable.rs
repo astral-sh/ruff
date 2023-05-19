@@ -915,7 +915,7 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(std::string::String::as_str),
+                type_comment: type_comment.as_ref().map(String::as_str),
             },
             Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
@@ -931,7 +931,7 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(std::string::String::as_str),
+                type_comment: type_comment.as_ref().map(String::as_str),
             },
             Stmt::ClassDef(ast::StmtClassDef {
                 name,
@@ -967,7 +967,7 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
             }) => Self::Assign {
                 targets: targets.iter().map(Into::into).collect(),
                 value: value.into(),
-                type_comment: type_comment.as_ref().map(std::string::String::as_str),
+                type_comment: type_comment.as_ref().map(String::as_str),
             },
             Stmt::AugAssign(ast::StmtAugAssign {
                 target,
