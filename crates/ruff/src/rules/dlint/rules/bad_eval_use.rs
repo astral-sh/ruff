@@ -16,15 +16,16 @@ impl Violation for BadEvalUse {
     }
 }
 
-// TODO: Consider helper func if more of these pop up
 /// DUO104
 pub(crate) fn bad_eval_use(checker: &mut Checker, expr: &Expr) {
     if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        if let Some(call_path) = checker.ctx.resolve_call_path(func) {
-            if call_path.as_slice() == ["", "eval"] {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(BadEvalUse, func.range()));
+        if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+            if id == "eval" && checker.ctx.is_builtin(id) {
+                {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(BadEvalUse, func.range()));
+                }
             }
         }
     }

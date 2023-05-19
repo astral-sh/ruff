@@ -19,11 +19,13 @@ impl Violation for BadExecUse {
 /// DUO105
 pub(crate) fn bad_exec_use(checker: &mut Checker, expr: &Expr) {
     if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        if let Some(call_path) = checker.ctx.resolve_call_path(func) {
-            if call_path.as_slice() == ["", "exec"] {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(BadExecUse, func.range()));
+        if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+            if id == "exec" && checker.ctx.is_builtin(id) {
+                {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(BadExecUse, func.range()));
+                }
             }
         }
     }
