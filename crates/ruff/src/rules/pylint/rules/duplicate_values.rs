@@ -31,7 +31,7 @@ pub(crate) fn duplicate_values(checker: &mut Checker, elts: &Vec<Expr>) {
         if let Expr::Constant(ast::ExprConstant { value, .. }) = elt {
             let comparable_value: ComparableExpr = elt.into();
 
-            if seen_values.contains(&comparable_value) {
+            if !seen_values.insert(comparable_value) {
                 checker.diagnostics.push(Diagnostic::new(
                     DuplicateValues {
                         value: checker.generator().constant(value),
@@ -39,7 +39,6 @@ pub(crate) fn duplicate_values(checker: &mut Checker, elts: &Vec<Expr>) {
                     elt.range(),
                 ));
             }
-            seen_values.insert(comparable_value);
         };
     }
 }
