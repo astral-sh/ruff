@@ -171,24 +171,37 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
                 converted.push('{');
 
                 let field = FieldName::parse(&field_name).ok()?;
+                let has_field_parts = !field.parts.is_empty();
                 match field.field_type {
                     FieldType::Auto => {
                         let Some(arg) = summary.consume_next() else {
                             return None;
                         };
-                        converted.push_str(&arg);
+                        if has_field_parts && arg.chars().all(|c| c.is_ascii_digit()) {
+                            converted.push_str(&format!("({arg})"));
+                        } else {
+                            converted.push_str(&arg);
+                        }
                     }
                     FieldType::Index(index) => {
                         let Some(arg) = summary.consume_arg(index) else {
                             return None;
                         };
-                        converted.push_str(&arg);
+                        if has_field_parts && arg.chars().all(|c| c.is_ascii_digit()) {
+                            converted.push_str(&format!("({arg})"));
+                        } else {
+                            converted.push_str(&arg);
+                        }
                     }
                     FieldType::Keyword(name) => {
                         let Some(arg) = summary.consume_kwarg(&name) else {
                             return None;
                         };
-                        converted.push_str(&arg);
+                        if has_field_parts && arg.chars().all(|c| c.is_ascii_digit()) {
+                            converted.push_str(&format!("({arg})"));
+                        } else {
+                            converted.push_str(&arg);
+                        }
                     }
                 }
 
