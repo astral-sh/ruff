@@ -134,7 +134,7 @@ Run `cargo dev generate-all` to generate the code for your new fixture. Then run
 locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test`.
+`test_case` macro in the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. Then, run `cargo test`.
 Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
 generated snapshot, then commit the snapshot file alongside the rest of your changes.
 
