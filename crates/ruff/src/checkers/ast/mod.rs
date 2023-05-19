@@ -2846,8 +2846,8 @@ where
                 if self.settings.rules.enabled(Rule::RequestWithoutTimeout) {
                     flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
                 }
-                if self.settings.rules.enabled(Rule::ParamikoCalls) {
-                    flake8_bandit::rules::paramiko_calls(self, func);
+                if self.settings.rules.enabled(Rule::ParamikoCall) {
+                    flake8_bandit::rules::paramiko_call(self, func);
                 }
                 if self
                     .settings

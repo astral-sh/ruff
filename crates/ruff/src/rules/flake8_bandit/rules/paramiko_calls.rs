@@ -6,17 +6,17 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct ParamikoCalls;
+pub struct ParamikoCall;
 
-impl Violation for ParamikoCalls {
+impl Violation for ParamikoCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Possible shell injection via Paramiko call, check inputs are properly sanitized")
+        format!("Possible shell injection via Paramiko call; check inputs are properly sanitized")
     }
 }
 
 /// S601
-pub(crate) fn paramiko_calls(checker: &mut Checker, func: &Expr) {
+pub(crate) fn paramiko_call(checker: &mut Checker, func: &Expr) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -26,6 +26,6 @@ pub(crate) fn paramiko_calls(checker: &mut Checker, func: &Expr) {
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(ParamikoCalls, func.range()));
+            .push(Diagnostic::new(ParamikoCall, func.range()));
     }
 }

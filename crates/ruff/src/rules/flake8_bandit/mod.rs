@@ -43,7 +43,7 @@ mod tests {
     #[test_case(Rule::TryExceptContinue, Path::new("S112.py"); "S112")]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"); "S506")]
-    #[test_case(Rule::ParamikoCalls, Path::new("S601.py"); "S601")]
+    #[test_case(Rule::ParamikoCall, Path::new("S601.py"); "S601")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

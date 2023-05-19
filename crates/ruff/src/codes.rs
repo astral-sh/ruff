@@ -507,7 +507,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "506") => (RuleGroup::Unspecified, Rule::UnsafeYAMLLoad),
         (Flake8Bandit, "508") => (RuleGroup::Unspecified, Rule::SnmpInsecureVersion),
         (Flake8Bandit, "509") => (RuleGroup::Unspecified, Rule::SnmpWeakCryptography),
-        (Flake8Bandit, "601") => (RuleGroup::Unspecified, Rule::ParamikoCalls),
+        (Flake8Bandit, "601") => (RuleGroup::Unspecified, Rule::ParamikoCall),
         (Flake8Bandit, "602") => (RuleGroup::Unspecified, Rule::SubprocessPopenWithShellEqualsTrue),
         (Flake8Bandit, "603") => (RuleGroup::Unspecified, Rule::SubprocessWithoutShellEqualsTrue),
         (Flake8Bandit, "604") => (RuleGroup::Unspecified, Rule::CallWithShellEqualsTrue),
