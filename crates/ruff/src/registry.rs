@@ -513,6 +513,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
     rules::flake8_pyi::rules::DuplicateUnionMember,
+    rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
     rules::flake8_pyi::rules::NonEmptyStubBody,
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::PassStatementStubBody,
