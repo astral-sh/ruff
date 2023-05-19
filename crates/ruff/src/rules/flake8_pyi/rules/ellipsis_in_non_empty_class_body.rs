@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_parser::ast::{Expr, ExprConstant, Ranged, Stmt, StmtExpr};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
@@ -9,26 +8,25 @@ use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-/// PYI013
 /// ## What it does
-/// Removes `...` in otherwise non-empty class bodies
+/// Removes ellipses (`...`) in otherwise non-empty class bodies.
 ///
 /// ## Why is this bad?
-/// The `...` is unnecessary and harms readability
-///
+/// An ellipsis in a class body is only necessary if the class body is
+/// otherwise empty. If the class body is non-empty, then the ellipsis
+/// is redundant.
 ///
 /// ## Example
 /// ```python
-/// class MyClass:
-//     ...
-//     value: int
+/// class Foo:
+///     ...
+///     value: int
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class MyClass:
-//     value: int
-/// ```
+/// class Foo:
+///     value: int
 /// ```
 #[violation]
 pub struct EllipsisInNonEmptyClassBody;
@@ -46,13 +44,14 @@ impl Violation for EllipsisInNonEmptyClassBody {
     }
 }
 
+/// PYI013
 pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
     checker: &mut Checker<'a>,
     parent: &'a Stmt,
     body: &'a [Stmt],
 ) {
-    // If body contains only one statement then it's okay for it to potentially be an Ellipsis
-    if body.len() < 2 {
+    // If the class body contains a single statement, then it's fine for it to be an ellipsis.
+    if body.len() == 1 {
         return;
     }
 
@@ -63,30 +62,28 @@ pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
                     let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
 
                     if checker.patch(diagnostic.kind.rule()) {
-                        let deleted: Vec<&Stmt> =
-                            checker.deletions.iter().map(Into::into).collect();
-                        match delete_stmt(
-                            stmt,
-                            Some(parent),
-                            &deleted,
-                            checker.locator,
-                            checker.indexer,
-                            checker.stylist,
-                        ) {
-                            Ok(edit) => {
-                                // In the unlikely event the class body consists solely of several
-                                // consecutive ellipses, `delete_stmt` can actually result in a
-                                // `pass`
-                                if edit.is_deletion() || edit.content() == Some("pass") {
-                                    checker.deletions.insert(RefEquality(stmt));
-                                    diagnostic.set_fix(Fix::automatic(edit));
-                                }
+                        diagnostic.try_set_fix(|| {
+                            let deleted: Vec<&Stmt> =
+                                checker.deletions.iter().map(Into::into).collect();
+                            let edit = delete_stmt(
+                                stmt,
+                                Some(parent),
+                                &deleted,
+                                checker.locator,
+                                checker.indexer,
+                                checker.stylist,
+                            )?;
+
+                            // In the unlikely event the class body consists solely of several
+                            // consecutive ellipses, `delete_stmt` can actually result in a
+                            // `pass`.
+                            if edit.is_deletion() || edit.content() == Some("pass") {
+                                checker.deletions.insert(RefEquality(stmt));
                             }
-                            Err(e) => {
-                                error!("Failed to delete `...` statement: {}", e);
-                            }
-                        };
-                    };
+
+                            Ok(Fix::automatic(edit))
+                        });
+                    }
 
                     checker.diagnostics.push(diagnostic);
                 }
