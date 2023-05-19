@@ -4,8 +4,6 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -542,7 +540,9 @@ where
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
-static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
+fn is_dunder(id: &str) -> bool {
+    id.starts_with("__") && id.ends_with("__")
+}
 
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
@@ -553,15 +553,19 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
             if targets.len() != 1 {
                 return false;
             }
-            match &targets[0] {
-                Expr::Name(ast::ExprName { id, .. }) => DUNDER_REGEX.is_match(id.as_str()),
-                _ => false,
+            if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+                is_dunder(id)
+            } else {
+                false
             }
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => match target.as_ref() {
-            Expr::Name(ast::ExprName { id, .. }) => DUNDER_REGEX.is_match(id.as_str()),
-            _ => false,
-        },
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                is_dunder(id)
+            } else {
+                false
+            }
+        }
         _ => false,
     }
 }
