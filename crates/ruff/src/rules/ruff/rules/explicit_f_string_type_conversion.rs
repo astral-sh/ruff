@@ -1,6 +1,5 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState};
-use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -49,7 +48,7 @@ impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
 
 fn fix_explicit_f_string_type_conversion(
     expr: &Expr,
-    formatted_values: &[(usize, TextRange)],
+    index: usize,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {
@@ -59,25 +58,24 @@ fn fix_explicit_f_string_type_conversion(
     let mut expression = match_expression(content)?;
     let formatted_string = match_formatted_string(&mut expression)?;
 
-    for (index, _) in formatted_values {
-        let mut formatted_string_expression =
-            match_formatted_string_expression(&mut formatted_string.parts[*index])?;
-        let call = match_call(&mut formatted_string_expression.expression)?;
-        let name = match_name(&mut call.func)?;
-        match name.value {
-            "str" => {
-                formatted_string_expression.conversion = Some("s");
-            }
-            "repr" => {
-                formatted_string_expression.conversion = Some("r");
-            }
-            "ascii" => {
-                formatted_string_expression.conversion = Some("a");
-            }
-            _ => unreachable!(),
+    // Replace the formatted call expression at `index` with a conversion flag.
+    let mut formatted_string_expression =
+        match_formatted_string_expression(&mut formatted_string.parts[index])?;
+    let call = match_call(&mut formatted_string_expression.expression)?;
+    let name = match_name(&mut call.func)?;
+    match name.value {
+        "str" => {
+            formatted_string_expression.conversion = Some("s");
         }
-        formatted_string_expression.expression = call.args[0].value.clone();
+        "repr" => {
+            formatted_string_expression.conversion = Some("r");
+        }
+        "ascii" => {
+            formatted_string_expression.conversion = Some("a");
+        }
+        _ => bail!("Unexpected function call: `{:?}`", name.value),
     }
+    formatted_string_expression.expression = call.args[0].value.clone();
 
     let mut state = CodegenState {
         default_newline: &stylist.line_ending(),
@@ -98,7 +96,6 @@ pub(crate) fn explicit_f_string_type_conversion(
     expr: &Expr,
     values: &[Expr],
 ) {
-    let mut formatted_values: Vec<(usize, TextRange)> = vec![];
     for (index, formatted_value) in values.iter().enumerate() {
         let Expr::FormattedValue(ast::ExprFormattedValue {
             conversion,
@@ -137,34 +134,13 @@ pub(crate) fn explicit_f_string_type_conversion(
         if !checker.ctx.is_builtin(id) {
             return;
         }
-        formatted_values.push((index, value.range()));
-    }
 
-    if formatted_values.is_empty() {
-        return;
-    }
-
-    let mut diagnostics = formatted_values
-        .iter()
-        .map(|(_, range)| Diagnostic::new(ExplicitFStringTypeConversion, *range))
-        .collect::<Vec<_>>();
-
-    if checker.patch(diagnostics[0].kind.rule()) {
-        let fix = fix_explicit_f_string_type_conversion(
-            expr,
-            &formatted_values,
-            checker.locator,
-            checker.stylist,
-        );
-        match fix {
-            Ok(fix) => {
-                for diagnostic in &mut diagnostics {
-                    diagnostic.set_fix(fix.clone());
-                }
-            }
-            Err(err) => log::error!("Failed to create fix: {err}"),
+        let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, value.range());
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.try_set_fix(|| {
+                fix_explicit_f_string_type_conversion(expr, index, checker.locator, checker.stylist)
+            });
         }
+        checker.diagnostics.push(diagnostic);
     }
-
-    checker.diagnostics.extend(diagnostics);
 }
