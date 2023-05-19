@@ -40,11 +40,11 @@ impl Violation for AssignmentFromNone {
 }
 /// PLE1128
 pub fn assignment_from_none(checker: &mut Checker, body: &Stmt) {
-    // if return statement
+    // if return statement with a value
     if let StmtKind::Return { value: Some(expr) } = body.node() {
-        // if something on that return statement
-        // if function call
+        // if function call in that return statement
         if let ExprKind::Call { func, .. } = expr.node() {
+            // need assistance on how to use Visitor here
             // let function_name = func.node.name();
             // for node in ast.iter() {
             //     match node.kind {
