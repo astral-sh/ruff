@@ -1,11 +1,13 @@
-use crate::autofix::actions::delete_stmt;
-use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 use log::error;
+use rustpython_parser::ast::{ExprConstant, ExprKind, Stmt, StmtExpr, StmtKind};
+
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
-use rustpython_parser::ast::{ExprConstant, ExprKind, Stmt, StmtExpr, StmtKind};
+
+use crate::autofix::actions::delete_stmt;
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// PYI013
 /// ## What it does
