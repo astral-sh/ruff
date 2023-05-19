@@ -17,10 +17,6 @@ use crate::rules::dlint::helpers::AnyStmtImport;
 /// ```python
 /// import marshal
 /// ```
-///
-/// Use instead:
-/// ```python
-/// ```
 #[violation]
 pub struct BadMarshalUse;
 

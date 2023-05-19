@@ -18,10 +18,6 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// compile("foo")
 /// ```
-///
-/// Use instead:
-/// ```python
-/// ```
 #[violation]
 pub struct BadCompileUse;
 

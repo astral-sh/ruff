@@ -17,10 +17,6 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// exec("foo")
 /// ```
-///
-/// Use instead:
-/// ```python
-/// ```
 #[violation]
 pub struct BadExecUse;
 

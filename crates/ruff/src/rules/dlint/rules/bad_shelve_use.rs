@@ -17,10 +17,6 @@ use crate::rules::dlint::helpers::AnyStmtImport;
 /// ```python
 /// import shelve
 /// ```
-///
-/// Use instead:
-/// ```python
-/// ```
 #[violation]
 pub struct BadShelveUse;
 
