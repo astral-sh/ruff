@@ -8,15 +8,19 @@ Example usage:
 """
 
 import argparse
+from pathlib import Path
+from typing import Optional
 
-from _utils import ROOT_DIR, dir_name, key_mod, key_pub_use, key_test_case
+from _utils import ROOT_DIR, dir_name, get_indent, key_mod, key_pub_use, key_test_case
 
 
-def main(*, linter: str, nb_digit: int) -> None:
-    """Generate boilerplate for a new rule."""
-    plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
-
-    # Add the relevant `#testcase` macro.
+def sort_test_cases(
+    plugin_module: Path,
+    nb_digit: int,
+    *,
+    test_case_to_add: Optional[str] = None,
+) -> None:
+    """Sort the `#testcase` macros."""
     mod_rs = plugin_module / "mod.rs"
     content = mod_rs.read_text()
 
@@ -27,6 +31,9 @@ def main(*, linter: str, nb_digit: int) -> None:
             if not has_added_testcase and (
                 line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
             ):
+                if test_case_to_add is not None:
+                    indent = get_indent(line)
+                    lines.append(indent + test_case_to_add)
                 lines.sort(key=key_test_case(nb_digit))
                 fp.write("\n".join(lines))
                 fp.write("\n")
@@ -43,74 +50,47 @@ def main(*, linter: str, nb_digit: int) -> None:
             else:
                 lines.append(line)
 
-    # Add the exports
-    rules_dir = plugin_module / "rules"
+
+def sort_exports(
+    rules_dir: Path,
+    *,
+    pub_use_to_add: Optional[str] = None,
+    mod_to_add: Optional[str] = None,
+) -> None:
+    """Sort the exports."""
     rules_mod = rules_dir / "mod.rs"
 
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
 
-    pub_use_contents = parts[0].split(";\n")
-    pub_use_contents.sort(key=key_pub_use)
+    if len(parts) == 2:
+        pub_use_contents = parts[0].split(";\n")
+        if pub_use_to_add is not None:
+            pub_use_contents.append(pub_use_to_add)
+        pub_use_contents.sort(key=key_pub_use)
 
-    mod_contents = parts[1].splitlines()
-    mod_contents.sort(key=key_mod)
+        mod_contents = parts[1].splitlines()
+        if mod_to_add is not None:
+            mod_contents.append(mod_to_add)
+        mod_contents.sort(key=key_mod)
 
-    new_contents = ";\n".join(pub_use_contents)
-    new_contents += "\n\n"
-    new_contents += "\n".join(mod_contents)
-    new_contents += "\n"
+        new_contents = ";\n".join(pub_use_contents)
+        new_contents += "\n\n"
+        new_contents += "\n".join(mod_contents)
+        new_contents += "\n"
 
-    rules_mod.write_text(new_contents)
+        rules_mod.write_text(new_contents)
+    else:
+        if pub_use_to_add is not None and mod_to_add is not None:
+            rules_mod.write_text(f"{pub_use_to_add};\n\n{mod_to_add}\n")
 
-    # Add the relevant code-to-violation pair to `src/registry.rs`.
-    content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
 
-    seen_macro = False
-    has_written = False
-    has_seen_linter = False
-    with (ROOT_DIR / "crates/ruff/src/registry.rs").open("w") as fp:
-        lines = []
-        for line in content.splitlines():
-            if has_written:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if line.startswith("ruff_macros::register_rules!"):
-                seen_macro = True
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not seen_macro:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if line.strip() == f"// {linter}":
-                has_seen_linter = True
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not has_seen_linter:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not line.strip().startswith("// "):
-                lines.append(line)
-            else:
-                lines.sort()
-                fp.write("\n".join(lines))
-                fp.write("\n")
-                fp.write(line)
-                fp.write("\n")
-                has_written = True
-
-    assert has_written
-
+def sort_code_to_rule_pairs(
+    linter: str,
+    *,
+    code_to_rule_pair_to_add: Optional[str] = None,
+) -> None:
+    """Sort the code-to-rule pairs from `src/codes.rs`."""
     text = ""
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
         while (line := next(fp)).strip() != f"// {linter}":
@@ -121,6 +101,8 @@ def main(*, linter: str, nb_digit: int) -> None:
         while (line := next(fp)).strip() != "":
             lines.append(line)
 
+        if code_to_rule_pair_to_add is not None:
+            lines.append(code_to_rule_pair_to_add)
         lines.sort()
 
         text += "".join(lines)
@@ -130,6 +112,16 @@ def main(*, linter: str, nb_digit: int) -> None:
 
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
         fp.write(text)
+
+
+def main(*, linter: str, nb_digit: int) -> None:
+    """Sort the code of the linter."""
+    plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
+    rules_dir = plugin_module / "rules"
+
+    sort_test_cases(plugin_module, nb_digit)
+    sort_exports(rules_dir)
+    sort_code_to_rule_pairs(linter)
 
 
 if __name__ == "__main__":

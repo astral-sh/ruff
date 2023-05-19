@@ -11,22 +11,19 @@ Example usage:
 """
 
 import argparse
+import re
+from pathlib import Path
 
-from _utils import (
-    ROOT_DIR,
-    dir_name,
-    get_indent,
-    key_mod,
-    key_pub_use,
-    key_test_case,
-    pascal_case,
-    snake_case,
+from _utils import ROOT_DIR, dir_name, pascal_case, snake_case
+from sort_rules import (
+    sort_code_to_rule_pairs,
+    sort_exports,
+    sort_test_cases,
 )
 
 
-def main(*, name: str, prefix: str, code: str, linter: str) -> None:
-    """Generate boilerplate for a new rule."""
-    # Create a test fixture.
+def create_test_fixture(prefix: str, code: str, linter: str) -> None:
+    """Create a test fixture for a new rule."""
     with (
         ROOT_DIR
         / "crates/ruff/resources/test/fixtures"
@@ -37,74 +34,39 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     ):
         pass
 
-    plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
+
+def add_test_case(
+    plugin_module: Path,
+    name: str,
+    prefix: str,
+    code: str,
+    linter: str,
+) -> None:
+    """Add the relevant `#testcase` macro."""
+    filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
+    test_case_to_add = f'#[test_case(Rule::{name}, Path::new("{filestem}.py"))]'
+    m = re.search(r"\d", code)
+    nb_digit = len(code) - (m.start() if m else 0)
+    sort_test_cases(plugin_module, nb_digit, test_case_to_add=test_case_to_add)
+
+
+def add_exports(rules_dir: Path, name: str) -> None:
+    """Add the exports."""
     rule_name_snake = snake_case(name)
-
-    # Add the relevant `#testcase` macro.
-    mod_rs = plugin_module / "mod.rs"
-    content = mod_rs.read_text()
-
-    with mod_rs.open("w") as fp:
-        has_added_testcase = False
-        lines = []
-        for line in content.splitlines():
-            if not has_added_testcase and (
-                line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
-            ):
-                indent = get_indent(line)
-                filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
-                lines.append(
-                    f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py"))]',
-                )
-                lines.sort(key=key_test_case(len(code)))
-                fp.write("\n".join(lines))
-                fp.write("\n")
-                lines.clear()
-                has_added_testcase = True
-
-            if has_added_testcase:
-                fp.write(line)
-                fp.write("\n")
-            elif line.strip() == "":
-                fp.write("\n".join(lines))
-                fp.write("\n\n")
-                lines.clear()
-            else:
-                lines.append(line)
-
-    # Add the exports
-    rules_dir = plugin_module / "rules"
-    rules_mod = rules_dir / "mod.rs"
-
-    contents = rules_mod.read_text()
-    parts = contents.split("\n\n")
-
     new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
     new_mod = f"mod {rule_name_snake};"
 
-    if len(parts) == 2:
-        pub_use_contents = parts[0].split(";\n")
-        pub_use_contents.append(new_pub_use)
-        pub_use_contents.sort(key=key_pub_use)
+    sort_exports(rules_dir, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
 
-        mod_contents = parts[1].splitlines()
-        mod_contents.append(new_mod)
-        mod_contents.sort(key=key_mod)
 
-        new_contents = ";\n".join(pub_use_contents)
-        new_contents += "\n\n"
-        new_contents += "\n".join(mod_contents)
-        new_contents += "\n"
-
-        rules_mod.write_text(new_contents)
-    else:
-        with rules_mod.open("a") as fp:
-            fp.write(f"{new_pub_use};")
-            fp.write("\n\n")
-            fp.write(f"{new_mod}")
-            fp.write("\n")
-
-    # Add the relevant rule function.
+def add_rule_function(
+    rules_dir: Path,
+    name: str,
+    prefix: str,
+    code: str,
+) -> None:
+    """Add the relevant rule function."""
+    rule_name_snake = snake_case(name)
     with (rules_dir / f"{rule_name_snake}.rs").open("w") as fp:
         fp.write(
             f"""\
@@ -131,28 +93,31 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
 """,
         )
 
-    text = ""
-    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
-        while (line := next(fp)).strip() != f"// {linter}":
-            text += line
-        text += line
 
-        lines = []
-        while (line := next(fp)).strip() != "":
-            lines.append(line)
+def add_code_to_rule_pair(
+    name: str,
+    code: str,
+    linter: str,
+) -> None:
+    """Add the relevant code-to-rule pair to `src/codes.rs`."""
+    variant = pascal_case(dir_name(linter))
+    rule = f"""rules::{linter.split(" ")[0]}::rules::{name}"""
+    new_code_to_rule_pair = (
+        " " * 8 + f'({variant}, "{code}") => (RuleGroup::Unspecified, {rule}),\n'
+    )
+    sort_code_to_rule_pairs(linter, code_to_rule_pair_to_add=new_code_to_rule_pair)
 
-        variant = pascal_case(dir_name(linter))
-        rule = f"""rules::{linter.split(" ")[0]}::rules::{name}"""
-        lines.append(
-            " " * 8
-            + f"""({variant}, "{code}") => (RuleGroup::Unspecified, {rule}),\n""",
-        )
-        lines.sort()
-        text += "".join(lines)
-        text += "\n"
-        text += fp.read()
-    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
-        fp.write(text)
+
+def main(*, name: str, prefix: str, code: str, linter: str) -> None:
+    """Generate boilerplate for a new rule."""
+    plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
+    rules_dir = plugin_module / "rules"
+
+    create_test_fixture(prefix, code, linter)
+    add_test_case(plugin_module, name, prefix, code, linter)
+    add_exports(rules_dir, name)
+    add_rule_function(rules_dir, name, prefix, code)
+    add_code_to_rule_pair(name, code, linter)
 
 
 if __name__ == "__main__":
