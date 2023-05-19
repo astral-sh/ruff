@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -64,17 +64,14 @@ pub(crate) fn locals_in_render_function(
             return;
         }
         &args[2]
-    } else if let Some(keyword) = keywords.iter().find(|keyword| {
-        keyword
-            .node
-            .arg
-            .as_ref()
-            .map_or(false, |arg| arg == "context")
-    }) {
-        if !is_locals_call(checker, &keyword.node.value) {
+    } else if let Some(keyword) = keywords
+        .iter()
+        .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "context"))
+    {
+        if !is_locals_call(checker, &keyword.value) {
             return;
         }
-        &keyword.node.value
+        &keyword.value
     } else {
         return;
     };
@@ -86,7 +83,7 @@ pub(crate) fn locals_in_render_function(
 }
 
 fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
-    let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node else {
+    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false
     };
     checker

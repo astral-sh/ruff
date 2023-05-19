@@ -1,5 +1,5 @@
 use log::error;
-use rustpython_parser::ast::{ExprConstant, ExprKind, Stmt, StmtExpr, StmtKind};
+use rustpython_parser::ast::{Expr, ExprConstant, Ranged, Stmt, StmtExpr};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,8 +57,8 @@ pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
     }
 
     for stmt in body {
-        if let StmtKind::Expr(StmtExpr { value }) = &stmt.node {
-            if let ExprKind::Constant(ExprConstant { value, .. }) = &value.node {
+        if let Stmt::Expr(StmtExpr { value, .. }) = &stmt {
+            if let Expr::Constant(ExprConstant { value, .. }) = value.as_ref() {
                 if value.is_ellipsis() {
                     let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
 

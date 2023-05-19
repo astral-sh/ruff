@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,13 +37,9 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
 
 fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool {
     keywords.iter().any(|keyword| {
-        keyword
-            .node
-            .arg
-            .as_ref()
-            .map_or(false, |arg| arg == "metaclass")
+        keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass")
             && context
-                .resolve_call_path(&keyword.node.value)
+                .resolve_call_path(&keyword.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["abc", "ABCMeta"]
                 })
@@ -55,10 +51,13 @@ fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
-    body.iter().all(|stmt| match &stmt.node {
-        StmtKind::Pass => true,
-        StmtKind::Expr(ast::StmtExpr { value }) => match &value.node {
-            ExprKind::Constant(ast::ExprConstant { value, .. }) => {
+    body.iter().all(|stmt| match stmt {
+        Stmt::Pass(_) => true,
+        Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _range,
+        }) => match value.as_ref() {
+            Expr::Constant(ast::ExprConstant { value, .. }) => {
                 matches!(value, Constant::Str(..) | Constant::Ellipsis)
             }
             _ => false,
@@ -88,24 +87,24 @@ pub(crate) fn abstract_base_class(
     for stmt in body {
         // https://github.com/PyCQA/flake8-bugbear/issues/293
         // Ignore abc's that declares a class attribute that must be set
-        if let StmtKind::AnnAssign(_) | StmtKind::Assign(_) = &stmt.node {
+        if let Stmt::AnnAssign(_) | Stmt::Assign(_) = stmt {
             has_abstract_method = true;
             continue;
         }
 
         let (
-            StmtKind::FunctionDef(ast::StmtFunctionDef {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
-            }) | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            }) | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 decorator_list,
                 body,
                 name: method_name,
                 ..
             })
-        ) = &stmt.node else {
+        ) = stmt else {
             continue;
         };
 

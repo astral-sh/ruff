@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Cmpop, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -77,17 +77,18 @@ impl AlwaysAutofixableViolation for NotIsTest {
 pub(crate) fn not_tests(
     checker: &mut Checker,
     expr: &Expr,
-    op: &Unaryop,
+    op: Unaryop,
     operand: &Expr,
     check_not_in: bool,
     check_not_is: bool,
 ) {
     if matches!(op, Unaryop::Not) {
-        if let ExprKind::Compare(ast::ExprCompare {
+        if let Expr::Compare(ast::ExprCompare {
             left,
             ops,
             comparators,
-        }) = &operand.node
+            range: _,
+        }) = operand
         {
             if !matches!(&ops[..], [Cmpop::In | Cmpop::Is]) {
                 return;

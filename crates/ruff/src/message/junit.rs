@@ -3,7 +3,7 @@ use crate::message::{
 };
 use crate::registry::AsRule;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
-use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+use ruff_python_ast::source_code::SourceLocation;
 use std::io::Write;
 use std::path::Path;
 
@@ -35,10 +35,7 @@ impl Emitter for JunitEmitter {
                 let location = if context.is_jupyter_notebook(message.filename()) {
                     // We can't give a reasonable location for the structured formats,
                     // so we show one that's clearly a fallback
-                    SourceLocation {
-                        row: OneIndexed::from_zero_indexed(0),
-                        column: OneIndexed::from_zero_indexed(0),
-                    }
+                    SourceLocation::default()
                 } else {
                     start_location
                 };

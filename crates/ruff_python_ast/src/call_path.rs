@@ -1,12 +1,12 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr};
 use smallvec::smallvec;
 
 /// A representation of a qualified name, like `typing.List`.
 pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;
 
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
-    match &expr.node {
-        ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+    match expr {
+        Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
             if collect_call_path_inner(value, parts) {
                 parts.push(attr.as_str());
                 true
@@ -14,7 +14,7 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool
                 false
             }
         }
-        ExprKind::Name(ast::ExprName { id, .. }) => {
+        Expr::Name(ast::ExprName { id, .. }) => {
             parts.push(id.as_str());
             true
         }

@@ -1,7 +1,7 @@
 use std::hash::BuildHasherDefault;
 
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Expr, ExprKind, Identifier};
+use rustpython_parser::ast::{self, Expr, Identifier, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,7 +27,7 @@ pub(crate) fn duplicate_bases(checker: &mut Checker, name: &str, bases: &[Expr])
     let mut seen: FxHashSet<&Identifier> =
         FxHashSet::with_capacity_and_hasher(bases.len(), BuildHasherDefault::default());
     for base in bases {
-        if let ExprKind::Name(ast::ExprName { id, .. }) = &base.node {
+        if let Expr::Name(ast::ExprName { id, .. }) = base {
             if !seen.insert(id) {
                 checker.diagnostics.push(Diagnostic::new(
                     DuplicateBases {

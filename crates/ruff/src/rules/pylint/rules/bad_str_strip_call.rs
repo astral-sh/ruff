@@ -1,7 +1,7 @@
 use std::fmt;
 
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -9,6 +9,26 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
 
+/// ## What it does
+/// Checks duplicate characters in `str#strip` calls.
+///
+/// ## Why is this bad?
+/// All characters in `str#strip` calls are removed from both the leading and
+/// trailing ends of the string. Including duplicate characters in the call
+/// is redundant and often indicative of a mistake.
+///
+/// ## Example
+/// ```python
+/// "bar foo baz".strip("bar baz ")  # "foo"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "bar foo baz".strip("abrz ")  # "foo"
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html?highlight=strip#str.strip)
 #[violation]
 pub struct BadStrStripCall {
     strip: StripKind,
@@ -107,20 +127,20 @@ fn has_duplicates(s: &str) -> bool {
 
 /// PLE1310
 pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
-    if let ExprKind::Attribute(ast::ExprAttribute { value, attr, .. }) = &func.node {
+    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
         if matches!(
-            value.node,
-            ExprKind::Constant(ast::ExprConstant {
+            value.as_ref(),
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(_) | Constant::Bytes(_),
                 ..
             })
         ) {
             if let Some(strip) = StripKind::from_str(attr.as_str()) {
                 if let Some(arg) = args.get(0) {
-                    if let ExprKind::Constant(ast::ExprConstant {
+                    if let Expr::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
-                    }) = &arg.node
+                    }) = &arg
                     {
                         if has_duplicates(value) {
                             let removal = if checker.settings.target_version >= PythonVersion::Py39

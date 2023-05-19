@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -61,7 +61,7 @@ pub(crate) fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_e
 
     // Avoid flagging on function calls (e.g., `df.values()`).
     if let Some(parent) = checker.ctx.expr_parent() {
-        if matches!(parent.node, ExprKind::Call(_)) {
+        if matches!(parent, Expr::Call(_)) {
             return;
         }
     }
@@ -72,7 +72,7 @@ pub(crate) fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_e
 
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like imports).
-    if let ExprKind::Name(ast::ExprName { id, .. }) = &value.node {
+    if let Expr::Name(ast::ExprName { id, .. }) = value {
         if checker.ctx.find_binding(id).map_or(true, |binding| {
             matches!(
                 binding.kind,

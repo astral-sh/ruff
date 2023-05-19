@@ -13,8 +13,8 @@ pub(crate) use prefix_type_params::{prefix_type_params, UnprefixedTypeParam};
 pub(crate) use quoted_annotation_in_stub::{quoted_annotation_in_stub, QuotedAnnotationInStub};
 pub(crate) use simple_defaults::{
     annotated_assignment_default_in_stub, argument_simple_defaults, assignment_default_in_stub,
-    typed_argument_simple_defaults, ArgumentDefaultInStub, AssignmentDefaultInStub,
-    TypedArgumentDefaultInStub,
+    typed_argument_simple_defaults, unannotated_assignment_in_stub, ArgumentDefaultInStub,
+    AssignmentDefaultInStub, TypedArgumentDefaultInStub, UnannotatedAssignmentInStub,
 };
 pub(crate) use type_alias_naming::{
     snake_case_type_alias, t_suffixed_type_alias, SnakeCaseTypeAlias, TSuffixedTypeAlias,

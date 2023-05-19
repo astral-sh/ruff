@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -7,6 +7,39 @@ use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for usages of names that are declared as `global` prior to the
+/// relevant `global` declaration.
+///
+/// ## Why is this bad?
+/// The `global` declaration applies to the entire scope. Using a name that's
+/// declared as `global` in a given scope prior to the relevant `global`
+/// declaration is a syntax error.
+///
+/// ## Example
+/// ```python
+/// counter = 1
+///
+///
+/// def increment():
+///     print(f"Adding 1 to {counter}")
+///     global counter
+///     counter += 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// counter = 1
+///
+///
+/// def increment():
+///     global counter
+///     print(f"Adding 1 to {counter}")
+///     counter += 1
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[violation]
 pub struct LoadBeforeGlobalDeclaration {
     name: String,

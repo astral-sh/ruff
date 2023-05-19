@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -32,8 +32,8 @@ pub(crate) fn raise_without_from_inside_except(checker: &mut Checker, body: &[St
     for (range, exc, cause) in raises {
         if cause.is_none() {
             if let Some(exc) = exc {
-                match &exc.node {
-                    ExprKind::Name(ast::ExprName { id, .. }) if is_lower(id) => {}
+                match exc {
+                    Expr::Name(ast::ExprName { id, .. }) if is_lower(id) => {}
                     _ => {
                         checker
                             .diagnostics

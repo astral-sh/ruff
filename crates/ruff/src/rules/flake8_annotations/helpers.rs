@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Arguments, Expr, Stmt};
 
 use ruff_python_ast::cast;
 use ruff_python_semantic::analyze::visibility;
@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 
 pub(super) fn match_function_def(
     stmt: &Stmt,
-) -> (&str, &Arguments, Option<&Expr>, &Vec<Stmt>, &Vec<Expr>) {
-    match &stmt.node {
-        StmtKind::FunctionDef(ast::StmtFunctionDef {
+) -> (&str, &Arguments, Option<&Expr>, &[Stmt], &[Expr]) {
+    match stmt {
+        Stmt::FunctionDef(ast::StmtFunctionDef {
             name,
             args,
             returns,
@@ -18,7 +18,7 @@ pub(super) fn match_function_def(
             decorator_list,
             ..
         })
-        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             name,
             args,
             returns,

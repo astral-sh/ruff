@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -61,8 +61,8 @@ pub(crate) fn unnecessary_literal_set(
         return;
     }
     let kind = match argument {
-        ExprKind::List(_) => "list",
-        ExprKind::Tuple(_) => "tuple",
+        Expr::List(_) => "list",
+        Expr::Tuple(_) => "tuple",
         _ => return,
     };
     let mut diagnostic = Diagnostic::new(

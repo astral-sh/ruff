@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ExprKind, Stmt, Withitem};
+use rustpython_parser::ast::{self, Expr, Ranged, Stmt, Withitem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,7 +55,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
         return;
     };
     let item_context = &item.context_expr;
-    let ExprKind::Call(ast::ExprCall { func, args, keywords }) = &item_context.node else {
+    let Expr::Call(ast::ExprCall { func, args, keywords, range: _ }) = &item_context else {
         return;
     };
     if args.len() != 1 {
@@ -74,7 +74,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
     }
 
     let kind = {
-        if matches!(&func.node, ExprKind::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
+        if matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
         {
             AssertionKind::AssertRaises
         } else if checker
@@ -83,13 +83,9 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["pytest", "raises"]
             })
-            && !keywords.iter().any(|keyword| {
-                keyword
-                    .node
-                    .arg
-                    .as_ref()
-                    .map_or(false, |arg| arg == "match")
-            })
+            && !keywords
+                .iter()
+                .any(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "match"))
         {
             AssertionKind::PytestRaises
         } else {

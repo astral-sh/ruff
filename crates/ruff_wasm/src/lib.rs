@@ -12,7 +12,6 @@ use ruff::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
@@ -155,7 +154,6 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         pycodestyle: Some(pycodestyle::settings::Settings::default().into()),
         pydocstyle: Some(pydocstyle::settings::Settings::default().into()),
         pylint: Some(pylint::settings::Settings::default().into()),
-        pyupgrade: Some(pyupgrade::settings::Settings::default().into()),
     })?)
 }
 

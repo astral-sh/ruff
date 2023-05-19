@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -38,7 +38,7 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     {
         return;
     }
-    let ExprKind::Constant(ast::ExprConstant { value, .. } )= &args[0].node else {
+    let Expr::Constant(ast::ExprConstant { value, .. } )= &args[0] else {
         return;
     };
     let Some(primitive) = Primitive::from_constant(value) else {

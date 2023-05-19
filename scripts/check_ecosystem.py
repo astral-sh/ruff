@@ -5,6 +5,7 @@ Example usage:
 
     scripts/check_ecosystem.py <path/to/ruff1> <path/to/ruff2>
 """
+from __future__ import annotations
 
 import argparse
 import asyncio
@@ -18,7 +19,7 @@ import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple, Optional, Self
+from typing import TYPE_CHECKING, NamedTuple, Self
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -31,13 +32,13 @@ class Repository(NamedTuple):
 
     org: str
     repo: str
-    ref: Optional[str]
+    ref: str | None
     select: str = ""
     ignore: str = ""
     exclude: str = ""
 
     @asynccontextmanager
-    async def clone(self: Self, checkout_dir: Path) -> "AsyncIterator[Path]":
+    async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
         """Shallow clone this repository to a temporary directory."""
         if checkout_dir.exists():
             logger.debug(f"Reusing {self.org}/{self.repo}")
@@ -101,7 +102,7 @@ async def check(
     select: str = "",
     ignore: str = "",
     exclude: str = "",
-) -> "Sequence[str]":
+) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
     logger.debug(f"Checking {name} with {ruff}")
     ruff_args = ["check", "--no-cache", "--exit-zero"]
@@ -148,7 +149,7 @@ class Diff(NamedTuple):
         """Return true if this diff is non-empty."""
         return bool(self.removed or self.added)
 
-    def __iter__(self: Self) -> "Iterator[str]":
+    def __iter__(self: Self) -> Iterator[str]:
         """Iterate through the changed lines in diff format."""
         for line in heapq.merge(sorted(self.removed), sorted(self.added)):
             if line in self.removed:
@@ -161,7 +162,7 @@ async def compare(
     ruff1: Path,
     ruff2: Path,
     repo: Repository,
-    checkouts: Optional[Path] = None,
+    checkouts: Path | None = None,
 ) -> Diff | None:
     """Check a specific repository against two versions of ruff."""
     removed, added = set(), set()
@@ -254,8 +255,8 @@ async def main(
     *,
     ruff1: Path,
     ruff2: Path,
-    projects_jsonl: Optional[Path],
-    checkouts: Optional[Path] = None,
+    projects_jsonl: Path | None,
+    checkouts: Path | None = None,
 ) -> None:
     """Check two versions of ruff against a corpus of open-source code."""
     if projects_jsonl:

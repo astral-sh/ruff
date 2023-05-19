@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Keyword};
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -70,7 +70,7 @@ pub(crate) fn unnecessary_collection_call(
         "dict"
             if keywords.is_empty()
                 || (!settings.allow_dict_calls_with_keyword_arguments
-                    && keywords.iter().all(|kw| kw.node.arg.is_some())) =>
+                    && keywords.iter().all(|kw| kw.arg.is_some())) =>
         {
             // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)
         }

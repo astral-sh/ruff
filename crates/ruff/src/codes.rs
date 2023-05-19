@@ -215,6 +215,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W3301") => Rule::NestedMinMax,
         (Pylint, "E0241") => Rule::DuplicateBases,
 
+        // flake8-async
+        (Flake8Async, "100") => Rule::BlockingHttpCallInAsyncFunction,
+        (Flake8Async, "101") => Rule::OpenSleepOrSubprocessInAsyncFunction,
+        (Flake8Async, "102") => Rule::BlockingOsCallInAsyncFunction,
+
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
         (Flake8Builtins, "002") => Rule::BuiltinArgumentShadowing,
@@ -330,6 +335,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Annotations, "205") => Rule::MissingReturnTypeStaticMethod,
         (Flake8Annotations, "206") => Rule::MissingReturnTypeClassMethod,
         (Flake8Annotations, "401") => Rule::AnyType,
+
+        // flake8-future-annotations
+        (Flake8FutureAnnotations, "100") => Rule::MissingFutureAnnotationsImport,
 
         // flake8-2020
         (Flake82020, "101") => Rule::SysVersionSlice3,
@@ -603,6 +611,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
         (Flake8Pyi, "042") => Rule::SnakeCaseTypeAlias,
         (Flake8Pyi, "043") => Rule::TSuffixedTypeAlias,
+        (Flake8Pyi, "052") => Rule::UnannotatedAssignmentInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::PytestFixtureIncorrectParenthesesStyle,

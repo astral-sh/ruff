@@ -191,6 +191,10 @@ ruff_macros::register_rules!(
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
     rules::pylint::rules::DuplicateBases,
+    // flake8-async
+    rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
+    rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
+    rules::flake8_async::rules::BlockingOsCallInAsyncFunction,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -290,6 +294,8 @@ ruff_macros::register_rules!(
     rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
     rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
     rules::flake8_annotations::rules::AnyType,
+    // flake8-future-annotations
+    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImport,
     // flake8-2020
     rules::flake8_2020::rules::SysVersionSlice3,
     rules::flake8_2020::rules::SysVersion2,
@@ -534,19 +540,20 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::AssignmentDefaultInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
-    rules::flake8_pyi::rules::NonEmptyStubBody,
-    rules::flake8_pyi::rules::PassStatementStubBody,
-    rules::flake8_pyi::rules::TypeCommentInStub,
-    rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
-    rules::flake8_pyi::rules::UnprefixedTypeParam,
-    rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
-    rules::flake8_pyi::rules::UnrecognizedPlatformName,
-    rules::flake8_pyi::rules::PassInClassBody,
-    rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
     rules::flake8_pyi::rules::DuplicateUnionMember,
+    rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
+    rules::flake8_pyi::rules::NonEmptyStubBody,
+    rules::flake8_pyi::rules::PassInClassBody,
+    rules::flake8_pyi::rules::PassStatementStubBody,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
+    rules::flake8_pyi::rules::TypeCommentInStub,
+    rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
+    rules::flake8_pyi::rules::UnannotatedAssignmentInStub,
+    rules::flake8_pyi::rules::UnprefixedTypeParam,
+    rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
+    rules::flake8_pyi::rules::UnrecognizedPlatformName,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,
@@ -734,6 +741,9 @@ pub enum Linter {
     /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
+    /// [flake8-async](https://pypi.org/project/flake8-async/)
+    #[prefix = "ASYNC"]
+    Flake8Async,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
@@ -770,6 +780,9 @@ pub enum Linter {
     /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
+    /// [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
+    #[prefix = "FA"]
+    Flake8FutureAnnotations,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,

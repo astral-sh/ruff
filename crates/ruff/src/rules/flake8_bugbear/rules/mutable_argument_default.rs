@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Expr, ExprKind};
+use rustpython_parser::ast::{self, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,14 +37,14 @@ pub(crate) fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
 }
 
 fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
-    match &expr.node {
-        ExprKind::List(_)
-        | ExprKind::Dict(_)
-        | ExprKind::Set(_)
-        | ExprKind::ListComp(_)
-        | ExprKind::DictComp(_)
-        | ExprKind::SetComp(_) => true,
-        ExprKind::Call(ast::ExprCall { func, .. }) => is_mutable_func(checker, func),
+    match expr {
+        Expr::List(_)
+        | Expr::Dict(_)
+        | Expr::Set(_)
+        | Expr::ListComp(_)
+        | Expr::DictComp(_)
+        | Expr::SetComp(_) => true,
+        Expr::Call(ast::ExprCall { func, .. }) => is_mutable_func(checker, func),
         _ => false,
     }
 }
@@ -68,7 +68,6 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Argume
     {
         if is_mutable_expr(checker, default)
             && !arg
-                .node
                 .annotation
                 .as_ref()
                 .map_or(false, |expr| is_immutable_annotation(&checker.ctx, expr))

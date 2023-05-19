@@ -2,7 +2,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use rustpython_parser::ast::{self, StmtKind, Suite};
+use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers::to_module_path;
@@ -28,18 +28,19 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
     let num_imports = blocks.iter().map(|block| block.imports.len()).sum();
     let mut module_imports = Vec::with_capacity(num_imports);
     for stmt in blocks.iter().flat_map(|block| &block.imports) {
-        match &stmt.node {
-            StmtKind::Import(ast::StmtImport { names }) => {
+        match stmt {
+            Stmt::Import(ast::StmtImport { names, range: _ }) => {
                 module_imports.extend(
                     names
                         .iter()
-                        .map(|name| ModuleImport::new(name.node.name.to_string(), stmt.range())),
+                        .map(|name| ModuleImport::new(name.name.to_string(), stmt.range())),
                 );
             }
-            StmtKind::ImportFrom(ast::StmtImportFrom {
+            Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
+                range: _,
             }) => {
                 let level = level.map_or(0, |level| level.to_usize());
                 let module = if let Some(module) = module {
@@ -60,10 +61,10 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
                     Cow::Owned(module_path[..module_path.len() - level].join("."))
                 };
                 module_imports.extend(names.iter().map(|name| {
-                    ModuleImport::new(format!("{}.{}", module, name.node.name), name.range())
+                    ModuleImport::new(format!("{}.{}", module, name.name), name.range())
                 }));
             }
-            _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
+            _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
         }
     }
 

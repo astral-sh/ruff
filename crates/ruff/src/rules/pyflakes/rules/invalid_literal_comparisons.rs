@@ -69,8 +69,8 @@ pub(crate) fn invalid_literal_comparison(
             let mut diagnostic = Diagnostic::new(IsLiteral { cmpop: op.into() }, location);
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(located_op) = &located.get(index) {
-                    assert_eq!(&located_op.node, op);
-                    if let Some(content) = match &located_op.node {
+                    assert_eq!(located_op.op, *op);
+                    if let Some(content) = match located_op.op {
                         Cmpop::Is => Some("==".to_string()),
                         Cmpop::IsNot => Some("!=".to_string()),
                         node => {
@@ -81,7 +81,7 @@ pub(crate) fn invalid_literal_comparison(
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                             content,
-                            located_op.range() + location.start(),
+                            located_op.range + location.start(),
                         )));
                     }
                 } else {

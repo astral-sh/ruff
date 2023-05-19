@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -26,8 +26,8 @@ const WEAK_HASHES: [&str; 4] = ["md4", "md5", "sha", "sha1"];
 fn is_used_for_security(call_args: &SimpleCallArgs) -> bool {
     match call_args.keyword_argument("usedforsecurity") {
         Some(expr) => !matches!(
-            &expr.node,
-            ExprKind::Constant(ast::ExprConstant {
+            expr,
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Bool(false),
                 ..
             })
