@@ -139,9 +139,7 @@ pub(crate) fn lint_path(
         let messages = lint_pyproject_toml(source_file)?;
         return Ok(Diagnostics {
             messages,
-            fixed: FxHashMap::default(),
-            imports: ImportMap::default(),
-            jupyter_index: FxHashMap::default(),
+			..Diagnostics::default(),
         });
     }
 
