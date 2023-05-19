@@ -44,7 +44,7 @@ pub fn assignment_from_none(checker: &mut Checker, body: &Stmt) {
     if let StmtKind::Return { value: Some(expr) } = body.node() {
         // if function call in that return statement
         if let ExprKind::Call { func, .. } = expr.node() {
-            // need assistance on how to use Visitor here
+            // need assistance on how to use Visitor here to find the function definition using the function name
             // let function_name = func.node.name();
             // for node in ast.iter() {
             //     match node.kind {
