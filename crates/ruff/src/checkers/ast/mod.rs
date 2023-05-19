@@ -742,6 +742,13 @@ where
                     if self.settings.rules.enabled(Rule::PassInClassBody) {
                         flake8_pyi::rules::pass_in_class_body(self, stmt, body);
                     }
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::EllipsisInNonEmptyClassBody)
+                    {
+                        flake8_pyi::rules::ellipsis_in_non_empty_class_body(self, stmt, body);
+                    }
                 }
 
                 if self
