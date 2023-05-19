@@ -43,7 +43,7 @@ use ruff_python_ast::source_code::Locator;
 ///     elif country == "United States":
 ///         return "Washington"
 ///     else:
-///         return "Unknown"  # 13th return statement
+///         return "Unknown"  # 13th branch
 /// ```
 ///
 /// Use instead:
