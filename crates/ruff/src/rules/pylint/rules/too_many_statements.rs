@@ -29,11 +29,11 @@ use ruff_python_ast::source_code::Locator;
 ///     elif number == 2:
 ///         return True
 ///     elif number == 3:
-///        return False
+///         return False
 ///     elif number == 4:
-///        return True
+///         return True
 ///     elif number == 5:
-///        return False
+///         return False
 ///     else:
 ///         ...
 /// ```

@@ -28,6 +28,7 @@ use crate::rules::pylint::settings::ConstantType;
 /// ```python
 /// DISCOUNT_RATE = 0.2
 ///
+///
 /// def calculate_discount(price: float) -> float:
 ///     return price * (1 - DISCOUNT_RATE)
 /// ```
