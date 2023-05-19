@@ -2,7 +2,6 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
-use std::ops::Add;
 
 use crate::cst::{
     Alias, Arg, Body, BoolOp, CmpOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
@@ -190,49 +189,25 @@ impl Trivia {
     }
 }
 
-pub fn extract_trivia_tokens(lxr: &[LexResult], text: &str) -> Vec<TriviaToken> {
+pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
     let mut tokens = vec![];
-    let mut prev_end = TextSize::default();
     let mut prev_tok: Option<(&Tok, TextRange)> = None;
     let mut prev_semantic_tok: Option<(&Tok, TextRange)> = None;
     let mut parens = vec![];
 
     for (tok, range) in lxr.iter().flatten() {
+        let after_new_line = matches!(prev_tok, Some((Tok::Newline | Tok::NonLogicalNewline, _)));
+
         // Add empty lines.
-        let trivia = &text[TextRange::new(prev_end, range.start())];
-        let bytes = trivia.as_bytes();
-
-        let mut bytes_iter = bytes.iter().enumerate();
-
-        let mut after_new_line =
-            matches!(prev_tok, Some((Tok::Newline | Tok::NonLogicalNewline, _)));
-
-        while let Some((index, byte)) = bytes_iter.next() {
-            let len = match byte {
-                b'\r' if bytes.get(index + 1) == Some(&b'\n') => {
-                    bytes_iter.next();
-                    TextSize::from(2)
-                }
-                b'\n' | b'\r' => TextSize::from(1),
-                _ => {
-                    // Must be whitespace or the parser would generate a token
-                    continue;
-                }
-            };
-
-            if after_new_line {
-                let new_line_start = prev_end.add(TextSize::try_from(index).unwrap());
-                tokens.push(TriviaToken {
-                    range: TextRange::new(new_line_start, new_line_start.add(len)),
-                    kind: TriviaTokenKind::EmptyLine,
-                });
-            } else {
-                after_new_line = true;
-            }
+        if after_new_line && matches!(tok, Tok::NonLogicalNewline) {
+            tokens.push(TriviaToken {
+                range: *range,
+                kind: TriviaTokenKind::EmptyLine,
+            });
         }
 
         // Add comments.
-        if let Tok::Comment(_) = tok {
+        if matches!(tok, Tok::Comment(..)) {
             tokens.push(TriviaToken {
                 range: *range,
                 // Used to use prev_non-newline_tok
@@ -293,8 +268,6 @@ pub fn extract_trivia_tokens(lxr: &[LexResult], text: &str) -> Vec<TriviaToken> 
         ) {
             prev_semantic_tok = Some((tok, *range));
         }
-
-        prev_end = range.end();
     }
     tokens
 }

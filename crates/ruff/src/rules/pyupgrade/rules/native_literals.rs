@@ -1,9 +1,10 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::checkers::ast::Checker;
@@ -50,7 +51,7 @@ pub(crate) fn native_literals(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let ExprKind::Name(ast::ExprName { id, .. }) = &func.node else { return; };
+    let Expr::Name(ast::ExprName { id, .. }) = func else { return; };
 
     if !keywords.is_empty() || args.len() > 1 {
         return;
@@ -64,20 +65,15 @@ pub(crate) fn native_literals(
                 LiteralType::Bytes
             }}, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
+                let constant = if id == "bytes" {
+                    Constant::Bytes(vec![])
+                } else {
+                    Constant::Str(String::new())
+                };
+                let content = checker.generator().constant(&constant);
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    if id == "bytes" {
-                        let mut content = String::with_capacity(3);
-                        content.push('b');
-                        content.push(checker.stylist.quote().into());
-                        content.push(checker.stylist.quote().into());
-                        content
-                    } else {
-                        let mut content = String::with_capacity(2);
-                        content.push(checker.stylist.quote().into());
-                        content.push(checker.stylist.quote().into());
-                        content
-                    },
+                    content,
                     expr.range(),
                 )));
             }
@@ -88,8 +84,8 @@ pub(crate) fn native_literals(
         // Look for `str("")`.
         if id == "str"
             && !matches!(
-                &arg.node,
-                ExprKind::Constant(ast::ExprConstant {
+                &arg,
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Str(_),
                     ..
                 }),
@@ -101,8 +97,8 @@ pub(crate) fn native_literals(
         // Look for `bytes(b"")`
         if id == "bytes"
             && !matches!(
-                &arg.node,
-                ExprKind::Constant(ast::ExprConstant {
+                &arg,
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Bytes(_),
                     ..
                 }),

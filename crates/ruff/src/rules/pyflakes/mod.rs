@@ -1030,6 +1030,23 @@ mod tests {
         "#,
             &[],
         );
+
+        flakes(
+            r#"
+        class A:
+            T = 1
+
+            # In each case, `T` is undefined. Only the first `iter` uses the class scope.
+            X = (T for x in range(10))
+            Y = [x for x in range(10) if T]
+            Z = [x for x in range(10) for y in T]
+        "#,
+            &[
+                Rule::UndefinedName,
+                Rule::UndefinedName,
+                Rule::UndefinedName,
+            ],
+        );
     }
 
     #[test]

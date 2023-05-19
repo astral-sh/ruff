@@ -66,6 +66,16 @@
         "type": "string"
       }
     },
+    "extend-fixable": {
+      "description": "A list of rule codes or prefixes to consider autofixable, in addition to those specified by `fixable`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
     "extend-include": {
       "description": "A list of file patterns to include when linting, in addition to those specified by `include`.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
@@ -441,17 +451,6 @@
         }
       ]
     },
-    "pyupgrade": {
-      "description": "Options for the `pyupgrade` plugin.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/PyUpgradeOptions"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "required-version": {
       "description": "Require a specific version of Ruff to be running (useful for unifying results across many environments, e.g., with a `pyproject.toml` file).",
       "anyOf": [
@@ -736,8 +735,10 @@
       "properties": {
         "extend-function-names": {
           "description": "Additional function names to consider as internationalization calls, in addition to those included in `function-names`.",
-          "default": [],
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
@@ -1348,19 +1349,6 @@
       },
       "additionalProperties": false
     },
-    "PyUpgradeOptions": {
-      "type": "object",
-      "properties": {
-        "keep-runtime-typing": {
-          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and enabling it is equivalent to disabling `use-pep585-annotation` (`UP006`) and `use-pep604-annotation` (`UP007`) entirely.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
     "Pycodestyle": {
       "type": "object",
       "properties": {
@@ -1556,6 +1544,12 @@
         "ARG003",
         "ARG004",
         "ARG005",
+        "ASYNC",
+        "ASYNC1",
+        "ASYNC10",
+        "ASYNC100",
+        "ASYNC101",
+        "ASYNC102",
         "B",
         "B0",
         "B00",
@@ -1717,6 +1711,37 @@
         "E1",
         "E10",
         "E101",
+        "E111",
+        "E112",
+        "E113",
+        "E114",
+        "E115",
+        "E116",
+        "E117",
+        "E201",
+        "E202",
+        "E203",
+        "E211",
+        "E221",
+        "E222",
+        "E223",
+        "E224",
+        "E225",
+        "E226",
+        "E227",
+        "E228",
+        "E231",
+        "E251",
+        "E252",
+        "E261",
+        "E262",
+        "E265",
+        "E266",
+        "E271",
+        "E272",
+        "E273",
+        "E274",
+        "E275",
         "E4",
         "E40",
         "E401",
@@ -1829,6 +1854,10 @@
         "F9",
         "F90",
         "F901",
+        "FA",
+        "FA1",
+        "FA10",
+        "FA100",
         "FBT",
         "FBT0",
         "FBT00",
@@ -2152,6 +2181,8 @@
         "PYI04",
         "PYI042",
         "PYI043",
+        "PYI05",
+        "PYI052",
         "Q",
         "Q0",
         "Q00",
@@ -2341,6 +2372,7 @@
         "TRY30",
         "TRY300",
         "TRY301",
+        "TRY302",
         "TRY4",
         "TRY40",
         "TRY400",

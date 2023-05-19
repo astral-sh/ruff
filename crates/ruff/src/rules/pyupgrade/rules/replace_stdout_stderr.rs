@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rustpython_parser::ast::{Expr, Keyword};
+use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -78,13 +78,13 @@ pub(crate) fn replace_stdout_stderr(
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
             .ctx
-            .resolve_call_path(&stdout.node.value)
+            .resolve_call_path(&stdout.value)
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["subprocess", "PIPE"]
             })
             || !checker
                 .ctx
-                .resolve_call_path(&stderr.node.value)
+                .resolve_call_path(&stderr.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["subprocess", "PIPE"]
                 })

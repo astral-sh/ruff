@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use log::error;
-use rustpython_parser::ast::{Alias, AliasData, Attributed, Stmt};
+use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -69,7 +69,7 @@ pub(crate) fn unnecessary_builtin_import(
     checker: &mut Checker,
     stmt: &Stmt,
     module: &str,
-    names: &[Attributed<AliasData>],
+    names: &[Alias],
 ) {
     let deprecated_names = match module {
         "builtins" => BUILTINS,
@@ -82,10 +82,10 @@ pub(crate) fn unnecessary_builtin_import(
 
     let mut unused_imports: Vec<&Alias> = vec![];
     for alias in names {
-        if alias.node.asname.is_some() {
+        if alias.asname.is_some() {
             continue;
         }
-        if deprecated_names.contains(&alias.node.name.as_str()) {
+        if deprecated_names.contains(&alias.name.as_str()) {
             unused_imports.push(alias);
         }
     }
@@ -97,7 +97,7 @@ pub(crate) fn unnecessary_builtin_import(
         UnnecessaryBuiltinImport {
             names: unused_imports
                 .iter()
-                .map(|alias| alias.node.name.to_string())
+                .map(|alias| alias.name.to_string())
                 .sorted()
                 .collect(),
         },
@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_builtin_import(
         let defined_in = checker.ctx.stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
-            .map(|alias| format!("{module}.{}", alias.node.name))
+            .map(|alias| format!("{module}.{}", alias.name))
             .collect();
         match autofix::actions::remove_unused_imports(
             unused_imports.iter().map(String::as_str),

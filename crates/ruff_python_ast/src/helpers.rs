@@ -4,52 +4,19 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
-    self, Arguments, Attributed, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind,
-    Keyword, KeywordData, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
+    self, Arguments, Cmpop, Constant, Excepthandler, Expr, Keyword, MatchCase, Pattern, Ranged,
+    Stmt,
 };
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
 use crate::newlines::UniversalNewlineIterator;
-use crate::source_code::{Generator, Indexer, Locator, Stylist};
+use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
-
-/// Create an `Expr` with default location from an `ExprKind`.
-pub fn create_expr(node: impl Into<ExprKind>) -> Expr {
-    Expr::new(TextRange::default(), node.into())
-}
-
-/// Create a `Stmt` with a default location from a `StmtKind`.
-pub fn create_stmt(node: impl Into<StmtKind>) -> Stmt {
-    Stmt::new(TextRange::default(), node.into())
-}
-
-/// Generate source code from an [`Expr`].
-pub fn unparse_expr(expr: &Expr, stylist: &Stylist) -> String {
-    let mut generator: Generator = stylist.into();
-    generator.unparse_expr(expr, 0);
-    generator.generate()
-}
-
-/// Generate source code from a [`Stmt`].
-pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
-    let mut generator: Generator = stylist.into();
-    generator.unparse_stmt(stmt);
-    generator.generate()
-}
-
-/// Generate source code from an [`Constant`].
-pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
-    let mut generator: Generator = stylist.into();
-    generator.unparse_constant(constant);
-    generator.generate()
-}
 
 fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
 where
@@ -68,14 +35,15 @@ where
 {
     any_over_expr(expr, &|expr| {
         // Accept empty initializers.
-        if let ExprKind::Call(ast::ExprCall {
+        if let Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        }) = &expr.node
+            range: _range,
+        }) = expr
         {
             if args.is_empty() && keywords.is_empty() {
-                if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         return true;
                     }
@@ -85,32 +53,32 @@ where
         }
 
         // Avoid false positive for overloaded operators.
-        if let ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) = &expr.node {
+        if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
             if !matches!(
-                left.node,
-                ExprKind::Constant(_)
-                    | ExprKind::JoinedStr(_)
-                    | ExprKind::List(_)
-                    | ExprKind::Tuple(_)
-                    | ExprKind::Set(_)
-                    | ExprKind::Dict(_)
-                    | ExprKind::ListComp(_)
-                    | ExprKind::SetComp(_)
-                    | ExprKind::DictComp(_)
+                left.as_ref(),
+                Expr::Constant(_)
+                    | Expr::JoinedStr(_)
+                    | Expr::List(_)
+                    | Expr::Tuple(_)
+                    | Expr::Set(_)
+                    | Expr::Dict(_)
+                    | Expr::ListComp(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
             ) {
                 return true;
             }
             if !matches!(
-                right.node,
-                ExprKind::Constant(_)
-                    | ExprKind::JoinedStr(_)
-                    | ExprKind::List(_)
-                    | ExprKind::Tuple(_)
-                    | ExprKind::Set(_)
-                    | ExprKind::Dict(_)
-                    | ExprKind::ListComp(_)
-                    | ExprKind::SetComp(_)
-                    | ExprKind::DictComp(_)
+                right.as_ref(),
+                Expr::Constant(_)
+                    | Expr::JoinedStr(_)
+                    | Expr::List(_)
+                    | Expr::Tuple(_)
+                    | Expr::Set(_)
+                    | Expr::Dict(_)
+                    | Expr::ListComp(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
             ) {
                 return true;
             }
@@ -119,16 +87,16 @@ where
 
         // Otherwise, avoid all complex expressions.
         matches!(
-            expr.node,
-            ExprKind::Await(_)
-                | ExprKind::Call(_)
-                | ExprKind::DictComp(_)
-                | ExprKind::GeneratorExp(_)
-                | ExprKind::ListComp(_)
-                | ExprKind::SetComp(_)
-                | ExprKind::Subscript(_)
-                | ExprKind::Yield(_)
-                | ExprKind::YieldFrom(_)
+            expr,
+            Expr::Await(_)
+                | Expr::Call(_)
+                | Expr::DictComp(_)
+                | Expr::GeneratorExp(_)
+                | Expr::ListComp(_)
+                | Expr::SetComp(_)
+                | Expr::Subscript(_)
+                | Expr::Yield(_)
+                | Expr::YieldFrom(_)
         )
     })
 }
@@ -142,34 +110,69 @@ where
     if func(expr) {
         return true;
     }
-    match &expr.node {
-        ExprKind::BoolOp(ast::ExprBoolOp { values, .. })
-        | ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
-            values.iter().any(|expr| any_over_expr(expr, func))
-        }
-        ExprKind::NamedExpr(ast::ExprNamedExpr { target, value }) => {
-            any_over_expr(target, func) || any_over_expr(value, func)
-        }
-        ExprKind::BinOp(ast::ExprBinOp { left, right, .. }) => {
+    match expr {
+        Expr::BoolOp(ast::ExprBoolOp {
+            values,
+            range: _range,
+            ..
+        })
+        | Expr::JoinedStr(ast::ExprJoinedStr {
+            values,
+            range: _range,
+        }) => values.iter().any(|expr| any_over_expr(expr, func)),
+        Expr::NamedExpr(ast::ExprNamedExpr {
+            target,
+            value,
+            range: _range,
+        }) => any_over_expr(target, func) || any_over_expr(value, func),
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
             any_over_expr(left, func) || any_over_expr(right, func)
         }
-        ExprKind::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
-        ExprKind::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
-        ExprKind::IfExp(ast::ExprIfExp { test, body, orelse }) => {
-            any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func)
-        }
-        ExprKind::Dict(ast::ExprDict { keys, values }) => values
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
+        Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
+        Expr::IfExp(ast::ExprIfExp {
+            test,
+            body,
+            orelse,
+            range: _range,
+        }) => any_over_expr(test, func) || any_over_expr(body, func) || any_over_expr(orelse, func),
+        Expr::Dict(ast::ExprDict {
+            keys,
+            values,
+            range: _range,
+        }) => values
             .iter()
             .chain(keys.iter().flatten())
             .any(|expr| any_over_expr(expr, func)),
-        ExprKind::Set(ast::ExprSet { elts })
-        | ExprKind::List(ast::ExprList { elts, .. })
-        | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.iter().any(|expr| any_over_expr(expr, func))
-        }
-        ExprKind::ListComp(ast::ExprListComp { elt, generators })
-        | ExprKind::SetComp(ast::ExprSetComp { elt, generators })
-        | ExprKind::GeneratorExp(ast::ExprGeneratorExp { elt, generators }) => {
+        Expr::Set(ast::ExprSet {
+            elts,
+            range: _range,
+        })
+        | Expr::List(ast::ExprList {
+            elts,
+            range: _range,
+            ..
+        })
+        | Expr::Tuple(ast::ExprTuple {
+            elts,
+            range: _range,
+            ..
+        }) => elts.iter().any(|expr| any_over_expr(expr, func)),
+        Expr::ListComp(ast::ExprListComp {
+            elt,
+            generators,
+            range: _range,
+        })
+        | Expr::SetComp(ast::ExprSetComp {
+            elt,
+            generators,
+            range: _range,
+        })
+        | Expr::GeneratorExp(ast::ExprGeneratorExp {
+            elt,
+            generators,
+            range: _range,
+        }) => {
             any_over_expr(elt, func)
                 || generators.iter().any(|generator| {
                     any_over_expr(&generator.target, func)
@@ -177,10 +180,11 @@ where
                         || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
                 })
         }
-        ExprKind::DictComp(ast::ExprDictComp {
+        Expr::DictComp(ast::ExprDictComp {
             key,
             value,
             generators,
+            range: _range,
         }) => {
             any_over_expr(key, func)
                 || any_over_expr(value, func)
@@ -190,28 +194,46 @@ where
                         || generator.ifs.iter().any(|expr| any_over_expr(expr, func))
                 })
         }
-        ExprKind::Await(ast::ExprAwait { value })
-        | ExprKind::YieldFrom(ast::ExprYieldFrom { value })
-        | ExprKind::Attribute(ast::ExprAttribute { value, .. })
-        | ExprKind::Starred(ast::ExprStarred { value, .. }) => any_over_expr(value, func),
-        ExprKind::Yield(ast::ExprYield { value }) => value
+        Expr::Await(ast::ExprAwait {
+            value,
+            range: _range,
+        })
+        | Expr::YieldFrom(ast::ExprYieldFrom {
+            value,
+            range: _range,
+        })
+        | Expr::Attribute(ast::ExprAttribute {
+            value,
+            range: _range,
+            ..
+        })
+        | Expr::Starred(ast::ExprStarred {
+            value,
+            range: _range,
+            ..
+        }) => any_over_expr(value, func),
+        Expr::Yield(ast::ExprYield {
+            value,
+            range: _range,
+        }) => value
             .as_ref()
             .map_or(false, |value| any_over_expr(value, func)),
-        ExprKind::Compare(ast::ExprCompare {
+        Expr::Compare(ast::ExprCompare {
             left, comparators, ..
         }) => any_over_expr(left, func) || comparators.iter().any(|expr| any_over_expr(expr, func)),
-        ExprKind::Call(ast::ExprCall {
+        Expr::Call(ast::ExprCall {
             func: call_func,
             args,
             keywords,
+            range: _range,
         }) => {
             any_over_expr(call_func, func)
                 || args.iter().any(|expr| any_over_expr(expr, func))
                 || keywords
                     .iter()
-                    .any(|keyword| any_over_expr(&keyword.node.value, func))
+                    .any(|keyword| any_over_expr(&keyword.value, func))
         }
-        ExprKind::FormattedValue(ast::ExprFormattedValue {
+        Expr::FormattedValue(ast::ExprFormattedValue {
             value, format_spec, ..
         }) => {
             any_over_expr(value, func)
@@ -219,10 +241,15 @@ where
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             any_over_expr(value, func) || any_over_expr(slice, func)
         }
-        ExprKind::Slice(ast::ExprSlice { lower, upper, step }) => {
+        Expr::Slice(ast::ExprSlice {
+            lower,
+            upper,
+            step,
+            range: _range,
+        }) => {
             lower
                 .as_ref()
                 .map_or(false, |value| any_over_expr(value, func))
@@ -233,7 +260,7 @@ where
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        ExprKind::Name(_) | ExprKind::Constant(_) => false,
+        Expr::Name(_) | Expr::Constant(_) => false,
     }
 }
 
@@ -241,19 +268,25 @@ pub fn any_over_pattern<F>(pattern: &Pattern, func: &F) -> bool
 where
     F: Fn(&Expr) -> bool,
 {
-    match &pattern.node {
-        PatternKind::MatchValue(ast::PatternMatchValue { value }) => any_over_expr(value, func),
-        PatternKind::MatchSingleton(_) => false,
-        PatternKind::MatchSequence(ast::PatternMatchSequence { patterns }) => patterns
+    match pattern {
+        Pattern::MatchValue(ast::PatternMatchValue {
+            value,
+            range: _range,
+        }) => any_over_expr(value, func),
+        Pattern::MatchSingleton(_) => false,
+        Pattern::MatchSequence(ast::PatternMatchSequence {
+            patterns,
+            range: _range,
+        }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
-        PatternKind::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
+        Pattern::MatchMapping(ast::PatternMatchMapping { keys, patterns, .. }) => {
             keys.iter().any(|key| any_over_expr(key, func))
                 || patterns
                     .iter()
                     .any(|pattern| any_over_pattern(pattern, func))
         }
-        PatternKind::MatchClass(ast::PatternMatchClass {
+        Pattern::MatchClass(ast::PatternMatchClass {
             cls,
             patterns,
             kwd_patterns,
@@ -267,11 +300,14 @@ where
                     .iter()
                     .any(|pattern| any_over_pattern(pattern, func))
         }
-        PatternKind::MatchStar(_) => false,
-        PatternKind::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern
+        Pattern::MatchStar(_) => false,
+        Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern
             .as_ref()
             .map_or(false, |pattern| any_over_pattern(pattern, func)),
-        PatternKind::MatchOr(ast::PatternMatchOr { patterns }) => patterns
+        Pattern::MatchOr(ast::PatternMatchOr {
+            patterns,
+            range: _range,
+        }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
     }
@@ -281,15 +317,15 @@ pub fn any_over_stmt<F>(stmt: &Stmt, func: &F) -> bool
 where
     F: Fn(&Expr) -> bool,
 {
-    match &stmt.node {
-        StmtKind::FunctionDef(ast::StmtFunctionDef {
+    match stmt {
+        Stmt::FunctionDef(ast::StmtFunctionDef {
             args,
             body,
             decorator_list,
             returns,
             ..
         })
-        | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
             args,
             body,
             decorator_list,
@@ -302,32 +338,27 @@ where
                     .iter()
                     .any(|expr| any_over_expr(expr, func))
                 || args.args.iter().any(|arg| {
-                    arg.node
-                        .annotation
+                    arg.annotation
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || args.kwonlyargs.iter().any(|arg| {
-                    arg.node
-                        .annotation
+                    arg.annotation
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || args.posonlyargs.iter().any(|arg| {
-                    arg.node
-                        .annotation
+                    arg.annotation
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || args.vararg.as_ref().map_or(false, |arg| {
-                    arg.node
-                        .annotation
+                    arg.annotation
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || args.kwarg.as_ref().map_or(false, |arg| {
-                    arg.node
-                        .annotation
+                    arg.annotation
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
@@ -337,7 +368,7 @@ where
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        StmtKind::ClassDef(ast::StmtClassDef {
+        Stmt::ClassDef(ast::StmtClassDef {
             bases,
             keywords,
             body,
@@ -347,23 +378,27 @@ where
             bases.iter().any(|expr| any_over_expr(expr, func))
                 || keywords
                     .iter()
-                    .any(|keyword| any_over_expr(&keyword.node.value, func))
+                    .any(|keyword| any_over_expr(&keyword.value, func))
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
                 || decorator_list.iter().any(|expr| any_over_expr(expr, func))
         }
-        StmtKind::Return(ast::StmtReturn { value }) => value
+        Stmt::Return(ast::StmtReturn {
+            value,
+            range: _range,
+        }) => value
             .as_ref()
             .map_or(false, |value| any_over_expr(value, func)),
-        StmtKind::Delete(ast::StmtDelete { targets }) => {
-            targets.iter().any(|expr| any_over_expr(expr, func))
-        }
-        StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
+        Stmt::Delete(ast::StmtDelete {
+            targets,
+            range: _range,
+        }) => targets.iter().any(|expr| any_over_expr(expr, func)),
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             targets.iter().any(|expr| any_over_expr(expr, func)) || any_over_expr(value, func)
         }
-        StmtKind::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
+        Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
             any_over_expr(target, func) || any_over_expr(value, func)
         }
-        StmtKind::AnnAssign(ast::StmtAnnAssign {
+        Stmt::AnnAssign(ast::StmtAnnAssign {
             target,
             annotation,
             value,
@@ -375,14 +410,14 @@ where
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        StmtKind::For(ast::StmtFor {
+        Stmt::For(ast::StmtFor {
             target,
             iter,
             body,
             orelse,
             ..
         })
-        | StmtKind::AsyncFor(ast::StmtAsyncFor {
+        | Stmt::AsyncFor(ast::StmtAsyncFor {
             target,
             iter,
             body,
@@ -394,14 +429,20 @@ where
                 || any_over_body(body, func)
                 || any_over_body(orelse, func)
         }
-        StmtKind::While(ast::StmtWhile { test, body, orelse }) => {
-            any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func)
-        }
-        StmtKind::If(ast::StmtIf { test, body, orelse }) => {
-            any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func)
-        }
-        StmtKind::With(ast::StmtWith { items, body, .. })
-        | StmtKind::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
+        Stmt::While(ast::StmtWhile {
+            test,
+            body,
+            orelse,
+            range: _range,
+        }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
+        Stmt::If(ast::StmtIf {
+            test,
+            body,
+            orelse,
+            range: _range,
+        }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
+        Stmt::With(ast::StmtWith { items, body, .. })
+        | Stmt::AsyncWith(ast::StmtAsyncWith { items, body, .. }) => {
             items.iter().any(|withitem| {
                 any_over_expr(&withitem.context_expr, func)
                     || withitem
@@ -410,32 +451,38 @@ where
                         .map_or(false, |expr| any_over_expr(expr, func))
             }) || any_over_body(body, func)
         }
-        StmtKind::Raise(ast::StmtRaise { exc, cause }) => {
+        Stmt::Raise(ast::StmtRaise {
+            exc,
+            cause,
+            range: _range,
+        }) => {
             exc.as_ref()
                 .map_or(false, |value| any_over_expr(value, func))
                 || cause
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        StmtKind::Try(ast::StmtTry {
+        Stmt::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
             finalbody,
+            range: _range,
         })
-        | StmtKind::TryStar(ast::StmtTryStar {
+        | Stmt::TryStar(ast::StmtTryStar {
             body,
             handlers,
             orelse,
             finalbody,
+            range: _range,
         }) => {
             any_over_body(body, func)
                 || handlers.iter().any(|handler| {
-                    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                         type_,
                         body,
                         ..
-                    }) = &handler.node;
+                    }) = handler;
                     type_
                         .as_ref()
                         .map_or(false, |expr| any_over_expr(expr, func))
@@ -444,19 +491,28 @@ where
                 || any_over_body(orelse, func)
                 || any_over_body(finalbody, func)
         }
-        StmtKind::Assert(ast::StmtAssert { test, msg }) => {
+        Stmt::Assert(ast::StmtAssert {
+            test,
+            msg,
+            range: _range,
+        }) => {
             any_over_expr(test, func)
                 || msg
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        StmtKind::Match(ast::StmtMatch { subject, cases }) => {
+        Stmt::Match(ast::StmtMatch {
+            subject,
+            cases,
+            range: _range,
+        }) => {
             any_over_expr(subject, func)
                 || cases.iter().any(|case| {
                     let MatchCase {
                         pattern,
                         guard,
                         body,
+                        range: _range,
                     } = case;
                     any_over_pattern(pattern, func)
                         || guard
@@ -465,14 +521,15 @@ where
                         || any_over_body(body, func)
                 })
         }
-        StmtKind::Import(_) => false,
-        StmtKind::ImportFrom(_) => false,
-        StmtKind::Global(_) => false,
-        StmtKind::Nonlocal(_) => false,
-        StmtKind::Expr(ast::StmtExpr { value }) => any_over_expr(value, func),
-        StmtKind::Pass => false,
-        StmtKind::Break => false,
-        StmtKind::Continue => false,
+        Stmt::Import(_) => false,
+        Stmt::ImportFrom(_) => false,
+        Stmt::Global(_) => false,
+        Stmt::Nonlocal(_) => false,
+        Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _range,
+        }) => any_over_expr(value, func),
+        Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
     }
 }
 
@@ -483,26 +540,32 @@ where
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
-static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
+fn is_dunder(id: &str) -> bool {
+    id.starts_with("__") && id.ends_with("__")
+}
 
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
     // annotation. This is what pycodestyle (as of 2.9.1) does.
-    match &stmt.node {
-        StmtKind::Assign(ast::StmtAssign { targets, .. }) => {
+    match stmt {
+        Stmt::Assign(ast::StmtAssign { targets, .. }) => {
             if targets.len() != 1 {
                 return false;
             }
-            match &targets[0].node {
-                ExprKind::Name(ast::ExprName { id, .. }) => DUNDER_REGEX.is_match(id.as_str()),
-                _ => false,
+            if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+                is_dunder(id)
+            } else {
+                false
             }
         }
-        StmtKind::AnnAssign(ast::StmtAnnAssign { target, .. }) => match &target.node {
-            ExprKind::Name(ast::ExprName { id, .. }) => DUNDER_REGEX.is_match(id.as_str()),
-            _ => false,
-        },
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                is_dunder(id)
+            } else {
+                false
+            }
+        }
         _ => false,
     }
 }
@@ -511,8 +574,8 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 /// `...`).
 pub const fn is_singleton(expr: &Expr) -> bool {
     matches!(
-        expr.node,
-        ExprKind::Constant(ast::ExprConstant {
+        expr,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::None | Constant::Bool(_) | Constant::Ellipsis,
             ..
         })
@@ -521,9 +584,9 @@ pub const fn is_singleton(expr: &Expr) -> bool {
 
 /// Return `true` if the [`Expr`] is a constant or tuple of constants.
 pub fn is_constant(expr: &Expr) -> bool {
-    match &expr.node {
-        ExprKind::Constant(_) => true,
-        ExprKind::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant),
+    match expr {
+        Expr::Constant(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant),
         _ => false,
     }
 }
@@ -537,7 +600,7 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
 /// [`Keyword`] arguments.
 pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&'a Keyword> {
     keywords.iter().find(|keyword| {
-        let KeywordData { arg, .. } = &keyword.node;
+        let Keyword { arg, .. } = keyword;
         arg.as_ref().map_or(false, |arg| arg == keyword_name)
     })
 }
@@ -545,10 +608,11 @@ pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&
 /// Return `true` if an [`Expr`] is `None`.
 pub const fn is_const_none(expr: &Expr) -> bool {
     matches!(
-        &expr.node,
-        ExprKind::Constant(ast::ExprConstant {
+        expr,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::None,
-            kind: None
+            kind: None,
+            ..
         }),
     )
 }
@@ -556,10 +620,11 @@ pub const fn is_const_none(expr: &Expr) -> bool {
 /// Return `true` if an [`Expr`] is `True`.
 pub const fn is_const_true(expr: &Expr) -> bool {
     matches!(
-        &expr.node,
-        ExprKind::Constant(ast::ExprConstant {
+        expr,
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Bool(true),
-            kind: None
+            kind: None,
+            ..
         }),
     )
 }
@@ -567,7 +632,7 @@ pub const fn is_const_true(expr: &Expr) -> bool {
 /// Return `true` if a keyword argument is present with a non-`None` value.
 pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
     find_keyword(keywords, keyword).map_or(false, |keyword| {
-        let KeywordData { value, .. } = &keyword.node;
+        let Keyword { value, .. } = keyword;
         !is_const_none(value)
     })
 }
@@ -576,10 +641,10 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
 pub fn extract_handled_exceptions(handlers: &[Excepthandler]) -> Vec<&Expr> {
     let mut handled_exceptions = Vec::new();
     for handler in handlers {
-        match &handler.node {
-            ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) => {
+        match handler {
+            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_, .. }) => {
                 if let Some(type_) = type_ {
-                    if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &type_.node {
+                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_.as_ref() {
                         for type_ in elts {
                             handled_exceptions.push(type_);
                         }
@@ -597,19 +662,19 @@ pub fn extract_handled_exceptions(handlers: &[Excepthandler]) -> Vec<&Expr> {
 pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
     let mut arg_names: FxHashSet<&'a str> = FxHashSet::default();
     for arg in &arguments.posonlyargs {
-        arg_names.insert(arg.node.arg.as_str());
+        arg_names.insert(arg.arg.as_str());
     }
     for arg in &arguments.args {
-        arg_names.insert(arg.node.arg.as_str());
+        arg_names.insert(arg.arg.as_str());
     }
     if let Some(arg) = &arguments.vararg {
-        arg_names.insert(arg.node.arg.as_str());
+        arg_names.insert(arg.arg.as_str());
     }
     for arg in &arguments.kwonlyargs {
-        arg_names.insert(arg.node.arg.as_str());
+        arg_names.insert(arg.arg.as_str());
     }
     if let Some(arg) = &arguments.kwarg {
-        arg_names.insert(arg.node.arg.as_str());
+        arg_names.insert(arg.arg.as_str());
     }
     arg_names
 }
@@ -618,7 +683,7 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 /// be used with or without explicit call syntax), return the underlying
 /// callable.
 pub fn map_callable(decorator: &Expr) -> &Expr {
-    if let ExprKind::Call(ast::ExprCall { func, .. }) = &decorator.node {
+    if let Expr::Call(ast::ExprCall { func, .. }) = decorator {
         func
     } else {
         decorator
@@ -626,7 +691,10 @@ pub fn map_callable(decorator: &Expr) -> &Expr {
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.
-pub fn has_comments<T>(located: &Attributed<T>, locator: &Locator) -> bool {
+pub fn has_comments<T>(located: &T, locator: &Locator) -> bool
+where
+    T: Ranged,
+{
     let start = if has_leading_content(located, locator) {
         located.start()
     } else {
@@ -668,8 +736,8 @@ where
     F: Fn(&str) -> bool,
 {
     any_over_body(body, &|expr| {
-        if let ExprKind::Call(ast::ExprCall { func, .. }) = &expr.node {
-            if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+            if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                 if matches!(id.as_str(), "locals" | "globals" | "vars" | "exec" | "eval") {
                     if is_builtin(id.as_str()) {
                         return true;
@@ -832,11 +900,14 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt.node {
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {
+        match stmt {
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 // Don't recurse.
             }
-            StmtKind::Return(ast::StmtReturn { value }) => self.returns.push(value.as_deref()),
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range: _range,
+            }) => self.returns.push(value.as_deref()),
             _ => walk_stmt(self, stmt),
         }
     }
@@ -853,28 +924,32 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt.node {
-            StmtKind::Raise(ast::StmtRaise { exc, cause }) => {
+        match stmt {
+            Stmt::Raise(ast::StmtRaise {
+                exc,
+                cause,
+                range: _range,
+            }) => {
                 self.raises
                     .push((stmt.range(), exc.as_deref(), cause.as_deref()));
             }
-            StmtKind::ClassDef(_)
-            | StmtKind::FunctionDef(_)
-            | StmtKind::AsyncFunctionDef(_)
-            | StmtKind::Try(_)
-            | StmtKind::TryStar(_) => {}
-            StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+            Stmt::ClassDef(_)
+            | Stmt::FunctionDef(_)
+            | Stmt::AsyncFunctionDef(_)
+            | Stmt::Try(_)
+            | Stmt::TryStar(_) => {}
+            Stmt::If(ast::StmtIf { body, orelse, .. }) => {
                 walk_body(self, body);
                 walk_body(self, orelse);
             }
-            StmtKind::While(ast::StmtWhile { body, .. })
-            | StmtKind::With(ast::StmtWith { body, .. })
-            | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. })
-            | StmtKind::For(ast::StmtFor { body, .. })
-            | StmtKind::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
+            Stmt::While(ast::StmtWhile { body, .. })
+            | Stmt::With(ast::StmtWith { body, .. })
+            | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. })
+            | Stmt::For(ast::StmtFor { body, .. })
+            | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
                 walk_body(self, body);
             }
-            StmtKind::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
                     walk_body(self, &case.body);
                 }
@@ -891,13 +966,16 @@ struct GlobalStatementVisitor<'a> {
 
 impl<'a> StatementVisitor<'a> for GlobalStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match &stmt.node {
-            StmtKind::Global(ast::StmtGlobal { names }) => {
+        match stmt {
+            Stmt::Global(ast::StmtGlobal {
+                names,
+                range: _range,
+            }) => {
                 for name in names {
                     self.globals.insert(name.as_str(), stmt);
                 }
             }
-            StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) | StmtKind::ClassDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             _ => walk_stmt(self, stmt),
@@ -914,15 +992,21 @@ pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
     visitor.globals
 }
 
-/// Return `true` if a [`Attributed`] has leading content.
-pub fn has_leading_content<T>(located: &Attributed<T>, locator: &Locator) -> bool {
+/// Return `true` if a [`Ranged`] has leading content.
+pub fn has_leading_content<T>(located: &T, locator: &Locator) -> bool
+where
+    T: Ranged,
+{
     let line_start = locator.line_start(located.start());
     let leading = &locator.contents()[TextRange::new(line_start, located.start())];
     leading.chars().any(|char| !char.is_whitespace())
 }
 
-/// Return `true` if a [`Attributed`] has trailing content.
-pub fn has_trailing_content<T>(located: &Attributed<T>, locator: &Locator) -> bool {
+/// Return `true` if a [`Ranged`] has trailing content.
+pub fn has_trailing_content<T>(located: &T, locator: &Locator) -> bool
+where
+    T: Ranged,
+{
     let line_end = locator.line_end(located.end());
     let trailing = &locator.contents()[TextRange::new(located.end(), line_end)];
 
@@ -937,11 +1021,11 @@ pub fn has_trailing_content<T>(located: &Attributed<T>, locator: &Locator) -> bo
     false
 }
 
-/// If a [`Attributed`] has a trailing comment, return the index of the hash.
-pub fn trailing_comment_start_offset<T>(
-    located: &Attributed<T>,
-    locator: &Locator,
-) -> Option<TextSize> {
+/// If a [`Ranged`] has a trailing comment, return the index of the hash.
+pub fn trailing_comment_start_offset<T>(located: &T, locator: &Locator) -> Option<TextSize>
+where
+    T: Ranged,
+{
     let line_end = locator.line_end(located.end());
 
     let trailing = &locator.contents()[TextRange::new(located.end(), line_end)];
@@ -1007,8 +1091,8 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 /// rather than that of the entire function or class body.
 pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
     if matches!(
-        stmt.node,
-        StmtKind::ClassDef(_) | StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_)
+        stmt,
+        Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)
     ) {
         let contents = &locator.contents()[stmt.range()];
 
@@ -1025,9 +1109,12 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
 
 /// Return the ranges of [`Tok::Name`] tokens within a specified node.
 pub fn find_names<'a, T>(
-    located: &'a Attributed<T>,
+    located: &'a T,
     locator: &'a Locator,
-) -> impl Iterator<Item = TextRange> + 'a {
+) -> impl Iterator<Item = TextRange> + 'a
+where
+    T: Ranged,
+{
     let contents = locator.slice(located.range());
 
     lexer::lex_starts_at(contents, Mode::Module, located.start())
@@ -1038,8 +1125,12 @@ pub fn find_names<'a, T>(
 
 /// Return the `Range` of `name` in `Excepthandler`.
 pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> Option<TextRange> {
-    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { name, type_, body }) =
-        &handler.node;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+        name,
+        type_,
+        body,
+        range: _range,
+    }) = handler;
 
     match (name, type_) {
         (Some(_), Some(type_)) => {
@@ -1059,8 +1150,7 @@ pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> O
 
 /// Return the `Range` of `except` in `Excepthandler`.
 pub fn except_range(handler: &Excepthandler, locator: &Locator) -> TextRange {
-    let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { body, type_, .. }) =
-        &handler.node;
+    let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, type_, .. }) = handler;
     let end = if let Some(type_) = type_ {
         type_.end()
     } else {
@@ -1077,10 +1167,10 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> TextRange {
 
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
 pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    match &stmt.node {
-        StmtKind::For(ast::StmtFor { body, orelse, .. })
-        | StmtKind::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
-        | StmtKind::While(ast::StmtWhile { body, orelse, .. })
+    match stmt {
+        Stmt::For(ast::StmtFor { body, orelse, .. })
+        | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
+        | Stmt::While(ast::StmtWhile { body, orelse, .. })
             if !orelse.is_empty() =>
         {
             let body_end = body.last().expect("Expected body to be non-empty").end();
@@ -1111,17 +1201,14 @@ pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRang
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
 pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
-    let StmtKind::If(ast::StmtIf { body, orelse, .. } )= &stmt.node else {
+    let Stmt::If(ast::StmtIf { body, orelse, .. } )= stmt else {
         return None;
     };
 
     let start = body.last().expect("Expected body to be non-empty").end();
 
     let end = match &orelse[..] {
-        [Stmt {
-            node: StmtKind::If(ast::StmtIf { test, .. }),
-            ..
-        }] => test.start(),
+        [Stmt::If(ast::StmtIf { test, .. })] => test.start(),
         [stmt, ..] => stmt.start(),
         _ => return None,
     };
@@ -1175,11 +1262,15 @@ pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool 
 }
 
 /// Return `true` if a `Stmt` is a docstring.
-pub const fn is_docstring_stmt(stmt: &Stmt) -> bool {
-    if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
+pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
+    if let Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _range,
+    }) = stmt
+    {
         matches!(
-            value.node,
-            ExprKind::Constant(ast::ExprConstant {
+            value.as_ref(),
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str { .. },
                 ..
             })
@@ -1203,13 +1294,13 @@ impl<'a> SimpleCallArgs<'a> {
     ) -> Self {
         let args = args
             .into_iter()
-            .take_while(|arg| !matches!(arg.node, ExprKind::Starred(_)))
+            .take_while(|arg| !matches!(arg, Expr::Starred(_)))
             .collect();
 
         let kwargs = keywords
             .into_iter()
             .filter_map(|keyword| {
-                let node = &keyword.node;
+                let node = keyword;
                 node.arg.as_ref().map(|arg| (arg.as_str(), &node.value))
             })
             .collect();
@@ -1246,14 +1337,15 @@ impl<'a> SimpleCallArgs<'a> {
 /// Check if a node is parent of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
-        if matches!(
-            parent.node,
-            StmtKind::If(_) | StmtKind::While(_) | StmtKind::Match(_)
-        ) {
+        if matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)) {
             return true;
         }
-        if let StmtKind::Expr(ast::StmtExpr { value }) = &parent.node {
-            if matches!(value.node, ExprKind::IfExp(_)) {
+        if let Stmt::Expr(ast::StmtExpr {
+            value,
+            range: _range,
+        }) = parent
+        {
+            if matches!(value.as_ref(), Expr::IfExp(_)) {
                 return true;
             }
         }
@@ -1265,22 +1357,18 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
 pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
         matches!(
-            parent.node,
-            StmtKind::Try(_)
-                | StmtKind::TryStar(_)
-                | StmtKind::If(_)
-                | StmtKind::With(_)
-                | StmtKind::Match(_)
+            parent,
+            Stmt::Try(_) | Stmt::TryStar(_) | Stmt::If(_) | Stmt::With(_) | Stmt::Match(_)
         )
     })
 }
 
 /// Check if a node represents an unpacking assignment.
 pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
-    match &parent.node {
-        StmtKind::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
+    match parent {
+        Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
             if let Some(optional_vars) = &item.optional_vars {
-                if matches!(optional_vars.node, ExprKind::Tuple(_)) {
+                if matches!(optional_vars.as_ref(), Expr::Tuple(_)) {
                     if any_over_expr(optional_vars, &|expr| expr == child) {
                         return true;
                     }
@@ -1288,29 +1376,24 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
             }
             false
         }),
-        StmtKind::Assign(ast::StmtAssign { targets, value, .. }) => {
+        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             // In `(a, b) = (1, 2)`, `(1, 2)` is the target, and it is a tuple.
             let value_is_tuple = matches!(
-                &value.node,
-                ExprKind::Set(_) | ExprKind::List(_) | ExprKind::Tuple(_)
+                value.as_ref(),
+                Expr::Set(_) | Expr::List(_) | Expr::Tuple(_)
             );
             // In `(a, b) = coords = (1, 2)`, `(a, b)` and `coords` are the targets, and
             // `(a, b)` is a tuple. (We use "tuple" as a placeholder for any
             // unpackable expression.)
-            let targets_are_tuples = targets.iter().all(|item| {
-                matches!(
-                    item.node,
-                    ExprKind::Set(_) | ExprKind::List(_) | ExprKind::Tuple(_)
-                )
-            });
+            let targets_are_tuples = targets
+                .iter()
+                .all(|item| matches!(item, Expr::Set(_) | Expr::List(_) | Expr::Tuple(_)));
             // If we're looking at `a` in `(a, b) = coords = (1, 2)`, then we should
             // identify that the current expression is in a tuple.
             let child_in_tuple = targets_are_tuples
                 || targets.iter().any(|item| {
-                    matches!(
-                        item.node,
-                        ExprKind::Set(_) | ExprKind::List(_) | ExprKind::Tuple(_)
-                    ) && any_over_expr(item, &|expr| expr == child)
+                    matches!(item, Expr::Set(_) | Expr::List(_) | Expr::Tuple(_))
+                        && any_over_expr(item, &|expr| expr == child)
                 });
 
             // If our child is a tuple, and value is not, it's always an unpacking
@@ -1340,7 +1423,20 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
     }
 }
 
-pub type AttributedCmpop<U = ()> = Attributed<Cmpop, U>;
+#[derive(Clone, PartialEq, Debug)]
+pub struct LocatedCmpop {
+    pub range: TextRange,
+    pub op: Cmpop,
+}
+
+impl LocatedCmpop {
+    fn new<T: Into<TextRange>>(range: T, op: Cmpop) -> Self {
+        Self {
+            range: range.into(),
+            op,
+        }
+    }
+}
 
 /// Extract all [`Cmpop`] operators from a source code snippet, with appropriate
 /// ranges.
@@ -1348,9 +1444,9 @@ pub type AttributedCmpop<U = ()> = Attributed<Cmpop, U>;
 /// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
 /// `CPython` doesn't either. This method iterates over the token stream and
 /// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
-pub fn locate_cmpops(contents: &str) -> Vec<AttributedCmpop> {
+pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
     let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
-    let mut ops: Vec<AttributedCmpop> = vec![];
+    let mut ops: Vec<LocatedCmpop> = vec![];
     let mut count: usize = 0;
     loop {
         let Some((tok, range)) = tok_iter.next() else {
@@ -1369,42 +1465,45 @@ pub fn locate_cmpops(contents: &str) -> Vec<AttributedCmpop> {
                     if let Some((_, next_range)) =
                         tok_iter.next_if(|(tok, _)| matches!(tok, Tok::In))
                     {
-                        ops.push(AttributedCmpop::new(
-                            range.start()..next_range.end(),
+                        ops.push(LocatedCmpop::new(
+                            TextRange::new(range.start(), next_range.end()),
                             Cmpop::NotIn,
                         ));
                     }
                 }
                 Tok::In => {
-                    ops.push(AttributedCmpop::new(range, Cmpop::In));
+                    ops.push(LocatedCmpop::new(range, Cmpop::In));
                 }
                 Tok::Is => {
                     let op = if let Some((_, next_range)) =
                         tok_iter.next_if(|(tok, _)| matches!(tok, Tok::Not))
                     {
-                        AttributedCmpop::new(range.start()..next_range.end(), Cmpop::IsNot)
+                        LocatedCmpop::new(
+                            TextRange::new(range.start(), next_range.end()),
+                            Cmpop::IsNot,
+                        )
                     } else {
-                        AttributedCmpop::new(range, Cmpop::Is)
+                        LocatedCmpop::new(range, Cmpop::Is)
                     };
                     ops.push(op);
                 }
                 Tok::NotEqual => {
-                    ops.push(AttributedCmpop::new(range, Cmpop::NotEq));
+                    ops.push(LocatedCmpop::new(range, Cmpop::NotEq));
                 }
                 Tok::EqEqual => {
-                    ops.push(AttributedCmpop::new(range, Cmpop::Eq));
+                    ops.push(LocatedCmpop::new(range, Cmpop::Eq));
                 }
                 Tok::GreaterEqual => {
-                    ops.push(AttributedCmpop::new(range, Cmpop::GtE));
+                    ops.push(LocatedCmpop::new(range, Cmpop::GtE));
                 }
                 Tok::Greater => {
-                    ops.push(AttributedCmpop::new(range, Cmpop::Gt));
+                    ops.push(LocatedCmpop::new(range, Cmpop::Gt));
                 }
                 Tok::LessEqual => {
-                    ops.push(AttributedCmpop::new(range, Cmpop::LtE));
+                    ops.push(LocatedCmpop::new(range, Cmpop::LtE));
                 }
                 Tok::Less => {
-                    ops.push(AttributedCmpop::new(range, Cmpop::Lt));
+                    ops.push(LocatedCmpop::new(range, Cmpop::Lt));
                 }
                 _ => {}
             }
@@ -1448,8 +1547,8 @@ impl Truthiness {
     where
         F: Fn(&str) -> bool,
     {
-        match &expr.node {
-            ExprKind::Constant(ast::ExprConstant { value, .. }) => match value {
+        match expr {
+            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
                 Constant::Bool(value) => Some(*value),
                 Constant::None => Some(false),
                 Constant::Str(string) => Some(!string.is_empty()),
@@ -1460,11 +1559,11 @@ impl Truthiness {
                 Constant::Ellipsis => Some(true),
                 Constant::Tuple(elts) => Some(!elts.is_empty()),
             },
-            ExprKind::JoinedStr(ast::ExprJoinedStr { values }) => {
+            Expr::JoinedStr(ast::ExprJoinedStr { values, range: _range }) => {
                 if values.is_empty() {
                     Some(false)
                 } else if values.iter().any(|value| {
-                    let ExprKind::Constant(ast::ExprConstant { value: Constant::Str(string), .. } )= &value.node else {
+                    let Expr::Constant(ast::ExprConstant { value: Constant::Str(string), .. } )= &value else {
                         return false;
                     };
                     !string.is_empty()
@@ -1474,16 +1573,16 @@ impl Truthiness {
                     None
                 }
             }
-            ExprKind::List(ast::ExprList { elts, .. })
-            | ExprKind::Set(ast::ExprSet { elts })
-            | ExprKind::Tuple(ast::ExprTuple { elts, .. }) => Some(!elts.is_empty()),
-            ExprKind::Dict(ast::ExprDict { keys, .. }) => Some(!keys.is_empty()),
-            ExprKind::Call(ast::ExprCall {
+            Expr::List(ast::ExprList { elts, range: _range, .. })
+            | Expr::Set(ast::ExprSet { elts, range: _range })
+            | Expr::Tuple(ast::ExprTuple { elts,  range: _range,.. }) => Some(!elts.is_empty()),
+            Expr::Dict(ast::ExprDict { keys, range: _range, .. }) => Some(!keys.is_empty()),
+            Expr::Call(ast::ExprCall {
                 func,
                 args,
-                keywords,
+                keywords, range: _range,
             }) => {
-                if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         if args.is_empty() && keywords.is_empty() {
                             Some(false)
@@ -1516,7 +1615,7 @@ mod tests {
 
     use crate::helpers::{
         elif_else_range, else_range, first_colon_range, has_trailing_content, identifier_range,
-        locate_cmpops, resolve_imported_module_path, AttributedCmpop,
+        locate_cmpops, resolve_imported_module_path, LocatedCmpop,
     };
     use crate::source_code::Locator;
 
@@ -1736,7 +1835,7 @@ else:
     fn extract_cmpop_location() {
         assert_eq!(
             locate_cmpops("x == 1"),
-            vec![AttributedCmpop::new(
+            vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::Eq
             )]
@@ -1744,7 +1843,7 @@ else:
 
         assert_eq!(
             locate_cmpops("x != 1"),
-            vec![AttributedCmpop::new(
+            vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::NotEq
             )]
@@ -1752,7 +1851,7 @@ else:
 
         assert_eq!(
             locate_cmpops("x is 1"),
-            vec![AttributedCmpop::new(
+            vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::Is
             )]
@@ -1760,7 +1859,7 @@ else:
 
         assert_eq!(
             locate_cmpops("x is not 1"),
-            vec![AttributedCmpop::new(
+            vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(8),
                 Cmpop::IsNot
             )]
@@ -1768,7 +1867,7 @@ else:
 
         assert_eq!(
             locate_cmpops("x in 1"),
-            vec![AttributedCmpop::new(
+            vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::In
             )]
@@ -1776,7 +1875,7 @@ else:
 
         assert_eq!(
             locate_cmpops("x not in 1"),
-            vec![AttributedCmpop::new(
+            vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(8),
                 Cmpop::NotIn
             )]
@@ -1784,7 +1883,7 @@ else:
 
         assert_eq!(
             locate_cmpops("x != (1 is not 2)"),
-            vec![AttributedCmpop::new(
+            vec![LocatedCmpop::new(
                 TextSize::from(2)..TextSize::from(4),
                 Cmpop::NotEq
             )]

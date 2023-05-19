@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use log::error;
 use num_bigint::{BigInt, Sign};
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Attributed, Cmpop, Constant, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -52,7 +52,10 @@ impl BlockMetadata {
     }
 }
 
-fn metadata<T>(locator: &Locator, located: &Attributed<T>) -> Option<BlockMetadata> {
+fn metadata<T>(locator: &Locator, located: &T) -> Option<BlockMetadata>
+where
+    T: Ranged,
+{
     indentation(locator, located)?;
 
     let line_start = locator.line_start(located.start());
@@ -107,10 +110,10 @@ fn bigint_to_u32(number: &BigInt) -> u32 {
 fn extract_version(elts: &[Expr]) -> Vec<u32> {
     let mut version: Vec<u32> = vec![];
     for elt in elts {
-        if let ExprKind::Constant(ast::ExprConstant {
+        if let Expr::Constant(ast::ExprConstant {
             value: Constant::Int(item),
             ..
-        }) = &elt.node
+        }) = &elt
         {
             let number = bigint_to_u32(item);
             version.push(number);
@@ -148,7 +151,7 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
     }
 }
 
-/// Convert a [`StmtKind::If`], retaining the `else`.
+/// Convert a [`Stmt::If`], retaining the `else`.
 fn fix_py2_block(
     checker: &mut Checker,
     stmt: &Stmt,
@@ -241,7 +244,7 @@ fn fix_py2_block(
     }
 }
 
-/// Convert a [`StmtKind::If`], removing the `else` block.
+/// Convert a [`Stmt::If`], removing the `else` block.
 fn fix_py3_block(
     checker: &mut Checker,
     stmt: &Stmt,
@@ -310,11 +313,12 @@ pub(crate) fn outdated_version_block(
     body: &[Stmt],
     orelse: &[Stmt],
 ) {
-    let ExprKind::Compare(ast::ExprCompare {
+    let Expr::Compare(ast::ExprCompare {
         left,
         ops,
         comparators,
-    }) = &test.node else {
+        range: _,
+    }) = &test else {
         return;
     };
 
@@ -329,10 +333,10 @@ pub(crate) fn outdated_version_block(
     }
 
     if ops.len() == 1 && comparators.len() == 1 {
-        let comparison = &comparators[0].node;
+        let comparison = &comparators[0];
         let op = &ops[0];
         match comparison {
-            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let version = extract_version(elts);
                 let target = checker.settings.target_version;
                 if op == &Cmpop::Lt || op == &Cmpop::LtE {
@@ -364,7 +368,7 @@ pub(crate) fn outdated_version_block(
                     }
                 }
             }
-            ExprKind::Constant(ast::ExprConstant {
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(number),
                 ..
             }) => {

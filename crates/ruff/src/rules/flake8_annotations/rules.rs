@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -419,8 +419,8 @@ fn is_none_returning(body: &[Stmt]) -> bool {
     visitor.visit_body(body);
     for expr in visitor.returns.into_iter().flatten() {
         if !matches!(
-            expr.node,
-            ExprKind::Constant(ref constant) if constant.value.is_none()
+            expr,
+            Expr::Constant(ref constant) if constant.value.is_none()
         ) {
             return false;
         }
@@ -495,20 +495,20 @@ pub(crate) fn definition(
         )
     {
         // ANN401 for dynamically typed arguments
-        if let Some(annotation) = &arg.node.annotation {
+        if let Some(annotation) = &arg.annotation {
             has_any_typed_arg = true;
             if checker.settings.rules.enabled(Rule::AnyType) {
                 check_dynamically_typed(
                     checker,
                     annotation,
-                    || arg.node.arg.to_string(),
+                    || arg.arg.to_string(),
                     &mut diagnostics,
                     is_overridden,
                 );
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
+                && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
             {
                 if checker
                     .settings
@@ -517,7 +517,7 @@ pub(crate) fn definition(
                 {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeFunctionArgument {
-                            name: arg.node.arg.to_string(),
+                            name: arg.arg.to_string(),
                         },
                         arg.range(),
                     ));
@@ -528,11 +528,11 @@ pub(crate) fn definition(
 
     // ANN002, ANN401
     if let Some(arg) = &args.vararg {
-        if let Some(expr) = &arg.node.annotation {
+        if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
                 if checker.settings.rules.enabled(Rule::AnyType) {
-                    let name = &arg.node.arg;
+                    let name = &arg.arg;
                     check_dynamically_typed(
                         checker,
                         expr,
@@ -544,12 +544,12 @@ pub(crate) fn definition(
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
+                && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
             {
                 if checker.settings.rules.enabled(Rule::MissingTypeArgs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeArgs {
-                            name: arg.node.arg.to_string(),
+                            name: arg.arg.to_string(),
                         },
                         arg.range(),
                     ));
@@ -560,11 +560,11 @@ pub(crate) fn definition(
 
     // ANN003, ANN401
     if let Some(arg) = &args.kwarg {
-        if let Some(expr) = &arg.node.annotation {
+        if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
                 if checker.settings.rules.enabled(Rule::AnyType) {
-                    let name = &arg.node.arg;
+                    let name = &arg.arg;
                     check_dynamically_typed(
                         checker,
                         expr,
@@ -576,12 +576,12 @@ pub(crate) fn definition(
             }
         } else {
             if !(checker.settings.flake8_annotations.suppress_dummy_args
-                && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
+                && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
             {
                 if checker.settings.rules.enabled(Rule::MissingTypeKwargs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeKwargs {
-                            name: arg.node.arg.to_string(),
+                            name: arg.arg.to_string(),
                         },
                         arg.range(),
                     ));
@@ -593,12 +593,12 @@ pub(crate) fn definition(
     // ANN101, ANN102
     if is_method && !visibility::is_staticmethod(&checker.ctx, cast::decorator_list(stmt)) {
         if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
-            if arg.node.annotation.is_none() {
+            if arg.annotation.is_none() {
                 if visibility::is_classmethod(&checker.ctx, cast::decorator_list(stmt)) {
                     if checker.settings.rules.enabled(Rule::MissingTypeCls) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeCls {
-                                name: arg.node.arg.to_string(),
+                                name: arg.arg.to_string(),
                             },
                             arg.range(),
                         ));
@@ -607,7 +607,7 @@ pub(crate) fn definition(
                     if checker.settings.rules.enabled(Rule::MissingTypeSelf) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeSelf {
-                                name: arg.node.arg.to_string(),
+                                name: arg.arg.to_string(),
                             },
                             arg.range(),
                         ));

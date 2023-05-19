@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_python_semantic::definition::Definition;
 
@@ -29,15 +29,15 @@ impl<'a> Docstring<'a> {
         DocstringBody { docstring: self }
     }
 
-    pub(crate) const fn start(&self) -> TextSize {
+    pub(crate) fn start(&self) -> TextSize {
         self.expr.start()
     }
 
-    pub(crate) const fn end(&self) -> TextSize {
+    pub(crate) fn end(&self) -> TextSize {
         self.expr.end()
     }
 
-    pub(crate) const fn range(&self) -> TextRange {
+    pub(crate) fn range(&self) -> TextRange {
         self.expr.range()
     }
 

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 use super::types;
 
@@ -20,7 +20,9 @@ fn default_broad_exceptions() -> Vec<String> {
     .to_vec()
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
+)]
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",

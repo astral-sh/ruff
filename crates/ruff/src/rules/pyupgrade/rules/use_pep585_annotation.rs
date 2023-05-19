@@ -1,14 +1,18 @@
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_semantic::analyze::typing::ModuleMember;
 
+use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
 pub struct NonPEP585Annotation {
-    name: String,
+    from: String,
+    to: String,
 }
 
 impl Violation for NonPEP585Annotation {
@@ -16,44 +20,60 @@ impl Violation for NonPEP585Annotation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonPEP585Annotation { name } = self;
-        format!(
-            "Use `{}` instead of `{}` for type annotations",
-            name.to_lowercase(),
-            name,
-        )
+        let NonPEP585Annotation { from, to } = self;
+        format!("Use `{to}` instead of `{from}` for type annotation")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let NonPEP585Annotation { name } = self;
-        Some(format!("Replace `{name}` with `{}`", name.to_lowercase()))
+        let NonPEP585Annotation { to, .. } = self;
+        Some(format!("Replace with `{to}`"))
     }
 }
 
 /// UP006
-pub(crate) fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
-    if let Some(binding) = checker
-        .ctx
-        .resolve_call_path(expr)
-        .and_then(|call_path| call_path.last().copied())
-    {
-        let fixable = !checker.ctx.in_complex_string_type_definition();
-        let mut diagnostic = Diagnostic::new(
-            NonPEP585Annotation {
-                name: binding.to_string(),
-            },
-            expr.range(),
-        );
-        if fixable && checker.patch(diagnostic.kind.rule()) {
-            let binding = binding.to_lowercase();
-            if checker.ctx.is_builtin(&binding) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    binding,
-                    expr.range(),
-                )));
+pub(crate) fn use_pep585_annotation(
+    checker: &mut Checker,
+    expr: &Expr,
+    replacement: &ModuleMember,
+) {
+    let Some(from) = compose_call_path(expr) else {
+        return;
+    };
+    let mut diagnostic = Diagnostic::new(
+        NonPEP585Annotation {
+            from,
+            to: replacement.to_string(),
+        },
+        expr.range(),
+    );
+    let fixable = !checker.ctx.in_complex_string_type_definition();
+    if fixable && checker.patch(diagnostic.kind.rule()) {
+        match replacement {
+            ModuleMember::BuiltIn(name) => {
+                // Built-in type, like `list`.
+                if checker.ctx.is_builtin(name) {
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                        (*name).to_string(),
+                        expr.range(),
+                    )));
+                }
+            }
+            ModuleMember::Member(module, member) => {
+                // Imported type, like `collections.deque`.
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = get_or_import_symbol(
+                        module,
+                        member,
+                        expr.start(),
+                        &checker.ctx,
+                        &checker.importer,
+                        checker.locator,
+                    )?;
+                    let reference_edit = Edit::range_replacement(binding, expr.range());
+                    Ok(Fix::suggested_edits(import_edit, [reference_edit]))
+                });
             }
         }
-        checker.diagnostics.push(diagnostic);
     }
+    checker.diagnostics.push(diagnostic);
 }

@@ -1,64 +1,64 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
-TRY301.py:9:13: TRY301 Abstract `raise` to an inner function
+TRY301.py:14:13: TRY301 Abstract `raise` to an inner function
    |
- 9 |         a = process()
-10 |         if not a:
-11 |             raise MyException(a)
+14 |         a = process()
+15 |         if not a:
+16 |             raise MyException(a)
    |             ^^^^^^^^^^^^^^^^^^^^ TRY301
-12 | 
-13 |         raise MyException(a)
+17 | 
+18 |         raise MyException(a)
    |
 
-TRY301.py:11:9: TRY301 Abstract `raise` to an inner function
+TRY301.py:16:9: TRY301 Abstract `raise` to an inner function
    |
-11 |             raise MyException(a)
-12 | 
-13 |         raise MyException(a)
+16 |             raise MyException(a)
+17 | 
+18 |         raise MyException(a)
    |         ^^^^^^^^^^^^^^^^^^^^ TRY301
-14 | 
-15 |         try:
+19 | 
+20 |         try:
    |
 
-TRY301.py:16:17: TRY301 Abstract `raise` to an inner function
+TRY301.py:21:17: TRY301 Abstract `raise` to an inner function
    |
-16 |             b = process()
-17 |             if not b:
-18 |                 raise MyException(b)
+21 |             b = process()
+22 |             if not b:
+23 |                 raise MyException(b)
    |                 ^^^^^^^^^^^^^^^^^^^^ TRY301
-19 |         except Exception:
-20 |             logger.exception("something failed")
+24 |         except Exception:
+25 |             logger.exception("something failed")
    |
 
-TRY301.py:27:13: TRY301 Abstract `raise` to an inner function
+TRY301.py:32:13: TRY301 Abstract `raise` to an inner function
    |
-27 |         a = process()
-28 |         if not a:
-29 |             raise MyException(a)
+32 |         a = process()
+33 |         if not a:
+34 |             raise MyException(a)
    |             ^^^^^^^^^^^^^^^^^^^^ TRY301
-30 | 
-31 |         raise MyException(a)
+35 | 
+36 |         raise MyException(a)
    |
 
-TRY301.py:29:9: TRY301 Abstract `raise` to an inner function
+TRY301.py:34:9: TRY301 Abstract `raise` to an inner function
    |
-29 |             raise MyException(a)
-30 | 
-31 |         raise MyException(a)
+34 |             raise MyException(a)
+35 | 
+36 |         raise MyException(a)
    |         ^^^^^^^^^^^^^^^^^^^^ TRY301
-32 | 
-33 |         try:
+37 | 
+38 |         try:
    |
 
-TRY301.py:34:17: TRY301 Abstract `raise` to an inner function
+TRY301.py:39:17: TRY301 Abstract `raise` to an inner function
    |
-34 |             b = process()
-35 |             if not b:
-36 |                 raise MyException(b)
+39 |             b = process()
+40 |             if not b:
+41 |                 raise MyException(b)
    |                 ^^^^^^^^^^^^^^^^^^^^ TRY301
-37 |         except* Exception:
-38 |             logger.exception("something failed")
+42 |         except* Exception:
+43 |             logger.exception("something failed")
    |
 
 

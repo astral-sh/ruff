@@ -2,35 +2,34 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use proc_macro2::Span;
 use quote::quote;
-use syn::{Attribute, Ident};
-
-pub(crate) fn get_prefix_ident(prefix: &str) -> Ident {
-    let prefix = if prefix.as_bytes()[0].is_ascii_digit() {
-        // Identifiers in Rust may not start with a number.
-        format!("_{prefix}")
-    } else {
-        prefix.to_string()
-    };
-    Ident::new(&prefix, Span::call_site())
-}
+use syn::{Attribute, Ident, Path};
 
 pub(crate) fn expand<'a>(
     prefix_ident: &Ident,
-    variants: impl Iterator<Item = (&'a str, &'a Vec<Attribute>)>,
+    variants: impl Iterator<Item = (&'a str, &'a Path, &'a Vec<Attribute>)>,
 ) -> proc_macro2::TokenStream {
     // Build up a map from prefix to matching RuleCodes.
     let mut prefix_to_codes: BTreeMap<String, BTreeSet<String>> = BTreeMap::default();
     let mut code_to_attributes: BTreeMap<String, &[Attribute]> = BTreeMap::default();
 
-    for (variant, attr) in variants {
+    for (variant, group, attr) in variants {
         let code_str = variant.to_string();
-        for i in 1..=code_str.len() {
-            let prefix = code_str[..i].to_string();
+        // Nursery rules have to be explicitly selected, so we ignore them when looking at prefixes.
+        if is_nursery(group) {
             prefix_to_codes
-                .entry(prefix)
+                .entry(code_str.clone())
                 .or_default()
                 .insert(code_str.clone());
+        } else {
+            for i in 1..=code_str.len() {
+                let prefix = code_str[..i].to_string();
+                prefix_to_codes
+                    .entry(prefix)
+                    .or_default()
+                    .insert(code_str.clone());
+            }
         }
+
         code_to_attributes.insert(code_str, attr);
     }
 
@@ -114,4 +113,26 @@ pub(crate) fn if_all_same<T: PartialEq>(iter: impl Iterator<Item = T>) -> Option
     } else {
         None
     }
+}
+
+/// Returns an identifier for the given prefix.
+pub(crate) fn get_prefix_ident(prefix: &str) -> Ident {
+    let prefix = if prefix.as_bytes()[0].is_ascii_digit() {
+        // Identifiers in Rust may not start with a number.
+        format!("_{prefix}")
+    } else {
+        prefix.to_string()
+    };
+    Ident::new(&prefix, Span::call_site())
+}
+
+/// Returns true if the given group is the "nursery" group.
+pub(crate) fn is_nursery(group: &Path) -> bool {
+    let group = group
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<String>>()
+        .join("::");
+    group == "RuleGroup::Nursery"
 }

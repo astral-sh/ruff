@@ -1,17 +1,18 @@
 //! Options that the user can provide via pyproject.toml.
 
+use rustc_hash::FxHashMap;
+use serde::{Deserialize, Serialize};
+
+use ruff_macros::ConfigurationOptions;
+
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
-use ruff_macros::ConfigurationOptions;
-use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -174,6 +175,24 @@ pub struct Options {
     /// A list of rule codes or prefixes to enable, in addition to those
     /// specified by `select`.
     pub extend_select: Option<Vec<RuleSelector>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Enable autofix for flake8-bugbear (`B`), on top of any rules specified by `fixable`.
+            extend-fixable = ["B"]
+        "#
+    )]
+    /// A list of rule codes or prefixes to consider autofixable, in addition to those
+    /// specified by `fixable`.
+    pub extend_fixable: Option<Vec<RuleSelector>>,
+    /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
+    /// specified by `unfixable`.
+    ///
+    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
+    /// interchangeable with `unfixable`.
+    #[cfg_attr(feature = "schemars", schemars(skip))]
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -508,9 +527,6 @@ pub struct Options {
     #[option_group]
     /// Options for the `pylint` plugin.
     pub pylint: Option<pylint::settings::Options>,
-    #[option_group]
-    /// Options for the `pyupgrade` plugin.
-    pub pyupgrade: Option<pyupgrade::settings::Options>,
     // Tables are required to go last.
     #[option(
         default = "{}",

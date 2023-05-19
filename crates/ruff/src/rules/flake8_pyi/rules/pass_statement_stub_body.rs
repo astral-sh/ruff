@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -20,7 +20,7 @@ pub(crate) fn pass_statement_stub_body(checker: &mut Checker, body: &[Stmt]) {
     if body.len() != 1 {
         return;
     }
-    if matches!(body[0].node, StmtKind::Pass) {
+    if body[0].is_pass_stmt() {
         checker
             .diagnostics
             .push(Diagnostic::new(PassStatementStubBody, body[0].range()));

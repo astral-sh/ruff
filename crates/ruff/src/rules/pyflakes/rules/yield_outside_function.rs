@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -43,11 +43,11 @@ pub(crate) fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
         checker.ctx.scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
-        let keyword = match expr.node {
-            ExprKind::Yield(_) => DeferralKeyword::Yield,
-            ExprKind::YieldFrom(_) => DeferralKeyword::YieldFrom,
-            ExprKind::Await(_) => DeferralKeyword::Await,
-            _ => panic!("Expected ExprKind::Yield | ExprKind::YieldFrom | ExprKind::Await"),
+        let keyword = match expr {
+            Expr::Yield(_) => DeferralKeyword::Yield,
+            Expr::YieldFrom(_) => DeferralKeyword::YieldFrom,
+            Expr::Await(_) => DeferralKeyword::Await,
+            _ => panic!("Expected Expr::Yield | Expr::YieldFrom | Expr::Await"),
         };
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },

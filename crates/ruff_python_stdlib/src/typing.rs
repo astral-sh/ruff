@@ -187,15 +187,26 @@ pub const PEP_593_SUBSCRIPTS: &[&[&str]] = &[
     &["typing_extensions", "Annotated"],
 ];
 
+type ModuleMember = (&'static str, &'static str);
+
+type SymbolReplacement = (ModuleMember, ModuleMember);
+
 // See: https://peps.python.org/pep-0585/
-pub const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
-    &["typing", "Dict"],
-    &["typing", "FrozenSet"],
-    &["typing", "List"],
-    &["typing", "Set"],
-    &["typing", "Tuple"],
-    &["typing", "Type"],
-    &["typing_extensions", "Type"],
+pub const PEP_585_GENERICS: &[SymbolReplacement] = &[
+    (("typing", "Dict"), ("", "dict")),
+    (("typing", "FrozenSet"), ("", "frozenset")),
+    (("typing", "List"), ("", "list")),
+    (("typing", "Set"), ("", "set")),
+    (("typing", "Tuple"), ("", "tuple")),
+    (("typing", "Type"), ("", "type")),
+    (("typing_extensions", "Type"), ("", "type")),
+    (("typing", "Deque"), ("collections", "deque")),
+    (("typing_extensions", "Deque"), ("collections", "deque")),
+    (("typing", "DefaultDict"), ("collections", "defaultdict")),
+    (
+        ("typing_extensions", "DefaultDict"),
+        ("collections", "defaultdict"),
+    ),
 ];
 
 // See: https://github.com/JelleZijlstra/autotyping/blob/0adba5ba0eee33c1de4ad9d0c79acfd737321dd9/autotyping/autotyping.py#L69-L91

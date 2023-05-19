@@ -1,9 +1,8 @@
-use rustpython_parser::ast::Attributed;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::builtins::BUILTINS;
+use rustpython_parser::ast::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -172,11 +171,10 @@ fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing<T>(
-    checker: &mut Checker,
-    name: &str,
-    attributed: &Attributed<T>,
-) {
+pub(crate) fn builtin_variable_shadowing<T>(checker: &mut Checker, name: &str, attributed: &T)
+where
+    T: Ranged,
+{
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinVariableShadowing {
@@ -188,11 +186,10 @@ pub(crate) fn builtin_variable_shadowing<T>(
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing<T>(
-    checker: &mut Checker,
-    name: &str,
-    attributed: &Attributed<T>,
-) {
+pub(crate) fn builtin_argument_shadowing<T>(checker: &mut Checker, name: &str, attributed: &T)
+where
+    T: Ranged,
+{
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinArgumentShadowing {
@@ -204,11 +201,10 @@ pub(crate) fn builtin_argument_shadowing<T>(
 }
 
 /// A003
-pub(crate) fn builtin_attribute_shadowing<T>(
-    checker: &mut Checker,
-    name: &str,
-    attributed: &Attributed<T>,
-) {
+pub(crate) fn builtin_attribute_shadowing<T>(checker: &mut Checker, name: &str, attributed: &T)
+where
+    T: Ranged,
+{
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinAttributeShadowing {

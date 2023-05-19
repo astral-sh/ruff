@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -36,15 +36,15 @@ impl Violation for UselessExpression {
 /// B018
 pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
-    if matches!(value.node, ExprKind::Compare(_)) {
+    if matches!(value, Expr::Compare(_)) {
         return;
     }
 
     // Ignore strings, to avoid false positives with docstrings.
     if matches!(
-        value.node,
-        ExprKind::JoinedStr(_)
-            | ExprKind::Constant(ast::ExprConstant {
+        value,
+        Expr::JoinedStr(_)
+            | Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(..) | Constant::Ellipsis,
                 ..
             })
@@ -56,7 +56,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
-        if matches!(value.node, ExprKind::Attribute(_)) {
+        if matches!(value, Expr::Attribute(_)) {
             checker.diagnostics.push(Diagnostic::new(
                 UselessExpression {
                     kind: Kind::Attribute,

@@ -68,7 +68,7 @@ pub(crate) fn cmp_modules(
         })
 }
 
-/// Compare two member imports within `StmtKind::ImportFrom` blocks.
+/// Compare two member imports within `Stmt::ImportFrom` blocks.
 pub(crate) fn cmp_members(
     alias1: &AliasData,
     alias2: &AliasData,
@@ -110,7 +110,7 @@ pub(crate) fn cmp_levels(
     }
 }
 
-/// Compare two `StmtKind::ImportFrom` blocks.
+/// Compare two `Stmt::ImportFrom` blocks.
 pub(crate) fn cmp_import_from(
     import_from1: &ImportFromData,
     import_from2: &ImportFromData,

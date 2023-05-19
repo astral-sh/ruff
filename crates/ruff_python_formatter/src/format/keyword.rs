@@ -24,13 +24,13 @@ impl Format<ASTFormatContext> for FormatKeyword<'_> {
         let keyword = self.item;
 
         write!(f, [leading_comments(keyword)])?;
-        if let Some(arg) = &keyword.node.arg {
+        if let Some(arg) = &keyword.arg {
             write!(f, [dynamic_text(arg, TextSize::default())])?;
             write!(f, [text("=")])?;
-            write!(f, [keyword.node.value.format()])?;
+            write!(f, [keyword.value.format()])?;
         } else {
             write!(f, [text("**")])?;
-            write!(f, [keyword.node.value.format()])?;
+            write!(f, [keyword.value.format()])?;
         }
         write!(f, [end_of_line_comments(keyword)])?;
         write!(f, [trailing_comments(keyword)])?;

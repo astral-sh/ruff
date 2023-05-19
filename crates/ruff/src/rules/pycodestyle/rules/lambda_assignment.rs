@@ -1,13 +1,14 @@
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt};
+
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_leading_content, has_trailing_content, unparse_stmt};
+use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::source_code::Generator;
 use ruff_python_ast::whitespace::leading_space;
 use ruff_python_semantic::context::Context;
 use ruff_python_semantic::scope::ScopeKind;
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arg, ArgData, Arguments, Constant, Expr, ExprKind, Stmt};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -63,8 +64,8 @@ pub(crate) fn lambda_assignment(
     annotation: Option<&Expr>,
     stmt: &Stmt,
 ) {
-    if let ExprKind::Name(ast::ExprName { id, .. }) = &target.node {
-        if let ExprKind::Lambda(ast::ExprLambda { args, body }) = &value.node {
+    if let Expr::Name(ast::ExprName { id, .. }) = target {
+        if let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value {
             // If the assignment is in a class body, it might not be safe
             // to replace it because the assignment might be
             // carrying a type annotation that will be used by some
@@ -88,10 +89,16 @@ pub(crate) fn lambda_assignment(
                 let first_line = checker.locator.line(stmt.start());
                 let indentation = &leading_space(first_line);
                 let mut indented = String::new();
-                for (idx, line) in
-                    function(&checker.ctx, id, args, body, annotation, checker.stylist)
-                        .universal_newlines()
-                        .enumerate()
+                for (idx, line) in function(
+                    &checker.ctx,
+                    id,
+                    args,
+                    body,
+                    annotation,
+                    checker.generator(),
+                )
+                .universal_newlines()
+                .enumerate()
                 {
                     if idx == 0 {
                         indented.push_str(&line);
@@ -118,10 +125,10 @@ pub(crate) fn lambda_assignment(
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
 fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
-    let ExprKind::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation.node else {
+    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
         return None;
     };
-    let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &slice.node else {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() else {
         return None;
     };
     if elts.len() != 2 {
@@ -137,9 +144,9 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
 
     // The first argument to `Callable` must be a list of types, parameter
     // specification, or ellipsis.
-    let args = match &elts[0].node {
-        ExprKind::List(ast::ExprList { elts, .. }) => elts.clone(),
-        ExprKind::Constant(ast::ExprConstant {
+    let args = match &elts[0] {
+        Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
+        Expr::Constant(ast::ExprConstant {
             value: Constant::Ellipsis,
             ..
         }) => vec![],
@@ -158,14 +165,12 @@ fn function(
     args: &Arguments,
     body: &Expr,
     annotation: Option<&Expr>,
-    stylist: &Stylist,
+    generator: Generator,
 ) -> String {
-    let body = Stmt::new(
-        TextRange::default(),
-        ast::StmtReturn {
-            value: Some(Box::new(body.clone())),
-        },
-    );
+    let body = Stmt::Return(ast::StmtReturn {
+        value: Some(Box::new(body.clone())),
+        range: TextRange::default(),
+    });
     if let Some(annotation) = annotation {
         if let Some((arg_types, return_type)) = extract_types(ctx, annotation) {
             // A `lambda` expression can only have positional and positional-only
@@ -174,62 +179,48 @@ fn function(
                 .posonlyargs
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| {
-                    Arg::new(
-                        TextRange::default(),
-                        ArgData {
-                            annotation: arg_types
-                                .get(idx)
-                                .map(|arg_type| Box::new(arg_type.clone())),
-                            ..arg.node.clone()
-                        },
-                    )
+                .map(|(idx, arg)| Arg {
+                    annotation: arg_types
+                        .get(idx)
+                        .map(|arg_type| Box::new(arg_type.clone())),
+                    ..arg.clone()
                 })
                 .collect::<Vec<_>>();
             let new_args = args
                 .args
                 .iter()
                 .enumerate()
-                .map(|(idx, arg)| {
-                    Arg::new(
-                        TextRange::default(),
-                        ArgData {
-                            annotation: arg_types
-                                .get(idx + new_posonlyargs.len())
-                                .map(|arg_type| Box::new(arg_type.clone())),
-                            ..arg.node.clone()
-                        },
-                    )
+                .map(|(idx, arg)| Arg {
+                    annotation: arg_types
+                        .get(idx + new_posonlyargs.len())
+                        .map(|arg_type| Box::new(arg_type.clone())),
+                    ..arg.clone()
                 })
                 .collect::<Vec<_>>();
-            let func = Stmt::new(
-                TextRange::default(),
-                ast::StmtFunctionDef {
-                    name: name.into(),
-                    args: Box::new(Arguments {
-                        posonlyargs: new_posonlyargs,
-                        args: new_args,
-                        ..args.clone()
-                    }),
-                    body: vec![body],
-                    decorator_list: vec![],
-                    returns: Some(Box::new(return_type)),
-                    type_comment: None,
-                },
-            );
-            return unparse_stmt(&func, stylist);
+            let func = Stmt::FunctionDef(ast::StmtFunctionDef {
+                name: name.into(),
+                args: Box::new(Arguments {
+                    posonlyargs: new_posonlyargs,
+                    args: new_args,
+                    ..args.clone()
+                }),
+                body: vec![body],
+                decorator_list: vec![],
+                returns: Some(Box::new(return_type)),
+                type_comment: None,
+                range: TextRange::default(),
+            });
+            return generator.stmt(&func);
         }
     }
-    let func = Stmt::new(
-        TextRange::default(),
-        ast::StmtFunctionDef {
-            name: name.into(),
-            args: Box::new(args.clone()),
-            body: vec![body],
-            decorator_list: vec![],
-            returns: None,
-            type_comment: None,
-        },
-    );
-    unparse_stmt(&func, stylist)
+    let func = Stmt::FunctionDef(ast::StmtFunctionDef {
+        name: name.into(),
+        args: Box::new(args.clone()),
+        body: vec![body],
+        decorator_list: vec![],
+        returns: None,
+        type_comment: None,
+        range: TextRange::default(),
+    });
+    generator.stmt(&func)
 }

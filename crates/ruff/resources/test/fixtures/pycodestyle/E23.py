@@ -18,3 +18,13 @@ def foo() -> None:
     #: E231
     if (1,2):
         pass
+
+#: Okay
+a = (1,\
+2)
+
+#: E231:2:20
+mdtypes_template = {
+    'tag_full': [('mdtype', 'u4'), ('byte_count', 'u4')],
+    'tag_smalldata':[('byte_count_mdtype', 'u4'), ('data', 'S4')],
+}

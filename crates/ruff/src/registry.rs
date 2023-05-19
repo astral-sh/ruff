@@ -14,67 +14,36 @@ pub use rule_set::{RuleSet, RuleSetIterator};
 ruff_macros::register_rules!(
     // pycodestyle errors
     rules::pycodestyle::rules::MixedSpacesAndTabs,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultiple,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::NoIndentedBlock,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::UnexpectedIndentation,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultipleComment,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::NoIndentedBlockComment,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::UnexpectedIndentationComment,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::OverIndented,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::WhitespaceAfterOpenBracket,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::WhitespaceBeforeCloseBracket,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::WhitespaceBeforePunctuation,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::TabBeforeOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::TabAfterOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::TooFewSpacesBeforeInlineComment,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::NoSpaceAfterInlineComment,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::NoSpaceAfterBlockComment,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MultipleLeadingHashesForBlockComment,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterKeyword,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MissingWhitespace,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeKeyword,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundArithmeticOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundBitwiseOrShiftOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundModuloOperator,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::TabAfterKeyword,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::UnexpectedSpacesAroundKeywordParameterEquals,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundParameterEquals,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::WhitespaceBeforeParameters,
-    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::logical_lines::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
@@ -191,6 +160,10 @@ ruff_macros::register_rules!(
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
     rules::pylint::rules::DuplicateBases,
+    // flake8-async
+    rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
+    rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
+    rules::flake8_async::rules::BlockingOsCallInAsyncFunction,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -290,6 +263,8 @@ ruff_macros::register_rules!(
     rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
     rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
     rules::flake8_annotations::rules::AnyType,
+    // flake8-future-annotations
+    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImport,
     // flake8-2020
     rules::flake8_2020::rules::SysVersionSlice3,
     rules::flake8_2020::rules::SysVersion2,
@@ -534,18 +509,19 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::AssignmentDefaultInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
-    rules::flake8_pyi::rules::NonEmptyStubBody,
-    rules::flake8_pyi::rules::PassStatementStubBody,
-    rules::flake8_pyi::rules::TypeCommentInStub,
-    rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
-    rules::flake8_pyi::rules::UnprefixedTypeParam,
-    rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
-    rules::flake8_pyi::rules::UnrecognizedPlatformName,
-    rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::DuplicateUnionMember,
+    rules::flake8_pyi::rules::NonEmptyStubBody,
+    rules::flake8_pyi::rules::PassInClassBody,
+    rules::flake8_pyi::rules::PassStatementStubBody,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
+    rules::flake8_pyi::rules::TypeCommentInStub,
+    rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
+    rules::flake8_pyi::rules::UnannotatedAssignmentInStub,
+    rules::flake8_pyi::rules::UnprefixedTypeParam,
+    rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
+    rules::flake8_pyi::rules::UnrecognizedPlatformName,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,
@@ -605,6 +581,7 @@ ruff_macros::register_rules!(
     rules::tryceratops::rules::ReraiseNoCause,
     rules::tryceratops::rules::VerboseRaise,
     rules::tryceratops::rules::TryConsiderElse,
+    rules::tryceratops::rules::UselessTryExcept,
     rules::tryceratops::rules::RaiseWithinTry,
     rules::tryceratops::rules::ErrorInsteadOfException,
     rules::tryceratops::rules::VerboseLogMessage,
@@ -733,6 +710,9 @@ pub enum Linter {
     /// [flake8-annotations](https://pypi.org/project/flake8-annotations/)
     #[prefix = "ANN"]
     Flake8Annotations,
+    /// [flake8-async](https://pypi.org/project/flake8-async/)
+    #[prefix = "ASYNC"]
+    Flake8Async,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
@@ -769,6 +749,9 @@ pub enum Linter {
     /// [flake8-executable](https://pypi.org/project/flake8-executable/)
     #[prefix = "EXE"]
     Flake8Executable,
+    /// [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
+    #[prefix = "FA"]
+    Flake8FutureAnnotations,
     /// [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
     #[prefix = "ISC"]
     Flake8ImplicitStrConcat,
@@ -961,7 +944,6 @@ impl Rule {
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
-            #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace

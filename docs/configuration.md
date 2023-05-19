@@ -241,6 +241,8 @@ Rule selection:
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>
           List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+      --extend-fixable <RULE_CODE>
+          Like --fixable, but adds additional rule codes on top of the fixable ones
 
 File selection:
       --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis

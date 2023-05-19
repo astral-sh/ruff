@@ -1,14 +1,13 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{self, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
+use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path;
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -49,13 +48,12 @@ impl AlwaysAutofixableViolation for DuplicateHandlerException {
 }
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
-    Expr::new(
-        TextRange::default(),
-        ast::ExprTuple {
-            elts: elts.into_iter().cloned().collect(),
-            ctx: ExprContext::Load,
-        },
-    )
+    ast::ExprTuple {
+        elts: elts.into_iter().cloned().collect(),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    }
+    .into()
 }
 
 fn duplicate_handler_exceptions<'a>(
@@ -98,9 +96,9 @@ fn duplicate_handler_exceptions<'a>(
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     if unique_elts.len() == 1 {
-                        unparse_expr(unique_elts[0], checker.stylist)
+                        checker.generator().expr(unique_elts[0])
                     } else {
-                        unparse_expr(&type_pattern(unique_elts), checker.stylist)
+                        checker.generator().expr(&type_pattern(unique_elts))
                     },
                     expr.range(),
                 )));
@@ -116,11 +114,11 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthand
     let mut seen: FxHashSet<CallPath> = FxHashSet::default();
     let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();
     for handler in handlers {
-        let ExcepthandlerKind::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = &handler.node else {
+        let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { type_: Some(type_), .. }) = handler else {
             continue;
         };
-        match &type_.node {
-            ExprKind::Attribute(_) | ExprKind::Name(_) => {
+        match type_.as_ref() {
+            Expr::Attribute(_) | Expr::Name(_) => {
                 if let Some(call_path) = call_path::collect_call_path(type_) {
                     if seen.contains(&call_path) {
                         duplicates.entry(call_path).or_default().push(type_);
@@ -129,7 +127,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthand
                     }
                 }
             }
-            ExprKind::Tuple(ast::ExprTuple { elts, .. }) => {
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for (name, expr) in duplicate_handler_exceptions(checker, type_, elts) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(expr);

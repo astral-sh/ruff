@@ -233,27 +233,10 @@ impl Directive {
     /// Extract a [`Directive`] from a comment.
     ///
     /// Returns the offset of the directive within the comment, and the matching directive tag.
-    fn from_comment(comment: &str) -> Option<(usize, Directive)> {
-        let mut chars = comment.chars().peekable();
-        let mut offset = 0;
-
-        // Detect the leading `#`.
-        if chars.next() == Some('#') {
-            offset += 1;
-        } else {
-            return None;
-        }
-
-        // Skip any whitespace after the leading `#`.
-        while let Some(c) = chars.peek() {
-            if !c.is_whitespace() {
-                break;
-            }
-            offset += c.len_utf8();
-            chars.next();
-        }
-
-        // Match the directive itself.
+    fn from_comment(comment: &str) -> Option<(Directive, TextSize)> {
+        let trimmed = comment.trim_start_matches('#').trim_start();
+        let offset = comment.text_len() - trimmed.text_len();
+        let mut chars = trimmed.chars();
         match (
             chars.next(),
             chars.next(),
@@ -267,23 +250,23 @@ impl Directive {
                 Some('X' | 'x'),
                 Some('M' | 'm'),
                 Some('E' | 'e'),
-            ) => Some((offset, Directive::Fixme)),
+            ) => Some((Directive::Fixme, offset)),
             (Some('T' | 't'), Some('O' | 'o'), Some('D' | 'd'), Some('O' | 'o'), ..) => {
-                Some((offset, Directive::Todo))
+                Some((Directive::Todo, offset))
             }
             (Some('X' | 'x'), Some('X' | 'x'), Some('X' | 'x'), ..) => {
-                Some((offset, Directive::Xxx))
+                Some((Directive::Xxx, offset))
             }
             _ => None,
         }
     }
 
     /// Returns the length of the directive tag.
-    fn len(&self) -> usize {
+    fn len(&self) -> TextSize {
         match self {
-            Directive::Fixme => 5,
-            Directive::Todo => 4,
-            Directive::Xxx => 3,
+            Directive::Fixme => TextSize::new(5),
+            Directive::Todo => TextSize::new(4),
+            Directive::Xxx => TextSize::new(3),
         }
     }
 }
@@ -316,7 +299,7 @@ pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic
         };
 
         // Check that the comment is a TODO (properly formed or not).
-        let Some(tag) = detect_tag(comment, token_range) else {
+        let Some(tag) = detect_tag(comment, token_range.start()) else {
             continue;
         };
 
@@ -326,16 +309,22 @@ pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic
         // TD003
         let mut has_issue_link = false;
         while let Some((token, token_range)) = iter.peek() {
-            if let Tok::Comment(comment) = token {
-                if detect_tag(comment, token_range).is_some() {
+            match token {
+                Tok::Comment(comment) => {
+                    if detect_tag(comment, token_range.start()).is_some() {
+                        break;
+                    }
+                    if ISSUE_LINK_REGEX_SET.is_match(comment) {
+                        has_issue_link = true;
+                        break;
+                    }
+                }
+                Tok::Newline | Tok::NonLogicalNewline => {
+                    continue;
+                }
+                _ => {
                     break;
                 }
-                if ISSUE_LINK_REGEX_SET.is_match(comment) {
-                    has_issue_link = true;
-                    break;
-                }
-            } else {
-                break;
             }
         }
         if !has_issue_link {
@@ -347,17 +336,13 @@ pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic
 }
 
 /// Returns the tag pulled out of a given comment, if it exists.
-fn detect_tag<'a>(comment: &'a str, comment_range: &'a TextRange) -> Option<Tag<'a>> {
-    let Some((offset, directive)) = Directive::from_comment(comment) else {
-        return None;
-    };
-
+fn detect_tag(comment: &str, start: TextSize) -> Option<Tag> {
+    let (directive, offset) = Directive::from_comment(comment)?;
+    let comment_range = TextRange::at(offset, directive.len());
+    let tag_range = TextRange::at(start + offset, directive.len());
     Some(Tag {
-        content: &comment[offset..offset + directive.len()],
-        range: TextRange::at(
-            comment_range.start() + TextSize::try_from(offset).ok().unwrap(),
-            TextSize::try_from(directive.len()).ok().unwrap(),
-        ),
+        content: &comment[comment_range],
+        range: tag_range,
     })
 }
 
@@ -450,50 +435,26 @@ mod tests {
             content: "TODO",
             range: TextRange::new(TextSize::new(2), TextSize::new(6)),
         };
-        assert_eq!(
-            Some(expected),
-            detect_tag(
-                test_comment,
-                &TextRange::new(TextSize::new(0), TextSize::new(15)),
-            )
-        );
+        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
 
         let test_comment = "#TODO: todo tag";
         let expected = Tag {
             content: "TODO",
             range: TextRange::new(TextSize::new(1), TextSize::new(5)),
         };
-        assert_eq!(
-            Some(expected),
-            detect_tag(
-                test_comment,
-                &TextRange::new(TextSize::new(0), TextSize::new(15)),
-            )
-        );
+        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
 
         let test_comment = "# todo: todo tag";
         let expected = Tag {
             content: "todo",
             range: TextRange::new(TextSize::new(2), TextSize::new(6)),
         };
-        assert_eq!(
-            Some(expected),
-            detect_tag(
-                test_comment,
-                &TextRange::new(TextSize::new(0), TextSize::new(15)),
-            )
-        );
+        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
         let test_comment = "# fixme: fixme tag";
         let expected = Tag {
             content: "fixme",
             range: TextRange::new(TextSize::new(2), TextSize::new(7)),
         };
-        assert_eq!(
-            Some(expected),
-            detect_tag(
-                test_comment,
-                &TextRange::new(TextSize::new(0), TextSize::new(17)),
-            )
-        );
+        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
     }
 }

@@ -1,11 +1,10 @@
-use ruff_text_size::TextRange;
 use std::fmt;
 
-use rustpython_parser::ast::{self, Expr, ExprKind, Operator};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -55,14 +54,12 @@ fn union(elts: &[Expr]) -> Expr {
     if elts.len() == 1 {
         elts[0].clone()
     } else {
-        Expr::new(
-            TextRange::default(),
-            ast::ExprBinOp {
-                left: Box::new(union(&elts[..elts.len() - 1])),
-                op: Operator::BitOr,
-                right: Box::new(elts[elts.len() - 1].clone()),
-            },
-        )
+        Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(union(&elts[..elts.len() - 1])),
+            op: Operator::BitOr,
+            right: Box::new(elts[elts.len() - 1].clone()),
+            range: TextRange::default(),
+        })
     }
 }
 
@@ -73,7 +70,7 @@ pub(crate) fn use_pep604_isinstance(
     func: &Expr,
     args: &[Expr],
 ) {
-    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
@@ -81,17 +78,14 @@ pub(crate) fn use_pep604_isinstance(
             return;
         };
         if let Some(types) = args.get(1) {
-            if let ExprKind::Tuple(ast::ExprTuple { elts, .. }) = &types.node {
+            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &types {
                 // Ex) `()`
                 if elts.is_empty() {
                     return;
                 }
 
                 // Ex) `(*args,)`
-                if elts
-                    .iter()
-                    .any(|elt| matches!(elt.node, ExprKind::Starred(_)))
-                {
+                if elts.iter().any(|elt| matches!(elt, Expr::Starred(_))) {
                     return;
                 }
 
@@ -99,7 +93,7 @@ pub(crate) fn use_pep604_isinstance(
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                        unparse_expr(&union(elts), checker.stylist),
+                        checker.generator().expr(&union(elts)),
                         types.range(),
                     )));
                 }

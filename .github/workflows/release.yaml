@@ -1,9 +1,9 @@
 name: "[ruff] Release"
 
 on:
-  push:
-    tags:
-      - v*
+  workflow_dispatch:
+  release:
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,6 +18,31 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build sdist"
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: "Test sdist"
+        run: |
+          pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
+          ruff --help
+          python -m ruff --help
+      - name: "Upload sdist"
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+
   macos-x86_64:
     runs-on: macos-latest
     steps:
@@ -32,7 +57,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
-          args: --release --out dist --sdist
+          args: --release --out dist
       - name: "Test wheel - x86_64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall

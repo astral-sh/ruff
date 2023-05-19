@@ -1,5 +1,5 @@
 use ruff_python_semantic::binding::{BindingKind, Importation};
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Keyword, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -76,13 +76,13 @@ pub(crate) fn inplace_argument(
     }
 
     for keyword in keywords.iter().rev() {
-        let Some(arg) = &keyword.node.arg else {
+        let Some(arg) = &keyword.arg else {
             seen_star = true;
             continue;
         };
         if arg == "inplace" {
-            let is_true_literal = match &keyword.node.value.node {
-                ExprKind::Constant(ast::ExprConstant {
+            let is_true_literal = match &keyword.value {
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(boolean),
                     ..
                 }) => *boolean,
@@ -99,7 +99,7 @@ pub(crate) fn inplace_argument(
                 //    but we don't currently restore expression stacks when parsing deferred nodes,
                 //    and so the parent is lost.
                 let fixable = !seen_star
-                    && matches!(checker.ctx.stmt().node, StmtKind::Expr(_))
+                    && checker.ctx.stmt().is_expr_stmt()
                     && checker.ctx.expr_parent().is_none()
                     && !checker.ctx.scope().kind.is_lambda();
                 let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());

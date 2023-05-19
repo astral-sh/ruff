@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;

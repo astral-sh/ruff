@@ -43,6 +43,17 @@ pub(crate) fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
                 output.push('\n');
             }
 
+            if rule.is_nursery() {
+                output.push_str(&format!(
+                    r#"This rule is part of the **nursery**, a collection of newer lints that are
+still under development. As such, it must be enabled by explicitly selecting
+{}."#,
+                    rule.noqa_code()
+                ));
+                output.push('\n');
+                output.push('\n');
+            }
+
             if let Some(explanation) = rule.explanation() {
                 output.push_str(explanation.trim());
             } else {

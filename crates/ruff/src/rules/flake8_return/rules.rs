@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -331,8 +331,8 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
             continue;
         };
         if !matches!(
-            expr.node,
-            ExprKind::Constant(ast::ExprConstant {
+            expr,
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::None,
                 ..
             })
@@ -402,8 +402,8 @@ fn is_noreturn_func(context: &Context, func: &Expr) -> bool {
 
 /// RET503
 fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
-    match &stmt.node {
-        StmtKind::If(ast::StmtIf { body, orelse, .. }) => {
+    match stmt {
+        Stmt::If(ast::StmtIf { body, orelse, .. }) => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }
@@ -427,25 +427,25 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        StmtKind::Assert(ast::StmtAssert { test, .. })
+        Stmt::Assert(ast::StmtAssert { test, .. })
             if matches!(
-                test.node,
-                ExprKind::Constant(ast::ExprConstant {
+                test.as_ref(),
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(false),
                     ..
                 })
             ) => {}
-        StmtKind::While(ast::StmtWhile { test, .. })
+        Stmt::While(ast::StmtWhile { test, .. })
             if matches!(
-                test.node,
-                ExprKind::Constant(ast::ExprConstant {
+                test.as_ref(),
+                Expr::Constant(ast::ExprConstant {
                     value: Constant::Bool(true),
                     ..
                 })
             ) => {}
-        StmtKind::For(ast::StmtFor { orelse, .. })
-        | StmtKind::AsyncFor(ast::StmtAsyncFor { orelse, .. })
-        | StmtKind::While(ast::StmtWhile { orelse, .. }) => {
+        Stmt::For(ast::StmtFor { orelse, .. })
+        | Stmt::AsyncFor(ast::StmtAsyncFor { orelse, .. })
+        | Stmt::While(ast::StmtWhile { orelse, .. }) => {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
@@ -466,24 +466,24 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 checker.diagnostics.push(diagnostic);
             }
         }
-        StmtKind::Match(ast::StmtMatch { cases, .. }) => {
+        Stmt::Match(ast::StmtMatch { cases, .. }) => {
             for case in cases {
                 if let Some(last_stmt) = case.body.last() {
                     implicit_return(checker, last_stmt);
                 }
             }
         }
-        StmtKind::With(ast::StmtWith { body, .. })
-        | StmtKind::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
+        Stmt::With(ast::StmtWith { body, .. })
+        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }
         }
-        StmtKind::Return(_) | StmtKind::Raise(_) | StmtKind::Try(_) | StmtKind::TryStar(_) => {}
-        StmtKind::Expr(ast::StmtExpr { value })
+        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) | Stmt::TryStar(_) => {}
+        Stmt::Expr(ast::StmtExpr { value, .. })
             if matches!(
-                &value.node,
-                ExprKind::Call(ast::ExprCall { func, ..  })
+                value.as_ref(),
+                Expr::Call(ast::ExprCall { func, ..  })
                     if is_noreturn_func(&checker.ctx, func)
             ) => {}
         _ => {
@@ -593,7 +593,7 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
 
 /// RET504
 fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
-    if let ExprKind::Name(ast::ExprName { id, .. }) = &expr.node {
+    if let Expr::Name(ast::ExprName { id, .. }) = expr {
         if !stack.assignments.contains_key(id.as_str()) {
             return;
         }
@@ -624,11 +624,11 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
 
 /// RET505, RET506, RET507, RET508
 fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> bool {
-    let StmtKind::If(ast::StmtIf { body, .. }) = &stmt.node else {
+    let Stmt::If(ast::StmtIf { body, .. }) = stmt else {
         return false;
     };
     for child in body {
-        if matches!(child.node, StmtKind::Return(_)) {
+        if child.is_return_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
@@ -637,8 +637,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 checker.diagnostics.push(diagnostic);
             }
             return true;
-        }
-        if matches!(child.node, StmtKind::Break) {
+        } else if child.is_break_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
@@ -647,8 +646,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 checker.diagnostics.push(diagnostic);
             }
             return true;
-        }
-        if matches!(child.node, StmtKind::Raise(_)) {
+        } else if child.is_raise_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
@@ -657,8 +655,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 checker.diagnostics.push(diagnostic);
             }
             return true;
-        }
-        if matches!(child.node, StmtKind::Continue) {
+        } else if child.is_continue_stmt() {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
@@ -695,7 +692,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
     };
 
     // Skip functions that consist of a single return statement.
-    if body.len() == 1 && matches!(last_stmt.node, StmtKind::Return(_)) {
+    if body.len() == 1 && matches!(last_stmt, Stmt::Return(_)) {
         return;
     }
 

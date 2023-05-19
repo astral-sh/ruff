@@ -1,9 +1,8 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprKind};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -25,11 +24,12 @@ impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
 /// UP011
 pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Expr]) {
     for expr in decorator_list.iter() {
-        let ExprKind::Call(ast::ExprCall {
+        let Expr::Call(ast::ExprCall {
             func,
             args,
             keywords,
-        }) = &expr.node else {
+            range: _,
+        }) = expr else {
             continue;
         };
 
@@ -50,7 +50,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
             if checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(func, checker.stylist),
+                    checker.generator().expr(func),
                     expr.range(),
                 )));
             }

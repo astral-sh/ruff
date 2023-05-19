@@ -1,12 +1,13 @@
 //! Extract `# noqa` and `# isort: skip` directives from tokenized source.
 
-use crate::noqa::NoqaMapping;
 use bitflags::bitflags;
-use ruff_python_ast::source_code::{Indexer, Locator};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use ruff_python_ast::source_code::{Indexer, Locator};
+
+use crate::noqa::NoqaMapping;
 use crate::settings::Settings;
 
 bitflags! {
@@ -102,7 +103,10 @@ pub fn extract_noqa_line_for(
                 ..
             } => {
                 if locator.contains_line_break(*range) {
-                    string_mappings.push(*range);
+                    string_mappings.push(TextRange::new(
+                        locator.line_start(range.start()),
+                        range.end(),
+                    ));
                 }
             }
 
@@ -219,10 +223,11 @@ pub fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDi
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::source_code::{Indexer, Locator};
     use ruff_text_size::{TextLen, TextRange, TextSize};
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
+
+    use ruff_python_ast::source_code::{Indexer, Locator};
 
     use crate::directives::{extract_isort_directives, extract_noqa_line_for};
     use crate::noqa::NoqaMapping;
@@ -271,7 +276,7 @@ y = 2
 z = x + 1";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(4), TextSize::from(22)),])
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(0), TextSize::from(22)),])
         );
 
         let contents = "x = 1
@@ -282,7 +287,7 @@ ghi
 z = 2";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(10), TextSize::from(28))])
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
         );
 
         let contents = "x = 1
@@ -292,7 +297,7 @@ ghi
 '''";
         assert_eq!(
             noqa_mappings(contents),
-            NoqaMapping::from_iter([TextRange::new(TextSize::from(10), TextSize::from(28))])
+            NoqaMapping::from_iter([TextRange::new(TextSize::from(6), TextSize::from(28))])
         );
 
         let contents = r#"x = \

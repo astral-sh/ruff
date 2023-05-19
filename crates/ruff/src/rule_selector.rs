@@ -119,8 +119,7 @@ impl Visitor<'_> for SelectorVisitor {
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str(
-            "expected a string code identifying a linter or specific rule, or a partial rule code \
-             or ALL to refer to all rules",
+            "expected a string code identifying a linter or specific rule, or a partial rule code or ALL to refer to all rules",
         )
     }
 
@@ -141,13 +140,22 @@ impl From<RuleCodePrefix> for RuleSelector {
     }
 }
 
+/// Returns `true` if the given rule should be selected by the `RuleSelector::All` selector.
+fn select_all(rule: Rule) -> bool {
+    // Nursery rules have to be explicitly selected, so we ignore them when looking at
+    // prefixes.
+    !rule.is_nursery()
+}
+
 impl IntoIterator for &RuleSelector {
-    type IntoIter = RuleSelectorIter;
     type Item = Rule;
+    type IntoIter = RuleSelectorIter;
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
+            RuleSelector::All => {
+                RuleSelectorIter::All(Rule::iter().filter(|rule| select_all(*rule)))
+            }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
                     .into_iter()
@@ -165,7 +173,7 @@ impl IntoIterator for &RuleSelector {
 }
 
 pub enum RuleSelectorIter {
-    All(RuleIter),
+    All(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
 }
@@ -196,14 +204,15 @@ pub(crate) const fn prefix_to_selector(prefix: RuleCodePrefix) -> RuleSelector {
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use crate::registry::RuleNamespace;
-    use crate::rule_selector::{Linter, Rule, RuleCodePrefix};
-    use crate::RuleSelector;
     use itertools::Itertools;
+    use schemars::JsonSchema;
     use schemars::_serde_json::Value;
     use schemars::schema::{InstanceType, Schema, SchemaObject};
-    use schemars::JsonSchema;
     use strum::IntoEnumIterator;
+
+    use crate::registry::RuleNamespace;
+    use crate::rule_selector::{Linter, RuleCodePrefix};
+    use crate::RuleSelector;
 
     impl JsonSchema for RuleSelector {
         fn schema_name() -> String {
@@ -228,20 +237,6 @@ mod schema {
                     .into_iter()
                     .chain(
                         RuleCodePrefix::iter()
-                            .filter(|p| {
-                                // Once logical lines are active by default, please remove this.
-                                // This is here because generate-all output otherwise depends on
-                                // the feature sets which makes the test running with
-                                // `--all-features` fail
-                                !Rule::from_code(&format!(
-                                    "{}{}",
-                                    p.linter().common_prefix(),
-                                    p.short_code()
-                                ))
-                                .unwrap()
-                                .lint_source()
-                                .is_logical_lines()
-                            })
                             .map(|p| {
                                 let prefix = p.linter().common_prefix();
                                 let code = p.short_code();

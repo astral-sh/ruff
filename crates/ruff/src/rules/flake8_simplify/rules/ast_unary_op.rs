@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Cmpop, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{self, Cmpop, Expr, ExprContext, Ranged, Stmt, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{create_expr, unparse_expr};
+
 use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
@@ -65,13 +66,13 @@ impl AlwaysAutofixableViolation for DoubleNegation {
 const DUNDER_METHODS: &[&str] = &["__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"];
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let StmtKind::If(ast::StmtIf {test: _, body, orelse: _ })= &stmt.node else {
+    let Stmt::If(ast::StmtIf {test: _, body, orelse: _, range: _ })= stmt else {
         return false;
     };
     if body.len() != 1 {
         return false;
     }
-    if matches!(body[0].node, StmtKind::Raise(_)) {
+    if matches!(body[0], Stmt::Raise(_)) {
         return true;
     }
     false
@@ -81,13 +82,13 @@ fn is_exception_check(stmt: &Stmt) -> bool {
 pub(crate) fn negation_with_equal_op(
     checker: &mut Checker,
     expr: &Expr,
-    op: &Unaryop,
+    op: Unaryop,
     operand: &Expr,
 ) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators}) = &operand.node else {
+    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _}) = operand else {
         return;
     };
     if !matches!(&ops[..], [Cmpop::Eq]) {
@@ -106,22 +107,21 @@ pub(crate) fn negation_with_equal_op(
 
     let mut diagnostic = Diagnostic::new(
         NegateEqualOp {
-            left: unparse_expr(left, checker.stylist),
-            right: unparse_expr(&comparators[0], checker.stylist),
+            left: checker.generator().expr(left),
+            right: checker.generator().expr(&comparators[0]),
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        let node = ast::ExprCompare {
+            left: left.clone(),
+            ops: vec![Cmpop::NotEq],
+            comparators: comparators.clone(),
+            range: TextRange::default(),
+        };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(
-                &create_expr(ast::ExprCompare {
-                    left: left.clone(),
-                    ops: vec![Cmpop::NotEq],
-                    comparators: comparators.clone(),
-                }),
-                checker.stylist,
-            ),
+            checker.generator().expr(&node.into()),
             expr.range(),
         )));
     }
@@ -132,13 +132,13 @@ pub(crate) fn negation_with_equal_op(
 pub(crate) fn negation_with_not_equal_op(
     checker: &mut Checker,
     expr: &Expr,
-    op: &Unaryop,
+    op: Unaryop,
     operand: &Expr,
 ) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::Compare(ast::ExprCompare { left, ops, comparators}) = &operand.node else {
+    let Expr::Compare(ast::ExprCompare { left, ops, comparators, range: _}) = operand else {
         return;
     };
     if !matches!(&ops[..], [Cmpop::NotEq]) {
@@ -157,22 +157,21 @@ pub(crate) fn negation_with_not_equal_op(
 
     let mut diagnostic = Diagnostic::new(
         NegateNotEqualOp {
-            left: unparse_expr(left, checker.stylist),
-            right: unparse_expr(&comparators[0], checker.stylist),
+            left: checker.generator().expr(left),
+            right: checker.generator().expr(&comparators[0]),
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
+        let node = ast::ExprCompare {
+            left: left.clone(),
+            ops: vec![Cmpop::Eq],
+            comparators: comparators.clone(),
+            range: TextRange::default(),
+        };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(
-                &create_expr(ast::ExprCompare {
-                    left: left.clone(),
-                    ops: vec![Cmpop::Eq],
-                    comparators: comparators.clone(),
-                }),
-                checker.stylist,
-            ),
+            checker.generator().expr(&node.into()),
             expr.range(),
         )));
     }
@@ -180,11 +179,11 @@ pub(crate) fn negation_with_not_equal_op(
 }
 
 /// SIM208
-pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
+pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, operand: &Expr) {
     if !matches!(op, Unaryop::Not) {
         return;
     }
-    let ExprKind::UnaryOp(ast::ExprUnaryOp { op: operand_op, operand }) = &operand.node else {
+    let Expr::UnaryOp(ast::ExprUnaryOp { op: operand_op, operand, range: _ }) = operand else {
         return;
     };
     if !matches!(operand_op, Unaryop::Not) {
@@ -193,7 +192,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
 
     let mut diagnostic = Diagnostic::new(
         DoubleNegation {
-            expr: unparse_expr(operand, checker.stylist),
+            expr: checker.generator().expr(operand),
         },
         expr.range(),
     );
@@ -201,23 +200,24 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         if checker.ctx.in_boolean_test() {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(operand, checker.stylist),
+                checker.generator().expr(operand),
                 expr.range(),
             )));
         } else if checker.ctx.is_builtin("bool") {
+            let node = ast::ExprName {
+                id: "bool".into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            };
+            let node1 = ast::ExprCall {
+                func: Box::new(node.into()),
+                args: vec![*operand.clone()],
+                keywords: vec![],
+                range: TextRange::default(),
+            };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(
-                    &create_expr(ast::ExprCall {
-                        func: Box::new(create_expr(ast::ExprName {
-                            id: "bool".into(),
-                            ctx: ExprContext::Load,
-                        })),
-                        args: vec![*operand.clone()],
-                        keywords: vec![],
-                    }),
-                    checker.stylist,
-                ),
+                checker.generator().expr(&node1.into()),
                 expr.range(),
             )));
         };

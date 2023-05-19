@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.267'
+  rev: 'v0.0.269'
   hooks:
     - id: ruff
 ```
@@ -249,6 +249,7 @@ quality tools, including:
 - [eradicate](https://pypi.org/project/eradicate/)
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
 - [flake8-annotations](https://pypi.org/project/flake8-annotations/)
+- [flake8-async](https://pypi.org/project/flake8-async)
 - [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
 - [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
 - [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
@@ -263,6 +264,7 @@ quality tools, including:
 - [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 - [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
 - [flake8-executable](https://pypi.org/project/flake8-executable/)
+- [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/)
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
 - [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
@@ -362,7 +364,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
-- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel), [ONNX Runtime](https://github.com/microsoft/onnxruntime))
+- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel), [ONNX Runtime](https://github.com/microsoft/onnxruntime), [LightGBM](https://github.com/microsoft/LightGBM))
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [ONNX](https://github.com/onnx/onnx)

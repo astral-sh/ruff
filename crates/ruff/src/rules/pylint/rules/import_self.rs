@@ -1,9 +1,24 @@
-use rustpython_parser::ast::Alias;
+use rustpython_parser::ast::{Alias, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 
+/// ## What it does
+/// Checks for import statements that import the current module.
+///
+/// ## Why is this bad?
+/// Importing a module from itself is a circular dependency.
+///
+/// ## Example
+/// ```python
+/// # file: this_file.py
+/// from this_file import foo
+///
+///
+/// def foo():
+///     ...
+/// ```
 #[violation]
 pub struct ImportSelf {
     name: String,
@@ -23,10 +38,10 @@ pub(crate) fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Opti
         return None;
     };
 
-    if alias.node.name.split('.').eq(module_path) {
+    if alias.name.split('.').eq(module_path) {
         return Some(Diagnostic::new(
             ImportSelf {
-                name: alias.node.name.to_string(),
+                name: alias.name.to_string(),
             },
             alias.range(),
         ));
@@ -55,11 +70,11 @@ pub(crate) fn import_from_self(
     {
         if let Some(alias) = names
             .iter()
-            .find(|alias| alias.node.name == module_path[module_path.len() - 1])
+            .find(|alias| alias.name == module_path[module_path.len() - 1])
         {
             return Some(Diagnostic::new(
                 ImportSelf {
-                    name: format!("{}.{}", imported_module_path, alias.node.name),
+                    name: format!("{}.{}", imported_module_path, alias.name),
                 },
                 alias.range(),
             ));

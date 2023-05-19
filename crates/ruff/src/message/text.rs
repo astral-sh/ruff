@@ -118,7 +118,7 @@ pub(super) struct RuleCodeAndBody<'a> {
 }
 
 impl Display for RuleCodeAndBody<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = &self.message.kind;
 
         if self.show_fix_status && self.message.fix.is_some() {

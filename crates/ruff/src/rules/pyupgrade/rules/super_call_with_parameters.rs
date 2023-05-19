@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, ArgData, Expr, ExprKind, StmtKind};
+use rustpython_parser::ast::{self, Arg, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -24,7 +24,7 @@ impl AlwaysAutofixableViolation for SuperCallWithParameters {
 
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
-    if let ExprKind::Name(ast::ExprName { id, .. }) = &func.node {
+    if let Expr::Name(ast::ExprName { id, .. }) = func {
         id == "super" && !args.is_empty()
     } else {
         false
@@ -60,38 +60,36 @@ pub(crate) fn super_call_with_parameters(
     };
 
     // Find the enclosing function definition (if any).
-    let Some(StmtKind::FunctionDef(ast::StmtFunctionDef {
+    let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
         args: parent_args, ..
     })) = parents
-        .find(|stmt| matches!(stmt.node, StmtKind::FunctionDef ( _)))
-        .map(|stmt| &stmt.node) else {
+        .find(|stmt| stmt.is_function_def_stmt()) else {
         return;
     };
 
     // Extract the name of the first argument to the enclosing function.
-    let Some(ArgData {
+    let Some(Arg {
         arg: parent_arg, ..
-    }) = parent_args.args.first().map(|expr| &expr.node) else {
+    }) = parent_args.args.first() else {
         return;
     };
 
     // Find the enclosing class definition (if any).
-    let Some(StmtKind::ClassDef(ast::StmtClassDef {
+    let Some(Stmt::ClassDef(ast::StmtClassDef {
         name: parent_name, ..
     })) = parents
-        .find(|stmt| matches!(stmt.node, StmtKind::ClassDef (_)))
-        .map(|stmt| &stmt.node) else {
+        .find(|stmt| matches!(stmt, Stmt::ClassDef (_))) else {
         return;
     };
 
     let (
-        ExprKind::Name(ast::ExprName {
+        Expr::Name(ast::ExprName {
             id: first_arg_id, ..
         }),
-        ExprKind::Name(ast::ExprName {
+        Expr::Name(ast::ExprName {
             id: second_arg_id, ..
         }),
-    ) = (&first_arg.node, &second_arg.node) else {
+    ) = (first_arg, second_arg) else {
         return;
     };
 
