@@ -5,8 +5,7 @@ use log::error;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{ExprConstant, ExprKind, Stmt, StmtExpr, StmtKind};
 
 /// PYI013
 /// ## What it does
@@ -56,9 +55,9 @@ pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
     }
 
     for stmt in body {
-        if let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node {
-            if let ExprKind::Constant(ast::ExprConstant { value, .. }) = &value.node {
-                if matches!(value, Constant::Ellipsis) {
+        if let StmtKind::Expr(StmtExpr { value }) = &stmt.node {
+            if let ExprKind::Constant(ExprConstant { value, .. }) = &value.node {
+                if value.is_ellipsis() {
                     let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
 
                     if checker.patch(diagnostic.kind.rule()) {
