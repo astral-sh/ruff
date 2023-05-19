@@ -14,3 +14,15 @@
 "{.real}".format(0b01)
 "{0.real}".format(0b01)
 "{a.real}".format(a=0b01)
+
+"{}".format(1 + 2)
+"{}".format([1, 2])
+"{}".format({1, 2})
+"{}".format({1: 2, 3: 4})
+"{}".format((i for i in range(2)))
+
+"{.real}".format(1 + 2)
+"{.real}".format([1, 2])
+"{.real}".format({1, 2})
+"{.real}".format({1: 2, 3: 4})
+"{}".format((i for i in range(2)))

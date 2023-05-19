@@ -200,6 +200,7 @@ UP032_2.py:14:1: UP032 [*] Use f-string instead of `format` call
    14 |+f"{0b01.real}"
 15 15 | "{0.real}".format(0b01)
 16 16 | "{a.real}".format(a=0b01)
+17 17 | 
 
 UP032_2.py:15:1: UP032 [*] Use f-string instead of `format` call
    |
@@ -217,6 +218,8 @@ UP032_2.py:15:1: UP032 [*] Use f-string instead of `format` call
 15    |-"{0.real}".format(0b01)
    15 |+f"{0b01.real}"
 16 16 | "{a.real}".format(a=0b01)
+17 17 | 
+18 18 | "{}".format(1 + 2)
 
 UP032_2.py:16:1: UP032 [*] Use f-string instead of `format` call
    |
@@ -224,6 +227,8 @@ UP032_2.py:16:1: UP032 [*] Use f-string instead of `format` call
 17 | "{0.real}".format(0b01)
 18 | "{a.real}".format(a=0b01)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+19 | 
+20 | "{}".format(1 + 2)
    |
    = help: Convert to f-string
 
@@ -233,5 +238,206 @@ UP032_2.py:16:1: UP032 [*] Use f-string instead of `format` call
 15 15 | "{0.real}".format(0b01)
 16    |-"{a.real}".format(a=0b01)
    16 |+f"{0b01.real}"
+17 17 | 
+18 18 | "{}".format(1 + 2)
+19 19 | "{}".format([1, 2])
+
+UP032_2.py:18:1: UP032 [*] Use f-string instead of `format` call
+   |
+18 | "{a.real}".format(a=0b01)
+19 | 
+20 | "{}".format(1 + 2)
+   | ^^^^^^^^^^^^^^^^^^ UP032
+21 | "{}".format([1, 2])
+22 | "{}".format({1, 2})
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+15 15 | "{0.real}".format(0b01)
+16 16 | "{a.real}".format(a=0b01)
+17 17 | 
+18    |-"{}".format(1 + 2)
+   18 |+f"{1 + 2}"
+19 19 | "{}".format([1, 2])
+20 20 | "{}".format({1, 2})
+21 21 | "{}".format({1: 2, 3: 4})
+
+UP032_2.py:19:1: UP032 [*] Use f-string instead of `format` call
+   |
+19 | "{}".format(1 + 2)
+20 | "{}".format([1, 2])
+   | ^^^^^^^^^^^^^^^^^^^ UP032
+21 | "{}".format({1, 2})
+22 | "{}".format({1: 2, 3: 4})
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+16 16 | "{a.real}".format(a=0b01)
+17 17 | 
+18 18 | "{}".format(1 + 2)
+19    |-"{}".format([1, 2])
+   19 |+f"{[1, 2]}"
+20 20 | "{}".format({1, 2})
+21 21 | "{}".format({1: 2, 3: 4})
+22 22 | "{}".format((i for i in range(2)))
+
+UP032_2.py:20:1: UP032 [*] Use f-string instead of `format` call
+   |
+20 | "{}".format(1 + 2)
+21 | "{}".format([1, 2])
+22 | "{}".format({1, 2})
+   | ^^^^^^^^^^^^^^^^^^^ UP032
+23 | "{}".format({1: 2, 3: 4})
+24 | "{}".format((i for i in range(2)))
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+17 17 | 
+18 18 | "{}".format(1 + 2)
+19 19 | "{}".format([1, 2])
+20    |-"{}".format({1, 2})
+   20 |+f"{({1, 2})}"
+21 21 | "{}".format({1: 2, 3: 4})
+22 22 | "{}".format((i for i in range(2)))
+23 23 | 
+
+UP032_2.py:21:1: UP032 [*] Use f-string instead of `format` call
+   |
+21 | "{}".format([1, 2])
+22 | "{}".format({1, 2})
+23 | "{}".format({1: 2, 3: 4})
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+24 | "{}".format((i for i in range(2)))
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+18 18 | "{}".format(1 + 2)
+19 19 | "{}".format([1, 2])
+20 20 | "{}".format({1, 2})
+21    |-"{}".format({1: 2, 3: 4})
+   21 |+f"{({1: 2, 3: 4})}"
+22 22 | "{}".format((i for i in range(2)))
+23 23 | 
+24 24 | "{.real}".format(1 + 2)
+
+UP032_2.py:22:1: UP032 [*] Use f-string instead of `format` call
+   |
+22 | "{}".format({1, 2})
+23 | "{}".format({1: 2, 3: 4})
+24 | "{}".format((i for i in range(2)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+25 | 
+26 | "{.real}".format(1 + 2)
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+19 19 | "{}".format([1, 2])
+20 20 | "{}".format({1, 2})
+21 21 | "{}".format({1: 2, 3: 4})
+22    |-"{}".format((i for i in range(2)))
+   22 |+f"{(i for i in range(2))}"
+23 23 | 
+24 24 | "{.real}".format(1 + 2)
+25 25 | "{.real}".format([1, 2])
+
+UP032_2.py:24:1: UP032 [*] Use f-string instead of `format` call
+   |
+24 | "{}".format((i for i in range(2)))
+25 | 
+26 | "{.real}".format(1 + 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
+27 | "{.real}".format([1, 2])
+28 | "{.real}".format({1, 2})
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+21 21 | "{}".format({1: 2, 3: 4})
+22 22 | "{}".format((i for i in range(2)))
+23 23 | 
+24    |-"{.real}".format(1 + 2)
+   24 |+f"{(1 + 2).real}"
+25 25 | "{.real}".format([1, 2])
+26 26 | "{.real}".format({1, 2})
+27 27 | "{.real}".format({1: 2, 3: 4})
+
+UP032_2.py:25:1: UP032 [*] Use f-string instead of `format` call
+   |
+25 | "{.real}".format(1 + 2)
+26 | "{.real}".format([1, 2])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+27 | "{.real}".format({1, 2})
+28 | "{.real}".format({1: 2, 3: 4})
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+22 22 | "{}".format((i for i in range(2)))
+23 23 | 
+24 24 | "{.real}".format(1 + 2)
+25    |-"{.real}".format([1, 2])
+   25 |+f"{[1, 2].real}"
+26 26 | "{.real}".format({1, 2})
+27 27 | "{.real}".format({1: 2, 3: 4})
+28 28 | "{}".format((i for i in range(2)))
+
+UP032_2.py:26:1: UP032 [*] Use f-string instead of `format` call
+   |
+26 | "{.real}".format(1 + 2)
+27 | "{.real}".format([1, 2])
+28 | "{.real}".format({1, 2})
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+29 | "{.real}".format({1: 2, 3: 4})
+30 | "{}".format((i for i in range(2)))
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+23 23 | 
+24 24 | "{.real}".format(1 + 2)
+25 25 | "{.real}".format([1, 2])
+26    |-"{.real}".format({1, 2})
+   26 |+f"{({1, 2}).real}"
+27 27 | "{.real}".format({1: 2, 3: 4})
+28 28 | "{}".format((i for i in range(2)))
+
+UP032_2.py:27:1: UP032 [*] Use f-string instead of `format` call
+   |
+27 | "{.real}".format([1, 2])
+28 | "{.real}".format({1, 2})
+29 | "{.real}".format({1: 2, 3: 4})
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+30 | "{}".format((i for i in range(2)))
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+24 24 | "{.real}".format(1 + 2)
+25 25 | "{.real}".format([1, 2])
+26 26 | "{.real}".format({1, 2})
+27    |-"{.real}".format({1: 2, 3: 4})
+   27 |+f"{({1: 2, 3: 4}).real}"
+28 28 | "{}".format((i for i in range(2)))
+
+UP032_2.py:28:1: UP032 [*] Use f-string instead of `format` call
+   |
+28 | "{.real}".format({1, 2})
+29 | "{.real}".format({1: 2, 3: 4})
+30 | "{}".format((i for i in range(2)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+   |
+   = help: Convert to f-string
+
+ℹ Suggested fix
+25 25 | "{.real}".format([1, 2])
+26 26 | "{.real}".format({1, 2})
+27 27 | "{.real}".format({1: 2, 3: 4})
+28    |-"{}".format((i for i in range(2)))
+   28 |+f"{(i for i in range(2))}"
 
 
