@@ -192,6 +192,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1508") => (RuleGroup::Unspecified, Rule::InvalidEnvvarDefault),
         (Pylint, "W2901") => (RuleGroup::Unspecified, Rule::RedefinedLoopName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, Rule::NestedMinMax),
+        (Pylint, "W0130") => (RuleGroup::Unspecified, Rule::DuplicateValue),
 
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Unspecified, Rule::BlockingHttpCallInAsyncFunction),
@@ -581,6 +582,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "010") => (RuleGroup::Unspecified, Rule::NonEmptyStubBody),
         (Flake8Pyi, "011") => (RuleGroup::Unspecified, Rule::TypedArgumentDefaultInStub),
         (Flake8Pyi, "012") => (RuleGroup::Unspecified, Rule::PassInClassBody),
+        (Flake8Pyi, "013") => (RuleGroup::Unspecified, Rule::EllipsisInNonEmptyClassBody),
         (Flake8Pyi, "014") => (RuleGroup::Unspecified, Rule::ArgumentDefaultInStub),
         (Flake8Pyi, "015") => (RuleGroup::Unspecified, Rule::AssignmentDefaultInStub),
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, Rule::DuplicateUnionMember),
