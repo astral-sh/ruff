@@ -19,6 +19,7 @@ import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
+from signal import SIGINT, SIGTERM
 from typing import TYPE_CHECKING, NamedTuple, Self
 
 if TYPE_CHECKING:
@@ -36,6 +37,8 @@ class Repository(NamedTuple):
     select: str = ""
     ignore: str = ""
     exclude: str = ""
+    # Generating fixes is slow and verbose
+    show_fixes: bool = False
 
     @asynccontextmanager
     async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
@@ -102,6 +105,7 @@ async def check(
     select: str = "",
     ignore: str = "",
     exclude: str = "",
+    show_fixes: bool = False,
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
     logger.debug(f"Checking {name} with {ruff}")
@@ -112,6 +116,8 @@ async def check(
         ruff_args.extend(["--ignore", ignore])
     if exclude:
         ruff_args.extend(["--exclude", exclude])
+    if show_fixes:
+        ruff_args.extend(["--show-fixes", "--ecosystem-ci"])
 
     start = time.time()
     proc = await create_subprocess_exec(
@@ -169,16 +175,16 @@ async def compare(
 
     # Allows to keep the checkouts locations
     if checkouts:
-        checkout_dir = checkouts.joinpath(repo.org).joinpath(repo.repo)
+        checkout_parent = checkouts.joinpath(repo.org)
         # Don't create the repodir itself, we need that for checking for existing
         # clones
-        checkout_dir.parent.mkdir(exist_ok=True, parents=True)
-        location_context = nullcontext(checkout_dir)
+        checkout_parent.mkdir(exist_ok=True, parents=True)
+        location_context = nullcontext(checkout_parent)
     else:
         location_context = tempfile.TemporaryDirectory()
 
-    with location_context as checkout_dir:
-        checkout_dir = Path(checkout_dir)
+    with location_context as checkout_parent:
+        checkout_dir = Path(checkout_parent).joinpath(repo.repo)
         async with repo.clone(checkout_dir) as path:
             try:
                 async with asyncio.TaskGroup() as tg:
@@ -190,6 +196,7 @@ async def compare(
                             select=repo.select,
                             ignore=repo.ignore,
                             exclude=repo.exclude,
+                            show_fixes=repo.show_fixes,
                         ),
                     )
                     check2 = tg.create_task(
@@ -200,6 +207,7 @@ async def compare(
                             select=repo.select,
                             ignore=repo.ignore,
                             exclude=repo.exclude,
+                            show_fixes=repo.show_fixes,
                         ),
                     )
             except ExceptionGroup as e:
@@ -237,6 +245,9 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
                     repository["owner"]["login"],
                     repository["name"],
                     None,
+                    select=repository.get("select"),
+                    ignore=repository.get("ignore"),
+                    exclude=repository.get("exclude"),
                 )
         else:
             assert "owner" in data, "Unknown ruff-usage-aggregate format"
@@ -247,6 +258,9 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
                 data["owner"],
                 data["repo"],
                 data.get("ref"),
+                select=data.get("select"),
+                ignore=data.get("ignore"),
+                exclude=data.get("exclude"),
             )
     return repositories
 
@@ -414,7 +428,8 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    asyncio.run(
+    loop = asyncio.get_event_loop()
+    main_task = asyncio.ensure_future(
         main(
             ruff1=args.ruff1,
             ruff2=args.ruff2,
@@ -422,3 +437,10 @@ if __name__ == "__main__":
             checkouts=args.checkouts,
         ),
     )
+    # https://stackoverflow.com/a/58840987/3549270
+    for signal in [SIGINT, SIGTERM]:
+        loop.add_signal_handler(signal, main_task.cancel)
+    try:
+        loop.run_until_complete(main_task)
+    finally:
+        loop.close()
