@@ -10,7 +10,7 @@ use ruff_python_ast::imports::{AnyImport, Import};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_semantic::model::SemanticModel;
 
-use crate::cst::matchers::{match_aliases, match_import_from, match_module};
+use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::importer::insertion::Insertion;
 
 mod insertion;
@@ -199,8 +199,8 @@ impl<'a> Importer<'a> {
 
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut tree = match_module(self.locator.slice(stmt.range()))?;
-        let import_from = match_import_from(&mut tree)?;
+        let mut statement = match_statement(self.locator.slice(stmt.range()))?;
+        let import_from = match_import_from(&mut statement)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {
             name: NameOrAttribute::N(Box::new(Name {
@@ -216,7 +216,7 @@ impl<'a> Importer<'a> {
             default_indent: self.stylist.indentation(),
             ..CodegenState::default()
         };
-        tree.codegen(&mut state);
+        statement.codegen(&mut state);
         Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
 }

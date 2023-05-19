@@ -14,7 +14,7 @@ use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 use crate::cst::helpers::compose_module_path;
-use crate::cst::matchers::match_module;
+use crate::cst::matchers::match_statement;
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -212,9 +212,9 @@ pub(crate) fn remove_unused_imports<'a>(
     stylist: &Stylist,
 ) -> Result<Edit> {
     let module_text = locator.slice(stmt.range());
-    let mut tree = match_module(module_text)?;
+    let mut tree = match_statement(module_text)?;
 
-    let Some(Statement::Simple(body)) = tree.body.first_mut() else {
+    let Statement::Simple(body) = &mut tree else {
         bail!("Expected Statement::Simple");
     };
 
