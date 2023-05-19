@@ -12,6 +12,42 @@ pub struct TooManyArguments {
     max_args: usize,
 }
 
+/// ## What it does
+/// Checks for functions with too many arguments.
+///
+/// By default, this rule allows up to 5 arguments. This can be configured
+/// using the `max-args` option.
+///
+/// ## Why is this bad?
+/// Functions with many arguments are harder to understand and maintain than
+/// functions with fewer arguments.
+///
+/// ## Example
+/// ```python
+/// def calculate_position(x_pos, y_pos, z_pos, x_vel, y_vel, z_vel, time):
+///     new_x = x_pos + x_vel * time
+///     new_y = y_pos + y_vel * time
+///     new_z = z_pos + z_vel * time
+///     return new_x, new_y, new_z
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import NamedTuple
+///
+///
+/// class Vector(NamedTuple):
+///     x: float
+///     y: float
+///     z: float
+///
+///
+/// def calculate_position(pos: Vector, vel: Vector, time: float) -> Vector:
+///     return Vector(*(p + v * time for p, v in zip(pos, vel)))
+/// ```
+///
+/// ## References
+/// - [Ruff configuration documentation](https://beta.ruff.rs/docs/settings/#max-args)
 impl Violation for TooManyArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
