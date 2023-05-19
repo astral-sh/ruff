@@ -1,5 +1,5 @@
 use rustpython_parser::ast;
-use rustpython_parser::ast::{Ranged, Stmt};
+use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -25,16 +25,19 @@ pub(crate) fn bad_marshal_use(checker: &mut Checker, stmt: &Stmt) {
                 if &name.name == "marshal" {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadMarshalUse, stmt.range()));
+                        .push(Diagnostic::new(BadMarshalUse, name.range));
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { module, .. }, ..) => {
+        Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }, ..) => {
             if let Some(id) = module {
                 if id == "marshal" {
-                    checker
+                    for name in names {
+                        checker
                         .diagnostics
-                        .push(Diagnostic::new(BadMarshalUse, stmt.range()));
+                        .push(Diagnostic::new(BadMarshalUse, name.range));
+                    }
+
                 }
             }
         }

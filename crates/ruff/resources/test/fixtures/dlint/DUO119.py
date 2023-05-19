@@ -1,7 +1,7 @@
 import shelve
 
 
-from shelve import open
+from shelve import open, Shelf
 
 
 # None shelve imports and funcs called shelve from other modules should not flag the rule:
