@@ -7,6 +7,23 @@ use ruff_python_ast::comparable::ComparableExpr;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for set literals that contain duplicate values.
+///
+/// ## Why is this bad?
+/// In Python, sets are unordered collections of unique elements. Including a
+/// duplicate value in a set literal is redundant, and may be indicative of a
+/// mistake.
+///
+/// ## Example
+/// ```python
+/// {1, 2, 3, 1}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// {1, 2, 3}
+/// ```
 #[violation]
 pub struct DuplicateValue {
     value: String,

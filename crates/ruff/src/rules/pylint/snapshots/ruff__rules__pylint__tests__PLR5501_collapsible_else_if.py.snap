@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-collapsible_else_if.py:38:9: PLR5501 Consider using `elif` instead of `else` then `if` to remove one indentation level
+collapsible_else_if.py:38:9: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
    |
 38 |           pass
 39 |       else:
@@ -11,7 +11,7 @@ collapsible_else_if.py:38:9: PLR5501 Consider using `elif` instead of `else` the
    | |________________^ PLR5501
    |
 
-collapsible_else_if.py:46:9: PLR5501 Consider using `elif` instead of `else` then `if` to remove one indentation level
+collapsible_else_if.py:46:9: PLR5501 Use `elif` instead of `else` then `if`, to reduce indentation
    |
 46 |           pass
 47 |       else:
