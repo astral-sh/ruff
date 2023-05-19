@@ -3360,6 +3360,13 @@ where
                 if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::ExplicitFStringTypeConversion)
+                {
+                    ruff::rules::explicit_f_string_type_conversion(self, expr, values);
+                }
             }
             Expr::BinOp(ast::ExprBinOp {
                 left,
@@ -3857,17 +3864,6 @@ where
                 }
                 if self.settings.rules.enabled(Rule::ExprAndFalse) {
                     flake8_simplify::rules::expr_and_false(self, expr);
-                }
-            }
-            Expr::FormattedValue(ast::ExprFormattedValue {
-                value, conversion, ..
-            }) => {
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::ExplicitFStringTypeConversion)
-                {
-                    ruff::rules::explicit_f_string_type_conversion(self, value, *conversion);
                 }
             }
             _ => {}
