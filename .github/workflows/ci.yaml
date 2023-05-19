@@ -183,18 +183,8 @@ jobs:
       - name: "Install cargo-udeps"
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
-        run: |
-          unused_dependencies=$(cargo +nightly-2023-03-30 udeps > unused.txt && cat unused.txt | cut -d $'\n' -f 2-)
-          if [ -z "$unused_dependencies" ]; then
-            echo "No unused dependencies found" > $GITHUB_STEP_SUMMARY
-            exit 0
-          else
-            echo "Found unused dependencies" > $GITHUB_STEP_SUMMARY
-            echo '```console' >> $GITHUB_STEP_SUMMARY
-            echo "$unused_dependencies" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
+        run: cargo +nightly-2023-03-30 udeps
+
 
   python-package:
     name: "python package"
