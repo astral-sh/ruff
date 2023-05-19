@@ -3311,8 +3311,8 @@ where
                 }
             }
             Expr::Set(ast::ExprSet { elts, range: _ }) => {
-                if self.settings.rules.enabled(Rule::DuplicateValues) {
-                    pylint::rules::duplicate_values(self, elts);
+                if self.settings.rules.enabled(Rule::DuplicateValue) {
+                    pylint::rules::duplicate_value(self, elts);
                 }
             }
             Expr::Yield(_) => {

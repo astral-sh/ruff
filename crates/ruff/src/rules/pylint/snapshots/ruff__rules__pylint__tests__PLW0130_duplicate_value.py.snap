@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-duplicate_values.py:4:35: PLW0130 Duplicate value `"value1"` in set.
+duplicate_value.py:4:35: PLW0130 Duplicate value `"value1"` in set
   |
 4 | # Errors.
 5 | ###
@@ -10,7 +10,7 @@ duplicate_values.py:4:35: PLW0130 Duplicate value `"value1"` in set.
 7 | incorrect_set = {1, 1}
   |
 
-duplicate_values.py:5:21: PLW0130 Duplicate value `1` in set.
+duplicate_value.py:5:21: PLW0130 Duplicate value `1` in set
   |
 5 | ###
 6 | incorrect_set = {"value1", 23, 5, "value1"}
