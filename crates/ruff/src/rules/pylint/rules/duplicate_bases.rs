@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 /// Checks for duplicate base classes in class definitions.
 ///
 /// ## Why is this bad?
-/// Duplicate base classes raise `TypeError` at runtime.
+/// Including duplicate base classes will raise a `TypeError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -20,7 +20,7 @@ use crate::checkers::ast::Checker;
 ///     pass
 ///
 ///
-/// class Bar(Foo, Foo):  # TypeError: duplicate base class Foo
+/// class Bar(Foo, Foo):
 ///     pass
 /// ```
 ///

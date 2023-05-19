@@ -7,12 +7,13 @@ use ruff_python_ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for properties with parameters.
+/// Checks for property definitions that accept function parameters.
 ///
 /// ## Why is this bad?
-/// Properties cannot be called with parameters. If you need to pass parameters
-/// to a property, create a method with the desired parameters and call that
-/// method instead.
+/// Properties cannot be called with parameters.
+///
+/// If you need to pass parameters to a property, create a method with the
+/// desired parameters and call that method instead.
 ///
 /// ## Example
 /// ```python

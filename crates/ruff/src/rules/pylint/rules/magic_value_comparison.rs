@@ -8,30 +8,28 @@ use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
 
 /// ## What it does
-/// Checks for magic values (unnamed numerical constants) in comparisons.
+/// Checks for the use of unnamed numerical constants ("magic") values in
+/// comparisons.
 ///
 /// ## Why is this bad?
-/// Magic values are harder to understand and maintain than named constants.
+/// The use of "magic" can make code harder to read and maintain, as readers
+/// will have to infer the meaning of the value from the context.
+///
+/// For convenience, this rule excludes a variety of common values from the
+/// "magic" value definition, such as `0`, `1`, `""`, and `"__main__"`.
 ///
 /// ## Example
 /// ```python
-/// def check_age(age):
-///     if age >= 18:
-///         print("You are old enough!")
-///     else:
-///         print("You are not old enough.")
+/// def calculate_discount(price: float) -> float:
+///     return price * (1 - 0.2)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// AGE_LIMIT = 18
+/// DISCOUNT_RATE = 0.2
 ///
-///
-/// def check_age(age):
-///     if age >= AGE_LIMIT:
-///         print("You are old enough!")
-///     else:
-///         print("You are not old enough.")
+/// def calculate_discount(price: float) -> float:
+///     return price * (1 - DISCOUNT_RATE)
 /// ```
 ///
 /// ## References

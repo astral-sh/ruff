@@ -8,39 +8,44 @@ use ruff_python_ast::source_code::Locator;
 /// ## What it does
 /// Checks for functions or methods with too many statements.
 ///
-/// By default, this rule allows up to 50 statements. This can be configured
-/// using the `max-statements` option.
+/// By default, this rule allows up to 50 statements, as configured by the
+/// `pylint.max-statements` option.
 ///
 /// ## Why is this bad?
 /// Functions or methods with many statements are harder to understand
-/// and maintain than functions or methods with fewer statements.
+/// and maintain.
 ///
 /// Instead, consider refactoring the function or method into smaller
-/// functions or methods.
+/// functions or methods, or identifying generalizable patterns and
+/// replacing them with generic logic or abstractions.
 ///
 /// ## Example
 /// ```python
-/// def is_even(number):
+/// def is_even(number: int) -> bool:
 ///     if number == 0:
 ///         return True
 ///     elif number == 1:
 ///         return False
 ///     elif number == 2:
 ///         return True
-///     # and so on for many more lines ...
+///     elif number == 3:
+///        return False
+///     elif number == 4:
+///        return True
+///     elif number == 5:
+///        return False
 ///     else:
-///         msg = "I don't know about this number"
-///         raise ValueError(msg)
+///         ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def is_even(number):
+/// def is_even(number: int) -> bool:
 ///     return number % 2 == 0
 /// ```
 ///
-/// ## References
-/// - [Ruff configuration documentation](https://beta.ruff.rs/docs/settings/#max-statements)
+/// ## Options
+/// - `pylint.max-statements`
 #[violation]
 pub struct TooManyStatements {
     statements: usize,

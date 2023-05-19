@@ -7,14 +7,15 @@ use ruff_python_ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for functions with too many arguments.
+/// Checks for function definitions that include too many arguments.
 ///
-/// By default, this rule allows up to 5 arguments. This can be configured
-/// using the `max-args` option.
+/// By default, this rule allows up to five arguments, as configured by the
+/// `pylint.max-args` option.
 ///
 /// ## Why is this bad?
-/// Functions with many arguments are harder to understand and maintain than
-/// functions with fewer arguments.
+/// Functions with many arguments are harder to understand, maintain, and call.
+/// Consider refactoring functions with many arguments into smaller functions
+/// with fewer arguments, or using objects to group related arguments.
 ///
 /// ## Example
 /// ```python
@@ -40,8 +41,8 @@ use crate::checkers::ast::Checker;
 ///     return Vector(*(p + v * time for p, v in zip(pos, vel)))
 /// ```
 ///
-/// ## References
-/// - [Ruff configuration documentation](https://beta.ruff.rs/docs/settings/#max-args)
+/// ## Options
+/// - `pylint.max-args`
 #[violation]
 pub struct TooManyArguments {
     c_args: usize,

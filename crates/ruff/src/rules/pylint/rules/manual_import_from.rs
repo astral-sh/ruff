@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for imports of submodules aliased to the submodule name.
+/// Checks for submodule imports that are aliased to the submodule name.
 ///
 /// ## Why is this bad?
 /// Using the `from` keyword to import the submodule is more concise and

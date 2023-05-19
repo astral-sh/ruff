@@ -58,11 +58,12 @@ impl fmt::Display for ViolationsCmpop {
 }
 
 /// ## What it does
-/// Checks for comparisons of two constants.
+/// Checks for comparisons between constants.
 ///
 /// ## Why is this bad?
-/// The result of the comparison will always be the same, so replacing the
-/// comparison with a constant is faster and will make the code more readable.
+/// Comparing two constants will always resolve to the same value, so the
+/// comparison is redundant. Instead, the expression should be replaced
+/// with the result of the comparison.
 ///
 /// ## Example
 /// ```python

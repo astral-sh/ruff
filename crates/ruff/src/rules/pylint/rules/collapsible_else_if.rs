@@ -5,34 +5,33 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
-/// Checks for `else` blocks that contain an `if` block that can be collapsed
-/// into an `elif` block.
+/// Checks for `else` blocks that consist of a single `if` statement.
 ///
 /// ## Why is this bad?
-/// The `else` block can be collapsed into the `if` block, reducing the
-/// indentation level by one.
+/// If an `else` block contains a single `if` statement, it can be collapsed
+/// into an `elif`, thus reducing the indentation level.
 ///
 /// ## Example
 /// ```python
-/// def check_age(age):
-///     if age >= 18:
-///         print("You are old enough!")
+/// def check_sign(value: int) -> None:
+///     if value > 0:
+///         print("Number is positive.")
 ///     else:
-///         if age == 17:
-///             print("You are seventeen, almost there!")
+///         if value < 0:
+///             print("Number is negative.")
 ///         else:
-///             print("You are not old enough.")
+///             print("Number is zero.")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def check_age(age):
-///     if age >= 18:
-///         print("You are old enough!")
-///     elif age == 17:
-///         print("You are seventeen, almost there!")
+/// def check_sign(value: int) -> None:
+///     if value > 0:
+///         print("Number is positive.")
+///     elif value < 0:
+///         print("Number is negative.")
 ///     else:
-///         print("You are not old enough.")
+///         print("Number is zero.")
 /// ```
 ///
 /// ## References
@@ -43,7 +42,7 @@ pub struct CollapsibleElseIf;
 impl Violation for CollapsibleElseIf {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Consider using `elif` instead of `else` then `if` to remove one indentation level")
+        format!("Use `elif` instead of `else` then `if`, to reduce indentation")
     }
 }
 

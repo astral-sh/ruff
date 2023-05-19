@@ -8,16 +8,21 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for uses of `exit()` or `quit()`.
+/// Checks for uses of the `exit()` and `quit()`.
 ///
 /// ## Why is this bad?
-/// Use `sys.exit()` instead, as the `sys` module is guaranteed to exist whereas the
-/// the site module is not.
+/// `exit` and `quit` come from the `site` module, which is typically imported
+/// automatically during startup. However, it is not _guaranteed_ to be
+/// imported, and so using these functions may result in a `NameError` at
+/// runtime. Generally, these constants are intended to be used in an interactive
+/// interpreter, and not in programs.
+///
+/// Prefer `sys.exit()`, as the `sys` module is guaranteed to exist in all
+/// contexts.
 ///
 /// ## Example
 /// ```python
 /// if __name__ == "__main__":
-///     ...
 ///     exit()
 /// ```
 ///
@@ -26,12 +31,11 @@ use crate::registry::AsRule;
 /// import sys
 ///
 /// if __name__ == "__main__":
-///     ...
 ///     sys.exit()
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/sys.html#sys.exit)
+/// - [Python documentation](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
 #[violation]
 pub struct SysExitAlias {
     name: String,

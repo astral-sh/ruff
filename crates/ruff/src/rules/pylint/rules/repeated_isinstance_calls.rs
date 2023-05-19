@@ -9,11 +9,11 @@ use ruff_python_ast::hashable::HashableExpr;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for repeated `isinstance` calls with the same object.
+/// Checks for repeated `isinstance` calls on the same object.
 ///
 /// ## Why is this bad?
-/// Repeated `isinstance` calls with the same object can be merged into one
-/// call.
+/// Repeated `isinstance` calls on the same object can be merged into a
+/// single call.
 ///
 /// ## Example
 /// ```python
@@ -24,14 +24,14 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// def is_number(x):
-///     return isinstance(x, int | float | complex)
+///     return isinstance(x, (int, float, complex))
 /// ```
 ///
-/// Or, if using Python < 3.10:
+/// Or, for Python 3.10 and later:
 ///
 /// ```python
 /// def is_number(x):
-///     return isinstance(x, (int, float, complex))
+///     return isinstance(x, int | float | complex)
 /// ```
 ///
 /// ## References
