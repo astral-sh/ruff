@@ -542,6 +542,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
     rules::flake8_pyi::rules::PassInClassBody,
+    rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
     rules::flake8_pyi::rules::DuplicateUnionMember,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
