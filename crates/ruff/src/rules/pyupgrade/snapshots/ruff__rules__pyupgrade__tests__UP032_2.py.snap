@@ -1,0 +1,55 @@
+---
+source: crates/ruff/src/rules/pyupgrade/mod.rs
+---
+UP032_2.py:1:1: UP032 [*] Use f-string instead of `format` call
+  |
+1 | "{.real}".format(1)
+  | ^^^^^^^^^^^^^^^^^^^ UP032
+2 | 
+3 | "{0.real}".format(1)
+  |
+  = help: Convert to f-string
+
+ℹ Suggested fix
+1   |-"{.real}".format(1)
+  1 |+f"{(1).real}"
+2 2 | 
+3 3 | "{0.real}".format(1)
+4 4 | 
+
+UP032_2.py:3:1: UP032 [*] Use f-string instead of `format` call
+  |
+3 | "{.real}".format(1)
+4 | 
+5 | "{0.real}".format(1)
+  | ^^^^^^^^^^^^^^^^^^^^ UP032
+6 | 
+7 | "{a.real}".format(a=1)
+  |
+  = help: Convert to f-string
+
+ℹ Suggested fix
+1 1 | "{.real}".format(1)
+2 2 | 
+3   |-"{0.real}".format(1)
+  3 |+f"{(1).real}"
+4 4 | 
+5 5 | "{a.real}".format(a=1)
+
+UP032_2.py:5:1: UP032 [*] Use f-string instead of `format` call
+  |
+5 | "{0.real}".format(1)
+6 | 
+7 | "{a.real}".format(a=1)
+  | ^^^^^^^^^^^^^^^^^^^^^^ UP032
+  |
+  = help: Convert to f-string
+
+ℹ Suggested fix
+2 2 | 
+3 3 | "{0.real}".format(1)
+4 4 | 
+5   |-"{a.real}".format(a=1)
+  5 |+f"{(1).real}"
+
+
