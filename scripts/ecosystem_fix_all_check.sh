@@ -21,6 +21,6 @@ time docker run --rm -it \
   python:3.11 ./ecosystem_fix_all_check_entrypoint.sh
 
 # grep the autofix errors
-grep -R "the rule codes" "${SCRIPT_DIR}/../target/ecosystem_fix_all_results" > "${SCRIPT_DIR}/../target/autofix-errors.txt"
+grep -R "the rule codes" "${SCRIPT_DIR}/../target/ecosystem_fix_all_results" | sort > "${SCRIPT_DIR}/../target/autofix-errors.txt"
 # Make sure we didn't have an early exit
 echo "Done"
