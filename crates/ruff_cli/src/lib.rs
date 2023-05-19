@@ -123,8 +123,13 @@ quoting the executed command, along with the relevant file contents and `pyproje
 }
 
 fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
-    #[cfg(feature = "ecosystem_ci")]
     let ecosystem_ci = args.ecosystem_ci;
+    if ecosystem_ci {
+        warn_user_once!(
+            "The formatting of fixes emitted by this option is a work-in-progress, subject to \
+            change at any time, and intended for use with the ecosystem ci scripts only."
+        );
+    }
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -211,14 +216,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(
-        format,
-        log_level,
-        autofix,
-        printer_flags,
-        #[cfg(feature = "ecosystem_ci")]
-        ecosystem_ci,
-    );
+    let printer = Printer::new(format, log_level, autofix, printer_flags, ecosystem_ci);
 
     if cli.watch {
         if format != SerializationFormat::Text {
