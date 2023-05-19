@@ -742,6 +742,13 @@ where
                     if self.settings.rules.enabled(Rule::PassInClassBody) {
                         flake8_pyi::rules::pass_in_class_body(self, stmt, body);
                     }
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::EllipsisInNonEmptyClassBody)
+                    {
+                        flake8_pyi::rules::ellipsis_in_non_empty_class_body(self, stmt, body);
+                    }
                 }
 
                 if self
@@ -1887,6 +1894,9 @@ where
                 }
                 if self.settings.rules.enabled(Rule::InvalidMockAccess) {
                     pygrep_hooks::rules::uncalled_mock_method(self, value);
+                }
+                if self.settings.rules.enabled(Rule::NamedExprWithoutContext) {
+                    pylint::rules::named_expr_without_context(self, value);
                 }
                 if self.settings.rules.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
@@ -3308,6 +3318,11 @@ where
 
                 if self.settings.rules.enabled(Rule::UnnecessarySpread) {
                     flake8_pie::rules::unnecessary_spread(self, keys, values);
+                }
+            }
+            Expr::Set(ast::ExprSet { elts, range: _ }) => {
+                if self.settings.rules.enabled(Rule::DuplicateValue) {
+                    pylint::rules::duplicate_value(self, elts);
                 }
             }
             Expr::Yield(_) => {

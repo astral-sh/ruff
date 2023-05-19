@@ -159,7 +159,9 @@ ruff_macros::register_rules!(
     rules::pylint::rules::LoggingTooManyArgs,
     rules::pylint::rules::UnexpectedSpecialMethodSignature,
     rules::pylint::rules::NestedMinMax,
+    rules::pylint::rules::DuplicateValue,
     rules::pylint::rules::DuplicateBases,
+    rules::pylint::rules::NamedExprWithoutContext,
     // flake8-async
     rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
     rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
@@ -511,6 +513,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
     rules::flake8_pyi::rules::DuplicateUnionMember,
+    rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
     rules::flake8_pyi::rules::NonEmptyStubBody,
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::PassStatementStubBody,

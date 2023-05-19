@@ -86,6 +86,19 @@
         "type": "string"
       }
     },
+    "extend-per-file-ignores": {
+      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/RuleSelector"
+        }
+      }
+    },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
@@ -2063,6 +2076,9 @@
         "PLW012",
         "PLW0120",
         "PLW0129",
+        "PLW013",
+        "PLW0130",
+        "PLW0131",
         "PLW04",
         "PLW040",
         "PLW0406",
@@ -2157,6 +2173,7 @@
         "PYI010",
         "PYI011",
         "PYI012",
+        "PYI013",
         "PYI014",
         "PYI015",
         "PYI016",
