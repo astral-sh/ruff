@@ -318,16 +318,15 @@ pub(crate) fn shell_injection(
         .settings
         .rules
         .enabled(Rule::UnixCommandWildcardInjection)
-        && !args.is_empty()
         && (matches!(call_kind, Some(CallKind::Shell)) || subprocess_with_shell)
     {
         if let Some(cmd) = args.first() {
             let cmd_string = match cmd {
                 Expr::List(ast::ExprList { elts, .. }) => elts
                     .iter()
-                    .map(|elt| string_literal(elt).unwrap_or(""))
+                    .map(|elt| string_literal(elt).unwrap_or_default())
                     .join(" "),
-                _ => String::from(string_literal(cmd).unwrap_or("")),
+                _ => String::from(string_literal(cmd).unwrap_or_default()),
             };
             if WILDCARD_COMMAND_REGEX.is_match(cmd_string.as_str()) {
                 checker
