@@ -176,6 +176,24 @@ pub struct Options {
     /// specified by `select`.
     pub extend_select: Option<Vec<RuleSelector>>,
     #[option(
+        default = r#"[]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Enable autofix for flake8-bugbear (`B`), on top of any rules specified by `fixable`.
+            extend-fixable = ["B"]
+        "#
+    )]
+    /// A list of rule codes or prefixes to consider autofixable, in addition to those
+    /// specified by `fixable`.
+    pub extend_fixable: Option<Vec<RuleSelector>>,
+    /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
+    /// specified by `unfixable`.
+    ///
+    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
+    /// interchangeable with `unfixable`.
+    #[schemars(skip)]
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    #[option(
         default = "[]",
         value_type = "list[str]",
         example = r#"
