@@ -853,4 +853,24 @@ def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    #[test]
+    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    fn decorator_ranges() {
+        let parse_ast = parse_program(
+            r#"
+@my_decorator
+def test():
+    pass
+    
+@class_decorator
+class Abcd:
+    pass
+"#
+            .trim(),
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }
