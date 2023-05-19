@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
-use ruff_python_ast::helpers::{resolve_imported_module_path, unparse_stmt};
-use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::helpers::resolve_imported_module_path;
+use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
@@ -90,7 +90,7 @@ fn fix_banned_relative_import(
     level: Option<u32>,
     module: Option<&str>,
     module_path: Option<&[String]>,
-    stylist: &Stylist,
+    generator: Generator,
 ) -> Option<Fix> {
     // Only fix is the module path is known.
     let Some(module_path) = resolve_imported_module_path(level, module, module_path) else {
@@ -112,7 +112,7 @@ fn fix_banned_relative_import(
         level: Some(Int::new(0)),
         range: TextRange::default(),
     };
-    let content = unparse_stmt(&node.into(), stylist);
+    let content = generator.stmt(&node.into());
     #[allow(deprecated)]
     Some(Fix::unspecified(Edit::range_replacement(
         content,
@@ -121,28 +121,23 @@ fn fix_banned_relative_import(
 }
 
 /// TID252
-pub fn banned_relative_import(
+pub(crate) fn banned_relative_import(
     checker: &Checker,
     stmt: &Stmt,
     level: Option<u32>,
     module: Option<&str>,
     module_path: Option<&[String]>,
-    strictness: &Strictness,
+    strictness: Strictness,
 ) -> Option<Diagnostic> {
     let strictness_level = match strictness {
         Strictness::All => 0,
         Strictness::Parents => 1,
     };
     if level? > strictness_level {
-        let mut diagnostic = Diagnostic::new(
-            RelativeImports {
-                strictness: *strictness,
-            },
-            stmt.range(),
-        );
+        let mut diagnostic = Diagnostic::new(RelativeImports { strictness }, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =
-                fix_banned_relative_import(stmt, level, module, module_path, checker.stylist)
+                fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
             {
                 diagnostic.set_fix(fix);
             };

@@ -13,7 +13,8 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
+use ruff_python_ast::str::trailing_quote;
 use ruff_python_ast::types::{Node, RefEquality};
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
@@ -56,7 +57,7 @@ use crate::{autofix, docstrings, noqa, warn_user};
 
 mod deferred;
 
-pub struct Checker<'a> {
+pub(crate) struct Checker<'a> {
     // Settings, static metadata, etc.
     path: &'a Path,
     module_path: Option<&'a [String]>,
@@ -64,23 +65,23 @@ pub struct Checker<'a> {
     is_stub: bool,
     noqa: flags::Noqa,
     noqa_line_for: &'a NoqaMapping,
-    pub settings: &'a Settings,
-    pub locator: &'a Locator<'a>,
-    pub stylist: &'a Stylist<'a>,
-    pub indexer: &'a Indexer,
-    pub importer: Importer<'a>,
+    pub(crate) settings: &'a Settings,
+    pub(crate) locator: &'a Locator<'a>,
+    pub(crate) stylist: &'a Stylist<'a>,
+    pub(crate) indexer: &'a Indexer,
+    pub(crate) importer: Importer<'a>,
     // Stateful fields.
-    pub ctx: Context<'a>,
-    pub diagnostics: Vec<Diagnostic>,
-    pub deletions: FxHashSet<RefEquality<'a, Stmt>>,
+    pub(crate) ctx: Context<'a>,
+    pub(crate) diagnostics: Vec<Diagnostic>,
+    pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
     deferred: Deferred<'a>,
     // Check-specific state.
-    pub flake8_bugbear_seen: Vec<&'a Expr>,
+    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
 
 impl<'a> Checker<'a> {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         settings: &'a Settings,
         noqa_line_for: &'a NoqaMapping,
         noqa: flags::Noqa,
@@ -116,12 +117,12 @@ impl<'a> Checker<'a> {
 impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
-    pub fn patch(&self, code: Rule) -> bool {
+    pub(crate) fn patch(&self, code: Rule) -> bool {
         self.settings.rules.should_fix(code)
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
-    pub fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
+    pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
@@ -133,6 +134,33 @@ impl<'a> Checker<'a> {
             return false;
         }
         noqa::rule_is_ignored(code, offset, self.noqa_line_for, self.locator)
+    }
+
+    /// Create a [`Generator`] to generate source code based on the current AST state.
+    pub(crate) fn generator(&self) -> Generator {
+        fn quote_style(context: &Context, locator: &Locator, indexer: &Indexer) -> Option<Quote> {
+            if !context.in_f_string() {
+                return None;
+            }
+
+            // Find the quote character used to start the containing f-string.
+            let expr = context.expr()?;
+            let string_range = indexer.f_string_range(expr.start())?;
+            let trailing_quote = trailing_quote(locator.slice(string_range))?;
+
+            // Invert the quote character, if it's a single quote.
+            match *trailing_quote {
+                "'" => Some(Quote::Double),
+                "\"" => Some(Quote::Single),
+                _ => None,
+            }
+        }
+
+        Generator::new(
+            self.stylist.indentation(),
+            quote_style(&self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
+            self.stylist.line_ending(),
+        )
     }
 }
 
@@ -1232,7 +1260,7 @@ where
                                 level,
                                 module,
                                 self.module_path,
-                                &self.settings.flake8_tidy_imports.ban_relative_imports,
+                                self.settings.flake8_tidy_imports.ban_relative_imports,
                             )
                         {
                             self.diagnostics.push(diagnostic);
@@ -1705,6 +1733,9 @@ where
                 }
                 if self.settings.rules.enabled(Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body, handlers);
+                }
+                if self.settings.rules.enabled(Rule::UselessTryExcept) {
+                    tryceratops::rules::useless_try_except(self, handlers);
                 }
                 if self.settings.rules.enabled(Rule::ErrorInsteadOfException) {
                     tryceratops::rules::error_instead_of_exception(self, handlers);
@@ -2356,6 +2387,8 @@ where
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, expr);
                 }
+
+                pandas_vet::rules::subscript(self, value, expr);
             }
             Expr::Tuple(ast::ExprTuple {
                 elts,
@@ -2529,7 +2562,7 @@ where
                 if self.settings.rules.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
                 }
-                pandas_vet::rules::check_attr(self, attr, value, expr);
+                pandas_vet::rules::attr(self, attr, value, expr);
             }
             Expr::Call(ast::ExprCall {
                 func,
@@ -2820,6 +2853,9 @@ where
                 if self.settings.rules.enabled(Rule::RequestWithoutTimeout) {
                     flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
                 }
+                if self.settings.rules.enabled(Rule::ParamikoCall) {
+                    flake8_bandit::rules::paramiko_call(self, func);
+                }
                 if self
                     .settings
                     .rules
@@ -3013,7 +3049,7 @@ where
                             .into_iter(),
                     );
                 }
-                pandas_vet::rules::check_call(self, func);
+                pandas_vet::rules::call(self, func);
 
                 if self.settings.rules.enabled(Rule::PandasUseOfPdMerge) {
                     if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
@@ -3279,6 +3315,11 @@ where
 
                 if self.settings.rules.enabled(Rule::UnnecessarySpread) {
                     flake8_pie::rules::unnecessary_spread(self, keys, values);
+                }
+            }
+            Expr::Set(ast::ExprSet { elts, range: _ }) => {
+                if self.settings.rules.enabled(Rule::DuplicateValue) {
+                    pylint::rules::duplicate_value(self, elts);
                 }
             }
             Expr::Yield(_) => {
@@ -3733,7 +3774,15 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -3749,13 +3798,33 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
-            Expr::GeneratorExp(_) => {
+            Expr::GeneratorExp(ast::ExprGeneratorExp {
+                generators,
+                elt: _,
+                range: _,
+            }) => {
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(ScopeKind::Generator);
+                if self.settings.rules.enabled(Rule::InDictKeys) {
+                    for generator in generators {
+                        flake8_simplify::rules::key_in_dict_for(
+                            self,
+                            &generator.target,
+                            &generator.iter,
+                        );
+                    }
+                }
             }
             Expr::BoolOp(ast::ExprBoolOp {
                 op,
@@ -3803,6 +3872,34 @@ where
 
         // Recurse.
         match expr {
+            Expr::ListComp(ast::ExprListComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::SetComp(ast::ExprSetComp {
+                elt,
+                generators,
+                range: _,
+            })
+            | Expr::GeneratorExp(ast::ExprGeneratorExp {
+                elt,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(elt);
+            }
+            Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                range: _,
+            }) => {
+                self.visit_generators(generators);
+                self.visit_expr(key);
+                self.visit_expr(value);
+            }
             Expr::Lambda(_) => {
                 self.deferred.lambdas.push((expr, self.ctx.snapshot()));
             }
@@ -4081,24 +4178,9 @@ where
         self.ctx.pop_expr();
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
-        if self.settings.rules.enabled(Rule::InDictKeys) {
-            flake8_simplify::rules::key_in_dict_for(
-                self,
-                &comprehension.target,
-                &comprehension.iter,
-            );
-        }
-        self.visit_expr(&comprehension.iter);
-        self.visit_expr(&comprehension.target);
-        for expr in &comprehension.ifs {
-            self.visit_boolean_test(expr);
-        }
-    }
-
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
         match excepthandler {
-            ast::Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+            Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
                 type_,
                 name,
                 body,
@@ -4400,6 +4482,58 @@ impl<'a> Checker<'a> {
         docstring.is_some()
     }
 
+    /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
+    /// generator expression, like a list or set comprehension.
+    fn visit_generators(&mut self, generators: &'a [Comprehension]) {
+        let mut generators = generators.iter();
+
+        let Some(generator) = generators.next() else {
+            unreachable!("Generator expression must contain at least one generator");
+        };
+
+        // Generators are compiled as nested functions. (This may change with PEP 709.)
+        // As such, the `iter` of the first generator is evaluated in the outer scope, while all
+        // subsequent nodes are evaluated in the inner scope.
+        //
+        // For example, given:
+        // ```py
+        // class A:
+        //     T = range(10)
+        //
+        //     L = [x for x in T for y in T]
+        // ```
+        //
+        // Conceptually, this is compiled as:
+        // ```py
+        // class A:
+        //     T = range(10)
+        //
+        //     def foo(x=T):
+        //         def bar(y=T):
+        //             pass
+        //         return bar()
+        //     foo()
+        // ```
+        //
+        // Following Python's scoping rules, the `T` in `x=T` is thus evaluated in the outer scope,
+        // while all subsequent reads and writes are evaluated in the inner scope. In particular,
+        // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
+        self.visit_expr(&generator.iter);
+        self.ctx.push_scope(ScopeKind::Generator);
+        self.visit_expr(&generator.target);
+        for expr in &generator.ifs {
+            self.visit_boolean_test(expr);
+        }
+
+        for generator in generators {
+            self.visit_expr(&generator.iter);
+            self.visit_expr(&generator.target);
+            for expr in &generator.ifs {
+                self.visit_boolean_test(expr);
+            }
+        }
+    }
+
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
         let snapshot = self.ctx.flags;
@@ -4409,7 +4543,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
-    pub fn visit_type_definition(&mut self, expr: &'a Expr) {
+    pub(crate) fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.ctx.flags;
         self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -4417,7 +4551,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
-    pub fn visit_non_type_definition(&mut self, expr: &'a Expr) {
+    pub(crate) fn visit_non_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.ctx.flags;
         self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -4427,7 +4561,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
-    pub fn visit_boolean_test(&mut self, expr: &'a Expr) {
+    pub(crate) fn visit_boolean_test(&mut self, expr: &'a Expr) {
         let snapshot = self.ctx.flags;
         self.ctx.flags |= ContextFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
@@ -4616,14 +4750,13 @@ impl<'a> Checker<'a> {
         let id = id.as_str();
 
         let mut first_iter = true;
-        let mut in_generator = false;
         let mut import_starred = false;
 
         for scope in self.ctx.scopes.ancestors(self.ctx.scope_id) {
             if scope.kind.is_class() {
                 if id == "__class__" {
                     return;
-                } else if !first_iter && !in_generator {
+                } else if !first_iter {
                     continue;
                 }
             }
@@ -4691,7 +4824,6 @@ impl<'a> Checker<'a> {
             }
 
             first_iter = false;
-            in_generator = matches!(scope.kind, ScopeKind::Generator);
             import_starred = import_starred || scope.uses_star_imports();
         }
 

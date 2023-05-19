@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments, unparse_expr};
+use ruff_python_ast::helpers::has_comments;
 use ruff_python_semantic::context::Context;
 
 use crate::{checkers::ast::Checker, registry::AsRule};
@@ -14,6 +14,30 @@ pub(crate) enum MinMax {
     Max,
 }
 
+/// ## What it does
+/// Checks for nested `min` and `max` calls.
+///
+/// ## Why is this bad?
+/// Nested `min` and `max` calls can be flattened into a single call to improve
+/// readability.
+///
+/// ## Example
+/// ```python
+/// minimum = min(1, 2, min(3, 4, 5))
+/// maximum = max(1, 2, max(3, 4, 5))
+/// diff = maximum - minimum
+/// ```
+///
+/// Use instead:
+/// ```python
+/// minimum = min(1, 2, 3, 4, 5)
+/// maximum = max(1, 2, 3, 4, 5)
+/// diff = maximum - minimum
+/// ```
+///
+/// ## References
+/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
+/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[violation]
 pub struct NestedMinMax {
     func: MinMax,
@@ -125,7 +149,7 @@ pub(crate) fn nested_min_max(
             });
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&flattened_expr, checker.stylist),
+                checker.generator().expr(&flattened_expr),
                 expr.range(),
             )));
         }

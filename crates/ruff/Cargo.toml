@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.267"
+version = "0.0.269"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -81,6 +81,5 @@ colored = { workspace = true, features = ["no-color"] }
 [features]
 default = []
 schemars = ["dep:schemars"]
-logical_lines = []
 jupyter_notebook = []
 ecosystem_ci = []

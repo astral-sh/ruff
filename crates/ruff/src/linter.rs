@@ -88,7 +88,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(&tokens, locator));
+        doc_lines.extend(doc_lines_from_tokens(&tokens));
     }
 
     // Run the token-based rules.
@@ -116,7 +116,6 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        #[cfg(feature = "logical_lines")]
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
             &tokens, locator, stylist, settings,
         ));

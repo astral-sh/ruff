@@ -3,8 +3,9 @@
 
 use num_bigint::BigInt;
 use rustpython_parser::ast::{
-    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler, Expr,
-    ExprContext, Identifier, Int, Keyword, MatchCase, Operator, Pattern, Stmt, Unaryop, Withitem,
+    self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
+    Excepthandler, Expr, ExprContext, Identifier, Int, Keyword, MatchCase, Operator, Pattern, Stmt,
+    Unaryop, Withitem,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -481,7 +482,7 @@ pub enum ComparableExpr<'a> {
     },
     FormattedValue {
         value: Box<ComparableExpr<'a>>,
-        conversion: Int,
+        conversion: ConversionFlag,
         format_spec: Option<Box<ComparableExpr<'a>>>,
     },
     JoinedStr {
@@ -914,7 +915,7 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(std::string::String::as_str),
+                type_comment: type_comment.as_ref().map(String::as_str),
             },
             Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
@@ -930,7 +931,7 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 returns: returns.as_ref().map(Into::into),
-                type_comment: type_comment.as_ref().map(std::string::String::as_str),
+                type_comment: type_comment.as_ref().map(String::as_str),
             },
             Stmt::ClassDef(ast::StmtClassDef {
                 name,
@@ -966,7 +967,7 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
             }) => Self::Assign {
                 targets: targets.iter().map(Into::into).collect(),
                 value: value.into(),
-                type_comment: type_comment.as_ref().map(std::string::String::as_str),
+                type_comment: type_comment.as_ref().map(String::as_str),
             },
             Stmt::AugAssign(ast::StmtAugAssign {
                 target,

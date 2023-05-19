@@ -5,7 +5,6 @@ use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_constant;
 
 use crate::checkers::ast::Checker;
 
@@ -106,9 +105,9 @@ pub(crate) fn comparison_of_constant(
         {
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
-                    left_constant: unparse_constant(left_constant, checker.stylist),
+                    left_constant: checker.generator().constant(left_constant),
                     op: op.into(),
-                    right_constant: unparse_constant(right_constant, checker.stylist),
+                    right_constant: checker.generator().constant(right_constant),
                 },
                 left.range(),
             );

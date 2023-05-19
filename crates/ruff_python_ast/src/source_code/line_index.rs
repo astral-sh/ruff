@@ -295,8 +295,8 @@ impl OneIndexed {
     }
 }
 
-impl std::fmt::Display for OneIndexed {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for OneIndexed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         std::fmt::Debug::fmt(&self.0.get(), f)
     }
 }

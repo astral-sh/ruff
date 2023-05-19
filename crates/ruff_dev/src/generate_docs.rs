@@ -43,6 +43,17 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
+            if rule.is_nursery() {
+                output.push_str(&format!(
+                    r#"This rule is part of the **nursery**, a collection of newer lints that are
+still under development. As such, it must be enabled by explicitly selecting
+{}."#,
+                    rule.noqa_code()
+                ));
+                output.push('\n');
+                output.push('\n');
+            }
+
             process_documentation(explanation.trim(), &mut output);
 
             let filename = PathBuf::from(ROOT_DIR)
@@ -116,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_process_documentation() {
-        let mut out = String::new();
+        let mut output = String::new();
         process_documentation(
             "
 See also [`mccabe.max-complexity`].
@@ -127,10 +138,10 @@ Something [`else`][other].
 - `mccabe.max-complexity`
 
 [other]: http://example.com.",
-            &mut out,
+            &mut output,
         );
         assert_eq!(
-            out,
+            output,
             "
 See also [`mccabe.max-complexity`][mccabe.max-complexity].
 Something [`else`][other].

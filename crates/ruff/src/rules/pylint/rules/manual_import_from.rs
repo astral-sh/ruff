@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Alias, Int, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -67,7 +66,7 @@ pub(crate) fn manual_from_import(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_stmt(&node.into(), checker.stylist),
+            checker.generator().stmt(&node.into()),
             stmt.range(),
         )));
     }

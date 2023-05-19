@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, ConversionFlag, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -43,10 +43,10 @@ impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
 pub(crate) fn explicit_f_string_type_conversion(
     checker: &mut Checker,
     formatted_value: &Expr,
-    conversion: ast::Int,
+    conversion: ConversionFlag,
 ) {
     // Skip if there's already a conversion flag.
-    if conversion != ast::ConversionFlag::None as u32 {
+    if !conversion.is_none() {
         return;
     }
 

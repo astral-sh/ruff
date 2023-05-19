@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
+
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 
 use crate::checkers::ast::Checker;
@@ -67,7 +67,7 @@ pub(crate) fn use_pep604_annotation(
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(&optional(slice), checker.stylist),
+                    checker.generator().expr(&optional(slice)),
                     expr.range(),
                 )));
             }
@@ -83,7 +83,7 @@ pub(crate) fn use_pep604_annotation(
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            unparse_expr(&union(elts), checker.stylist),
+                            checker.generator().expr(&union(elts)),
                             expr.range(),
                         )));
                     }
@@ -91,7 +91,7 @@ pub(crate) fn use_pep604_annotation(
                         // Single argument.
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            unparse_expr(slice, checker.stylist),
+                            checker.generator().expr(slice),
                             expr.range(),
                         )));
                     }

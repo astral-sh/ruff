@@ -1,3 +1,8 @@
+"""
+Violation:
+
+Checks for `raise` statements within `try` blocks.
+"""
 class MyException(Exception):
     pass
 

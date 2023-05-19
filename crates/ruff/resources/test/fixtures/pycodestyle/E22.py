@@ -160,6 +160,7 @@ if alpha[:-i]:
     *a, b = (1, 2, 3)
 
 
+@decorator
 def squares(n):
     return (i**2 for i in range(n))
 
@@ -168,4 +169,14 @@ ENG_PREFIXES = {
     -6: "\u03bc",  # Greek letter mu
     -3: "m",
 }
+
+i = (
+    i +  #
+    1
+)
+
+x[~y]
+
+if i == -1:
+    pass
 #:
