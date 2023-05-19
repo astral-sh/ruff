@@ -6,12 +6,6 @@ use ruff_python_ast::helpers::identifier_range;
 
 use crate::checkers::ast::Checker;
 
-#[violation]
-pub struct TooManyArguments {
-    c_args: usize,
-    max_args: usize,
-}
-
 /// ## What it does
 /// Checks for functions with too many arguments.
 ///
@@ -48,6 +42,12 @@ pub struct TooManyArguments {
 ///
 /// ## References
 /// - [Ruff configuration documentation](https://beta.ruff.rs/docs/settings/#max-args)
+#[violation]
+pub struct TooManyArguments {
+    c_args: usize,
+    max_args: usize,
+}
+
 impl Violation for TooManyArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
