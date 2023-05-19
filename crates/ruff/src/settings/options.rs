@@ -551,6 +551,6 @@ pub struct Options {
         "#
     )]
     /// A list of mappings from file pattern to rule codes or prefixes to
-    /// exclude, when considering any matching files.
+    /// exclude, in addition to any rules excluded by `per-file-ignores`.
     pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 }

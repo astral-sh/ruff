@@ -126,8 +126,8 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub ignore: Option<Vec<RuleSelector>>,
-    /// Like --select, but adds additional rule codes on top of the selected
-    /// ones.
+    /// Like --select, but adds additional rule codes on top of those already
+    /// specified.
     #[arg(
         long,
         value_delimiter = ',',
@@ -147,11 +147,11 @@ pub struct CheckArgs {
         hide = true
     )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
-    /// List of mappings from file pattern to code to exclude
+    /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    /// List of mappings from file pattern to code to exclude, on top of those
-    /// already specified with per-file-ignores.
+    /// Like `--per-file-ignores`, but adds additional ignores on top of
+    /// those already specified.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// List of paths, used to omit files and/or directories from analysis.
@@ -193,8 +193,8 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
-    /// Like --fixable, but adds additional rule codes on top of the fixable
-    /// ones.
+    /// Like --fixable, but adds additional rule codes on top of those already
+    /// specified.
     #[arg(
         long,
         value_delimiter = ',',

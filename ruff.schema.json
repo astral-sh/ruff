@@ -87,7 +87,7 @@
       }
     },
     "extend-per-file-ignores": {
-      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files.",
+      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
       "type": [
         "object",
         "null"
