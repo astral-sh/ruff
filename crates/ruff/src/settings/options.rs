@@ -541,4 +541,16 @@ pub struct Options {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files.
     pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    #[option(
+        default = "{}",
+        value_type = "dict[str, list[RuleSelector]]",
+        example = r#"
+            # Also ignore `E401` in all `__init__.py` files.
+            [tool.ruff.extend-per-file-ignores]
+            "__init__.py" = ["E402"]
+        "#
+    )]
+    /// A list of mappings from file pattern to rule codes or prefixes to
+    /// exclude, in addition to any rules excluded by `per-file-ignores`.
+    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 }

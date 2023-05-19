@@ -7,6 +7,35 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
 
+/// ## What it does
+/// Checks for the use of unnamed numerical constants ("magic") values in
+/// comparisons.
+///
+/// ## Why is this bad?
+/// The use of "magic" can make code harder to read and maintain, as readers
+/// will have to infer the meaning of the value from the context.
+///
+/// For convenience, this rule excludes a variety of common values from the
+/// "magic" value definition, such as `0`, `1`, `""`, and `"__main__"`.
+///
+/// ## Example
+/// ```python
+/// def calculate_discount(price: float) -> float:
+///     return price * (1 - 0.2)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// DISCOUNT_RATE = 0.2
+///
+///
+/// def calculate_discount(price: float) -> float:
+///     return price * (1 - DISCOUNT_RATE)
+/// ```
+///
+/// ## References
+/// - [Wikipedia](https://en.wikipedia.org/wiki/Magic_number_(programming)#Unnamed_numerical_constants)
+/// - [PEP 8](https://peps.python.org/pep-0008/#constants)
 #[violation]
 pub struct MagicValueComparison {
     value: String,
