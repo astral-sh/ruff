@@ -1,22 +1,14 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-confusables.py:1:6: RUF001 [*] String contains ambiguous unicode character `𝐁` (did you mean `B`?)
+confusables.py:1:6: RUF001 String contains ambiguous unicode character `𝐁` (did you mean `B`?)
   |
 1 | x = "𝐁ad string"
   |      ^ RUF001
 2 | y = "−"
   |
-  = help: Replace `𝐁` with `B`
 
-ℹ Suggested fix
-1   |-x = "𝐁ad string"
-  1 |+x = "Bad string"
-2 2 | y = "−"
-3 3 | 
-4 4 | 
-
-confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `）` (did you mean `)`?)
+confusables.py:6:56: RUF002 Docstring contains ambiguous unicode character `）` (did you mean `)`?)
   |
 6 | def f():
 7 |     """Here's a docstring with an unusual parenthesis: ）"""
@@ -24,19 +16,8 @@ confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `
 8 |     # And here's a comment with an unusual punctuation mark: ᜵
 9 |     ...
   |
-  = help: Replace `）` with `)`
 
-ℹ Suggested fix
-3 3 | 
-4 4 | 
-5 5 | def f():
-6   |-    """Here's a docstring with an unusual parenthesis: ）"""
-  6 |+    """Here's a docstring with an unusual parenthesis: )"""
-7 7 |     # And here's a comment with an unusual punctuation mark: ᜵
-8 8 |     ...
-9 9 | 
-
-confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `᜵` (did you mean `/`?)
+confusables.py:7:62: RUF003 Comment contains ambiguous unicode character `᜵` (did you mean `/`?)
    |
  7 | def f():
  8 |     """Here's a docstring with an unusual parenthesis: ）"""
@@ -44,16 +25,5 @@ confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `�
    |                                                              ^ RUF003
 10 |     ...
    |
-   = help: Replace `᜵` with `/`
-
-ℹ Suggested fix
-4 4 | 
-5 5 | def f():
-6 6 |     """Here's a docstring with an unusual parenthesis: ）"""
-7   |-    # And here's a comment with an unusual punctuation mark: ᜵
-  7 |+    # And here's a comment with an unusual punctuation mark: /
-8 8 |     ...
-9 9 | 
-10 10 | 
 
 

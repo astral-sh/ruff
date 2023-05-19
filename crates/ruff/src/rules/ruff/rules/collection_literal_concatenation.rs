@@ -55,8 +55,6 @@ enum Kind {
 }
 
 /// RUF005
-/// This suggestion could be unsafe if the non-literal expression in the
-/// expression has overridden the `__add__` (or `__radd__`) magic methods.
 pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
         return;
@@ -143,8 +141,9 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     );
     if checker.patch(diagnostic.kind.rule()) {
         if fixable {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            // This suggestion could be unsafe if the non-literal expression in the
+            // expression has overridden the `__add__` (or `__radd__`) magic methods.
+            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 contents,
                 expr.range(),
             )));

@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -15,7 +15,8 @@ pub struct AmbiguousUnicodeCharacterString {
     representant: char,
 }
 
-impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
+/// RUF001
+impl Violation for AmbiguousUnicodeCharacterString {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AmbiguousUnicodeCharacterString {
@@ -27,14 +28,6 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
              `{representant}`?)"
         )
     }
-
-    fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterString {
-            confusable,
-            representant,
-        } = self;
-        format!("Replace `{confusable}` with `{representant}`")
-    }
 }
 
 #[violation]
@@ -43,7 +36,8 @@ pub struct AmbiguousUnicodeCharacterDocstring {
     representant: char,
 }
 
-impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
+/// RUF002
+impl Violation for AmbiguousUnicodeCharacterDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AmbiguousUnicodeCharacterDocstring {
@@ -55,14 +49,6 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
              `{representant}`?)"
         )
     }
-
-    fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterDocstring {
-            confusable,
-            representant,
-        } = self;
-        format!("Replace `{confusable}` with `{representant}`")
-    }
 }
 
 #[violation]
@@ -71,7 +57,8 @@ pub struct AmbiguousUnicodeCharacterComment {
     representant: char,
 }
 
-impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
+/// RUF003
+impl Violation for AmbiguousUnicodeCharacterComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AmbiguousUnicodeCharacterComment {
@@ -82,14 +69,6 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
             "Comment contains ambiguous unicode character `{confusable}` (did you mean \
              `{representant}`?)"
         )
-    }
-
-    fn autofix_title(&self) -> String {
-        let AmbiguousUnicodeCharacterComment {
-            confusable,
-            representant,
-        } = self;
-        format!("Replace `{confusable}` with `{representant}`")
     }
 }
 
@@ -113,7 +92,7 @@ pub(crate) fn ambiguous_unicode_character(
                         current_char.text_len(),
                     );
 
-                    let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
+                    let diagnostic = Diagnostic::new::<DiagnosticKind>(
                         match context {
                             Context::String => AmbiguousUnicodeCharacterString {
                                 confusable: current_char,
@@ -134,13 +113,6 @@ pub(crate) fn ambiguous_unicode_character(
                         char_range,
                     );
                     if settings.rules.enabled(diagnostic.kind.rule()) {
-                        if settings.rules.should_fix(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                (representant as char).to_string(),
-                                char_range,
-                            )));
-                        }
                         diagnostics.push(diagnostic);
                     }
                 }
