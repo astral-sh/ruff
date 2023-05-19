@@ -1,6 +1,5 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-assertion_line: 83
 ---
 duplicate_values.py:4:35: PLW0130 Duplicate value `"value1"` in set.
   |
