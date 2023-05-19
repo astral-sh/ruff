@@ -6,6 +6,21 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::rules::dlint::helpers::AnyStmtImport;
 
+/// ## What it does
+/// Checks that code does not use the `marshal` module
+///
+/// ## Why is this bad?
+/// The marshal module is not intended to be secure against erroneous or maliciously constructed
+/// data. Never unmarshal data received from an untrusted or unauthenticated source.
+///
+/// ## Example
+/// ```python
+/// import marshal
+/// ```
+///
+/// Use instead:
+/// ```python
+/// ```
 #[violation]
 pub struct BadMarshalUse;
 

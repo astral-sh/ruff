@@ -6,6 +6,22 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks that code does not call the built-in function `compile`
+///
+/// ## Why is this bad?
+/// While not bad in and of itself, this function is _probably_ a code smell that
+/// something else we don't want could be going on. I.e. "compile" is often proceeded by
+/// "eval" or "exec".
+///
+/// ## Example
+/// ```python
+/// compile("foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// ```
 #[violation]
 pub struct BadCompileUse;
 

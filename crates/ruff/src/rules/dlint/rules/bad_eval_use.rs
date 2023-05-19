@@ -6,6 +6,21 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks that code does not call the built-in function `eval`
+///
+/// ## Why is this bad?
+/// This function makes it far too easy to achieve arbitrary code execution, so we shouldn't
+/// support it in any context.
+///
+/// ## Example
+/// ```python
+/// eval("foo")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// ```
 #[violation]
 pub struct BadEvalUse;
 
