@@ -553,15 +553,19 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
             if targets.len() != 1 {
                 return false;
             }
-            match &targets[0] {
-                Expr::Name(ast::ExprName { id, .. }) => is_dunder(&id),
-                _ => false,
+            if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+                is_dunder(id)
+            } else {
+                false
             }
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => match target.as_ref() {
-            Expr::Name(ast::ExprName { id, .. }) => is_dunder(&id),
-            _ => false,
-        },
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                is_dunder(id)
+            } else {
+                false
+            }
+        }
         _ => false,
     }
 }
