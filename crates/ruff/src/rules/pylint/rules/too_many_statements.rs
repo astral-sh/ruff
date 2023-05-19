@@ -5,6 +5,42 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
 
+/// ## What it does
+/// Checks for functions or methods with too many statements.
+///
+/// By default, this rule allows up to 50 statements. This can be configured
+/// using the `max-statements` option.
+///
+/// ## Why is this bad?
+/// Functions or methods with many statements are harder to understand
+/// and maintain than functions or methods with fewer statements.
+///
+/// Instead, consider refactoring the function or method into smaller
+/// functions or methods.
+///
+/// ## Example
+/// ```python
+/// def is_even(number):
+///     if number == 0:
+///         return True
+///     elif number == 1:
+///         return False
+///     elif number == 2:
+///         return True
+///     # and so on for many more lines ...
+///     else:
+///         msg = "I don't know about this number"
+///         raise ValueError(msg)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def is_even(number):
+///     return number % 2 == 0
+/// ```
+///
+/// ## References
+/// - [Ruff configuration documentation](https://beta.ruff.rs/docs/settings/#max-statements)
 #[violation]
 pub struct TooManyStatements {
     statements: usize,

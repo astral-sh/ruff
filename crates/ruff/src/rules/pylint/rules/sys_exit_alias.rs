@@ -7,6 +7,31 @@ use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for uses of `exit()` or `quit()`.
+///
+/// ## Why is this bad?
+/// Use `sys.exit()` instead, as the `sys` module is guaranteed to exist whereas the
+/// the site module is not.
+///
+/// ## Example
+/// ```python
+/// if __name__ == "__main__":
+///     ...
+///     exit()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// if __name__ == "__main__":
+///     ...
+///     sys.exit()
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/sys.html#sys.exit)
 #[violation]
 pub struct SysExitAlias {
     name: String,

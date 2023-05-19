@@ -8,6 +8,34 @@ use ruff_python_ast::hashable::HashableExpr;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for repeated `isinstance` calls with the same object.
+///
+/// ## Why is this bad?
+/// Repeated `isinstance` calls with the same object can be merged into one
+/// call.
+///
+/// ## Example
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, int) or isinstance(x, float) or isinstance(x, complex)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, int | float | complex)
+/// ```
+///
+/// Or, if using Python < 3.10:
+///
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, (int, float, complex))
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct RepeatedIsinstanceCalls {
     obj: String,

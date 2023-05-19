@@ -57,6 +57,25 @@ impl fmt::Display for ViolationsCmpop {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons of two constants.
+///
+/// ## Why is this bad?
+/// The result of the comparison will always be the same, so replacing the
+/// comparison with a constant is faster and will make the code more readable.
+///
+/// ## Example
+/// ```python
+/// foo = 1 == 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = True
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct ComparisonOfConstant {
     left_constant: String,

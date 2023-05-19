@@ -8,6 +8,34 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for duplicate base classes in class definitions.
+///
+/// ## Why is this bad?
+/// Duplicate base classes raise `TypeError` at runtime.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     pass
+///
+///
+/// class Bar(Foo, Foo):  # TypeError: duplicate base class Foo
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     pass
+///
+///
+/// class Bar(Foo):
+///     pass
+/// ```
+///
+/// ## References
+/// - [Python documenation](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
 #[violation]
 pub struct DuplicateBases {
     base: String,

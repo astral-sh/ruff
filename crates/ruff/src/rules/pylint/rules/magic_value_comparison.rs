@@ -7,6 +7,36 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
 
+/// ## What it does
+/// Checks for magic values (unnamed numerical constants) in comparisons.
+///
+/// ## Why is this bad?
+/// Magic values are harder to understand and maintain than named constants.
+///
+/// ## Example
+/// ```python
+/// def check_age(age):
+///     if age >= 18:
+///         print("You are old enough!")
+///     else:
+///         print("You are not old enough.")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// AGE_LIMIT = 18
+///
+///
+/// def check_age(age):
+///     if age >= AGE_LIMIT:
+///         print("You are old enough!")
+///     else:
+///         print("You are not old enough.")
+/// ```
+///
+/// ## References
+/// - [Wikipedia](https://en.wikipedia.org/wiki/Magic_number_(programming)#Unnamed_numerical_constants)
+/// - [PEP 8](https://peps.python.org/pep-0008/#constants)
 #[violation]
 pub struct MagicValueComparison {
     value: String,

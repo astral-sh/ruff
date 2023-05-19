@@ -4,6 +4,39 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
+/// ## What it does
+/// Checks for `else` blocks that contain an `if` block that can be collapsed
+/// into an `elif` block.
+///
+/// ## Why is this bad?
+/// The `else` block can be collapsed into the `if` block, reducing the
+/// indentation level by one.
+///
+/// ## Example
+/// ```python
+/// def check_age(age):
+///     if age >= 18:
+///         print("You are old enough!")
+///     else:
+///         if age == 17:
+///             print("You are seventeen, almost there!")
+///         else:
+///             print("You are not old enough.")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def check_age(age):
+///     if age >= 18:
+///         print("You are old enough!")
+///     elif age == 17:
+///         print("You are seventeen, almost there!")
+///     else:
+///         print("You are not old enough.")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
 #[violation]
 pub struct CollapsibleElseIf;
 

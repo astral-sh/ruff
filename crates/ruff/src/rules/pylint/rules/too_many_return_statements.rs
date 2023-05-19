@@ -6,6 +6,52 @@ use ruff_python_ast::helpers::{identifier_range, ReturnStatementVisitor};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 
+/// ## What it does
+/// Checks for functions or methods with too many return statements.
+///
+/// By default, this rule allows up to 6 return statements. This can be configured
+/// using the `max-returns` option.
+///
+/// ## Why is this bad?
+/// Functions or methods with many return statements are harder to understand
+/// and maintain than functions or methods with fewer return statements.
+///
+/// ## Example
+/// ```python
+/// def capital(country):
+///     if country == "England":
+///         return "London"
+///     elif country == "France":
+///         return "Paris"
+///     elif country == "Poland":
+///         return "Warsaw"
+///     elif country == "Romania":
+///         return "Bucharest"
+///     elif country == "Spain":
+///         return "Madrid"
+///     elif country == "Thailand":
+///         return "Bangkok"
+///     else:
+///         return "Unknown"  # 7th return statement
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def capital(country):
+///     capitals = {
+///         "England": "London",
+///         "France": "Paris",
+///         "Poland": "Warsaw",
+///         "Romania": "Bucharest",
+///         "Spain": "Madrid",
+///         "Thailand": "Bangkok",
+///     }
+///     city = capitals.get(country, "Unknown")
+///     return city
+/// ```
+///
+/// ## References
+/// - [Ruff configuration documentation](https://beta.ruff.rs/docs/settings/#max-returns)
 #[violation]
 pub struct TooManyReturnStatements {
     returns: usize,
