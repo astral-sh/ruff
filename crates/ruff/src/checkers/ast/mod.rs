@@ -3310,6 +3310,11 @@ where
                     flake8_pie::rules::unnecessary_spread(self, keys, values);
                 }
             }
+            Expr::Set(ast::ExprSet { elts, range: _ }) => {
+                if self.settings.rules.enabled(Rule::DuplicateValue) {
+                    pylint::rules::duplicate_value(self, elts);
+                }
+            }
             Expr::Yield(_) => {
                 if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
