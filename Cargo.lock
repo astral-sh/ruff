@@ -1927,7 +1927,6 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "once_cell",
- "regex",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-literal",
