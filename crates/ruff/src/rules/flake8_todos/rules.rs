@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use ruff_python_ast::source_code::{Indexer, Locator};
@@ -291,7 +290,7 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let mut iter = indexer.comment_ranges().iter().multipeek();
+    let mut iter = indexer.comment_ranges().iter().peekable();
     while let Some(comment_range) = iter.next() {
         let comment = locator.slice(*comment_range);
 
@@ -305,15 +304,33 @@ pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -
 
         // TD003
         let mut has_issue_link = false;
-        while let Some(next_comment_range) = iter.peek() {
-            let next_comment = locator.slice(*next_comment_range.to_owned());
-            if detect_tag(next_comment, next_comment_range.start()).is_some() {
+        let mut curr_range = comment_range;
+        while let Some(next_range) = iter.peek() {
+            // Ensure that next_comment_range is in the same multiline comment "block" as
+            // comment_range.
+            if !locator
+                .slice(TextRange::new(curr_range.end(), next_range.start()))
+                .chars()
+                .all(char::is_whitespace)
+            {
                 break;
             }
+
+            let next_comment = locator.slice(**next_range);
+            if detect_tag(next_comment, next_range.start()).is_some() {
+                break;
+            }
+
             if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
                 has_issue_link = true;
-                break;
             }
+
+            // If the next_comment isn't a tag or an issue, it's worthles in the context of this
+            // linter. We can increment here instead of waiting for the next iteration of the outer
+            // loop.
+            //
+            // Unwrap is safe because peek() is Some()
+            curr_range = iter.next().unwrap();
         }
 
         if !has_issue_link {

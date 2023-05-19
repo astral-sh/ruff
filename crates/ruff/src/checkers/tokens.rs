@@ -41,7 +41,6 @@ pub(crate) fn check_tokens(
         Rule::BadQuotesDocstring,
         Rule::AvoidableEscapedQuote,
     ]);
-    // indexer
     let enforce_commented_out_code = settings.rules.enabled(Rule::CommentedOutCode);
     let enforce_compound_statements = settings.rules.any_enabled(&[
         Rule::MultipleStatementsOnOneLineColon,
@@ -60,9 +59,7 @@ pub(crate) fn check_tokens(
         Rule::ProhibitedTrailingComma,
     ]);
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
-    // indexer
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
-    // indexer
     let enforce_todos = settings.rules.any_enabled(&[
         Rule::InvalidTodoTag,
         Rule::MissingTodoAuthor,
