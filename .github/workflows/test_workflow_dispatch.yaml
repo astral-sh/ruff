@@ -1,0 +1,24 @@
+name: "Test Update pre-commit mirror"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ create_workflow_dispatch ]
+
+jobs:
+  release-token:
+    name: release-token
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Update pre-commit mirror"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.RUFF_PRE_COMMIT_PAT }}
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: 'charliermarsh',
+              repo: 'ruff-pre-commit',
+              workflow_id: 'workflows/main.yml',
+              rev: 'main',
+            })
+
