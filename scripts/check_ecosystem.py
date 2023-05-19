@@ -175,16 +175,16 @@ async def compare(
 
     # Allows to keep the checkouts locations
     if checkouts:
-        checkout_dir = checkouts.joinpath(repo.org).joinpath(repo.repo)
+        checkout_parent = checkouts.joinpath(repo.org)
         # Don't create the repodir itself, we need that for checking for existing
         # clones
-        checkout_dir.parent.mkdir(exist_ok=True, parents=True)
-        location_context = nullcontext(checkout_dir)
+        checkout_parent.mkdir(exist_ok=True, parents=True)
+        location_context = nullcontext(checkout_parent)
     else:
         location_context = tempfile.TemporaryDirectory()
 
-    with location_context as checkout_dir:
-        checkout_dir = Path(checkout_dir)
+    with location_context as checkout_parent:
+        checkout_dir = Path(checkout_parent).joinpath(repo.repo)
         async with repo.clone(checkout_dir) as path:
             try:
                 async with asyncio.TaskGroup() as tg:
