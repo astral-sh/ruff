@@ -78,7 +78,6 @@ class Repository(NamedTuple):
         yield Path(checkout_dir)
 
 
-# We only check the fixes for the not-select-ALL cases
 REPOSITORIES = {
     "airflow": Repository("apache", "airflow", "main", select="ALL"),
     "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
@@ -86,17 +85,8 @@ REPOSITORIES = {
     "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
     "disnake": Repository("DisnakeDev", "disnake", "master"),
     "scikit-build": Repository("scikit-build", "scikit-build", "main"),
-    "scikit-build-core": Repository(
-        "scikit-build",
-        "scikit-build-core",
-        "main",
-    ),
-    "typeshed": Repository(
-        "python",
-        "typeshed",
-        "main",
-        select="PYI",
-    ),
+    "scikit-build-core": Repository("scikit-build", "scikit-build-core", "main"),
+    "typeshed": Repository("python", "typeshed", "main", select="PYI"),
     "zulip": Repository("zulip", "zulip", "main", select="ALL"),
 }
 
