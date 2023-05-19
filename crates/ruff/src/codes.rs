@@ -185,6 +185,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R5501") => (RuleGroup::Unspecified, Rule::CollapsibleElseIf),
         (Pylint, "W0120") => (RuleGroup::Unspecified, Rule::UselessElseOnLoop),
         (Pylint, "W0129") => (RuleGroup::Unspecified, Rule::AssertOnStringLiteral),
+        (Pylint, "W0131") => (RuleGroup::Unspecified, Rule::NamedExprWithoutContext),
         (Pylint, "W0406") => (RuleGroup::Unspecified, Rule::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Unspecified, Rule::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Unspecified, Rule::GlobalStatement),

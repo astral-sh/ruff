@@ -1895,6 +1895,9 @@ where
                 if self.settings.rules.enabled(Rule::InvalidMockAccess) {
                     pygrep_hooks::rules::uncalled_mock_method(self, value);
                 }
+                if self.settings.rules.enabled(Rule::NamedExprWithoutContext) {
+                    pylint::rules::named_expr_without_context(self, value);
+                }
                 if self.settings.rules.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
                         self.ctx.resolve_call_path(expr)
