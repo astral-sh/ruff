@@ -9,8 +9,14 @@ DUO120.py:1:8: DUO120 Use of the `marshal` module should be avoided
 
 DUO120.py:4:21: DUO120 Use of the `marshal` module should be avoided
   |
-4 | from marshal import load
+4 | from marshal import load, dump
   |                     ^^^^ DUO120
+  |
+
+DUO120.py:4:27: DUO120 Use of the `marshal` module should be avoided
+  |
+4 | from marshal import load, dump
+  |                           ^^^^ DUO120
   |
 
 

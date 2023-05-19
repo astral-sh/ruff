@@ -1,10 +1,10 @@
-use rustpython_parser::ast;
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Identifier, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::rules::dlint::helpers::AnyStmtImport;
 
 #[violation]
 pub struct BadShelveUse;
@@ -18,28 +18,26 @@ impl Violation for BadShelveUse {
 
 /// DUO119
 pub(crate) fn bad_shelve_use(checker: &mut Checker, stmt: &Stmt) {
-    match stmt {
-        Stmt::Import(ast::StmtImport { names, range: _ }) => {
-            for name in names {
-                if &name.name == "shelve" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(BadShelveUse, name.range));
-                }
-            }
-        }
-        Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }, ..) => {
-            if let Some(id) = module {
-                if id == "shelve" {
-                    for name in names {
+    if let Some(imp_stmt) = AnyStmtImport::cast(stmt) {
+        match imp_stmt {
+            AnyStmtImport::Import(imp) => {
+                for name in &imp.names {
+                    if name.name.as_str() == "shelve" {
                         checker
-                        .diagnostics
-                        .push(Diagnostic::new(BadShelveUse, name.range));
+                            .diagnostics
+                            .push(Diagnostic::new(BadShelveUse, name.range));
                     }
-
+                }
+            }
+            AnyStmtImport::ImportFrom(imp) => {
+                if imp.module == Some(Identifier::from("shelve")) {
+                    for name in &imp.names {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(BadShelveUse, name.range));
+                    }
                 }
             }
         }
-        _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
     }
 }
