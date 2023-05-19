@@ -422,6 +422,7 @@ ruff_macros::register_rules!(
     rules::flake8_bandit::rules::HardcodedTempFile,
     rules::flake8_bandit::rules::HashlibInsecureHashFunction,
     rules::flake8_bandit::rules::Jinja2AutoescapeFalse,
+    rules::flake8_bandit::rules::ParamikoCall,
     rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     rules::flake8_bandit::rules::RequestWithNoCertValidation,
     rules::flake8_bandit::rules::RequestWithoutTimeout,
