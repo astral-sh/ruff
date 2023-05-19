@@ -805,16 +805,19 @@ where
                     pylint::rules::duplicate_bases(self, name, bases);
                 }
             }
-            Stmt::Import(ast::StmtImport { names, range: _ }) => {
+            Stmt::Import(import @ ast::StmtImport { names, range: _ }) => {
                 if self.settings.rules.enabled(Rule::MultipleImportsOnOneLine) {
                     pycodestyle::rules::multiple_imports_on_one_line(self, stmt, names);
                 }
                 //dlint
                 if self.settings.rules.enabled(Rule::BadShelveUse) {
-                    dlint::rules::bad_shelve_use(self, stmt);
+                    dlint::rules::bad_shelve_use(self, dlint::helpers::AnyStmtImport::from(import));
                 }
                 if self.settings.rules.enabled(Rule::BadMarshalUse) {
-                    dlint::rules::bad_marshal_use(self, stmt);
+                    dlint::rules::bad_marshal_use(
+                        self,
+                        dlint::helpers::AnyStmtImport::from(import),
+                    );
                 }
 
                 if self
@@ -1077,12 +1080,14 @@ where
                     }
                 }
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-            }) => {
+            Stmt::ImportFrom(
+                import_from @ ast::StmtImportFrom {
+                    names,
+                    module,
+                    level,
+                    range: _,
+                },
+            ) => {
                 let module = module.as_deref();
                 let level = level.map(|level| level.to_u32());
                 if self
@@ -1105,10 +1110,16 @@ where
 
                 //dlint
                 if self.settings.rules.enabled(Rule::BadShelveUse) {
-                    dlint::rules::bad_shelve_use(self, stmt);
+                    dlint::rules::bad_shelve_use(
+                        self,
+                        dlint::helpers::AnyStmtImport::from(import_from),
+                    );
                 }
                 if self.settings.rules.enabled(Rule::BadMarshalUse) {
-                    dlint::rules::bad_marshal_use(self, stmt);
+                    dlint::rules::bad_marshal_use(
+                        self,
+                        dlint::helpers::AnyStmtImport::from(import_from),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::UnnecessaryFutureImport)

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Identifier, Stmt};
+use rustpython_parser::ast::Identifier;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,25 +17,23 @@ impl Violation for BadShelveUse {
 }
 
 /// DUO119
-pub(crate) fn bad_shelve_use(checker: &mut Checker, stmt: &Stmt) {
-    if let Some(imp_stmt) = AnyStmtImport::cast(stmt) {
-        match imp_stmt {
-            AnyStmtImport::Import(imp) => {
-                for name in &imp.names {
-                    if name.name.as_str() == "shelve" {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(BadShelveUse, name.range));
-                    }
+pub(crate) fn bad_shelve_use(checker: &mut Checker, stmt: AnyStmtImport) {
+    match stmt {
+        AnyStmtImport::Import(imp) => {
+            for name in &imp.names {
+                if name.name.as_str() == "shelve" {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(BadShelveUse, name.range));
                 }
             }
-            AnyStmtImport::ImportFrom(imp) => {
-                if imp.module == Some(Identifier::from("shelve")) {
-                    for name in &imp.names {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(BadShelveUse, name.range));
-                    }
+        }
+        AnyStmtImport::ImportFrom(imp) => {
+            if imp.module == Some(Identifier::from("shelve")) {
+                for name in &imp.names {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(BadShelveUse, name.range));
                 }
             }
         }

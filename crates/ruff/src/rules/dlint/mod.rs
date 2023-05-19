@@ -1,5 +1,5 @@
 //! Rules from [dlint](https://pypi.org/project/dlint/).
-mod helpers;
+pub(crate) mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
