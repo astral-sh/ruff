@@ -191,7 +191,7 @@ pub struct Options {
     ///
     /// This option has been **deprecated** in favor of `unfixable` since its usage is now
     /// interchangeable with `unfixable`.
-    #[schemars(skip)]
+    #[cfg_attr(feature = "schemars", schemars(skip))]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
     #[option(
         default = "[]",
