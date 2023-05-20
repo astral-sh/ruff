@@ -245,7 +245,7 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut range = annotation_range;
     let mut line_width = LineWidth::new(TAB_SIZE);
 
-    for (index, c) in source.chars().enumerate() {
+    for (index, c) in source.char_indices() {
         let old_width = line_width.width();
         line_width = line_width.add_char(c);
 
