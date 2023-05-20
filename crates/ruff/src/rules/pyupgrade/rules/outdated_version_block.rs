@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use log::error;
-use num_bigint::{BigInt, Sign};
+use malachite_bigint::{BigInt, Sign};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};

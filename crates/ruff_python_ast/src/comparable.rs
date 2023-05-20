@@ -1,7 +1,7 @@
 //! An equivalent object hierarchy to the [`Expr`] hierarchy, but with the
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
-use num_bigint::BigInt;
+use malachite_bigint::BigInt;
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
     Excepthandler, Expr, ExprContext, Identifier, Int, Keyword, MatchCase, Operator, Pattern, Stmt,

@@ -1,4 +1,4 @@
-use num_bigint::BigInt;
+use malachite_bigint::BigInt;
 use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
