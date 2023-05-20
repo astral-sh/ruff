@@ -121,7 +121,7 @@ pub fn convert(
                 }
                 "max-line-length" | "max_line_length" => match value.parse::<usize>() {
                     Ok(line_length) => {
-                        options.line_length = Some(LineWidth::from_line_length(line_length))
+                        options.line_length = Some(LineWidth::from_line_length(line_length));
                     }
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
