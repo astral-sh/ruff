@@ -114,15 +114,16 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/sort_rules.py
+      - run: git diff --exit-code
+      - run: cargo check
+      - run: cargo fmt --all --check
       - run: ./scripts/add_rule.py --name DoTheThing --prefix PL --code C0999 --linter pylint
       - run: cargo check
       - run: cargo fmt --all --check
       - run: |
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
-      - run: cargo check
-      - run: cargo fmt --all --check
-      - run: ./scripts/sort_rules.py
       - run: cargo check
       - run: cargo fmt --all --check
 
