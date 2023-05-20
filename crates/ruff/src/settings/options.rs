@@ -56,14 +56,21 @@ impl LineWidth {
     fn update(mut self, chars: impl Iterator<Item = char>) -> Self {
         let tab_size: usize = self.tab_size.into();
         for c in chars {
-            self.width += if matches!(c, '\t') {
-                let tab_offset = tab_size - (self.column % tab_size);
-                self.column += tab_offset;
-                tab_offset
-            } else {
-                self.column += 1;
-                c.width().unwrap_or(0)
-            };
+            match c {
+                '\t' => {
+                    let tab_offset = tab_size - (self.column % tab_size);
+                    self.width += tab_offset;
+                    self.column += tab_offset;
+                }
+                '\n' | '\r' => {
+                    self.width = 0;
+                    self.column = 0;
+                }
+                _ => {
+                    self.width += c.width().unwrap_or(0);
+                    self.column += 1;
+                }
+            }
         }
         self
     }

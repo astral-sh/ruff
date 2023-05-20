@@ -14,6 +14,7 @@ use crate::fs::relativize_path;
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use crate::settings::options::{LineWidth, TabSize};
 
 bitflags! {
     #[derive(Default)]
@@ -237,39 +238,34 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `tab-size`
+    static TAB_SIZE: TabSize = TabSize(4); // TODO(jonathan): use `tab-size`
 
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut column = 0;
+    let mut line_width = LineWidth::new(TAB_SIZE);
 
     for (index, c) in source.chars().enumerate() {
-        match c {
-            '\t' => {
-                let tab_width = TAB_SIZE - column % TAB_SIZE;
-                column += tab_width;
+        let old_width = line_width.width();
+        line_width = line_width.add_char(c);
 
-                if index < usize::from(annotation_range.start()) {
-                    range += TextSize::new(tab_width - 1);
-                } else if index < usize::from(annotation_range.end()) {
-                    range = range.add_end(TextSize::new(tab_width - 1));
-                }
+        if matches!(c, '\t') {
+            #[allow(clippy::cast_possible_truncation)]
+            let tab_width = (line_width.width() - old_width) as u32;
 
-                result.push_str(&source[last_end..index]);
-
-                for _ in 0..tab_width {
-                    result.push(' ');
-                }
-
-                last_end = index + 1;
+            if index < usize::from(annotation_range.start()) {
+                range += TextSize::new(tab_width - 1);
+            } else if index < usize::from(annotation_range.end()) {
+                range = range.add_end(TextSize::new(tab_width - 1));
             }
-            '\n' | '\r' => {
-                column = 0;
+
+            result.push_str(&source[last_end..index]);
+
+            for _ in 0..tab_width {
+                result.push(' ');
             }
-            _ => {
-                column += 1;
-            }
+
+            last_end = index + 1;
         }
     }
 
