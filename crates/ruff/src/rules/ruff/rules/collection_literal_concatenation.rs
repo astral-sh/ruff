@@ -1,3 +1,5 @@
+use std::dbg;
+
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
 
@@ -54,65 +56,84 @@ enum Kind {
     Tuple,
 }
 
-/// RUF005
-/// This suggestion could be unsafe if the non-literal expression in the
-/// expression has overridden the `__add__` (or `__radd__`) magic methods.
-pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
+fn build_new_expr(expr: &Expr) -> Option<Expr> {
     let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
-        return;
+        return None;
     };
 
+    let new_left = match left.as_ref() {
+        Expr::BinOp(ast::ExprBinOp { .. }) => match build_new_expr(left) {
+            Some(new_left) => new_left.to_owned(),
+            None => *left.to_owned(),
+        },
+        _ => *left.to_owned(),
+    };
+
+    let new_right = match right.as_ref() {
+        Expr::BinOp(ast::ExprBinOp { .. }) => match build_new_expr(right) {
+            Some(new_right) => {
+                dbg!("AAAAAAA");
+                new_right.to_owned()
+            }
+            None => *right.to_owned(),
+        },
+        _ => *right.to_owned(),
+    };
+
+    // dbg!(&new_left);
+    // dbg!(&new_right);
+
     // Figure out which way the splat is, and what the kind of the collection is.
-    let (kind, splat_element, other_elements, splat_at_left, ctx) =
-        match (left.as_ref(), right.as_ref()) {
-            (
-                Expr::List(ast::ExprList {
-                    elts: l_elts,
-                    ctx,
-                    range: _,
-                }),
-                _,
-            ) => (Kind::List, right, l_elts, false, ctx),
-            (
-                Expr::Tuple(ast::ExprTuple {
-                    elts: l_elts,
-                    ctx,
-                    range: _,
-                }),
-                _,
-            ) => (Kind::Tuple, right, l_elts, false, ctx),
-            (
-                _,
-                Expr::List(ast::ExprList {
-                    elts: r_elts,
-                    ctx,
-                    range: _,
-                }),
-            ) => (Kind::List, left, r_elts, true, ctx),
-            (
-                _,
-                Expr::Tuple(ast::ExprTuple {
-                    elts: r_elts,
-                    ctx,
-                    range: _,
-                }),
-            ) => (Kind::Tuple, left, r_elts, true, ctx),
-            _ => return,
-        };
+    let (kind, splat_element, other_elements, splat_at_left, ctx) = match (&new_left, &new_right) {
+        (
+            Expr::List(ast::ExprList {
+                elts: l_elts,
+                ctx,
+                range: _,
+            }),
+            _,
+        ) => (Kind::List, new_right, l_elts, false, ctx),
+        (
+            Expr::Tuple(ast::ExprTuple {
+                elts: l_elts,
+                ctx,
+                range: _,
+            }),
+            _,
+        ) => (Kind::Tuple, new_right, l_elts, false, ctx),
+        (
+            _,
+            Expr::List(ast::ExprList {
+                elts: r_elts,
+                ctx,
+                range: _,
+            }),
+        ) => (Kind::List, new_left, r_elts, true, ctx),
+        (
+            _,
+            Expr::Tuple(ast::ExprTuple {
+                elts: r_elts,
+                ctx,
+                range: _,
+            }),
+        ) => (Kind::Tuple, new_left, r_elts, true, ctx),
+        _ => return None,
+    };
 
     // We'll be a bit conservative here; only calls, names and attribute accesses
     // will be considered as splat elements.
     if !(splat_element.is_call_expr()
         || splat_element.is_name_expr()
+        || splat_element.is_list_expr()
         || splat_element.is_attribute_expr())
     {
-        return;
+        return None;
     }
 
     let new_expr = match kind {
         Kind::List => {
             let node = ast::ExprList {
-                elts: make_splat_elts(splat_element, other_elements, splat_at_left),
+                elts: make_splat_elts(&splat_element, &other_elements, splat_at_left),
                 ctx: *ctx,
                 range: TextRange::default(),
             };
@@ -120,12 +141,37 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         }
         Kind::Tuple => {
             let node = ast::ExprTuple {
-                elts: make_splat_elts(splat_element, other_elements, splat_at_left),
+                elts: make_splat_elts(&splat_element, &other_elements, splat_at_left),
                 ctx: *ctx,
                 range: TextRange::default(),
             };
             node.into()
         }
+    };
+
+    return Some(new_expr);
+}
+
+/// RUF005
+/// This suggestion could be unsafe if the non-literal expression in the
+/// expression has overridden the `__add__` (or `__radd__`) magic methods.
+pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
+    let Some(new_expr) = build_new_expr(expr) else {
+        return
+    };
+
+    // dbg!(&new_expr);
+
+    let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
+        return;
+    };
+
+    let kind = match (left.as_ref(), right.as_ref()) {
+        (Expr::List(ast::ExprList { .. }), _) => Kind::List,
+        (Expr::Tuple(ast::ExprTuple { .. }), _) => Kind::Tuple,
+        (_, Expr::List(ast::ExprList { .. })) => Kind::List,
+        (_, Expr::Tuple(ast::ExprTuple { .. })) => Kind::Tuple,
+        _ => return,
     };
 
     let contents = match kind {
