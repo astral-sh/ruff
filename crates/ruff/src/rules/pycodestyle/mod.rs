@@ -177,6 +177,22 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn max_doc_length_with_utf_8() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle/W505_utf_8.py"),
+            &settings::Settings {
+                pycodestyle: Settings {
+                    max_doc_length: Some(LineWidth::from_line_length(50)),
+                    ..Settings::default()
+                },
+                ..settings::Settings::for_rule(Rule::DocLineTooLong)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(1)]
     #[test_case(2)]
     #[test_case(4)]
