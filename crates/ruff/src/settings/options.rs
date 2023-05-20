@@ -3,7 +3,7 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
@@ -13,6 +13,23 @@ use crate::rules::{
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+
+pub struct TabSize(pub u8);
+
+impl From<u8> for TabSize {
+    fn from(n: u8) -> Self {
+        Self(n)
+    }
+}
+
+impl From<TabSize> for usize {
+    fn from(tab_size: TabSize) -> Self {
+        tab_size.0 as usize
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -318,7 +335,7 @@ pub struct Options {
         "#
     )]
     /// The tabulation size to calculate line length.
-    pub tab_size: Option<u8>,
+    pub tab_size: Option<TabSize>,
     #[option(
         default = "None",
         value_type = "str",

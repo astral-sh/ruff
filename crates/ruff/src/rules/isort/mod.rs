@@ -19,6 +19,7 @@ use types::{AliasData, EitherImport, TrailingComma};
 
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
+use crate::settings::options::TabSize;
 use crate::settings::types::PythonVersion;
 
 mod annotate;
@@ -67,7 +68,7 @@ pub(crate) fn format_imports(
     locator: &Locator,
     line_length: usize,
     indentation_width: usize,
-    tab_size: u8,
+    tab_size: TabSize,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -168,7 +169,7 @@ fn format_import_block(
     block: ImportBlock,
     line_length: usize,
     indentation_width: usize,
-    tab_size: u8,
+    tab_size: TabSize,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,

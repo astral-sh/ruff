@@ -25,6 +25,8 @@ use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 
+use super::options::TabSize;
+
 #[derive(Debug, Default)]
 pub struct RuleSelection {
     pub select: Option<Vec<RuleSelector>>,
@@ -57,7 +59,7 @@ pub struct Configuration {
     pub ignore_init_module_imports: Option<bool>,
     pub include: Option<Vec<FilePattern>>,
     pub line_length: Option<usize>,
-    pub tab_size: Option<u8>,
+    pub tab_size: Option<TabSize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,

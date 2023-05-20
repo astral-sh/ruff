@@ -3,6 +3,7 @@ use unicode_width::UnicodeWidthStr;
 use ruff_python_ast::source_code::Stylist;
 
 use crate::rules::pycodestyle::helpers::WidthWithTabs;
+use crate::settings::options::TabSize;
 
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 
@@ -49,7 +50,7 @@ pub(crate) fn format_import_from(
     aliases: &[(AliasData, CommentSet)],
     line_length: usize,
     indentation_width: usize,
-    tab_size: u8,
+    tab_size: TabSize,
     stylist: &Stylist,
     force_wrap_aliases: bool,
     is_first: bool,
@@ -108,7 +109,7 @@ fn format_single_line(
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
     stylist: &Stylist,
-    tab_size: u8,
+    tab_size: TabSize,
     indentation_width: usize,
 ) -> (String, usize) {
     let mut output = String::with_capacity(CAPACITY);

@@ -16,6 +16,7 @@ use crate::rules::{
 };
 use crate::settings::types::FilePatternSet;
 
+use super::options::TabSize;
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
 
@@ -28,7 +29,7 @@ pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
 
 pub const LINE_LENGTH: usize = 88;
 
-pub const TAB_SIZE: u8 = 4;
+pub const TAB_SIZE: TabSize = TabSize(4);
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
