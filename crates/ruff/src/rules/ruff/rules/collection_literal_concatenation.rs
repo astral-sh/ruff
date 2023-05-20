@@ -85,6 +85,24 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
 
     // Figure out which way the splat is, and what the kind of the collection is.
     let (kind, splat_element, other_elements, splat_at_left, ctx) = match (&new_left, &new_right) {
+        // (
+        //     Expr::List(ast::ExprList {
+        //         elts: l_elts,
+        //         ctx,
+        //         range: _,
+        //     }),
+        //     Expr::List(ast::ExprList { elts: r_elts, .. }),
+        //     _,
+        // ) => (Kind::List, l_elts, r_elts, false, ctx),
+        // (
+        //     Expr::Tuple(ast::ExprTuple {
+        //         elts: l_elts,
+        //         ctx,
+        //         range: _,
+        //     }),
+        //     Expr::Tuple(ast::ExprTuple { elts: r_elts, .. }),
+        //     _,
+        // ) => (Kind::Tuple, l_elts, r_elts, false, ctx),
         (
             Expr::List(ast::ExprList {
                 elts: l_elts,
@@ -92,7 +110,7 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
                 range: _,
             }),
             _,
-        ) => (Kind::List, new_right, l_elts, false, ctx),
+        ) => (Kind::List, &new_right, l_elts, false, ctx),
         (
             Expr::Tuple(ast::ExprTuple {
                 elts: l_elts,
@@ -100,7 +118,7 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
                 range: _,
             }),
             _,
-        ) => (Kind::Tuple, new_right, l_elts, false, ctx),
+        ) => (Kind::Tuple, &new_right, l_elts, false, ctx),
         (
             _,
             Expr::List(ast::ExprList {
@@ -108,7 +126,7 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
                 ctx,
                 range: _,
             }),
-        ) => (Kind::List, new_left, r_elts, true, ctx),
+        ) => (Kind::List, &new_left, r_elts, true, ctx),
         (
             _,
             Expr::Tuple(ast::ExprTuple {
@@ -116,24 +134,42 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
                 ctx,
                 range: _,
             }),
-        ) => (Kind::Tuple, new_left, r_elts, true, ctx),
+        ) => (Kind::Tuple, &new_left, r_elts, true, ctx),
         _ => return None,
     };
 
     // We'll be a bit conservative here; only calls, names and attribute accesses
     // will be considered as splat elements.
-    if !(splat_element.is_call_expr()
+    let mut new_elts;
+    if splat_element.is_call_expr()
         || splat_element.is_name_expr()
-        || splat_element.is_list_expr()
-        || splat_element.is_attribute_expr())
+        || splat_element.is_attribute_expr()
     {
+        new_elts = make_splat_elts(&splat_element, &other_elements, splat_at_left);
+    } else if splat_element.is_list_expr() {
+        new_elts = other_elements.to_owned();
+
+        let mut elts = match splat_element {
+            Expr::List(ast::ExprList { elts, .. }) => elts.to_owned(),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.to_owned(),
+            _ => return None,
+        };
+
+        if splat_at_left {
+            elts.extend_from_slice(&new_elts);
+            new_elts = elts.to_vec();
+        } else {
+            new_elts.extend_from_slice(&elts);
+        }
+        // new_elts = make_splat_elts(&splat_element, &other_elements, splat_at_left);
+    } else {
         return None;
     }
 
     let new_expr = match kind {
         Kind::List => {
             let node = ast::ExprList {
-                elts: make_splat_elts(&splat_element, &other_elements, splat_at_left),
+                elts: new_elts,
                 ctx: *ctx,
                 range: TextRange::default(),
             };
@@ -141,7 +177,7 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
         }
         Kind::Tuple => {
             let node = ast::ExprTuple {
-                elts: make_splat_elts(&splat_element, &other_elements, splat_at_left),
+                elts: new_elts,
                 ctx: *ctx,
                 range: TextRange::default(),
             };
