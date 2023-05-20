@@ -34,7 +34,6 @@ def key_test_case(nb_digit: int) -> Callable[[str], tuple[str, int, str, int]]:
         subcode = int(subcode[1:]) if subcode else -1
         prefix = prefix or ""
         code = int(code + "0" * (nb_digit - len(code))) if code is not None else -1
-        print(line, rule, prefix, code, subcode, nb_digit)
         return prefix, code, rule, subcode
 
     return key
