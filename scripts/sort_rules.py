@@ -77,7 +77,7 @@ def sort_exports(
     parts = contents.split("\n\n")
 
     if len(parts) == 2:
-        pub_use_contents = parts[0].split(";\n")
+        pub_use_contents = parts[0][:-1].split(";\n")
         if pub_use_to_add is not None:
             pub_use_contents.append(pub_use_to_add)
         pub_use_contents.sort(key=key_pub_use)
@@ -88,7 +88,7 @@ def sort_exports(
         mod_contents.sort(key=key_mod)
 
         new_contents = ";\n".join(pub_use_contents)
-        new_contents += "\n\n"
+        new_contents += ";\n\n"
         new_contents += "\n".join(mod_contents)
         new_contents += "\n"
 
