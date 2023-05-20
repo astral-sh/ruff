@@ -4,7 +4,7 @@ use criterion::{
 };
 use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
-use ruff::RuleSelector;
+use ruff::{Pyupgrade, RuleCodePrefix, RuleSelector};
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use std::time::Duration;
 
@@ -73,14 +73,14 @@ fn benchmark_linter(mut group: BenchmarkGroup<WallTime>, settings: &Settings) {
     group.finish();
 }
 
-fn benchmark_default_rules(criterion: &mut Criterion) {
-    let group = criterion.benchmark_group("linter/default-rules");
-    benchmark_linter(group, &Settings::default());
-}
-
 fn benchmark_all_rules(criterion: &mut Criterion) {
     let settings = Settings {
-        rules: RuleSelector::All.into_iter().collect(),
+        rules: RuleSelector::Prefix {
+            prefix: RuleCodePrefix::Pyupgrade(Pyupgrade::_0),
+            redirected_from: None,
+        }
+        .into_iter()
+        .collect(),
         ..Settings::default()
     };
 
@@ -88,6 +88,6 @@ fn benchmark_all_rules(criterion: &mut Criterion) {
     benchmark_linter(group, &settings);
 }
 
-criterion_group!(default_rules, benchmark_default_rules);
+// criterion_group!(default_rules, benchmark_default_rules);
 criterion_group!(all_rules, benchmark_all_rules);
-criterion_main!(default_rules, all_rules);
+criterion_main!(all_rules);
