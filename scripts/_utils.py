@@ -11,7 +11,7 @@ def dir_name(linter_name: str) -> str:
 
 def pascal_case(linter_name: str) -> str:
     """Convert from snake-case to PascalCase."""
-    return "".join(word.title() for word in linter_name.split("-"))
+    return "".join(word.title() for word in linter_name.split("_")[0].split("-"))
 
 
 def snake_case(name: str) -> str:
@@ -45,6 +45,7 @@ def key_pub_use(line: str) -> str:
 
 def key_mod(line: str) -> str:
     return line.replace("pub(crate) ", "")
+
 
 def key_code_to_rule_pair(line: str) -> str:
     return line.lstrip().replace("// Reserved: ", "")
