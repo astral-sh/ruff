@@ -33,7 +33,6 @@ def key_test_case(nb_digit: int) -> Callable[[str], tuple[str, int, int]]:
         )
         code = int(code + "0" * (nb_digit - len(code)))
         subcode = int(subcode[1:]) if subcode else -1
-        print(line, prefix, code, subcode, nb_digit)
         return prefix, code, subcode
 
     return key
