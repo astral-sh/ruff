@@ -38,57 +38,57 @@ SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead o
    |
    = help: Replace `if`-`else`-block with `abc = x if x > 0 else -x`
 
-SIM108.py:82:1: SIM108 [*] Use ternary operator `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd` instead of `if`-`else`-block
+SIM108.py:82:1: SIM108 [*] Use ternary operator `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"` instead of `if`-`else`-block
    |
 82 |   # SIM108
 83 | / if a:
-84 | |     b = cccccccccccccccccccccccccccccccccccc
+84 | |     b = "cccccccccccccccccccccccccccccccccß"
 85 | | else:
-86 | |     b = ddddddddddddddddddddddddddddddddddddd
+86 | |     b = "ddddddddddddddddddddddddddddddddd💣"
    | |_____________________________________________^ SIM108
    |
-   = help: Replace `if`-`else`-block with `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd`
+   = help: Replace `if`-`else`-block with `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"`
 
 ℹ Suggested fix
 79 79 | 
 80 80 | 
 81 81 | # SIM108
 82    |-if a:
-83    |-    b = cccccccccccccccccccccccccccccccccccc
+83    |-    b = "cccccccccccccccccccccccccccccccccß"
 84    |-else:
-85    |-    b = ddddddddddddddddddddddddddddddddddddd
-   82 |+b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
+85    |-    b = "ddddddddddddddddddddddddddddddddd💣"
+   82 |+b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"
 86 83 | 
 87 84 | 
 88 85 | # OK (too long)
 
-SIM108.py:97:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
+SIM108.py:105:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
     |
- 97 |   # SIM108 (without fix due to trailing comment)
- 98 | / if True:
- 99 | |     exitcode = 0
-100 | | else:
-101 | |     exitcode = 1  # Trailing comment
+105 |   # SIM108 (without fix due to trailing comment)
+106 | / if True:
+107 | |     exitcode = 0
+108 | | else:
+109 | |     exitcode = 1  # Trailing comment
     | |________________^ SIM108
     |
     = help: Replace `if`-`else`-block with `exitcode = 0 if True else 1`
 
-SIM108.py:104:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+SIM108.py:112:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
     |
-104 |   # SIM108
-105 | / if True: x = 3  # Foo
-106 | | else: x = 5
+112 |   # SIM108
+113 | / if True: x = 3  # Foo
+114 | | else: x = 5
     | |___________^ SIM108
     |
     = help: Replace `if`-`else`-block with `x = 3 if True else 5`
 
-SIM108.py:109:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+SIM108.py:117:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
     |
-109 |   # SIM108
-110 | / if True:  # Foo
-111 | |     x = 3
-112 | | else:
-113 | |     x = 5
+117 |   # SIM108
+118 | / if True:  # Foo
+119 | |     x = 3
+120 | | else:
+121 | |     x = 5
     | |_________^ SIM108
     |
     = help: Replace `if`-`else`-block with `x = 3 if True else 5`
