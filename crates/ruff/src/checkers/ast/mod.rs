@@ -4747,63 +4747,7 @@ impl<'a> Checker<'a> {
             return;
         };
         match self.ctx.resolve_reference(id, expr.range()) {
-            ResolvedReference::Resolved(scope_id, binding_id) => {
-                // If the name of the sub-importation is the same as an alias of another
-                // importation and the alias is used, that sub-importation should be
-                // marked as used too.
-                //
-                // For example, mark `pa` as used in:
-                //
-                // ```python
-                // import pyarrow as pa
-                // import pyarrow.csv
-                // print(pa.csv.read_csv("test.csv"))
-                // ```
-                match &self.ctx.bindings[binding_id].kind {
-                    BindingKind::Importation(Importation { name, full_name })
-                    | BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) =>
-                    {
-                        let has_alias = full_name
-                            .split('.')
-                            .last()
-                            .map(|segment| &segment != name)
-                            .unwrap_or_default();
-                        if has_alias {
-                            // Mark the sub-importation as used.
-                            if let Some(binding_id) = self.ctx.scopes[scope_id].get(full_name) {
-                                let context = self.ctx.execution_context();
-                                self.ctx.bindings[*binding_id].mark_used(
-                                    self.ctx.scope_id,
-                                    expr.range(),
-                                    context,
-                                );
-                            }
-                        }
-                    }
-                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
-                        let has_alias = full_name
-                            .split('.')
-                            .last()
-                            .map(|segment| &segment != name)
-                            .unwrap_or_default();
-                        if has_alias {
-                            // Mark the sub-importation as used.
-                            if let Some(binding_id) =
-                                self.ctx.scopes[scope_id].get(full_name.as_str())
-                            {
-                                let context = self.ctx.execution_context();
-                                self.ctx.bindings[*binding_id].mark_used(
-                                    self.ctx.scope_id,
-                                    expr.range(),
-                                    context,
-                                );
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            ResolvedReference::ImplicitGlobal => {
+            ResolvedReference::Resolved(..) | ResolvedReference::ImplicitGlobal => {
                 // Nothing to do.
             }
             ResolvedReference::StarImport => {

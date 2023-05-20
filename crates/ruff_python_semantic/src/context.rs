@@ -120,9 +120,16 @@ impl<'a> Context<'a> {
         // should prefer it over local resolutions.
         if self.in_deferred_type_definition() {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
+                // Mark the binding as used.
                 let context = self.execution_context();
                 self.bindings[*binding_id].mark_used(ScopeId::global(), range, context);
-                return ResolvedReference::Resolved(ScopeId::global(), *binding_id);
+
+                // Mark any submodule aliases as used.
+                if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), *binding_id) {
+                    self.bindings[binding_id].mark_used(ScopeId::global(), range, context);
+                }
+
+                return ResolvedReference::Resolved(*binding_id);
             }
         }
 
@@ -151,6 +158,11 @@ impl<'a> Context<'a> {
                 let context = self.execution_context();
                 self.bindings[*binding_id].mark_used(self.scope_id, range, context);
 
+                // Mark any submodule aliases as used.
+                if let Some(binding_id) = self.resolve_submodule(scope_id, *binding_id) {
+                    self.bindings[binding_id].mark_used(ScopeId::global(), range, context);
+                }
+
                 // But if it's a type annotation, don't treat it as resolved, unless we're in a
                 // forward reference. For example, given:
                 //
@@ -167,7 +179,7 @@ impl<'a> Context<'a> {
                     continue;
                 }
 
-                return ResolvedReference::Resolved(scope_id, *binding_id);
+                return ResolvedReference::Resolved(*binding_id);
             }
 
             // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
@@ -200,6 +212,41 @@ impl<'a> Context<'a> {
         } else {
             ResolvedReference::NotFound
         }
+    }
+
+    /// Given a `BindingId`, return the `BindingId` of the submodule import that it aliases.
+    fn resolve_submodule(&self, scope_id: ScopeId, binding_id: BindingId) -> Option<BindingId> {
+        // If the name of a submodule import is the same as an alias of another import, and the
+        // alias is used, then the submodule import should be marked as used too.
+        //
+        // For example, mark `pyarrow.csv` as used in:
+        //
+        // ```python
+        // import pyarrow as pa
+        // import pyarrow.csv
+        // print(pa.csv.read_csv("test.csv"))
+        // ```
+        let (name, full_name) = match &self.bindings[binding_id].kind {
+            BindingKind::Importation(Importation { name, full_name }) => (*name, *full_name),
+            BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) => {
+                (*name, *full_name)
+            }
+            BindingKind::FromImportation(FromImportation { name, full_name }) => {
+                (*name, full_name.as_str())
+            }
+            _ => return None,
+        };
+
+        let has_alias = full_name
+            .split('.')
+            .last()
+            .map(|segment| segment != name)
+            .unwrap_or_default();
+        if !has_alias {
+            return None;
+        }
+
+        self.scopes[scope_id].get(full_name).copied()
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
@@ -801,7 +848,7 @@ pub struct Snapshot {
 #[derive(Debug)]
 pub enum ResolvedReference {
     /// The reference is resolved to a specific binding.
-    Resolved(ScopeId, BindingId),
+    Resolved(BindingId),
     /// The reference is resolved to a context-specific, implicit global (e.g., `__class__` within
     /// a class scope).
     ImplicitGlobal,
