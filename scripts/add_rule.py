@@ -50,14 +50,14 @@ def add_test_case(
     sort_test_cases(plugin_module, nb_digit, test_case_to_add=test_case_to_add)
 
 
-def add_exports(rules_dir: Path, name: str, linter: str) -> None:
+def add_exports(plugin_module: Path, name: str, linter: str) -> None:
     """Add the exports."""
     rule_name_snake = snake_case(name)
     new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
     new_mod = f"mod {rule_name_snake};"
 
     try:
-        sort_exports(rules_dir, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
+        sort_exports(plugin_module, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
     except FileNotFoundError:
         print(
             f"'{linter}' use a deprecated rules architecture.\n"
@@ -66,14 +66,14 @@ def add_exports(rules_dir: Path, name: str, linter: str) -> None:
 
 
 def add_rule_function(
-    rules_dir: Path,
+    plugin_module: Path,
     name: str,
     prefix: str,
     code: str,
 ) -> None:
     """Add the relevant rule function."""
     rule_name_snake = snake_case(name)
-    with (rules_dir / f"{rule_name_snake}.rs").open("w") as fp:
+    with (plugin_module / "rules" / f"{rule_name_snake}.rs").open("w") as fp:
         fp.write(
             f"""\
 use ruff_diagnostics::Violation;
@@ -117,12 +117,11 @@ def add_code_to_rule_pair(
 def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     """Generate boilerplate for a new rule."""
     plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
-    rules_dir = plugin_module / "rules"
 
     create_test_fixture(prefix, code, linter)
     add_test_case(plugin_module, name, prefix, code, linter)
-    add_exports(rules_dir, name, linter)
-    add_rule_function(rules_dir, name, prefix, code)
+    add_exports(plugin_module, name, linter)
+    add_rule_function(plugin_module, name, prefix, code)
     add_code_to_rule_pair(name, code, linter)
 
 
