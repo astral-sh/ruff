@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::Rule;
 
 #[violation]
@@ -171,7 +171,11 @@ fn create_remove_param_fix(locator: &Locator, expr: &ExprCall, mode_param: &Expr
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &ExprCall) {
+pub(crate) fn redundant_open_modes(
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
+    expr: &ExprCall,
+) {
     // If `open` has been rebound, skip this check entirely.
     if !checker.ctx.is_builtin(OPEN_FUNC_NAME) {
         return;
@@ -185,7 +189,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &ExprCall) {
             }) = &keyword.value
             {
                 if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                    checker.diagnostics.push(create_check(
+                    diagnostics.push(create_check(
                         expr,
                         &keyword.value,
                         mode.replacement_value(),
@@ -202,7 +206,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &ExprCall) {
         }) = &mode_param
         {
             if let Ok(mode) = OpenMode::from_str(mode_param_value.as_str()) {
-                checker.diagnostics.push(create_check(
+                diagnostics.push(create_check(
                     expr,
                     mode_param,
                     mode.replacement_value(),

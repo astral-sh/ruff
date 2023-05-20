@@ -7,7 +7,7 @@ use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::AsRule;
 
 #[violation]
@@ -54,7 +54,8 @@ fn generate_fix(
 
 /// UP022
 pub(crate) fn replace_stdout_stderr(
-    checker: &mut Checker,
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
     ExprCall {
         func,
         args,
@@ -100,6 +101,6 @@ pub(crate) fn replace_stdout_stderr(
                 generate_fix(checker.locator, func, args, keywords, stdout, stderr)
             });
         }
-        checker.diagnostics.push(diagnostic);
+        diagnostics.push(diagnostic);
     }
 }

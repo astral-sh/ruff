@@ -6,7 +6,7 @@ use rustpython_parser::ast::{self, Expr, ExprCall, Operator, Ranged};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -65,7 +65,8 @@ fn union(elts: &[Expr]) -> Expr {
 
 /// UP038
 pub(crate) fn use_pep604_isinstance(
-    checker: &mut Checker,
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
     ExprCall {
         func, args, range, ..
     }: &ExprCall,
@@ -97,7 +98,7 @@ pub(crate) fn use_pep604_isinstance(
                         types.range(),
                     )));
                 }
-                checker.diagnostics.push(diagnostic);
+                diagnostics.push(diagnostic);
             }
         }
     }

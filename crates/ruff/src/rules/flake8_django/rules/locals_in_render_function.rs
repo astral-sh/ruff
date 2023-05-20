@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{self, Expr, ExprCall, Keyword, Ranged};
+use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 
 /// ## What it does
 /// Checks for the use of `locals()` in `render` functions.
@@ -44,13 +44,14 @@ impl Violation for DjangoLocalsInRenderFunction {
 
 /// DJ003
 pub(crate) fn locals_in_render_function(
-    checker: &mut Checker,
-    ExprCall {
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
+    ast::ExprCall {
         func,
         args,
         keywords,
         ..
-    }: &ExprCall,
+    }: &ast::ExprCall,
 ) {
     if !checker
         .ctx
@@ -79,13 +80,13 @@ pub(crate) fn locals_in_render_function(
         return;
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    diagnostics.push(Diagnostic::new(
         DjangoLocalsInRenderFunction,
         locals.range(),
     ));
 }
 
-fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
+fn is_locals_call(checker: &ImmutableChecker, expr: &Expr) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false
     };

@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::scope::ScopeKind;
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes;
 
@@ -33,7 +33,8 @@ fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 
 /// UP008
 pub(crate) fn super_call_with_parameters(
-    checker: &mut Checker,
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
     ExprCall {
         func, args, range, ..
     }: &ExprCall,
@@ -105,5 +106,5 @@ pub(crate) fn super_call_with_parameters(
             diagnostic.set_fix(Fix::unspecified(edit));
         }
     }
-    checker.diagnostics.push(diagnostic);
+    diagnostics.push(diagnostic);
 }

@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::Rule;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -130,7 +130,8 @@ fn replace_with_bytes_literal(locator: &Locator, range: TextRange) -> Fix {
 
 /// UP012
 pub(crate) fn unnecessary_encode_utf8(
-    checker: &mut Checker,
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
     ExprCall {
         func,
         args,
@@ -160,7 +161,7 @@ pub(crate) fn unnecessary_encode_utf8(
                     if checker.patch(Rule::UnnecessaryEncodeUTF8) {
                         diagnostic.set_fix(replace_with_bytes_literal(checker.locator, *range));
                     }
-                    checker.diagnostics.push(diagnostic);
+                    diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode(encoding="utf-8")` to
                     // `"unicode text©".encode()`.
@@ -183,7 +184,7 @@ pub(crate) fn unnecessary_encode_utf8(
                             )
                         });
                     }
-                    checker.diagnostics.push(diagnostic);
+                    diagnostics.push(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode("utf-8")` to `"unicode text©".encode()`.
                     let mut diagnostic = Diagnostic::new(
@@ -205,7 +206,7 @@ pub(crate) fn unnecessary_encode_utf8(
                             )
                         });
                     }
-                    checker.diagnostics.push(diagnostic);
+                    diagnostics.push(diagnostic);
                 }
             }
         }
@@ -234,7 +235,7 @@ pub(crate) fn unnecessary_encode_utf8(
                             )
                         });
                     }
-                    checker.diagnostics.push(diagnostic);
+                    diagnostics.push(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode("utf-8")` to `f"unicode text©".encode()`.
                     let mut diagnostic = Diagnostic::new(
@@ -256,7 +257,7 @@ pub(crate) fn unnecessary_encode_utf8(
                             )
                         });
                     }
-                    checker.diagnostics.push(diagnostic);
+                    diagnostics.push(diagnostic);
                 }
             }
         }

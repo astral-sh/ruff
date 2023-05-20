@@ -36,7 +36,7 @@ pub(crate) use type_of_primitive::{type_of_primitive, TypeOfPrimitive};
 pub(crate) use typing_text_str_alias::{typing_text_str_alias, TypingTextStrAlias};
 pub(crate) use unicode_kind_prefix::{unicode_kind_prefix, UnicodeKindPrefix};
 pub(crate) use unnecessary_builtin_import::{unnecessary_builtin_import, UnnecessaryBuiltinImport};
-pub(crate) use unnecessary_coding_comment::UTF8EncodingDeclaration;
+pub(crate) use unnecessary_coding_comment::{unnecessary_coding_comment, UTF8EncodingDeclaration};
 pub(crate) use unnecessary_encode_utf8::{unnecessary_encode_utf8, UnnecessaryEncodeUTF8};
 pub(crate) use unnecessary_future_import::{unnecessary_future_import, UnnecessaryFutureImport};
 pub(crate) use unpacked_list_comprehension::{

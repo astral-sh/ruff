@@ -6,7 +6,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::is_implicit_concatenation;
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -44,7 +44,8 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 
 /// UP018
 pub(crate) fn native_literals(
-    checker: &mut Checker,
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
     ExprCall {
         func,
         args,
@@ -80,7 +81,7 @@ pub(crate) fn native_literals(
                     *range,
                 )));
             }
-            checker.diagnostics.push(diagnostic);
+            diagnostics.push(diagnostic);
             return;
         };
 
@@ -133,6 +134,6 @@ pub(crate) fn native_literals(
                 *range,
             )));
         }
-        checker.diagnostics.push(diagnostic);
+        diagnostics.push(diagnostic);
     }
 }

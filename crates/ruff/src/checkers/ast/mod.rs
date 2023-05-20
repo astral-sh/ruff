@@ -77,6 +77,16 @@ pub(crate) struct Checker<'a> {
     deferred: Deferred<'a>,
     // Check-specific state.
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
+    // Dispatches
+    rules: Vec<fn(&mut Vec<Diagnostic>, &ImmutableChecker, &ast::ExprCall)>,
+}
+
+pub(crate) struct ImmutableChecker<'a> {
+    pub(crate) settings: &'a Settings,
+    pub(crate) locator: &'a Locator<'a>,
+    pub(crate) stylist: &'a Stylist<'a>,
+    pub(crate) indexer: &'a Indexer,
+    pub(crate) ctx: &'a Context<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -93,6 +103,50 @@ impl<'a> Checker<'a> {
         indexer: &'a Indexer,
         importer: Importer<'a>,
     ) -> Checker<'a> {
+        let mut rules: Vec<fn(&mut Vec<Diagnostic>, &ImmutableChecker, &ast::ExprCall)> = vec![];
+
+        // flake8-django
+        if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
+            rules.push(flake8_django::rules::locals_in_render_function);
+        }
+
+        // pyupgrade
+        if settings.rules.enabled(Rule::DeprecatedUnittestAlias) {
+            rules.push(pyupgrade::rules::deprecated_unittest_alias);
+        }
+        if settings.rules.enabled(Rule::SuperCallWithParameters) {
+            rules.push(pyupgrade::rules::super_call_with_parameters);
+        }
+        if settings.rules.enabled(Rule::UnnecessaryEncodeUTF8) {
+            rules.push(pyupgrade::rules::unnecessary_encode_utf8);
+        }
+        if settings.rules.enabled(Rule::RedundantOpenModes) {
+            rules.push(pyupgrade::rules::redundant_open_modes);
+        }
+        if settings.rules.enabled(Rule::NativeLiterals) {
+            rules.push(pyupgrade::rules::native_literals);
+        }
+        if settings.rules.enabled(Rule::OpenAlias) {
+            rules.push(pyupgrade::rules::open_alias);
+        }
+        if settings.rules.enabled(Rule::ReplaceUniversalNewlines) {
+            rules.push(pyupgrade::rules::replace_universal_newlines);
+        }
+        if settings.rules.enabled(Rule::ReplaceStdoutStderr) {
+            rules.push(pyupgrade::rules::replace_stdout_stderr);
+        }
+        if settings.rules.enabled(Rule::OSErrorAlias) {
+            rules.push(pyupgrade::rules::os_error_alias_call);
+        }
+        if settings.rules.enabled(Rule::NonPEP604Isinstance)
+            && settings.target_version >= PythonVersion::Py310
+        {
+            rules.push(pyupgrade::rules::use_pep604_isinstance);
+        }
+        if settings.rules.enabled(Rule::TypeOfPrimitive) {
+            rules.push(pyupgrade::rules::type_of_primitive);
+        }
+
         Checker {
             settings,
             noqa_line_for,
@@ -110,7 +164,43 @@ impl<'a> Checker<'a> {
             diagnostics: Vec::default(),
             deletions: FxHashSet::default(),
             flake8_bugbear_seen: Vec::default(),
+            rules,
         }
+    }
+}
+
+impl<'a> ImmutableChecker<'a> {
+    /// Return `true` if a patch should be generated under the given autofix
+    /// `Mode`.
+    pub(crate) fn patch(&self, code: Rule) -> bool {
+        self.settings.rules.should_fix(code)
+    }
+
+    /// Create a [`Generator`] to generate source code based on the current AST state.
+    pub(crate) fn generator(&self) -> Generator {
+        fn quote_style(context: &Context, locator: &Locator, indexer: &Indexer) -> Option<Quote> {
+            if !context.in_f_string() {
+                return None;
+            }
+
+            // Find the quote character used to start the containing f-string.
+            let expr = context.expr()?;
+            let string_range = indexer.f_string_range(expr.start())?;
+            let trailing_quote = trailing_quote(locator.slice(string_range))?;
+
+            // Invert the quote character, if it's a single quote.
+            match *trailing_quote {
+                "'" => Some(Quote::Double),
+                "\"" => Some(Quote::Single),
+                _ => None,
+            }
+        }
+
+        Generator::new(
+            self.stylist.indentation(),
+            quote_style(&self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
+            self.stylist.line_ending(),
+        )
     }
 }
 
@@ -2568,53 +2658,15 @@ where
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
             Expr::Call(call) => {
-                let mut rules: Vec<fn(&mut Checker, &ast::ExprCall)> = vec![];
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::DjangoLocalsInRenderFunction)
-                {
-                    rules.push(flake8_django::rules::locals_in_render_function);
-                }
-
-                // pyupgrade
-                if self.settings.rules.enabled(Rule::DeprecatedUnittestAlias) {
-                    rules.push(pyupgrade::rules::deprecated_unittest_alias);
-                }
-                if self.settings.rules.enabled(Rule::SuperCallWithParameters) {
-                    rules.push(pyupgrade::rules::super_call_with_parameters);
-                }
-                if self.settings.rules.enabled(Rule::UnnecessaryEncodeUTF8) {
-                    rules.push(pyupgrade::rules::unnecessary_encode_utf8);
-                }
-                if self.settings.rules.enabled(Rule::RedundantOpenModes) {
-                    rules.push(pyupgrade::rules::redundant_open_modes);
-                }
-                if self.settings.rules.enabled(Rule::NativeLiterals) {
-                    rules.push(pyupgrade::rules::native_literals);
-                }
-                if self.settings.rules.enabled(Rule::OpenAlias) {
-                    rules.push(pyupgrade::rules::open_alias);
-                }
-                if self.settings.rules.enabled(Rule::ReplaceUniversalNewlines) {
-                    rules.push(pyupgrade::rules::replace_universal_newlines);
-                }
-                if self.settings.rules.enabled(Rule::ReplaceStdoutStderr) {
-                    rules.push(pyupgrade::rules::replace_stdout_stderr);
-                }
-                if self.settings.rules.enabled(Rule::OSErrorAlias) {
-                    rules.push(pyupgrade::rules::os_error_alias_call);
-                }
-                if self.settings.rules.enabled(Rule::NonPEP604Isinstance)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    rules.push(pyupgrade::rules::use_pep604_isinstance);
-                }
-                if self.settings.rules.enabled(Rule::TypeOfPrimitive) {
-                    rules.push(pyupgrade::rules::type_of_primitive);
-                }
-                for rule in rules {
-                    rule(self, call);
+                let immutable_checker = ImmutableChecker {
+                    settings: self.settings,
+                    locator: self.locator,
+                    stylist: self.stylist,
+                    indexer: self.indexer,
+                    ctx: &self.ctx,
+                };
+                for rule in &self.rules {
+                    rule(&mut self.diagnostics, &immutable_checker, call);
                 }
 
                 let ast::ExprCall {

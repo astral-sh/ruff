@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Expr, ExprCall};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::AsRule;
 
 #[violation]
@@ -48,11 +48,12 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
 });
 
 /// UP005
-pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, ExprCall { func, .. }: &ExprCall) {
+pub(crate) fn deprecated_unittest_alias(
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
+    ExprCall { func, .. }: &ExprCall,
+) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, range, .. }) = func.as_ref() else {
-        return;
-    };
-    let Some(target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
         return;
     };
     let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
@@ -61,6 +62,9 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, ExprCall { func, 
     if id != "self" {
         return;
     }
+    let Some(target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
+        return;
+    };
     let mut diagnostic = Diagnostic::new(
         DeprecatedUnittestAlias {
             alias: attr.to_string(),
@@ -75,5 +79,5 @@ pub(crate) fn deprecated_unittest_alias(checker: &mut Checker, ExprCall { func, 
             *range,
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    diagnostics.push(diagnostic);
 }

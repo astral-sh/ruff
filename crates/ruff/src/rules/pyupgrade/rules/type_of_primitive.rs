@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr, ExprCall};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::AsRule;
 
 use super::super::types::Primitive;
@@ -28,7 +28,8 @@ impl AlwaysAutofixableViolation for TypeOfPrimitive {
 
 /// UP003
 pub(crate) fn type_of_primitive(
-    checker: &mut Checker,
+    diagnostics: &mut Vec<Diagnostic>,
+    checker: &ImmutableChecker,
     ExprCall {
         func, args, range, ..
     }: &ExprCall,
@@ -57,5 +58,5 @@ pub(crate) fn type_of_primitive(
             *range,
         )));
     }
-    checker.diagnostics.push(diagnostic);
+    diagnostics.push(diagnostic);
 }
