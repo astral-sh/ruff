@@ -171,3 +171,19 @@ def f():
         if x > y:
             return False
     return True
+
+
+def f():
+    # SIM111
+    for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9":
+        if x.isdigit():
+            return False
+    return True
+
+
+def f():
+    # OK (too long)
+    for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß90":
+        if x.isdigit():
+            return False
+    return True
