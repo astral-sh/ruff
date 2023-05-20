@@ -212,5 +212,41 @@ SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts 
 91    |-    ):
 92    |-        print("hello")
    89 |+    print("hello")
+93 90 | 
+94 91 | # SIM117 (auto-fixable)
+95 92 | with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
+
+SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+95 |   # SIM117 (auto-fixable)
+96 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
+97 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+   | |__________________________________________________^ SIM117
+98 |           print("hello")
+   |
+   = help: Combine `with` statements
+
+ℹ Suggested fix
+92 92 |         print("hello")
+93 93 | 
+94 94 | # SIM117 (auto-fixable)
+95    |-with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
+96    |-    with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+97    |-        print("hello")
+   95 |+with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a, B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+   96 |+    print("hello")
+98 97 | 
+99 98 | # SIM117 (not auto-fixable too long)
+100 99 | with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
+
+SIM117.py:100:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+    |
+100 |   # SIM117 (not auto-fixable too long)
+101 | / with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
+102 | |     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+    | |__________________________________________________^ SIM117
+103 |           print("hello")
+    |
+    = help: Combine `with` statements
 
 

@@ -90,3 +90,13 @@ with (
         D() as d,
     ):
         print("hello")
+
+# SIM117 (auto-fixable)
+with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
+    with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+        print("hello")
+
+# SIM117 (not auto-fixable too long)
+with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ890") as a:
+    with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+        print("hello")
