@@ -64,13 +64,13 @@ def sort_test_cases(
 
 
 def sort_exports(
-    rules_dir: Path,
+    plugin_module: Path,
     *,
     pub_use_to_add: Optional[str] = None,
     mod_to_add: Optional[str] = None,
 ) -> None:
     """Sort the exports."""
-    rules_mod = rules_dir / "mod.rs"
+    rules_mod = plugin_module / "rules" / "mod.rs"
 
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
@@ -183,14 +183,13 @@ def sort_code_to_rule_pairs(
         fp.write(text)
 
 
-def main(*, linter: str, nb_digit: int) -> None:
+def sort_linter(*, linter: str, nb_digit: int) -> None:
     """Sort the code of the linter."""
     plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
-    mod_dir = plugin_module / "rules" / "mod.rs"
 
     sort_test_cases(plugin_module, nb_digit)
     try:
-        sort_exports(mod_dir)
+        sort_exports(plugin_module)
     except FileNotFoundError:
         print(f"'{linter}' use a deprecated rules architecture, skip sorting exports.")
     sort_code_to_violation_pairs(linter)
