@@ -14,6 +14,17 @@ mod tests {
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
+    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
+    fn paths(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pandas_vet").join(path).as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(
         r#"
         import pandas as pd
@@ -357,16 +368,5 @@ mod tests {
         let diagnostics =
             test_snippet(contents, &settings::Settings::for_rules(&Linter::PandasVet));
         assert_messages!(snapshot, diagnostics);
-    }
-
-    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
-    fn paths(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("pandas_vet").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
     }
 }
