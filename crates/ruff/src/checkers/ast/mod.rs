@@ -4841,13 +4841,6 @@ impl<'a> Checker<'a> {
                         return;
                     }
 
-                    // Allow "__module__" and "__qualname__" in class scopes.
-                    if (id == "__module__" || id == "__qualname__")
-                        && matches!(self.ctx.scope().kind, ScopeKind::Class(..))
-                    {
-                        return;
-                    }
-
                     // Avoid flagging if `NameError` is handled.
                     if self
                         .ctx

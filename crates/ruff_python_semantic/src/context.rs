@@ -126,11 +126,19 @@ impl<'a> Context<'a> {
             }
         }
 
+        let mut seen_function = false;
         let mut import_starred = false;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
-                if symbol == "__class__" {
+                // Allow usages of `__class__` within methods, e.g.:
+                //
+                // ```python
+                // class Foo:
+                //     def __init__(self):
+                //         print(__class__)
+                // ```
+                if seen_function && matches!(symbol, "__class__") {
                     return ResolvedReference::ImplicitGlobal;
                 }
                 if index > 0 {
@@ -162,6 +170,28 @@ impl<'a> Context<'a> {
                 return ResolvedReference::Resolved(scope_id, *binding_id);
             }
 
+            // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
+            //
+            // ```python
+            // class Foo:
+            //     print(__qualname__)
+            // ```
+            //
+            // Intentionally defer this check to _after_ the standard `scope.get` logic, so that
+            // we properly attribute reads to overridden class members, e.g.:
+            //
+            // ```python
+            // class Foo:
+            //     __qualname__ = "Bar"
+            //     print(__qualname__)
+            // ```
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return ResolvedReference::ImplicitGlobal;
+                }
+            }
+
+            seen_function |= scope.kind.is_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 

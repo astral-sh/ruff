@@ -473,6 +473,16 @@ mod tests {
         "#,
             &[Rule::UndefinedName],
         );
+        flakes(
+            r#"
+        def f():
+            __qualname__ = 1
+
+            class Foo:
+                __qualname__
+        "#,
+            &[Rule::UnusedVariable],
+        );
     }
 
     #[test]
@@ -1150,6 +1160,40 @@ mod tests {
         t = Test()
         "#,
             &[],
+        );
+        flakes(
+            r#"
+        class Test(object):
+            print(__class__.__name__)
+
+            def __init__(self):
+                self.x = 1
+
+        t = Test()
+        "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        class Test(object):
+            X = [__class__ for _ in range(10)]
+
+            def __init__(self):
+                self.x = 1
+
+        t = Test()
+        "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        def f(self):
+            print(__class__.__name__)
+            self.x = 1
+
+        f()
+        "#,
+            &[Rule::UndefinedName],
         );
     }
 
