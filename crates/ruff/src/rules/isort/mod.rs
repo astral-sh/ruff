@@ -19,7 +19,7 @@ use types::{AliasData, EitherImport, TrailingComma};
 
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
-use crate::settings::options::TabSize;
+use crate::settings::options::LineWidth;
 use crate::settings::types::PythonVersion;
 
 mod annotate;
@@ -66,9 +66,8 @@ pub(crate) fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
     locator: &Locator,
-    line_length: usize,
-    indentation_width: usize,
-    tab_size: TabSize,
+    line_length: LineWidth,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -111,7 +110,6 @@ pub(crate) fn format_imports(
             block,
             line_length,
             indentation_width,
-            tab_size,
             stylist,
             src,
             package,
@@ -167,9 +165,8 @@ pub(crate) fn format_imports(
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn format_import_block(
     block: ImportBlock,
-    line_length: usize,
-    indentation_width: usize,
-    tab_size: TabSize,
+    line_length: LineWidth,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -272,7 +269,6 @@ fn format_import_block(
                         &aliases,
                         line_length,
                         indentation_width,
-                        tab_size,
                         stylist,
                         force_wrap_aliases,
                         is_first_statement,

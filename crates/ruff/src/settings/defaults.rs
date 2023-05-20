@@ -16,7 +16,7 @@ use crate::rules::{
 };
 use crate::settings::types::FilePatternSet;
 
-use super::options::TabSize;
+use super::options::{LineWidth, TabSize};
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
 
@@ -26,10 +26,6 @@ pub const PREFIXES: &[RuleSelector] = &[
 ];
 
 pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
-
-pub const LINE_LENGTH: usize = 88;
-
-pub const TAB_SIZE: TabSize = TabSize(4);
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
@@ -79,8 +75,8 @@ impl Default for Settings {
             force_exclude: false,
             ignore_init_module_imports: false,
             include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
-            line_length: LINE_LENGTH,
-            tab_size: TAB_SIZE,
+            line_length: LineWidth::default(),
+            tab_size: TabSize::default(),
             namespace_packages: vec![],
             per_file_ignores: vec![],
             respect_gitignore: true,

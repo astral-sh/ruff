@@ -366,12 +366,14 @@
     },
     "line-length": {
       "description": "The line length to use when enforcing long-lines violations (like `E501`).",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint",
-      "minimum": 0.0
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LineWidth"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "mccabe": {
       "description": "Options for the `mccabe` plugin.",
@@ -505,12 +507,14 @@
     },
     "tab-size": {
       "description": "The tabulation size to calculate line length.",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint8",
-      "minimum": 0.0
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TabSize"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "target-version": {
       "description": "The Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, the target version will be inferred from the `project.requires-python` field in the relevant `pyproject.toml` (e.g., `requires-python = \">=3.8\"`), if present.",
@@ -1285,6 +1289,19 @@
       },
       "additionalProperties": false
     },
+    "LineWidth": {
+      "type": "object",
+      "required": [
+        "width"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
     "McCabeOptions": {
       "type": "object",
       "properties": {
@@ -1370,12 +1387,14 @@
         },
         "max-doc-length": {
           "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint",
-          "minimum": 0.0
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineWidth"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -2497,6 +2516,11 @@
           ]
         }
       ]
+    },
+    "TabSize": {
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
     },
     "Version": {
       "type": "string"

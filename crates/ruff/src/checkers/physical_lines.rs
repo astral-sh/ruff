@@ -184,6 +184,7 @@ mod tests {
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::registry::Rule;
+    use crate::settings::options::LineWidth;
     use crate::settings::Settings;
 
     use super::check_physical_lines;
@@ -196,7 +197,7 @@ mod tests {
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let stylist = Stylist::from_tokens(&tokens, &locator);
 
-        let check_with_max_line_length = |line_length: usize| {
+        let check_with_max_line_length = |line_length: LineWidth| {
             check_physical_lines(
                 Path::new("foo.py"),
                 &locator,
@@ -209,7 +210,8 @@ mod tests {
                 },
             )
         };
-        assert_eq!(check_with_max_line_length(8), vec![]);
-        assert_eq!(check_with_max_line_length(8), vec![]);
+        let line_length = LineWidth::from_line_length(8);
+        assert_eq!(check_with_max_line_length(line_length), vec![]);
+        assert_eq!(check_with_max_line_length(line_length), vec![]);
     }
 }

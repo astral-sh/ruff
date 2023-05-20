@@ -25,7 +25,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once_by_id;
 
-use self::options::TabSize;
+use self::options::{LineWidth, TabSize};
 use self::rule_table::RuleTable;
 
 pub mod configuration;
@@ -99,7 +99,7 @@ pub struct Settings {
     pub dummy_variable_rgx: Regex,
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
-    pub line_length: usize,
+    pub line_length: LineWidth,
     pub tab_size: TabSize,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
@@ -162,8 +162,8 @@ impl Settings {
                 config.include.unwrap_or_else(|| defaults::INCLUDE.clone()),
             )?,
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
-            line_length: config.line_length.unwrap_or(defaults::LINE_LENGTH),
-            tab_size: config.tab_size.unwrap_or(defaults::TAB_SIZE),
+            line_length: config.line_length.unwrap_or_default(),
+            tab_size: config.tab_size.unwrap_or_default(),
             namespace_packages: config.namespace_packages.unwrap_or_default(),
             per_file_ignores: resolve_per_file_ignores(
                 config

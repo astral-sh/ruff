@@ -158,6 +158,7 @@ mod tests {
         flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_import_conventions,
         flake8_pytest_style, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
+    use crate::settings::options::LineWidth;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
@@ -200,7 +201,7 @@ line-length = 79
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    line_length: Some(79),
+                    line_length: Some(LineWidth::from_line_length(79)),
                     ..Options::default()
                 })
             })
@@ -301,7 +302,7 @@ other-attribute = 1
             config,
             Options {
                 allowed_confusables: Some(vec!['−', 'ρ', '∗']),
-                line_length: Some(88),
+                line_length: Some(LineWidth::from_line_length(88)),
                 extend_exclude: Some(vec![
                     "excluded_file.py".to_string(),
                     "migrations".to_string(),

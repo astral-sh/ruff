@@ -50,5 +50,10 @@ pub(crate) fn doc_line_too_long(line: &Line, settings: &Settings) -> Option<Diag
         &settings.task_tags,
         settings.tab_size,
     )
-    .map(|overlong| Diagnostic::new(DocLineTooLong(overlong.width(), limit), overlong.range()))
+    .map(|overlong| {
+        Diagnostic::new(
+            DocLineTooLong(overlong.width(), limit.width()),
+            overlong.range(),
+        )
+    })
 }

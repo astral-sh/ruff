@@ -14,7 +14,7 @@ use ruff::rules::{
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
 };
 use ruff::settings::configuration::Configuration;
-use ruff::settings::options::Options;
+use ruff::settings::options::{LineWidth, Options, TabSize};
 use ruff::settings::{defaults, flags, Settings};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceLocation, Stylist};
@@ -102,8 +102,8 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         extend_unfixable: Some(Vec::default()),
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
-        line_length: Some(defaults::LINE_LENGTH),
-        tab_size: Some(defaults::TAB_SIZE),
+        line_length: Some(LineWidth::default()),
+        tab_size: Some(TabSize::default()),
         select: Some(defaults::PREFIXES.to_vec()),
         target_version: Some(defaults::TARGET_VERSION),
         // Ignore a bunch of options that don't make sense in a single-file editor.

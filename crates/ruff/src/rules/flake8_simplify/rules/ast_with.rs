@@ -10,7 +10,7 @@ use ruff_python_ast::newlines::StrExt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::WidthWithTabs;
+use crate::settings::options::LineWidth;
 
 use super::fix_with;
 
@@ -112,7 +112,7 @@ pub(crate) fn multiple_with_statements(
                         .unwrap_or_default()
                         .universal_newlines()
                         .all(|line| {
-                            line.width_with_tabs(checker.settings.tab_size, None)
+                            LineWidth::new(checker.settings.tab_size).add_str(&line)
                                 <= checker.settings.line_length
                         })
                     {

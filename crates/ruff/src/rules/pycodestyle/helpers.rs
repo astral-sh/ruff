@@ -1,11 +1,11 @@
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{self, Cmpop, Expr};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthStr;
 
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Generator;
 
-use crate::settings::options::TabSize;
+use crate::settings::options::{LineWidth, TabSize};
 
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -28,24 +28,19 @@ pub(crate) fn compare(
 
 pub(super) fn is_overlong(
     line: &Line,
-    limit: usize,
+    limit: LineWidth,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
     tab_size: TabSize,
 ) -> Option<Overlong> {
-    let tab_size: usize = tab_size.into();
     let mut start_offset = line.start();
-    let mut width = 0;
+    let mut width = LineWidth::new(tab_size);
 
     for c in line.chars() {
         if width < limit {
             start_offset += c.text_len();
         }
-        width += if matches!(c, '\t') {
-            tab_size - (width % tab_size)
-        } else {
-            c.width().unwrap_or(0)
-        };
+        width = width.add_char(c);
     }
 
     if width <= limit {
@@ -71,14 +66,14 @@ pub(super) fn is_overlong(
     // begins before the limit.
     let last_chunk = chunks.last().unwrap_or(second_chunk);
     if last_chunk.contains("://") {
-        if width - last_chunk.width() <= limit {
+        if width.width() - last_chunk.width() <= limit.width() {
             return None;
         }
     }
 
     Some(Overlong {
         range: TextRange::new(start_offset, line.end()),
-        width,
+        width: width.width(),
     })
 }
 
@@ -94,24 +89,5 @@ impl Overlong {
 
     pub(super) const fn width(&self) -> usize {
         self.width
-    }
-}
-
-pub(crate) trait WidthWithTabs {
-    fn width_with_tabs(&self, tab_size: TabSize, current_width: Option<usize>) -> usize;
-}
-
-impl WidthWithTabs for str {
-    fn width_with_tabs(&self, tab_size: TabSize, current_width: Option<usize>) -> usize {
-        let tab_size: usize = tab_size.into();
-        let current_width = current_width.unwrap_or(0);
-        self.chars().fold(current_width, |width, c| {
-            width
-                + if matches!(c, '\t') {
-                    tab_size - (width % tab_size)
-                } else {
-                    c.width().unwrap_or(0)
-                }
-        })
     }
 }

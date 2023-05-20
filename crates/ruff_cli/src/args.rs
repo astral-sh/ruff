@@ -9,6 +9,7 @@ use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
 use ruff::settings::configuration::RuleSelection;
+use ruff::settings::options::LineWidth;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
@@ -546,7 +547,7 @@ impl ConfigProcessor for &Overrides {
             config.force_exclude = Some(*force_exclude);
         }
         if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+            config.line_length = Some(LineWidth::from_line_length(*line_length));
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));

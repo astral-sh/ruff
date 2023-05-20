@@ -1,9 +1,6 @@
-use unicode_width::UnicodeWidthStr;
-
 use ruff_python_ast::source_code::Stylist;
 
-use crate::rules::pycodestyle::helpers::WidthWithTabs;
-use crate::settings::options::TabSize;
+use crate::settings::options::LineWidth;
 
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 
@@ -48,9 +45,8 @@ pub(crate) fn format_import_from(
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
-    line_length: usize,
-    indentation_width: usize,
-    tab_size: TabSize,
+    line_length: LineWidth,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     force_wrap_aliases: bool,
     is_first: bool,
@@ -67,7 +63,6 @@ pub(crate) fn format_import_from(
             aliases,
             is_first,
             stylist,
-            tab_size,
             indentation_width,
         );
         return single_line;
@@ -89,7 +84,6 @@ pub(crate) fn format_import_from(
             aliases,
             is_first,
             stylist,
-            tab_size,
             indentation_width,
         );
         if import_width <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
@@ -109,9 +103,8 @@ fn format_single_line(
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
     stylist: &Stylist,
-    tab_size: TabSize,
-    indentation_width: usize,
-) -> (String, usize) {
+    indentation_width: LineWidth,
+) -> (String, LineWidth) {
     let mut output = String::with_capacity(CAPACITY);
     let mut line_width = indentation_width;
 
@@ -127,28 +120,28 @@ fn format_single_line(
     output.push_str("from ");
     output.push_str(&module_name);
     output.push_str(" import ");
-    line_width += 5 + module_name.width() + 8;
+    line_width = line_width.add_width(5).add_str(&module_name).add_width(8);
 
     for (index, (AliasData { name, asname }, comments)) in aliases.iter().enumerate() {
         if let Some(asname) = asname {
             output.push_str(name);
             output.push_str(" as ");
             output.push_str(asname);
-            line_width += name.width() + 4 + asname.width();
+            line_width = line_width.add_str(name).add_width(4).add_str(asname);
         } else {
             output.push_str(name);
-            line_width += name.width();
+            line_width = line_width.add_str(name);
         }
         if index < aliases.len() - 1 {
             output.push_str(", ");
-            line_width += 2;
+            line_width = line_width.add_width(2);
         }
 
         for comment in &comments.inline {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_width = comment.width_with_tabs(tab_size, Some(line_width + 2));
+            line_width = line_width.add_width(2).add_str(comment);
         }
     }
 
@@ -156,7 +149,7 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_width = comment.width_with_tabs(tab_size, Some(line_width + 2));
+        line_width = line_width.add_width(2).add_str(comment);
     }
 
     output.push_str(&stylist.line_ending());

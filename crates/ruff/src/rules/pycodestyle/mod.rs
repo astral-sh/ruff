@@ -12,6 +12,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::options::LineWidth;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -166,7 +167,7 @@ mod tests {
             Path::new("pycodestyle/W505.py"),
             &settings::Settings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(50),
+                    max_doc_length: Some(LineWidth::from_line_length(50)),
                     ..Settings::default()
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)

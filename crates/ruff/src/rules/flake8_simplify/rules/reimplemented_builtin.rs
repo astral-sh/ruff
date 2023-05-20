@@ -9,7 +9,7 @@ use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
-use crate::rules::pycodestyle::helpers::WidthWithTabs;
+use crate::settings::options::LineWidth;
 
 #[violation]
 pub struct ReimplementedBuiltin {
@@ -224,12 +224,11 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                let tab_size = checker.settings.tab_size;
-                let mut width = checker.locator.contents()
-                    [TextRange::new(line_start, stmt.start())]
-                .width_with_tabs(tab_size, None);
-                width = contents.width_with_tabs(tab_size, Some(width));
-                if width > checker.settings.line_length {
+                if LineWidth::new(checker.settings.tab_size)
+                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+                    .add_str(&contents)
+                    > checker.settings.line_length
+                {
                     return;
                 }
 
@@ -318,12 +317,11 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                let tab_size = checker.settings.tab_size;
-                let mut width = checker.locator.contents()
-                    [TextRange::new(line_start, stmt.start())]
-                .width_with_tabs(tab_size, None);
-                width = contents.width_with_tabs(tab_size, Some(width));
-                if width > checker.settings.line_length {
+                if LineWidth::new(checker.settings.tab_size)
+                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+                    .add_str(&contents)
+                    > checker.settings.line_length
+                {
                     return;
                 }
 
