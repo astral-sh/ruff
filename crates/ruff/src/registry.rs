@@ -662,7 +662,7 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
     // flynt
     rules::flynt::rules::StaticJoinToFString,
-    // flake8-todo
+    // flake8-todos
     rules::flake8_todos::rules::InvalidTodoTag,
     rules::flake8_todos::rules::MissingTodoAuthor,
     rules::flake8_todos::rules::MissingTodoLink,
