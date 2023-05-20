@@ -141,7 +141,7 @@ def sort_code_to_violation_pairs(
                 fp.write("\n")
                 continue
 
-            if not line.strip().startswith("// "):
+            if not line.strip().startswith(("// ", ");")):
                 lines.append(line)
             else:
                 lines.sort()
