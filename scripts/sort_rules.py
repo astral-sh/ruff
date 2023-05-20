@@ -8,7 +8,6 @@ Example usage:
 """
 
 import argparse
-import contextlib
 from pathlib import Path
 from typing import Optional
 
@@ -122,11 +121,13 @@ def sort_code_to_rule_pairs(
 def main(*, linter: str, nb_digit: int) -> None:
     """Sort the code of the linter."""
     plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
-    rules_dir = plugin_module / "rules"
+    mod_dir = plugin_module / "rules" / "mod.rs"
 
     sort_test_cases(plugin_module, nb_digit)
-    with contextlib.suppress(FileNotFoundError):
-        sort_exports(rules_dir)
+    try:
+        sort_exports(mod_dir)
+    except FileNotFoundError:
+        print(f"'{linter}' use a deprecated rules architecture, skip sorting exports.")
     sort_code_to_rule_pairs(linter)
 
 
