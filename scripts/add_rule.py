@@ -94,7 +94,7 @@ impl Violation for {name} {{
             f"""
 /// {prefix}{code}
 pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
-"""
+""",
         )
 
 
