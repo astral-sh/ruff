@@ -50,13 +50,19 @@ def add_test_case(
     sort_test_cases(plugin_module, nb_digit, test_case_to_add=test_case_to_add)
 
 
-def add_exports(rules_dir: Path, name: str) -> None:
+def add_exports(rules_dir: Path, name: str, linter: str) -> None:
     """Add the exports."""
     rule_name_snake = snake_case(name)
     new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
     new_mod = f"mod {rule_name_snake};"
 
-    sort_exports(rules_dir, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
+    try:
+        sort_exports(rules_dir, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
+    except FileNotFoundError:
+        print(
+            f"'{linter}' use a deprecated rules architecture.\n"
+            "Please update the rules architecture to use the new one",
+        )
 
 
 def add_rule_function(
@@ -115,7 +121,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
 
     create_test_fixture(prefix, code, linter)
     add_test_case(plugin_module, name, prefix, code, linter)
-    add_exports(rules_dir, name)
+    add_exports(rules_dir, name, linter)
     add_rule_function(rules_dir, name, prefix, code)
     add_code_to_rule_pair(name, code, linter)
 
