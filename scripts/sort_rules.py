@@ -51,6 +51,10 @@ def sort_test_cases(
             else:
                 lines.append(line)
 
+        if not has_added_testcase:
+            fp.write("\n".join(lines))
+            fp.write("\n")
+
 
 def sort_exports(
     rules_dir: Path,
