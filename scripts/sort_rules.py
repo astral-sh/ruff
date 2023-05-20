@@ -8,6 +8,7 @@ Example usage:
 """
 
 import argparse
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -185,6 +186,7 @@ def sort_code_to_rule_pairs(
 
 def sort_linter(*, linter: str, nb_digit: int) -> None:
     """Sort the code of the linter."""
+    print(f"Sort '{linter}'.")
     plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
 
     sort_test_cases(plugin_module, nb_digit)
@@ -196,7 +198,26 @@ def sort_linter(*, linter: str, nb_digit: int) -> None:
     sort_code_to_rule_pairs(linter)
 
 
-if __name__ == "__main__":
+def get_linters() -> dict[str, int]:
+    """Get the linters."""
+    linters = {}
+    lines = (ROOT_DIR / "crates/ruff/src/codes.rs").read_text().splitlines()
+    linter = None
+    for line in lines:
+        m = re.match(r"^        // ([^,]*)$", line)
+        if m:
+            linter = m.group(1)
+        elif linter is not None:
+            m = re.match(r'^        \([A-Za-z0-9]+, "[A-Z]?([0-9]+)"', line)
+            if m:
+                nb_digit = len(m.group(1))
+                linters[linter] = nb_digit
+                linter = None
+    return linters
+
+
+def main() -> None:
+    """Sort the code of linters."""
     parser = argparse.ArgumentParser(
         description="Generate boilerplate for a new rule.",
         epilog=(
@@ -207,15 +228,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "--linter",
         type=str,
-        required=True,
         help="The source with which the check originated (e.g., 'flake8-pie').",
-    )
-    parser.add_argument(
-        "--nb-digit",
-        type=int,
-        default=3,
-        help="The number of digits in the rule code (e.g., '3').",
     )
     args = parser.parse_args()
 
-    main(linter=args.linter, nb_digit=args.nb_digit)
+    linters = get_linters()
+
+    if args.linter is None:
+        for linter, nb_digit in linters.items():
+            sort_linter(linter=linter, nb_digit=nb_digit)
+        return
+
+    nb_digit = linters.get(args.linter)
+    if nb_digit is None:
+        print(f"Unknown linter '{args.linter}'.")
+        return
+
+    sort_linter(linter=args.linter, nb_digit=nb_digit)
+
+
+if __name__ == "__main__":
+    main()
