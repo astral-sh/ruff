@@ -116,6 +116,16 @@ impl<'a> Context<'a> {
 
     /// Resolve a reference to the given symbol.
     pub fn resolve_reference(&mut self, symbol: &str, range: TextRange) -> ResolvedReference {
+        // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
+        // should prefer it over local resolutions.
+        if self.in_deferred_type_definition() {
+            if let Some(binding_id) = self.scopes.global().get(symbol) {
+                let context = self.execution_context();
+                self.bindings[*binding_id].mark_used(ScopeId::global(), range, context);
+                return ResolvedReference::Resolved(ScopeId::global(), *binding_id);
+            }
+        }
+
         let mut import_starred = false;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
@@ -750,7 +760,7 @@ impl ContextFlags {
 }
 
 /// A snapshot of the [`Context`] at a given point in the AST traversal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Snapshot {
     scope_id: ScopeId,
     stmt_id: Option<NodeId>,
