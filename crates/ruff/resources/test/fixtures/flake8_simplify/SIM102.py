@@ -86,9 +86,16 @@ while x > 0:
         ):
             print("Bad module!")
 
-# SIM102
-if node.module:
-    if node.module == "multiprocessing" or node.module.startswith(
+# SIM102 (auto-fixable)
+if node.module012345678:
+    if node.module == "multiprocß9💣2ℝ" or node.module.startswith(
+        "multiprocessing."
+    ):
+        print("Bad module!")
+
+# SIM102 (not auto-fixable)
+if node.module0123456789:
+    if node.module == "multiprocß9💣2ℝ" or node.module.startswith(
         "multiprocessing."
     ):
         print("Bad module!")
