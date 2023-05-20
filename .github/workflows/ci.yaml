@@ -122,6 +122,9 @@ jobs:
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
       - run: cargo check
       - run: cargo fmt --all --check
+      - run: ./scripts/sort_rules.py
+      - run: cargo check
+      - run: cargo fmt --all --check
 
   ecosystem:
     name: "ecosystem"
