@@ -236,7 +236,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    stmt.range(),
+                    TextRange::new(stmt.start(), loop_info.terminal),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
                     #[allow(deprecated)]
@@ -326,7 +326,7 @@ pub(crate) fn convert_for_loop_to_any_all(
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    stmt.range(),
+                    TextRange::new(stmt.start(), loop_info.terminal),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
                     #[allow(deprecated)]
