@@ -11,7 +11,15 @@ import argparse
 from pathlib import Path
 from typing import Optional
 
-from _utils import ROOT_DIR, dir_name, get_indent, key_mod, key_pub_use, key_test_case
+from _utils import (
+    ROOT_DIR,
+    dir_name,
+    get_indent,
+    key_code_to_rule_pair,
+    key_mod,
+    key_pub_use,
+    key_test_case,
+)
 
 
 def sort_test_cases(
@@ -164,7 +172,7 @@ def sort_code_to_rule_pairs(
 
         if code_to_rule_pair_to_add is not None:
             lines.append(code_to_rule_pair_to_add)
-        lines.sort()
+        lines.sort(key=key_code_to_rule_pair)
 
         text += "".join(lines)
         text += "\n"

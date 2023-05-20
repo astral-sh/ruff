@@ -44,3 +44,6 @@ def key_pub_use(line: str) -> str:
 
 def key_mod(line: str) -> str:
     return line.replace("pub(crate) ", "")
+
+def key_code_to_rule_pair(line: str) -> str:
+    return line.lstrip().replace("// Reserved: ", "")
