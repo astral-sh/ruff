@@ -20,6 +20,17 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, directives, settings};
 
+    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pandas_vet").join(path).as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     fn rule_code(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(&Linter::PandasVet);
@@ -277,16 +288,5 @@ mod tests {
     "#, &[Rule::PandasDfVariableName]; "PD901_fail_df_var")]
     fn test_pandas_vet(code: &str, expected: &[Rule]) {
         rule_code(code, expected);
-    }
-
-    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
-    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("pandas_vet").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
     }
 }
