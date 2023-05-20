@@ -28,7 +28,7 @@ def get_indent(line: str) -> str:
 def key_test_case(nb_digit: int) -> Callable[[str], tuple[str, int, str, int]]:
     def key(line: str) -> tuple[str, int, str, int]:
         *_, (rule, prefix, code, subcode) = re.findall(
-            r'Rule::(.*?), Path::new\((?:"([A-Z]+)([0-9]+)|.*?)(_[0-9]+)?(?:.py)"',
+            r'Rule::(.*?), Path::new\((?:"([A-Z]+)([0-9]+)|.*?)(_[0-9]+)?(?:.pyi?)"',
             line,
         )
         subcode = int(subcode[1:]) if subcode else -1
