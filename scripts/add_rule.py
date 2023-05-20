@@ -73,9 +73,11 @@ def add_rule_function(
 ) -> None:
     """Add the relevant rule function."""
     rule_name_snake = snake_case(name)
-    with (plugin_module / "rules" / f"{rule_name_snake}.rs").open("w") as fp:
-        fp.write(
-            f"""\
+    rule_path = plugin_module / "rules"
+    if not rule_path.exists():
+        rule_path.mkdir()
+    (rule_path/f"{rule_name_snake}.rs").write_text(
+        f"""\
 use ruff_diagnostics::Violation;
 use ruff_macros::{{derive_message_formats, violation}};
 
@@ -90,14 +92,10 @@ impl Violation for {name} {{
         format!("TODO: write message: {{}}", todo!("implement message"))
     }}
 }}
-""",
-        )
-        fp.write(
-            f"""
 /// {prefix}{code}
 pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
 """,
-        )
+    )
 
 
 def add_code_to_rule_pair(
