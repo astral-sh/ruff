@@ -51,11 +51,10 @@ pub(crate) fn adjust_indentation(
 
 /// Generate a fix to remove arguments from a `super` call.
 pub(crate) fn remove_super_arguments(
+    range: TextRange,
     locator: &Locator,
     stylist: &Stylist,
-    expr: &Expr,
 ) -> Option<Edit> {
-    let range = expr.range();
     let contents = locator.slice(range);
 
     let mut tree = libcst_native::parse_module(contents, None).ok()?;

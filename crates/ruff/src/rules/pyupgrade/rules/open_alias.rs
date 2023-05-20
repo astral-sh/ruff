@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Ranged};
+use rustpython_parser::ast::{ExprCall, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -23,7 +23,7 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn open_alias(checker: &mut Checker, ExprCall { func, range, .. }: &ExprCall) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -33,7 +33,7 @@ pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
             .ctx
             .find_binding("open")
             .map_or(true, |binding| binding.kind.is_builtin());
-        let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
+        let mut diagnostic = Diagnostic::new(OpenAlias, *range);
         if fixable && checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
+use rustpython_parser::ast::{self, Expr, ExprCall, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,9 +45,12 @@ impl Violation for DjangoLocalsInRenderFunction {
 /// DJ003
 pub(crate) fn locals_in_render_function(
     checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    ExprCall {
+        func,
+        args,
+        keywords,
+        ..
+    }: &ExprCall,
 ) {
     if !checker
         .ctx

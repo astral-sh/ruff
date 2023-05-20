@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, Expr, ExprCall};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,7 +27,12 @@ impl AlwaysAutofixableViolation for TypeOfPrimitive {
 }
 
 /// UP003
-pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn type_of_primitive(
+    checker: &mut Checker,
+    ExprCall {
+        func, args, range, ..
+    }: &ExprCall,
+) {
     if args.len() != 1 {
         return;
     }
@@ -44,12 +49,12 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     let Some(primitive) = Primitive::from_constant(value) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
+    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, *range);
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
             primitive.builtin(),
-            expr.range(),
+            *range,
         )));
     }
     checker.diagnostics.push(diagnostic);

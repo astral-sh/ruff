@@ -1,10 +1,9 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, Excepthandler, Expr, ExprCall, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
-
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -156,7 +155,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
 }
 
 /// UP024
-pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
+pub(crate) fn os_error_alias_call(checker: &mut Checker, ExprCall { func, .. }: &ExprCall) {
     if is_alias(&checker.ctx, func) {
         atom_diagnostic(checker, func);
     }

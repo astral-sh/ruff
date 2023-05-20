@@ -1,5 +1,5 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
+use rustpython_parser::ast::{ExprCall, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -23,7 +23,10 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
+pub(crate) fn replace_universal_newlines(
+    checker: &mut Checker,
+    ExprCall { func, keywords, .. }: &ExprCall,
+) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -31,8 +34,8 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwa
             call_path.as_slice() == ["subprocess", "run"]
         })
     {
-        let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
-        let range = TextRange::at(kwarg.start(), "universal_newlines".text_len());
+        let Some(keyword) = find_keyword(keywords, "universal_newlines") else { return; };
+        let range = TextRange::at(keyword.start(), "universal_newlines".text_len());
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]

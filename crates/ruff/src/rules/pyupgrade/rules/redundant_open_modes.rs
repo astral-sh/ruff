@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, ExprCall, Keyword, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -86,24 +86,24 @@ impl OpenMode {
     }
 }
 
-fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
-    if let Expr::Call(ast::ExprCall {
+fn match_open(
+    ExprCall {
         func,
         args,
         keywords,
         range: _,
-    }) = expr
-    {
-        if matches!(func.as_ref(), Expr::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
-            // Return the "open mode" parameter and keywords.
-            return (args.get(1), keywords.clone());
-        }
+    }: &ExprCall,
+) -> (Option<&Expr>, Vec<Keyword>) {
+    if matches!(func.as_ref(), Expr::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
+        // Return the "open mode" parameter and keywords.
+        (args.get(1), keywords.clone())
+    } else {
+        (None, vec![])
     }
-    (None, vec![])
 }
 
 fn create_check(
-    expr: &Expr,
+    expr: &ExprCall,
     mode_param: &Expr,
     replacement_value: Option<&str>,
     locator: &Locator,
@@ -130,7 +130,7 @@ fn create_check(
     diagnostic
 }
 
-fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
+fn create_remove_param_fix(locator: &Locator, expr: &ExprCall, mode_param: &Expr) -> Result<Edit> {
     let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
@@ -171,7 +171,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn redundant_open_modes(checker: &mut Checker, expr: &ExprCall) {
     // If `open` has been rebound, skip this check entirely.
     if !checker.ctx.is_builtin(OPEN_FUNC_NAME) {
         return;

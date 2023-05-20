@@ -2567,12 +2567,63 @@ where
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords,
-                range: _,
-            }) => {
+            Expr::Call(call) => {
+                let mut rules: Vec<fn(&mut Checker, &ast::ExprCall)> = vec![];
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DjangoLocalsInRenderFunction)
+                {
+                    rules.push(flake8_django::rules::locals_in_render_function);
+                }
+
+                // pyupgrade
+                if self.settings.rules.enabled(Rule::DeprecatedUnittestAlias) {
+                    rules.push(pyupgrade::rules::deprecated_unittest_alias);
+                }
+                if self.settings.rules.enabled(Rule::SuperCallWithParameters) {
+                    rules.push(pyupgrade::rules::super_call_with_parameters);
+                }
+                if self.settings.rules.enabled(Rule::UnnecessaryEncodeUTF8) {
+                    rules.push(pyupgrade::rules::unnecessary_encode_utf8);
+                }
+                if self.settings.rules.enabled(Rule::RedundantOpenModes) {
+                    rules.push(pyupgrade::rules::redundant_open_modes);
+                }
+                if self.settings.rules.enabled(Rule::NativeLiterals) {
+                    rules.push(pyupgrade::rules::native_literals);
+                }
+                if self.settings.rules.enabled(Rule::OpenAlias) {
+                    rules.push(pyupgrade::rules::open_alias);
+                }
+                if self.settings.rules.enabled(Rule::ReplaceUniversalNewlines) {
+                    rules.push(pyupgrade::rules::replace_universal_newlines);
+                }
+                if self.settings.rules.enabled(Rule::ReplaceStdoutStderr) {
+                    rules.push(pyupgrade::rules::replace_stdout_stderr);
+                }
+                if self.settings.rules.enabled(Rule::OSErrorAlias) {
+                    rules.push(pyupgrade::rules::os_error_alias_call);
+                }
+                if self.settings.rules.enabled(Rule::NonPEP604Isinstance)
+                    && self.settings.target_version >= PythonVersion::Py310
+                {
+                    rules.push(pyupgrade::rules::use_pep604_isinstance);
+                }
+                if self.settings.rules.enabled(Rule::TypeOfPrimitive) {
+                    rules.push(pyupgrade::rules::type_of_primitive);
+                }
+                for rule in rules {
+                    rule(self, call);
+                }
+
+                let ast::ExprCall {
+                    func,
+                    args,
+                    keywords,
+                    range: _,
+                } = call;
+
                 if self.settings.rules.any_enabled(&[
                     // pyflakes
                     Rule::StringDotFormatInvalidFormat,
@@ -2670,43 +2721,6 @@ where
                             }
                         }
                     }
-                }
-
-                // pyupgrade
-                if self.settings.rules.enabled(Rule::TypeOfPrimitive) {
-                    pyupgrade::rules::type_of_primitive(self, expr, func, args);
-                }
-                if self.settings.rules.enabled(Rule::DeprecatedUnittestAlias) {
-                    pyupgrade::rules::deprecated_unittest_alias(self, func);
-                }
-                if self.settings.rules.enabled(Rule::SuperCallWithParameters) {
-                    pyupgrade::rules::super_call_with_parameters(self, expr, func, args);
-                }
-                if self.settings.rules.enabled(Rule::UnnecessaryEncodeUTF8) {
-                    pyupgrade::rules::unnecessary_encode_utf8(self, expr, func, args, keywords);
-                }
-                if self.settings.rules.enabled(Rule::RedundantOpenModes) {
-                    pyupgrade::rules::redundant_open_modes(self, expr);
-                }
-                if self.settings.rules.enabled(Rule::NativeLiterals) {
-                    pyupgrade::rules::native_literals(self, expr, func, args, keywords);
-                }
-                if self.settings.rules.enabled(Rule::OpenAlias) {
-                    pyupgrade::rules::open_alias(self, expr, func);
-                }
-                if self.settings.rules.enabled(Rule::ReplaceUniversalNewlines) {
-                    pyupgrade::rules::replace_universal_newlines(self, func, keywords);
-                }
-                if self.settings.rules.enabled(Rule::ReplaceStdoutStderr) {
-                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, args, keywords);
-                }
-                if self.settings.rules.enabled(Rule::OSErrorAlias) {
-                    pyupgrade::rules::os_error_alias_call(self, func);
-                }
-                if self.settings.rules.enabled(Rule::NonPEP604Isinstance)
-                    && self.settings.target_version >= PythonVersion::Py310
-                {
-                    pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
 
                 // flake8-async
@@ -3293,15 +3307,6 @@ where
                     .any_enabled(&[Rule::LoggingTooFewArgs, Rule::LoggingTooManyArgs])
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
-                }
-
-                // flake8-django
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::DjangoLocalsInRenderFunction)
-                {
-                    flake8_django::rules::locals_in_render_function(self, func, args, keywords);
                 }
             }
             Expr::Dict(ast::ExprDict {

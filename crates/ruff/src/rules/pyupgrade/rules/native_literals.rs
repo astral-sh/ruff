@@ -1,10 +1,9 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, ExprCall, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::checkers::ast::Checker;
@@ -46,12 +45,16 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 /// UP018
 pub(crate) fn native_literals(
     checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    ExprCall {
+        func,
+        args,
+        keywords,
+        range,
+    }: &ExprCall,
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else { return; };
+    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+        return;
+    };
 
     if !keywords.is_empty() || args.len() > 1 {
         return;
@@ -63,7 +66,7 @@ pub(crate) fn native_literals(
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
-            }}, expr.range());
+            }}, *range);
             if checker.patch(diagnostic.kind.rule()) {
                 let constant = if id == "bytes" {
                     Constant::Bytes(vec![])
@@ -74,7 +77,7 @@ pub(crate) fn native_literals(
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     content,
-                    expr.range(),
+                    *range,
                 )));
             }
             checker.diagnostics.push(diagnostic);
@@ -121,13 +124,13 @@ pub(crate) fn native_literals(
                     LiteralType::Bytes
                 },
             },
-            expr.range(),
+            *range,
         );
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 arg_code.to_string(),
-                expr.range(),
+                *range,
             )));
         }
         checker.diagnostics.push(diagnostic);

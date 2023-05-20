@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, Operator, Ranged};
+use rustpython_parser::ast::{self, Expr, ExprCall, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -66,11 +66,11 @@ fn union(elts: &[Expr]) -> Expr {
 /// UP038
 pub(crate) fn use_pep604_isinstance(
     checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
+    ExprCall {
+        func, args, range, ..
+    }: &ExprCall,
 ) {
-    if let Expr::Name(ast::ExprName { id, .. }) = func {
+    if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
@@ -89,7 +89,7 @@ pub(crate) fn use_pep604_isinstance(
                     return;
                 }
 
-                let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
+                let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, *range);
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(

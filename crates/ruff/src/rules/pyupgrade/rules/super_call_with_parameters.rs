@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arg, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Arg, Expr, ExprCall, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -34,9 +34,9 @@ fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 /// UP008
 pub(crate) fn super_call_with_parameters(
     checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
+    ExprCall {
+        func, args, range, ..
+    }: &ExprCall,
 ) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
@@ -55,7 +55,7 @@ pub(crate) fn super_call_with_parameters(
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
-    let [first_arg, second_arg] = args else {
+    let [first_arg, second_arg] = args.as_slice() else {
         return;
     };
 
@@ -97,9 +97,10 @@ pub(crate) fn super_call_with_parameters(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
+    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, *range);
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
+        if let Some(edit) = fixes::remove_super_arguments(*range, checker.locator, checker.stylist)
+        {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(edit));
         }

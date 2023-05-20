@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rustpython_parser::ast::{Expr, Keyword, Ranged};
+use rustpython_parser::ast::{Expr, ExprCall, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -55,10 +55,12 @@ fn generate_fix(
 /// UP022
 pub(crate) fn replace_stdout_stderr(
     checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    ExprCall {
+        func,
+        args,
+        keywords,
+        range,
+    }: &ExprCall,
 ) {
     if checker
         .ctx
@@ -92,7 +94,7 @@ pub(crate) fn replace_stdout_stderr(
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, expr.range());
+        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, *range);
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
                 generate_fix(checker.locator, func, args, keywords, stdout, stderr)
