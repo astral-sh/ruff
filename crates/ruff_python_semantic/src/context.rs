@@ -3,6 +3,7 @@ use std::path::Path;
 
 use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
@@ -111,6 +112,54 @@ impl<'a> Context<'a> {
     pub fn is_builtin(&self, member: &str) -> bool {
         self.find_binding(member)
             .map_or(false, |binding| binding.kind.is_builtin())
+    }
+
+    /// Resolve a reference to the given symbol.
+    pub fn resolve_reference(&mut self, symbol: &str, range: TextRange) -> ResolvedReference {
+        let mut import_starred = false;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+            if scope.kind.is_class() {
+                if symbol == "__class__" {
+                    return ResolvedReference::ImplicitGlobal;
+                }
+                if index > 0 {
+                    continue;
+                }
+            }
+
+            if let Some(binding_id) = scope.get(symbol) {
+                // Mark the binding as used.
+                let context = self.execution_context();
+                self.bindings[*binding_id].mark_used(self.scope_id, range, context);
+
+                // But if it's a type annotation, don't treat it as resolved, unless we're in a
+                // forward reference. For example, given:
+                //
+                // ```python
+                // name: str
+                // print(name)
+                // ```
+                //
+                // The `name` in `print(name)` should be treated as unresolved, but the `name` in
+                // `name: str` should be treated as used.
+                if !self.in_deferred_type_definition()
+                    && self.bindings[*binding_id].kind.is_annotation()
+                {
+                    continue;
+                }
+
+                return ResolvedReference::Resolved(scope_id, *binding_id);
+            }
+
+            import_starred = import_starred || scope.uses_star_imports();
+        }
+
+        if import_starred {
+            ResolvedReference::StarImport
+        } else {
+            ResolvedReference::NotFound
+        }
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
@@ -707,4 +756,18 @@ pub struct Snapshot {
     stmt_id: Option<NodeId>,
     definition_id: DefinitionId,
     flags: ContextFlags,
+}
+
+#[derive(Debug)]
+pub enum ResolvedReference {
+    /// The reference is resolved to a specific binding.
+    Resolved(ScopeId, BindingId),
+    /// The reference is resolved to a context-specific, implicit global (e.g., `__class__` within
+    /// a class scope).
+    ImplicitGlobal,
+    /// The reference is unresolved, but at least one of the containing scopes contains a star
+    /// import.
+    StarImport,
+    /// The reference is definitively unresolved.
+    NotFound,
 }
