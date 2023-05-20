@@ -33,7 +33,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"); "TCH004_13")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"); "TCH004_14")]
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"); "TCH005")]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"); "strict")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"); "TCH_strict")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
