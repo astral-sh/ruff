@@ -10,7 +10,7 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::registry::Rule;
 use crate::settings::Settings;
 
-use super::settings::Quote;
+use super::super::settings::Quote;
 
 /// ## What it does
 /// Checks for inline strings that use single quotes or double quotes,
