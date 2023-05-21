@@ -3,6 +3,7 @@ use std::iter;
 use regex::Regex;
 use rustpython_parser::ast::{Arg, Arguments};
 
+use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::function_type;
@@ -11,10 +12,42 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::binding::Bindings;
 use ruff_python_semantic::scope::{FunctionDef, Lambda, Scope, ScopeKind};
 
-use crate::checkers::ast::Checker;
+use super::super::helpers;
 
-use super::helpers;
-use super::types::Argumentable;
+use crate::checkers::ast::Checker;
+use crate::registry::Rule;
+
+/// An AST node that can contain arguments.
+#[derive(Copy, Clone)]
+enum Argumentable {
+    Function,
+    Method,
+    ClassMethod,
+    StaticMethod,
+    Lambda,
+}
+
+impl Argumentable {
+    pub(crate) fn check_for(self, name: String) -> DiagnosticKind {
+        match self {
+            Self::Function => UnusedFunctionArgument { name }.into(),
+            Self::Method => UnusedMethodArgument { name }.into(),
+            Self::ClassMethod => UnusedClassMethodArgument { name }.into(),
+            Self::StaticMethod => UnusedStaticMethodArgument { name }.into(),
+            Self::Lambda => UnusedLambdaArgument { name }.into(),
+        }
+    }
+
+    pub(crate) const fn rule_code(self) -> Rule {
+        match self {
+            Self::Function => Rule::UnusedFunctionArgument,
+            Self::Method => Rule::UnusedMethodArgument,
+            Self::ClassMethod => Rule::UnusedClassMethodArgument,
+            Self::StaticMethod => Rule::UnusedStaticMethodArgument,
+            Self::Lambda => Rule::UnusedLambdaArgument,
+        }
+    }
+}
 
 /// ## What it does
 /// Checks for the presence of unused arguments in function definitions.
