@@ -80,29 +80,8 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
         _ => *right.to_owned(),
     };
 
-    // dbg!(&new_left);
-    // dbg!(&new_right);
-
     // Figure out which way the splat is, and what the kind of the collection is.
     let (kind, splat_element, other_elements, splat_at_left, ctx) = match (&new_left, &new_right) {
-        // (
-        //     Expr::List(ast::ExprList {
-        //         elts: l_elts,
-        //         ctx,
-        //         range: _,
-        //     }),
-        //     Expr::List(ast::ExprList { elts: r_elts, .. }),
-        //     _,
-        // ) => (Kind::List, l_elts, r_elts, false, ctx),
-        // (
-        //     Expr::Tuple(ast::ExprTuple {
-        //         elts: l_elts,
-        //         ctx,
-        //         range: _,
-        //     }),
-        //     Expr::Tuple(ast::ExprTuple { elts: r_elts, .. }),
-        //     _,
-        // ) => (Kind::Tuple, l_elts, r_elts, false, ctx),
         (
             Expr::List(ast::ExprList {
                 elts: l_elts,
@@ -146,7 +125,7 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
         || splat_element.is_attribute_expr()
     {
         new_elts = make_splat_elts(&splat_element, &other_elements, splat_at_left);
-    } else if splat_element.is_list_expr() {
+    } else if splat_element.is_list_expr() || splat_element.is_tuple_expr() {
         new_elts = other_elements.to_owned();
 
         let mut elts = match splat_element {
@@ -195,8 +174,6 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
     let Some(new_expr) = build_new_expr(expr) else {
         return
     };
-
-    // dbg!(&new_expr);
 
     let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
         return;
