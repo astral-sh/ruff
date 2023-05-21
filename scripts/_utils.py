@@ -73,3 +73,17 @@ def get_linters() -> dict[str, int]:
                 linters[linter] = nb_digit
                 linter = None
     return linters
+
+
+def get_linters_with_deprecated_architecture() -> list[str]:
+    """Get the linters with deprecated architecture."""
+    return [
+        linter
+        for linter in get_linters()
+        if not (RULES_DIR / dir_name(linter) / "rules" / "mod.rs").exists()
+    ]
+
+if __name__ == "__main__":
+    linters_with_deprecated_architecture = get_linters_with_deprecated_architecture()
+    print(*linters_with_deprecated_architecture, sep="\n")
+    print(len(linters_with_deprecated_architecture))
