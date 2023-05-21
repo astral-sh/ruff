@@ -3024,7 +3024,7 @@ where
                     Rule::BuiltinOpen,
                     Rule::PyPath,
                 ]) {
-                    flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
+                    flake8_use_pathlib::rules::replaceable_by_pathlib(self, func);
                 }
 
                 // numpy

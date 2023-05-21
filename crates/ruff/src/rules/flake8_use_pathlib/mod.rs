@@ -1,5 +1,5 @@
 //! Rules from [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/).
-pub(crate) mod helpers;
+pub(crate) mod rules;
 pub(crate) mod violations;
 
 #[cfg(test)]
