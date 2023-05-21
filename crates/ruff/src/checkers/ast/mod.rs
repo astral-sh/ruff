@@ -35,7 +35,7 @@ use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::checkers::ast::deferred::Deferred;
-use crate::checkers::ast::traits::RegistryRule;
+use crate::checkers::ast::traits::{AstRule, AstRuleExecutor, RegisteredAstRule};
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
@@ -82,11 +82,13 @@ pub(crate) struct Checker<'a> {
     // Check-specific state.
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
     // Dispatches
-    rules: Vec<fn(&mut Vec<Diagnostic>, &ImmutableChecker, &ast::ExprCall)>,
-    analysis_rules: Vec<RegistryRule<ast::ExprCall>>,
+    // We can have a separate vector for each rule type?
+    rules: Vec<fn(&mut Vec<Diagnostic>, &RuleContext, &ast::ExprCall)>,
+    analysis_rules: Vec<RegisteredAstRule<ast::ExprCall>>,
+    _analysis_rules: Vec<AstRuleExecutor<ast::ExprCall>>,
 }
 
-pub(crate) struct ImmutableChecker<'a> {
+pub(crate) struct RuleContext<'a> {
     pub(crate) settings: &'a Settings,
     pub(crate) locator: &'a Locator<'a>,
     pub(crate) stylist: &'a Stylist<'a>,
@@ -108,7 +110,7 @@ impl<'a> Checker<'a> {
         indexer: &'a Indexer,
         importer: Importer<'a>,
     ) -> Checker<'a> {
-        let mut rules: Vec<fn(&mut Vec<Diagnostic>, &ImmutableChecker, &ast::ExprCall)> = vec![];
+        let mut rules: Vec<fn(&mut Vec<Diagnostic>, &RuleContext, &ast::ExprCall)> = vec![];
 
         // flake8-django
         if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
@@ -152,16 +154,40 @@ impl<'a> Checker<'a> {
             rules.push(pyupgrade::rules::type_of_primitive);
         }
 
-        let mut analysis_rules: Vec<RegistryRule<ast::ExprCall>> = vec![];
+        // This is closest to Rome.
+        let mut analysis_rules: Vec<RegisteredAstRule<ast::ExprCall>> = vec![];
 
         // flake8-django
         if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
-            analysis_rules.push(RegistryRule::new::<DjangoLocalsInRenderFunction>());
+            analysis_rules.push(RegisteredAstRule::new::<DjangoLocalsInRenderFunction>());
         }
 
         // pyupgrade
         if settings.rules.enabled(Rule::TypeOfPrimitive) {
-            analysis_rules.push(RegistryRule::new::<TypeOfPrimitive>());
+            analysis_rules.push(RegisteredAstRule::new::<TypeOfPrimitive>());
+        }
+
+        let mut _analysis_rules: Vec<AstRuleExecutor<ast::ExprCall>> = vec![];
+
+        // flake8-django
+        if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
+            _analysis_rules.push(DjangoLocalsInRenderFunction::run);
+        }
+
+        // We _can_ do this which is nice.
+        for (rule, analyzer) in [
+            (
+                Rule::DjangoLocalsInRenderFunction,
+                RegisteredAstRule::new::<DjangoLocalsInRenderFunction>(),
+            ),
+            (
+                Rule::TypeOfPrimitive,
+                RegisteredAstRule::new::<TypeOfPrimitive>(),
+            ),
+        ] {
+            if settings.rules.enabled(rule) {
+                analysis_rules.push(analyzer);
+            }
         }
 
         Checker {
@@ -183,11 +209,12 @@ impl<'a> Checker<'a> {
             flake8_bugbear_seen: Vec::default(),
             rules,
             analysis_rules,
+            _analysis_rules,
         }
     }
 }
 
-impl<'a> ImmutableChecker<'a> {
+impl<'a> RuleContext<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub(crate) fn patch(&self, code: Rule) -> bool {
@@ -2676,7 +2703,7 @@ where
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
             Expr::Call(call) => {
-                let immutable_checker = ImmutableChecker {
+                let immutable_checker = RuleContext {
                     settings: self.settings,
                     locator: self.locator,
                     stylist: self.stylist,

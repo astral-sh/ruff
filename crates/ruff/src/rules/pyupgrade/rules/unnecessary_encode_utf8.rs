@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::Rule;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -131,7 +131,7 @@ fn replace_with_bytes_literal(locator: &Locator, range: TextRange) -> Fix {
 /// UP012
 pub(crate) fn unnecessary_encode_utf8(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     ExprCall {
         func,
         args,

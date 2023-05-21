@@ -3,7 +3,7 @@ use rustpython_parser::ast::{ExprCall, Ranged};
 use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::AsRule;
 
 #[violation]
@@ -25,7 +25,7 @@ impl Violation for OpenAlias {
 /// UP020
 pub(crate) fn open_alias(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     ExprCall { func, range, .. }: &ExprCall,
 ) {
     if checker

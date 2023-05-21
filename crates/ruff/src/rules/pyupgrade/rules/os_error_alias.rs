@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::context::Context;
 
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::AsRule;
 
 #[violation]
@@ -73,7 +73,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
-fn immutable_atom_diagnostic(checker: &ImmutableChecker, target: &Expr) -> Diagnostic {
+fn immutable_atom_diagnostic(checker: &RuleContext, target: &Expr) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         OSErrorAlias {
             name: compose_call_path(target),
@@ -175,7 +175,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
 /// UP024
 pub(crate) fn os_error_alias_call(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     ExprCall { func, .. }: &ExprCall,
 ) {
     if is_alias(&checker.ctx, func) {

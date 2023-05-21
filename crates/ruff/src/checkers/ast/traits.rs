@@ -1,19 +1,20 @@
 use ruff_diagnostics::Diagnostic;
 
-use crate::checkers::ast::ImmutableChecker;
+use crate::checkers::ast::RuleContext;
 
-pub(crate) struct RegistryRule<T> {
-    pub(crate) run: RuleExecutor<T>,
+pub(crate) struct RegisteredAstRule<T> {
+    pub(crate) run: AstRuleExecutor<T>,
 }
 
-type RuleExecutor<T> = fn(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &T);
-
-impl<T> RegistryRule<T> {
-    pub(crate) fn new<R: AnalysisRule<T> + 'static>() -> Self {
+impl<T> RegisteredAstRule<T> {
+    pub(crate) fn new<R: AstRule<T> + 'static>() -> Self {
         Self { run: R::run }
     }
 }
 
-pub(crate) trait AnalysisRule<T>: Sized {
-    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &T);
+pub(crate) type AstRuleExecutor<T> =
+    fn(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);
+
+pub(crate) trait AstRule<T>: Sized {
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);
 }

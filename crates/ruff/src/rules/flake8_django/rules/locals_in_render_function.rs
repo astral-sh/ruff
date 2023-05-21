@@ -3,8 +3,8 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::traits::AnalysisRule;
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::traits::AstRule;
+use crate::checkers::ast::{Checker, RuleContext};
 
 /// ## What it does
 /// Checks for the use of `locals()` in `render` functions.
@@ -43,8 +43,8 @@ impl Violation for DjangoLocalsInRenderFunction {
     }
 }
 
-impl AnalysisRule<ast::ExprCall> for DjangoLocalsInRenderFunction {
-    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &ast::ExprCall) {
+impl AstRule<ast::ExprCall> for DjangoLocalsInRenderFunction {
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
         locals_in_render_function(diagnostics, checker, node)
     }
 }
@@ -52,7 +52,7 @@ impl AnalysisRule<ast::ExprCall> for DjangoLocalsInRenderFunction {
 /// DJ003
 pub(crate) fn locals_in_render_function(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     ast::ExprCall {
         func,
         args,
@@ -93,7 +93,7 @@ pub(crate) fn locals_in_render_function(
     ));
 }
 
-fn is_locals_call(checker: &ImmutableChecker, expr: &Expr) -> bool {
+fn is_locals_call(checker: &RuleContext, expr: &Expr) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return false
     };

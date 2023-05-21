@@ -7,7 +7,7 @@ use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::AsRule;
 
 #[violation]
@@ -55,7 +55,7 @@ fn generate_fix(
 /// UP022
 pub(crate) fn replace_stdout_stderr(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     ExprCall {
         func,
         args,

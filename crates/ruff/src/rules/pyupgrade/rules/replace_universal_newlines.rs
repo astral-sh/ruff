@@ -5,7 +5,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::AsRule;
 
 #[violation]
@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 /// UP021
 pub(crate) fn replace_universal_newlines(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     ExprCall { func, keywords, .. }: &ExprCall,
 ) {
     if checker

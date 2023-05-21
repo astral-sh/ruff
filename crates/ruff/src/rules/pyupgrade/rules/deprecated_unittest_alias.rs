@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Expr, ExprCall};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::AsRule;
 
 #[violation]
@@ -50,7 +50,7 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
 /// UP005
 pub(crate) fn deprecated_unittest_alias(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     ExprCall { func, .. }: &ExprCall,
 ) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, range, .. }) = func.as_ref() else {

@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
-use crate::checkers::ast::{Checker, ImmutableChecker};
+use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::Rule;
 
 #[violation]
@@ -173,7 +173,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &ExprCall, mode_param: &Expr
 /// UP015
 pub(crate) fn redundant_open_modes(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &ImmutableChecker,
+    checker: &RuleContext,
     expr: &ExprCall,
 ) {
     // If `open` has been rebound, skip this check entirely.
