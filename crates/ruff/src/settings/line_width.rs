@@ -122,12 +122,6 @@ impl PartialOrd<LineWidth<Length>> for LineWidth<TabInfos> {
     }
 }
 
-impl PartialOrd<LineWidth<TabInfos>> for LineWidth<Length> {
-    fn partial_cmp(&self, other: &LineWidth<TabInfos>) -> Option<std::cmp::Ordering> {
-        self.width.partial_cmp(&other.width)
-    }
-}
-
 impl<S> Ord for LineWidth<S>
 where
     S: LineWidthState,
@@ -148,12 +142,6 @@ where
 
 impl PartialEq<LineWidth<Length>> for LineWidth<TabInfos> {
     fn eq(&self, other: &LineWidth<Length>) -> bool {
-        self.width == other.width
-    }
-}
-
-impl PartialEq<LineWidth<TabInfos>> for LineWidth<Length> {
-    fn eq(&self, other: &LineWidth<TabInfos>) -> bool {
         self.width == other.width
     }
 }
