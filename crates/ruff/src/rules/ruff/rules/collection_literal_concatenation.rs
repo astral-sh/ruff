@@ -1,5 +1,3 @@
-use std::dbg;
-
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, ExprContext, Operator, Ranged};
 
@@ -63,21 +61,18 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
 
     let new_left = match left.as_ref() {
         Expr::BinOp(ast::ExprBinOp { .. }) => match build_new_expr(left) {
-            Some(new_left) => new_left.to_owned(),
-            None => *left.to_owned(),
+            Some(new_left) => new_left,
+            None => *left.clone(),
         },
-        _ => *left.to_owned(),
+        _ => *left.clone(),
     };
 
     let new_right = match right.as_ref() {
         Expr::BinOp(ast::ExprBinOp { .. }) => match build_new_expr(right) {
-            Some(new_right) => {
-                dbg!("AAAAAAA");
-                new_right.to_owned()
-            }
-            None => *right.to_owned(),
+            Some(new_right) => new_right,
+            None => *right.clone(),
         },
-        _ => *right.to_owned(),
+        _ => *right.clone(),
     };
 
     // Figure out which way the splat is, and what the kind of the collection is.
@@ -124,23 +119,24 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
         || splat_element.is_name_expr()
         || splat_element.is_attribute_expr()
     {
-        new_elts = make_splat_elts(&splat_element, &other_elements, splat_at_left);
-    } else if splat_element.is_list_expr() || splat_element.is_tuple_expr() {
-        new_elts = other_elements.to_owned();
+        new_elts = make_splat_elts(splat_element, other_elements, splat_at_left);
+    }
+    // If the splat element is itself a list/tuple, insert them in the other list/tuple.
+    else if splat_element.is_list_expr() || splat_element.is_tuple_expr() {
+        new_elts = other_elements.clone();
 
         let mut elts = match splat_element {
-            Expr::List(ast::ExprList { elts, .. }) => elts.to_owned(),
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.to_owned(),
+            Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.clone(),
             _ => return None,
         };
 
         if splat_at_left {
             elts.extend_from_slice(&new_elts);
-            new_elts = elts.to_vec();
+            new_elts = elts.clone();
         } else {
             new_elts.extend_from_slice(&elts);
         }
-        // new_elts = make_splat_elts(&splat_element, &other_elements, splat_at_left);
     } else {
         return None;
     }
@@ -164,7 +160,7 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
         }
     };
 
-    return Some(new_expr);
+    Some(new_expr)
 }
 
 /// RUF005
