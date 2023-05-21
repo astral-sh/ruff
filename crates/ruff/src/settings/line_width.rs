@@ -1,62 +1,90 @@
 use serde::{Deserialize, Serialize};
 use unicode_width::UnicodeWidthChar;
 
+use ruff_cache::CacheKey;
 use ruff_macros::CacheKey;
+
+pub trait LineWidthState: Clone + Default + CacheKey {}
+
+#[derive(Clone, Copy, Debug, CacheKey)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct Length;
+
+impl Default for Length {
+    fn default() -> Self {
+        Self
+    }
+}
+
+#[derive(Clone, Copy, Default, CacheKey)]
+pub struct TabInfos {
+    column: usize,
+    tab_size: TabSize,
+}
+
+impl LineWidthState for Length {}
+impl LineWidthState for TabInfos {}
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(from = "usize", into = "usize")]
-pub struct LineWidth {
+pub struct LineWidth<S: LineWidthState> {
     width: usize,
     #[serde(skip)]
-    column: usize,
-    #[serde(skip)]
-    tab_size: TabSize,
+    extra: S,
 }
 
-impl Default for LineWidth {
+impl Default for LineWidth<Length> {
     fn default() -> Self {
-        Self::from_line_length(88)
+        Self {
+            width: 88,
+            extra: Length,
+        }
     }
 }
 
-impl LineWidth {
-    pub fn new(tab_size: TabSize) -> Self {
-        LineWidth {
-            width: 0,
-            column: 0,
-            tab_size,
-        }
+impl Default for LineWidth<TabInfos> {
+    fn default() -> Self {
+        Self::new(TabSize::default())
     }
+}
 
-    pub fn from_line_length(line_length: usize) -> Self {
-        Self {
-            width: line_length,
-            column: 0,
-            tab_size: TabSize::default(),
-        }
-    }
-
+impl<S> LineWidth<S>
+where
+    S: LineWidthState,
+{
     pub const fn width(&self) -> usize {
         self.width
     }
+}
+
+impl LineWidth<TabInfos> {
+    pub fn new(tab_size: TabSize) -> Self {
+        LineWidth {
+            width: 0,
+            extra: TabInfos {
+                column: 0,
+                tab_size,
+            },
+        }
+    }
 
     fn update(mut self, chars: impl Iterator<Item = char>) -> Self {
-        let tab_size: usize = self.tab_size.into();
+        let tab_size: usize = self.extra.tab_size.into();
         for c in chars {
             match c {
                 '\t' => {
-                    let tab_offset = tab_size - (self.column % tab_size);
+                    let tab_offset = tab_size - (self.extra.column % tab_size);
                     self.width += tab_offset;
-                    self.column += tab_offset;
+                    self.extra.column += tab_offset;
                 }
                 '\n' | '\r' => {
                     self.width = 0;
-                    self.column = 0;
+                    self.extra.column = 0;
                 }
                 _ => {
                     self.width += c.width().unwrap_or(0);
-                    self.column += 1;
+                    self.extra.column += 1;
                 }
             }
         }
@@ -76,39 +104,81 @@ impl LineWidth {
     #[must_use]
     pub fn add_width(mut self, width: usize) -> Self {
         self.width += width;
-        self.column += width;
+        self.extra.column += width;
         self
     }
 }
 
-impl PartialOrd<LineWidth> for LineWidth {
-    fn partial_cmp(&self, other: &LineWidth) -> Option<std::cmp::Ordering> {
+impl<S> PartialOrd<LineWidth<S>> for LineWidth<S>
+where
+    S: LineWidthState,
+{
+    fn partial_cmp(&self, other: &LineWidth<S>) -> Option<std::cmp::Ordering> {
         self.width.partial_cmp(&other.width)
     }
 }
 
-impl Ord for LineWidth {
-    fn cmp(&self, other: &LineWidth) -> std::cmp::Ordering {
+impl PartialOrd<LineWidth<Length>> for LineWidth<TabInfos> {
+    fn partial_cmp(&self, other: &LineWidth<Length>) -> Option<std::cmp::Ordering> {
+        self.width.partial_cmp(&other.width)
+    }
+}
+
+impl PartialOrd<LineWidth<TabInfos>> for LineWidth<Length> {
+    fn partial_cmp(&self, other: &LineWidth<TabInfos>) -> Option<std::cmp::Ordering> {
+        self.width.partial_cmp(&other.width)
+    }
+}
+
+impl<S> Ord for LineWidth<S>
+where
+    S: LineWidthState,
+{
+    fn cmp(&self, other: &LineWidth<S>) -> std::cmp::Ordering {
         self.width.cmp(&other.width)
     }
 }
 
-impl PartialEq<LineWidth> for LineWidth {
-    fn eq(&self, other: &LineWidth) -> bool {
+impl<S> PartialEq<LineWidth<S>> for LineWidth<S>
+where
+    S: LineWidthState,
+{
+    fn eq(&self, other: &LineWidth<S>) -> bool {
         self.width == other.width
     }
 }
 
-impl Eq for LineWidth {}
-
-impl From<usize> for LineWidth {
-    fn from(width: usize) -> Self {
-        Self::from_line_length(width)
+impl PartialEq<LineWidth<Length>> for LineWidth<TabInfos> {
+    fn eq(&self, other: &LineWidth<Length>) -> bool {
+        self.width == other.width
     }
 }
 
-impl From<LineWidth> for usize {
-    fn from(line_width: LineWidth) -> usize {
+impl PartialEq<LineWidth<TabInfos>> for LineWidth<Length> {
+    fn eq(&self, other: &LineWidth<TabInfos>) -> bool {
+        self.width == other.width
+    }
+}
+
+impl<S> Eq for LineWidth<S> where S: LineWidthState {}
+
+impl<S> From<usize> for LineWidth<S>
+where
+    S: LineWidthState,
+{
+    fn from(width: usize) -> Self {
+        Self {
+            width,
+            extra: S::default(),
+        }
+    }
+}
+
+impl<S> From<LineWidth<S>> for usize
+where
+    S: LineWidthState,
+{
+    fn from(line_width: LineWidth<S>) -> usize {
         line_width.width
     }
 }
@@ -134,3 +204,6 @@ impl From<TabSize> for usize {
         tab_size.0 as usize
     }
 }
+
+pub type LineLength = LineWidth<Length>;
+pub type Width = LineWidth<TabInfos>;

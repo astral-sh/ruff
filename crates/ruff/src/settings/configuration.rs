@@ -25,7 +25,7 @@ use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 
-use super::line_width::{LineWidth, TabSize};
+use super::line_width::{LineLength, TabSize};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {
@@ -58,7 +58,7 @@ pub struct Configuration {
     pub format: Option<SerializationFormat>,
     pub ignore_init_module_imports: Option<bool>,
     pub include: Option<Vec<FilePattern>>,
-    pub line_length: Option<LineWidth>,
+    pub line_length: Option<LineLength>,
     pub tab_size: Option<TabSize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub required_version: Option<Version>,

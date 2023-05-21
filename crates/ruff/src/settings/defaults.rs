@@ -16,7 +16,7 @@ use crate::rules::{
 };
 use crate::settings::types::FilePatternSet;
 
-use super::line_width::{LineWidth, TabSize};
+use super::line_width::{LineLength, TabSize};
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
 
@@ -75,7 +75,7 @@ impl Default for Settings {
             force_exclude: false,
             ignore_init_module_imports: false,
             include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
-            line_length: LineWidth::default(),
+            line_length: LineLength::default(),
             tab_size: TabSize::default(),
             namespace_packages: vec![],
             per_file_ignores: vec![],

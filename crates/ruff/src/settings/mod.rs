@@ -25,7 +25,7 @@ use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once_by_id;
 
-use self::line_width::{LineWidth, TabSize};
+use self::line_width::{LineLength, TabSize};
 use self::rule_table::RuleTable;
 
 pub mod configuration;
@@ -100,7 +100,7 @@ pub struct Settings {
     pub dummy_variable_rgx: Regex,
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
-    pub line_length: LineWidth,
+    pub line_length: LineLength,
     pub tab_size: TabSize,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,

@@ -1,6 +1,6 @@
 use ruff_python_ast::source_code::Stylist;
 
-use crate::settings::line_width::LineWidth;
+use crate::settings::line_width::{LineLength, Width};
 
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 
@@ -45,8 +45,8 @@ pub(crate) fn format_import_from(
     import_from: &ImportFromData,
     comments: &CommentSet,
     aliases: &[(AliasData, CommentSet)],
-    line_length: LineWidth,
-    indentation_width: LineWidth,
+    line_length: LineLength,
+    indentation_width: Width,
     stylist: &Stylist,
     force_wrap_aliases: bool,
     is_first: bool,
@@ -103,8 +103,8 @@ fn format_single_line(
     aliases: &[(AliasData, CommentSet)],
     is_first: bool,
     stylist: &Stylist,
-    indentation_width: LineWidth,
-) -> (String, LineWidth) {
+    indentation_width: Width,
+) -> (String, Width) {
     let mut output = String::with_capacity(CAPACITY);
     let mut line_width = indentation_width;
 

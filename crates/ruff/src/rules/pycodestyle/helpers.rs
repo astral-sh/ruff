@@ -5,7 +5,7 @@ use unicode_width::UnicodeWidthStr;
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Generator;
 
-use crate::settings::line_width::{LineWidth, TabSize};
+use crate::settings::line_width::{LineLength, TabSize, Width};
 
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -28,13 +28,13 @@ pub(crate) fn compare(
 
 pub(super) fn is_overlong(
     line: &Line,
-    limit: LineWidth,
+    limit: LineLength,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
     tab_size: TabSize,
 ) -> Option<Overlong> {
     let mut start_offset = line.start();
-    let mut width = LineWidth::new(tab_size);
+    let mut width = Width::new(tab_size);
 
     for c in line.chars() {
         if width < limit {

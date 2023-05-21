@@ -15,7 +15,7 @@ use crate::rules::{
     flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
     flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
-use crate::settings::line_width::LineWidth;
+use crate::settings::line_width::LineLength;
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::settings::types::PythonVersion;
@@ -122,7 +122,7 @@ pub fn convert(
                 }
                 "max-line-length" | "max_line_length" => match value.parse::<usize>() {
                     Ok(line_length) => {
-                        options.line_length = Some(LineWidth::from_line_length(line_length));
+                        options.line_length = Some(LineLength::from(line_length));
                     }
                     Err(e) => {
                         warn_user!("Unable to parse '{key}' property: {e}");
@@ -406,7 +406,7 @@ pub fn convert(
     // Extract any settings from the existing `pyproject.toml`.
     if let Some(black) = &external_config.black {
         if let Some(line_length) = &black.line_length {
-            options.line_length = Some(LineWidth::from_line_length(*line_length));
+            options.line_length = Some(LineLength::from(*line_length));
         }
 
         if let Some(target_version) = &black.target_version {
@@ -467,7 +467,7 @@ mod tests {
     use crate::rule_selector::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
-    use crate::settings::line_width::LineWidth;
+    use crate::settings::line_width::LineLength;
     use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
     use crate::settings::types::PythonVersion;
@@ -514,7 +514,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            line_length: Some(LineWidth::from_line_length(100)),
+            line_length: Some(LineLength::from(100)),
             ..default_options([])
         });
         assert_eq!(actual, expected);
@@ -533,7 +533,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            line_length: Some(LineWidth::from_line_length(100)),
+            line_length: Some(LineLength::from(100)),
             ..default_options([])
         });
         assert_eq!(actual, expected);

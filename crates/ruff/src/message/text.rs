@@ -14,7 +14,7 @@ use crate::fs::relativize_path;
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use crate::settings::line_width::{LineWidth, TabSize};
+use crate::settings::line_width::{TabSize, Width};
 
 bitflags! {
     #[derive(Default)]
@@ -243,7 +243,7 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidth::new(TAB_SIZE);
+    let mut line_width = Width::new(TAB_SIZE);
 
     for (index, c) in source.char_indices() {
         let old_width = line_width.width();

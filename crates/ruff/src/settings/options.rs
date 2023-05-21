@@ -14,7 +14,7 @@ use crate::rules::{
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
-use super::line_width::{LineWidth, TabSize};
+use super::line_width::{LineLength, TabSize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -311,7 +311,7 @@ pub struct Options {
     )]
     /// The line length to use when enforcing long-lines violations (like
     /// `E501`).
-    pub line_length: Option<LineWidth>,
+    pub line_length: Option<LineLength>,
     #[option(
         default = "4",
         value_type = "int",

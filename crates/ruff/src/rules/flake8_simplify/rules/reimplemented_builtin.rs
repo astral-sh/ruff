@@ -9,7 +9,7 @@ use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
-use crate::settings::line_width::LineWidth;
+use crate::settings::line_width::Width;
 
 #[violation]
 pub struct ReimplementedBuiltin {
@@ -224,7 +224,7 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                if LineWidth::new(checker.settings.tab_size)
+                if Width::new(checker.settings.tab_size)
                     .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
                     .add_str(&contents)
                     > checker.settings.line_length
@@ -317,7 +317,7 @@ pub(crate) fn convert_for_loop_to_any_all(
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                if LineWidth::new(checker.settings.tab_size)
+                if Width::new(checker.settings.tab_size)
                     .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
                     .add_str(&contents)
                     > checker.settings.line_length

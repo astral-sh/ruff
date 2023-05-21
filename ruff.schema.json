@@ -368,7 +368,7 @@
       "description": "The line length to use when enforcing long-lines violations (like `E501`).",
       "anyOf": [
         {
-          "$ref": "#/definitions/LineWidth"
+          "$ref": "#/definitions/LineWidth_for_Length"
         },
         {
           "type": "null"
@@ -1289,7 +1289,7 @@
       },
       "additionalProperties": false
     },
-    "LineWidth": {
+    "LineWidth_for_Length": {
       "type": "object",
       "required": [
         "width"
@@ -1389,7 +1389,7 @@
           "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
           "anyOf": [
             {
-              "$ref": "#/definitions/LineWidth"
+              "$ref": "#/definitions/LineWidth_for_Length"
             },
             {
               "type": "null"
