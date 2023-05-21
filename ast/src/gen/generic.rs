@@ -29,6 +29,114 @@ impl<R> Node for Ast<R> {
     const FIELD_NAMES: &'static [&'static str] = &[];
 }
 
+impl<R> From<Mod<R>> for Ast<R> {
+    fn from(node: Mod<R>) -> Self {
+        Ast::Mod(node)
+    }
+}
+
+impl<R> From<Stmt<R>> for Ast<R> {
+    fn from(node: Stmt<R>) -> Self {
+        Ast::Stmt(node)
+    }
+}
+
+impl<R> From<Expr<R>> for Ast<R> {
+    fn from(node: Expr<R>) -> Self {
+        Ast::Expr(node)
+    }
+}
+
+impl<R> From<ExprContext> for Ast<R> {
+    fn from(node: ExprContext) -> Self {
+        Ast::ExprContext(node)
+    }
+}
+
+impl<R> From<Boolop> for Ast<R> {
+    fn from(node: Boolop) -> Self {
+        Ast::Boolop(node)
+    }
+}
+
+impl<R> From<Operator> for Ast<R> {
+    fn from(node: Operator) -> Self {
+        Ast::Operator(node)
+    }
+}
+
+impl<R> From<Unaryop> for Ast<R> {
+    fn from(node: Unaryop) -> Self {
+        Ast::Unaryop(node)
+    }
+}
+
+impl<R> From<Cmpop> for Ast<R> {
+    fn from(node: Cmpop) -> Self {
+        Ast::Cmpop(node)
+    }
+}
+
+impl<R> From<Comprehension<R>> for Ast<R> {
+    fn from(node: Comprehension<R>) -> Self {
+        Ast::Comprehension(node)
+    }
+}
+
+impl<R> From<Excepthandler<R>> for Ast<R> {
+    fn from(node: Excepthandler<R>) -> Self {
+        Ast::Excepthandler(node)
+    }
+}
+
+impl<R> From<Arguments<R>> for Ast<R> {
+    fn from(node: Arguments<R>) -> Self {
+        Ast::Arguments(node)
+    }
+}
+
+impl<R> From<Arg<R>> for Ast<R> {
+    fn from(node: Arg<R>) -> Self {
+        Ast::Arg(node)
+    }
+}
+
+impl<R> From<Keyword<R>> for Ast<R> {
+    fn from(node: Keyword<R>) -> Self {
+        Ast::Keyword(node)
+    }
+}
+
+impl<R> From<Alias<R>> for Ast<R> {
+    fn from(node: Alias<R>) -> Self {
+        Ast::Alias(node)
+    }
+}
+
+impl<R> From<Withitem<R>> for Ast<R> {
+    fn from(node: Withitem<R>) -> Self {
+        Ast::Withitem(node)
+    }
+}
+
+impl<R> From<MatchCase<R>> for Ast<R> {
+    fn from(node: MatchCase<R>) -> Self {
+        Ast::MatchCase(node)
+    }
+}
+
+impl<R> From<Pattern<R>> for Ast<R> {
+    fn from(node: Pattern<R>) -> Self {
+        Ast::Pattern(node)
+    }
+}
+
+impl<R> From<TypeIgnore<R>> for Ast<R> {
+    fn from(node: TypeIgnore<R>) -> Self {
+        Ast::TypeIgnore(node)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModModule<R = TextRange> {
     pub range: OptionalRange<R>,
@@ -43,6 +151,11 @@ impl<R> Node for ModModule<R> {
 impl<R> From<ModModule<R>> for Mod<R> {
     fn from(payload: ModModule<R>) -> Self {
         Mod::Module(payload)
+    }
+}
+impl<R> From<ModModule<R>> for Ast<R> {
+    fn from(payload: ModModule<R>) -> Self {
+        Mod::from(payload).into()
     }
 }
 
@@ -61,6 +174,11 @@ impl<R> From<ModInteractive<R>> for Mod<R> {
         Mod::Interactive(payload)
     }
 }
+impl<R> From<ModInteractive<R>> for Ast<R> {
+    fn from(payload: ModInteractive<R>) -> Self {
+        Mod::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModExpression<R = TextRange> {
@@ -75,6 +193,11 @@ impl<R> Node for ModExpression<R> {
 impl<R> From<ModExpression<R>> for Mod<R> {
     fn from(payload: ModExpression<R>) -> Self {
         Mod::Expression(payload)
+    }
+}
+impl<R> From<ModExpression<R>> for Ast<R> {
+    fn from(payload: ModExpression<R>) -> Self {
+        Mod::from(payload).into()
     }
 }
 
@@ -92,6 +215,11 @@ impl<R> Node for ModFunctionType<R> {
 impl<R> From<ModFunctionType<R>> for Mod<R> {
     fn from(payload: ModFunctionType<R>) -> Self {
         Mod::FunctionType(payload)
+    }
+}
+impl<R> From<ModFunctionType<R>> for Ast<R> {
+    fn from(payload: ModFunctionType<R>) -> Self {
+        Mod::from(payload).into()
     }
 }
 
@@ -135,6 +263,11 @@ impl<R> From<StmtFunctionDef<R>> for Stmt<R> {
         Stmt::FunctionDef(payload)
     }
 }
+impl<R> From<StmtFunctionDef<R>> for Ast<R> {
+    fn from(payload: StmtFunctionDef<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAsyncFunctionDef<R = TextRange> {
@@ -163,6 +296,11 @@ impl<R> From<StmtAsyncFunctionDef<R>> for Stmt<R> {
         Stmt::AsyncFunctionDef(payload)
     }
 }
+impl<R> From<StmtAsyncFunctionDef<R>> for Ast<R> {
+    fn from(payload: StmtAsyncFunctionDef<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtClassDef<R = TextRange> {
@@ -184,6 +322,11 @@ impl<R> From<StmtClassDef<R>> for Stmt<R> {
         Stmt::ClassDef(payload)
     }
 }
+impl<R> From<StmtClassDef<R>> for Ast<R> {
+    fn from(payload: StmtClassDef<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtReturn<R = TextRange> {
@@ -200,6 +343,11 @@ impl<R> From<StmtReturn<R>> for Stmt<R> {
         Stmt::Return(payload)
     }
 }
+impl<R> From<StmtReturn<R>> for Ast<R> {
+    fn from(payload: StmtReturn<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtDelete<R = TextRange> {
@@ -214,6 +362,11 @@ impl<R> Node for StmtDelete<R> {
 impl<R> From<StmtDelete<R>> for Stmt<R> {
     fn from(payload: StmtDelete<R>) -> Self {
         Stmt::Delete(payload)
+    }
+}
+impl<R> From<StmtDelete<R>> for Ast<R> {
+    fn from(payload: StmtDelete<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -234,6 +387,11 @@ impl<R> From<StmtAssign<R>> for Stmt<R> {
         Stmt::Assign(payload)
     }
 }
+impl<R> From<StmtAssign<R>> for Ast<R> {
+    fn from(payload: StmtAssign<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAugAssign<R = TextRange> {
@@ -250,6 +408,11 @@ impl<R> Node for StmtAugAssign<R> {
 impl<R> From<StmtAugAssign<R>> for Stmt<R> {
     fn from(payload: StmtAugAssign<R>) -> Self {
         Stmt::AugAssign(payload)
+    }
+}
+impl<R> From<StmtAugAssign<R>> for Ast<R> {
+    fn from(payload: StmtAugAssign<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -269,6 +432,11 @@ impl<R> Node for StmtAnnAssign<R> {
 impl<R> From<StmtAnnAssign<R>> for Stmt<R> {
     fn from(payload: StmtAnnAssign<R>) -> Self {
         Stmt::AnnAssign(payload)
+    }
+}
+impl<R> From<StmtAnnAssign<R>> for Ast<R> {
+    fn from(payload: StmtAnnAssign<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -292,6 +460,11 @@ impl<R> From<StmtFor<R>> for Stmt<R> {
         Stmt::For(payload)
     }
 }
+impl<R> From<StmtFor<R>> for Ast<R> {
+    fn from(payload: StmtFor<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAsyncFor<R = TextRange> {
@@ -313,6 +486,11 @@ impl<R> From<StmtAsyncFor<R>> for Stmt<R> {
         Stmt::AsyncFor(payload)
     }
 }
+impl<R> From<StmtAsyncFor<R>> for Ast<R> {
+    fn from(payload: StmtAsyncFor<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtWhile<R = TextRange> {
@@ -329,6 +507,11 @@ impl<R> Node for StmtWhile<R> {
 impl<R> From<StmtWhile<R>> for Stmt<R> {
     fn from(payload: StmtWhile<R>) -> Self {
         Stmt::While(payload)
+    }
+}
+impl<R> From<StmtWhile<R>> for Ast<R> {
+    fn from(payload: StmtWhile<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -349,6 +532,11 @@ impl<R> From<StmtIf<R>> for Stmt<R> {
         Stmt::If(payload)
     }
 }
+impl<R> From<StmtIf<R>> for Ast<R> {
+    fn from(payload: StmtIf<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtWith<R = TextRange> {
@@ -365,6 +553,11 @@ impl<R> Node for StmtWith<R> {
 impl<R> From<StmtWith<R>> for Stmt<R> {
     fn from(payload: StmtWith<R>) -> Self {
         Stmt::With(payload)
+    }
+}
+impl<R> From<StmtWith<R>> for Ast<R> {
+    fn from(payload: StmtWith<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -385,6 +578,11 @@ impl<R> From<StmtAsyncWith<R>> for Stmt<R> {
         Stmt::AsyncWith(payload)
     }
 }
+impl<R> From<StmtAsyncWith<R>> for Ast<R> {
+    fn from(payload: StmtAsyncWith<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtMatch<R = TextRange> {
@@ -402,6 +600,11 @@ impl<R> From<StmtMatch<R>> for Stmt<R> {
         Stmt::Match(payload)
     }
 }
+impl<R> From<StmtMatch<R>> for Ast<R> {
+    fn from(payload: StmtMatch<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtRaise<R = TextRange> {
@@ -417,6 +620,11 @@ impl<R> Node for StmtRaise<R> {
 impl<R> From<StmtRaise<R>> for Stmt<R> {
     fn from(payload: StmtRaise<R>) -> Self {
         Stmt::Raise(payload)
+    }
+}
+impl<R> From<StmtRaise<R>> for Ast<R> {
+    fn from(payload: StmtRaise<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -438,6 +646,11 @@ impl<R> From<StmtTry<R>> for Stmt<R> {
         Stmt::Try(payload)
     }
 }
+impl<R> From<StmtTry<R>> for Ast<R> {
+    fn from(payload: StmtTry<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtTryStar<R = TextRange> {
@@ -457,6 +670,11 @@ impl<R> From<StmtTryStar<R>> for Stmt<R> {
         Stmt::TryStar(payload)
     }
 }
+impl<R> From<StmtTryStar<R>> for Ast<R> {
+    fn from(payload: StmtTryStar<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtAssert<R = TextRange> {
@@ -474,6 +692,11 @@ impl<R> From<StmtAssert<R>> for Stmt<R> {
         Stmt::Assert(payload)
     }
 }
+impl<R> From<StmtAssert<R>> for Ast<R> {
+    fn from(payload: StmtAssert<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtImport<R = TextRange> {
@@ -488,6 +711,11 @@ impl<R> Node for StmtImport<R> {
 impl<R> From<StmtImport<R>> for Stmt<R> {
     fn from(payload: StmtImport<R>) -> Self {
         Stmt::Import(payload)
+    }
+}
+impl<R> From<StmtImport<R>> for Ast<R> {
+    fn from(payload: StmtImport<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -508,6 +736,11 @@ impl<R> From<StmtImportFrom<R>> for Stmt<R> {
         Stmt::ImportFrom(payload)
     }
 }
+impl<R> From<StmtImportFrom<R>> for Ast<R> {
+    fn from(payload: StmtImportFrom<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtGlobal<R = TextRange> {
@@ -522,6 +755,11 @@ impl<R> Node for StmtGlobal<R> {
 impl<R> From<StmtGlobal<R>> for Stmt<R> {
     fn from(payload: StmtGlobal<R>) -> Self {
         Stmt::Global(payload)
+    }
+}
+impl<R> From<StmtGlobal<R>> for Ast<R> {
+    fn from(payload: StmtGlobal<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -540,6 +778,11 @@ impl<R> From<StmtNonlocal<R>> for Stmt<R> {
         Stmt::Nonlocal(payload)
     }
 }
+impl<R> From<StmtNonlocal<R>> for Ast<R> {
+    fn from(payload: StmtNonlocal<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtExpr<R = TextRange> {
@@ -554,6 +797,11 @@ impl<R> Node for StmtExpr<R> {
 impl<R> From<StmtExpr<R>> for Stmt<R> {
     fn from(payload: StmtExpr<R>) -> Self {
         Stmt::Expr(payload)
+    }
+}
+impl<R> From<StmtExpr<R>> for Ast<R> {
+    fn from(payload: StmtExpr<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -571,6 +819,11 @@ impl<R> From<StmtPass<R>> for Stmt<R> {
         Stmt::Pass(payload)
     }
 }
+impl<R> From<StmtPass<R>> for Ast<R> {
+    fn from(payload: StmtPass<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtBreak<R = TextRange> {
@@ -586,6 +839,11 @@ impl<R> From<StmtBreak<R>> for Stmt<R> {
         Stmt::Break(payload)
     }
 }
+impl<R> From<StmtBreak<R>> for Ast<R> {
+    fn from(payload: StmtBreak<R>) -> Self {
+        Stmt::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StmtContinue<R = TextRange> {
@@ -599,6 +857,11 @@ impl<R> Node for StmtContinue<R> {
 impl<R> From<StmtContinue<R>> for Stmt<R> {
     fn from(payload: StmtContinue<R>) -> Self {
         Stmt::Continue(payload)
+    }
+}
+impl<R> From<StmtContinue<R>> for Ast<R> {
+    fn from(payload: StmtContinue<R>) -> Self {
+        Stmt::from(payload).into()
     }
 }
 
@@ -681,6 +944,11 @@ impl<R> From<ExprBoolOp<R>> for Expr<R> {
         Expr::BoolOp(payload)
     }
 }
+impl<R> From<ExprBoolOp<R>> for Ast<R> {
+    fn from(payload: ExprBoolOp<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprNamedExpr<R = TextRange> {
@@ -696,6 +964,11 @@ impl<R> Node for ExprNamedExpr<R> {
 impl<R> From<ExprNamedExpr<R>> for Expr<R> {
     fn from(payload: ExprNamedExpr<R>) -> Self {
         Expr::NamedExpr(payload)
+    }
+}
+impl<R> From<ExprNamedExpr<R>> for Ast<R> {
+    fn from(payload: ExprNamedExpr<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -716,6 +989,11 @@ impl<R> From<ExprBinOp<R>> for Expr<R> {
         Expr::BinOp(payload)
     }
 }
+impl<R> From<ExprBinOp<R>> for Ast<R> {
+    fn from(payload: ExprBinOp<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprUnaryOp<R = TextRange> {
@@ -733,6 +1011,11 @@ impl<R> From<ExprUnaryOp<R>> for Expr<R> {
         Expr::UnaryOp(payload)
     }
 }
+impl<R> From<ExprUnaryOp<R>> for Ast<R> {
+    fn from(payload: ExprUnaryOp<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprLambda<R = TextRange> {
@@ -748,6 +1031,11 @@ impl<R> Node for ExprLambda<R> {
 impl<R> From<ExprLambda<R>> for Expr<R> {
     fn from(payload: ExprLambda<R>) -> Self {
         Expr::Lambda(payload)
+    }
+}
+impl<R> From<ExprLambda<R>> for Ast<R> {
+    fn from(payload: ExprLambda<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -768,6 +1056,11 @@ impl<R> From<ExprIfExp<R>> for Expr<R> {
         Expr::IfExp(payload)
     }
 }
+impl<R> From<ExprIfExp<R>> for Ast<R> {
+    fn from(payload: ExprIfExp<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprDict<R = TextRange> {
@@ -785,6 +1078,11 @@ impl<R> From<ExprDict<R>> for Expr<R> {
         Expr::Dict(payload)
     }
 }
+impl<R> From<ExprDict<R>> for Ast<R> {
+    fn from(payload: ExprDict<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSet<R = TextRange> {
@@ -799,6 +1097,11 @@ impl<R> Node for ExprSet<R> {
 impl<R> From<ExprSet<R>> for Expr<R> {
     fn from(payload: ExprSet<R>) -> Self {
         Expr::Set(payload)
+    }
+}
+impl<R> From<ExprSet<R>> for Ast<R> {
+    fn from(payload: ExprSet<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -818,6 +1121,11 @@ impl<R> From<ExprListComp<R>> for Expr<R> {
         Expr::ListComp(payload)
     }
 }
+impl<R> From<ExprListComp<R>> for Ast<R> {
+    fn from(payload: ExprListComp<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSetComp<R = TextRange> {
@@ -833,6 +1141,11 @@ impl<R> Node for ExprSetComp<R> {
 impl<R> From<ExprSetComp<R>> for Expr<R> {
     fn from(payload: ExprSetComp<R>) -> Self {
         Expr::SetComp(payload)
+    }
+}
+impl<R> From<ExprSetComp<R>> for Ast<R> {
+    fn from(payload: ExprSetComp<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -853,6 +1166,11 @@ impl<R> From<ExprDictComp<R>> for Expr<R> {
         Expr::DictComp(payload)
     }
 }
+impl<R> From<ExprDictComp<R>> for Ast<R> {
+    fn from(payload: ExprDictComp<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprGeneratorExp<R = TextRange> {
@@ -868,6 +1186,11 @@ impl<R> Node for ExprGeneratorExp<R> {
 impl<R> From<ExprGeneratorExp<R>> for Expr<R> {
     fn from(payload: ExprGeneratorExp<R>) -> Self {
         Expr::GeneratorExp(payload)
+    }
+}
+impl<R> From<ExprGeneratorExp<R>> for Ast<R> {
+    fn from(payload: ExprGeneratorExp<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -886,6 +1209,11 @@ impl<R> From<ExprAwait<R>> for Expr<R> {
         Expr::Await(payload)
     }
 }
+impl<R> From<ExprAwait<R>> for Ast<R> {
+    fn from(payload: ExprAwait<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYield<R = TextRange> {
@@ -902,6 +1230,11 @@ impl<R> From<ExprYield<R>> for Expr<R> {
         Expr::Yield(payload)
     }
 }
+impl<R> From<ExprYield<R>> for Ast<R> {
+    fn from(payload: ExprYield<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprYieldFrom<R = TextRange> {
@@ -916,6 +1249,11 @@ impl<R> Node for ExprYieldFrom<R> {
 impl<R> From<ExprYieldFrom<R>> for Expr<R> {
     fn from(payload: ExprYieldFrom<R>) -> Self {
         Expr::YieldFrom(payload)
+    }
+}
+impl<R> From<ExprYieldFrom<R>> for Ast<R> {
+    fn from(payload: ExprYieldFrom<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -936,6 +1274,11 @@ impl<R> From<ExprCompare<R>> for Expr<R> {
         Expr::Compare(payload)
     }
 }
+impl<R> From<ExprCompare<R>> for Ast<R> {
+    fn from(payload: ExprCompare<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprCall<R = TextRange> {
@@ -952,6 +1295,11 @@ impl<R> Node for ExprCall<R> {
 impl<R> From<ExprCall<R>> for Expr<R> {
     fn from(payload: ExprCall<R>) -> Self {
         Expr::Call(payload)
+    }
+}
+impl<R> From<ExprCall<R>> for Ast<R> {
+    fn from(payload: ExprCall<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -972,6 +1320,11 @@ impl<R> From<ExprFormattedValue<R>> for Expr<R> {
         Expr::FormattedValue(payload)
     }
 }
+impl<R> From<ExprFormattedValue<R>> for Ast<R> {
+    fn from(payload: ExprFormattedValue<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprJoinedStr<R = TextRange> {
@@ -986,6 +1339,11 @@ impl<R> Node for ExprJoinedStr<R> {
 impl<R> From<ExprJoinedStr<R>> for Expr<R> {
     fn from(payload: ExprJoinedStr<R>) -> Self {
         Expr::JoinedStr(payload)
+    }
+}
+impl<R> From<ExprJoinedStr<R>> for Ast<R> {
+    fn from(payload: ExprJoinedStr<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -1003,6 +1361,11 @@ impl<R> Node for ExprConstant<R> {
 impl<R> From<ExprConstant<R>> for Expr<R> {
     fn from(payload: ExprConstant<R>) -> Self {
         Expr::Constant(payload)
+    }
+}
+impl<R> From<ExprConstant<R>> for Ast<R> {
+    fn from(payload: ExprConstant<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -1023,6 +1386,11 @@ impl<R> From<ExprAttribute<R>> for Expr<R> {
         Expr::Attribute(payload)
     }
 }
+impl<R> From<ExprAttribute<R>> for Ast<R> {
+    fn from(payload: ExprAttribute<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprSubscript<R = TextRange> {
@@ -1039,6 +1407,11 @@ impl<R> Node for ExprSubscript<R> {
 impl<R> From<ExprSubscript<R>> for Expr<R> {
     fn from(payload: ExprSubscript<R>) -> Self {
         Expr::Subscript(payload)
+    }
+}
+impl<R> From<ExprSubscript<R>> for Ast<R> {
+    fn from(payload: ExprSubscript<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -1058,6 +1431,11 @@ impl<R> From<ExprStarred<R>> for Expr<R> {
         Expr::Starred(payload)
     }
 }
+impl<R> From<ExprStarred<R>> for Ast<R> {
+    fn from(payload: ExprStarred<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName<R = TextRange> {
@@ -1073,6 +1451,11 @@ impl<R> Node for ExprName<R> {
 impl<R> From<ExprName<R>> for Expr<R> {
     fn from(payload: ExprName<R>) -> Self {
         Expr::Name(payload)
+    }
+}
+impl<R> From<ExprName<R>> for Ast<R> {
+    fn from(payload: ExprName<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -1092,6 +1475,11 @@ impl<R> From<ExprList<R>> for Expr<R> {
         Expr::List(payload)
     }
 }
+impl<R> From<ExprList<R>> for Ast<R> {
+    fn from(payload: ExprList<R>) -> Self {
+        Expr::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprTuple<R = TextRange> {
@@ -1107,6 +1495,11 @@ impl<R> Node for ExprTuple<R> {
 impl<R> From<ExprTuple<R>> for Expr<R> {
     fn from(payload: ExprTuple<R>) -> Self {
         Expr::Tuple(payload)
+    }
+}
+impl<R> From<ExprTuple<R>> for Ast<R> {
+    fn from(payload: ExprTuple<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -1125,6 +1518,11 @@ impl<R> Node for ExprSlice<R> {
 impl<R> From<ExprSlice<R>> for Expr<R> {
     fn from(payload: ExprSlice<R>) -> Self {
         Expr::Slice(payload)
+    }
+}
+impl<R> From<ExprSlice<R>> for Ast<R> {
+    fn from(payload: ExprSlice<R>) -> Self {
+        Expr::from(payload).into()
     }
 }
 
@@ -1229,6 +1627,11 @@ impl From<ExprContextLoad> for ExprContext {
         ExprContext::Load
     }
 }
+impl<R> From<ExprContextLoad> for Ast<R> {
+    fn from(_: ExprContextLoad) -> Self {
+        ExprContext::Load.into()
+    }
+}
 impl Node for ExprContextLoad {
     const NAME: &'static str = "Load";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1246,6 +1649,11 @@ impl From<ExprContextStore> for ExprContext {
         ExprContext::Store
     }
 }
+impl<R> From<ExprContextStore> for Ast<R> {
+    fn from(_: ExprContextStore) -> Self {
+        ExprContext::Store.into()
+    }
+}
 impl Node for ExprContextStore {
     const NAME: &'static str = "Store";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1261,6 +1669,11 @@ pub struct ExprContextDel;
 impl From<ExprContextDel> for ExprContext {
     fn from(_: ExprContextDel) -> Self {
         ExprContext::Del
+    }
+}
+impl<R> From<ExprContextDel> for Ast<R> {
+    fn from(_: ExprContextDel) -> Self {
+        ExprContext::Del.into()
     }
 }
 impl Node for ExprContextDel {
@@ -1308,6 +1721,11 @@ impl From<BoolopAnd> for Boolop {
         Boolop::And
     }
 }
+impl<R> From<BoolopAnd> for Ast<R> {
+    fn from(_: BoolopAnd) -> Self {
+        Boolop::And.into()
+    }
+}
 impl Node for BoolopAnd {
     const NAME: &'static str = "And";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1323,6 +1741,11 @@ pub struct BoolopOr;
 impl From<BoolopOr> for Boolop {
     fn from(_: BoolopOr) -> Self {
         Boolop::Or
+    }
+}
+impl<R> From<BoolopOr> for Ast<R> {
+    fn from(_: BoolopOr) -> Self {
+        Boolop::Or.into()
     }
 }
 impl Node for BoolopOr {
@@ -1469,6 +1892,11 @@ impl From<OperatorAdd> for Operator {
         Operator::Add
     }
 }
+impl<R> From<OperatorAdd> for Ast<R> {
+    fn from(_: OperatorAdd) -> Self {
+        Operator::Add.into()
+    }
+}
 impl Node for OperatorAdd {
     const NAME: &'static str = "Add";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1484,6 +1912,11 @@ pub struct OperatorSub;
 impl From<OperatorSub> for Operator {
     fn from(_: OperatorSub) -> Self {
         Operator::Sub
+    }
+}
+impl<R> From<OperatorSub> for Ast<R> {
+    fn from(_: OperatorSub) -> Self {
+        Operator::Sub.into()
     }
 }
 impl Node for OperatorSub {
@@ -1503,6 +1936,11 @@ impl From<OperatorMult> for Operator {
         Operator::Mult
     }
 }
+impl<R> From<OperatorMult> for Ast<R> {
+    fn from(_: OperatorMult) -> Self {
+        Operator::Mult.into()
+    }
+}
 impl Node for OperatorMult {
     const NAME: &'static str = "Mult";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1518,6 +1956,11 @@ pub struct OperatorMatMult;
 impl From<OperatorMatMult> for Operator {
     fn from(_: OperatorMatMult) -> Self {
         Operator::MatMult
+    }
+}
+impl<R> From<OperatorMatMult> for Ast<R> {
+    fn from(_: OperatorMatMult) -> Self {
+        Operator::MatMult.into()
     }
 }
 impl Node for OperatorMatMult {
@@ -1537,6 +1980,11 @@ impl From<OperatorDiv> for Operator {
         Operator::Div
     }
 }
+impl<R> From<OperatorDiv> for Ast<R> {
+    fn from(_: OperatorDiv) -> Self {
+        Operator::Div.into()
+    }
+}
 impl Node for OperatorDiv {
     const NAME: &'static str = "Div";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1552,6 +2000,11 @@ pub struct OperatorMod;
 impl From<OperatorMod> for Operator {
     fn from(_: OperatorMod) -> Self {
         Operator::Mod
+    }
+}
+impl<R> From<OperatorMod> for Ast<R> {
+    fn from(_: OperatorMod) -> Self {
+        Operator::Mod.into()
     }
 }
 impl Node for OperatorMod {
@@ -1571,6 +2024,11 @@ impl From<OperatorPow> for Operator {
         Operator::Pow
     }
 }
+impl<R> From<OperatorPow> for Ast<R> {
+    fn from(_: OperatorPow) -> Self {
+        Operator::Pow.into()
+    }
+}
 impl Node for OperatorPow {
     const NAME: &'static str = "Pow";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1586,6 +2044,11 @@ pub struct OperatorLShift;
 impl From<OperatorLShift> for Operator {
     fn from(_: OperatorLShift) -> Self {
         Operator::LShift
+    }
+}
+impl<R> From<OperatorLShift> for Ast<R> {
+    fn from(_: OperatorLShift) -> Self {
+        Operator::LShift.into()
     }
 }
 impl Node for OperatorLShift {
@@ -1605,6 +2068,11 @@ impl From<OperatorRShift> for Operator {
         Operator::RShift
     }
 }
+impl<R> From<OperatorRShift> for Ast<R> {
+    fn from(_: OperatorRShift) -> Self {
+        Operator::RShift.into()
+    }
+}
 impl Node for OperatorRShift {
     const NAME: &'static str = "RShift";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1620,6 +2088,11 @@ pub struct OperatorBitOr;
 impl From<OperatorBitOr> for Operator {
     fn from(_: OperatorBitOr) -> Self {
         Operator::BitOr
+    }
+}
+impl<R> From<OperatorBitOr> for Ast<R> {
+    fn from(_: OperatorBitOr) -> Self {
+        Operator::BitOr.into()
     }
 }
 impl Node for OperatorBitOr {
@@ -1639,6 +2112,11 @@ impl From<OperatorBitXor> for Operator {
         Operator::BitXor
     }
 }
+impl<R> From<OperatorBitXor> for Ast<R> {
+    fn from(_: OperatorBitXor) -> Self {
+        Operator::BitXor.into()
+    }
+}
 impl Node for OperatorBitXor {
     const NAME: &'static str = "BitXor";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1656,6 +2134,11 @@ impl From<OperatorBitAnd> for Operator {
         Operator::BitAnd
     }
 }
+impl<R> From<OperatorBitAnd> for Ast<R> {
+    fn from(_: OperatorBitAnd) -> Self {
+        Operator::BitAnd.into()
+    }
+}
 impl Node for OperatorBitAnd {
     const NAME: &'static str = "BitAnd";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1671,6 +2154,11 @@ pub struct OperatorFloorDiv;
 impl From<OperatorFloorDiv> for Operator {
     fn from(_: OperatorFloorDiv) -> Self {
         Operator::FloorDiv
+    }
+}
+impl<R> From<OperatorFloorDiv> for Ast<R> {
+    fn from(_: OperatorFloorDiv) -> Self {
+        Operator::FloorDiv.into()
     }
 }
 impl Node for OperatorFloorDiv {
@@ -1736,6 +2224,11 @@ impl From<UnaryopInvert> for Unaryop {
         Unaryop::Invert
     }
 }
+impl<R> From<UnaryopInvert> for Ast<R> {
+    fn from(_: UnaryopInvert) -> Self {
+        Unaryop::Invert.into()
+    }
+}
 impl Node for UnaryopInvert {
     const NAME: &'static str = "Invert";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1751,6 +2244,11 @@ pub struct UnaryopNot;
 impl From<UnaryopNot> for Unaryop {
     fn from(_: UnaryopNot) -> Self {
         Unaryop::Not
+    }
+}
+impl<R> From<UnaryopNot> for Ast<R> {
+    fn from(_: UnaryopNot) -> Self {
+        Unaryop::Not.into()
     }
 }
 impl Node for UnaryopNot {
@@ -1770,6 +2268,11 @@ impl From<UnaryopUAdd> for Unaryop {
         Unaryop::UAdd
     }
 }
+impl<R> From<UnaryopUAdd> for Ast<R> {
+    fn from(_: UnaryopUAdd) -> Self {
+        Unaryop::UAdd.into()
+    }
+}
 impl Node for UnaryopUAdd {
     const NAME: &'static str = "UAdd";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1785,6 +2288,11 @@ pub struct UnaryopUSub;
 impl From<UnaryopUSub> for Unaryop {
     fn from(_: UnaryopUSub) -> Self {
         Unaryop::USub
+    }
+}
+impl<R> From<UnaryopUSub> for Ast<R> {
+    fn from(_: UnaryopUSub) -> Self {
+        Unaryop::USub.into()
     }
 }
 impl Node for UnaryopUSub {
@@ -1904,6 +2412,11 @@ impl From<CmpopEq> for Cmpop {
         Cmpop::Eq
     }
 }
+impl<R> From<CmpopEq> for Ast<R> {
+    fn from(_: CmpopEq) -> Self {
+        Cmpop::Eq.into()
+    }
+}
 impl Node for CmpopEq {
     const NAME: &'static str = "Eq";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1919,6 +2432,11 @@ pub struct CmpopNotEq;
 impl From<CmpopNotEq> for Cmpop {
     fn from(_: CmpopNotEq) -> Self {
         Cmpop::NotEq
+    }
+}
+impl<R> From<CmpopNotEq> for Ast<R> {
+    fn from(_: CmpopNotEq) -> Self {
+        Cmpop::NotEq.into()
     }
 }
 impl Node for CmpopNotEq {
@@ -1938,6 +2456,11 @@ impl From<CmpopLt> for Cmpop {
         Cmpop::Lt
     }
 }
+impl<R> From<CmpopLt> for Ast<R> {
+    fn from(_: CmpopLt) -> Self {
+        Cmpop::Lt.into()
+    }
+}
 impl Node for CmpopLt {
     const NAME: &'static str = "Lt";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1953,6 +2476,11 @@ pub struct CmpopLtE;
 impl From<CmpopLtE> for Cmpop {
     fn from(_: CmpopLtE) -> Self {
         Cmpop::LtE
+    }
+}
+impl<R> From<CmpopLtE> for Ast<R> {
+    fn from(_: CmpopLtE) -> Self {
+        Cmpop::LtE.into()
     }
 }
 impl Node for CmpopLtE {
@@ -1972,6 +2500,11 @@ impl From<CmpopGt> for Cmpop {
         Cmpop::Gt
     }
 }
+impl<R> From<CmpopGt> for Ast<R> {
+    fn from(_: CmpopGt) -> Self {
+        Cmpop::Gt.into()
+    }
+}
 impl Node for CmpopGt {
     const NAME: &'static str = "Gt";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -1987,6 +2520,11 @@ pub struct CmpopGtE;
 impl From<CmpopGtE> for Cmpop {
     fn from(_: CmpopGtE) -> Self {
         Cmpop::GtE
+    }
+}
+impl<R> From<CmpopGtE> for Ast<R> {
+    fn from(_: CmpopGtE) -> Self {
+        Cmpop::GtE.into()
     }
 }
 impl Node for CmpopGtE {
@@ -2006,6 +2544,11 @@ impl From<CmpopIs> for Cmpop {
         Cmpop::Is
     }
 }
+impl<R> From<CmpopIs> for Ast<R> {
+    fn from(_: CmpopIs) -> Self {
+        Cmpop::Is.into()
+    }
+}
 impl Node for CmpopIs {
     const NAME: &'static str = "Is";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -2021,6 +2564,11 @@ pub struct CmpopIsNot;
 impl From<CmpopIsNot> for Cmpop {
     fn from(_: CmpopIsNot) -> Self {
         Cmpop::IsNot
+    }
+}
+impl<R> From<CmpopIsNot> for Ast<R> {
+    fn from(_: CmpopIsNot) -> Self {
+        Cmpop::IsNot.into()
     }
 }
 impl Node for CmpopIsNot {
@@ -2040,6 +2588,11 @@ impl From<CmpopIn> for Cmpop {
         Cmpop::In
     }
 }
+impl<R> From<CmpopIn> for Ast<R> {
+    fn from(_: CmpopIn) -> Self {
+        Cmpop::In.into()
+    }
+}
 impl Node for CmpopIn {
     const NAME: &'static str = "In";
     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -2055,6 +2608,11 @@ pub struct CmpopNotIn;
 impl From<CmpopNotIn> for Cmpop {
     fn from(_: CmpopNotIn) -> Self {
         Cmpop::NotIn
+    }
+}
+impl<R> From<CmpopNotIn> for Ast<R> {
+    fn from(_: CmpopNotIn) -> Self {
+        Cmpop::NotIn.into()
     }
 }
 impl Node for CmpopNotIn {
@@ -2102,6 +2660,11 @@ impl<R> Node for ExcepthandlerExceptHandler<R> {
 impl<R> From<ExcepthandlerExceptHandler<R>> for Excepthandler<R> {
     fn from(payload: ExcepthandlerExceptHandler<R>) -> Self {
         Excepthandler::ExceptHandler(payload)
+    }
+}
+impl<R> From<ExcepthandlerExceptHandler<R>> for Ast<R> {
+    fn from(payload: ExcepthandlerExceptHandler<R>) -> Self {
+        Excepthandler::from(payload).into()
     }
 }
 
@@ -2217,6 +2780,11 @@ impl<R> From<PatternMatchValue<R>> for Pattern<R> {
         Pattern::MatchValue(payload)
     }
 }
+impl<R> From<PatternMatchValue<R>> for Ast<R> {
+    fn from(payload: PatternMatchValue<R>) -> Self {
+        Pattern::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSingleton<R = TextRange> {
@@ -2231,6 +2799,11 @@ impl<R> Node for PatternMatchSingleton<R> {
 impl<R> From<PatternMatchSingleton<R>> for Pattern<R> {
     fn from(payload: PatternMatchSingleton<R>) -> Self {
         Pattern::MatchSingleton(payload)
+    }
+}
+impl<R> From<PatternMatchSingleton<R>> for Ast<R> {
+    fn from(payload: PatternMatchSingleton<R>) -> Self {
+        Pattern::from(payload).into()
     }
 }
 
@@ -2249,6 +2822,11 @@ impl<R> From<PatternMatchSequence<R>> for Pattern<R> {
         Pattern::MatchSequence(payload)
     }
 }
+impl<R> From<PatternMatchSequence<R>> for Ast<R> {
+    fn from(payload: PatternMatchSequence<R>) -> Self {
+        Pattern::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchMapping<R = TextRange> {
@@ -2265,6 +2843,11 @@ impl<R> Node for PatternMatchMapping<R> {
 impl<R> From<PatternMatchMapping<R>> for Pattern<R> {
     fn from(payload: PatternMatchMapping<R>) -> Self {
         Pattern::MatchMapping(payload)
+    }
+}
+impl<R> From<PatternMatchMapping<R>> for Ast<R> {
+    fn from(payload: PatternMatchMapping<R>) -> Self {
+        Pattern::from(payload).into()
     }
 }
 
@@ -2286,6 +2869,11 @@ impl<R> From<PatternMatchClass<R>> for Pattern<R> {
         Pattern::MatchClass(payload)
     }
 }
+impl<R> From<PatternMatchClass<R>> for Ast<R> {
+    fn from(payload: PatternMatchClass<R>) -> Self {
+        Pattern::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchStar<R = TextRange> {
@@ -2300,6 +2888,11 @@ impl<R> Node for PatternMatchStar<R> {
 impl<R> From<PatternMatchStar<R>> for Pattern<R> {
     fn from(payload: PatternMatchStar<R>) -> Self {
         Pattern::MatchStar(payload)
+    }
+}
+impl<R> From<PatternMatchStar<R>> for Ast<R> {
+    fn from(payload: PatternMatchStar<R>) -> Self {
+        Pattern::from(payload).into()
     }
 }
 
@@ -2319,6 +2912,11 @@ impl<R> From<PatternMatchAs<R>> for Pattern<R> {
         Pattern::MatchAs(payload)
     }
 }
+impl<R> From<PatternMatchAs<R>> for Ast<R> {
+    fn from(payload: PatternMatchAs<R>) -> Self {
+        Pattern::from(payload).into()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchOr<R = TextRange> {
@@ -2333,6 +2931,11 @@ impl<R> Node for PatternMatchOr<R> {
 impl<R> From<PatternMatchOr<R>> for Pattern<R> {
     fn from(payload: PatternMatchOr<R>) -> Self {
         Pattern::MatchOr(payload)
+    }
+}
+impl<R> From<PatternMatchOr<R>> for Ast<R> {
+    fn from(payload: PatternMatchOr<R>) -> Self {
+        Pattern::from(payload).into()
     }
 }
 
@@ -2367,6 +2970,11 @@ impl<R> Node for TypeIgnoreTypeIgnore<R> {
 impl<R> From<TypeIgnoreTypeIgnore<R>> for TypeIgnore<R> {
     fn from(payload: TypeIgnoreTypeIgnore<R>) -> Self {
         TypeIgnore::TypeIgnore(payload)
+    }
+}
+impl<R> From<TypeIgnoreTypeIgnore<R>> for Ast<R> {
+    fn from(payload: TypeIgnoreTypeIgnore<R>) -> Self {
+        TypeIgnore::from(payload).into()
     }
 }
 

@@ -322,6 +322,16 @@ class StructVisitor(EmitVisitor):
             const FIELD_NAMES: &'static [&'static str] = &[];
         }
         """, 0)
+        for dfn in mod.dfns:
+            rust_name = rust_type_name(dfn.name)
+            generics = "" if self.type_info[dfn.name].is_simple else "<R>"
+            self.emit(f"""
+            impl<R> From<{rust_name}{generics}> for Ast<R> {{
+                fn from(node: {rust_name}{generics}) -> Self {{
+                    Ast::{rust_name}(node)
+                }}
+            }}
+            """, 0)
 
         for dfn in mod.dfns:
             self.visit(dfn)
@@ -385,6 +395,11 @@ class StructVisitor(EmitVisitor):
                         {rust_name}::{cons.name}
                     }}
                 }}
+                impl<R> From<{rust_name}{cons.name}> for Ast<R> {{
+                    fn from(_: {rust_name}{cons.name}) -> Self {{
+                        {rust_name}::{cons.name}.into()
+                    }}
+                }}
                 impl Node for {rust_name}{cons.name} {{
                     const NAME: &'static str = "{cons.name}";
                     const FIELD_NAMES: &'static [&'static str] = &[];
@@ -445,6 +460,11 @@ class StructVisitor(EmitVisitor):
             impl<R> From<{payload_name}<R>> for {rust_name}<R> {{
                 fn from(payload: {payload_name}<R>) -> Self {{
                     {rust_name}::{t.name}(payload)
+                }}
+            }}
+            impl<R> From<{payload_name}<R>> for Ast<R> {{
+                fn from(payload: {payload_name}<R>) -> Self {{
+                    {rust_name}::from(payload).into()
                 }}
             }}
             """,
