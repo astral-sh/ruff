@@ -1289,12 +1289,19 @@
       },
       "additionalProperties": false
     },
+    "Length": {
+      "type": "null"
+    },
     "LineWidth_for_Length": {
       "type": "object",
       "required": [
+        "extra",
         "width"
       ],
       "properties": {
+        "extra": {
+          "$ref": "#/definitions/Length"
+        },
         "width": {
           "type": "integer",
           "format": "uint",

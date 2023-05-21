@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use unicode_width::UnicodeWidthChar;
 
 use ruff_cache::CacheKey;
@@ -25,12 +25,10 @@ pub struct TabInfos {
 impl LineWidthState for Length {}
 impl LineWidthState for TabInfos {}
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, CacheKey)]
+#[derive(Clone, Copy, Debug, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[serde(from = "usize", into = "usize")]
 pub struct LineWidth<S: LineWidthState> {
     width: usize,
-    #[serde(skip)]
     extra: S,
 }
 
@@ -162,24 +160,40 @@ impl PartialEq<LineWidth<TabInfos>> for LineWidth<Length> {
 
 impl<S> Eq for LineWidth<S> where S: LineWidthState {}
 
-impl<S> From<usize> for LineWidth<S>
-where
-    S: LineWidthState,
-{
+impl From<usize> for LineWidth<Length> {
     fn from(width: usize) -> Self {
         Self {
             width,
-            extra: S::default(),
+            ..Default::default()
         }
     }
 }
 
-impl<S> From<LineWidth<S>> for usize
-where
-    S: LineWidthState,
-{
-    fn from(line_width: LineWidth<S>) -> usize {
+impl From<LineWidth<Length>> for usize {
+    fn from(line_width: LineWidth<Length>) -> usize {
         line_width.width
+    }
+}
+
+impl<'de> Deserialize<'de> for LineWidth<Length> {
+    fn deserialize<D>(deserializer: D) -> Result<LineWidth<Length>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let width = usize::deserialize(deserializer)?;
+        Ok(LineWidth {
+            width,
+            ..Default::default()
+        })
+    }
+}
+
+impl Serialize for LineWidth<Length> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        usize::serialize(&self.width, serializer)
     }
 }
 
