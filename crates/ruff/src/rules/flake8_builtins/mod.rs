@@ -1,4 +1,5 @@
 //! Rules from [flake8-builtins](https://pypi.org/project/flake8-builtins/).
+pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 

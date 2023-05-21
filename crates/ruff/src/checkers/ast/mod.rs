@@ -42,7 +42,7 @@ use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
-use crate::rules::flake8_builtins::rules::AnyShadowing;
+use crate::rules::flake8_builtins::helpers::AnyShadowing;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
