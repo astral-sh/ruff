@@ -5,7 +5,7 @@ Example usage:
 
     python scripts/add_plugin.py \
         flake8-pie \
-        --url https://pypi.org/project/flake8-pie/
+        --url https://pypi.org/project/flake8-pie/ \
         --prefix PIE
 """
 
