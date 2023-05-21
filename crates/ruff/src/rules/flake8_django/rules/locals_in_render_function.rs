@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::traits::AnalysisRule;
 use crate::checkers::ast::{Checker, ImmutableChecker};
 
 /// ## What it does
@@ -39,6 +40,12 @@ impl Violation for DjangoLocalsInRenderFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Avoid passing `locals()` as context to a `render` function")
+    }
+}
+
+impl AnalysisRule for DjangoLocalsInRenderFunction {
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &ast::ExprCall) {
+        locals_in_render_function(diagnostics, checker, node)
     }
 }
 

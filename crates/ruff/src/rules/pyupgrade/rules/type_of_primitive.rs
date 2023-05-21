@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Expr, ExprCall};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::traits::AnalysisRule;
 use crate::checkers::ast::{Checker, ImmutableChecker};
 use crate::registry::AsRule;
 
@@ -23,6 +24,12 @@ impl AlwaysAutofixableViolation for TypeOfPrimitive {
     fn autofix_title(&self) -> String {
         let TypeOfPrimitive { primitive } = self;
         format!("Replace `type(...)` with `{}`", primitive.builtin())
+    }
+}
+
+impl AnalysisRule for TypeOfPrimitive {
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &ast::ExprCall) {
+        type_of_primitive(diagnostics, checker, node)
     }
 }
 

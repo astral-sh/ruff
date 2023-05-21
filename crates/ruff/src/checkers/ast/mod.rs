@@ -35,12 +35,15 @@ use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::checkers::ast::deferred::Deferred;
+use crate::checkers::ast::traits::RegistryRule;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
+use crate::rules::flake8_django::rules::DjangoLocalsInRenderFunction;
+use crate::rules::pyupgrade::rules::TypeOfPrimitive;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -56,6 +59,7 @@ use crate::settings::{flags, Settings};
 use crate::{autofix, docstrings, noqa, warn_user};
 
 mod deferred;
+pub(crate) mod traits;
 
 pub(crate) struct Checker<'a> {
     // Settings, static metadata, etc.
@@ -79,6 +83,7 @@ pub(crate) struct Checker<'a> {
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
     // Dispatches
     rules: Vec<fn(&mut Vec<Diagnostic>, &ImmutableChecker, &ast::ExprCall)>,
+    analysis_rules: Vec<RegistryRule>,
 }
 
 pub(crate) struct ImmutableChecker<'a> {
@@ -147,6 +152,18 @@ impl<'a> Checker<'a> {
             rules.push(pyupgrade::rules::type_of_primitive);
         }
 
+        let mut analysis_rules: Vec<RegistryRule> = vec![];
+
+        // flake8-django
+        if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
+            analysis_rules.push(RegistryRule::new::<DjangoLocalsInRenderFunction>());
+        }
+
+        // pyupgrade
+        if settings.rules.enabled(Rule::TypeOfPrimitive) {
+            analysis_rules.push(RegistryRule::new::<TypeOfPrimitive>());
+        }
+
         Checker {
             settings,
             noqa_line_for,
@@ -165,6 +182,7 @@ impl<'a> Checker<'a> {
             deletions: FxHashSet::default(),
             flake8_bugbear_seen: Vec::default(),
             rules,
+            analysis_rules,
         }
     }
 }
@@ -2665,8 +2683,8 @@ where
                     indexer: self.indexer,
                     ctx: &self.ctx,
                 };
-                for rule in &self.rules {
-                    rule(&mut self.diagnostics, &immutable_checker, call);
+                for rule in &self.analysis_rules {
+                    (rule.run)(&mut self.diagnostics, &immutable_checker, call);
                 }
 
                 let ast::ExprCall {
