@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::{self, Constant, Expr, ExprCall, Keyword, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -10,7 +10,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
-use crate::checkers::ast::{Checker, RuleContext};
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
 use crate::registry::Rule;
 
 #[violation]
@@ -38,6 +39,16 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
                 format!("Replace with \"{replacement}\"")
             }
         }
+    }
+}
+
+impl AstAnalyzer<ast::ExprCall> for RedundantOpenModes {
+    fn rule() -> Rule {
+        Rule::RedundantOpenModes
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        redundant_open_modes(diagnostics, checker, node);
     }
 }
 
@@ -87,12 +98,12 @@ impl OpenMode {
 }
 
 fn match_open(
-    ExprCall {
+    ast::ExprCall {
         func,
         args,
         keywords,
         range: _,
-    }: &ExprCall,
+    }: &ast::ExprCall,
 ) -> (Option<&Expr>, Vec<Keyword>) {
     if matches!(func.as_ref(), Expr::Name(ast::ExprName {id, ..}) if id == OPEN_FUNC_NAME) {
         // Return the "open mode" parameter and keywords.
@@ -103,7 +114,7 @@ fn match_open(
 }
 
 fn create_check(
-    expr: &ExprCall,
+    expr: &ast::ExprCall,
     mode_param: &Expr,
     replacement_value: Option<&str>,
     locator: &Locator,
@@ -130,7 +141,11 @@ fn create_check(
     diagnostic
 }
 
-fn create_remove_param_fix(locator: &Locator, expr: &ExprCall, mode_param: &Expr) -> Result<Edit> {
+fn create_remove_param_fix(
+    locator: &Locator,
+    expr: &ast::ExprCall,
+    mode_param: &Expr,
+) -> Result<Edit> {
     let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
@@ -174,7 +189,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &ExprCall, mode_param: &Expr
 pub(crate) fn redundant_open_modes(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    expr: &ExprCall,
+    expr: &ast::ExprCall,
 ) {
     // If `open` has been rebound, skip this check entirely.
     if !checker.ctx.is_builtin(OPEN_FUNC_NAME) {

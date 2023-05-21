@@ -1,13 +1,14 @@
 use std::fmt;
 
-use rustpython_parser::ast::{self, Constant, Expr, ExprCall, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::is_implicit_concatenation;
 
-use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum LiteralType {
@@ -42,16 +43,26 @@ impl AlwaysAutofixableViolation for NativeLiterals {
     }
 }
 
+impl AstAnalyzer<ast::ExprCall> for NativeLiterals {
+    fn rule() -> Rule {
+        Rule::NativeLiterals
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        native_literals(diagnostics, checker, node);
+    }
+}
+
 /// UP018
 pub(crate) fn native_literals(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall {
+    ast::ExprCall {
         func,
         args,
         keywords,
         range,
-    }: &ExprCall,
+    }: &ast::ExprCall,
 ) {
     let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
         return;

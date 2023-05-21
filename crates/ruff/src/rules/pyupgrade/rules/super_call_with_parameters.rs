@@ -1,11 +1,12 @@
-use rustpython_parser::ast::{self, Arg, Expr, ExprCall, Stmt};
+use rustpython_parser::ast::{self, Arg, Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::scope::ScopeKind;
 
-use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::{AsRule, Rule};
 use crate::rules::pyupgrade::fixes;
 
 #[violation]
@@ -22,6 +23,16 @@ impl AlwaysAutofixableViolation for SuperCallWithParameters {
     }
 }
 
+impl AstAnalyzer<ast::ExprCall> for SuperCallWithParameters {
+    fn rule() -> Rule {
+        Rule::SuperCallWithParameters
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        super_call_with_parameters(diagnostics, checker, node);
+    }
+}
+
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = func {
@@ -35,9 +46,9 @@ fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
 pub(crate) fn super_call_with_parameters(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall {
+    ast::ExprCall {
         func, args, range, ..
-    }: &ExprCall,
+    }: &ast::ExprCall,
 ) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)

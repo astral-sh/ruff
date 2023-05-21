@@ -1,12 +1,13 @@
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{self, Expr, ExprCall};
+use rustpython_parser::ast::{self, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct DeprecatedUnittestAlias {
@@ -24,6 +25,16 @@ impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {
     fn autofix_title(&self) -> String {
         let DeprecatedUnittestAlias { alias, target } = self;
         format!("Replace `{target}` with `{alias}`")
+    }
+}
+
+impl AstAnalyzer<ast::ExprCall> for DeprecatedUnittestAlias {
+    fn rule() -> Rule {
+        Rule::DeprecatedUnittestAlias
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        deprecated_unittest_alias(diagnostics, checker, node);
     }
 }
 
@@ -51,7 +62,7 @@ static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::n
 pub(crate) fn deprecated_unittest_alias(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall { func, .. }: &ExprCall,
+    ast::ExprCall { func, .. }: &ast::ExprCall,
 ) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, range, .. }) = func.as_ref() else {
         return;

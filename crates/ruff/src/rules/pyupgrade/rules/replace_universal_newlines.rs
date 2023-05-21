@@ -1,12 +1,13 @@
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser::ast::{ExprCall, Ranged};
+use rustpython_parser::ast::{self, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 
-use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct ReplaceUniversalNewlines;
@@ -22,11 +23,21 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
     }
 }
 
+impl AstAnalyzer<ast::ExprCall> for ReplaceUniversalNewlines {
+    fn rule() -> Rule {
+        Rule::ReplaceUniversalNewlines
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        replace_universal_newlines(diagnostics, checker, node);
+    }
+}
+
 /// UP021
 pub(crate) fn replace_universal_newlines(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall { func, keywords, .. }: &ExprCall,
+    ast::ExprCall { func, keywords, .. }: &ast::ExprCall,
 ) {
     if checker
         .ctx

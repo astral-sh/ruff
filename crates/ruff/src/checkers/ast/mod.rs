@@ -35,15 +35,13 @@ use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::checkers::ast::deferred::Deferred;
-use crate::checkers::ast::traits::{AstRule, AstRuleExecutor, RegisteredAstRule};
+use crate::checkers::ast::traits::RegisteredAstRule;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
-use crate::rules::flake8_django::rules::DjangoLocalsInRenderFunction;
-use crate::rules::pyupgrade::rules::TypeOfPrimitive;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -81,11 +79,8 @@ pub(crate) struct Checker<'a> {
     deferred: Deferred<'a>,
     // Check-specific state.
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
-    // Dispatches
-    // We can have a separate vector for each rule type?
-    rules: Vec<fn(&mut Vec<Diagnostic>, &RuleContext, &ast::ExprCall)>,
-    analysis_rules: Vec<RegisteredAstRule<ast::ExprCall>>,
-    _analysis_rules: Vec<AstRuleExecutor<ast::ExprCall>>,
+    // Dispatchers
+    call_rules: Vec<RegisteredAstRule<ast::ExprCall>>,
 }
 
 pub(crate) struct RuleContext<'a> {
@@ -110,73 +105,6 @@ impl<'a> Checker<'a> {
         indexer: &'a Indexer,
         importer: Importer<'a>,
     ) -> Checker<'a> {
-        let mut rules: Vec<fn(&mut Vec<Diagnostic>, &RuleContext, &ast::ExprCall)> = vec![];
-
-        // flake8-django
-        if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
-            rules.push(flake8_django::rules::locals_in_render_function);
-        }
-
-        // pyupgrade
-        if settings.rules.enabled(Rule::DeprecatedUnittestAlias) {
-            rules.push(pyupgrade::rules::deprecated_unittest_alias);
-        }
-        if settings.rules.enabled(Rule::SuperCallWithParameters) {
-            rules.push(pyupgrade::rules::super_call_with_parameters);
-        }
-        if settings.rules.enabled(Rule::UnnecessaryEncodeUTF8) {
-            rules.push(pyupgrade::rules::unnecessary_encode_utf8);
-        }
-        if settings.rules.enabled(Rule::RedundantOpenModes) {
-            rules.push(pyupgrade::rules::redundant_open_modes);
-        }
-        if settings.rules.enabled(Rule::NativeLiterals) {
-            rules.push(pyupgrade::rules::native_literals);
-        }
-        if settings.rules.enabled(Rule::OpenAlias) {
-            rules.push(pyupgrade::rules::open_alias);
-        }
-        if settings.rules.enabled(Rule::ReplaceUniversalNewlines) {
-            rules.push(pyupgrade::rules::replace_universal_newlines);
-        }
-        if settings.rules.enabled(Rule::ReplaceStdoutStderr) {
-            rules.push(pyupgrade::rules::replace_stdout_stderr);
-        }
-        if settings.rules.enabled(Rule::OSErrorAlias) {
-            rules.push(pyupgrade::rules::os_error_alias_call);
-        }
-        if settings.rules.enabled(Rule::NonPEP604Isinstance)
-            && settings.target_version >= PythonVersion::Py310
-        {
-            rules.push(pyupgrade::rules::use_pep604_isinstance);
-        }
-        if settings.rules.enabled(Rule::TypeOfPrimitive) {
-            rules.push(pyupgrade::rules::type_of_primitive);
-        }
-
-        let mut _analysis_rules: Vec<AstRuleExecutor<ast::ExprCall>> = vec![];
-
-        // flake8-django
-        if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
-            _analysis_rules.push(DjangoLocalsInRenderFunction::run);
-        }
-
-        // We _can_ do this which is nice.
-
-        // This is closest to Rome.
-        let mut analysis_rules: Vec<RegisteredAstRule<ast::ExprCall>> = vec![];
-
-        for analyzer in [
-            RegisteredAstRule::new::<DjangoLocalsInRenderFunction>(
-                Rule::DjangoLocalsInRenderFunction,
-            ),
-            RegisteredAstRule::new::<TypeOfPrimitive>(Rule::TypeOfPrimitive),
-        ] {
-            if settings.rules.enabled(analyzer.rule) {
-                analysis_rules.push(analyzer);
-            }
-        }
-
         Checker {
             settings,
             noqa_line_for,
@@ -194,9 +122,23 @@ impl<'a> Checker<'a> {
             diagnostics: Vec::default(),
             deletions: FxHashSet::default(),
             flake8_bugbear_seen: Vec::default(),
-            rules,
-            analysis_rules,
-            _analysis_rules,
+            call_rules: [
+                RegisteredAstRule::new::<flake8_django::rules::DjangoLocalsInRenderFunction>(),
+                RegisteredAstRule::new::<pyupgrade::rules::DeprecatedUnittestAlias>(),
+                RegisteredAstRule::new::<pyupgrade::rules::SuperCallWithParameters>(),
+                RegisteredAstRule::new::<pyupgrade::rules::UnnecessaryEncodeUTF8>(),
+                RegisteredAstRule::new::<pyupgrade::rules::RedundantOpenModes>(),
+                RegisteredAstRule::new::<pyupgrade::rules::NativeLiterals>(),
+                RegisteredAstRule::new::<pyupgrade::rules::OpenAlias>(),
+                RegisteredAstRule::new::<pyupgrade::rules::ReplaceUniversalNewlines>(),
+                RegisteredAstRule::new::<pyupgrade::rules::ReplaceStdoutStderr>(),
+                RegisteredAstRule::new::<pyupgrade::rules::OSErrorAlias>(),
+                RegisteredAstRule::new::<pyupgrade::rules::NonPEP604Isinstance>(),
+                RegisteredAstRule::new::<pyupgrade::rules::TypeOfPrimitive>(),
+            ]
+            .into_iter()
+            .filter(|rule| rule.enabled(settings))
+            .collect(),
         }
     }
 }
@@ -230,7 +172,7 @@ impl<'a> RuleContext<'a> {
 
         Generator::new(
             self.stylist.indentation(),
-            quote_style(&self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
+            quote_style(self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
             self.stylist.line_ending(),
         )
     }
@@ -2697,8 +2639,8 @@ where
                     indexer: self.indexer,
                     ctx: &self.ctx,
                 };
-                for rule in &self.analysis_rules {
-                    (rule.run)(&mut self.diagnostics, &immutable_checker, call);
+                for rule in &self.call_rules {
+                    rule.run(&mut self.diagnostics, &immutable_checker, call);
                 }
 
                 let ast::ExprCall {

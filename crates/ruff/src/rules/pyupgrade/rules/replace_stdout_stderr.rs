@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rustpython_parser::ast::{Expr, ExprCall, Keyword, Ranged};
+use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -7,8 +7,9 @@ use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct ReplaceStdoutStderr;
@@ -21,6 +22,16 @@ impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
 
     fn autofix_title(&self) -> String {
         "Replace with `capture_output` keyword argument".to_string()
+    }
+}
+
+impl AstAnalyzer<ast::ExprCall> for ReplaceStdoutStderr {
+    fn rule() -> Rule {
+        Rule::ReplaceStdoutStderr
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        replace_stdout_stderr(diagnostics, checker, node);
     }
 }
 
@@ -56,12 +67,12 @@ fn generate_fix(
 pub(crate) fn replace_stdout_stderr(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall {
+    ast::ExprCall {
         func,
         args,
         keywords,
         range,
-    }: &ExprCall,
+    }: &ast::ExprCall,
 ) {
     if checker
         .ctx

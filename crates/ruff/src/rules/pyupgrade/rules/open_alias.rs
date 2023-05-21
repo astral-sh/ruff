@@ -1,10 +1,11 @@
-use rustpython_parser::ast::{ExprCall, Ranged};
+use rustpython_parser::ast::{self, Ranged};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Edit, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct OpenAlias;
@@ -22,23 +23,33 @@ impl Violation for OpenAlias {
     }
 }
 
+impl AstAnalyzer<ast::ExprCall> for OpenAlias {
+    fn rule() -> Rule {
+        Rule::OpenAlias
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, context: &RuleContext, node: &ast::ExprCall) {
+        open_alias(diagnostics, context, node);
+    }
+}
+
 /// UP020
 pub(crate) fn open_alias(
     diagnostics: &mut Vec<Diagnostic>,
-    checker: &RuleContext,
-    ExprCall { func, range, .. }: &ExprCall,
+    context: &RuleContext,
+    ast::ExprCall { func, range, .. }: &ast::ExprCall,
 ) {
-    if checker
+    if context
         .ctx
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["io", "open"])
     {
-        let fixable = checker
+        let fixable = context
             .ctx
             .find_binding("open")
             .map_or(true, |binding| binding.kind.is_builtin());
         let mut diagnostic = Diagnostic::new(OpenAlias, *range);
-        if fixable && checker.patch(diagnostic.kind.rule()) {
+        if fixable && context.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 "open".to_string(),

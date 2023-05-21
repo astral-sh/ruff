@@ -1,13 +1,14 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Excepthandler, Expr, ExprCall, ExprContext, Ranged};
+use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::context::Context;
 
+use crate::checkers::ast::traits::AstAnalyzer;
 use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct OSErrorAlias {
@@ -26,6 +27,16 @@ impl AlwaysAutofixableViolation for OSErrorAlias {
             None => "Replace with builtin `OSError`".to_string(),
             Some(name) => format!("Replace `{name}` with builtin `OSError`"),
         }
+    }
+}
+
+impl AstAnalyzer<ast::ExprCall> for OSErrorAlias {
+    fn rule() -> Rule {
+        Rule::OSErrorAlias
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        os_error_alias_call(diagnostics, checker, node);
     }
 }
 
@@ -176,9 +187,9 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
 pub(crate) fn os_error_alias_call(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall { func, .. }: &ExprCall,
+    ast::ExprCall { func, .. }: &ast::ExprCall,
 ) {
-    if is_alias(&checker.ctx, func) {
+    if is_alias(checker.ctx, func) {
         diagnostics.push(immutable_atom_diagnostic(checker, func));
     }
 }

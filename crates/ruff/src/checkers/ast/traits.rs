@@ -2,23 +2,41 @@ use ruff_diagnostics::Diagnostic;
 
 use crate::checkers::ast::RuleContext;
 use crate::registry::Rule;
+use crate::settings::Settings;
 
-pub(crate) struct RegisteredAstRule<T> {
-    pub(crate) run: AstRuleExecutor<T>,
-    pub(crate) rule: Rule,
+/// Trait for a lint rule that can be run on an AST node of type `T`.
+pub(crate) trait AstAnalyzer<T>: Sized {
+    /// The [`Rule`] that this analyzer implements.
+    fn rule() -> Rule;
+
+    /// Run the analyzer on the given node.
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);
 }
 
-// A nice thing about this is that we can have state that lives in this struct,
-// and we can pass it to the `run` function... E.g., flake8_bugbear_seen.
+/// Internal representation of a single [`Rule`] that can be run on an AST node of type `T`.
+pub(super) struct RegisteredAstRule<T> {
+    rule: Rule,
+    run: Run<T>,
+}
+
 impl<T> RegisteredAstRule<T> {
-    pub(crate) fn new<R: AstRule<T> + 'static>(rule: Rule) -> Self {
-        Self { run: R::run, rule }
+    pub(super) fn new<R: AstAnalyzer<T> + 'static>() -> Self {
+        Self {
+            rule: R::rule(),
+            run: R::run,
+        }
+    }
+
+    #[inline]
+    pub(super) fn enabled(&self, settings: &Settings) -> bool {
+        settings.rules.enabled(self.rule)
+    }
+
+    #[inline]
+    pub(super) fn run(&self, diagnostics: &mut Vec<Diagnostic>, context: &RuleContext, node: &T) {
+        (self.run)(diagnostics, context, node);
     }
 }
 
-pub(crate) type AstRuleExecutor<T> =
-    fn(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);
-
-pub(crate) trait AstRule<T>: Sized {
-    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);
-}
+/// Executor for an [`AstAnalyzer`] as a generic function pointer.
+type Run<T> = fn(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);

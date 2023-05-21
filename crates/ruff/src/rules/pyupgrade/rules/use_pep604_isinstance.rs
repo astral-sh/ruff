@@ -1,13 +1,14 @@
 use std::fmt;
 
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, ExprCall, Operator, Ranged};
+use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::{Checker, RuleContext};
-use crate::registry::AsRule;
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum CallKind {
@@ -50,6 +51,16 @@ impl AlwaysAutofixableViolation for NonPEP604Isinstance {
     }
 }
 
+impl AstAnalyzer<ast::ExprCall> for NonPEP604Isinstance {
+    fn rule() -> Rule {
+        Rule::NonPEP604Isinstance
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        use_pep604_isinstance(diagnostics, checker, node);
+    }
+}
+
 fn union(elts: &[Expr]) -> Expr {
     if elts.len() == 1 {
         elts[0].clone()
@@ -67,9 +78,9 @@ fn union(elts: &[Expr]) -> Expr {
 pub(crate) fn use_pep604_isinstance(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall {
+    ast::ExprCall {
         func, args, range, ..
-    }: &ExprCall,
+    }: &ast::ExprCall,
 ) {
     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
         let Some(kind) = CallKind::from_name(id) else {

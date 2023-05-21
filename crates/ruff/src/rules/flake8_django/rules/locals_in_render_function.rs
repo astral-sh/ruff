@@ -3,8 +3,9 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::traits::AstRule;
-use crate::checkers::ast::{Checker, RuleContext};
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for the use of `locals()` in `render` functions.
@@ -43,13 +44,17 @@ impl Violation for DjangoLocalsInRenderFunction {
     }
 }
 
-impl AstRule<ast::ExprCall> for DjangoLocalsInRenderFunction {
+/// DJ003
+impl AstAnalyzer<ast::ExprCall> for DjangoLocalsInRenderFunction {
+    fn rule() -> Rule {
+        Rule::DjangoLocalsInRenderFunction
+    }
+
     fn run(diagnostics: &mut Vec<Diagnostic>, context: &RuleContext, node: &ast::ExprCall) {
-        locals_in_render_function(diagnostics, context, node)
+        locals_in_render_function(diagnostics, context, node);
     }
 }
 
-/// DJ003
 pub(crate) fn locals_in_render_function(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,

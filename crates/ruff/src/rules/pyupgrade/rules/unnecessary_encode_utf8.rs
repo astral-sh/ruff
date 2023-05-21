@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Constant, Expr, ExprCall, Keyword, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -7,7 +7,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::{Checker, RuleContext};
+use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::RuleContext;
 use crate::registry::Rule;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -32,6 +33,16 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
             Reason::BytesLiteral => "Rewrite as bytes literal".to_string(),
             Reason::DefaultArgument => "Remove unnecessary encoding argument".to_string(),
         }
+    }
+}
+
+impl AstAnalyzer<ast::ExprCall> for UnnecessaryEncodeUTF8 {
+    fn rule() -> Rule {
+        Rule::UnnecessaryEncodeUTF8
+    }
+
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
+        unnecessary_encode_utf8(diagnostics, checker, node);
     }
 }
 
@@ -132,13 +143,12 @@ fn replace_with_bytes_literal(locator: &Locator, range: TextRange) -> Fix {
 pub(crate) fn unnecessary_encode_utf8(
     diagnostics: &mut Vec<Diagnostic>,
     checker: &RuleContext,
-    ExprCall {
+    ast::ExprCall {
         func,
         args,
         range,
         keywords,
-        ..
-    }: &ExprCall,
+    }: &ast::ExprCall,
 ) {
     let Some(variable) = match_encoded_variable(func) else {
         return;
