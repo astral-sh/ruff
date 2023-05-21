@@ -253,7 +253,7 @@ pub struct Options {
     /// respect these exclusions unequivocally.
     ///
     /// This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
-    /// changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit)
+    /// changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit)
     /// plugin, regardless of whether they're marked as excluded by Ruff's own
     /// settings.
     pub force_exclude: Option<bool>,
