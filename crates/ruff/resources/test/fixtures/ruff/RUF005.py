@@ -47,3 +47,5 @@ second = first + [
 f"{[*a(), 'b']}"
 
 pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+b = a + [2, 3] + [4]
