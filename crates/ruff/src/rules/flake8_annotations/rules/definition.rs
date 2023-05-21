@@ -14,8 +14,8 @@ use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
-use super::fixes;
-use super::helpers::match_function_def;
+use super::super::fixes;
+use super::super::helpers::match_function_def;
 
 /// ## What it does
 /// Checks that function arguments have type annotations.
