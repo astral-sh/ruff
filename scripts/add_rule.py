@@ -56,7 +56,7 @@ def add_test_case(
     sort_test_cases(plugin_module, nb_digit, test_case_to_add=test_case_to_add)
 
 
-def add_exports(plugin_module: Path, name: str, should_create: bool) -> None:
+def add_exports(plugin_module: Path, name: str, should_create: bool) -> bool:
     """Add the exports."""
     rule_name_snake = snake_case(name)
     new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
