@@ -56,7 +56,7 @@ def key_code_to_rule_pair(line: str) -> str:
     return line.lstrip().replace("// Reserved: ", "")
 
 
-def get_linters() -> dict[str, (int, bool)]:
+def get_linters() -> dict[str, int]:
     """Get the linters."""
     linters = {}
     lines = CODES_DIR.read_text().splitlines()
@@ -70,10 +70,6 @@ def get_linters() -> dict[str, (int, bool)]:
             if m:
                 code = m.group(1)
                 nb_digit = len(code) if code is not None else 3
-                linters[linter] = (nb_digit, use_deprecated_rules_architecture(linter))
+                linters[linter] = nb_digit
                 linter = None
     return linters
-
-
-def use_deprecated_rules_architecture(linter: str) -> bool:
-    return not (RULES_DIR / dir_name(linter) / "rules" / "mod.rs").exists()

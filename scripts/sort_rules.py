@@ -71,9 +71,17 @@ def sort_exports(
     *,
     pub_use_to_add: Optional[str] = None,
     mod_to_add: Optional[str] = None,
-) -> None:
+    should_create: bool = False,
+) -> bool:
     """Sort the exports."""
     rules_mod = plugin_module / "rules" / "mod.rs"
+
+    if not rules_mod.exists():
+        if not should_create:
+            return False
+        if not rules_mod.parent.exists():
+            rules_mod.parent.mkdir()
+        rules_mod.touch()
 
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
@@ -101,6 +109,8 @@ def sort_exports(
     else:
         if pub_use_to_add is not None and mod_to_add is not None:
             rules_mod.write_text(f"{pub_use_to_add};\n\n{mod_to_add}\n")
+
+    return True
 
 
 def sort_code_to_violation_pairs(
@@ -189,15 +199,13 @@ def sort_code_to_rule_pairs(
         fp.write(text)
 
 
-def sort_linter(*, linter: str, nb_digit: int, use_deprecated_rules_arch: bool) -> None:
+def sort_linter(*, linter: str, nb_digit: int) -> None:
     """Sort the code of the linter."""
     print(f"Sort '{linter}'.")
     plugin_module = RULES_DIR / dir_name(linter)
 
     sort_test_cases(plugin_module, nb_digit)
-    if not use_deprecated_rules_arch:
-        sort_exports(plugin_module)
-    else:
+    if not sort_exports(plugin_module):
         print(f"'{linter}' use a deprecated rules architecture, skip sorting exports.")
     sort_code_to_violation_pairs(linter)
     sort_code_to_rule_pairs(linter)
@@ -222,24 +230,17 @@ def main() -> None:
     linters = get_linters()
 
     if args.linter is None:
-        for linter, (nb_digit, use_deprecated_rules_arch) in linters.items():
-            sort_linter(
-                linter=linter,
-                nb_digit=nb_digit,
-                use_deprecated_rules_arch=use_deprecated_rules_arch,
-            )
+        for linter, nb_digit in linters.items():
+            sort_linter(linter=linter, nb_digit=nb_digit)
         return
 
-    if args.linter not in linters:
+    nb_digit = linters.get(args.linter)
+
+    if nb_digit is None:
         print(f"Unknown linter '{args.linter}'.")
         return
 
-    (nb_digit, use_deprecated_rules_arch) = linters[args.linter]
-    sort_linter(
-        linter=args.linter,
-        nb_digit=nb_digit,
-        use_deprecated_rules_arch=use_deprecated_rules_arch,
-    )
+    sort_linter(linter=args.linter, nb_digit=nb_digit)
 
 
 if __name__ == "__main__":
