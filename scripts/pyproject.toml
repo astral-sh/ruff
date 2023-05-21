@@ -17,6 +17,7 @@ ignore = [
   "S",     # bandit
   "G",     # flake8-logging
   "T",     # flake8-print
+  "TD003", # flake8-todo
   "FBT",   # flake8-boolean-trap
 ]
 
