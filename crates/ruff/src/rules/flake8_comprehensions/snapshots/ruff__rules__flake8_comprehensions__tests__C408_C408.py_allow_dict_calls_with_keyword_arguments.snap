@@ -55,4 +55,20 @@ C408.py:3:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
 5 5 | d3 = dict(**d2)
 6 6 | 
 
+C408.py:16:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+   |
+16 | f"{dict(x='y')}"
+17 | f'{dict(x="y")}'
+18 | f"{dict()}"
+   |    ^^^^^^ C408
+   |
+   = help: Rewrite as a literal
+
+ℹ Suggested fix
+13 13 | 
+14 14 | f"{dict(x='y')}"
+15 15 | f'{dict(x="y")}'
+16    |-f"{dict()}"
+   16 |+f"{ {} }"
+
 

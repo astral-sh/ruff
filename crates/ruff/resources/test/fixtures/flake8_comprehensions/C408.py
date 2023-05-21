@@ -10,3 +10,7 @@ def list():
 
 
 a = list()
+
+f"{dict(x='y')}"
+f'{dict(x="y")}'
+f"{dict()}"

@@ -13,5 +13,81 @@ C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
 1   |-dict([(i, i) for i in range(3)])
   1 |+{i: i for i in range(3)}
 2 2 | dict([(i, i) for i in range(3)], z=4)
+3 3 | 
+4 4 | def f(x):
+
+C404.py:7:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+   |
+ 7 |     return x
+ 8 | 
+ 9 | f'{dict([(s,s) for s in "ab"])}'
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+10 | f"{dict([(s,s) for s in 'ab'])}"
+11 | f"{dict([(s, s) for s in 'ab'])}"
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+4 4 | def f(x):
+5 5 |     return x
+6 6 | 
+7   |-f'{dict([(s,s) for s in "ab"])}'
+  7 |+f'{ {s: s for s in "ab"} }'
+8 8 | f"{dict([(s,s) for s in 'ab'])}"
+9 9 | f"{dict([(s, s) for s in 'ab'])}"
+10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
+
+C404.py:8:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+   |
+ 8 | f'{dict([(s,s) for s in "ab"])}'
+ 9 | f"{dict([(s,s) for s in 'ab'])}"
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+10 | f"{dict([(s, s) for s in 'ab'])}"
+11 | f"{dict([(s,f(s)) for s in 'ab'])}"
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+5 5 |     return x
+6 6 | 
+7 7 | f'{dict([(s,s) for s in "ab"])}'
+8   |-f"{dict([(s,s) for s in 'ab'])}"
+  8 |+f"{ {s: s for s in 'ab'} }"
+9 9 | f"{dict([(s, s) for s in 'ab'])}"
+10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
+
+C404.py:9:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+   |
+ 9 | f'{dict([(s,s) for s in "ab"])}'
+10 | f"{dict([(s,s) for s in 'ab'])}"
+11 | f"{dict([(s, s) for s in 'ab'])}"
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+12 | f"{dict([(s,f(s)) for s in 'ab'])}"
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+6  6  | 
+7  7  | f'{dict([(s,s) for s in "ab"])}'
+8  8  | f"{dict([(s,s) for s in 'ab'])}"
+9     |-f"{dict([(s, s) for s in 'ab'])}"
+   9  |+f"{ {s: s for s in 'ab'} }"
+10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
+
+C404.py:10:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+   |
+10 | f"{dict([(s,s) for s in 'ab'])}"
+11 | f"{dict([(s, s) for s in 'ab'])}"
+12 | f"{dict([(s,f(s)) for s in 'ab'])}"
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+7  7  | f'{dict([(s,s) for s in "ab"])}'
+8  8  | f"{dict([(s,s) for s in 'ab'])}"
+9  9  | f"{dict([(s, s) for s in 'ab'])}"
+10    |-f"{dict([(s,f(s)) for s in 'ab'])}"
+   10 |+f"{ {s: f(s) for s in 'ab'} }"
 
 

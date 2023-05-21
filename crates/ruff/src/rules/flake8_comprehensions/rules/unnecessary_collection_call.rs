@@ -90,9 +90,7 @@ pub(crate) fn unnecessary_collection_call(
     );
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_collection_call(checker.locator, checker.stylist, expr)
-        });
+        diagnostic.try_set_fix_from_edit(|| fixes::fix_unnecessary_collection_call(checker, expr));
     }
     checker.diagnostics.push(diagnostic);
 }

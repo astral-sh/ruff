@@ -12,6 +12,7 @@ use rustpython_parser::ast::Ranged;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
+use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_expr, match_module};
 
 fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
@@ -193,10 +194,11 @@ pub(crate) fn fix_unnecessary_generator_dict(
 
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
 pub(crate) fn fix_unnecessary_list_comprehension_set(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
     let module_text = locator.slice(expr.range());
@@ -229,16 +231,21 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        wrap_code_in_spaces(&state, checker.ctx.in_f_string()),
+        expr.range(),
+    ))
 }
 
 /// (C404) Convert `dict([(i, i) for i in range(3)])` to `{i: i for i in
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_list_comprehension_dict(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -254,16 +261,15 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     };
 
     let [Element::Simple {
-            value: key,
-            comma: Some(comma),
+            value: key, ..
         }, Element::Simple { value, .. }] = &tuple.elements[..] else { bail!("Expected tuple with two elements"); };
 
     body.value = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
         value: Box::new(value.clone()),
         for_in: list_comp.for_in.clone(),
-        whitespace_before_colon: comma.whitespace_before.clone(),
-        whitespace_after_colon: comma.whitespace_after.clone(),
+        whitespace_before_colon: ParenthesizableWhitespace::default(),
+        whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
         lbrace: LeftCurlyBrace {
             whitespace_after: call.whitespace_before_args.clone(),
         },
@@ -281,7 +287,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        wrap_code_in_spaces(&state, checker.ctx.in_f_string()),
+        expr.range(),
+    ))
 }
 
 /// Drop a trailing comma from a list of tuple elements.
@@ -329,10 +338,12 @@ fn drop_trailing_comma<'a>(
 
 /// (C405) Convert `set((1, 2))` to `{1, 2}`.
 pub(crate) fn fix_unnecessary_literal_set(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
@@ -371,7 +382,10 @@ pub(crate) fn fix_unnecessary_literal_set(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        wrap_code_in_spaces(&state, checker.ctx.in_f_string()),
+        expr.range(),
+    ))
 }
 
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
@@ -445,10 +459,12 @@ pub(crate) fn fix_unnecessary_literal_dict(
 
 /// (C408)
 pub(crate) fn fix_unnecessary_collection_call(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
     let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
@@ -457,6 +473,7 @@ pub(crate) fn fix_unnecessary_collection_call(
     let Expression::Name(name) = &call.func.as_ref() else {
         bail!("Expected Expression::Name");
     };
+    let mut wrap_in_spaces = false;
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
     // below.
@@ -480,6 +497,10 @@ pub(crate) fn fix_unnecessary_collection_call(
             }));
         }
         "dict" => {
+            let in_f_string = checker.ctx.in_f_string();
+            if in_f_string {
+                wrap_in_spaces = true;
+            }
             if call.args.is_empty() {
                 body.value = Expression::Dict(Box::new(Dict {
                     elements: vec![],
@@ -489,16 +510,18 @@ pub(crate) fn fix_unnecessary_collection_call(
                     rpar: vec![],
                 }));
             } else {
+                let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+
                 // Quote each argument.
                 for arg in &call.args {
                     let quoted = format!(
                         "{}{}{}",
-                        stylist.quote(),
+                        quote,
                         arg.keyword
                             .as_ref()
                             .expect("Expected dictionary argument to be kwarg")
                             .value,
-                        stylist.quote(),
+                        quote,
                     );
                     arena.push(quoted);
                 }
@@ -552,7 +575,19 @@ pub(crate) fn fix_unnecessary_collection_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        wrap_code_in_spaces(&state, wrap_in_spaces),
+        expr.range(),
+    ))
+}
+
+/// Adds spaces around the code generated from `state` if `wrap_in_spaces` is true.
+fn wrap_code_in_spaces(state: &CodegenState, wrap_in_spaces: bool) -> String {
+    if wrap_in_spaces {
+        format!(" {state} ")
+    } else {
+        state.to_string()
+    }
 }
 
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
