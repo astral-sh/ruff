@@ -2,7 +2,11 @@ import re
 from pathlib import Path
 from typing import Callable
 
+from requests import get
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
+RULES_DIR = ROOT_DIR / "crates" / "ruff" / "src" / "rules"
+CODES_DIR = ROOT_DIR / "crates" / "ruff" / "src" / "codes.rs"
 
 
 def dir_name(linter_name: str) -> str:
@@ -53,3 +57,26 @@ def key_mod(line: str) -> str:
 
 def key_code_to_rule_pair(line: str) -> str:
     return line.lstrip().replace("// Reserved: ", "")
+
+
+def get_linters() -> dict[str, (int, bool)]:
+    """Get the linters."""
+    linters = {}
+    lines = CODES_DIR.read_text().splitlines()
+    linter = None
+    for line in lines:
+        m = re.match(r"^        // ([^,]*)$", line)
+        if m:
+            linter = m.group(1)
+        elif linter is not None:
+            m = re.match(r'(?:^        \([A-Za-z0-9]+, "[A-Z]?([0-9]+)"|^$)', line)
+            if m:
+                code = m.group(1)
+                nb_digit = len(code) if code is not None else 3
+                linters[linter] = (nb_digit, use_deprecated_rules_architecture(linter))
+                linter = None
+    return linters
+
+
+def use_deprecated_rules_architecture(linter: str) -> bool:
+    return not (RULES_DIR / dir_name(linter) / "rules" / "mod.rs").exists()
