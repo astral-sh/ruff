@@ -14,7 +14,14 @@ import argparse
 import re
 from pathlib import Path
 
-from _utils import ROOT_DIR, dir_name, pascal_case, snake_case
+from _utils import (
+    ROOT_DIR,
+    RULES_DIR,
+    dir_name,
+    pascal_case,
+    snake_case,
+    use_deprecated_rules_architecture,
+)
 from sort_rules import (
     sort_code_to_rule_pairs,
     sort_exports,
@@ -50,19 +57,13 @@ def add_test_case(
     sort_test_cases(plugin_module, nb_digit, test_case_to_add=test_case_to_add)
 
 
-def add_exports(plugin_module: Path, name: str, linter: str) -> None:
+def add_exports(plugin_module: Path, name: str) -> None:
     """Add the exports."""
     rule_name_snake = snake_case(name)
     new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
     new_mod = f"mod {rule_name_snake};"
 
-    try:
-        sort_exports(plugin_module, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
-    except FileNotFoundError:
-        print(
-            f"'{linter}' use a deprecated rules architecture.\n"
-            "Please update the rules architecture to use the new one",
-        )
+    sort_exports(plugin_module, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
 
 
 def add_rule_function(
@@ -74,9 +75,7 @@ def add_rule_function(
     """Add the relevant rule function."""
     rule_name_snake = snake_case(name)
     rule_path = plugin_module / "rules"
-    if not rule_path.exists():
-        rule_path.mkdir()
-    (rule_path/f"{rule_name_snake}.rs").write_text(
+    (rule_path / f"{rule_name_snake}.rs").write_text(
         f"""\
 use ruff_diagnostics::Violation;
 use ruff_macros::{{derive_message_formats, violation}};
@@ -112,14 +111,28 @@ def add_code_to_rule_pair(
     sort_code_to_rule_pairs(linter, code_to_rule_pair_to_add=new_code_to_rule_pair)
 
 
-def main(*, name: str, prefix: str, code: str, linter: str) -> None:
+def add_rule(
+    *,
+    name: str,
+    prefix: str,
+    code: str,
+    linter: str,
+    use_deprecated_rules_arch: bool,
+) -> None:
     """Generate boilerplate for a new rule."""
-    plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
+    print(f"Adding rule '{name} ({prefix}{code})' to '{linter}'...")
+    plugin_module = RULES_DIR / dir_name(linter)
 
     create_test_fixture(prefix, code, linter)
     add_test_case(plugin_module, name, prefix, code, linter)
-    add_exports(plugin_module, name, linter)
-    add_rule_function(plugin_module, name, prefix, code)
+    if not use_deprecated_rules_arch:
+        add_exports(plugin_module, name)
+        add_rule_function(plugin_module, name, prefix, code)
+    else:
+        print(
+            f"'{linter}' use a deprecated rules architecture.\n"
+            "Please update the rules architecture to use the new one",
+        )
     add_code_to_rule_pair(name, code, linter)
 
 
@@ -160,4 +173,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main(name=args.name, prefix=args.prefix, code=args.code, linter=args.linter)
+    add_rule(
+        name=args.name,
+        prefix=args.prefix,
+        code=args.code,
+        linter=args.linter,
+        use_deprecated_rules_arch=use_deprecated_rules_architecture(args.linter),
+    )

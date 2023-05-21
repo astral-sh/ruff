@@ -8,14 +8,16 @@ Example usage:
 """
 
 import argparse
-import re
 from pathlib import Path
 from typing import Optional
 
 from _utils import (
+    CODES_DIR,
     ROOT_DIR,
+    RULES_DIR,
     dir_name,
     get_indent,
+    get_linters,
     key_code_to_rule_pair,
     key_mod,
     key_pub_use,
@@ -108,7 +110,7 @@ def sort_code_to_rule_pairs(
 ) -> None:
     """Sort the code-to-rule pairs from `src/codes.rs`."""
     text = ""
-    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
+    with CODES_DIR.open("r") as fp:
         while (line := next(fp)).strip() != f"// {linter}":
             text += line
         text += line
@@ -130,35 +132,17 @@ def sort_code_to_rule_pairs(
         fp.write(text)
 
 
-def sort_linter(*, linter: str, nb_digit: int) -> None:
+def sort_linter(*, linter: str, nb_digit: int, use_deprecated_rules_arch: bool) -> None:
     """Sort the code of the linter."""
     print(f"Sort '{linter}'.")
-    plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
+    plugin_module = RULES_DIR / dir_name(linter)
 
     sort_test_cases(plugin_module, nb_digit)
-    try:
+    if not use_deprecated_rules_arch:
         sort_exports(plugin_module)
-    except FileNotFoundError:
+    else:
         print(f"'{linter}' use a deprecated rules architecture, skip sorting exports.")
     sort_code_to_rule_pairs(linter)
-
-
-def get_linters() -> dict[str, int]:
-    """Get the linters."""
-    linters = {}
-    lines = (ROOT_DIR / "crates/ruff/src/codes.rs").read_text().splitlines()
-    linter = None
-    for line in lines:
-        m = re.match(r"^        // ([^,]*)$", line)
-        if m:
-            linter = m.group(1)
-        elif linter is not None:
-            m = re.match(r'^        \([A-Za-z0-9]+, "[A-Z]?([0-9]+)"', line)
-            if m:
-                nb_digit = len(m.group(1))
-                linters[linter] = nb_digit
-                linter = None
-    return linters
 
 
 def main() -> None:
@@ -180,16 +164,24 @@ def main() -> None:
     linters = get_linters()
 
     if args.linter is None:
-        for linter, nb_digit in linters.items():
-            sort_linter(linter=linter, nb_digit=nb_digit)
+        for linter, (nb_digit, use_deprecated_rules_arch) in linters.items():
+            sort_linter(
+                linter=linter,
+                nb_digit=nb_digit,
+                use_deprecated_rules_arch=use_deprecated_rules_arch,
+            )
         return
 
-    nb_digit = linters.get(args.linter)
-    if nb_digit is None:
+    if args.linter not in linters:
         print(f"Unknown linter '{args.linter}'.")
         return
 
-    sort_linter(linter=args.linter, nb_digit=nb_digit)
+    (nb_digit, use_deprecated_rules_arch) = linters[args.linter]
+    sort_linter(
+        linter=args.linter,
+        nb_digit=nb_digit,
+        use_deprecated_rules_arch=use_deprecated_rules_arch,
+    )
 
 
 if __name__ == "__main__":
