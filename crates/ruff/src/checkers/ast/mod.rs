@@ -83,7 +83,7 @@ pub(crate) struct Checker<'a> {
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
     // Dispatches
     rules: Vec<fn(&mut Vec<Diagnostic>, &ImmutableChecker, &ast::ExprCall)>,
-    analysis_rules: Vec<RegistryRule>,
+    analysis_rules: Vec<RegistryRule<ast::ExprCall>>,
 }
 
 pub(crate) struct ImmutableChecker<'a> {
@@ -152,7 +152,7 @@ impl<'a> Checker<'a> {
             rules.push(pyupgrade::rules::type_of_primitive);
         }
 
-        let mut analysis_rules: Vec<RegistryRule> = vec![];
+        let mut analysis_rules: Vec<RegistryRule<ast::ExprCall>> = vec![];
 
         // flake8-django
         if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {

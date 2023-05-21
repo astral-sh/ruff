@@ -43,7 +43,7 @@ impl Violation for DjangoLocalsInRenderFunction {
     }
 }
 
-impl AnalysisRule for DjangoLocalsInRenderFunction {
+impl AnalysisRule<ast::ExprCall> for DjangoLocalsInRenderFunction {
     fn run(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &ast::ExprCall) {
         locals_in_render_function(diagnostics, checker, node)
     }

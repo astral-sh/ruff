@@ -1,30 +1,19 @@
 use ruff_diagnostics::Diagnostic;
-use rustpython_parser::ast;
 
 use crate::checkers::ast::ImmutableChecker;
 
-pub(crate) struct RegistryRule {
-    pub(crate) run: RuleExecutor,
+pub(crate) struct RegistryRule<T> {
+    pub(crate) run: RuleExecutor<T>,
 }
 
-type RuleExecutor =
-    fn(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &ast::ExprCall);
+type RuleExecutor<T> = fn(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &T);
 
-impl RegistryRule {
-    pub(crate) fn new<R: AnalysisRule + 'static>() -> Self {
+impl<T> RegistryRule<T> {
+    pub(crate) fn new<R: AnalysisRule<T> + 'static>() -> Self {
         Self { run: R::run }
     }
-
-    pub fn run(
-        &self,
-        diagnostics: &mut Vec<Diagnostic>,
-        checker: &ImmutableChecker,
-        node: &ast::ExprCall,
-    ) {
-        (self.run)(diagnostics, checker, node)
-    }
 }
 
-pub(crate) trait AnalysisRule: Sized {
-    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &ast::ExprCall);
+pub(crate) trait AnalysisRule<T>: Sized {
+    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &ImmutableChecker, node: &T);
 }
