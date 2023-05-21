@@ -157,12 +157,6 @@ impl From<usize> for LineWidth<Length> {
     }
 }
 
-impl From<LineWidth<Length>> for usize {
-    fn from(line_width: LineWidth<Length>) -> usize {
-        line_width.width
-    }
-}
-
 impl<'de> Deserialize<'de> for LineWidth<Length> {
     fn deserialize<D>(deserializer: D) -> Result<LineWidth<Length>, D::Error>
     where
