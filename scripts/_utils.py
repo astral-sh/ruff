@@ -15,6 +15,8 @@ def pascal_case(linter_name: str) -> str:
     """Convert from snake-case to PascalCase."""
     if linter_name == "pep8-naming":
         return "PEP8Naming"
+    if linter_name == "flake8-errmsg":
+        return "Flake8ErrMsg"
     return "".join(
         word.title() for word in linter_name.split(" ")[0].split("_")[0].split("-")
     )
