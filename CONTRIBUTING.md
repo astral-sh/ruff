@@ -102,19 +102,37 @@ At time of writing, the repository includes the following crates:
 
 At a high level, the steps involved in adding a new lint rule are as follows:
 
-1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
-1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention), in the example it is `PreferListBuiltin`.
+
+1. Determine the linter prefix for the new rule, in the example it is `PIE`.
+
+1. Determine the rule code for the new rule, in the example it is `807`.
+
+1. Determine the linter name for the new rule, in the example it is `flake8-pie`.
+
+1. Run the following command to generate the rule boilerplate:
+
+   ```shell
+   python scripts/add_rule.py --name PreferListBuiltin --prefix PIE --code 807 --linter flake8-pie
+   ```
+
+1. Edit the generated file for your rule (e.g., `crates/ruff/src/rules/flake8_pie/rules/prefer_list_builtin.rs`).
+
 1. In that file, define a violation struct. You can grep for `#[violation]` to see examples.
+
 1. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
+
 1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for AST-based
    checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
    (for text-based checks), or `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based
    checks).
+
 1. Add a test fixture.
-1. Update the generated files (documentation and generated code).
+
+1. Update the generated files.
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
-rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
+rule linter (e.g., `crates/ruff/src/rules/flake8_pie/rules/prefer_list_builtin.rs`). That file should
 contain a struct defined via `#[violation]`, along with a function that creates the violation
 based on any required inputs.
 
@@ -126,12 +144,12 @@ If you need to inspect the AST, you can run `cargo dev print-ast` with a Python 
 for the `Check::new` invocations to understand how other, similar rules are implemented.
 
 To add a test fixture, create a file under `crates/ruff/resources/test/fixtures/[linter]`, named to match
-the code you defined earlier (e.g., `crates/ruff/resources/test/fixtures/pycodestyle/E402.py`). This file should
+the code you defined earlier (e.g., `crates/ruff/resources/test/fixtures/flake8_pie/PIE807.py`). This file should
 contain a variety of violations and non-violations designed to evaluate and demonstrate the behavior
 of your lint rule.
 
 Run `cargo dev generate-all` to generate the code for your new fixture. Then run Ruff
-locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
+locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/flake8_pie/PIE807.py --no-cache --select PIE807`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
 `test_case` macro in the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. Then, run `cargo test`.
@@ -153,6 +171,16 @@ This implies that rule names:
 
 When re-implementing rules from other linters, this convention is given more importance than
 preserving the original rule name.
+
+### Example: Adding a new plugin
+
+To add a new plugin, run the following command:
+
+```shell
+python scripts/add_plugin.py flake8-pie --url https://pypi.org/project/flake8-pie/ --prefix PIE
+```
+
+This should generate all the necessary boilerplate for a new plugin, ready to add your rules.
 
 ### Example: Adding a new configuration option
 
