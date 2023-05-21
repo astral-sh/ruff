@@ -86,7 +86,7 @@ where
         match expr {
             Expr::Call(ast::ExprCall { func, args, .. }) => {
                 if !is_mutable_func(self.checker, func)
-                    && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)
+                    && !is_immutable_func(&self.checker.model, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((

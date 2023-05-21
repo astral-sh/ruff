@@ -43,14 +43,14 @@ pub(crate) fn super_call_with_parameters(
     if !is_super_call_with_arguments(func, args) {
         return;
     }
-    let scope = checker.ctx.scope();
+    let scope = checker.model.scope();
 
     // Check: are we in a Function scope?
     if !matches!(scope.kind, ScopeKind::Function(_)) {
         return;
     }
 
-    let mut parents = checker.ctx.parents();
+    let mut parents = checker.model.parents();
 
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first

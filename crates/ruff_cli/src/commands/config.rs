@@ -1,5 +1,6 @@
-use crate::ExitStatus;
 use ruff::settings::options::Options;
+
+use crate::ExitStatus;
 
 #[allow(clippy::print_stdout)]
 pub(crate) fn config(key: Option<&str>) -> ExitStatus {

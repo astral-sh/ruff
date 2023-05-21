@@ -129,7 +129,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
         let certainty = Certainty::from(!helpers::uses_magic_variable_access(body, |id| {
-            checker.ctx.is_builtin(id)
+            checker.model.is_builtin(id)
         }));
 
         // Attempt to rename the variable by prepending an underscore, but avoid
@@ -153,12 +153,12 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
         if let Some(rename) = rename {
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
-                let scope = checker.ctx.scope();
+                let scope = checker.model.scope();
                 let binding = scope.bindings_for_name(name).find_map(|index| {
-                    let binding = &checker.ctx.bindings[*index];
-                    binding
-                        .source
-                        .and_then(|source| (Some(source) == checker.ctx.stmt_id).then_some(binding))
+                    let binding = &checker.model.bindings[*index];
+                    binding.source.and_then(|source| {
+                        (Some(source) == checker.model.stmt_id).then_some(binding)
+                    })
                 });
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {

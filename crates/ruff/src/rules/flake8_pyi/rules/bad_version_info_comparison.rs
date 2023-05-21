@@ -68,7 +68,7 @@ pub(crate) fn bad_version_info_comparison(
     };
 
     if !checker
-        .ctx
+        .model
         .resolve_call_path(left)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["sys", "version_info"]

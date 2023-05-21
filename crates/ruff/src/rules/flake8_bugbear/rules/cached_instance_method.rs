@@ -20,7 +20,7 @@ impl Violation for CachedInstanceMethod {
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
     checker
-        .ctx
+        .model
         .resolve_call_path(expr)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["functools", "lru_cache"]
@@ -30,7 +30,7 @@ fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
 
 /// B019
 pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if !matches!(checker.ctx.scope().kind, ScopeKind::Class(_)) {
+    if !matches!(checker.model.scope().kind, ScopeKind::Class(_)) {
         return;
     }
     for decorator in decorator_list {

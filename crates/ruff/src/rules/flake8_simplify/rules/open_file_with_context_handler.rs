@@ -42,7 +42,7 @@ impl Violation for OpenFileWithContextHandler {
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.
 fn match_async_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.expr_grandparent() else {
+    let Some(expr) = checker.model.expr_grandparent() else {
         return false;
     };
     let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
@@ -57,12 +57,12 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_async_context" {
         return false;
     }
-    for parent in checker.ctx.parents() {
+    for parent in checker.model.parents() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if checker
-                        .ctx
+                        .model
                         .resolve_call_path(func)
                         .map_or(false, |call_path| {
                             call_path.as_slice() == ["contextlib", "AsyncExitStack"]
@@ -80,7 +80,7 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
 /// Return `true` if the current expression is nested in an
 /// `exit_stack.enter_context` call.
 fn match_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.expr_parent() else {
+    let Some(expr) = checker.model.expr_parent() else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func,  .. }) = expr else {
@@ -92,12 +92,12 @@ fn match_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_context" {
         return false;
     }
-    for parent in checker.ctx.parents() {
+    for parent in checker.model.parents() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if checker
-                        .ctx
+                        .model
                         .resolve_call_path(func)
                         .map_or(false, |call_path| {
                             call_path.as_slice() == ["contextlib", "ExitStack"]
@@ -115,13 +115,13 @@ fn match_exit_stack(checker: &Checker) -> bool {
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     if checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "open"])
     {
-        if checker.ctx.is_builtin("open") {
+        if checker.model.is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.ctx.stmt(), Stmt::With(_)) {
+            if matches!(checker.model.stmt(), Stmt::With(_)) {
                 return;
             }
 

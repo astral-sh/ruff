@@ -2,14 +2,16 @@ use std::fmt::{Display, Formatter, Write};
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::fs;
 use anyhow::Result;
 use colored::Colorize;
 use fern;
 use log::Level;
 use once_cell::sync::Lazy;
-use ruff_python_ast::source_code::SourceCode;
 use rustpython_parser::{ParseError, ParseErrorType};
+
+use ruff_python_ast::source_code::SourceCode;
+
+use crate::fs;
 
 pub(crate) static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 

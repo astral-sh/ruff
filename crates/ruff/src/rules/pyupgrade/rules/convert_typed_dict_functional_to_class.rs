@@ -53,7 +53,7 @@ fn match_typed_dict_assign<'a>(
         return None;
     };
     if !checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["typing", "TypedDict"]

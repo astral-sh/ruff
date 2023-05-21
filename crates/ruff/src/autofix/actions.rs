@@ -13,7 +13,7 @@ use ruff_python_ast::helpers;
 use ruff_python_ast::imports::{AnyImport, Import};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;
@@ -435,11 +435,11 @@ pub(crate) fn get_or_import_symbol(
     module: &str,
     member: &str,
     at: TextSize,
-    context: &Context,
+    model: &SemanticModel,
     importer: &Importer,
     locator: &Locator,
 ) -> Result<(Edit, String)> {
-    if let Some((source, binding)) = context.resolve_qualified_import_name(module, member) {
+    if let Some((source, binding)) = model.resolve_qualified_import_name(module, member) {
         // If the symbol is already available in the current scope, use it.
 
         // The exception: the symbol source (i.e., the import statement) comes after the current
@@ -477,7 +477,7 @@ pub(crate) fn get_or_import_symbol(
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
-            if context
+            if model
                 .find_binding(member)
                 .map_or(true, |binding| binding.kind.is_builtin())
             {
@@ -489,7 +489,7 @@ pub(crate) fn get_or_import_symbol(
         } else {
             // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
             // return `"functools.cache"` as the bound name.
-            if context
+            if model
                 .find_binding(module)
                 .map_or(true, |binding| binding.kind.is_builtin())
             {

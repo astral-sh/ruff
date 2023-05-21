@@ -3,9 +3,6 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use itertools::Itertools;
 
-use super::external_config::ExternalConfig;
-use super::plugin::Plugin;
-use super::{parser, plugin};
 use crate::registry::Linter;
 use crate::rule_selector::RuleSelector;
 use crate::rules::flake8_pytest_style::types::{
@@ -22,6 +19,10 @@ use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::settings::types::PythonVersion;
 use crate::warn_user;
+
+use super::external_config::ExternalConfig;
+use super::plugin::Plugin;
+use super::{parser, plugin};
 
 const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::Linter(Linter::Pyflakes),
@@ -456,8 +457,6 @@ mod tests {
     use pep440_rs::VersionSpecifiers;
     use pretty_assertions::assert_eq;
 
-    use super::super::plugin::Plugin;
-    use super::convert;
     use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
     use crate::flake8_to_ruff::pep621::Project;
     use crate::flake8_to_ruff::ExternalConfig;
@@ -468,6 +467,9 @@ mod tests {
     use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
     use crate::settings::types::PythonVersion;
+
+    use super::super::plugin::Plugin;
+    use super::convert;
 
     fn default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> Options {
         Options {

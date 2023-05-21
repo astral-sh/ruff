@@ -78,7 +78,7 @@ pub(crate) fn unnecessary_literal_within_list_call(
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
-    if !checker.ctx.is_builtin("list") {
+    if !checker.model.is_builtin("list") {
         return;
     }
     let argument_kind = match argument {

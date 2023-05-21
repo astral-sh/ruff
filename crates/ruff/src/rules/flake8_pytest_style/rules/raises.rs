@@ -48,7 +48,7 @@ impl Violation for PytestRaisesWithoutException {
 
 fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
     checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "raises"]
@@ -147,7 +147,7 @@ pub(crate) fn complex_raises(
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
     if let Some(call_path) = checker
-        .ctx
+        .model
         .resolve_call_path(exception)
         .and_then(|call_path| {
             let is_broad_exception = checker

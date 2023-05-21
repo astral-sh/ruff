@@ -125,7 +125,7 @@ pub(crate) fn call_datetime_without_tzinfo(
     location: TextRange,
 ) {
     if !checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "datetime"]
@@ -158,7 +158,7 @@ pub(crate) fn call_datetime_without_tzinfo(
 /// Use `datetime.datetime.now(tz=)` instead.
 pub(crate) fn call_datetime_today(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "datetime", "today"]
@@ -180,7 +180,7 @@ pub(crate) fn call_datetime_today(checker: &mut Checker, func: &Expr, location: 
 /// current time in UTC is by calling `datetime.now(timezone.utc)`.
 pub(crate) fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "datetime", "utcnow"]
@@ -207,7 +207,7 @@ pub(crate) fn call_datetime_utcfromtimestamp(
     location: TextRange,
 ) {
     if checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "datetime", "utcfromtimestamp"]
@@ -228,7 +228,7 @@ pub(crate) fn call_datetime_now_without_tzinfo(
     location: TextRange,
 ) {
     if !checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "datetime", "now"]
@@ -270,7 +270,7 @@ pub(crate) fn call_datetime_fromtimestamp(
     location: TextRange,
 ) {
     if !checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "datetime", "fromtimestamp"]
@@ -311,7 +311,7 @@ pub(crate) fn call_datetime_strptime_without_zone(
     location: TextRange,
 ) {
     if !checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "datetime", "strptime"]
@@ -332,7 +332,7 @@ pub(crate) fn call_datetime_strptime_without_zone(
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (checker.ctx.expr_grandparent(), checker.ctx.expr_parent()) else {
+    let (Some(grandparent), Some(parent)) = (checker.model.expr_grandparent(), checker.model.expr_parent()) else {
         checker.diagnostics.push(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone,
             location,
@@ -370,7 +370,7 @@ pub(crate) fn call_datetime_strptime_without_zone(
 /// Use `datetime.datetime.now(tz=).date()` instead.
 pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "date", "today"]
@@ -390,7 +390,7 @@ pub(crate) fn call_date_today(checker: &mut Checker, func: &Expr, location: Text
 /// Use `datetime.datetime.fromtimestamp(, tz=).date()` instead.
 pub(crate) fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "date", "fromtimestamp"]

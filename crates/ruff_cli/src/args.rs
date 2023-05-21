@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
+use rustc_hash::FxHashMap;
+
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
@@ -11,7 +13,6 @@ use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
-use rustc_hash::FxHashMap;
 
 #[derive(Debug, Parser)]
 #[command(

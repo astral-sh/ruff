@@ -57,7 +57,7 @@ pub(crate) fn unnecessary_subscript_reversal(
     if !(id == "set" || id == "sorted" || id == "reversed") {
         return;
     }
-    if !checker.ctx.is_builtin(id) {
+    if !checker.model.is_builtin(id) {
         return;
     }
     let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {

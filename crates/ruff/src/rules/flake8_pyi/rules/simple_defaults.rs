@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, 
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 use ruff_python_semantic::scope::{ClassDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -172,7 +172,7 @@ fn is_valid_default_value_with_annotation(
             // Ex) `-math.inf`, `-math.pi`, etc.
             if let Expr::Attribute(_) = operand.as_ref() {
                 if checker
-                    .ctx
+                    .model
                     .resolve_call_path(operand)
                     .map_or(false, |call_path| {
                         ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
@@ -224,7 +224,7 @@ fn is_valid_default_value_with_annotation(
         // Ex) `math.inf`, `sys.stdin`, etc.
         Expr::Attribute(_) => {
             if checker
-                .ctx
+                .model
                 .resolve_call_path(default)
                 .map_or(false, |call_path| {
                     ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS
@@ -278,11 +278,11 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
 
 /// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
 /// call.
-fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
+fn is_type_var_like_call(model: &SemanticModel, expr: &Expr) -> bool {
     let Expr::Call(ast::ExprCall { func, .. } )= expr else {
         return false;
     };
-    context.resolve_call_path(func).map_or(false, |call_path| {
+    model.resolve_call_path(func).map_or(false, |call_path| {
         matches!(
             call_path.as_slice(),
             [
@@ -295,11 +295,11 @@ fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
 
 /// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
 /// `__all__`).
-fn is_special_assignment(context: &Context, target: &Expr) -> bool {
+fn is_special_assignment(model: &SemanticModel, target: &Expr) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = target {
         match id.as_str() {
-            "__all__" => context.scope().kind.is_module(),
-            "__match_args__" | "__slots__" => context.scope().kind.is_class(),
+            "__all__" => model.scope().kind.is_module(),
+            "__match_args__" | "__slots__" => model.scope().kind.is_class(),
             _ => false,
         }
     } else {
@@ -308,9 +308,9 @@ fn is_special_assignment(context: &Context, target: &Expr) -> bool {
 }
 
 /// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(context: &Context, bases: &[Expr]) -> bool {
+fn is_enum(model: &SemanticModel, bases: &[Expr]) -> bool {
     return bases.iter().any(|expr| {
-        context.resolve_call_path(expr).map_or(false, |call_path| {
+        model.resolve_call_path(expr).map_or(false, |call_path| {
             matches!(
                 call_path.as_slice(),
                 [
@@ -445,10 +445,10 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
     if !target.is_name_expr() {
         return;
     }
-    if is_special_assignment(&checker.ctx, target) {
+    if is_special_assignment(&checker.model, target) {
         return;
     }
-    if is_type_var_like_call(&checker.ctx, value) {
+    if is_type_var_like_call(&checker.model, value) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
@@ -476,13 +476,13 @@ pub(crate) fn annotated_assignment_default_in_stub(
     value: &Expr,
     annotation: &Expr,
 ) {
-    if checker.ctx.match_typing_expr(annotation, "TypeAlias") {
+    if checker.model.match_typing_expr(annotation, "TypeAlias") {
         return;
     }
-    if is_special_assignment(&checker.ctx, target) {
+    if is_special_assignment(&checker.model, target) {
         return;
     }
-    if is_type_var_like_call(&checker.ctx, value) {
+    if is_type_var_like_call(&checker.model, value) {
         return;
     }
     if is_valid_default_value_with_annotation(value, checker, true) {
@@ -513,10 +513,10 @@ pub(crate) fn unannotated_assignment_in_stub(
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
-    if is_special_assignment(&checker.ctx, target) {
+    if is_special_assignment(&checker.model, target) {
         return;
     }
-    if is_type_var_like_call(&checker.ctx, value) {
+    if is_type_var_like_call(&checker.model, value) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
@@ -526,8 +526,8 @@ pub(crate) fn unannotated_assignment_in_stub(
         return;
     }
 
-    if let ScopeKind::Class(ClassDef { bases, .. }) = &checker.ctx.scope().kind {
-        if is_enum(&checker.ctx, bases) {
+    if let ScopeKind::Class(ClassDef { bases, .. }) = &checker.model.scope().kind {
+        if is_enum(&checker.model, bases) {
             return;
         }
     }

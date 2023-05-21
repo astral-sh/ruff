@@ -57,7 +57,7 @@ impl Violation for NumpyLegacyRandom {
 
 /// NPY002
 pub(crate) fn numpy_legacy_random(checker: &mut Checker, expr: &Expr) {
-    if let Some(method_name) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
+    if let Some(method_name) = checker.model.resolve_call_path(expr).and_then(|call_path| {
         // seeding state
         if call_path.as_slice() == ["numpy", "random", "seed"]
             || call_path.as_slice() == ["numpy", "random", "get_state"]

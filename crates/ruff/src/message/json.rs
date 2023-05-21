@@ -1,11 +1,14 @@
-use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
-use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::SourceCode;
+use std::io::Write;
+
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
-use std::io::Write;
+
+use ruff_diagnostics::Edit;
+use ruff_python_ast::source_code::SourceCode;
+
+use crate::message::{Emitter, EmitterContext, Message};
+use crate::registry::AsRule;
 
 #[derive(Default)]
 pub struct JsonEmitter;
@@ -94,9 +97,10 @@ impl Serialize for ExpandedEdits<'_> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::JsonEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn output() {

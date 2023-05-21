@@ -21,7 +21,7 @@ impl Violation for UndefinedLocal {
 /// F823
 pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
     // If the name hasn't already been defined in the current scope...
-    let current = checker.ctx.scope();
+    let current = checker.model.scope();
     if !current.kind.is_function() || current.defines(name) {
         return;
     }
@@ -31,16 +31,16 @@ pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
     };
 
     // For every function and module scope above us...
-    for scope in checker.ctx.scopes.ancestors(parent) {
+    for scope in checker.model.scopes.ancestors(parent) {
         if !(scope.kind.is_function() || scope.kind.is_module()) {
             continue;
         }
 
         // If the name was defined in that scope...
-        if let Some(binding) = scope.get(name).map(|index| &checker.ctx.bindings[*index]) {
+        if let Some(binding) = scope.get(name).map(|index| &checker.model.bindings[*index]) {
             // And has already been accessed in the current scope...
             if let Some((scope_id, location)) = binding.runtime_usage {
-                if scope_id == checker.ctx.scope_id {
+                if scope_id == checker.model.scope_id {
                     // Then it's probably an error.
                     checker.diagnostics.push(Diagnostic::new(
                         UndefinedLocal {

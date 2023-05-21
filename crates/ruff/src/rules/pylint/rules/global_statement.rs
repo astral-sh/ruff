@@ -54,11 +54,11 @@ impl Violation for GlobalStatement {
 
 /// PLW0603
 pub(crate) fn global_statement(checker: &mut Checker, name: &str) {
-    let scope = checker.ctx.scope();
+    let scope = checker.model.scope();
     if let Some(index) = scope.get(name) {
-        let binding = &checker.ctx.bindings[*index];
+        let binding = &checker.model.bindings[*index];
         if binding.kind.is_global() {
-            let source = checker.ctx.stmts[binding
+            let source = checker.model.stmts[binding
                 .source
                 .expect("`global` bindings should always have a `source`")];
             let diagnostic = Diagnostic::new(

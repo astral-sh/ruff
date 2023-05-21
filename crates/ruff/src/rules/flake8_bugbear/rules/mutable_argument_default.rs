@@ -27,7 +27,7 @@ const MUTABLE_FUNCS: &[&[&str]] = &[
 
 pub(crate) fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
     checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             MUTABLE_FUNCS
@@ -70,7 +70,7 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Argume
             && !arg
                 .annotation
                 .as_ref()
-                .map_or(false, |expr| is_immutable_annotation(&checker.ctx, expr))
+                .map_or(false, |expr| is_immutable_annotation(&checker.model, expr))
         {
             checker
                 .diagnostics

@@ -27,7 +27,7 @@ pub(crate) fn is_untyped_exception(type_: Option<&Expr>, checker: &Checker) -> b
         if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &type_ {
             elts.iter().any(|type_| {
                 checker
-                    .ctx
+                    .model
                     .resolve_call_path(type_)
                     .map_or(false, |call_path| {
                         call_path.as_slice() == ["", "Exception"]
@@ -36,7 +36,7 @@ pub(crate) fn is_untyped_exception(type_: Option<&Expr>, checker: &Checker) -> b
             })
         } else {
             checker
-                .ctx
+                .model
                 .resolve_call_path(type_)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["", "Exception"]
