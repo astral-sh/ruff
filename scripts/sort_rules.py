@@ -91,7 +91,9 @@ def sort_exports(
         new_contents += ";\n\n"
         new_contents += "\n".join(mod_contents)
         new_contents += "\n"
-        new_contents += "\n\n".join(parts[2:])
+        if len(parts) > 2:
+            new_contents += "\n"
+            new_contents += "\n\n".join(parts[2:])
 
         rules_mod.write_text(new_contents)
     else:
