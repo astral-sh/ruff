@@ -812,7 +812,7 @@ pub enum Linter {
     Flake8UsePathlib,
     /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
     #[prefix = "TD"]
-    Flake8Todo,
+    Flake8Todos,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
