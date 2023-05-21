@@ -10,7 +10,7 @@ use ruff_python_ast::newlines::StrExt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-use crate::settings::options::LineWidth;
+use crate::settings::line_width::LineWidth;
 
 use super::fix_with;
 

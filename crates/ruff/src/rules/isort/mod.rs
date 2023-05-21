@@ -19,7 +19,7 @@ use types::{AliasData, EitherImport, TrailingComma};
 
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
-use crate::settings::options::LineWidth;
+use crate::settings::line_width::LineWidth;
 use crate::settings::types::PythonVersion;
 
 mod annotate;

@@ -9,7 +9,7 @@ use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
-use crate::settings::options::LineWidth;
+use crate::settings::line_width::LineWidth;
 
 #[violation]
 pub struct ReimplementedBuiltin {

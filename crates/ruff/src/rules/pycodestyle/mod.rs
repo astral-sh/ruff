@@ -12,7 +12,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::options::LineWidth;
+    use crate::settings::line_width::LineWidth;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 

@@ -14,7 +14,8 @@ use ruff::rules::{
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
 };
 use ruff::settings::configuration::Configuration;
-use ruff::settings::options::{LineWidth, Options, TabSize};
+use ruff::settings::line_width::{LineWidth, TabSize};
+use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceLocation, Stylist};

@@ -25,12 +25,13 @@ use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once_by_id;
 
-use self::options::{LineWidth, TabSize};
+use self::line_width::{LineWidth, TabSize};
 use self::rule_table::RuleTable;
 
 pub mod configuration;
 pub mod defaults;
 pub mod flags;
+pub mod line_width;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;

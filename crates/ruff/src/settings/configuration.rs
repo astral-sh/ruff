@@ -25,7 +25,7 @@ use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
 
-use super::options::{LineWidth, TabSize};
+use super::line_width::{LineWidth, TabSize};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {

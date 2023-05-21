@@ -9,7 +9,7 @@ use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
 use ruff::settings::configuration::RuleSelection;
-use ruff::settings::options::LineWidth;
+use ruff::settings::line_width::LineWidth;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };

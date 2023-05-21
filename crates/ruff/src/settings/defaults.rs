@@ -16,7 +16,7 @@ use crate::rules::{
 };
 use crate::settings::types::FilePatternSet;
 
-use super::options::{LineWidth, TabSize};
+use super::line_width::{LineWidth, TabSize};
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
 

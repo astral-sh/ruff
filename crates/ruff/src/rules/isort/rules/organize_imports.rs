@@ -14,7 +14,7 @@ use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::whitespace::leading_space;
 
 use crate::registry::AsRule;
-use crate::settings::options::LineWidth;
+use crate::settings::line_width::LineWidth;
 use crate::settings::Settings;
 
 use super::super::block::Block;

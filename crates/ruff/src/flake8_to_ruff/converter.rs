@@ -15,7 +15,8 @@ use crate::rules::{
     flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
     flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
 };
-use crate::settings::options::{LineWidth, Options};
+use crate::settings::line_width::LineWidth;
+use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
 use crate::settings::types::PythonVersion;
 use crate::warn_user;
@@ -466,7 +467,8 @@ mod tests {
     use crate::rule_selector::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
-    use crate::settings::options::{LineWidth, Options};
+    use crate::settings::line_width::LineWidth;
+    use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
     use crate::settings::types::PythonVersion;
 

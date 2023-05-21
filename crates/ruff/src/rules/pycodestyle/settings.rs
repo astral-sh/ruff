@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
-use crate::settings::options::LineWidth;
+use crate::settings::line_width::LineWidth;
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,

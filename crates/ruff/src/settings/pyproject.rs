@@ -158,7 +158,7 @@ mod tests {
         flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_import_conventions,
         flake8_pytest_style, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
-    use crate::settings::options::LineWidth;
+    use crate::settings::line_width::LineWidth;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
