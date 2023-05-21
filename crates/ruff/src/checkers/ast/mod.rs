@@ -2892,22 +2892,12 @@ where
                 }
                 if self.settings.rules.enabled(Rule::UnnecessaryGeneratorSet) {
                     flake8_comprehensions::rules::unnecessary_generator_set(
-                        self,
-                        expr,
-                        self.ctx.expr_parent(),
-                        func,
-                        args,
-                        keywords,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.rules.enabled(Rule::UnnecessaryGeneratorDict) {
                     flake8_comprehensions::rules::unnecessary_generator_dict(
-                        self,
-                        expr,
-                        self.ctx.expr_parent(),
-                        func,
-                        args,
-                        keywords,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self

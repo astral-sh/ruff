@@ -7,6 +7,7 @@ use libcst_native::{
     ParenthesizedWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp,
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{Edit, Fix};
@@ -75,11 +76,12 @@ pub(crate) fn fix_unnecessary_generator_list(
 
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
 pub(crate) fn fix_unnecessary_generator_set(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
-    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
@@ -113,25 +115,21 @@ pub(crate) fn fix_unnecessary_generator_set(
     };
     tree.codegen(&mut state);
 
-    let mut content = state.to_string();
-
-    // If the expression is embedded in an f-string, surround it with spaces to avoid
-    // syntax errors.
-    if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
-        content = format!(" {content} ");
-    }
-
-    Ok(Edit::range_replacement(content, expr.range()))
+    Ok(Edit::range_replacement(
+        wrap_code_in_spaces(&state, checker, expr.range()),
+        expr.range(),
+    ))
 }
 
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_generator_dict(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
-    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -181,15 +179,10 @@ pub(crate) fn fix_unnecessary_generator_dict(
     };
     tree.codegen(&mut state);
 
-    let mut content = state.to_string();
-
-    // If the expression is embedded in an f-string, surround it with spaces to avoid
-    // syntax errors.
-    if let Some(rustpython_parser::ast::Expr::FormattedValue(_)) = parent {
-        content = format!(" {content} ");
-    }
-
-    Ok(Edit::range_replacement(content, expr.range()))
+    Ok(Edit::range_replacement(
+        wrap_code_in_spaces(&state, checker, expr.range()),
+        expr.range(),
+    ))
 }
 
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
@@ -232,7 +225,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(&state, checker.ctx.in_f_string()),
+        wrap_code_in_spaces(&state, checker, expr.range()),
         expr.range(),
     ))
 }
@@ -288,7 +281,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(&state, checker.ctx.in_f_string()),
+        wrap_code_in_spaces(&state, checker, expr.range()),
         expr.range(),
     ))
 }
@@ -383,17 +376,19 @@ pub(crate) fn fix_unnecessary_literal_set(
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(
-        wrap_code_in_spaces(&state, checker.ctx.in_f_string()),
+        wrap_code_in_spaces(&state, checker, expr.range()),
         expr.range(),
     ))
 }
 
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
 pub(crate) fn fix_unnecessary_literal_dict(
-    locator: &Locator,
-    stylist: &Stylist,
+    checker: &Checker,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
+    let locator = checker.locator;
+    let stylist = checker.stylist;
+
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
@@ -454,7 +449,10 @@ pub(crate) fn fix_unnecessary_literal_dict(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        wrap_code_in_spaces(&state, checker, expr.range()),
+        expr.range(),
+    ))
 }
 
 /// (C408)
@@ -575,19 +573,51 @@ pub(crate) fn fix_unnecessary_collection_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::range_replacement(
-        wrap_code_in_spaces(&state, wrap_in_spaces),
-        expr.range(),
-    ))
+    let code = if wrap_in_spaces {
+        wrap_code_in_spaces(&state, checker, expr.range())
+    } else {
+        state.to_string()
+    };
+
+    Ok(Edit::range_replacement(code, expr.range()))
 }
 
 /// Adds spaces around the code generated from `state` if `wrap_in_spaces` is true.
-fn wrap_code_in_spaces(state: &CodegenState, wrap_in_spaces: bool) -> String {
-    if wrap_in_spaces {
-        format!(" {state} ")
-    } else {
-        state.to_string()
+fn wrap_code_in_spaces(state: &CodegenState, checker: &Checker, expr_range: TextRange) -> String {
+    if checker.ctx.in_f_string() {
+        if let Some(f_string_range) = checker.indexer.f_string_range(expr_range.start()) {
+            let f_string = checker.locator.slice(f_string_range);
+
+            // find the braces that delimit the f-string
+            let f_string_start = f_string_range.start();
+            let f_string_sbrace =
+                f_string_start + TextSize::try_from(f_string.find('{').unwrap()).unwrap();
+            let f_string_ebrace =
+                f_string_start + TextSize::try_from(f_string.rfind('}').unwrap()).unwrap();
+
+            let mut buf = Vec::with_capacity(3);
+
+            // check if left padding is required
+            // this is true when between the opening brace of the f-string and the start of the
+            // current expression there are no characters
+            let one = TextSize::from(1u32);
+            if f_string_sbrace + one == expr_range.start() {
+                buf.push(" ".to_string());
+            }
+
+            buf.push(state.to_string());
+
+            // check if right padding is required
+            // this is true when between the end of the current expression and the closing
+            // brace of the f-string there are no characters
+            if expr_range.end() == f_string_ebrace {
+                buf.push(" ".to_string());
+            }
+
+            return buf.join("");
+        }
     }
+    state.to_string()
 }
 
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`

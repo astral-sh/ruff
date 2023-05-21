@@ -14,6 +14,8 @@ def f(x):
 print(f'Hello {set(a for a in "abc")} World')
 print(f"Hello {set(a for a in 'abc')} World")
 print(f"Hello {set(f(a) for a in 'abc')} World")
+print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 
 
 def set(*args, **kwargs):

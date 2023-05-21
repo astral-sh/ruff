@@ -118,7 +118,7 @@ C401.py:14:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    14 |+print(f'Hello { {a for a in "abc"} } World')
 15 15 | print(f"Hello {set(a for a in 'abc')} World")
 16 16 | print(f"Hello {set(f(a) for a in 'abc')} World")
-17 17 | 
+17 17 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 
 C401.py:15:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
@@ -126,6 +126,7 @@ C401.py:15:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 16 | print(f"Hello {set(a for a in 'abc')} World")
    |                ^^^^^^^^^^^^^^^^^^^^^ C401
 17 | print(f"Hello {set(f(a) for a in 'abc')} World")
+18 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
    |
    = help: Rewrite as a `set` comprehension
 
@@ -136,8 +137,8 @@ C401.py:15:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 15    |-print(f"Hello {set(a for a in 'abc')} World")
    15 |+print(f"Hello { {a for a in 'abc'} } World")
 16 16 | print(f"Hello {set(f(a) for a in 'abc')} World")
-17 17 | 
-18 18 | 
+17 17 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+18 18 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 
 C401.py:16:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
@@ -145,6 +146,8 @@ C401.py:16:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 17 | print(f"Hello {set(a for a in 'abc')} World")
 18 | print(f"Hello {set(f(a) for a in 'abc')} World")
    |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
    = help: Rewrite as a `set` comprehension
 
@@ -154,8 +157,86 @@ C401.py:16:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
 15 15 | print(f"Hello {set(a for a in 'abc')} World")
 16    |-print(f"Hello {set(f(a) for a in 'abc')} World")
    16 |+print(f"Hello { {f(a) for a in 'abc'} } World")
-17 17 | 
-18 18 | 
-19 19 | def set(*args, **kwargs):
+17 17 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+18 18 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+19 19 | 
+
+C401.py:17:10: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+   |
+17 | print(f"Hello {set(a for a in 'abc')} World")
+18 | print(f"Hello {set(f(a) for a in 'abc')} World")
+19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   |          ^^^^^^^^^^^^^^^^^^^^^ C401
+20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |
+   = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+14 14 | print(f'Hello {set(a for a in "abc")} World')
+15 15 | print(f"Hello {set(a for a in 'abc')} World")
+16 16 | print(f"Hello {set(f(a) for a in 'abc')} World")
+17    |-print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   17 |+print(f"{ {a for a in 'abc'} - set(a for a in 'ab')}")
+18 18 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+19 19 | 
+20 20 | 
+
+C401.py:17:34: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+   |
+17 | print(f"Hello {set(a for a in 'abc')} World")
+18 | print(f"Hello {set(f(a) for a in 'abc')} World")
+19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   |                                  ^^^^^^^^^^^^^^^^^^^^ C401
+20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |
+   = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+14 14 | print(f'Hello {set(a for a in "abc")} World')
+15 15 | print(f"Hello {set(a for a in 'abc')} World")
+16 16 | print(f"Hello {set(f(a) for a in 'abc')} World")
+17    |-print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+   17 |+print(f"{set(a for a in 'abc') - {a for a in 'ab'} }")
+18 18 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+19 19 | 
+20 20 | 
+
+C401.py:18:11: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+   |
+18 | print(f"Hello {set(f(a) for a in 'abc')} World")
+19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |           ^^^^^^^^^^^^^^^^^^^^^ C401
+   |
+   = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+15 15 | print(f"Hello {set(a for a in 'abc')} World")
+16 16 | print(f"Hello {set(f(a) for a in 'abc')} World")
+17 17 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+18    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   18 |+print(f"{ {a for a in 'abc'} - set(a for a in 'ab') }")
+19 19 | 
+20 20 | 
+21 21 | def set(*args, **kwargs):
+
+C401.py:18:35: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+   |
+18 | print(f"Hello {set(f(a) for a in 'abc')} World")
+19 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+20 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   |                                   ^^^^^^^^^^^^^^^^^^^^ C401
+   |
+   = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+15 15 | print(f"Hello {set(a for a in 'abc')} World")
+16 16 | print(f"Hello {set(f(a) for a in 'abc')} World")
+17 17 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+18    |-print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+   18 |+print(f"{ set(a for a in 'abc') - {a for a in 'ab'} }")
+19 19 | 
+20 20 | 
+21 21 | def set(*args, **kwargs):
 
 

@@ -122,7 +122,7 @@ C402.py:9:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
    9  |+print(f'Hello { {x: x for x in "abc"} } World')
 10 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
 11 11 | 
-12 12 | def f(x):
+12 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
 
 C402.py:10:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
    |
@@ -131,7 +131,7 @@ C402.py:10:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension
 12 | print(f'Hello {dict((x,x) for x in "abc")} World')
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
 13 | 
-14 | def f(x):
+14 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
    |
    = help: Rewrite as a `dict` comprehension
 
@@ -142,23 +142,103 @@ C402.py:10:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension
 10    |-print(f'Hello {dict((x,x) for x in "abc")} World')
    10 |+print(f'Hello { {x: x for x in "abc"} } World')
 11 11 | 
-12 12 | def f(x):
-13 13 |     return x
+12 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+13 13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
 
-C402.py:15:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+C402.py:12:4: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
    |
-15 |     return x
-16 | 
-17 | print(f'Hello {dict((x,f(x)) for x in "abc")} World')
+12 | print(f'Hello {dict((x,x) for x in "abc")} World')
+13 | 
+14 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+15 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+9  9  | print(f'Hello {dict((x, x) for x in "abc")} World')
+10 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
+11 11 | 
+12    |-f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+   12 |+f'{ {x: x for x in range(3)} | dict((x, x) for x in range(3))}'
+13 13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+14 14 | 
+15 15 | def f(x):
+
+C402.py:12:37: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+   |
+12 | print(f'Hello {dict((x,x) for x in "abc")} World')
+13 | 
+14 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+   |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+15 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+9  9  | print(f'Hello {dict((x, x) for x in "abc")} World')
+10 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
+11 11 | 
+12    |-f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+   12 |+f'{dict((x, x) for x in range(3)) | {x: x for x in range(3)} }'
+13 13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+14 14 | 
+15 15 | def f(x):
+
+C402.py:13:5: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+   |
+13 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+14 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+15 | 
+16 | def f(x):
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+10 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
+11 11 | 
+12 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+13    |-f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+   13 |+f'{ {x: x for x in range(3)} | dict((x, x) for x in range(3)) }'
+14 14 | 
+15 15 | def f(x):
+16 16 |     return x
+
+C402.py:13:38: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+   |
+13 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+14 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+15 | 
+16 | def f(x):
+   |
+   = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+10 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
+11 11 | 
+12 12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+13    |-f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+   13 |+f'{ dict((x, x) for x in range(3)) | {x: x for x in range(3)} }'
+14 14 | 
+15 15 | def f(x):
+16 16 |     return x
+
+C402.py:18:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+   |
+18 |     return x
+19 | 
+20 | print(f'Hello {dict((x,f(x)) for x in "abc")} World')
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
    |
    = help: Rewrite as a `dict` comprehension
 
 ℹ Suggested fix
-12 12 | def f(x):
-13 13 |     return x
-14 14 | 
-15    |-print(f'Hello {dict((x,f(x)) for x in "abc")} World')
-   15 |+print(f'Hello { {x: f(x) for x in "abc"} } World')
+15 15 | def f(x):
+16 16 |     return x
+17 17 | 
+18    |-print(f'Hello {dict((x,f(x)) for x in "abc")} World')
+   18 |+print(f'Hello { {x: f(x) for x in "abc"} } World')
 
 

@@ -45,7 +45,6 @@ impl AlwaysAutofixableViolation for UnnecessaryGeneratorDict {
 pub(crate) fn unnecessary_generator_dict(
     checker: &mut Checker,
     expr: &Expr,
-    parent: Option<&Expr>,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
@@ -60,12 +59,7 @@ pub(crate) fn unnecessary_generator_dict(
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
                     diagnostic.try_set_fix_from_edit(|| {
-                        fixes::fix_unnecessary_generator_dict(
-                            checker.locator,
-                            checker.stylist,
-                            expr,
-                            parent,
-                        )
+                        fixes::fix_unnecessary_generator_dict(checker, expr)
                     });
                 }
                 checker.diagnostics.push(diagnostic);
