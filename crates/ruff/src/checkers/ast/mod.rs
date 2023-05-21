@@ -154,19 +154,6 @@ impl<'a> Checker<'a> {
             rules.push(pyupgrade::rules::type_of_primitive);
         }
 
-        // This is closest to Rome.
-        let mut analysis_rules: Vec<RegisteredAstRule<ast::ExprCall>> = vec![];
-
-        // flake8-django
-        if settings.rules.enabled(Rule::DjangoLocalsInRenderFunction) {
-            analysis_rules.push(RegisteredAstRule::new::<DjangoLocalsInRenderFunction>());
-        }
-
-        // pyupgrade
-        if settings.rules.enabled(Rule::TypeOfPrimitive) {
-            analysis_rules.push(RegisteredAstRule::new::<TypeOfPrimitive>());
-        }
-
         let mut _analysis_rules: Vec<AstRuleExecutor<ast::ExprCall>> = vec![];
 
         // flake8-django
@@ -175,17 +162,17 @@ impl<'a> Checker<'a> {
         }
 
         // We _can_ do this which is nice.
-        for (rule, analyzer) in [
-            (
+
+        // This is closest to Rome.
+        let mut analysis_rules: Vec<RegisteredAstRule<ast::ExprCall>> = vec![];
+
+        for analyzer in [
+            RegisteredAstRule::new::<DjangoLocalsInRenderFunction>(
                 Rule::DjangoLocalsInRenderFunction,
-                RegisteredAstRule::new::<DjangoLocalsInRenderFunction>(),
             ),
-            (
-                Rule::TypeOfPrimitive,
-                RegisteredAstRule::new::<TypeOfPrimitive>(),
-            ),
+            RegisteredAstRule::new::<TypeOfPrimitive>(Rule::TypeOfPrimitive),
         ] {
-            if settings.rules.enabled(rule) {
+            if settings.rules.enabled(analyzer.rule) {
                 analysis_rules.push(analyzer);
             }
         }

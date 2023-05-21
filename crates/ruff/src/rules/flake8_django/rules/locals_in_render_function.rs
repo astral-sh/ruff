@@ -44,8 +44,8 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 impl AstRule<ast::ExprCall> for DjangoLocalsInRenderFunction {
-    fn run(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &ast::ExprCall) {
-        locals_in_render_function(diagnostics, checker, node)
+    fn run(diagnostics: &mut Vec<Diagnostic>, context: &RuleContext, node: &ast::ExprCall) {
+        locals_in_render_function(diagnostics, context, node)
     }
 }
 
