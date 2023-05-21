@@ -2,8 +2,6 @@ import re
 from pathlib import Path
 from typing import Callable
 
-from requests import get
-
 ROOT_DIR = Path(__file__).resolve().parent.parent
 RULES_DIR = ROOT_DIR / "crates" / "ruff" / "src" / "rules"
 CODES_DIR = ROOT_DIR / "crates" / "ruff" / "src" / "codes.rs"
