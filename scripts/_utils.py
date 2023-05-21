@@ -11,7 +11,11 @@ def dir_name(linter_name: str) -> str:
 
 def pascal_case(linter_name: str) -> str:
     """Convert from snake-case to PascalCase."""
-    return "".join(word.title() for word in linter_name.split("_")[0].split("-"))
+    if linter_name == "pep8-naming":
+        return "PEP8Naming"
+    return "".join(
+        word.title() for word in linter_name.split(" ")[0].split("_")[0].split("-")
+    )
 
 
 def snake_case(name: str) -> str:
