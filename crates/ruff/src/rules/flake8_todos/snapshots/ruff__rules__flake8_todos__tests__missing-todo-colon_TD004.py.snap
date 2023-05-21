@@ -18,6 +18,7 @@ TD004.py:5:3: TD004 Missing colon in TODO
 7 | # TODO(evanrittenhouse 😀) this has no colon
   |   ^^^^ TD004
 8 | # FIXME add a colon
+9 | # foo # TODO add a colon
   |
 
 TD004.py:6:3: TD004 Missing colon in TODO
@@ -26,6 +27,15 @@ TD004.py:6:3: TD004 Missing colon in TODO
 7 | # TODO(evanrittenhouse 😀) this has no colon
 8 | # FIXME add a colon
   |   ^^^^^ TD004
+9 | # foo # TODO add a colon
+  |
+
+TD004.py:7:9: TD004 Missing colon in TODO
+  |
+7 | # TODO(evanrittenhouse 😀) this has no colon
+8 | # FIXME add a colon
+9 | # foo # TODO add a colon
+  |         ^^^^ TD004
   |
 
 

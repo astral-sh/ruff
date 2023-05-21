@@ -230,33 +230,42 @@ enum Directive {
 impl Directive {
     /// Extract a [`Directive`] from a comment.
     ///
-    /// Returns the offset of the directive within the comment, and the matching directive tag.
+    /// Returns the matching directive tag and its offset within the comment.
     fn from_comment(comment: &str) -> Option<(Directive, TextSize)> {
-        let trimmed = comment.trim_start_matches('#').trim_start();
-        let offset = comment.text_len() - trimmed.text_len();
-        let mut chars = trimmed.chars();
-        match (
-            chars.next(),
-            chars.next(),
-            chars.next(),
-            chars.next(),
-            chars.next(),
-        ) {
-            (
-                Some('F' | 'f'),
-                Some('I' | 'i'),
-                Some('X' | 'x'),
-                Some('M' | 'm'),
-                Some('E' | 'e'),
-            ) => Some((Directive::Fixme, offset)),
-            (Some('T' | 't'), Some('O' | 'o'), Some('D' | 'd'), Some('O' | 'o'), ..) => {
-                Some((Directive::Todo, offset))
+        let mut subset_opt = Some(comment);
+        let mut total_offset = TextSize::new(0);
+
+        // Loop over the comment to catch cases like `# foo # TODO`.
+        while let Some(subset) = subset_opt {
+            let trimmed = subset.trim_start_matches('#').trim_start().to_lowercase();
+
+            let offset = subset.text_len() - trimmed.text_len();
+            total_offset += offset;
+
+            let directive = if trimmed.starts_with("fixme") {
+                Some((Directive::Fixme, total_offset))
+            } else if trimmed.starts_with("xxx") {
+                Some((Directive::Xxx, total_offset))
+            } else if trimmed.starts_with("todo") {
+                Some((Directive::Todo, total_offset))
+            } else {
+                None
+            };
+
+            if directive.is_some() {
+                return directive;
             }
-            (Some('X' | 'x'), Some('X' | 'x'), Some('X' | 'x'), ..) => {
-                Some((Directive::Xxx, offset))
-            }
-            _ => None,
+
+            // Shrink the subset to check for the next phrase starting with "#".
+            subset_opt = if let Some(new_offset) = trimmed.find('#') {
+                total_offset += TextSize::try_from(new_offset).unwrap();
+                subset.get(total_offset.to_usize()..)
+            } else {
+                None
+            };
         }
+
+        None
     }
 
     /// Returns the length of the directive tag.
@@ -464,6 +473,18 @@ mod tests {
         let expected = Tag {
             content: "fixme",
             range: TextRange::new(TextSize::new(2), TextSize::new(7)),
+        };
+        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
+        let test_comment = "# noqa # TODO: todo";
+        let expected = Tag {
+            content: "TODO",
+            range: TextRange::new(TextSize::new(9), TextSize::new(13)),
+        };
+        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
+        let test_comment = "# noqa # XXX";
+        let expected = Tag {
+            content: "XXX",
+            range: TextRange::new(TextSize::new(9), TextSize::new(12)),
         };
         assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
     }
