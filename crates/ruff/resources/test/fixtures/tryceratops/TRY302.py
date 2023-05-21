@@ -78,6 +78,12 @@ def fine():
     try:
         process()
     except Exception as e:
+        raise e from Exception
+
+def fine():
+    try:
+        process()
+    except Exception as e:
         raise ex
 
 def fine():
