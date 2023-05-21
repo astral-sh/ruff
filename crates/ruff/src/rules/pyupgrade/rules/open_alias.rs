@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Ranged};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::{AsRule, Rule};
 
@@ -23,7 +23,7 @@ impl Violation for OpenAlias {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for OpenAlias {
+impl Analyzer<ast::ExprCall> for OpenAlias {
     fn rule() -> Rule {
         Rule::OpenAlias
     }

@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::context::Context;
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::{Checker, RuleContext};
 use crate::registry::{AsRule, Rule};
 
@@ -30,7 +30,7 @@ impl AlwaysAutofixableViolation for OSErrorAlias {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for OSErrorAlias {
+impl Analyzer<ast::ExprCall> for OSErrorAlias {
     fn rule() -> Rule {
         Rule::OSErrorAlias
     }

@@ -35,7 +35,7 @@ use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::checkers::ast::deferred::Deferred;
-use crate::checkers::ast::traits::RegisteredAstRule;
+use crate::checkers::ast::traits::RegisteredRule;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
@@ -80,7 +80,7 @@ pub(crate) struct Checker<'a> {
     // Check-specific state.
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
     // Dispatchers
-    call_rules: Vec<RegisteredAstRule<ast::ExprCall>>,
+    call_rules: Vec<RegisteredRule<ast::ExprCall>>,
 }
 
 pub(crate) struct RuleContext<'a> {
@@ -123,18 +123,18 @@ impl<'a> Checker<'a> {
             deletions: FxHashSet::default(),
             flake8_bugbear_seen: Vec::default(),
             call_rules: [
-                RegisteredAstRule::new::<flake8_django::rules::DjangoLocalsInRenderFunction>(),
-                RegisteredAstRule::new::<pyupgrade::rules::DeprecatedUnittestAlias>(),
-                RegisteredAstRule::new::<pyupgrade::rules::SuperCallWithParameters>(),
-                RegisteredAstRule::new::<pyupgrade::rules::UnnecessaryEncodeUTF8>(),
-                RegisteredAstRule::new::<pyupgrade::rules::RedundantOpenModes>(),
-                RegisteredAstRule::new::<pyupgrade::rules::NativeLiterals>(),
-                RegisteredAstRule::new::<pyupgrade::rules::OpenAlias>(),
-                RegisteredAstRule::new::<pyupgrade::rules::ReplaceUniversalNewlines>(),
-                RegisteredAstRule::new::<pyupgrade::rules::ReplaceStdoutStderr>(),
-                RegisteredAstRule::new::<pyupgrade::rules::OSErrorAlias>(),
-                RegisteredAstRule::new::<pyupgrade::rules::NonPEP604Isinstance>(),
-                RegisteredAstRule::new::<pyupgrade::rules::TypeOfPrimitive>(),
+                RegisteredRule::new::<flake8_django::rules::DjangoLocalsInRenderFunction>(),
+                RegisteredRule::new::<pyupgrade::rules::DeprecatedUnittestAlias>(),
+                RegisteredRule::new::<pyupgrade::rules::SuperCallWithParameters>(),
+                RegisteredRule::new::<pyupgrade::rules::UnnecessaryEncodeUTF8>(),
+                RegisteredRule::new::<pyupgrade::rules::RedundantOpenModes>(),
+                RegisteredRule::new::<pyupgrade::rules::NativeLiterals>(),
+                RegisteredRule::new::<pyupgrade::rules::OpenAlias>(),
+                RegisteredRule::new::<pyupgrade::rules::ReplaceUniversalNewlines>(),
+                RegisteredRule::new::<pyupgrade::rules::ReplaceStdoutStderr>(),
+                RegisteredRule::new::<pyupgrade::rules::OSErrorAlias>(),
+                RegisteredRule::new::<pyupgrade::rules::NonPEP604Isinstance>(),
+                RegisteredRule::new::<pyupgrade::rules::TypeOfPrimitive>(),
             ]
             .into_iter()
             .filter(|rule| rule.enabled(settings))
@@ -143,6 +143,7 @@ impl<'a> Checker<'a> {
     }
 }
 
+// TODO(charlie): Remove these methods from `Checker`, use the immutable `RuleContext` everywhere.
 impl<'a> RuleContext<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
@@ -2632,7 +2633,7 @@ where
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
             Expr::Call(call) => {
-                let immutable_checker = RuleContext {
+                let context = RuleContext {
                     settings: self.settings,
                     locator: self.locator,
                     stylist: self.stylist,
@@ -2640,9 +2641,10 @@ where
                     ctx: &self.ctx,
                 };
                 for rule in &self.call_rules {
-                    rule.run(&mut self.diagnostics, &immutable_checker, call);
+                    rule.run(&mut self.diagnostics, &context, call);
                 }
 
+                // Destructure for the rest of the rules, for now.
                 let ast::ExprCall {
                     func,
                     args,

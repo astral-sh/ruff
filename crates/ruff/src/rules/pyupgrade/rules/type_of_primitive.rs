@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::{AsRule, Rule};
 
@@ -27,7 +27,7 @@ impl AlwaysAutofixableViolation for TypeOfPrimitive {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for TypeOfPrimitive {
+impl Analyzer<ast::ExprCall> for TypeOfPrimitive {
     fn rule() -> Rule {
         Rule::TypeOfPrimitive
     }

@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::Rule;
 
@@ -45,7 +45,7 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-impl AstAnalyzer<ast::ExprCall> for DjangoLocalsInRenderFunction {
+impl Analyzer<ast::ExprCall> for DjangoLocalsInRenderFunction {
     fn rule() -> Rule {
         Rule::DjangoLocalsInRenderFunction
     }

@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::Rule;
 
@@ -42,7 +42,7 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for RedundantOpenModes {
+impl Analyzer<ast::ExprCall> for RedundantOpenModes {
     fn rule() -> Rule {
         Rule::RedundantOpenModes
     }

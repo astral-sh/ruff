@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::Rule;
 
@@ -36,7 +36,7 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for UnnecessaryEncodeUTF8 {
+impl Analyzer<ast::ExprCall> for UnnecessaryEncodeUTF8 {
     fn rule() -> Rule {
         Rule::UnnecessaryEncodeUTF8
     }

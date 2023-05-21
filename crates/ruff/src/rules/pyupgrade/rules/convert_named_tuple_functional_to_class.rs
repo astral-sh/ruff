@@ -5,6 +5,7 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged,
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
 use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 

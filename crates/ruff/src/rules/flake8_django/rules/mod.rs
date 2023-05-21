@@ -1,8 +1,6 @@
 pub(crate) use all_with_model_form::{all_with_model_form, DjangoAllWithModelForm};
 pub(crate) use exclude_with_model_form::{exclude_with_model_form, DjangoExcludeWithModelForm};
-pub(crate) use locals_in_render_function::{
-    DjangoLocalsInRenderFunction,
-};
+pub(crate) use locals_in_render_function::DjangoLocalsInRenderFunction;
 pub(crate) use model_without_dunder_str::{model_without_dunder_str, DjangoModelWithoutDunderStr};
 pub(crate) use non_leading_receiver_decorator::{
     non_leading_receiver_decorator, DjangoNonLeadingReceiverDecorator,

@@ -6,7 +6,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::is_implicit_concatenation;
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::{AsRule, Rule};
 
@@ -43,7 +43,7 @@ impl AlwaysAutofixableViolation for NativeLiterals {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for NativeLiterals {
+impl Analyzer<ast::ExprCall> for NativeLiterals {
     fn rule() -> Rule {
         Rule::NativeLiterals
     }

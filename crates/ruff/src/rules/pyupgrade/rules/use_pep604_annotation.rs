@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 
 use crate::checkers::ast::Checker;

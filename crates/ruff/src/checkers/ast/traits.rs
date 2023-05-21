@@ -5,7 +5,7 @@ use crate::registry::Rule;
 use crate::settings::Settings;
 
 /// Trait for a lint rule that can be run on an AST node of type `T`.
-pub(crate) trait AstAnalyzer<T>: Sized {
+pub(crate) trait Analyzer<T>: Sized {
     /// The [`Rule`] that this analyzer implements.
     fn rule() -> Rule;
 
@@ -14,13 +14,13 @@ pub(crate) trait AstAnalyzer<T>: Sized {
 }
 
 /// Internal representation of a single [`Rule`] that can be run on an AST node of type `T`.
-pub(super) struct RegisteredAstRule<T> {
+pub(super) struct RegisteredRule<T> {
     rule: Rule,
-    run: Run<T>,
+    run: Executor<T>,
 }
 
-impl<T> RegisteredAstRule<T> {
-    pub(super) fn new<R: AstAnalyzer<T> + 'static>() -> Self {
+impl<T> RegisteredRule<T> {
+    pub(super) fn new<R: Analyzer<T> + 'static>() -> Self {
         Self {
             rule: R::rule(),
             run: R::run,
@@ -38,5 +38,5 @@ impl<T> RegisteredAstRule<T> {
     }
 }
 
-/// Executor for an [`AstAnalyzer`] as a generic function pointer.
-type Run<T> = fn(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);
+/// Executor for an [`Analyzer`] as a generic function pointer.
+type Executor<T> = fn(diagnostics: &mut Vec<Diagnostic>, checker: &RuleContext, node: &T);

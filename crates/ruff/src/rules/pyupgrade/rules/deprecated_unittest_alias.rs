@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Expr};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::{AsRule, Rule};
 
@@ -28,7 +28,7 @@ impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for DeprecatedUnittestAlias {
+impl Analyzer<ast::ExprCall> for DeprecatedUnittestAlias {
     fn rule() -> Rule {
         Rule::DeprecatedUnittestAlias
     }

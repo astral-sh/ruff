@@ -6,9 +6,10 @@ use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::{AsRule, Rule};
+use crate::settings::types::PythonVersion;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum CallKind {
@@ -51,7 +52,7 @@ impl AlwaysAutofixableViolation for NonPEP604Isinstance {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for NonPEP604Isinstance {
+impl Analyzer<ast::ExprCall> for NonPEP604Isinstance {
     fn rule() -> Rule {
         Rule::NonPEP604Isinstance
     }
@@ -82,6 +83,10 @@ pub(crate) fn use_pep604_isinstance(
         func, args, range, ..
     }: &ast::ExprCall,
 ) {
+    if checker.settings.target_version < PythonVersion::Py310 {
+        return;
+    }
+
     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
         let Some(kind) = CallKind::from_name(id) else {
             return;

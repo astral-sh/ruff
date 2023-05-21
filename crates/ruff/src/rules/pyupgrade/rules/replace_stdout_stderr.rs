@@ -7,7 +7,7 @@ use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
 use crate::autofix::actions::remove_argument;
-use crate::checkers::ast::traits::AstAnalyzer;
+use crate::checkers::ast::traits::Analyzer;
 use crate::checkers::ast::RuleContext;
 use crate::registry::{AsRule, Rule};
 
@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
     }
 }
 
-impl AstAnalyzer<ast::ExprCall> for ReplaceStdoutStderr {
+impl Analyzer<ast::ExprCall> for ReplaceStdoutStderr {
     fn rule() -> Rule {
         Rule::ReplaceStdoutStderr
     }
