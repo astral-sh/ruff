@@ -5,7 +5,7 @@ use ruff_python_ast::source_code::{Indexer, Locator};
 use crate::registry::Rule;
 use crate::settings::Settings;
 
-use super::detection::comment_contains_code;
+use super::super::detection::comment_contains_code;
 
 /// ## What it does
 /// Checks for commented-out Python code.
