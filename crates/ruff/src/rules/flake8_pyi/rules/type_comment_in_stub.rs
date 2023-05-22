@@ -1,7 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
+use ruff_python_ast::source_code::{Indexer, Locator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -35,14 +34,14 @@ impl Violation for TypeCommentInStub {
 }
 
 /// PYI033
-pub(crate) fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
+pub(crate) fn type_comment_in_stub(indexer: &Indexer, locator: &Locator) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    for token in tokens.iter().flatten() {
-        if let (Tok::Comment(comment), range) = token {
-            if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-                diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));
-            }
+    for range in indexer.comment_ranges() {
+        let comment = locator.slice(*range);
+
+        if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
+            diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));
         }
     }
 
