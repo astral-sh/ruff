@@ -12,6 +12,7 @@ include = ["LICENSE", "Cargo.toml", "src/**/*.rs"]
 resolver = "2"
 members = [
     "ast", "core", "format", "literal", "parser",
+    "ast-pyo3",
     "ruff_text_size", "ruff_source_location",
 ]
 

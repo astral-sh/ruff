@@ -1,4 +1,3 @@
-use crate::{source_code::SourceRange, text_size::TextRange, ConversionFlag, Node};
 use num_complex::Complex64;
 use once_cell::sync::OnceCell;
 use pyo3::{
@@ -6,8 +5,11 @@ use pyo3::{
     types::{PyBool, PyBytes, PyList, PyString, PyTuple},
     ToPyObject,
 };
+use rustpython_ast::{
+    self as ast, source_code::SourceRange, text_size::TextRange, ConversionFlag, Node,
+};
 
-pub trait Pyo3Node {
+pub trait PyNode {
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         {
             static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -16,120 +18,96 @@ pub trait Pyo3Node {
     }
 }
 
-pub trait ToPyo3Ast {
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny>;
+pub trait ToPyAst {
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny>;
 }
 
-impl<T: ToPyo3Ast> ToPyo3Ast for Box<T> {
+impl<T: ToPyAst> ToPyAst for Box<T> {
     #[inline]
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
-        (**self).to_pyo3_ast(py)
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        (**self).to_py_ast(py)
     }
 }
 
-impl<T: ToPyo3Ast> ToPyo3Ast for Option<T> {
+impl<T: ToPyAst> ToPyAst for Option<T> {
     #[inline]
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         match self {
-            Some(ast) => ast.to_pyo3_ast(py),
+            Some(ast) => ast.to_py_ast(py),
             None => Ok(ast_cache().none_ref(py)),
         }
     }
 }
 
-impl<T: ToPyo3Ast> ToPyo3Ast for Vec<T> {
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+impl<T: ToPyAst> ToPyAst for Vec<T> {
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let elts = self
             .iter()
-            .map(|item| item.to_pyo3_ast(py))
+            .map(|item| item.to_py_ast(py))
             .collect::<Result<Vec<_>, _>>()?;
         let list = PyList::new(py, elts);
         Ok(list.into())
     }
 }
 
-impl ToPyo3Ast for crate::Identifier {
+impl ToPyAst for ast::Identifier {
     #[inline]
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         Ok(PyString::new(py, self.as_str()).into())
     }
 }
 
-impl ToPyo3Ast for crate::String {
+impl ToPyAst for ast::String {
     #[inline]
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         Ok(PyString::new(py, self.as_str()).into())
     }
 }
 
-impl ToPyo3Ast for bool {
+impl ToPyAst for bool {
     #[inline]
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         Ok(ast_cache().bool_int(py, *self))
     }
 }
 
-impl ToPyo3Ast for ConversionFlag {
+impl ToPyAst for ConversionFlag {
     #[inline]
-    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         Ok(ast_cache().conversion_flag(py, *self))
     }
 }
 
-impl ToPyObject for crate::Constant {
-    fn to_object(&self, py: Python) -> PyObject {
-        let cache = ast_cache();
-        match self {
-            crate::Constant::None => cache.none.clone_ref(py),
-            crate::Constant::Bool(bool) => cache.bool(py, *bool).into(),
-            crate::Constant::Str(string) => string.to_object(py),
-            crate::Constant::Bytes(bytes) => PyBytes::new(py, bytes).into(),
-            crate::Constant::Int(int) => int.to_object(py),
-            crate::Constant::Tuple(elts) => {
-                let elts: Vec<_> = elts.iter().map(|c| c.to_object(py)).collect();
-                PyTuple::new(py, elts).into()
-            }
-            crate::Constant::Float(f64) => f64.to_object(py),
-            crate::Constant::Complex { real, imag } => Complex64::new(*real, *imag).to_object(py),
-            crate::Constant::Ellipsis => py.Ellipsis(),
+fn constant_to_object(constant: &ast::Constant, py: Python) -> PyObject {
+    let cache = ast_cache();
+    match constant {
+        ast::Constant::None => cache.none.clone_ref(py),
+        ast::Constant::Bool(bool) => cache.bool(py, *bool).into(),
+        ast::Constant::Str(string) => string.to_object(py),
+        ast::Constant::Bytes(bytes) => PyBytes::new(py, bytes).into(),
+        ast::Constant::Int(int) => int.to_object(py),
+        ast::Constant::Tuple(elts) => {
+            let elts: Vec<_> = elts.iter().map(|c| constant_to_object(c, py)).collect();
+            PyTuple::new(py, elts).into()
         }
+        ast::Constant::Float(f64) => f64.to_object(py),
+        ast::Constant::Complex { real, imag } => Complex64::new(*real, *imag).to_object(py),
+        ast::Constant::Ellipsis => py.Ellipsis(),
     }
 }
 
-// impl ToPyo3Ast for crate::Constant {
-//     #[inline]
-//     fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
-//         let cache = ast_cache();
-//         let value = match self {
-//             crate::Constant::None => cache.none_ref(py),
-//             crate::Constant::Bool(bool) => cache.bool_ref(py),
-//             crate::Constant::Str(string) => string.to_object(py),
-//             crate::Constant::Bytes(bytes) => PyBytes::new(py, bytes).into(),
-//             crate::Constant::Int(int) => int.to_object(py),
-//             crate::Constant::Tuple(elts) => {
-//                 let elts: PyResult<Vec<_>> = elts.iter().map(|c| c.to_pyo3_ast(py)).collect();
-//                 PyTuple::new(py, elts?).into()
-//             }
-//             crate::Constant::Float(f64) => f64.to_object(py),
-//             crate::Constant::Complex { real, imag } => Complex64::new(*real, *imag).to_object(py),
-//             crate::Constant::Ellipsis => py.Ellipsis(),
-//         };
-//         Ok(value)
-//     }
-// }
-
 #[pyclass(module = "rustpython_ast", subclass)]
-pub struct AST;
+pub struct Ast;
 
 #[pymethods]
-impl AST {
+impl Ast {
     #[new]
     fn new() -> Self {
         Self
     }
 }
 
-fn cache_py_type<N: Pyo3Node + Node>(ast_module: &PyAny) -> PyResult<()> {
+fn cache_py_type<N: PyNode + Node>(ast_module: &PyAny) -> PyResult<()> {
     let class = ast_module.getattr(N::NAME)?;
     let base = if std::mem::size_of::<N>() == 0 {
         class.call0()?
@@ -209,4 +187,4 @@ pub fn init(py: Python) -> PyResult<()> {
     init_types(py)
 }
 
-include!("gen/to_pyo3.rs");
+include!("gen/to_py_ast.rs");
