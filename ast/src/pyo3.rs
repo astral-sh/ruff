@@ -38,11 +38,11 @@ impl<T: ToPyo3Ast> ToPyo3Ast for Option<T> {
 
 impl<T: ToPyo3Ast> ToPyo3Ast for Vec<T> {
     fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
-        let list = PyList::empty(py);
-        for item in self {
-            let py_item = item.to_pyo3_ast(py)?;
-            list.append(py_item)?;
-        }
+        let elts = self
+            .iter()
+            .map(|item| item.to_pyo3_ast(py))
+            .collect::<Result<Vec<_>, _>>()?;
+        let list = PyList::new(py, elts);
         Ok(list.into())
     }
 }
