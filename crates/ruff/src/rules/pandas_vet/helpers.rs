@@ -1,7 +1,8 @@
-use ruff_python_semantic::binding::{BindingKind, Importation};
-use ruff_python_semantic::model::SemanticModel;
 use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
+
+use ruff_python_semantic::binding::{BindingKind, Importation};
+use ruff_python_semantic::model::SemanticModel;
 
 pub(crate) enum Resolution {
     /// The expression resolves to an irrelevant expression type (e.g., a constant).

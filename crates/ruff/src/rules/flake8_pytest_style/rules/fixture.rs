@@ -1,7 +1,8 @@
+use std::fmt;
+
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged, Stmt};
-use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};

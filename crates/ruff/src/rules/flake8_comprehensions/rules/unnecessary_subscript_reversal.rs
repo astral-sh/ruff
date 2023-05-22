@@ -1,9 +1,10 @@
 use num_bigint::BigInt;
 use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 use super::helpers;
 

@@ -8,7 +8,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;

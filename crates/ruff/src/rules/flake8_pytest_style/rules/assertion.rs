@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
@@ -6,7 +8,6 @@ use libcst_native::{
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
-use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};

@@ -7,7 +7,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 

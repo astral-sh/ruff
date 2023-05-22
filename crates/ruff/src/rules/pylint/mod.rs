@@ -7,12 +7,11 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use regex::Regex;
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::types::PythonVersion;

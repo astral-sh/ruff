@@ -1,9 +1,10 @@
 use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Check for multiple imports on one line.

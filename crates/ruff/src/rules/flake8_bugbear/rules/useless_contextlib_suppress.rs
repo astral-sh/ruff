@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{Expr, Ranged};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct UselessContextlibSuppress;

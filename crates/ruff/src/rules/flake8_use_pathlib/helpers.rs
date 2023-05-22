@@ -1,5 +1,7 @@
 use rustpython_parser::ast::{Expr, Ranged};
 
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_use_pathlib::violations::{
@@ -9,7 +11,6 @@ use crate::rules::flake8_use_pathlib::violations::{
     OsRmdir, OsStat, OsUnlink, PathlibReplace, PyPath,
 };
 use crate::settings::types::PythonVersion;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 
 pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
     if let Some(diagnostic_kind) =

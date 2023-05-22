@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 

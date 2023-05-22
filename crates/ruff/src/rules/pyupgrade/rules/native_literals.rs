@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::checkers::ast::Checker;

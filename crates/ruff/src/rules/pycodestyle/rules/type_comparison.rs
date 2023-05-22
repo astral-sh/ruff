@@ -1,9 +1,10 @@
 use itertools::izip;
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for object type comparisons without using isinstance().
