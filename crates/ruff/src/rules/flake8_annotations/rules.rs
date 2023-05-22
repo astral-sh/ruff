@@ -8,6 +8,7 @@ use ruff_python_ast::{cast, helpers};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::analyze::visibility::Visibility;
 use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_python_semantic::model::SemanticModel;
 use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
 
 use crate::checkers::ast::Checker;
@@ -430,7 +431,7 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 
 /// ANN401
 fn check_dynamically_typed<F>(
-    checker: &Checker,
+    model: &SemanticModel,
     annotation: &Expr,
     func: F,
     diagnostics: &mut Vec<Diagnostic>,
@@ -438,7 +439,7 @@ fn check_dynamically_typed<F>(
 ) where
     F: FnOnce() -> String,
 {
-    if !is_overridden && checker.model.match_typing_expr(annotation, "Any") {
+    if !is_overridden && model.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
             AnyType { name: func() },
             annotation.range(),
@@ -500,7 +501,7 @@ pub(crate) fn definition(
             has_any_typed_arg = true;
             if checker.settings.rules.enabled(Rule::AnyType) {
                 check_dynamically_typed(
-                    checker,
+                    &checker.model,
                     annotation,
                     || arg.arg.to_string(),
                     &mut diagnostics,
@@ -535,7 +536,7 @@ pub(crate) fn definition(
                 if checker.settings.rules.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
-                        checker,
+                        &checker.model,
                         expr,
                         || format!("*{name}"),
                         &mut diagnostics,
@@ -567,7 +568,7 @@ pub(crate) fn definition(
                 if checker.settings.rules.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
-                        checker,
+                        &checker.model,
                         expr,
                         || format!("**{name}"),
                         &mut diagnostics,
@@ -625,7 +626,7 @@ pub(crate) fn definition(
         has_typed_return = true;
         if checker.settings.rules.enabled(Rule::AnyType) {
             check_dynamically_typed(
-                checker,
+                &checker.model,
                 expr,
                 || name.to_string(),
                 &mut diagnostics,

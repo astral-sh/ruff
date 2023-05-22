@@ -778,7 +778,7 @@ where
                 if self.settings.rules.any_enabled(&[
                     Rule::MutableDataclassDefault,
                     Rule::FunctionCallInDataclassDefaultArgument,
-                ]) && ruff::rules::is_dataclass(self, decorator_list)
+                ]) && ruff::rules::is_dataclass(&self.model, decorator_list)
                 {
                     if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
                         ruff::rules::mutable_dataclass_default(self, body);
@@ -5729,7 +5729,7 @@ impl<'a> Checker<'a> {
                 // classes, etc.).
                 if !overloaded_name.map_or(false, |overloaded_name| {
                     flake8_annotations::helpers::is_overload_impl(
-                        self,
+                        &self.model,
                         definition,
                         &overloaded_name,
                     )
@@ -5741,7 +5741,8 @@ impl<'a> Checker<'a> {
                             *visibility,
                         ));
                 }
-                overloaded_name = flake8_annotations::helpers::overloaded_name(self, definition);
+                overloaded_name =
+                    flake8_annotations::helpers::overloaded_name(&self.model, definition);
             }
 
             // flake8-pyi
@@ -5756,7 +5757,7 @@ impl<'a> Checker<'a> {
             // pydocstyle
             if enforce_docstrings {
                 if pydocstyle::helpers::should_ignore_definition(
-                    self,
+                    &self.model,
                     definition,
                     &self.settings.pydocstyle.ignore_decorators,
                 ) {

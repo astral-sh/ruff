@@ -151,7 +151,7 @@ pub(crate) fn logging_call(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !logging::is_logger_candidate(&checker.model, func) {
+    if !logging::is_logger_candidate(func, &checker.model) {
         return;
     }
 
