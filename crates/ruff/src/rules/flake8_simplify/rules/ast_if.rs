@@ -351,7 +351,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
-        && (test.is_compare_expr() || checker.model.is_builtin("bool"));
+        && (test.is_compare_expr() || checker.semantic_model().is_builtin("bool"));
 
     let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
     if fixable && checker.patch(diagnostic.kind.rule()) {
@@ -447,13 +447,13 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(&checker.model, test, &["sys", "version_info"]) {
+    if contains_call_path(checker.semantic_model(), test, &["sys", "version_info"]) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(&checker.model, test, &["sys", "platform"]) {
+    if contains_call_path(checker.semantic_model(), test, &["sys", "platform"]) {
         return;
     }
 
@@ -648,7 +648,7 @@ pub(crate) fn manual_dict_lookup(
         return;
     };
     if value.as_ref().map_or(false, |value| {
-        contains_effect(value, |id| checker.model.is_builtin(id))
+        contains_effect(value, |id| checker.semantic_model().is_builtin(id))
     }) {
         return;
     }
@@ -721,7 +721,7 @@ pub(crate) fn manual_dict_lookup(
             return;
         };
         if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.model.is_builtin(id))
+            contains_effect(value, |id| checker.semantic_model().is_builtin(id))
         }) {
             return;
         };
@@ -804,7 +804,7 @@ pub(crate) fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.model.is_builtin(id)) {
+    if contains_effect(default_value, |id| checker.semantic_model().is_builtin(id)) {
         return;
     }
 

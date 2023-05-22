@@ -138,16 +138,13 @@ struct ExprWithInnerBindingKind<'a> {
     binding_kind: InnerBindingKind,
 }
 
-struct InnerForWithAssignTargetsVisitor<'a> {
-    context: &'a SemanticModel<'a>,
+struct InnerForWithAssignTargetsVisitor<'a, 'b> {
+    context: &'a SemanticModel<'b>,
     dummy_variable_rgx: &'a Regex,
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a>
-where
-    'b: 'a,
-{
+impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
         match stmt {
@@ -348,7 +345,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: &checker.model,
+                    context: checker.semantic_model(),
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };
@@ -368,7 +365,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: &checker.model,
+                    context: checker.semantic_model(),
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };
@@ -384,13 +381,15 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
         Node::Expr(_) => panic!("redefined_loop_name called on Node that is not a Statement"),
     };
 
+    let mut diagnostics = Vec::new();
+
     for outer_assignment_target in &outer_assignment_targets {
         for inner_assignment_target in &inner_assignment_targets {
             // Compare the targets structurally.
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                checker.diagnostics.push(Diagnostic::new(
+                diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
@@ -401,4 +400,6 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
             }
         }
     }
+
+    checker.diagnostics.extend(diagnostics);
 }

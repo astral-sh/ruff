@@ -39,7 +39,7 @@ impl Violation for YieldInInit {
 
 /// PLE0100
 pub(crate) fn yield_in_init(checker: &mut Checker, expr: &Expr) {
-    if in_dunder_init(&checker.model, checker.settings) {
+    if in_dunder_init(checker.semantic_model(), checker.settings) {
         checker
             .diagnostics
             .push(Diagnostic::new(YieldInInit, expr.range()));

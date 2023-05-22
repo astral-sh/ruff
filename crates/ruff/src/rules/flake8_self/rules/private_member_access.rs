@@ -94,7 +94,7 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
                     // Ignore accesses on class members from _within_ the class.
                     if checker
-                        .model
+                        .semantic_model()
                         .scopes
                         .iter()
                         .rev()
@@ -104,14 +104,14 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                         })
                         .map_or(false, |class_def| {
                             if call_path.as_slice() == [class_def.name] {
-                                checker.model.find_binding(class_def.name).map_or(
-                                    false,
-                                    |binding| {
+                                checker
+                                    .semantic_model()
+                                    .find_binding(class_def.name)
+                                    .map_or(false, |binding| {
                                         // TODO(charlie): Could the name ever be bound to a
                                         // _different_ class here?
                                         binding.kind.is_class_definition()
-                                    },
-                                )
+                                    })
                             } else {
                                 false
                             }

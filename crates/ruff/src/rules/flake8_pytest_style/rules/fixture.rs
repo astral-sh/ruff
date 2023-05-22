@@ -457,7 +457,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 
 /// PT020
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
-    if is_pytest_yield_fixture(&checker.model, decorator) {
+    if is_pytest_yield_fixture(checker.semantic_model(), decorator) {
         checker.diagnostics.push(Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
@@ -533,7 +533,7 @@ pub(crate) fn fixture(
     decorators: &[Expr],
     body: &[Stmt],
 ) {
-    let decorator = get_fixture_decorator(&checker.model, decorators);
+    let decorator = get_fixture_decorator(checker.semantic_model(), decorators);
     if let Some(decorator) = decorator {
         if checker
             .settings
@@ -572,7 +572,7 @@ pub(crate) fn fixture(
                 .settings
                 .rules
                 .enabled(Rule::PytestUselessYieldFixture))
-            && !is_abstract(&checker.model, decorators)
+            && !is_abstract(checker.semantic_model(), decorators)
         {
             check_fixture_returns(checker, stmt, name, body);
         }

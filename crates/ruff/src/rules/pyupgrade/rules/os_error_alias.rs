@@ -93,7 +93,10 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
             .collect();
 
         // If `OSError` itself isn't already in the tuple, add it.
-        if elts.iter().all(|elt| !is_os_error(&checker.model, elt)) {
+        if elts
+            .iter()
+            .all(|elt| !is_os_error(checker.semantic_model(), elt))
+        {
             let node = ast::ExprName {
                 id: "OSError".into(),
                 ctx: ExprContext::Load,
@@ -133,7 +136,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
         };
         match expr.as_ref() {
             Expr::Name(_) | Expr::Attribute(_) => {
-                if is_alias(&checker.model, expr) {
+                if is_alias(checker.semantic_model(), expr) {
                     atom_diagnostic(checker, expr);
                 }
             }
@@ -141,7 +144,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
                 // List of aliases to replace with `OSError`.
                 let mut aliases: Vec<&Expr> = vec![];
                 for elt in elts {
-                    if is_alias(&checker.model, elt) {
+                    if is_alias(checker.semantic_model(), elt) {
                         aliases.push(elt);
                     }
                 }
@@ -156,7 +159,7 @@ pub(crate) fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepth
 
 /// UP024
 pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
-    if is_alias(&checker.model, func) {
+    if is_alias(checker.semantic_model(), func) {
         atom_diagnostic(checker, func);
     }
 }
@@ -164,7 +167,7 @@ pub(crate) fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
 /// UP024
 pub(crate) fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
-        if is_alias(&checker.model, expr) {
+        if is_alias(checker.semantic_model(), expr) {
             atom_diagnostic(checker, expr);
         }
     }

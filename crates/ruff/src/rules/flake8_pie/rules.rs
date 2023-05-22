@@ -417,7 +417,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
     if !bases.iter().any(|expr| {
         checker
-            .model
+            .semantic_model()
             .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
     }) {
@@ -432,7 +432,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             if checker
-                .model
+                .semantic_model()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
             {

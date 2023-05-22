@@ -60,19 +60,22 @@ pub(crate) fn inplace_argument(
     let mut is_checkable = false;
     let mut is_pandas = false;
 
-    if let Some(call_path) = checker.model.resolve_call_path(func) {
+    if let Some(call_path) = checker.semantic_model().resolve_call_path(func) {
         is_checkable = true;
 
         let module = call_path[0];
-        is_pandas = checker.model.find_binding(module).map_or(false, |binding| {
-            matches!(
-                binding.kind,
-                BindingKind::Importation(Importation {
-                    full_name: "pandas",
-                    ..
-                })
-            )
-        });
+        is_pandas = checker
+            .semantic_model()
+            .find_binding(module)
+            .map_or(false, |binding| {
+                matches!(
+                    binding.kind,
+                    BindingKind::Importation(Importation {
+                        full_name: "pandas",
+                        ..
+                    })
+                )
+            });
     }
 
     for keyword in keywords.iter().rev() {
@@ -99,9 +102,9 @@ pub(crate) fn inplace_argument(
                 //    but we don't currently restore expression stacks when parsing deferred nodes,
                 //    and so the parent is lost.
                 let fixable = !seen_star
-                    && checker.model.stmt().is_expr_stmt()
-                    && checker.model.expr_parent().is_none()
-                    && !checker.model.scope().kind.is_lambda();
+                    && checker.semantic_model().stmt().is_expr_stmt()
+                    && checker.semantic_model().expr_parent().is_none()
+                    && !checker.semantic_model().scope().kind.is_lambda();
                 let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Some(fix) = convert_inplace_argument_to_assignment(

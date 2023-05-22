@@ -237,7 +237,9 @@ pub(crate) fn convert_for_loop_to_any_all(
                     },
                     TextRange::new(stmt.start(), loop_info.terminal),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.model.is_builtin("any") {
+                if checker.patch(diagnostic.kind.rule())
+                    && checker.semantic_model().is_builtin("any")
+                {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,
@@ -327,7 +329,9 @@ pub(crate) fn convert_for_loop_to_any_all(
                     },
                     TextRange::new(stmt.start(), loop_info.terminal),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.model.is_builtin("all") {
+                if checker.patch(diagnostic.kind.rule())
+                    && checker.semantic_model().is_builtin("all")
+                {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,

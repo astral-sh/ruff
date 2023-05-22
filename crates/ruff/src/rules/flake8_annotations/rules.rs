@@ -480,7 +480,7 @@ pub(crate) fn definition(
     // unless configured to suppress ANN* for declarations that are fully untyped.
     let mut diagnostics = Vec::new();
 
-    let is_overridden = visibility::is_override(&checker.model, decorator_list);
+    let is_overridden = visibility::is_override(checker.semantic_model(), decorator_list);
 
     // ANN001, ANN401
     for arg in args
@@ -492,7 +492,10 @@ pub(crate) fn definition(
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 is_method
-                    && !visibility::is_staticmethod(&checker.model, cast::decorator_list(stmt)),
+                    && !visibility::is_staticmethod(
+                        checker.semantic_model(),
+                        cast::decorator_list(stmt),
+                    ),
             ),
         )
     {
@@ -501,7 +504,7 @@ pub(crate) fn definition(
             has_any_typed_arg = true;
             if checker.settings.rules.enabled(Rule::AnyType) {
                 check_dynamically_typed(
-                    &checker.model,
+                    checker.semantic_model(),
                     annotation,
                     || arg.arg.to_string(),
                     &mut diagnostics,
@@ -536,7 +539,7 @@ pub(crate) fn definition(
                 if checker.settings.rules.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
-                        &checker.model,
+                        checker.semantic_model(),
                         expr,
                         || format!("*{name}"),
                         &mut diagnostics,
@@ -568,7 +571,7 @@ pub(crate) fn definition(
                 if checker.settings.rules.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
-                        &checker.model,
+                        checker.semantic_model(),
                         expr,
                         || format!("**{name}"),
                         &mut diagnostics,
@@ -593,10 +596,13 @@ pub(crate) fn definition(
     }
 
     // ANN101, ANN102
-    if is_method && !visibility::is_staticmethod(&checker.model, cast::decorator_list(stmt)) {
+    if is_method
+        && !visibility::is_staticmethod(checker.semantic_model(), cast::decorator_list(stmt))
+    {
         if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
             if arg.annotation.is_none() {
-                if visibility::is_classmethod(&checker.model, cast::decorator_list(stmt)) {
+                if visibility::is_classmethod(checker.semantic_model(), cast::decorator_list(stmt))
+                {
                     if checker.settings.rules.enabled(Rule::MissingTypeCls) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeCls {
@@ -626,7 +632,7 @@ pub(crate) fn definition(
         has_typed_return = true;
         if checker.settings.rules.enabled(Rule::AnyType) {
             check_dynamically_typed(
-                &checker.model,
+                checker.semantic_model(),
                 expr,
                 || name.to_string(),
                 &mut diagnostics,
@@ -638,7 +644,9 @@ pub(crate) fn definition(
         // (explicitly or implicitly).
         checker.settings.flake8_annotations.suppress_none_returning && is_none_returning(body)
     ) {
-        if is_method && visibility::is_classmethod(&checker.model, cast::decorator_list(stmt)) {
+        if is_method
+            && visibility::is_classmethod(checker.semantic_model(), cast::decorator_list(stmt))
+        {
             if checker
                 .settings
                 .rules
@@ -652,7 +660,7 @@ pub(crate) fn definition(
                 ));
             }
         } else if is_method
-            && visibility::is_staticmethod(&checker.model, cast::decorator_list(stmt))
+            && visibility::is_staticmethod(checker.semantic_model(), cast::decorator_list(stmt))
         {
             if checker
                 .settings

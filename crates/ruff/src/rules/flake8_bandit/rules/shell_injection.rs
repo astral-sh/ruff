@@ -184,11 +184,11 @@ pub(crate) fn shell_injection(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let call_kind = get_call_kind(func, &checker.model);
+    let call_kind = get_call_kind(func, checker.semantic_model());
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
-            match find_shell_keyword(&checker.model, keywords) {
+            match find_shell_keyword(checker.semantic_model(), keywords) {
                 // S602
                 Some(ShellKeyword {
                     truthiness: Truthiness::Truthy,
@@ -241,7 +241,7 @@ pub(crate) fn shell_injection(
     } else if let Some(ShellKeyword {
         truthiness: Truthiness::Truthy,
         keyword,
-    }) = find_shell_keyword(&checker.model, keywords)
+    }) = find_shell_keyword(checker.semantic_model(), keywords)
     {
         // S604
         if checker

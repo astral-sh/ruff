@@ -74,7 +74,7 @@ pub(crate) fn use_pep604_isinstance(
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
-        if !checker.model.is_builtin(id) {
+        if !checker.semantic_model().is_builtin(id) {
             return;
         };
         if let Some(types) = args.get(1) {
