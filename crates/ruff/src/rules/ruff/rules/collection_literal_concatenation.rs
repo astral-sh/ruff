@@ -125,18 +125,13 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
     else if splat_element.is_list_expr() || splat_element.is_tuple_expr() {
         new_elts = other_elements.clone();
 
-        let mut elts = match splat_element {
+        let elts = match splat_element {
             Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
             Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.clone(),
             _ => return None,
         };
 
-        if splat_at_left {
-            elts.extend_from_slice(&new_elts);
-            new_elts = elts.clone();
-        } else {
-            new_elts.extend_from_slice(&elts);
-        }
+        new_elts.extend_from_slice(&elts);
     } else {
         return None;
     }
