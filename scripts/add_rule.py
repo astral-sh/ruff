@@ -56,18 +56,13 @@ def add_test_case(
     sort_test_cases(plugin_module, nb_digit, test_case_to_add=test_case_to_add)
 
 
-def add_exports(plugin_module: Path, name: str, should_create: bool) -> bool:
+def add_exports(plugin_module: Path, name: str) -> None:
     """Add the exports."""
     rule_name_snake = snake_case(name)
     new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
     new_mod = f"mod {rule_name_snake};"
 
-    return sort_exports(
-        plugin_module,
-        pub_use_to_add=new_pub_use,
-        mod_to_add=new_mod,
-        should_create=should_create,
-    )
+    sort_exports(plugin_module, pub_use_to_add=new_pub_use, mod_to_add=new_mod)
 
 
 def add_rule_function(
@@ -121,16 +116,12 @@ def add_rule(
     prefix: str,
     code: str,
     linter: str,
-    # TODO(jonathan): Remove when all linters use the new architecture.
-    should_create: bool,
 ) -> None:
     """Generate boilerplate for a new rule."""
     print(f"Adding rule '{name} ({prefix}{code})' to '{linter}'...")
     plugin_module = RULES_DIR / dir_name(linter)
 
-    if not add_exports(plugin_module, name, should_create):
-        print(f"'{linter}' use a deprecated rules architecture, skipping generation.")
-        return
+    add_exports(plugin_module, name)
     add_rule_function(plugin_module, name, prefix, code)
     create_test_fixture(prefix, code, linter)
     add_test_case(plugin_module, name, prefix, code, linter)
@@ -174,10 +165,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    add_rule(
-        name=args.name,
-        prefix=args.prefix,
-        code=args.code,
-        linter=args.linter,
-        should_create=True,
-    )
+    add_rule(name=args.name, prefix=args.prefix, code=args.code, linter=args.linter)

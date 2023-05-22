@@ -71,17 +71,9 @@ def sort_exports(
     *,
     pub_use_to_add: Optional[str] = None,
     mod_to_add: Optional[str] = None,
-    should_create: bool = False,
-) -> bool:
+) -> None:
     """Sort the exports."""
     rules_mod = plugin_module / "rules" / "mod.rs"
-
-    if not rules_mod.exists():
-        if not should_create:
-            return False
-        if not rules_mod.parent.exists():
-            rules_mod.parent.mkdir()
-        rules_mod.touch()
 
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
@@ -109,8 +101,6 @@ def sort_exports(
     else:
         if pub_use_to_add is not None and mod_to_add is not None:
             rules_mod.write_text(f"{pub_use_to_add};\n\n{mod_to_add}\n")
-
-    return True
 
 
 def sort_code_to_rule_pairs(
@@ -148,8 +138,7 @@ def sort_linter(*, linter: str, nb_digit: int) -> None:
     plugin_module = RULES_DIR / dir_name(linter)
 
     sort_test_cases(plugin_module, nb_digit)
-    if not sort_exports(plugin_module):
-        print(f"'{linter}' use a deprecated rules architecture, skip sorting exports.")
+    sort_exports(plugin_module)
     sort_code_to_rule_pairs(linter)
 
 
