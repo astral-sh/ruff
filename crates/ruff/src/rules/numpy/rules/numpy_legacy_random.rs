@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{Expr, Ranged};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the use of legacy `np.random` function calls.
@@ -57,7 +58,7 @@ impl Violation for NumpyLegacyRandom {
 
 /// NPY002
 pub(crate) fn numpy_legacy_random(checker: &mut Checker, expr: &Expr) {
-    if let Some(method_name) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
+    if let Some(method_name) = checker.model.resolve_call_path(expr).and_then(|call_path| {
         // seeding state
         if call_path.as_slice() == ["numpy", "random", "seed"]
             || call_path.as_slice() == ["numpy", "random", "get_state"]

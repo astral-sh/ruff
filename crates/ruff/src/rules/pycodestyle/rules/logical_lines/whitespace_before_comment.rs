@@ -1,10 +1,12 @@
-use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.

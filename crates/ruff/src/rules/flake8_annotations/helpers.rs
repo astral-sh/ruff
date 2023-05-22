@@ -44,7 +44,7 @@ pub(crate) fn overloaded_name(checker: &Checker, definition: &Definition) -> Opt
         ..
     }) = definition
     {
-        if visibility::is_overload(&checker.ctx, cast::decorator_list(stmt)) {
+        if visibility::is_overload(&checker.model, cast::decorator_list(stmt)) {
             let (name, ..) = match_function_def(stmt);
             Some(name.to_string())
         } else {
@@ -68,7 +68,7 @@ pub(crate) fn is_overload_impl(
         ..
     }) = definition
     {
-        if visibility::is_overload(&checker.ctx, cast::decorator_list(stmt)) {
+        if visibility::is_overload(&checker.model, cast::decorator_list(stmt)) {
             false
         } else {
             let (name, ..) = match_function_def(stmt);

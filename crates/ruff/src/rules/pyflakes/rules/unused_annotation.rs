@@ -19,10 +19,10 @@ impl Violation for UnusedAnnotation {
 
 /// F842
 pub(crate) fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
-    let scope = &checker.ctx.scopes[scope];
+    let scope = &checker.model.scopes[scope];
     for (name, binding) in scope
         .bindings()
-        .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
+        .map(|(name, index)| (name, &checker.model.bindings[*index]))
     {
         if !binding.used()
             && binding.kind.is_annotation()

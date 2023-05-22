@@ -1,13 +1,13 @@
-use crate::autofix::actions::delete_stmt;
 use log::error;
+use rustpython_parser::ast::{Ranged, Stmt};
+
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
 
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
-
 use crate::registry::AsRule;
-use rustpython_parser::ast::{Ranged, Stmt};
 
 #[violation]
 pub struct PassInClassBody;

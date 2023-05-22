@@ -20,8 +20,8 @@ use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::node::{NodeId, Nodes};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
-#[allow(clippy::struct_excessive_bools)]
-pub struct Context<'a> {
+/// A semantic model for a Python module, to enable querying the module's semantic information.
+pub struct SemanticModel<'a> {
     pub typing_modules: &'a [String],
     pub module_path: Option<&'a [String]>,
     // Stack of all visited statements, along with the identifier of the current statement.
@@ -49,7 +49,7 @@ pub struct Context<'a> {
     pub handled_exceptions: Vec<Exceptions>,
 }
 
-impl<'a> Context<'a> {
+impl<'a> SemanticModel<'a> {
     pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
@@ -836,7 +836,7 @@ impl ContextFlags {
     }
 }
 
-/// A snapshot of the [`Context`] at a given point in the AST traversal.
+/// A snapshot of the [`SemanticModel`] at a given point in the AST traversal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Snapshot {
     scope_id: ScopeId,

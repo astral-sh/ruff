@@ -1,8 +1,10 @@
+use std::io::Write;
+
+use ruff_python_ast::source_code::SourceLocation;
+
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use ruff_python_ast::source_code::SourceLocation;
-use std::io::Write;
 
 /// Generate error workflow command in GitHub Actions format.
 /// See: [GitHub documentation](https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message)
@@ -57,9 +59,10 @@ impl Emitter for GithubEmitter {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::GithubEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn output() {

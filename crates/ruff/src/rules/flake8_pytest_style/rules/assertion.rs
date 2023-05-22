@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
@@ -6,7 +8,6 @@ use libcst_native::{
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
-use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -184,9 +185,9 @@ pub(crate) fn unittest_assertion(
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = checker.ctx.stmt().is_expr_stmt()
-                    && checker.ctx.expr_parent().is_none()
-                    && !checker.ctx.scope().kind.is_lambda()
+                let fixable = checker.model.stmt().is_expr_stmt()
+                    && checker.model.expr_parent().is_none()
+                    && !checker.model.scope().kind.is_lambda()
                     && !has_comments_in(expr.range(), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {
@@ -214,7 +215,7 @@ pub(crate) fn unittest_assertion(
 
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if Truthiness::from_expr(test, |id| checker.ctx.is_builtin(id)).is_falsey() {
+    if Truthiness::from_expr(test, |id| checker.model.is_builtin(id)).is_falsey() {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));

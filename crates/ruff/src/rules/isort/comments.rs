@@ -1,6 +1,6 @@
-use ruff_text_size::{TextRange, TextSize};
 use std::borrow::Cow;
 
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::source_code::Locator;

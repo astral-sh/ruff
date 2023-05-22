@@ -1,6 +1,6 @@
-use ruff_text_size::TextRange;
 use std::str::FromStr;
 
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_format::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};

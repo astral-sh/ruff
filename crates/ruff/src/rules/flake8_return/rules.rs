@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -391,12 +391,12 @@ const NORETURN_FUNCS: &[&[&str]] = &[
 ];
 
 /// Return `true` if the `func` is a known function that never returns.
-fn is_noreturn_func(context: &Context, func: &Expr) -> bool {
-    context.resolve_call_path(func).map_or(false, |call_path| {
+fn is_noreturn_func(model: &SemanticModel, func: &Expr) -> bool {
+    model.resolve_call_path(func).map_or(false, |call_path| {
         NORETURN_FUNCS
             .iter()
             .any(|target| call_path.as_slice() == *target)
-            || context.match_typing_call_path(&call_path, "assert_never")
+            || model.match_typing_call_path(&call_path, "assert_never")
     })
 }
 
@@ -484,7 +484,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
-                    if is_noreturn_func(&checker.ctx, func)
+                    if is_noreturn_func(&checker.model, func)
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());

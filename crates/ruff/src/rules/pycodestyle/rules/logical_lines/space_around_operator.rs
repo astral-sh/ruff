@@ -1,10 +1,12 @@
 use ruff_text_size::TextRange;
 
-use super::{LogicalLine, Whitespace};
-use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+
+use super::{LogicalLine, Whitespace};
 
 /// ## What it does
 /// Checks for extraneous tabs before an operator.

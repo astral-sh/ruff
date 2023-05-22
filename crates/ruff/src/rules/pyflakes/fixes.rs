@@ -1,15 +1,15 @@
 use anyhow::{bail, Ok, Result};
 use libcst_native::{Codegen, CodegenState, DictElement, Expression};
 use ruff_text_size::TextRange;
+use rustpython_format::{
+    FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
+};
 use rustpython_parser::ast::{Excepthandler, Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::raw_contents;
-use rustpython_format::{
-    FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
-};
 
 use crate::cst::matchers::{
     match_attribute, match_call, match_dict, match_expression, match_simple_string,

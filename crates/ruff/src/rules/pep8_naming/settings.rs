@@ -1,7 +1,8 @@
 //! Settings for the `pep8-naming` plugin.
 
-use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 const IGNORE_NAMES: [&str; 12] = [
     "setUp",

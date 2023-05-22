@@ -80,7 +80,7 @@ pub(crate) fn call(checker: &mut Checker, func: &Expr) {
 
     // Ignore irrelevant bindings (like imports).
     if !matches!(
-        test_expression(value, &checker.ctx),
+        test_expression(value, &checker.model),
         Resolution::RelevantLocal | Resolution::PandasModule
     ) {
         return;

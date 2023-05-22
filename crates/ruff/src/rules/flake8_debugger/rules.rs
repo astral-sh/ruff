@@ -1,10 +1,11 @@
 use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
-use crate::checkers::ast::Checker;
-use crate::rules::flake8_debugger::types::DebuggerUsingType;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPath};
+
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 #[violation]
 pub struct Debugger {
@@ -42,7 +43,7 @@ const DEBUGGERS: &[&[&str]] = &[
 
 /// Checks for the presence of a debugger call.
 pub(crate) fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(target) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
+    if let Some(target) = checker.model.resolve_call_path(func).and_then(|call_path| {
         DEBUGGERS
             .iter()
             .find(|target| call_path.as_slice() == **target)

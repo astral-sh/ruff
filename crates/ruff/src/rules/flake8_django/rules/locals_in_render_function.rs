@@ -50,7 +50,7 @@ pub(crate) fn locals_in_render_function(
     keywords: &[Keyword],
 ) {
     if !checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["django", "shortcuts", "render"]
@@ -87,7 +87,7 @@ fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
         return false
     };
     checker
-        .ctx
+        .model
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "locals"])
 }

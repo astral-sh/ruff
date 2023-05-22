@@ -1,12 +1,14 @@
-use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
+
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
+
+use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
+use ruff_python_ast::whitespace;
 
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};
-use ruff_python_ast::whitespace;
 
 #[derive(EnumIter, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SectionKind {

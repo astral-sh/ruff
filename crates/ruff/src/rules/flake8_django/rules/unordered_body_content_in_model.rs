@@ -103,7 +103,7 @@ fn get_element_type(checker: &Checker, element: &Stmt) -> Option<ContentType> {
     match element {
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                if helpers::is_model_field(&checker.ctx, func) {
+                if helpers::is_model_field(&checker.model, func) {
                     return Some(ContentType::FieldDeclaration);
                 }
             }
@@ -144,7 +144,7 @@ pub(crate) fn unordered_body_content_in_model(
 ) {
     if !bases
         .iter()
-        .any(|base| helpers::is_model(&checker.ctx, base))
+        .any(|base| helpers::is_model(&checker.model, base))
     {
         return;
     }

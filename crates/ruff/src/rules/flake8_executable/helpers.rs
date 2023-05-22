@@ -51,11 +51,11 @@ pub(crate) fn is_executable(filepath: &Path) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_text_size::TextSize;
+
     use crate::rules::flake8_executable::helpers::{
         extract_shebang, ShebangDirective, SHEBANG_REGEX,
     };
-
-    use ruff_text_size::TextSize;
 
     #[test]
     fn shebang_regex() {
