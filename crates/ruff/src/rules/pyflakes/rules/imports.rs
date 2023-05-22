@@ -315,7 +315,6 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 /// ```python
 /// def foo():
 ///     from math import *
-///     ...
 /// ```
 ///
 /// Use instead:
