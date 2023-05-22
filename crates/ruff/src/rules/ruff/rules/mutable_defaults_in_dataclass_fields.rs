@@ -244,10 +244,9 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-pub(crate) fn is_dataclass(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub(crate) fn is_dataclass(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|decorator| {
-        checker
-            .model
+        model
             .resolve_call_path(map_callable(decorator))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["dataclasses", "dataclass"]

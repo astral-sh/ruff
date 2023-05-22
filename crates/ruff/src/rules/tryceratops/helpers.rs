@@ -26,7 +26,7 @@ where
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if logging::is_logger_candidate(self.context, func) {
+            if logging::is_logger_candidate(func, self.context) {
                 self.calls.push((expr, func));
             }
         }
