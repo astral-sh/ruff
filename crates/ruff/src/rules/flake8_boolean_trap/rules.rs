@@ -97,7 +97,7 @@ impl Violation for BooleanPositionalArgInFunctionDefinition {
 /// round_number(1.5, up=False)
 /// ```
 ///
-/// Instead, refactor to not use a boolean argument:
+/// Use instead:
 /// ```python
 /// from math import ceil, floor
 ///
