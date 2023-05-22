@@ -3,5 +3,5 @@ name = "hello-world"
 version = "0.1.0"
 # Ensure that the spans from toml handle utf-8 correctly
 authors = [
-    { name = "콘스턴틴", email = 1 }
+    { name = "Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘", email = 1 }
 ]

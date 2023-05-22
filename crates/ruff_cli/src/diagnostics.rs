@@ -139,7 +139,7 @@ pub(crate) fn lint_path(
         let messages = lint_pyproject_toml(source_file)?;
         return Ok(Diagnostics {
             messages,
-			..Diagnostics::default(),
+            ..Diagnostics::default()
         });
     }
 
