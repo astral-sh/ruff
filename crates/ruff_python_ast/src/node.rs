@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use ruff_text_size::TextRange;
-
+use std::ptr::NonNull;
 pub trait AstNode: Ranged {
     fn cast(kind: AnyNode) -> Option<Self>
     where
@@ -596,6 +596,14 @@ impl AnyNode {
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
             Self::TypeIgnoreTypeIgnore(node) => AnyNodeRef::TypeIgnoreTypeIgnore(node),
         }
+    }
+
+    pub fn kind(&self) -> NodeKind {
+        self.as_ref().kind()
+    }
+
+    pub fn offset_key(&self) -> NodeOffsetKey {
+        self.as_ref().offset_key()
     }
 }
 
@@ -2625,6 +2633,181 @@ pub enum AnyNodeRef<'a> {
     TypeIgnoreTypeIgnore(&'a TypeIgnoreTypeIgnore<TextRange>),
 }
 
+impl AnyNodeRef<'_> {
+    /// Returns the node's [`kind`](NodeKind) that has no data associated and is [`Copy`].
+    pub fn kind(self) -> NodeKind {
+        match self {
+            AnyNodeRef::ModModule(_) => NodeKind::ModModule,
+            AnyNodeRef::ModInteractive(_) => NodeKind::ModInteractive,
+            AnyNodeRef::ModExpression(_) => NodeKind::ModExpression,
+            AnyNodeRef::ModFunctionType(_) => NodeKind::ModFunctionType,
+            AnyNodeRef::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
+            AnyNodeRef::StmtAsyncFunctionDef(_) => NodeKind::StmtAsyncFunctionDef,
+            AnyNodeRef::StmtClassDef(_) => NodeKind::StmtClassDef,
+            AnyNodeRef::StmtReturn(_) => NodeKind::StmtReturn,
+            AnyNodeRef::StmtDelete(_) => NodeKind::StmtDelete,
+            AnyNodeRef::StmtAssign(_) => NodeKind::StmtAssign,
+            AnyNodeRef::StmtAugAssign(_) => NodeKind::StmtAugAssign,
+            AnyNodeRef::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
+            AnyNodeRef::StmtFor(_) => NodeKind::StmtFor,
+            AnyNodeRef::StmtAsyncFor(_) => NodeKind::StmtAsyncFor,
+            AnyNodeRef::StmtWhile(_) => NodeKind::StmtWhile,
+            AnyNodeRef::StmtIf(_) => NodeKind::StmtIf,
+            AnyNodeRef::StmtWith(_) => NodeKind::StmtWith,
+            AnyNodeRef::StmtAsyncWith(_) => NodeKind::StmtAsyncWith,
+            AnyNodeRef::StmtMatch(_) => NodeKind::StmtMatch,
+            AnyNodeRef::StmtRaise(_) => NodeKind::StmtRaise,
+            AnyNodeRef::StmtTry(_) => NodeKind::StmtTry,
+            AnyNodeRef::StmtTryStar(_) => NodeKind::StmtTryStar,
+            AnyNodeRef::StmtAssert(_) => NodeKind::StmtAssert,
+            AnyNodeRef::StmtImport(_) => NodeKind::StmtImport,
+            AnyNodeRef::StmtImportFrom(_) => NodeKind::StmtImportFrom,
+            AnyNodeRef::StmtGlobal(_) => NodeKind::StmtGlobal,
+            AnyNodeRef::StmtNonlocal(_) => NodeKind::StmtNonlocal,
+            AnyNodeRef::StmtExpr(_) => NodeKind::StmtExpr,
+            AnyNodeRef::StmtPass(_) => NodeKind::StmtPass,
+            AnyNodeRef::StmtBreak(_) => NodeKind::StmtBreak,
+            AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
+            AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
+            AnyNodeRef::ExprNamedExpr(_) => NodeKind::ExprNamedExpr,
+            AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
+            AnyNodeRef::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
+            AnyNodeRef::ExprLambda(_) => NodeKind::ExprLambda,
+            AnyNodeRef::ExprIfExp(_) => NodeKind::ExprIfExp,
+            AnyNodeRef::ExprDict(_) => NodeKind::ExprDict,
+            AnyNodeRef::ExprSet(_) => NodeKind::ExprSet,
+            AnyNodeRef::ExprListComp(_) => NodeKind::ExprListComp,
+            AnyNodeRef::ExprSetComp(_) => NodeKind::ExprSetComp,
+            AnyNodeRef::ExprDictComp(_) => NodeKind::ExprDictComp,
+            AnyNodeRef::ExprGeneratorExp(_) => NodeKind::ExprGeneratorExp,
+            AnyNodeRef::ExprAwait(_) => NodeKind::ExprAwait,
+            AnyNodeRef::ExprYield(_) => NodeKind::ExprYield,
+            AnyNodeRef::ExprYieldFrom(_) => NodeKind::ExprYieldFrom,
+            AnyNodeRef::ExprCompare(_) => NodeKind::ExprCompare,
+            AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
+            AnyNodeRef::ExprFormattedValue(_) => NodeKind::ExprFormattedValue,
+            AnyNodeRef::ExprJoinedStr(_) => NodeKind::ExprJoinedStr,
+            AnyNodeRef::ExprConstant(_) => NodeKind::ExprConstant,
+            AnyNodeRef::ExprAttribute(_) => NodeKind::ExprAttribute,
+            AnyNodeRef::ExprSubscript(_) => NodeKind::ExprSubscript,
+            AnyNodeRef::ExprStarred(_) => NodeKind::ExprStarred,
+            AnyNodeRef::ExprName(_) => NodeKind::ExprName,
+            AnyNodeRef::ExprList(_) => NodeKind::ExprList,
+            AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
+            AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
+            AnyNodeRef::ExcepthandlerExceptHandler(_) => NodeKind::ExcepthandlerExceptHandler,
+            AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
+            AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
+            AnyNodeRef::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
+            AnyNodeRef::PatternMatchMapping(_) => NodeKind::PatternMatchMapping,
+            AnyNodeRef::PatternMatchClass(_) => NodeKind::PatternMatchClass,
+            AnyNodeRef::PatternMatchStar(_) => NodeKind::PatternMatchStar,
+            AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
+            AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
+            AnyNodeRef::TypeIgnoreTypeIgnore(_) => NodeKind::TypeIgnoreTypeIgnore,
+        }
+    }
+
+    /// Returns a copyable key implementing [`Hash`] and [`Eq`] that compares nodes by their [kind](NodeKind)
+    /// and absolute offset.
+    ///
+    /// ## Manually created or mutated trees
+    ///
+    /// Manually created or mutated trees commonly use [`TextRange::default`] for a node's range. This
+    /// may result in multiple nodes sharing the same location and kind, and thus, incorrectly compare equal.
+    ///
+    /// That's why it's preferred to use [`NodeRefEqualityKey`] for manually manipulated trees.
+    pub fn offset_key(&self) -> NodeOffsetKey {
+        NodeOffsetKey {
+            kind: self.kind(),
+            offset: self.start(),
+        }
+    }
+
+    /// Returns a key that implements [`Eq`] and [`Hash`] based on the Node's address.
+    ///
+    /// The returned value is only useful for comparing if two nodes are the *same* instance. Copied nodes
+    /// or moved nodes (e.g. when returning or passing by value) have different [`NodeRefEqualityKey`]s.
+    ///
+    /// ## Considerations
+    /// [`NodeRefEqualityKey`]s debug representation is a pointer, which can make code very hard to debug.
+    /// Prefer [`NodeOffsetKey`] for trees coming directly from the parser or if you copy/move nodes.
+    pub fn ref_equality_key(&self) -> NodeRefEqualityKey {
+        let ptr: std::ptr::NonNull<()> = match self {
+            AnyNodeRef::ModModule(module) => std::ptr::NonNull::from(*module).cast(),
+            AnyNodeRef::ModInteractive(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ModExpression(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ModFunctionType(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtFunctionDef(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAsyncFunctionDef(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtClassDef(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtReturn(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtDelete(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAssign(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAugAssign(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAnnAssign(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtFor(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAsyncFor(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtWhile(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtIf(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtWith(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAsyncWith(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtMatch(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtRaise(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtTry(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtTryStar(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAssert(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtImport(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtImportFrom(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtGlobal(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtNonlocal(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtExpr(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtPass(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtBreak(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::StmtContinue(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprBoolOp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprNamedExpr(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprBinOp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprUnaryOp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprLambda(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprIfExp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprDict(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSet(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprListComp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSetComp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprDictComp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprGeneratorExp(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprAwait(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprYield(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprYieldFrom(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprCompare(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprCall(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprFormattedValue(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprJoinedStr(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprConstant(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprAttribute(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSubscript(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprStarred(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprName(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprList(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprTuple(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSlice(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::ExcepthandlerExceptHandler(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchValue(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchSingleton(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchSequence(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchMapping(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchClass(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchStar(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchAs(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchOr(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::TypeIgnoreTypeIgnore(node) => std::ptr::NonNull::from(*node).cast(),
+        };
+
+        NodeRefEqualityKey(ptr)
+    }
+}
+
 impl<'a> From<&'a ModModule> for AnyNodeRef<'a> {
     fn from(node: &'a ModModule) -> Self {
         AnyNodeRef::ModModule(node)
@@ -3217,5 +3400,162 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchOr(node) => node.range(),
             AnyNodeRef::TypeIgnoreTypeIgnore(node) => node.range(),
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum NodeKind {
+    ModModule,
+    ModInteractive,
+    ModExpression,
+    ModFunctionType,
+    StmtFunctionDef,
+    StmtAsyncFunctionDef,
+    StmtClassDef,
+    StmtReturn,
+    StmtDelete,
+    StmtAssign,
+    StmtAugAssign,
+    StmtAnnAssign,
+    StmtFor,
+    StmtAsyncFor,
+    StmtWhile,
+    StmtIf,
+    StmtWith,
+    StmtAsyncWith,
+    StmtMatch,
+    StmtRaise,
+    StmtTry,
+    StmtTryStar,
+    StmtAssert,
+    StmtImport,
+    StmtImportFrom,
+    StmtGlobal,
+    StmtNonlocal,
+    StmtExpr,
+    StmtPass,
+    StmtBreak,
+    StmtContinue,
+    ExprBoolOp,
+    ExprNamedExpr,
+    ExprBinOp,
+    ExprUnaryOp,
+    ExprLambda,
+    ExprIfExp,
+    ExprDict,
+    ExprSet,
+    ExprListComp,
+    ExprSetComp,
+    ExprDictComp,
+    ExprGeneratorExp,
+    ExprAwait,
+    ExprYield,
+    ExprYieldFrom,
+    ExprCompare,
+    ExprCall,
+    ExprFormattedValue,
+    ExprJoinedStr,
+    ExprConstant,
+    ExprAttribute,
+    ExprSubscript,
+    ExprStarred,
+    ExprName,
+    ExprList,
+    ExprTuple,
+    ExprSlice,
+    ExcepthandlerExceptHandler,
+    PatternMatchValue,
+    PatternMatchSingleton,
+    PatternMatchSequence,
+    PatternMatchMapping,
+    PatternMatchClass,
+    PatternMatchStar,
+    PatternMatchAs,
+    PatternMatchOr,
+    TypeIgnoreTypeIgnore,
+}
+
+/// A key that compares two nodes by their kinds and absolute offsets in the document.
+///
+/// This is based on the assumption that no two nodes with the same kind should ever start at the same position,
+/// which holds true for any AST generated by the parser. This property may not hold true for manually
+/// created or manipulated trees. E.g. it's common to use [`TextRange::default`] for manually
+/// created nodes, which has the result that multiple nodes can end up at the same location.
+///
+/// Prefer to use [`NodeRefEqualityKey`] for these use cases.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct NodeOffsetKey {
+    kind: NodeKind,
+    offset: TextSize,
+}
+
+/// A key that compares two nodes by reference equality. Moved or copied are considered different.
+///
+/// The key can outlive the node.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct NodeRefEqualityKey(NonNull<()>);
+
+#[cfg(test)]
+mod tests {
+    use crate::node::{AnyNode, AnyNodeRef};
+    use crate::prelude::*;
+    use ruff_text_size::{TextLen, TextRange, TextSize};
+
+    #[test]
+    fn offset_key_equal() {
+        let first_continue = AnyNode::from(Stmt::Continue(StmtContinue {
+            range: TextRange::at(TextSize::new(10), "continue".text_len()),
+        }));
+
+        let second_continue = AnyNode::from(Stmt::Continue(StmtContinue {
+            range: TextRange::at(TextSize::new(10), "continue".text_len()),
+        }));
+
+        assert_eq!(first_continue.offset_key(), first_continue.offset_key());
+        assert_eq!(first_continue.offset_key(), second_continue.offset_key());
+    }
+
+    #[test]
+    fn offset_key_not_equal() {
+        let first_continue = AnyNode::from(Stmt::Continue(StmtContinue {
+            range: TextRange::at(TextSize::new(10), "continue".text_len()),
+        }));
+
+        let different_offset = AnyNode::from(Stmt::Continue(StmtContinue {
+            range: TextRange::at(TextSize::new(20), "continue".text_len()),
+        }));
+
+        let different_kind = AnyNode::from(Stmt::Break(StmtBreak {
+            range: TextRange::at(TextSize::new(10), "break".text_len()),
+        }));
+
+        assert_ne!(first_continue.offset_key(), different_offset.offset_key());
+        assert_ne!(first_continue.offset_key(), different_kind.offset_key());
+    }
+
+    #[test]
+    fn ref_equality_key_equal() {
+        let first_continue = Box::new(Stmt::Continue(StmtContinue {
+            range: TextRange::at(TextSize::new(10), "continue".text_len()),
+        }));
+
+        assert_eq!(
+            AnyNodeRef::from(first_continue.as_ref()).ref_equality_key(),
+            AnyNodeRef::from(first_continue.as_ref()).ref_equality_key()
+        );
+    }
+
+    #[test]
+    fn ref_equality_key_not_equal() {
+        let first_continue = Box::new(Stmt::Continue(StmtContinue {
+            range: TextRange::at(TextSize::new(10), "continue".text_len()),
+        }));
+
+        let second_continue = first_continue.clone();
+
+        assert_ne!(
+            AnyNodeRef::from(first_continue.as_ref()).ref_equality_key(),
+            AnyNodeRef::from(second_continue.as_ref()).ref_equality_key()
+        );
     }
 }
