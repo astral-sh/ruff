@@ -5,7 +5,7 @@ use unicode_width::UnicodeWidthStr;
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Generator;
 
-use crate::settings::line_width::{LineLength, TabSize, Width};
+use crate::settings::line_width::{LineLength, LineWidth, TabSize};
 
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -34,7 +34,7 @@ pub(super) fn is_overlong(
     tab_size: TabSize,
 ) -> Option<Overlong> {
     let mut start_offset = line.start();
-    let mut width = Width::new(tab_size);
+    let mut width = LineWidth::new(tab_size);
 
     for c in line.chars() {
         if width < limit {
@@ -66,14 +66,14 @@ pub(super) fn is_overlong(
     // begins before the limit.
     let last_chunk = chunks.last().unwrap_or(second_chunk);
     if last_chunk.contains("://") {
-        if width.width() - last_chunk.width() <= limit.width() {
+        if width.get() - last_chunk.width() <= limit.get() {
             return None;
         }
     }
 
     Some(Overlong {
         range: TextRange::new(start_offset, line.end()),
-        width: width.width(),
+        width: width.get(),
     })
 }
 

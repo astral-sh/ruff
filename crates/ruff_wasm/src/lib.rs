@@ -14,7 +14,7 @@ use ruff::rules::{
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
 };
 use ruff::settings::configuration::Configuration;
-use ruff::settings::line_width::{LineWidth, TabSize};
+use ruff::settings::line_width::{LineLength, TabSize};
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_diagnostics::Edit;
@@ -103,7 +103,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         extend_unfixable: Some(Vec::default()),
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
-        line_length: Some(LineWidth::default()),
+        line_length: Some(LineLength::default()),
         tab_size: Some(TabSize::default()),
         select: Some(defaults::PREFIXES.to_vec()),
         target_version: Some(defaults::TARGET_VERSION),

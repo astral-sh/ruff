@@ -368,7 +368,7 @@
       "description": "The line length to use when enforcing long-lines violations (like `E501`).",
       "anyOf": [
         {
-          "$ref": "#/definitions/LineWidth_for_Length"
+          "$ref": "#/definitions/LineLength"
         },
         {
           "type": "null"
@@ -1289,25 +1289,10 @@
       },
       "additionalProperties": false
     },
-    "Length": {
-      "type": "null"
-    },
-    "LineWidth_for_Length": {
-      "type": "object",
-      "required": [
-        "extra",
-        "width"
-      ],
-      "properties": {
-        "extra": {
-          "$ref": "#/definitions/Length"
-        },
-        "width": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0.0
-        }
-      }
+    "LineLength": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0.0
     },
     "McCabeOptions": {
       "type": "object",
@@ -1396,7 +1381,7 @@
           "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
           "anyOf": [
             {
-              "$ref": "#/definitions/LineWidth_for_Length"
+              "$ref": "#/definitions/LineLength"
             },
             {
               "type": "null"

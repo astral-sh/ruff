@@ -14,7 +14,7 @@ use crate::fs::relativize_path;
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use crate::settings::line_width::{TabSize, Width};
+use crate::settings::line_width::{LineWidth, TabSize};
 
 bitflags! {
     #[derive(Default)]
@@ -243,15 +243,16 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = Width::new(TAB_SIZE);
+    let mut line_width = LineWidth::new(TAB_SIZE);
 
     for (index, c) in source.char_indices() {
-        let old_width = line_width.width();
+        let old_width = line_width.get();
         line_width = line_width.add_char(c);
 
         if matches!(c, '\t') {
+            // SAFETY: The difference is a value in the range [1..TAB_SIZE] which is guaranteed to be less than `u32`.
             #[allow(clippy::cast_possible_truncation)]
-            let tab_width = (line_width.width() - old_width) as u32;
+            let tab_width = (line_width.get() - old_width) as u32;
 
             if index < usize::from(annotation_range.start()) {
                 range += TextSize::new(tab_width - 1);

@@ -19,7 +19,7 @@ use types::{AliasData, EitherImport, TrailingComma};
 
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
-use crate::settings::line_width::{LineLength, Width};
+use crate::settings::line_width::{LineLength, LineWidth};
 use crate::settings::types::PythonVersion;
 
 mod annotate;
@@ -67,7 +67,7 @@ pub(crate) fn format_imports(
     comments: Vec<Comment>,
     locator: &Locator,
     line_length: LineLength,
-    indentation_width: Width,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -166,7 +166,7 @@ pub(crate) fn format_imports(
 fn format_import_block(
     block: ImportBlock,
     line_length: LineLength,
-    indentation_width: Width,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,

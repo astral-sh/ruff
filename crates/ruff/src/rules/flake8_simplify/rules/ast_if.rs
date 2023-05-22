@@ -15,7 +15,7 @@ use ruff_python_semantic::model::SemanticModel;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::settings::line_width::Width;
+use crate::settings::line_width::LineWidth;
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)
@@ -289,7 +289,7 @@ pub(crate) fn nested_if_statements(
                     .unwrap_or_default()
                     .universal_newlines()
                     .all(|line| {
-                        Width::new(checker.settings.tab_size).add_str(&line)
+                        LineWidth::new(checker.settings.tab_size).add_str(&line)
                             <= checker.settings.line_length
                     })
                 {
@@ -511,7 +511,7 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    if Width::new(checker.settings.tab_size)
+    if LineWidth::new(checker.settings.tab_size)
         .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
         .add_str(&contents)
         > checker.settings.line_length
@@ -867,7 +867,7 @@ pub(crate) fn use_dict_get_with_default(
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    if Width::new(checker.settings.tab_size)
+    if LineWidth::new(checker.settings.tab_size)
         .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
         .add_str(&contents)
         > checker.settings.line_length
