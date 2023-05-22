@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, result_like::BoolLike)]
-pub enum Certainty {
+enum Certainty {
     Certain,
     Uncertain,
 }
@@ -39,15 +39,15 @@ pub enum Certainty {
 #[violation]
 pub struct UnusedLoopControlVariable {
     /// The name of the loop control variable.
-    pub name: String,
+    name: String,
     /// The name to which the variable should be renamed, if it can be
     /// safely renamed.
-    pub rename: Option<String>,
+    rename: Option<String>,
     /// Whether the variable is certain to be unused in the loop body, or
     /// merely suspect. A variable _may_ be used, but undetectably
     /// so, if the loop incorporates by magic control flow (e.g.,
     /// `locals()`).
-    pub certainty: Certainty,
+    certainty: Certainty,
 }
 
 impl Violation for UnusedLoopControlVariable {
