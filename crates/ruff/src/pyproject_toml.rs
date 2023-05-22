@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use pyproject_toml::PyProjectToml;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -19,10 +19,10 @@ pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
         // TODO(konstin,micha): https://github.com/charliermarsh/ruff/issues/4571
         None => TextRange::default(),
         Some(range) => {
-            let expect_err = "pyproject.toml file be smaller than 4GB";
+            let expect_err = "pyproject.toml should be smaller than 4GB";
             TextRange::new(
-                TextSize::try_from(range.start).expect(expect_err),
-                TextSize::try_from(range.end).expect(expect_err),
+                TextSize::try_from(range.start).context(expect_err)?,
+                TextSize::try_from(range.end).context(expect_err)?,
             )
         }
     };
