@@ -41,11 +41,9 @@ pub(crate) fn bad_shelve_use(checker: &mut Checker, stmt: AnyStmtImport) {
         }
         AnyStmtImport::ImportFrom(imp) => {
             if imp.module == Some(Identifier::from("shelve")) {
-                for name in &imp.names {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(ShelveUse, name.range));
-                }
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(ShelveUse, imp.range));
             }
         }
     }

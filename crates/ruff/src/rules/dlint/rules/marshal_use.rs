@@ -41,11 +41,9 @@ pub(crate) fn bad_marshal_use(checker: &mut Checker, stmt: AnyStmtImport) {
         }
         AnyStmtImport::ImportFrom(imp) => {
             if imp.module == Some(Identifier::from("marshal")) {
-                for name in &imp.names {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(MarshalUse, name.range));
-                }
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(MarshalUse, imp.range));
             }
         }
     }

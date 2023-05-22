@@ -7,16 +7,10 @@ DUO119.py:1:8: DUO119 Use of the `shelve` module should be avoided
   |        ^^^^^^ DUO119
   |
 
-DUO119.py:4:20: DUO119 Use of the `shelve` module should be avoided
+DUO119.py:4:1: DUO119 Use of the `shelve` module should be avoided
   |
 4 | from shelve import open, Shelf
-  |                    ^^^^ DUO119
-  |
-
-DUO119.py:4:26: DUO119 Use of the `shelve` module should be avoided
-  |
-4 | from shelve import open, Shelf
-  |                          ^^^^^ DUO119
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DUO119
   |
 
 

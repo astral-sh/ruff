@@ -30,13 +30,13 @@ impl Violation for CompileUse {
 
 /// DUO110
 pub(crate) fn bad_compile_use(checker: &mut Checker, expr: &ast::ExprCall) {
-        if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
-            if id == "compile" && checker.ctx.is_builtin(id) {
-                {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(CompileUse, expr.func.range()));
-                }
+    if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
+        if id == "compile" && checker.ctx.is_builtin(id) {
+            {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(CompileUse, expr.func.range()));
             }
         }
     }
+}
