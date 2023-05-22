@@ -1,5 +1,6 @@
 use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -24,7 +25,9 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             representant,
         } = self;
         format!(
-            "String contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?)"
+            "String contains ambiguous {}. Did you mean {}?",
+            NamedUnicode(*confusable),
+            NamedUnicode(*representant)
         )
     }
 
@@ -33,7 +36,11 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             confusable,
             representant,
         } = self;
-        format!("Replace `{confusable}` with `{representant}`")
+        format!(
+            "Replace {} with {}",
+            NamedUnicode(*confusable),
+            NamedUnicode(*representant)
+        )
     }
 }
 
@@ -51,7 +58,9 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
             representant,
         } = self;
         format!(
-            "Docstring contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?)"
+            "Docstring contains ambiguous {}. Did you mean {}?",
+            NamedUnicode(*confusable),
+            NamedUnicode(*representant)
         )
     }
 
@@ -60,7 +69,11 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
             confusable,
             representant,
         } = self;
-        format!("Replace `{confusable}` with `{representant}`")
+        format!(
+            "Replace {} with {}",
+            NamedUnicode(*confusable),
+            NamedUnicode(*representant)
+        )
     }
 }
 
@@ -78,7 +91,9 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
             representant,
         } = self;
         format!(
-            "Comment contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?)"
+            "Comment contains ambiguous {}. Did you mean {}?",
+            NamedUnicode(*confusable),
+            NamedUnicode(*representant)
         )
     }
 
@@ -87,7 +102,11 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
             confusable,
             representant,
         } = self;
-        format!("Replace `{confusable}` with `{representant}`")
+        format!(
+            "Replace {} with {}",
+            NamedUnicode(*confusable),
+            NamedUnicode(*representant)
+        )
     }
 }
 
@@ -247,5 +266,18 @@ impl Candidate {
             }
         }
         None
+    }
+}
+
+struct NamedUnicode(char);
+
+impl fmt::Display for NamedUnicode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let NamedUnicode(c) = self;
+        if let Some(name) = unicode_names2::name(*c) {
+            write!(f, "`{c}` ({name})")
+        } else {
+            write!(f, "`{c}`")
+        }
     }
 }

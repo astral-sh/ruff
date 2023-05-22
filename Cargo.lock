@@ -1780,6 +1780,7 @@ dependencies = [
  "toml",
  "typed-arena",
  "unicode-width",
+ "unicode_names2",
 ]
 
 [[package]]
