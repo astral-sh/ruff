@@ -58,7 +58,7 @@ pub(crate) fn repeated_isinstance_calls(
     op: Boolop,
     values: &[Expr],
 ) {
-    if !matches!(op, Boolop::Or) || !checker.model.is_builtin("isinstance") {
+    if !matches!(op, Boolop::Or) || !checker.semantic_model().is_builtin("isinstance") {
         return;
     }
 

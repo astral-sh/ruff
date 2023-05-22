@@ -88,7 +88,7 @@ pub(crate) fn unnecessary_map(
     };
     match id {
         "map" => {
-            if !checker.model.is_builtin(id) {
+            if !checker.semantic_model().is_builtin(id) {
                 return;
             }
 
@@ -119,7 +119,7 @@ pub(crate) fn unnecessary_map(
             }
         }
         "list" | "set" => {
-            if !checker.model.is_builtin(id) {
+            if !checker.semantic_model().is_builtin(id) {
                 return;
             }
 
@@ -149,7 +149,7 @@ pub(crate) fn unnecessary_map(
             }
         }
         "dict" => {
-            if !checker.model.is_builtin(id) {
+            if !checker.semantic_model().is_builtin(id) {
                 return;
             }
 

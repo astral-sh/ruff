@@ -64,7 +64,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_raises(func, &checker.model) {
+    if is_pytest_raises(func, checker.semantic_model()) {
         if checker
             .settings
             .rules
@@ -104,7 +104,7 @@ pub(crate) fn complex_raises(
     let mut is_too_complex = false;
 
     let raises_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, &checker.model),
+        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic_model()),
         _ => false,
     });
 
@@ -145,7 +145,7 @@ pub(crate) fn complex_raises(
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
     if let Some(call_path) = checker
-        .model
+        .semantic_model()
         .resolve_call_path(exception)
         .and_then(|call_path| {
             let is_broad_exception = checker

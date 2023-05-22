@@ -45,7 +45,7 @@ pub(crate) fn no_explicit_stacklevel(
     keywords: &[Keyword],
 ) {
     if !checker
-        .model
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["warnings", "warn"]

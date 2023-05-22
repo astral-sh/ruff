@@ -108,7 +108,7 @@ pub(crate) fn bad_file_permissions(
     keywords: &[Keyword],
 ) {
     if checker
-        .model
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["os", "chmod"])
     {

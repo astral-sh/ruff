@@ -27,7 +27,7 @@ pub(crate) fn try_except_pass(
 ) {
     if body.len() == 1
         && body[0].is_pass_stmt()
-        && (check_typed_exception || is_untyped_exception(type_, &checker.model))
+        && (check_typed_exception || is_untyped_exception(type_, checker.semantic_model()))
     {
         checker
             .diagnostics

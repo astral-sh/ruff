@@ -67,11 +67,14 @@ impl Violation for MissingFutureAnnotationsImport {
 
 /// FA100
 pub(crate) fn missing_future_annotations(checker: &mut Checker, expr: &Expr) {
-    if let Some(binding) = checker.model.resolve_call_path(expr) {
+    let name = checker
+        .semantic_model()
+        .resolve_call_path(expr)
+        .map(|binding| format_call_path(&binding));
+
+    if let Some(name) = name {
         checker.diagnostics.push(Diagnostic::new(
-            MissingFutureAnnotationsImport {
-                name: format_call_path(&binding),
-            },
+            MissingFutureAnnotationsImport { name },
             expr.range(),
         ));
     }

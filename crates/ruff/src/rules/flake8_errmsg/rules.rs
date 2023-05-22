@@ -233,7 +233,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
                             let indentation = whitespace::indentation(checker.locator, stmt)
                                 .and_then(|indentation| {
-                                    if checker.model.find_binding("msg").is_none() {
+                                    if checker.semantic_model().find_binding("msg").is_none() {
                                         Some(indentation)
                                     } else {
                                         None
@@ -261,7 +261,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                     if checker.settings.rules.enabled(Rule::FStringInException) {
                         let indentation = whitespace::indentation(checker.locator, stmt).and_then(
                             |indentation| {
-                                if checker.model.find_binding("msg").is_none() {
+                                if checker.semantic_model().find_binding("msg").is_none() {
                                     Some(indentation)
                                 } else {
                                     None
@@ -292,7 +292,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                             if attr == "format" && value.is_constant_expr() {
                                 let indentation = whitespace::indentation(checker.locator, stmt)
                                     .and_then(|indentation| {
-                                        if checker.model.find_binding("msg").is_none() {
+                                        if checker.semantic_model().find_binding("msg").is_none() {
                                             Some(indentation)
                                         } else {
                                             None

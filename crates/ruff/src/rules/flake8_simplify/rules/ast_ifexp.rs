@@ -107,7 +107,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
                 checker.generator().expr(&test.clone()),
                 expr.range(),
             )));
-        } else if checker.model.is_builtin("bool") {
+        } else if checker.semantic_model().is_builtin("bool") {
             let node = ast::ExprName {
                 id: "bool".into(),
                 ctx: ExprContext::Load,

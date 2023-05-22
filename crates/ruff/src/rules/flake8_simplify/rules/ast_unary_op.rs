@@ -93,12 +93,12 @@ pub(crate) fn negation_with_equal_op(
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    if is_exception_check(checker.model.stmt()) {
+    if is_exception_check(checker.semantic_model().stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.model.scope().kind {
+    if let ScopeKind::Function(def) = &checker.semantic_model().scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -143,12 +143,12 @@ pub(crate) fn negation_with_not_equal_op(
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    if is_exception_check(checker.model.stmt()) {
+    if is_exception_check(checker.semantic_model().stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.model.scope().kind {
+    if let ScopeKind::Function(def) = &checker.semantic_model().scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -196,13 +196,13 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, o
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if checker.model.in_boolean_test() {
+        if checker.semantic_model().in_boolean_test() {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 checker.generator().expr(operand),
                 expr.range(),
             )));
-        } else if checker.model.is_builtin("bool") {
+        } else if checker.semantic_model().is_builtin("bool") {
             let node = ast::ExprName {
                 id: "bool".into(),
                 ctx: ExprContext::Load,

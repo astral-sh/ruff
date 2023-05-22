@@ -18,7 +18,7 @@ impl Violation for ReturnOutsideFunction {
 
 pub(crate) fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
     if matches!(
-        checker.model.scope().kind,
+        checker.semantic_model().scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         checker

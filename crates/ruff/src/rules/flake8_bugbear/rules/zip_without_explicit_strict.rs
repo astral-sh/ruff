@@ -24,7 +24,7 @@ pub(crate) fn zip_without_explicit_strict(
 ) {
     if let Expr::Name(ast::ExprName { id, .. }) = func {
         if id == "zip"
-            && checker.model.is_builtin("zip")
+            && checker.semantic_model().is_builtin("zip")
             && !kwargs
                 .iter()
                 .any(|keyword| keyword.arg.as_ref().map_or(false, |name| name == "strict"))

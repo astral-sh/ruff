@@ -149,7 +149,8 @@ pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &
         .map(|target| from_qualified_name(target))
         .collect();
     let diagnostics = {
-        let mut visitor = ArgumentDefaultVisitor::new(&checker.model, extend_immutable_calls);
+        let mut visitor =
+            ArgumentDefaultVisitor::new(checker.semantic_model(), extend_immutable_calls);
         for expr in arguments
             .defaults
             .iter()
