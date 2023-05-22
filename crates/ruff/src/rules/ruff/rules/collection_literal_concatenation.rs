@@ -48,7 +48,7 @@ fn make_splat_elts(
     new_elts
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum Kind {
     List,
     Tuple,
@@ -123,7 +123,9 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
         new_elts = make_splat_elts(splat_element, other_elements, splat_at_left);
     }
     // If the splat element is itself a list/tuple, insert them in the other list/tuple.
-    else if splat_element.is_list_expr() || splat_element.is_tuple_expr() {
+    else if (kind == Kind::List && splat_element.is_list_expr())
+        || (kind == Kind::Tuple && splat_element.is_tuple_expr())
+    {
         new_elts = other_elements.clone();
 
         let elts = match splat_element {
