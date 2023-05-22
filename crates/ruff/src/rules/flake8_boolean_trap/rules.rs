@@ -124,7 +124,7 @@ impl Violation for BooleanDefaultValueInFunctionDefinition {
 }
 
 /// ## What it does
-/// Checks for boolean positional arguments in function definitions.
+/// Checks for boolean positional arguments in function calls.
 ///
 /// ## Why is this bad?
 /// It is not clear what the boolean argument means. It is better to use a keyword argument instead.
@@ -142,7 +142,7 @@ impl Violation for BooleanDefaultValueInFunctionDefinition {
 ///
 /// Use instead:
 /// ```python
-/// def foo(flag: bool = True) -> None:
+/// def foo(flag: bool) -> None:
 ///     ...
 ///
 ///
