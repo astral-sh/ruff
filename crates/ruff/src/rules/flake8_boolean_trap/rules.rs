@@ -11,12 +11,12 @@ use crate::checkers::ast::Checker;
 /// Checks for boolean positional arguments in function definitions.
 ///
 /// ## Why is this bad?
-/// Calling a function with boolean positional arguments is confusing as it is
-/// not clear what the boolean value represents. Boolean arguments also lock
-/// the function into only two possible behaviors, which makes the function
-/// difficult to extend in the future.
+/// Calling a function with boolean positional arguments is confusing as the
+/// meaning of the boolean value is not clear to the caller, and to future
+/// readers of the code.
 ///
-/// Instead, refactor to not use boolean positional arguments.
+/// The use of a boolean will also limit the function to only two possible
+/// behaviors, which makes the function difficult to extend in the future.
 ///
 /// ## Example
 /// ```python
@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 /// round_number(1.5, False)  # What does `False` mean?
 /// ```
 ///
-/// Instead, refactor to not use a boolean argument:
+/// Instead, refactor into separate implementations:
 /// ```python
 /// from math import ceil, floor
 ///
@@ -48,17 +48,18 @@ use crate::checkers::ast::Checker;
 /// round_down(1.5)
 /// ```
 ///
-/// Or, refactor to make the boolean argument a keyword argument:
+/// Or, refactor to use an `Enum`:
 /// ```python
-/// from math import ceil, floor
+/// from enum import Enum
 ///
 ///
-/// def round_number(number: float, *, up: bool) -> int:
-///     return ceil(number) if up else floor(number)
+/// class RoundingMethod(Enum):
+///     UP = 1
+///     DOWN = 2
 ///
 ///
-/// round_number(1.5, up=True)
-/// round_number(1.5, up=False)
+/// def round_number(value: float, method: RoundingMethod) -> float:
+///     ...
 /// ```
 ///
 /// ## References
@@ -75,14 +76,13 @@ impl Violation for BooleanPositionalArgInFunctionDefinition {
 }
 
 /// ## What it does
-/// Checks for boolean default values in function definitions.
+/// Checks for the use of booleans as default values in function definitions.
 ///
 /// ## Why is this bad?
-/// Calling a function with boolean default values means that the keyword
+/// Calling a function with boolean default means that the keyword argument
 /// argument can be omitted, which makes the function call ambiguous.
 ///
-/// Instead, refactor to not use boolean default values so that the keyword
-/// argument must be specified.
+/// Instead, define the relevant argument as keyword-only.
 ///
 /// ## Example
 /// ```python
@@ -127,9 +127,9 @@ impl Violation for BooleanDefaultValueInFunctionDefinition {
 /// Checks for boolean positional arguments in function calls.
 ///
 /// ## Why is this bad?
-/// It is not clear what the boolean argument means. It is better to use a keyword argument instead.
-///
-/// Alternatively, rewrite the function to not use a boolean argument.
+/// Calling a function with boolean positional arguments is confusing as the
+/// meaning of the boolean value is not clear to the caller, and to future
+/// readers of the code.
 ///
 /// ## Example
 /// ```python
