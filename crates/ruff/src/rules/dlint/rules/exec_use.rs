@@ -32,7 +32,7 @@ impl Violation for ExecUse {
 /// DUO105
 pub(crate) fn bad_exec_use(checker: &mut Checker, expr: &ast::ExprCall) {
     if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
-        if id == "exec" && checker.ctx.is_builtin(id) {
+        if id == "exec" && checker.model.is_builtin(id) {
             {
                 checker
                     .diagnostics

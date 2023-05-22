@@ -31,7 +31,7 @@ impl Violation for CompileUse {
 /// DUO110
 pub(crate) fn bad_compile_use(checker: &mut Checker, expr: &ast::ExprCall) {
     if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
-        if id == "compile" && checker.ctx.is_builtin(id) {
+        if id == "compile" && checker.model.is_builtin(id) {
             {
                 checker
                     .diagnostics

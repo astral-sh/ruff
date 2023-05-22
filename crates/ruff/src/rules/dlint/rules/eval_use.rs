@@ -31,7 +31,7 @@ impl Violation for EvalUse {
 /// DUO104
 pub(crate) fn bad_eval_use(checker: &mut Checker, expr: &ast::ExprCall) {
     if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
-        if id == "eval" && checker.ctx.is_builtin(id) {
+        if id == "eval" && checker.model.is_builtin(id) {
             {
                 checker
                     .diagnostics
