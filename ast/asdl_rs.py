@@ -300,10 +300,13 @@ class StructVisitor(EmitVisitor):
 
     def visitModule(self, mod):
         self.emit_attrs(0)
-        self.emit("""
+        self.emit(
+            """
         #[derive(is_macro::Is)]
         pub enum Ast<R=TextRange> {
-        """, 0)
+        """,
+            0,
+        )
         for dfn in mod.dfns:
             rust_name = rust_type_name(dfn.name)
             generics = "" if self.type_info[dfn.name].is_simple else "<R>"
@@ -315,23 +318,29 @@ class StructVisitor(EmitVisitor):
                 # "ast_" prefix to everywhere seems less useful.
                 self.emit('#[is(name = "module")]', 1)
             self.emit(f"{rust_name}({rust_name}{generics}),", 1)
-        self.emit("""
-        }
-        impl<R> Node for Ast<R> {
-            const NAME: &'static str = "AST";
-            const FIELD_NAMES: &'static [&'static str] = &[];
-        }
-        """, 0)
+        self.emit(
+            """
+            }
+            impl<R> Node for Ast<R> {
+                const NAME: &'static str = "AST";
+                const FIELD_NAMES: &'static [&'static str] = &[];
+            }
+            """,
+            0,
+        )
         for dfn in mod.dfns:
             rust_name = rust_type_name(dfn.name)
             generics = "" if self.type_info[dfn.name].is_simple else "<R>"
-            self.emit(f"""
+            self.emit(
+                f"""
             impl<R> From<{rust_name}{generics}> for Ast<R> {{
                 fn from(node: {rust_name}{generics}) -> Self {{
                     Ast::{rust_name}(node)
                 }}
             }}
-            """, 0)
+            """,
+                0,
+            )
 
         for dfn in mod.dfns:
             self.visit(dfn)
@@ -663,9 +672,7 @@ class FoldImplVisitor(EmitVisitor):
 
         cons_type_name = f"{enum_name}{cons.name}"
 
-        self.emit(
-            f"impl<T, U> Foldable<T, U> for {cons_type_name}{apply_t} {{", depth
-        )
+        self.emit(f"impl<T, U> Foldable<T, U> for {cons_type_name}{apply_t} {{", depth)
         self.emit(f"type Mapped = {cons_type_name}{apply_u};", depth + 1)
         self.emit(
             "fn fold<F: Fold<T, TargetU = U> + ?Sized>(self, folder: &mut F) -> Result<Self::Mapped, F::Error> {",
@@ -1095,16 +1102,16 @@ class ToPyo3AstVisitor(EmitVisitor):
 
         self.emit(
             f"""
-            impl ToPyo3Ast for crate::generic::{rust_name}{self.generics} {{
+            impl ToPyAst for ast::{rust_name}{self.generics} {{
                 #[inline]
-                fn to_pyo3_ast(&self, {"_" if simple else ""}py: Python) -> PyResult<Py<PyAny>> {{
+                fn to_py_ast<'py>(&self, {"_" if simple else ""}py: Python<'py>) -> PyResult<&'py PyAny> {{
                     let instance = match &self {{
             """,
             0,
         )
         for cons in sum.types:
             self.emit(
-                f"crate::{rust_name}::{cons.name}(cons) => cons.to_pyo3_ast(py)?,",
+                f"ast::{rust_name}::{cons.name}(cons) => cons.to_py_ast(py)?,",
                 1,
             )
         self.emit(
@@ -1128,9 +1135,9 @@ class ToPyo3AstVisitor(EmitVisitor):
         type_info = self.type_info[type.name]
         self.emit(
             f"""
-            impl ToPyo3Ast for crate::{name}{self.generics} {{
+            impl ToPyAst for ast::{name}{self.generics} {{
                 #[inline]
-                    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {{
+                    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {{
                         let cache = Self::py_type_cache().get().unwrap();
             """,
             0,
@@ -1144,12 +1151,39 @@ class ToPyo3AstVisitor(EmitVisitor):
                 1,
             )
             self.emit(
-                "let instance = cache.0.call1(py, (",
+                """
+                let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+                """,
                 1,
             )
             for field in cons.fields:
+                if field.type == "constant":
+                    self.emit(
+                        f"constant_to_object({rust_field(field.name)}, py),",
+                        3,
+                    )
+                    continue
+                if field.type == "int":
+                    if field.name == "level":
+                        assert field.opt
+                        self.emit(
+                            f"{rust_field(field.name)}.map_or_else(|| py.None(), |level| level.to_u32().to_object(py)),",
+                            3,
+                        )
+                        continue
+                    if field.name in (
+                        "lineno",
+                        "col_offset",
+                        "end_lineno",
+                        "end_col_offset",
+                    ):
+                        self.emit(
+                            f"{rust_field(field.name)}.to_u32().to_object(py),",
+                            3,
+                        )
+                        continue
                 self.emit(
-                    f"{rust_field(field.name)}.to_pyo3_ast(py)?,",
+                    f"{rust_field(field.name)}.to_py_ast(py)?,",
                     3,
                 )
             self.emit(
@@ -1158,7 +1192,7 @@ class ToPyo3AstVisitor(EmitVisitor):
             )
         else:
             self.emit(
-                "let instance = cache.0.call0(py)?;",
+                "let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;",
                 1,
             )
             self.emit(
@@ -1168,12 +1202,12 @@ class ToPyo3AstVisitor(EmitVisitor):
         if type.value.attributes and self.namespace == "located":
             self.emit(
                 """
-                let cache = ast_key_cache().get().unwrap();
-                instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-                instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+                let cache = ast_cache();
+                instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+                instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
                 if let Some(end) = _range.end {
-                    instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-                    instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+                    instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+                    instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
                 }
                 """,
                 1,
@@ -1218,7 +1252,7 @@ class Pyo3StructVisitor(EmitVisitor):
     def ref(self):
         return "&" if self.borrow else ""
 
-    def emit_class(self, name, rust_name, simple, base="super::AST"):
+    def emit_class(self, name, rust_name, simple, base="super::Ast"):
         info = self.type_info[name]
         if simple:
             generics = ""
@@ -1230,7 +1264,7 @@ class Pyo3StructVisitor(EmitVisitor):
             into = f"{rust_name}"
         else:
             subclass = ""
-            body = f"(pub {self.ref_def} crate::{rust_name}{generics})"
+            body = f"(pub {self.ref_def} ast::{rust_name}{generics})"
             into = f"{rust_name}(node)"
 
         self.emit(
@@ -1239,8 +1273,8 @@ class Pyo3StructVisitor(EmitVisitor):
             #[derive(Clone, Debug)]
             pub struct {rust_name} {body};
 
-            impl From<{self.ref_def} crate::{rust_name}{generics}> for {rust_name} {{
-                fn from({"" if body else "_"}node: {self.ref_def} crate::{rust_name}{generics}) -> Self {{
+            impl From<{self.ref_def} ast::{rust_name}{generics}> for {rust_name} {{
+                fn from({"" if body else "_"}node: {self.ref_def} ast::{rust_name}{generics}) -> Self {{
                     {into}
                 }}
             }}
@@ -1254,7 +1288,7 @@ class Pyo3StructVisitor(EmitVisitor):
                 impl {rust_name} {{
                     #[new]
                     fn new() -> PyClassInitializer<Self> {{
-                        PyClassInitializer::from(AST)
+                        PyClassInitializer::from(Ast)
                             .add_subclass(Self)
                     }}
 
@@ -1269,7 +1303,7 @@ class Pyo3StructVisitor(EmitVisitor):
                 0,
             )
         else:
-            if base != "super::AST":
+            if base != "super::Ast":
                 add_subclass = f".add_subclass({base})"
             else:
                 add_subclass = ""
@@ -1277,7 +1311,7 @@ class Pyo3StructVisitor(EmitVisitor):
                 f"""
                 impl ToPyObject for {rust_name} {{
                     fn to_object(&self, py: Python) -> PyObject {{
-                        let initializer = PyClassInitializer::from(AST)
+                        let initializer = PyClassInitializer::from(Ast)
                         {add_subclass}
                         .add_subclass(self.clone());
                         Py::new(py, initializer).unwrap().into_py(py)
@@ -1305,7 +1339,7 @@ class Pyo3StructVisitor(EmitVisitor):
                 #[getter]
                 #[inline]
                 fn get_{field.name}(&self, py: Python) -> PyResult<PyObject> {{
-                    self.0.{rust_field(field.name)}.to_pyo3_wrapper(py)
+                    self.0.{rust_field(field.name)}.to_py_wrapper(py)
                 }}
                 """,
                 3,
@@ -1331,7 +1365,7 @@ class Pyo3StructVisitor(EmitVisitor):
 
         for field in owner.fields:
             self.emit(
-                f'"{field.name}" => self.0.{rust_field(field.name)}.to_pyo3_wrapper(py)?,',
+                f'"{field.name}" => self.0.{rust_field(field.name)}.to_py_wrapper(py)?,',
                 3,
             )
 
@@ -1349,9 +1383,9 @@ class Pyo3StructVisitor(EmitVisitor):
     def emit_wrapper(self, rust_name):
         self.emit(
             f"""
-            impl ToPyo3Wrapper for crate::{rust_name}{self.generics} {{
+            impl ToPyWrapper for ast::{rust_name}{self.generics} {{
                 #[inline]
-                fn to_pyo3_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {{
+                fn to_py_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {{
                     Ok({rust_name}(self).to_object(py))
                 }}
             }}
@@ -1375,16 +1409,16 @@ class Pyo3StructVisitor(EmitVisitor):
         if not simple:
             self.emit(
                 f"""
-                impl ToPyo3Wrapper for crate::{rust_name}{self.generics} {{
+                impl ToPyWrapper for ast::{rust_name}{self.generics} {{
                     #[inline]
-                    fn to_pyo3_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {{
+                    fn to_py_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {{
                         match &self {{
                 """,
                 0,
             )
 
             for cons in sum.types:
-                self.emit(f"Self::{cons.name}(cons) => cons.to_pyo3_wrapper(py),", 3)
+                self.emit(f"Self::{cons.name}(cons) => cons.to_py_wrapper(py),", 3)
 
             self.emit(
                 """
@@ -1413,7 +1447,7 @@ class Pyo3StructVisitor(EmitVisitor):
 
                 impl ToPyObject for {parent}{cons.name} {{
                     fn to_object(&self, py: Python) -> PyObject {{
-                        let initializer = PyClassInitializer::from(AST)
+                        let initializer = PyClassInitializer::from(Ast)
                         .add_subclass({parent})
                         .add_subclass(Self);
                         Py::new(py, initializer).unwrap().into_py(py)
@@ -1462,9 +1496,7 @@ class Pyo3PymoduleVisitor(EmitVisitor):
         self.emit_fields(cons.name, rust_name, simple)
 
     def emit_fields(self, name, rust_name, simple):
-        self.emit(
-            f"super::init_type::<{rust_name}, crate::generic::{rust_name}>(py, m)?;", 1
-        )
+        self.emit(f"super::init_type::<{rust_name}, ast::{rust_name}>(py, m)?;", 1)
 
 
 class StdlibClassDefVisitor(EmitVisitor):
@@ -1812,7 +1844,7 @@ def write_pyo3_node(type_info, f):
 
         f.write(
             f"""
-            impl{generics} Pyo3Node for crate::generic::{rust_name}{generics} {{
+            impl{generics} PyNode for ast::{rust_name}{generics} {{
                 #[inline]
                 fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {{
                     static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -1842,7 +1874,7 @@ def write_to_pyo3(mod, type_info, f):
 
     for info in type_info.values():
         rust_name = info.rust_sum_name
-        f.write(f"cache_py_type::<crate::generic::{rust_name}>(ast_module)?;\n")
+        f.write(f"cache_py_type::<ast::{rust_name}>(ast_module)?;\n")
     f.write("Ok(())\n}")
 
 
@@ -1856,20 +1888,20 @@ def write_to_pyo3_simple(type_info, f):
         rust_name = type_info.rust_sum_name
         f.write(
             f"""
-            impl ToPyo3Ast for crate::generic::{rust_name} {{
+            impl ToPyAst for ast::{rust_name} {{
                 #[inline]
-                fn to_pyo3_ast(&self, _py: Python) -> PyResult<Py<PyAny>> {{
+                fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {{
                     let cell = match &self {{
             """,
         )
         for cons in type_info.type.value.types:
             f.write(
-                f"""crate::{rust_name}::{cons.name} => crate::{rust_name}{cons.name}::py_type_cache(),""",
+                f"""ast::{rust_name}::{cons.name} => ast::{rust_name}{cons.name}::py_type_cache(),""",
             )
         f.write(
             """
                     };
-                    Ok(cell.get().unwrap().1.clone())
+                    Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
                 }
             }
             """,
@@ -1887,9 +1919,9 @@ def write_pyo3_wrapper(mod, type_info, namespace, f):
             rust_name = type_info.rust_sum_name
             f.write(
                 f"""
-                impl ToPyo3Wrapper for crate::generic::{rust_name} {{
+                impl ToPyWrapper for ast::{rust_name} {{
                     #[inline]
-                    fn to_pyo3_wrapper(&self, py: Python) -> PyResult<Py<PyAny>> {{
+                    fn to_py_wrapper(&self, py: Python) -> PyResult<Py<PyAny>> {{
                         match &self {{
                 """,
             )
@@ -1908,9 +1940,9 @@ def write_pyo3_wrapper(mod, type_info, namespace, f):
             for cons in type_info.type.value.types:
                 f.write(
                     f"""
-                    impl ToPyo3Wrapper for crate::generic::{rust_name}{cons.name} {{
+                    impl ToPyWrapper for ast::{rust_name}{cons.name} {{
                         #[inline]
-                        fn to_pyo3_wrapper(&self, py: Python) -> PyResult<Py<PyAny>> {{
+                        fn to_py_wrapper(&self, py: Python) -> PyResult<Py<PyAny>> {{
                             Ok({rust_name}{cons.name}.to_object(py))
                         }}
                     }}
@@ -1949,6 +1981,7 @@ def write_ast_mod(mod, type_info, f):
 def main(
     input_filename,
     ast_dir,
+    ast_pyo3_dir,
     module_filename,
     dump_module=False,
 ):
@@ -1971,11 +2004,17 @@ def main(
         ("ranged", p(write_ranged_def, mod, type_info)),
         ("located", p(write_located_def, mod, type_info)),
         ("visitor", p(write_visitor_def, mod, type_info)),
-        ("to_pyo3", p(write_to_pyo3, mod, type_info)),
-        ("pyo3_wrapper_located", p(write_pyo3_wrapper, mod, type_info, "located")),
-        ("pyo3_wrapper_ranged", p(write_pyo3_wrapper, mod, type_info, "ranged")),
     ]:
         with (ast_dir / f"{filename}.rs").open("w") as f:
+            f.write(auto_gen_msg)
+            write(f)
+
+    for filename, write in [
+        ("to_py_ast", p(write_to_pyo3, mod, type_info)),
+        ("wrapper_located", p(write_pyo3_wrapper, mod, type_info, "located")),
+        ("wrapper_ranged", p(write_pyo3_wrapper, mod, type_info, "ranged")),
+    ]:
+        with (ast_pyo3_dir / f"{filename}.rs").open("w") as f:
             f.write(auto_gen_msg)
             write(f)
 
@@ -1990,6 +2029,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("input_file", type=Path)
     parser.add_argument("-A", "--ast-dir", type=Path, required=True)
+    parser.add_argument("-O", "--ast-pyo3-dir", type=Path, required=True)
     parser.add_argument("-M", "--module-file", type=Path, required=True)
     parser.add_argument("-d", "--dump-module", action="store_true")
 
@@ -1997,6 +2037,7 @@ if __name__ == "__main__":
     main(
         args.input_file,
         args.ast_dir,
+        args.ast_pyo3_dir,
         args.module_file,
         args.dump_module,
     )

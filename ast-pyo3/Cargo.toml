@@ -1,0 +1,16 @@
+[package]
+name = "rustpython-ast-pyo3"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+# This feature is experimental
+# It reimplements AST types, but currently both slower than python AST types and limited to use in other API
+wrapper = []
+
+[dependencies]
+rustpython-ast = { workspace = true, features = ["location"] }
+num-complex = { workspace = true }
+once_cell = { workspace = true }
+
+pyo3 = { workspace = true, features = ["num-bigint", "num-complex"] }
