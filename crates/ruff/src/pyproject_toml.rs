@@ -16,6 +16,7 @@ pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
 
     let range = match err.span() {
         // This is bad but sometimes toml and/or serde just don't give us spans
+        // TODO(konstin,micha): https://github.com/charliermarsh/ruff/issues/4571
         None => TextRange::default(),
         Some(range) => {
             let expect_err = "pyproject.toml file be smaller than 4GB";
