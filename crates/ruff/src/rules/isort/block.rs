@@ -121,7 +121,7 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Track manual splits.
         for (index, split) in self.splits.iter().enumerate() {
-            if stmt.end() >= *split {
+            if stmt.start() >= *split {
                 self.finalize(self.trailer_for(stmt));
                 self.splits = &self.splits[index + 1..];
             } else {
