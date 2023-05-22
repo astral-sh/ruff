@@ -1,3 +1,31 @@
+###
+# Non-fixable Errors.
+###
+foo + [  # This will be preserved, but doesn't prevent the fix
+]
+[*foo] + [  # This will be preserved, but doesn't prevent the fix
+]
+first = [
+    # The order
+    1,  # here
+    2,  # is
+    # extremely
+    3,  # critical
+    # to preserve
+]
+second = first + [
+    # please
+    4,
+    # don't
+    5,
+    # touch
+    6,
+]
+
+
+###
+# Fixable errors.
+###
 class Fun:
     words = ("how", "fun!")
 
@@ -22,32 +50,19 @@ chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 
 baz = () + zoob
 
-first = [
-    # The order
-    1,  # here
-    2,  # is
-    # extremely
-    3,  # critical
-    # to preserve
-]
-second = first + [
-    # please
-    4,
-    # don't
-    5,
-    # touch
-    6,
-]
-
 [] + foo + [
 ]
-
-[] + foo + [  # This will be preserved, but doesn't prevent the fix
-]
-
-# Uses the non-preferred quote style, which should be retained.
-f"{[*a(), 'b']}"
 
 pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 b = a + [2, 3] + [4]
+
+
+###
+# Non-errors.
+###
+a = (1,) + [2]
+a = [1, 2] + (3, 4)
+
+# Uses the non-preferred quote style, which should be retained.
+f"{[*a(), 'b']}"
