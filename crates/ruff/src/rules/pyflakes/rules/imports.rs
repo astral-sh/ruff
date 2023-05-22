@@ -19,11 +19,11 @@ pub(crate) enum UnusedImportContext {
 /// Checks for imports that are never used.
 ///
 /// ## Why is this bad?
-/// Unused imports confuse the reader and may impact performance negatively.
-/// They should be removed.
+/// Unused imports confuse the reader and may impact performance. They should
+/// be removed.
 ///
-/// If the unused import is used to check for availability of a module,
-/// consider using `importlib.util.find_spec` instead.
+/// If the import is used to check for availability of a module, consider using
+/// `importlib.util.find_spec` instead.
 ///
 /// ## Example
 /// ```python
@@ -238,8 +238,8 @@ impl Violation for LateFutureImport {
 /// If the name is defined in a wildcard import, it should be imported
 /// explicitly to avoid confusion.
 ///
-/// If the name is not defined in a wildcard import and is undefined, it should
-/// be defined or imported.
+/// If the name is not defined in a wildcard import, it should be defined or
+/// imported.
 ///
 /// ## Example (name in wildcard import)
 /// ```python
