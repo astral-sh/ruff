@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: a33e9abb4be2a3730161519ce0f298452edbc50335b9e0c812d5a1730f1d8816
+// sha3: f95a98ddc92e7f056dba3f921c7c9b36d7725b180106324fd00b6157a1c36fe7
 use crate::{
     ast::{self as ast, Ranged},
     lexer::{LexicalError, LexicalErrorType},
@@ -30961,8 +30961,8 @@ fn __action156<
 #[allow(clippy::too_many_arguments)]
 fn __action157<
 >(
-    (_, decorator_list, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     (_, location, _): (TextSize, TextSize, TextSize),
+    (_, decorator_list, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     (_, is_async, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
@@ -31055,8 +31055,8 @@ fn __action161<
 #[allow(clippy::too_many_arguments)]
 fn __action162<
 >(
-    (_, decorator_list, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     (_, location, _): (TextSize, TextSize, TextSize),
+    (_, decorator_list, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
     (_, a, _): (TextSize, core::option::Option<(token::Tok, ArgumentList, token::Tok)>, TextSize),
@@ -37788,8 +37788,8 @@ fn __action636<
 #[allow(clippy::too_many_arguments)]
 fn __action637<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __1: (TextSize, TextSize, TextSize),
+    __0: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Identifier, TextSize),
@@ -37821,8 +37821,8 @@ fn __action637<
 #[allow(clippy::too_many_arguments)]
 fn __action638<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __1: (TextSize, TextSize, TextSize),
+    __0: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, ast::Arguments, TextSize),
@@ -37991,8 +37991,8 @@ fn __action643<
 #[allow(clippy::too_many_arguments)]
 fn __action644<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __1: (TextSize, TextSize, TextSize),
+    __0: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -38024,8 +38024,8 @@ fn __action644<
 #[allow(clippy::too_many_arguments)]
 fn __action645<
 >(
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    __1: (TextSize, TextSize, TextSize),
+    __0: (TextSize, TextSize, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -40293,16 +40293,16 @@ fn __action738<
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
 {
-    let __start0 = __0.2;
-    let __end0 = __1.0;
+    let __start0 = __0.0;
+    let __end0 = __0.0;
     let __temp0 = __action371(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
     __action644(
-        __0,
         __temp0,
+        __0,
         __1,
         __2,
         __3,
@@ -40323,16 +40323,16 @@ fn __action739<
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
 {
-    let __start0 = __0.2;
-    let __end0 = __1.0;
+    let __start0 = __0.0;
+    let __end0 = __0.0;
     let __temp0 = __action371(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
     __action645(
-        __0,
         __temp0,
+        __0,
         __1,
         __2,
         __3,
@@ -41316,16 +41316,16 @@ fn __action777<
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
 {
-    let __start0 = __0.2;
-    let __end0 = __1.0;
+    let __start0 = __0.0;
+    let __end0 = __0.0;
     let __temp0 = __action371(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
     __action637(
-        __0,
         __temp0,
+        __0,
         __1,
         __2,
         __3,
@@ -41348,16 +41348,16 @@ fn __action778<
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
 {
-    let __start0 = __0.2;
-    let __end0 = __1.0;
+    let __start0 = __0.0;
+    let __end0 = __0.0;
     let __temp0 = __action371(
         &__start0,
         &__end0,
     );
     let __temp0 = (__start0, __temp0, __end0);
     __action638(
-        __0,
         __temp0,
+        __0,
         __1,
         __2,
         __3,

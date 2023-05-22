@@ -1,0 +1,72 @@
+---
+source: parser/src/parser.rs
+expression: parse_ast
+---
+[
+    FunctionDef(
+        StmtFunctionDef {
+            range: 0..34,
+            name: Identifier(
+                "test",
+            ),
+            args: Arguments {
+                range: (),
+                posonlyargs: [],
+                args: [],
+                vararg: None,
+                kwonlyargs: [],
+                kw_defaults: [],
+                kwarg: None,
+                defaults: [],
+            },
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 30..34,
+                    },
+                ),
+            ],
+            decorator_list: [
+                Name(
+                    ExprName {
+                        range: 1..13,
+                        id: Identifier(
+                            "my_decorator",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+            ],
+            returns: None,
+            type_comment: None,
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 40..77,
+            name: Identifier(
+                "Abcd",
+            ),
+            bases: [],
+            keywords: [],
+            body: [
+                Pass(
+                    StmtPass {
+                        range: 73..77,
+                    },
+                ),
+            ],
+            decorator_list: [
+                Name(
+                    ExprName {
+                        range: 41..56,
+                        id: Identifier(
+                            "class_decorator",
+                        ),
+                        ctx: Load,
+                    },
+                ),
+            ],
+        },
+    ),
+]
