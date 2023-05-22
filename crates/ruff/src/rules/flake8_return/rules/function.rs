@@ -15,9 +15,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 
-use super::branch::Branch;
-use super::helpers::result_exists;
-use super::visitor::{ReturnVisitor, Stack};
+use super::super::branch::Branch;
+use super::super::helpers::result_exists;
+use super::super::visitor::{ReturnVisitor, Stack};
 
 /// ## What it does
 /// Checks for the presence of a `return None` statement when `None` is the only
