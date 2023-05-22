@@ -54,6 +54,7 @@ enum Kind {
     Tuple,
 }
 
+/// Recursively merge all the tuples/lists of the expression.
 fn build_new_expr(expr: &Expr) -> Option<Expr> {
     let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
         return None;
