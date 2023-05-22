@@ -47,6 +47,16 @@ mod tests {
     }
 
     #[test]
+    fn noqa() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/noqa.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedVariable, Rule::AmbiguousVariableName]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn ruf100_0() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
