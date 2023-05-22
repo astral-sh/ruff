@@ -5,7 +5,7 @@ use ruff_python_stdlib::typing::{
     IMMUTABLE_GENERIC_TYPES, IMMUTABLE_TYPES, PEP_585_GENERICS, PEP_593_SUBSCRIPTS, SUBSCRIPTS,
 };
 
-use crate::context::Context;
+use crate::model::SemanticModel;
 
 #[derive(Copy, Clone)]
 pub enum Callable {
@@ -26,14 +26,14 @@ pub enum SubscriptKind {
 
 pub fn match_annotated_subscript<'a>(
     expr: &Expr,
-    context: &Context,
+    model: &SemanticModel,
     typing_modules: impl Iterator<Item = &'a str>,
 ) -> Option<SubscriptKind> {
     if !matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
         return None;
     }
 
-    context.resolve_call_path(expr).and_then(|call_path| {
+    model.resolve_call_path(expr).and_then(|call_path| {
         if SUBSCRIPTS.contains(&call_path.as_slice()) {
             return Some(SubscriptKind::AnnotatedSubscript);
         }
@@ -80,8 +80,8 @@ impl std::fmt::Display for ModuleMember {
 
 /// Returns the PEP 585 standard library generic variant for a `typing` module reference, if such
 /// a variant exists.
-pub fn to_pep585_generic(expr: &Expr, context: &Context) -> Option<ModuleMember> {
-    context.resolve_call_path(expr).and_then(|call_path| {
+pub fn to_pep585_generic(expr: &Expr, model: &SemanticModel) -> Option<ModuleMember> {
+    model.resolve_call_path(expr).and_then(|call_path| {
         let [module, name] = call_path.as_slice() else {
             return None;
         };
@@ -110,7 +110,11 @@ pub enum Pep604Operator {
 }
 
 /// Return the PEP 604 operator variant to which the given subscript [`Expr`] corresponds, if any.
-pub fn to_pep604_operator(value: &Expr, slice: &Expr, context: &Context) -> Option<Pep604Operator> {
+pub fn to_pep604_operator(
+    value: &Expr,
+    slice: &Expr,
+    model: &SemanticModel,
+) -> Option<Pep604Operator> {
     /// Returns `true` if any argument in the slice is a string.
     fn any_arg_is_str(slice: &Expr) -> bool {
         match slice {
@@ -129,13 +133,13 @@ pub fn to_pep604_operator(value: &Expr, slice: &Expr, context: &Context) -> Opti
         return None;
     }
 
-    context
+    model
         .resolve_call_path(value)
         .as_ref()
         .and_then(|call_path| {
-            if context.match_typing_call_path(call_path, "Optional") {
+            if model.match_typing_call_path(call_path, "Optional") {
                 Some(Pep604Operator::Optional)
-            } else if context.match_typing_call_path(call_path, "Union") {
+            } else if model.match_typing_call_path(call_path, "Union") {
                 Some(Pep604Operator::Union)
             } else {
                 None
@@ -145,10 +149,10 @@ pub fn to_pep604_operator(value: &Expr, slice: &Expr, context: &Context) -> Opti
 
 /// Return `true` if `Expr` represents a reference to a type annotation that resolves to an
 /// immutable type.
-pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
+pub fn is_immutable_annotation(model: &SemanticModel, expr: &Expr) -> bool {
     match expr {
         Expr::Name(_) | Expr::Attribute(_) => {
-            context.resolve_call_path(expr).map_or(false, |call_path| {
+            model.resolve_call_path(expr).map_or(false, |call_path| {
                 IMMUTABLE_TYPES
                     .iter()
                     .chain(IMMUTABLE_GENERIC_TYPES)
@@ -156,7 +160,7 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
             })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            context.resolve_call_path(value).map_or(false, |call_path| {
+            model.resolve_call_path(value).map_or(false, |call_path| {
                 if IMMUTABLE_GENERIC_TYPES
                     .iter()
                     .any(|target| call_path.as_slice() == *target)
@@ -164,16 +168,16 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
                     true
                 } else if call_path.as_slice() == ["typing", "Union"] {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                        elts.iter().all(|elt| is_immutable_annotation(context, elt))
+                        elts.iter().all(|elt| is_immutable_annotation(model, elt))
                     } else {
                         false
                     }
                 } else if call_path.as_slice() == ["typing", "Optional"] {
-                    is_immutable_annotation(context, slice)
+                    is_immutable_annotation(model, slice)
                 } else if call_path.as_slice() == ["typing", "Annotated"] {
                     if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
                         elts.first()
-                            .map_or(false, |elt| is_immutable_annotation(context, elt))
+                            .map_or(false, |elt| is_immutable_annotation(model, elt))
                     } else {
                         false
                     }
@@ -187,7 +191,7 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
             op: Operator::BitOr,
             right,
             range: _range,
-        }) => is_immutable_annotation(context, left) && is_immutable_annotation(context, right),
+        }) => is_immutable_annotation(model, left) && is_immutable_annotation(model, right),
         Expr::Constant(ast::ExprConstant {
             value: Constant::None,
             ..
@@ -213,11 +217,11 @@ const IMMUTABLE_FUNCS: &[&[&str]] = &[
 
 /// Return `true` if `func` is a function that returns an immutable object.
 pub fn is_immutable_func(
-    context: &Context,
+    model: &SemanticModel,
     func: &Expr,
     extend_immutable_calls: &[CallPath],
 ) -> bool {
-    context.resolve_call_path(func).map_or(false, |call_path| {
+    model.resolve_call_path(func).map_or(false, |call_path| {
         IMMUTABLE_FUNCS
             .iter()
             .any(|target| call_path.as_slice() == *target)

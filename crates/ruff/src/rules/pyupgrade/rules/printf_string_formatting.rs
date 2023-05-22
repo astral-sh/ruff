@@ -1,6 +1,6 @@
-use ruff_text_size::TextRange;
 use std::str::FromStr;
 
+use ruff_text_size::TextRange;
 use rustpython_format::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };

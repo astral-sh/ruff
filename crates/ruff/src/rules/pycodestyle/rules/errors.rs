@@ -1,10 +1,11 @@
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ParseError;
 
-use crate::logging::DisplayParseErrorType;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+
+use crate::logging::DisplayParseErrorType;
 
 #[violation]
 pub struct IOError {

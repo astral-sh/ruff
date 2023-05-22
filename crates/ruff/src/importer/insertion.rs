@@ -1,8 +1,8 @@
-use ruff_diagnostics::Edit;
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::source_code::{Locator, Stylist};
 

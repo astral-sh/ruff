@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -66,9 +66,9 @@ const BLOCKING_HTTP_CALLS: &[&[&str]] = &[
 
 /// ASYNC100
 pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(&checker.ctx) {
+    if in_async_function(&checker.model) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if let Some(call_path) = checker.ctx.resolve_call_path(func) {
+            if let Some(call_path) = checker.model.resolve_call_path(func) {
                 if BLOCKING_HTTP_CALLS.contains(&call_path.as_slice()) {
                     checker.diagnostics.push(Diagnostic::new(
                         BlockingHttpCallInAsyncFunction,
@@ -133,9 +133,9 @@ const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
 
 /// ASYNC101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(&checker.ctx) {
+    if in_async_function(&checker.model) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if let Some(call_path) = checker.ctx.resolve_call_path(func) {
+            if let Some(call_path) = checker.model.resolve_call_path(func) {
                 if OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&call_path.as_slice()) {
                     checker.diagnostics.push(Diagnostic::new(
                         OpenSleepOrSubprocessInAsyncFunction,
@@ -197,9 +197,9 @@ const UNSAFE_OS_METHODS: &[&[&str]] = &[
 
 /// ASYNC102
 pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(&checker.ctx) {
+    if in_async_function(&checker.model) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if let Some(call_path) = checker.ctx.resolve_call_path(func) {
+            if let Some(call_path) = checker.model.resolve_call_path(func) {
                 if UNSAFE_OS_METHODS.contains(&call_path.as_slice()) {
                     checker
                         .diagnostics
@@ -210,9 +210,9 @@ pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-/// Return `true` if the [`Context`] is inside an async function definition.
-fn in_async_function(context: &Context) -> bool {
-    context
+/// Return `true` if the [`SemanticModel`] is inside an async function definition.
+fn in_async_function(model: &SemanticModel) -> bool {
+    model
         .scopes()
         .find_map(|scope| {
             if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {

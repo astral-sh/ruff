@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 
 use crate::checkers::ast::Checker;
@@ -60,7 +59,7 @@ pub(crate) fn use_pep604_annotation(
 ) {
     // Avoid fixing forward references, or types not in an annotation.
     let fixable =
-        checker.ctx.in_type_definition() && !checker.ctx.in_complex_string_type_definition();
+        checker.model.in_type_definition() && !checker.model.in_complex_string_type_definition();
     match operator {
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());

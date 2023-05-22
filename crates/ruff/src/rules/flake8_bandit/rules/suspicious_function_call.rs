@@ -470,7 +470,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    let Some(reason) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
+    let Some(reason) = checker.model.resolve_call_path(func).and_then(|call_path| {
         for module in SUSPICIOUS_MEMBERS {
             for member in module.members {
                 if call_path.as_slice() == *member {

@@ -195,11 +195,12 @@ pub(crate) fn collect_per_file_ignores(
 mod tests {
     use anyhow::Result;
 
-    use super::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
     use crate::codes;
     use crate::registry::Linter;
     use crate::rule_selector::RuleSelector;
     use crate::settings::types::PatternPrefixPair;
+
+    use super::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
 
     #[test]
     fn it_parses_prefix_codes() {

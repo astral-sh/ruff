@@ -9,13 +9,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use regex::Regex;
-    use ruff_diagnostics::Diagnostic;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
 
+    use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::linter::{check_path, LinterResult};

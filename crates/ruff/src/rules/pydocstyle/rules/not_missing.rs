@@ -1,3 +1,5 @@
+use ruff_text_size::TextRange;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
@@ -6,10 +8,8 @@ use ruff_python_semantic::analyze::visibility::{
     is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
 };
 use ruff_python_semantic::definition::{Definition, Member, MemberKind, Module, ModuleKind};
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
-
 use crate::registry::Rule;
 
 #[violation]
@@ -174,7 +174,7 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(&checker.ctx, cast::decorator_list(stmt)) {
+            if is_overload(&checker.model, cast::decorator_list(stmt)) {
                 true
             } else {
                 if checker
@@ -195,8 +195,8 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(&checker.ctx, cast::decorator_list(stmt))
-                || is_override(&checker.ctx, cast::decorator_list(stmt))
+            if is_overload(&checker.model, cast::decorator_list(stmt))
+                || is_override(&checker.model, cast::decorator_list(stmt))
             {
                 true
             } else if is_init(cast::name(stmt)) {

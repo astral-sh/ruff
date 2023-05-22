@@ -102,7 +102,7 @@ pub(crate) fn logging_call(
         return;
     }
 
-    if !logging::is_logger_candidate(&checker.ctx, func) {
+    if !logging::is_logger_candidate(func, &checker.model) {
         return;
     }
 

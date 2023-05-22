@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::process::Command;
+
 use url::Url;
 
 /// Relative size of a test case. Benchmarks can use it to configure the time for how long a benchmark should run to get stable results.

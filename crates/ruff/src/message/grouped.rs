@@ -1,3 +1,11 @@
+use std::fmt::{Display, Formatter};
+use std::io::Write;
+use std::num::NonZeroUsize;
+
+use colored::Colorize;
+
+use ruff_python_ast::source_code::OneIndexed;
+
 use crate::fs::relativize_path;
 use crate::jupyter::JupyterIndex;
 use crate::message::diff::calculate_print_width;
@@ -5,11 +13,6 @@ use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
-use colored::Colorize;
-use ruff_python_ast::source_code::OneIndexed;
-use std::fmt::{Display, Formatter};
-use std::io::Write;
-use std::num::NonZeroUsize;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
@@ -175,9 +178,10 @@ impl std::fmt::Write for PadAdapter<'_> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::GroupedEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn default() {

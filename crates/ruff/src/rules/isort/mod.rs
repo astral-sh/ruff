@@ -4,8 +4,9 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use annotate::annotate_imports;
+pub(crate) use categorize::categorize;
 use categorize::categorize_imports;
-pub use categorize::{categorize, ImportSection, ImportType};
+pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
@@ -35,15 +36,15 @@ pub(crate) mod track;
 mod types;
 
 #[derive(Debug)]
-pub struct AnnotatedAliasData<'a> {
-    pub name: &'a str,
-    pub asname: Option<&'a str>,
-    pub atop: Vec<Comment<'a>>,
-    pub inline: Vec<Comment<'a>>,
+pub(crate) struct AnnotatedAliasData<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) asname: Option<&'a str>,
+    pub(crate) atop: Vec<Comment<'a>>,
+    pub(crate) inline: Vec<Comment<'a>>,
 }
 
 #[derive(Debug)]
-pub enum AnnotatedImport<'a> {
+pub(crate) enum AnnotatedImport<'a> {
     Import {
         names: Vec<AliasData<'a>>,
         atop: Vec<Comment<'a>>,
@@ -60,7 +61,7 @@ pub enum AnnotatedImport<'a> {
 }
 
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-pub fn format_imports(
+pub(crate) fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
     locator: &Locator,
@@ -282,12 +283,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
-    use crate::message::Message;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use crate::assert_messages;
+    use crate::message::Message;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::{bail, Result};
 use libcst_native::{
     BooleanOp, BooleanOperation, Codegen, CodegenState, CompoundStatement, Expression, If,
@@ -5,7 +7,6 @@ use libcst_native::{
     Statement, Suite,
 };
 use rustpython_parser::ast::Ranged;
-use std::borrow::Cow;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};

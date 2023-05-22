@@ -106,7 +106,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
         }
         Expr::Call(ast::ExprCall { func, keywords, .. }) => {
             if checker
-                .ctx
+                .model
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["", "dict"])
             {
@@ -151,7 +151,7 @@ pub(crate) fn logging_call(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !logging::is_logger_candidate(&checker.ctx, func) {
+    if !logging::is_logger_candidate(func, &checker.model) {
         return;
     }
 
@@ -198,7 +198,7 @@ pub(crate) fn logging_call(
                     .rules
                     .enabled(Rule::LoggingRedundantExcInfo)
             {
-                if !checker.ctx.in_exception_handler() {
+                if !checker.model.in_exception_handler() {
                     return;
                 }
                 if let Some(exc_info) = find_keyword(keywords, "exc_info") {
@@ -212,7 +212,7 @@ pub(crate) fn logging_call(
                         })
                     ) || if let Expr::Call(ast::ExprCall { func, .. }) = &exc_info.value {
                         checker
-                            .ctx
+                            .model
                             .resolve_call_path(func)
                             .map_or(false, |call_path| {
                                 call_path.as_slice() == ["sys", "exc_info"]

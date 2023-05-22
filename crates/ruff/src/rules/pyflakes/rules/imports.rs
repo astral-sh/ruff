@@ -10,16 +10,16 @@ use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
 use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum UnusedImportContext {
+pub(crate) enum UnusedImportContext {
     ExceptHandler,
     Init,
 }
 
 #[violation]
 pub struct UnusedImport {
-    pub name: String,
-    pub context: Option<UnusedImportContext>,
-    pub multiple: bool,
+    pub(crate) name: String,
+    pub(crate) context: Option<UnusedImportContext>,
+    pub(crate) multiple: bool,
 }
 
 impl Violation for UnusedImport {
@@ -56,8 +56,8 @@ impl Violation for UnusedImport {
 }
 #[violation]
 pub struct ImportShadowedByLoopVar {
-    pub name: String,
-    pub line: OneIndexed,
+    pub(crate) name: String,
+    pub(crate) line: OneIndexed,
 }
 
 impl Violation for ImportShadowedByLoopVar {
@@ -70,7 +70,7 @@ impl Violation for ImportShadowedByLoopVar {
 
 #[violation]
 pub struct UndefinedLocalWithImportStar {
-    pub name: String,
+    pub(crate) name: String,
 }
 
 impl Violation for UndefinedLocalWithImportStar {
@@ -93,8 +93,8 @@ impl Violation for LateFutureImport {
 
 #[violation]
 pub struct UndefinedLocalWithImportStarUsage {
-    pub name: String,
-    pub sources: Vec<String>,
+    pub(crate) name: String,
+    pub(crate) sources: Vec<String>,
 }
 
 impl Violation for UndefinedLocalWithImportStarUsage {
@@ -111,7 +111,7 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 
 #[violation]
 pub struct UndefinedLocalWithNestedImportStarUsage {
-    pub name: String,
+    pub(crate) name: String,
 }
 
 impl Violation for UndefinedLocalWithNestedImportStarUsage {

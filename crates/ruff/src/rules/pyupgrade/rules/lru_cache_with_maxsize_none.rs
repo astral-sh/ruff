@@ -38,7 +38,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
         if args.is_empty()
             && keywords.len() == 1
             && checker
-                .ctx
+                .model
                 .resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["functools", "lru_cache"]
@@ -69,7 +69,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                             "functools",
                             "cache",
                             expr.start(),
-                            &checker.ctx,
+                            &checker.model,
                             &checker.importer,
                             checker.locator,
                         )?;

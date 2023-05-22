@@ -131,7 +131,7 @@ pub(crate) fn explicit_f_string_type_conversion(
             return;
         };
 
-        if !checker.ctx.is_builtin(id) {
+        if !checker.model.is_builtin(id) {
             return;
         }
 

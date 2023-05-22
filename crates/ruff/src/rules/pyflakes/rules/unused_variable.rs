@@ -204,7 +204,7 @@ fn remove_unused_variable(
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
             if target.is_name_expr() {
                 return if targets.len() > 1
-                    || contains_effect(value, |id| checker.ctx.is_builtin(id))
+                    || contains_effect(value, |id| checker.model.is_builtin(id))
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
@@ -219,7 +219,7 @@ fn remove_unused_variable(
                     ))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let parent = checker.ctx.stmts.parent(stmt);
+                    let parent = checker.model.stmts.parent(stmt);
                     let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                     match delete_stmt(
                         stmt,
@@ -249,7 +249,7 @@ fn remove_unused_variable(
     }) = stmt
     {
         if target.is_name_expr() {
-            return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
+            return if contains_effect(value, |id| checker.model.is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 #[allow(deprecated)]
@@ -262,7 +262,7 @@ fn remove_unused_variable(
                 ))
             } else {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = checker.ctx.stmts.parent(stmt);
+                let parent = checker.model.stmts.parent(stmt);
                 let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 match delete_stmt(
                     stmt,
@@ -313,14 +313,14 @@ fn remove_unused_variable(
 
 /// F841
 pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
-    let scope = &checker.ctx.scopes[scope];
+    let scope = &checker.model.scopes[scope];
     if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
         return;
     }
 
     for (name, binding) in scope
         .bindings()
-        .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
+        .map(|(name, index)| (name, &checker.model.bindings[*index]))
     {
         if !binding.used()
             && (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
@@ -338,7 +338,7 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
             );
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(source) = binding.source {
-                    let stmt = checker.ctx.stmts[source];
+                    let stmt = checker.model.stmts[source];
                     if let Some((kind, fix)) = remove_unused_variable(stmt, binding.range, checker)
                     {
                         if matches!(kind, DeletionKind::Whole) {
