@@ -41,6 +41,7 @@ use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
+use crate::rules::flake8_builtins::rules::AnyShadowing;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -626,11 +627,19 @@ where
 
                 if self.semantic_model.scope().kind.is_class() {
                     if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
-                        flake8_builtins::rules::builtin_attribute_shadowing(self, name, stmt);
+                        flake8_builtins::rules::builtin_attribute_shadowing(
+                            self,
+                            name,
+                            AnyShadowing::from(stmt),
+                        );
                     }
                 } else {
                     if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                        flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                        flake8_builtins::rules::builtin_variable_shadowing(
+                            self,
+                            name,
+                            AnyShadowing::from(stmt),
+                        );
                     }
                 }
             }
@@ -804,7 +813,11 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                    flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                    flake8_builtins::rules::builtin_variable_shadowing(
+                        self,
+                        name,
+                        AnyShadowing::from(stmt),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::DuplicateBases) {
@@ -921,7 +934,9 @@ where
                         if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
-                                    self, asname, stmt,
+                                    self,
+                                    asname,
+                                    AnyShadowing::from(stmt),
                                 );
                             }
                         }
@@ -1228,7 +1243,9 @@ where
                         if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
-                                    self, asname, stmt,
+                                    self,
+                                    asname,
+                                    AnyShadowing::from(stmt),
                                 );
                             }
                         }
@@ -2526,11 +2543,19 @@ where
 
                         if self.semantic_model.scope().kind.is_class() {
                             if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
-                                flake8_builtins::rules::builtin_attribute_shadowing(self, id, expr);
+                                flake8_builtins::rules::builtin_attribute_shadowing(
+                                    self,
+                                    id,
+                                    AnyShadowing::from(expr),
+                                );
                             }
                         } else {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                                flake8_builtins::rules::builtin_variable_shadowing(self, id, expr);
+                                flake8_builtins::rules::builtin_variable_shadowing(
+                                    self,
+                                    id,
+                                    AnyShadowing::from(expr),
+                                );
                             }
                         }
 
@@ -4323,7 +4348,7 @@ where
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 self,
                                 name,
-                                excepthandler,
+                                AnyShadowing::from(excepthandler),
                             );
                         }
 
@@ -4481,7 +4506,7 @@ where
         }
 
         if self.settings.rules.enabled(Rule::BuiltinArgumentShadowing) {
-            flake8_builtins::rules::builtin_argument_shadowing(self, &arg.arg, arg);
+            flake8_builtins::rules::builtin_argument_shadowing(self, arg);
         }
     }
 
