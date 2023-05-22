@@ -54,15 +54,16 @@ enum Kind {
     Tuple,
 }
 
-/// Recursively merge all the tuples/lists of the expression.
-fn build_new_expr(expr: &Expr) -> Option<Expr> {
+/// Recursively merge all the tuples/lists of the expression and return the new suggested expression
+/// along with what kind of expression it is (or return none if the expression is not a concatenation of tuples/lists).
+fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
     let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
         return None;
     };
 
     let new_left = match left.as_ref() {
         Expr::BinOp(ast::ExprBinOp { .. }) => match build_new_expr(left) {
-            Some(new_left) => new_left,
+            Some((new_left, _)) => new_left,
             None => *left.clone(),
         },
         _ => *left.clone(),
@@ -70,7 +71,7 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
 
     let new_right = match right.as_ref() {
         Expr::BinOp(ast::ExprBinOp { .. }) => match build_new_expr(right) {
-            Some(new_right) => new_right,
+            Some((new_right, _)) => new_right,
             None => *right.clone(),
         },
         _ => *right.clone(),
@@ -158,27 +159,15 @@ fn build_new_expr(expr: &Expr) -> Option<Expr> {
         }
     };
 
-    Some(new_expr)
+    Some((new_expr, kind))
 }
 
 /// RUF005
 /// This suggestion could be unsafe if the non-literal expression in the
 /// expression has overridden the `__add__` (or `__radd__`) magic methods.
 pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
-    let Some(new_expr) = build_new_expr(expr) else {
+    let Some((new_expr, kind)) = build_new_expr(expr) else {
         return
-    };
-
-    let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
-        return;
-    };
-
-    let kind = match (left.as_ref(), right.as_ref()) {
-        (Expr::List(ast::ExprList { .. }), _) => Kind::List,
-        (Expr::Tuple(ast::ExprTuple { .. }), _) => Kind::Tuple,
-        (_, Expr::List(ast::ExprList { .. })) => Kind::List,
-        (_, Expr::Tuple(ast::ExprTuple { .. })) => Kind::Tuple,
-        _ => return,
     };
 
     let contents = match kind {
