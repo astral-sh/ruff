@@ -59,7 +59,7 @@ pub(crate) fn property_with_parameters(
     {
         return;
     }
-    if checker.model.is_builtin("property")
+    if checker.semantic_model().is_builtin("property")
         && args
             .args
             .iter()

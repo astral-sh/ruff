@@ -27,7 +27,7 @@ pub(crate) fn snmp_weak_cryptography(
     keywords: &[Keyword],
 ) {
     if checker
-        .model
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pysnmp", "hlapi", "UsmUserData"]

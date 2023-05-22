@@ -74,7 +74,7 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandl
 
         // Find all calls to `logging.exception`.
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::new(&checker.model);
+            let mut visitor = LoggerCandidateVisitor::new(checker.semantic_model());
             visitor.visit_body(body);
             visitor.calls
         };

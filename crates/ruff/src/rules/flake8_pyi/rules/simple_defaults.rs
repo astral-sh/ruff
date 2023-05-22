@@ -330,7 +330,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Argum
                         default,
                         true,
                         checker.locator,
-                        &checker.model,
+                        checker.semantic_model(),
                     ) {
                         let mut diagnostic =
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
@@ -362,7 +362,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Argum
                         default,
                         true,
                         checker.locator,
-                        &checker.model,
+                        checker.semantic_model(),
                     ) {
                         let mut diagnostic =
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
@@ -397,7 +397,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
                         default,
                         true,
                         checker.locator,
-                        &checker.model,
+                        checker.semantic_model(),
                     ) {
                         let mut diagnostic =
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
@@ -429,7 +429,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
                         default,
                         true,
                         checker.locator,
-                        &checker.model,
+                        checker.semantic_model(),
                     ) {
                         let mut diagnostic =
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
@@ -459,16 +459,21 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
     if !target.is_name_expr() {
         return;
     }
-    if is_special_assignment(&checker.model, target) {
+    if is_special_assignment(checker.semantic_model(), target) {
         return;
     }
-    if is_type_var_like_call(&checker.model, value) {
+    if is_type_var_like_call(checker.semantic_model(), value) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if is_valid_default_value_with_annotation(value, true, checker.locator, &checker.model) {
+    if is_valid_default_value_with_annotation(
+        value,
+        true,
+        checker.locator,
+        checker.semantic_model(),
+    ) {
         return;
     }
 
@@ -490,16 +495,24 @@ pub(crate) fn annotated_assignment_default_in_stub(
     value: &Expr,
     annotation: &Expr,
 ) {
-    if checker.model.match_typing_expr(annotation, "TypeAlias") {
+    if checker
+        .semantic_model()
+        .match_typing_expr(annotation, "TypeAlias")
+    {
         return;
     }
-    if is_special_assignment(&checker.model, target) {
+    if is_special_assignment(checker.semantic_model(), target) {
         return;
     }
-    if is_type_var_like_call(&checker.model, value) {
+    if is_type_var_like_call(checker.semantic_model(), value) {
         return;
     }
-    if is_valid_default_value_with_annotation(value, true, checker.locator, &checker.model) {
+    if is_valid_default_value_with_annotation(
+        value,
+        true,
+        checker.locator,
+        checker.semantic_model(),
+    ) {
         return;
     }
 
@@ -527,21 +540,26 @@ pub(crate) fn unannotated_assignment_in_stub(
     let Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
-    if is_special_assignment(&checker.model, target) {
+    if is_special_assignment(checker.semantic_model(), target) {
         return;
     }
-    if is_type_var_like_call(&checker.model, value) {
+    if is_type_var_like_call(checker.semantic_model(), value) {
         return;
     }
     if is_valid_default_value_without_annotation(value) {
         return;
     }
-    if !is_valid_default_value_with_annotation(value, true, checker.locator, &checker.model) {
+    if !is_valid_default_value_with_annotation(
+        value,
+        true,
+        checker.locator,
+        checker.semantic_model(),
+    ) {
         return;
     }
 
-    if let ScopeKind::Class(ClassDef { bases, .. }) = &checker.model.scope().kind {
-        if is_enum(&checker.model, bases) {
+    if let ScopeKind::Class(ClassDef { bases, .. }) = checker.semantic_model().scope().kind {
+        if is_enum(checker.semantic_model(), bases) {
             return;
         }
     }

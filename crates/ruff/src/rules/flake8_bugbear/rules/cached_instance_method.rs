@@ -28,7 +28,7 @@ fn is_cache_func(model: &SemanticModel, expr: &Expr) -> bool {
 
 /// B019
 pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if !matches!(checker.model.scope().kind, ScopeKind::Class(_)) {
+    if !matches!(checker.semantic_model().scope().kind, ScopeKind::Class(_)) {
         return;
     }
     for decorator in decorator_list {
@@ -42,7 +42,7 @@ pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Ex
     }
     for decorator in decorator_list {
         if is_cache_func(
-            &checker.model,
+            checker.semantic_model(),
             match decorator {
                 Expr::Call(ast::ExprCall { func, .. }) => func,
                 _ => decorator,

@@ -93,7 +93,7 @@ pub(crate) fn suppressible_exception(
                         "contextlib",
                         "suppress",
                         stmt.start(),
-                        &checker.model,
+                        checker.semantic_model(),
                         &checker.importer,
                         checker.locator,
                     )?;

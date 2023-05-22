@@ -174,7 +174,7 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(&checker.model, cast::decorator_list(stmt)) {
+            if is_overload(checker.semantic_model(), cast::decorator_list(stmt)) {
                 true
             } else {
                 if checker
@@ -195,8 +195,8 @@ pub(crate) fn not_missing(
             stmt,
             ..
         }) => {
-            if is_overload(&checker.model, cast::decorator_list(stmt))
-                || is_override(&checker.model, cast::decorator_list(stmt))
+            if is_overload(checker.semantic_model(), cast::decorator_list(stmt))
+                || is_override(checker.semantic_model(), cast::decorator_list(stmt))
             {
                 true
             } else if is_init(cast::name(stmt)) {

@@ -484,7 +484,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 value.as_ref(),
                 Expr::Call(ast::ExprCall { func, ..  })
-                    if is_noreturn_func(&checker.model, func)
+                    if is_noreturn_func(checker.semantic_model(), func)
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());

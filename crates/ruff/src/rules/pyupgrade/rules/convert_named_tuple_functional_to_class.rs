@@ -184,7 +184,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     value: &Expr,
 ) {
     let Some((typename, args, keywords, base_class)) =
-        match_named_tuple_assign(&checker.model, targets, value) else
+        match_named_tuple_assign(checker.semantic_model(), targets, value) else
     {
         return;
     };

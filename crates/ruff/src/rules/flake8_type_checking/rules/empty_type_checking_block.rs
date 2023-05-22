@@ -60,7 +60,7 @@ pub(crate) fn empty_type_checking_block<'a, 'b>(
 
         // Delete the entire type-checking block.
         if checker.patch(diagnostic.kind.rule()) {
-            let parent = checker.model.stmts.parent(stmt);
+            let parent = checker.semantic_model().stmts.parent(stmt);
             let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
             match delete_stmt(
                 stmt,

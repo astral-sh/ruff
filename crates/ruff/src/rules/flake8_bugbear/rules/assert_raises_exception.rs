@@ -66,7 +66,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
     }
 
     if !checker
-        .model
+        .semantic_model()
         .resolve_call_path(args.first().unwrap())
         .map_or(false, |call_path| call_path.as_slice() == ["", "Exception"])
     {
@@ -78,7 +78,7 @@ pub(crate) fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items:
         {
             AssertionKind::AssertRaises
         } else if checker
-            .model
+            .semantic_model()
             .resolve_call_path(func)
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["pytest", "raises"]

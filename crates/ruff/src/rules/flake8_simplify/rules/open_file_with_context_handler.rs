@@ -108,23 +108,23 @@ fn match_exit_stack(model: &SemanticModel) -> bool {
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     if checker
-        .model
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "open"])
     {
-        if checker.model.is_builtin("open") {
+        if checker.semantic_model().is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.model.stmt(), Stmt::With(_)) {
+            if matches!(checker.semantic_model().stmt(), Stmt::With(_)) {
                 return;
             }
 
             // Ex) `with contextlib.ExitStack() as exit_stack: ...`
-            if match_exit_stack(&checker.model) {
+            if match_exit_stack(checker.semantic_model()) {
                 return;
             }
 
             // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
-            if match_async_exit_stack(&checker.model) {
+            if match_async_exit_stack(checker.semantic_model()) {
                 return;
             }
 

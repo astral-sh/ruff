@@ -261,10 +261,7 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
-    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
-    where
-        'b: 'a,
-    {
+    pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
         let Some(call_path) = collect_call_path(value) else {
             return None;
         };

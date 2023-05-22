@@ -48,16 +48,21 @@ pub(crate) fn hashlib_insecure_hash_functions(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(hashlib_call) = checker.model.resolve_call_path(func).and_then(|call_path| {
-        if call_path.as_slice() == ["hashlib", "new"] {
-            Some(HashlibCall::New)
-        } else {
-            WEAK_HASHES
-                .iter()
-                .find(|hash| call_path.as_slice() == ["hashlib", hash])
-                .map(|hash| HashlibCall::WeakHash(hash))
-        }
-    }) {
+    if let Some(hashlib_call) =
+        checker
+            .semantic_model()
+            .resolve_call_path(func)
+            .and_then(|call_path| {
+                if call_path.as_slice() == ["hashlib", "new"] {
+                    Some(HashlibCall::New)
+                } else {
+                    WEAK_HASHES
+                        .iter()
+                        .find(|hash| call_path.as_slice() == ["hashlib", hash])
+                        .map(|hash| HashlibCall::WeakHash(hash))
+                }
+            })
+    {
         match hashlib_call {
             HashlibCall::New => {
                 let call_args = SimpleCallArgs::new(args, keywords);

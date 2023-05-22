@@ -46,7 +46,7 @@ pub(crate) fn no_eval(checker: &mut Checker, func: &Expr) {
     if id != "eval" {
         return;
     }
-    if !checker.model.is_builtin("eval") {
+    if !checker.semantic_model().is_builtin("eval") {
         return;
     }
     checker

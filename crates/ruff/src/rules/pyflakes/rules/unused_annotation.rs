@@ -19,21 +19,31 @@ impl Violation for UnusedAnnotation {
 
 /// F842
 pub(crate) fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
-    let scope = &checker.model.scopes[scope];
-    for (name, binding) in scope
+    let scope = &checker.semantic_model().scopes[scope];
+
+    let bindings: Vec<_> = scope
         .bindings()
-        .map(|(name, index)| (name, &checker.model.bindings[*index]))
-    {
-        if !binding.used()
-            && binding.kind.is_annotation()
-            && !checker.settings.dummy_variable_rgx.is_match(name)
-        {
-            checker.diagnostics.push(Diagnostic::new(
-                UnusedAnnotation {
-                    name: (*name).to_string(),
-                },
-                binding.range,
-            ));
-        }
+        .filter_map(|(name, index)| {
+            let name = *name;
+            let binding = &checker.semantic_model().bindings[*index];
+
+            if !binding.used()
+                && binding.kind.is_annotation()
+                && !checker.settings.dummy_variable_rgx.is_match(name)
+            {
+                Some((name.to_string(), binding.range))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (name, range) in bindings {
+        checker.diagnostics.push(Diagnostic::new(
+            UnusedAnnotation {
+                name: (*name).to_string(),
+            },
+            range,
+        ));
     }
 }

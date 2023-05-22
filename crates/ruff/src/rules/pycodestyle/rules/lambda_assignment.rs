@@ -72,7 +72,7 @@ pub(crate) fn lambda_assignment(
             // package like dataclasses, which wouldn't consider the
             // rewritten function definition to be equivalent.
             // See https://github.com/charliermarsh/ruff/issues/3046
-            let fixable = !matches!(checker.model.scope().kind, ScopeKind::Class(_));
+            let fixable = !matches!(checker.semantic_model().scope().kind, ScopeKind::Class(_));
 
             let mut diagnostic = Diagnostic::new(
                 LambdaAssignment {
@@ -90,7 +90,7 @@ pub(crate) fn lambda_assignment(
                 let indentation = &leading_space(first_line);
                 let mut indented = String::new();
                 for (idx, line) in function(
-                    &checker.model,
+                    checker.semantic_model(),
                     id,
                     args,
                     body,

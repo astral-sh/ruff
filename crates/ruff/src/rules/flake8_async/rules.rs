@@ -66,15 +66,17 @@ const BLOCKING_HTTP_CALLS: &[&[&str]] = &[
 
 /// ASYNC100
 pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(&checker.model) {
+    if in_async_function(checker.semantic_model()) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if let Some(call_path) = checker.model.resolve_call_path(func) {
-                if BLOCKING_HTTP_CALLS.contains(&call_path.as_slice()) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        BlockingHttpCallInAsyncFunction,
-                        func.range(),
-                    ));
-                }
+            let call_path = checker.semantic_model().resolve_call_path(func);
+            let is_blocking =
+                call_path.map_or(false, |path| BLOCKING_HTTP_CALLS.contains(&path.as_slice()));
+
+            if is_blocking {
+                checker.diagnostics.push(Diagnostic::new(
+                    BlockingHttpCallInAsyncFunction,
+                    func.range(),
+                ));
             }
         }
     }
@@ -133,15 +135,20 @@ const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
 
 /// ASYNC101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(&checker.model) {
+    if in_async_function(checker.semantic_model()) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if let Some(call_path) = checker.model.resolve_call_path(func) {
-                if OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&call_path.as_slice()) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        OpenSleepOrSubprocessInAsyncFunction,
-                        func.range(),
-                    ));
-                }
+            let is_open_sleep_or_subprocess_call = checker
+                .semantic_model()
+                .resolve_call_path(func)
+                .map_or(false, |path| {
+                    OPEN_SLEEP_OR_SUBPROCESS_CALL.contains(&path.as_slice())
+                });
+
+            if is_open_sleep_or_subprocess_call {
+                checker.diagnostics.push(Diagnostic::new(
+                    OpenSleepOrSubprocessInAsyncFunction,
+                    func.range(),
+                ));
             }
         }
     }
@@ -197,14 +204,17 @@ const UNSAFE_OS_METHODS: &[&[&str]] = &[
 
 /// ASYNC102
 pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(&checker.model) {
+    if in_async_function(checker.semantic_model()) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if let Some(call_path) = checker.model.resolve_call_path(func) {
-                if UNSAFE_OS_METHODS.contains(&call_path.as_slice()) {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(BlockingOsCallInAsyncFunction, func.range()));
-                }
+            let is_unsafe_os_method = checker
+                .semantic_model()
+                .resolve_call_path(func)
+                .map_or(false, |path| UNSAFE_OS_METHODS.contains(&path.as_slice()));
+
+            if is_unsafe_os_method {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(BlockingOsCallInAsyncFunction, func.range()));
             }
         }
     }
