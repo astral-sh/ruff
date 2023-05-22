@@ -495,7 +495,7 @@ pub(crate) fn fix_unnecessary_collection_call(
             }));
         }
         "dict" => {
-            let in_f_string = checker.ctx.in_f_string();
+            let in_f_string = checker.model.in_f_string();
             if in_f_string {
                 wrap_in_spaces = true;
             }
@@ -584,7 +584,7 @@ pub(crate) fn fix_unnecessary_collection_call(
 
 /// Adds spaces around the code generated from `state` if `wrap_in_spaces` is true.
 fn wrap_code_in_spaces(state: &CodegenState, checker: &Checker, expr_range: TextRange) -> String {
-    if checker.ctx.in_f_string() {
+    if checker.model.in_f_string() {
         if let Some(f_string_range) = checker.indexer.f_string_range(expr_range.start()) {
             let f_string = checker.locator.slice(f_string_range);
 
