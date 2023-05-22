@@ -10,17 +10,18 @@ use crate::checkers::ast::Checker;
 /// Checks that code does not call the built-in function `eval`
 ///
 /// ## Why is this bad?
-/// This function makes it far too easy to achieve arbitrary code execution, so we shouldn't
-/// support it in any context.
+/// The `eval` function can be used to execute arbitrary code objects if a code object is passed
+/// as the expression argument. If a code object is passed from an untrusted source it can be used
+/// to run malicious code
 ///
 /// ## Example
 /// ```python
 /// eval("foo")
 /// ```
 #[violation]
-pub struct BadEvalUse;
+pub struct EvalUse;
 
-impl Violation for BadEvalUse {
+impl Violation for EvalUse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of the `eval` command should be avoided")
@@ -28,16 +29,14 @@ impl Violation for BadEvalUse {
 }
 
 /// DUO104
-pub(crate) fn bad_eval_use(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+pub(crate) fn bad_eval_use(checker: &mut Checker, expr: &ast::ExprCall) {
+        if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
             if id == "eval" && checker.ctx.is_builtin(id) {
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadEvalUse, func.range()));
+                        .push(Diagnostic::new(EvalUse, expr.func.range()));
                 }
             }
         }
     }
-}

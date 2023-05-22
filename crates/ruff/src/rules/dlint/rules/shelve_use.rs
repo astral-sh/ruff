@@ -18,9 +18,9 @@ use crate::rules::dlint::helpers::AnyStmtImport;
 /// import shelve
 /// ```
 #[violation]
-pub struct BadShelveUse;
+pub struct ShelveUse;
 
-impl Violation for BadShelveUse {
+impl Violation for ShelveUse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of the `shelve` module should be avoided")
@@ -35,7 +35,7 @@ pub(crate) fn bad_shelve_use(checker: &mut Checker, stmt: AnyStmtImport) {
                 if name.name.as_str() == "shelve" {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadShelveUse, name.range));
+                        .push(Diagnostic::new(ShelveUse, name.range));
                 }
             }
         }
@@ -44,7 +44,7 @@ pub(crate) fn bad_shelve_use(checker: &mut Checker, stmt: AnyStmtImport) {
                 for name in &imp.names {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadShelveUse, name.range));
+                        .push(Diagnostic::new(ShelveUse, name.range));
                 }
             }
         }

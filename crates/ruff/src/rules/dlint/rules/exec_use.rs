@@ -10,17 +10,19 @@ use crate::checkers::ast::Checker;
 /// Checks that code does not call the built-in function `exec`
 ///
 /// ## Why is this bad?
-/// This function makes it far too easy to achieve arbitrary code execution, so we shouldn't
-/// support it in any context.
+/// `exec` supports dynamic execution of Python code by passing either a string or a code object
+/// to it, which are then parsed and executed or simply executed respectively. If a string or code
+/// object is passed from an untrusted source  (or contains parts from an untrusted source) it can
+/// be used to run malicious code
 ///
 /// ## Example
 /// ```python
 /// exec("foo")
 /// ```
 #[violation]
-pub struct BadExecUse;
+pub struct ExecUse;
 
-impl Violation for BadExecUse {
+impl Violation for ExecUse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of the `exec` command should be avoided")
@@ -28,16 +30,14 @@ impl Violation for BadExecUse {
 }
 
 /// DUO105
-pub(crate) fn bad_exec_use(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+pub(crate) fn bad_exec_use(checker: &mut Checker, expr: &ast::ExprCall) {
+        if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
             if id == "exec" && checker.ctx.is_builtin(id) {
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadExecUse, func.range()));
+                        .push(Diagnostic::new(ExecUse, expr.func.range()));
                 }
             }
         }
     }
-}

@@ -19,9 +19,9 @@ use crate::checkers::ast::Checker;
 /// compile("foo")
 /// ```
 #[violation]
-pub struct BadCompileUse;
+pub struct CompileUse;
 
-impl Violation for BadCompileUse {
+impl Violation for CompileUse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of the `compile` command should be avoided")
@@ -29,16 +29,14 @@ impl Violation for BadCompileUse {
 }
 
 /// DUO110
-pub(crate) fn bad_compile_use(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+pub(crate) fn bad_compile_use(checker: &mut Checker, expr: &ast::ExprCall) {
+        if let Expr::Name(ast::ExprName { id, .. }) = expr.func.as_ref() {
             if id == "compile" && checker.ctx.is_builtin(id) {
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadCompileUse, func.range()));
+                        .push(Diagnostic::new(CompileUse, expr.func.range()));
                 }
             }
         }
     }
-}

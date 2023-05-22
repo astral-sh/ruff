@@ -18,9 +18,9 @@ use crate::rules::dlint::helpers::AnyStmtImport;
 /// import marshal
 /// ```
 #[violation]
-pub struct BadMarshalUse;
+pub struct MarshalUse;
 
-impl Violation for BadMarshalUse {
+impl Violation for MarshalUse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of the `marshal` module should be avoided")
@@ -35,7 +35,7 @@ pub(crate) fn bad_marshal_use(checker: &mut Checker, stmt: AnyStmtImport) {
                 if name.name.as_str() == "marshal" {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadMarshalUse, name.range));
+                        .push(Diagnostic::new(MarshalUse, name.range));
                 }
             }
         }
@@ -44,7 +44,7 @@ pub(crate) fn bad_marshal_use(checker: &mut Checker, stmt: AnyStmtImport) {
                 for name in &imp.names {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(BadMarshalUse, name.range));
+                        .push(Diagnostic::new(MarshalUse, name.range));
                 }
             }
         }

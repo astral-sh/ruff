@@ -810,10 +810,10 @@ where
                     pycodestyle::rules::multiple_imports_on_one_line(self, stmt, names);
                 }
                 //dlint
-                if self.settings.rules.enabled(Rule::BadShelveUse) {
+                if self.settings.rules.enabled(Rule::ShelveUse) {
                     dlint::rules::bad_shelve_use(self, dlint::helpers::AnyStmtImport::from(import));
                 }
-                if self.settings.rules.enabled(Rule::BadMarshalUse) {
+                if self.settings.rules.enabled(Rule::MarshalUse) {
                     dlint::rules::bad_marshal_use(
                         self,
                         dlint::helpers::AnyStmtImport::from(import),
@@ -1109,13 +1109,13 @@ where
                 }
 
                 //dlint
-                if self.settings.rules.enabled(Rule::BadShelveUse) {
+                if self.settings.rules.enabled(Rule::ShelveUse) {
                     dlint::rules::bad_shelve_use(
                         self,
                         dlint::helpers::AnyStmtImport::from(import_from),
                     );
                 }
-                if self.settings.rules.enabled(Rule::BadMarshalUse) {
+                if self.settings.rules.enabled(Rule::MarshalUse) {
                     dlint::rules::bad_marshal_use(
                         self,
                         dlint::helpers::AnyStmtImport::from(import_from),
@@ -2593,7 +2593,7 @@ where
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
-            Expr::Call(ast::ExprCall {
+            Expr::Call(expr_call @ ast::ExprCall {
                 func,
                 args,
                 keywords,
@@ -2735,14 +2735,14 @@ where
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
                 // dlint
-                if self.settings.rules.enabled(Rule::BadEvalUse) {
-                    dlint::rules::bad_eval_use(self, expr);
+                if self.settings.rules.enabled(Rule::EvalUse) {
+                    dlint::rules::bad_eval_use(self, expr_call);
                 }
-                if self.settings.rules.enabled(Rule::BadExecUse) {
-                    dlint::rules::bad_exec_use(self, expr);
+                if self.settings.rules.enabled(Rule::ExecUse) {
+                    dlint::rules::bad_exec_use(self, expr_call);
                 }
-                if self.settings.rules.enabled(Rule::BadCompileUse) {
-                    dlint::rules::bad_compile_use(self, expr);
+                if self.settings.rules.enabled(Rule::CompileUse) {
+                    dlint::rules::bad_compile_use(self, expr_call);
                 }
                 // flake8-async
                 if self
