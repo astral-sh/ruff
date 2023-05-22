@@ -16,7 +16,7 @@ use ruff_python_ast::whitespace::leading_space;
 use crate::registry::AsRule;
 use crate::settings::Settings;
 
-use super::super::track::Block;
+use super::super::block::Block;
 use super::super::{comments, format_imports};
 
 /// ## What it does

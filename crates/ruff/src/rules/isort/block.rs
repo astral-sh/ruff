@@ -7,13 +7,7 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 use crate::directives::IsortDirectives;
 use crate::rules::isort::helpers;
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) enum Trailer {
-    Sibling,
-    ClassDef,
-    FunctionDef,
-}
-
+/// A block of imports within a Python module.
 #[derive(Debug, Default)]
 pub(crate) struct Block<'a> {
     pub(crate) nested: bool,
@@ -21,7 +15,16 @@ pub(crate) struct Block<'a> {
     pub(crate) trailer: Option<Trailer>,
 }
 
-pub(crate) struct ImportTracker<'a> {
+/// The type of trailer that should follow an import block.
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum Trailer {
+    Sibling,
+    ClassDef,
+    FunctionDef,
+}
+
+/// A builder for identifying and constructing import blocks within a Python module.
+pub(crate) struct BlockBuilder<'a> {
     locator: &'a Locator<'a>,
     is_stub: bool,
     blocks: Vec<Block<'a>>,
@@ -30,7 +33,7 @@ pub(crate) struct ImportTracker<'a> {
     nested: bool,
 }
 
-impl<'a> ImportTracker<'a> {
+impl<'a> BlockBuilder<'a> {
     pub(crate) fn new(
         locator: &'a Locator<'a>,
         directives: &'a IsortDirectives,
@@ -111,7 +114,7 @@ impl<'a> ImportTracker<'a> {
     }
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ImportTracker<'a>
+impl<'a, 'b> StatementVisitor<'b> for BlockBuilder<'a>
 where
     'b: 'a,
 {
