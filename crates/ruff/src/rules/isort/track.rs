@@ -8,17 +8,17 @@ use crate::directives::IsortDirectives;
 use crate::rules::isort::helpers;
 
 #[derive(Debug, Copy, Clone)]
-pub enum Trailer {
+pub(crate) enum Trailer {
     Sibling,
     ClassDef,
     FunctionDef,
 }
 
 #[derive(Debug, Default)]
-pub struct Block<'a> {
-    pub nested: bool,
-    pub imports: Vec<&'a Stmt>,
-    pub trailer: Option<Trailer>,
+pub(crate) struct Block<'a> {
+    pub(crate) nested: bool,
+    pub(crate) imports: Vec<&'a Stmt>,
+    pub(crate) trailer: Option<Trailer>,
 }
 
 pub(crate) struct ImportTracker<'a> {
