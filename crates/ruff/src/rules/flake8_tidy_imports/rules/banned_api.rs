@@ -1,22 +1,10 @@
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Ranged};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation, CacheKey};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::from_qualified_name;
 
 use crate::checkers::ast::Checker;
-
-pub type Settings = FxHashMap<String, ApiBan>;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct ApiBan {
-    /// The message to display when the API is used.
-    pub msg: String,
-}
 
 /// ## What it does
 /// Checks for banned imports.
@@ -113,79 +101,5 @@ pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
             },
             expr.range(),
         ));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use anyhow::Result;
-    use rustc_hash::FxHashMap;
-
-    use crate::assert_messages;
-    use crate::registry::Rule;
-    use crate::settings::Settings;
-    use crate::test::test_path;
-
-    use super::ApiBan;
-
-    #[test]
-    fn banned_api() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID251.py"),
-            &Settings {
-                flake8_tidy_imports: super::super::Settings {
-                    banned_api: FxHashMap::from_iter([
-                        (
-                            "cgi".to_string(),
-                            ApiBan {
-                                msg: "The cgi module is deprecated.".to_string(),
-                            },
-                        ),
-                        (
-                            "typing.TypedDict".to_string(),
-                            ApiBan {
-                                msg: "Use typing_extensions.TypedDict instead.".to_string(),
-                            },
-                        ),
-                    ]),
-                    ..Default::default()
-                },
-                ..Settings::for_rules(vec![Rule::BannedApi])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn banned_api_package() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
-            &Settings {
-                flake8_tidy_imports: super::super::Settings {
-                    banned_api: FxHashMap::from_iter([
-                        (
-                            "attrs".to_string(),
-                            ApiBan {
-                                msg: "The attrs module is deprecated.".to_string(),
-                            },
-                        ),
-                        (
-                            "my_package.sublib.protocol".to_string(),
-                            ApiBan {
-                                msg: "The protocol module is deprecated.".to_string(),
-                            },
-                        ),
-                    ]),
-                    ..Default::default()
-                },
-                namespace_packages: vec![Path::new("my_package").to_path_buf()],
-                ..Settings::for_rules(vec![Rule::BannedApi])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
     }
 }

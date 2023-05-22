@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
+source: crates/ruff/src/rules/flake8_tidy_imports/mod.rs
 ---
 TID252.py:9:1: TID252 Relative imports from parent modules are banned
    |

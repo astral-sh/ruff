@@ -1,28 +1,15 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Int, Ranged, Stmt};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation, CacheKey};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-
-pub type Settings = Strictness;
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, Default)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum Strictness {
-    /// Ban imports that extend into the parent module or beyond.
-    #[default]
-    Parents,
-    /// Ban all relative imports.
-    All,
-}
+use crate::rules::flake8_tidy_imports::settings::Strictness;
 
 /// ## What it does
 /// Checks for relative imports.
@@ -145,68 +132,5 @@ pub(crate) fn banned_relative_import(
         Some(diagnostic)
     } else {
         None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use anyhow::Result;
-
-    use crate::assert_messages;
-    use crate::registry::Rule;
-    use crate::settings::Settings;
-    use crate::test::test_path;
-
-    use super::Strictness;
-
-    #[test]
-    fn ban_parent_imports() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID252.py"),
-            &Settings {
-                flake8_tidy_imports: super::super::Settings {
-                    ban_relative_imports: Strictness::Parents,
-                    ..Default::default()
-                },
-                ..Settings::for_rules(vec![Rule::RelativeImports])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn ban_all_imports() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID252.py"),
-            &Settings {
-                flake8_tidy_imports: super::super::Settings {
-                    ban_relative_imports: Strictness::All,
-                    ..Default::default()
-                },
-                ..Settings::for_rules(vec![Rule::RelativeImports])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn ban_parent_imports_package() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
-            &Settings {
-                flake8_tidy_imports: super::super::Settings {
-                    ban_relative_imports: Strictness::Parents,
-                    ..Default::default()
-                },
-                namespace_packages: vec![Path::new("my_package").to_path_buf()],
-                ..Settings::for_rules(vec![Rule::RelativeImports])
-            },
-        )?;
-        assert_messages!(diagnostics);
-        Ok(())
     }
 }

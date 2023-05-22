@@ -97,7 +97,7 @@ impl Default for Settings {
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_gettext: flake8_gettext::settings::Settings::default(),
             flake8_self: flake8_self::settings::Settings::default(),
-            flake8_tidy_imports: flake8_tidy_imports::Settings::default(),
+            flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             flake8_type_checking: flake8_type_checking::settings::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
             isort: isort::settings::Settings::default(),

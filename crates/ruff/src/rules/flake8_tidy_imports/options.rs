@@ -5,9 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CombineOptions, ConfigurationOptions};
 
-use super::banned_api::ApiBan;
-use super::relative_imports::Strictness;
-use super::Settings;
+use super::settings::{ApiBan, Settings, Strictness};
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,

@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
+source: crates/ruff/src/rules/flake8_tidy_imports/mod.rs
 ---
 TID251.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
   |

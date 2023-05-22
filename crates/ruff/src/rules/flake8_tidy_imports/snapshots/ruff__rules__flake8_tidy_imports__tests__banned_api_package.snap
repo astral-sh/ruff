@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
+source: crates/ruff/src/rules/flake8_tidy_imports/mod.rs
 ---
 application.py:3:8: TID251 `attrs` is banned: The attrs module is deprecated.
   |

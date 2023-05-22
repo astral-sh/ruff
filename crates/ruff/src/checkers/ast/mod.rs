@@ -894,7 +894,7 @@ where
 
                     // flake8_tidy_imports
                     if self.enabled(Rule::BannedApi) {
-                        flake8_tidy_imports::banned_api::name_or_parent_is_banned(
+                        flake8_tidy_imports::rules::name_or_parent_is_banned(
                             self,
                             &alias.name,
                             alias,
@@ -1057,15 +1057,13 @@ where
                     if let Some(module) =
                         helpers::resolve_imported_module_path(level, module, self.module_path)
                     {
-                        flake8_tidy_imports::banned_api::name_or_parent_is_banned(
-                            self, &module, stmt,
-                        );
+                        flake8_tidy_imports::rules::name_or_parent_is_banned(self, &module, stmt);
 
                         for alias in names {
                             if &alias.name == "*" {
                                 continue;
                             }
-                            flake8_tidy_imports::banned_api::name_is_banned(
+                            flake8_tidy_imports::rules::name_is_banned(
                                 self,
                                 format!("{module}.{}", alias.name),
                                 alias,
@@ -1180,7 +1178,7 @@ where
 
                     if self.enabled(Rule::RelativeImports) {
                         if let Some(diagnostic) =
-                            flake8_tidy_imports::relative_imports::banned_relative_import(
+                            flake8_tidy_imports::rules::banned_relative_import(
                                 self,
                                 stmt,
                                 level,
@@ -2438,7 +2436,7 @@ where
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
                 if self.enabled(Rule::BannedApi) {
-                    flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
+                    flake8_tidy_imports::rules::banned_attribute_access(self, expr);
                 }
                 if self.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);

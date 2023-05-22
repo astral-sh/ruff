@@ -10,7 +10,7 @@ use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
 use crate::rules::flake8_quotes::settings::Quote;
-use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
+use crate::rules::flake8_tidy_imports::settings::Strictness;
 use crate::rules::pydocstyle::settings::Convention;
 use crate::rules::{
     flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
