@@ -16,7 +16,7 @@ impl AlwaysAutofixableViolation for PassStatementStubBody {
     }
 
     fn autofix_title(&self) -> String {
-        format!("Replace `pass` with `...` in empty function body")
+        format!("Replace `pass` with `...`")
     }
 }
 
