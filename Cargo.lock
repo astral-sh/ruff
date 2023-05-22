@@ -1929,6 +1929,7 @@ dependencies = [
  "once_cell",
  "ruff_text_size",
  "rustc-hash",
+ "rustpython-ast",
  "rustpython-literal",
  "rustpython-parser",
  "serde",
@@ -1985,6 +1986,16 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "rustpython-parser",
+]
+
+[[package]]
+name = "ruff_source_location"
+version = "0.0.0"
+source = "git+https://github.com/RustPython/Parser.git?rev=e1f02fced740cdd99593ae4b14bcfcac725e9e02#e1f02fced740cdd99593ae4b14bcfcac725e9e02"
+dependencies = [
+ "memchr",
+ "once_cell",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -2132,6 +2143,7 @@ version = "0.2.0"
 source = "git+https://github.com/RustPython/Parser.git?rev=e1f02fced740cdd99593ae4b14bcfcac725e9e02#e1f02fced740cdd99593ae4b14bcfcac725e9e02"
 dependencies = [
  "is-macro",
+ "ruff_source_location",
  "ruff_text_size",
 ]
 

@@ -34,6 +34,7 @@ rustc-hash = { version = "1.1.0" }
 ruff_text_size = { git = "https://github.com/RustPython/Parser.git", rev = "e1f02fced740cdd99593ae4b14bcfcac725e9e02" }
 rustpython-format = { git = "https://github.com/RustPython/Parser.git", rev = "e1f02fced740cdd99593ae4b14bcfcac725e9e02" }
 rustpython-literal = { git = "https://github.com/RustPython/Parser.git", rev = "e1f02fced740cdd99593ae4b14bcfcac725e9e02" }
+rustpython-ast = { git = "https://github.com/RustPython/Parser.git", rev = "e1f02fced740cdd99593ae4b14bcfcac725e9e02" }
 rustpython-parser = { git = "https://github.com/RustPython/Parser.git", rev = "e1f02fced740cdd99593ae4b14bcfcac725e9e02", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
