@@ -953,12 +953,7 @@ impl From<(ast::Stmt, &Locator<'_>)> for Stmt {
                 };
 
                 Stmt {
-                    range: TextRange::new(
-                        decorator_list
-                            .first()
-                            .map_or(range.start(), ast::Ranged::start),
-                        body.end(),
-                    ),
+                    range: TextRange::new(range.start(), body.end()),
                     node: StmtKind::FunctionDef {
                         name: name.into(),
                         args: Box::new((*args, locator).into()),
@@ -999,12 +994,7 @@ impl From<(ast::Stmt, &Locator<'_>)> for Stmt {
                 };
 
                 Stmt {
-                    range: TextRange::new(
-                        decorator_list
-                            .first()
-                            .map_or(range.start(), |expr| expr.range().start()),
-                        body.end(),
-                    ),
+                    range: TextRange::new(range.start(), body.end()),
                     node: StmtKind::AsyncFunctionDef {
                         name: name.into(),
                         args: Box::new((*args, locator).into()),

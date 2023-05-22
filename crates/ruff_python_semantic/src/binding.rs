@@ -1,7 +1,10 @@
 use std::num::TryFromIntError;
 use std::ops::{Deref, Index, IndexMut};
 
+use crate::model::SemanticModel;
 use bitflags::bitflags;
+use ruff_python_ast::helpers;
+use ruff_python_ast::source_code::Locator;
 use ruff_text_size::TextRange;
 
 use crate::node::NodeId;
@@ -107,6 +110,18 @@ impl<'a> Binding<'a> {
             _ => {}
         }
         existing.is_definition()
+    }
+
+    /// Returns the appropriate visual range for highlighting this binding.
+    pub fn trimmed_range(&self, semantic_model: &SemanticModel, locator: &Locator) -> TextRange {
+        match self.kind {
+            BindingKind::ClassDefinition | BindingKind::FunctionDefinition => {
+                self.source.map_or(self.range, |source| {
+                    helpers::identifier_range(semantic_model.stmts[source], locator)
+                })
+            }
+            _ => self.range,
+        }
     }
 }
 

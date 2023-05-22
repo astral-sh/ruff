@@ -1090,21 +1090,40 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 /// Specifically, this method returns the range of a function or class name,
 /// rather than that of the entire function or class body.
 pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
-    if matches!(
-        stmt,
-        Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)
-    ) {
-        let contents = &locator.contents()[stmt.range()];
+    match stmt {
+        Stmt::ClassDef(ast::StmtClassDef {
+            decorator_list,
+            range,
+            ..
+        })
+        | Stmt::FunctionDef(ast::StmtFunctionDef {
+            decorator_list,
+            range,
+            ..
+        })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            decorator_list,
+            range,
+            ..
+        }) => {
+            let header_range = decorator_list.last().map_or(*range, |last_decorator| {
+                TextRange::new(last_decorator.end(), range.end())
+            });
 
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
-            if matches!(tok, Tok::Name { .. }) {
-                return range;
-            }
+            let contents = locator.slice(header_range);
+
+            let mut tokens =
+                lexer::lex_starts_at(contents, Mode::Module, header_range.start()).flatten();
+            tokens
+                .find_map(|(t, range)| t.is_name().then_some(range))
+                .unwrap_or_else(|| {
+                    error!("Failed to find identifier for {:?}", stmt);
+
+                    header_range
+                })
         }
-        error!("Failed to find identifier for {:?}", stmt);
+        _ => stmt.range(),
     }
-
-    stmt.range()
 }
 
 /// Return the ranges of [`Tok::Name`] tokens within a specified node.

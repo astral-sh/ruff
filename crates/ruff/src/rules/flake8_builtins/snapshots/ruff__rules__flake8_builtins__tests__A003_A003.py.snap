@@ -29,14 +29,13 @@ A003.py:4:5: A003 Class attribute `dir` is shadowing a Python builtin
 8 |     def __init__(self):
   |
 
-A003.py:11:5: A003 Class attribute `str` is shadowing a Python builtin
+A003.py:11:9: A003 Class attribute `str` is shadowing a Python builtin
    |
-11 |           self.dir = "."
-12 |   
-13 |       def str(self):
-   |  _____^
-14 | |         pass
-   | |____________^ A003
+11 |         self.dir = "."
+12 | 
+13 |     def str(self):
+   |         ^^^ A003
+14 |         pass
    |
 
 

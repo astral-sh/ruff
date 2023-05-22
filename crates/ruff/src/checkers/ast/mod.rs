@@ -41,6 +41,7 @@ use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
+use crate::rules::flake8_builtins::rules::AnyShadowing;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -626,11 +627,19 @@ where
 
                 if self.semantic_model.scope().kind.is_class() {
                     if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
-                        flake8_builtins::rules::builtin_attribute_shadowing(self, name, stmt);
+                        flake8_builtins::rules::builtin_attribute_shadowing(
+                            self,
+                            name,
+                            AnyShadowing::from(stmt),
+                        );
                     }
                 } else {
                     if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                        flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                        flake8_builtins::rules::builtin_variable_shadowing(
+                            self,
+                            name,
+                            AnyShadowing::from(stmt),
+                        );
                     }
                 }
             }
@@ -804,7 +813,11 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                    flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                    flake8_builtins::rules::builtin_variable_shadowing(
+                        self,
+                        name,
+                        AnyShadowing::from(stmt),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::DuplicateBases) {
@@ -921,7 +934,9 @@ where
                         if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
-                                    self, asname, stmt,
+                                    self,
+                                    asname,
+                                    AnyShadowing::from(stmt),
                                 );
                             }
                         }
@@ -1228,7 +1243,9 @@ where
                         if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
-                                    self, asname, stmt,
+                                    self,
+                                    asname,
+                                    AnyShadowing::from(stmt),
                                 );
                             }
                         }
@@ -2526,11 +2543,19 @@ where
 
                         if self.semantic_model.scope().kind.is_class() {
                             if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
-                                flake8_builtins::rules::builtin_attribute_shadowing(self, id, expr);
+                                flake8_builtins::rules::builtin_attribute_shadowing(
+                                    self,
+                                    id,
+                                    AnyShadowing::from(expr),
+                                );
                             }
                         } else {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                                flake8_builtins::rules::builtin_variable_shadowing(self, id, expr);
+                                flake8_builtins::rules::builtin_variable_shadowing(
+                                    self,
+                                    id,
+                                    AnyShadowing::from(expr),
+                                );
                             }
                         }
 
@@ -4323,7 +4348,7 @@ where
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 self,
                                 name,
-                                excepthandler,
+                                AnyShadowing::from(excepthandler),
                             );
                         }
 
@@ -4481,7 +4506,7 @@ where
         }
 
         if self.settings.rules.enabled(Rule::BuiltinArgumentShadowing) {
-            flake8_builtins::rules::builtin_argument_shadowing(self, &arg.arg, arg);
+            flake8_builtins::rules::builtin_argument_shadowing(self, arg);
         }
     }
 
@@ -4686,26 +4711,18 @@ impl<'a> Checker<'a> {
                     {
                         if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
                             #[allow(deprecated)]
-                            let line = self.locator.compute_line_index(existing.range.start());
+                            let line = self.locator.compute_line_index(
+                                existing
+                                    .trimmed_range(self.semantic_model(), self.locator)
+                                    .start(),
+                            );
 
                             let mut diagnostic = Diagnostic::new(
                                 pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
                                     line,
                                 },
-                                matches!(
-                                    binding.kind,
-                                    BindingKind::ClassDefinition | BindingKind::FunctionDefinition
-                                )
-                                .then(|| {
-                                    binding.source.map_or(binding.range, |source| {
-                                        helpers::identifier_range(
-                                            self.semantic_model.stmts[source],
-                                            self.locator,
-                                        )
-                                    })
-                                })
-                                .unwrap_or(binding.range),
+                                binding.trimmed_range(self.semantic_model(), self.locator),
                             );
                             if let Some(parent) = binding.source {
                                 let parent = self.semantic_model.stmts[parent];
@@ -5466,27 +5483,18 @@ impl<'a> Checker<'a> {
                             for index in indices {
                                 let rebound = &self.semantic_model.bindings[*index];
                                 #[allow(deprecated)]
-                                let line = self.locator.compute_line_index(binding.range.start());
+                                let line = self.locator.compute_line_index(
+                                    binding
+                                        .trimmed_range(self.semantic_model(), self.locator)
+                                        .start(),
+                                );
 
                                 let mut diagnostic = Diagnostic::new(
                                     pyflakes::rules::RedefinedWhileUnused {
                                         name: (*name).to_string(),
                                         line,
                                     },
-                                    matches!(
-                                        rebound.kind,
-                                        BindingKind::ClassDefinition
-                                            | BindingKind::FunctionDefinition
-                                    )
-                                    .then(|| {
-                                        rebound.source.map_or(rebound.range, |source| {
-                                            helpers::identifier_range(
-                                                self.semantic_model.stmts[source],
-                                                self.locator,
-                                            )
-                                        })
-                                    })
-                                    .unwrap_or(rebound.range),
+                                    rebound.trimmed_range(self.semantic_model(), self.locator),
                                 );
                                 if let Some(source) = rebound.source {
                                     let parent = &self.semantic_model.stmts[source];
