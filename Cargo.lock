@@ -193,9 +193,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.2.1"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24a6904aef64d73cf10ab17ebace7befb918b82164785cb89907993be7f83813"
+checksum = "6776fc96284a0bb647b615056fc496d1fe1644a7ab01829818a6d91cae888b84"
 
 [[package]]
 name = "bstr"
@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.267"
+version = "0.0.269"
 dependencies = [
  "anyhow",
  "clap 4.2.7",
@@ -1723,11 +1723,11 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.267"
+version = "0.0.269"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
- "bitflags 2.2.1",
+ "bitflags 2.3.1",
  "chrono",
  "clap 4.2.7",
  "colored",
@@ -1780,7 +1780,7 @@ dependencies = [
  "toml",
  "typed-arena",
  "unicode-width",
- "unicode_names2 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode_names2",
 ]
 
 [[package]]
@@ -1813,7 +1813,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.267"
+version = "0.0.269"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1821,7 +1821,7 @@ dependencies = [
  "assert_cmd",
  "atty",
  "bincode",
- "bitflags 2.2.1",
+ "bitflags 2.3.1",
  "cachedir",
  "chrono",
  "clap 4.2.7",
@@ -1920,7 +1920,7 @@ name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.2.1",
+ "bitflags 2.3.1",
  "is-macro",
  "itertools",
  "log",
@@ -1928,7 +1928,6 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "once_cell",
- "regex",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-literal",
@@ -1962,7 +1961,7 @@ dependencies = [
 name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.2.1",
+ "bitflags 2.3.1",
  "is-macro",
  "nohash-hasher",
  "ruff_python_ast",
@@ -2002,7 +2001,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=335780aeeac1e6fcd85994ba001d7b8ce99fcf65#335780aeeac1e6fcd85994ba001d7b8ce99fcf65"
 dependencies = [
  "schemars",
  "serde",
@@ -2073,7 +2072,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=335780aeeac1e6fcd85994ba001d7b8ce99fcf65#335780aeeac1e6fcd85994ba001d7b8ce99fcf65"
 dependencies = [
  "is-macro",
  "num-bigint",
@@ -2084,9 +2083,9 @@ dependencies = [
 [[package]]
 name = "rustpython-format"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=335780aeeac1e6fcd85994ba001d7b8ce99fcf65#335780aeeac1e6fcd85994ba001d7b8ce99fcf65"
 dependencies = [
- "bitflags 2.2.1",
+ "bitflags 2.3.1",
  "itertools",
  "num-bigint",
  "num-traits",
@@ -2096,9 +2095,10 @@ dependencies = [
 [[package]]
 name = "rustpython-literal"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=335780aeeac1e6fcd85994ba001d7b8ce99fcf65#335780aeeac1e6fcd85994ba001d7b8ce99fcf65"
 dependencies = [
  "hexf-parse",
+ "is-macro",
  "lexical-parse-float",
  "num-traits",
  "unic-ucd-category",
@@ -2107,9 +2107,10 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=335780aeeac1e6fcd85994ba001d7b8ce99fcf65#335780aeeac1e6fcd85994ba001d7b8ce99fcf65"
 dependencies = [
  "anyhow",
+ "is-macro",
  "itertools",
  "lalrpop-util",
  "log",
@@ -2123,14 +2124,15 @@ dependencies = [
  "tiny-keccak",
  "unic-emoji-char",
  "unic-ucd-ident",
- "unicode_names2 0.6.0 (git+https://github.com/youknowone/unicode_names2.git?rev=4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde)",
+ "unicode_names2",
 ]
 
 [[package]]
 name = "rustpython-parser-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/Parser.git?rev=27e3873dc2a3b0d652cc106bc9ddcede4b01806d#27e3873dc2a3b0d652cc106bc9ddcede4b01806d"
+source = "git+https://github.com/astral-sh/RustPython-Parser.git?rev=335780aeeac1e6fcd85994ba001d7b8ce99fcf65#335780aeeac1e6fcd85994ba001d7b8ce99fcf65"
 dependencies = [
+ "is-macro",
  "ruff_text_size",
 ]
 
@@ -2719,12 +2721,6 @@ name = "unicode-width"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
-
-[[package]]
-name = "unicode_names2"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "446c96c6dd42604779487f0a981060717156648c1706aa1f464677f03c6cc059"
 
 [[package]]
 name = "unicode_names2"

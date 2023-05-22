@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
+use rustc_hash::FxHashMap;
+
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
@@ -11,7 +13,6 @@ use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
-use rustc_hash::FxHashMap;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -57,6 +58,13 @@ pub enum Command {
     /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
+    /// Format the given files, or stdin when using `-`.
+    #[doc(hidden)]
+    #[clap(hide = true)]
+    Format {
+        /// List of files or directories to format or `-` for stdin
+        files: Vec<PathBuf>,
+    },
 }
 
 #[derive(Debug, clap::Args)]
@@ -126,8 +134,8 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub ignore: Option<Vec<RuleSelector>>,
-    /// Like --select, but adds additional rule codes on top of the selected
-    /// ones.
+    /// Like --select, but adds additional rule codes on top of those already
+    /// specified.
     #[arg(
         long,
         value_delimiter = ',',
@@ -147,9 +155,13 @@ pub struct CheckArgs {
         hide = true
     )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
-    /// List of mappings from file pattern to code to exclude
+    /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    /// Like `--per-file-ignores`, but adds additional ignores on top of
+    /// those already specified.
+    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// List of paths, used to omit files and/or directories from analysis.
     #[arg(
         long,
@@ -189,6 +201,27 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
+    /// Like --fixable, but adds additional rule codes on top of those already
+    /// specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    pub extend_fixable: Option<Vec<RuleSelector>>,
+    /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
+        help_heading = "Rule selection",
+        hide = true
+    )]
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore
     /// files.
     #[arg(
@@ -375,8 +408,10 @@ impl CheckArgs {
                 dummy_variable_rgx: self.dummy_variable_rgx,
                 exclude: self.exclude,
                 extend_exclude: self.extend_exclude,
+                extend_fixable: self.extend_fixable,
                 extend_ignore: self.extend_ignore,
                 extend_select: self.extend_select,
+                extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
                 ignore: self.ignore,
                 line_length: self.line_length,
@@ -442,8 +477,10 @@ pub struct Overrides {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
+    pub extend_fixable: Option<Vec<RuleSelector>>,
     pub extend_ignore: Option<Vec<RuleSelector>>,
     pub extend_select: Option<Vec<RuleSelector>>,
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<usize>,
@@ -493,7 +530,14 @@ impl ConfigProcessor for &Overrides {
                 .collect(),
             extend_select: self.extend_select.clone().unwrap_or_default(),
             fixable: self.fixable.clone(),
-            unfixable: self.unfixable.clone().unwrap_or_default(),
+            unfixable: self
+                .unfixable
+                .iter()
+                .cloned()
+                .chain(self.extend_unfixable.iter().cloned())
+                .flatten()
+                .collect(),
+            extend_fixable: self.extend_fixable.clone().unwrap_or_default(),
         });
         if let Some(format) = &self.format {
             config.format = Some(*format);

@@ -1,5 +1,6 @@
-use ruff_python_ast::source_code::Stylist;
 use unicode_width::UnicodeWidthStr;
+
+use ruff_python_ast::source_code::Stylist;
 
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 

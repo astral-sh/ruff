@@ -46,7 +46,7 @@ impl Violation for AwaitOutsideAsync {
 /// PLE1142
 pub(crate) fn await_outside_async(checker: &mut Checker, expr: &Expr) {
     if !checker
-        .ctx
+        .semantic_model()
         .scopes()
         .find_map(|scope| {
             if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {

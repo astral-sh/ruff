@@ -8,7 +8,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
@@ -105,6 +104,32 @@ mod tests {
         x = pd.DataFrame()
         index = x.loc[:, ['B', 'A']]
     "#, &[]; "PD008_pass")]
+    #[test_case(r#"
+        import io
+        import zipfile
+
+
+        class MockBinaryFile(io.BytesIO):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+
+            def close(self):
+                pass  # Don't allow closing the file, it would clear the buffer
+
+
+        zip_buffer = MockBinaryFile()
+
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr("dir/file.txt", "This is a test")
+
+        # Reset the BytesIO object's cursor to the start.
+        zip_buffer.seek(0)
+
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            zpath = zipfile.Path(zf, "/")
+
+        dir_name, file_name = zpath.at.split("/")
+    "#, &[]; "PD008_pass_on_attr")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()

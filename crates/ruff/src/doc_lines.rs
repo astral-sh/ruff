@@ -3,7 +3,7 @@
 
 use std::iter::FusedIterator;
 
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt, Suite};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
@@ -13,24 +13,19 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub(crate) fn doc_lines_from_tokens<'a>(
-    lxr: &'a [LexResult],
-    locator: &'a Locator<'a>,
-) -> DocLines<'a> {
-    DocLines::new(lxr, locator)
+pub(crate) fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {
+    DocLines::new(lxr)
 }
 
 pub(crate) struct DocLines<'a> {
     inner: std::iter::Flatten<core::slice::Iter<'a, LexResult>>,
-    locator: &'a Locator<'a>,
     prev: TextSize,
 }
 
 impl<'a> DocLines<'a> {
-    fn new(lxr: &'a [LexResult], locator: &'a Locator) -> Self {
+    fn new(lxr: &'a [LexResult]) -> Self {
         Self {
             inner: lxr.iter().flatten(),
-            locator,
             prev: TextSize::default(),
         }
     }
@@ -46,15 +41,11 @@ impl Iterator for DocLines<'_> {
 
             match tok {
                 Tok::Comment(..) => {
-                    if at_start_of_line
-                        || self
-                            .locator
-                            .contains_line_break(TextRange::new(self.prev, range.start()))
-                    {
+                    if at_start_of_line {
                         break Some(range.start());
                     }
                 }
-                Tok::Newline => {
+                Tok::Newline | Tok::NonLogicalNewline => {
                     at_start_of_line = true;
                 }
                 Tok::Indent | Tok::Dedent => {

@@ -81,7 +81,7 @@ pub(crate) fn invalid_envvar_value(
     keywords: &[Keyword],
 ) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["os", "getenv"])
     {

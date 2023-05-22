@@ -3,11 +3,39 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
 
+/// ## What it does
+/// Checks for the use of unnamed numerical constants ("magic") values in
+/// comparisons.
+///
+/// ## Why is this bad?
+/// The use of "magic" can make code harder to read and maintain, as readers
+/// will have to infer the meaning of the value from the context.
+///
+/// For convenience, this rule excludes a variety of common values from the
+/// "magic" value definition, such as `0`, `1`, `""`, and `"__main__"`.
+///
+/// ## Example
+/// ```python
+/// def calculate_discount(price: float) -> float:
+///     return price * (1 - 0.2)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// DISCOUNT_RATE = 0.2
+///
+///
+/// def calculate_discount(price: float) -> float:
+///     return price * (1 - DISCOUNT_RATE)
+/// ```
+///
+/// ## References
+/// - [Wikipedia](https://en.wikipedia.org/wiki/Magic_number_(programming)#Unnamed_numerical_constants)
+/// - [PEP 8](https://peps.python.org/pep-0008/#constants)
 #[violation]
 pub struct MagicValueComparison {
     value: String,
@@ -79,7 +107,7 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: unparse_expr(comparison_expr, checker.stylist),
+                        value: checker.generator().expr(comparison_expr),
                     },
                     comparison_expr.range(),
                 ));

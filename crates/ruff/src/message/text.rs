@@ -1,16 +1,19 @@
-use crate::fs::relativize_path;
-use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
+use std::borrow::Cow;
+use std::fmt::{Display, Formatter};
+use std::io::Write;
+
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
-use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 use ruff_text_size::{TextRange, TextSize};
-use std::borrow::Cow;
-use std::fmt::{Display, Formatter};
-use std::io::Write;
+
+use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+
+use crate::fs::relativize_path;
+use crate::message::diff::Diff;
+use crate::message::{Emitter, EmitterContext, Message};
+use crate::registry::AsRule;
 
 bitflags! {
     #[derive(Default)]
@@ -118,7 +121,7 @@ pub(super) struct RuleCodeAndBody<'a> {
 }
 
 impl Display for RuleCodeAndBody<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = &self.message.kind;
 
         if self.show_fix_status && self.message.fix.is_some() {
@@ -292,9 +295,10 @@ struct SourceCode<'a> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::TextEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn default() {

@@ -99,10 +99,7 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     }
 
     // Require the function to be the builtin `zip`.
-    if id != "zip" {
-        return;
-    }
-    if !checker.ctx.is_builtin(id) {
+    if !(id == "zip" && checker.semantic_model().is_builtin(id)) {
         return;
     }
 
@@ -118,9 +115,9 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     };
 
     // Require second argument to be a `Subscript`.
-    let Expr::Subscript (_) = &args[1] else {
+    if !matches!(&args[1], Expr::Subscript(_)) {
         return;
-    };
+    }
     let Some(second_arg_info) = match_slice_info(&args[1]) else {
         return;
     };

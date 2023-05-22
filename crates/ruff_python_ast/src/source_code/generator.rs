@@ -5,11 +5,10 @@ use std::ops::Deref;
 use rustpython_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag,
-    Excepthandler, Expr, Identifier, Int, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
+    Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
 };
 
 use crate::newlines::LineEnding;
-
 use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
@@ -101,8 +100,22 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub fn generate(self) -> String {
-        self.buffer
+    /// Generate source code from a [`Stmt`].
+    pub fn stmt(mut self, stmt: &Stmt) -> String {
+        self.unparse_stmt(stmt);
+        self.generate()
+    }
+
+    /// Generate source code from an [`Expr`].
+    pub fn expr(mut self, expr: &Expr) -> String {
+        self.unparse_expr(expr, 0);
+        self.generate()
+    }
+
+    /// Generate source code from a [`Constant`].
+    pub fn constant(mut self, constant: &Constant) -> String {
+        self.unparse_constant(constant);
+        self.generate()
     }
 
     fn newline(&mut self) {
@@ -165,13 +178,17 @@ impl<'a> Generator<'a> {
         self.p_if(!std::mem::take(first), s);
     }
 
-    pub fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
+    pub(crate) fn generate(self) -> String {
+        self.buffer
+    }
+
+    pub(crate) fn unparse_suite<U>(&mut self, suite: &Suite<U>) {
         for stmt in suite {
             self.unparse_stmt(stmt);
         }
     }
 
-    pub fn unparse_stmt<U>(&mut self, ast: &Stmt<U>) {
+    pub(crate) fn unparse_stmt<U>(&mut self, ast: &Stmt<U>) {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
@@ -824,7 +841,7 @@ impl<'a> Generator<'a> {
         self.body(&ast.body);
     }
 
-    pub fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) {
+    pub(crate) fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
@@ -1218,7 +1235,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub fn unparse_constant(&mut self, constant: &Constant) {
+    pub(crate) fn unparse_constant(&mut self, constant: &Constant) {
         assert_eq!(f64::MAX_10_EXP, 308);
         let inf_str = "1e309";
         match constant {
@@ -1340,7 +1357,12 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_formatted<U>(&mut self, val: &Expr<U>, conversion: Int, spec: Option<&Expr<U>>) {
+    fn unparse_formatted<U>(
+        &mut self,
+        val: &Expr<U>,
+        conversion: ConversionFlag,
+        spec: Option<&Expr<U>>,
+    ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
         let brace = if generator.buffer.starts_with('{') {
@@ -1352,10 +1374,10 @@ impl<'a> Generator<'a> {
         self.p(brace);
         self.buffer += &generator.buffer;
 
-        if conversion.to_u32() != ConversionFlag::None as u32 {
+        if !conversion.is_none() {
             self.p("!");
             #[allow(clippy::cast_possible_truncation)]
-            self.p(&format!("{}", conversion.to_u32() as u8 as char));
+            self.p(&format!("{}", conversion as u8 as char));
         }
 
         if let Some(spec) = spec {
@@ -1434,9 +1456,9 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::newlines::LineEnding;
     use rustpython_parser as parser;
 
+    use crate::newlines::LineEnding;
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;
 

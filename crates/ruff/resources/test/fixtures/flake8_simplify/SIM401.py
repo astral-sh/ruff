@@ -14,7 +14,7 @@ if key not in a_dict:
 else:
     var = a_dict[key]
 
-# SIM401 (default with a complex expression)
+# OK (default contains effect)
 if key in a_dict:
     var = a_dict[key]
 else:

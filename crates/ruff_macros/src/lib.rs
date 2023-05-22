@@ -15,7 +15,7 @@ mod rule_namespace;
 mod violation;
 
 #[proc_macro_derive(ConfigurationOptions, attributes(option, doc, option_group))]
-pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_config(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     config::derive_impl(input)
@@ -24,7 +24,7 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 }
 
 #[proc_macro_derive(CombineOptions)]
-pub fn derive_combine_options(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_combine_options(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     combine_options::derive_impl(input)
@@ -43,13 +43,12 @@ pub fn cache_key(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn register_rules(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn register_rules(item: TokenStream) -> TokenStream {
     let mapping = parse_macro_input!(item as register_rules::Input);
     register_rules::register_rules(&mapping).into()
 }
 
-/// Adds an `explanation()` method from the doc comment and
-/// `#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]`
+/// Adds an `explanation()` method from the doc comment.
 #[proc_macro_attribute]
 pub fn violation(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let violation = parse_macro_input!(item as ItemStruct);
@@ -59,7 +58,7 @@ pub fn violation(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_derive(RuleNamespace, attributes(prefix))]
-pub fn derive_rule_namespace(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_rule_namespace(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     rule_namespace::derive_impl(input)

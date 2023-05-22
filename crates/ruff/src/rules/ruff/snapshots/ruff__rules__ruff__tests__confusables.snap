@@ -56,4 +56,75 @@ confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `�
 9 9 | 
 10 10 | 
 
+confusables.py:17:6: RUF001 [*] String contains ambiguous unicode character `𝐁` (did you mean `B`?)
+   |
+17 | x = "𝐁ad string"
+   |      ^ RUF001
+18 | x = "−"
+   |
+   = help: Replace `𝐁` with `B`
+
+ℹ Suggested fix
+14 14 |     ...
+15 15 | 
+16 16 | 
+17    |-x = "𝐁ad string"
+   17 |+x = "Bad string"
+18 18 | x = "−"
+19 19 | 
+20 20 | # This should be ignored, since it contains an unambiguous unicode character, and no
+
+confusables.py:26:10: RUF001 [*] String contains ambiguous unicode character `α` (did you mean `a`?)
+   |
+26 | # The first word should be ignored, while the second should be included, since it
+27 | # contains ASCII.
+28 | x = "βα Bαd"
+   |          ^ RUF001
+29 | 
+30 | # The two characters should be flagged here. The first character is a "word"
+   |
+   = help: Replace `α` with `a`
+
+ℹ Suggested fix
+23 23 | 
+24 24 | # The first word should be ignored, while the second should be included, since it
+25 25 | # contains ASCII.
+26    |-x = "βα Bαd"
+   26 |+x = "βα Bad"
+27 27 | 
+28 28 | # The two characters should be flagged here. The first character is a "word"
+29 29 | # consisting of a single ambiguous character, while the second character is a "word
+
+confusables.py:31:6: RUF001 [*] String contains ambiguous unicode character `Р` (did you mean `P`?)
+   |
+31 | # consisting of a single ambiguous character, while the second character is a "word
+32 | # boundary" (whitespace) that it itself ambiguous.
+33 | x = "Р усский"
+   |      ^ RUF001
+   |
+   = help: Replace `Р` with `P`
+
+ℹ Suggested fix
+28 28 | # The two characters should be flagged here. The first character is a "word"
+29 29 | # consisting of a single ambiguous character, while the second character is a "word
+30 30 | # boundary" (whitespace) that it itself ambiguous.
+31    |-x = "Р усский"
+   31 |+x = "P усский"
+
+confusables.py:31:7: RUF001 [*] String contains ambiguous unicode character ` ` (did you mean ` `?)
+   |
+31 | # consisting of a single ambiguous character, while the second character is a "word
+32 | # boundary" (whitespace) that it itself ambiguous.
+33 | x = "Р усский"
+   |       ^ RUF001
+   |
+   = help: Replace ` ` with ` `
+
+ℹ Suggested fix
+28 28 | # The two characters should be flagged here. The first character is a "word"
+29 29 | # consisting of a single ambiguous character, while the second character is a "word
+30 30 | # boundary" (whitespace) that it itself ambiguous.
+31    |-x = "Р усский"
+   31 |+x = "Р усский"
+
 

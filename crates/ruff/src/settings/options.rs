@@ -176,6 +176,24 @@ pub struct Options {
     /// specified by `select`.
     pub extend_select: Option<Vec<RuleSelector>>,
     #[option(
+        default = r#"[]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            # Enable autofix for flake8-bugbear (`B`), on top of any rules specified by `fixable`.
+            extend-fixable = ["B"]
+        "#
+    )]
+    /// A list of rule codes or prefixes to consider autofixable, in addition to those
+    /// specified by `fixable`.
+    pub extend_fixable: Option<Vec<RuleSelector>>,
+    /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
+    /// specified by `unfixable`.
+    ///
+    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
+    /// interchangeable with `unfixable`.
+    #[cfg_attr(feature = "schemars", schemars(skip))]
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    #[option(
         default = "[]",
         value_type = "list[str]",
         example = r#"
@@ -235,7 +253,7 @@ pub struct Options {
     /// respect these exclusions unequivocally.
     ///
     /// This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
-    /// changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit)
+    /// changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit)
     /// plugin, regardless of whether they're marked as excluded by Ruff's own
     /// settings.
     pub force_exclude: Option<bool>,
@@ -523,4 +541,16 @@ pub struct Options {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files.
     pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    #[option(
+        default = "{}",
+        value_type = "dict[str, list[RuleSelector]]",
+        example = r#"
+            # Also ignore `E401` in all `__init__.py` files.
+            [tool.ruff.extend-per-file-ignores]
+            "__init__.py" = ["E402"]
+        "#
+    )]
+    /// A list of mappings from file pattern to rule codes or prefixes to
+    /// exclude, in addition to any rules excluded by `per-file-ignores`.
+    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
 }

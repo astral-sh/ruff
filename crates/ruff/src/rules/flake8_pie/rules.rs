@@ -13,7 +13,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{trailing_comment_start_offset, unparse_expr};
+use ruff_python_ast::helpers::trailing_comment_start_offset;
 use ruff_python_ast::types::RefEquality;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -417,7 +417,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
     if !bases.iter().any(|expr| {
         checker
-            .ctx
+            .semantic_model()
             .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
     }) {
@@ -432,7 +432,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
 
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
             if checker
-                .ctx
+                .semantic_model()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
             {
@@ -443,7 +443,7 @@ pub(crate) fn non_unique_enums<'a, 'b>(
         if !seen_targets.insert(ComparableExpr::from(value)) {
             let diagnostic = Diagnostic::new(
                 NonUniqueEnums {
-                    value: unparse_expr(value, checker.stylist),
+                    value: checker.generator().expr(value),
                 },
                 stmt.range(),
             );
@@ -612,7 +612,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 let bool_op = node;
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(&bool_op, checker.stylist),
+                    checker.generator().expr(&bool_op),
                     expr.range(),
                 )));
             }

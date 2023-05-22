@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -61,7 +60,7 @@ fn traverse_union<'a>(
     if !seen_nodes.insert(expr.into()) {
         let mut diagnostic = Diagnostic::new(
             DuplicateUnionMember {
-                duplicate_name: unparse_expr(expr, checker.stylist),
+                duplicate_name: checker.generator().expr(expr),
             },
             expr.range(),
         );
@@ -80,10 +79,9 @@ fn traverse_union<'a>(
             // Replace the parent with its non-duplicate child.
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(
-                    if expr == left.as_ref() { right } else { left },
-                    checker.stylist,
-                ),
+                checker
+                    .generator()
+                    .expr(if expr == left.as_ref() { right } else { left }),
                 parent.range(),
             )));
         }

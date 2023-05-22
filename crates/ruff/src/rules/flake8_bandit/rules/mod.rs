@@ -20,6 +20,7 @@ pub(crate) use jinja2_autoescape_false::{jinja2_autoescape_false, Jinja2Autoesca
 pub(crate) use logging_config_insecure_listen::{
     logging_config_insecure_listen, LoggingConfigInsecureListen,
 };
+pub(crate) use paramiko_calls::{paramiko_call, ParamikoCall};
 pub(crate) use request_with_no_cert_validation::{
     request_with_no_cert_validation, RequestWithNoCertValidation,
 };
@@ -57,6 +58,7 @@ mod hardcoded_tmp_directory;
 mod hashlib_insecure_hash_functions;
 mod jinja2_autoescape_false;
 mod logging_config_insecure_listen;
+mod paramiko_calls;
 mod request_with_no_cert_validation;
 mod request_without_timeout;
 mod shell_injection;

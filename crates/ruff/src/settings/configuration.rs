@@ -32,6 +32,7 @@ pub struct RuleSelection {
     pub extend_select: Vec<RuleSelector>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub unfixable: Vec<RuleSelector>,
+    pub extend_fixable: Vec<RuleSelector>,
 }
 
 #[derive(Debug, Default)]
@@ -47,6 +48,7 @@ pub struct Configuration {
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
     pub extend_include: Vec<FilePattern>,
+    pub extend_per_file_ignores: Vec<PerFileIgnore>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
@@ -101,7 +103,13 @@ impl Configuration {
                     .collect(),
                 extend_select: options.extend_select.unwrap_or_default(),
                 fixable: options.fixable,
-                unfixable: options.unfixable.unwrap_or_default(),
+                unfixable: options
+                    .unfixable
+                    .into_iter()
+                    .flatten()
+                    .chain(options.extend_unfixable.into_iter().flatten())
+                    .collect(),
+                extend_fixable: options.extend_fixable.unwrap_or_default(),
             }],
             allowed_confusables: options.allowed_confusables,
             builtins: options.builtins,
@@ -155,6 +163,17 @@ impl Configuration {
                         .map(|pattern| {
                             let absolute = fs::normalize_path_to(&pattern, project_root);
                             FilePattern::User(pattern, absolute)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            extend_per_file_ignores: options
+                .extend_per_file_ignores
+                .map(|per_file_ignores| {
+                    per_file_ignores
+                        .into_iter()
+                        .map(|(pattern, prefixes)| {
+                            PerFileIgnore::new(pattern, &prefixes, Some(project_root))
                         })
                         .collect()
                 })
@@ -246,6 +265,11 @@ impl Configuration {
                 .extend_include
                 .into_iter()
                 .chain(self.extend_include.into_iter())
+                .collect(),
+            extend_per_file_ignores: config
+                .extend_per_file_ignores
+                .into_iter()
+                .chain(self.extend_per_file_ignores.into_iter())
                 .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),

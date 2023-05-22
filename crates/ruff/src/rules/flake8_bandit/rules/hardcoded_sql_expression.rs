@@ -4,14 +4,14 @@ use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{any_over_expr, unparse_expr};
+use ruff_python_ast::helpers::any_over_expr;
 
 use crate::checkers::ast::Checker;
 
 use super::super::helpers::string_literal;
 
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(select\s.*from\s|delete\s+from\s|insert\s+into\s.*values\s|update\s.*set\s)")
+    Regex::new(r"(?i)\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)")
         .unwrap()
 });
 
@@ -60,16 +60,16 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             op: Operator::Add | Operator::Mod,
             ..
         }) => {
-            let Some(parent) = checker.ctx.expr_parent() else {
+            let Some(parent) = checker.semantic_model().expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.stylist));
+                    return Some(checker.generator().expr(expr));
                 }
                 return None;
             };
             // Only evaluate the full BinOp, not the nested components.
             let Expr::BinOp(_ )= parent else {
                 if any_over_expr(expr, &has_string_literal) {
-                    return Some(unparse_expr(expr, checker.stylist));
+                    return Some(checker.generator().expr(expr));
                 }
                 return None;
             };
@@ -81,12 +81,12 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             };
             // "select * from table where val = {}".format(...)
             if attr == "format" && string_literal(value).is_some() {
-                return Some(unparse_expr(expr, checker.stylist));
+                return Some(checker.generator().expr(expr));
             };
             None
         }
         // f"select * from table where val = {val}"
-        Expr::JoinedStr(_) => Some(unparse_expr(expr, checker.stylist)),
+        Expr::JoinedStr(_) => Some(checker.generator().expr(expr)),
         _ => None,
     }
 }

@@ -65,7 +65,7 @@ RUF010.py:11:4: RUF010 [*] Use conversion in f-string
 13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |    ^^^^^^^^^^^ RUF010
 14 | 
-15 | f"{foo(bla)}"  # OK
+15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Replace f-string function call with conversion
 
@@ -76,7 +76,7 @@ RUF010.py:11:4: RUF010 [*] Use conversion in f-string
 11    |-f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    11 |+f"{d['a']!s}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 12 12 | 
-13 13 | f"{foo(bla)}"  # OK
+13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
 RUF010.py:11:19: RUF010 [*] Use conversion in f-string
@@ -86,7 +86,7 @@ RUF010.py:11:19: RUF010 [*] Use conversion in f-string
 13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |                   ^^^^^^^^^^^^ RUF010
 14 | 
-15 | f"{foo(bla)}"  # OK
+15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Replace f-string function call with conversion
 
@@ -97,7 +97,7 @@ RUF010.py:11:19: RUF010 [*] Use conversion in f-string
 11    |-f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    11 |+f"{str(d['a'])}, {d['b']!r}, {ascii(d['c'])}"  # RUF010
 12 12 | 
-13 13 | f"{foo(bla)}"  # OK
+13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
 
 RUF010.py:11:35: RUF010 [*] Use conversion in f-string
@@ -107,7 +107,7 @@ RUF010.py:11:35: RUF010 [*] Use conversion in f-string
 13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    |                                   ^^^^^^^^^^^^^ RUF010
 14 | 
-15 | f"{foo(bla)}"  # OK
+15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
    |
    = help: Replace f-string function call with conversion
 
@@ -118,7 +118,70 @@ RUF010.py:11:35: RUF010 [*] Use conversion in f-string
 11    |-f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
    11 |+f"{str(d['a'])}, {repr(d['b'])}, {d['c']!a}"  # RUF010
 12 12 | 
-13 13 | f"{foo(bla)}"  # OK
+13 13 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
 14 14 | 
+
+RUF010.py:13:5: RUF010 [*] Use conversion in f-string
+   |
+13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+14 | 
+15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+   |     ^^^^^^^^ RUF010
+16 | 
+17 | f"{foo(bla)}"  # OK
+   |
+   = help: Replace f-string function call with conversion
+
+ℹ Fix
+10 10 | 
+11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+12 12 | 
+13    |-f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+   13 |+f"{bla!s}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+14 14 | 
+15 15 | f"{foo(bla)}"  # OK
+16 16 | 
+
+RUF010.py:13:19: RUF010 [*] Use conversion in f-string
+   |
+13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+14 | 
+15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+   |                   ^^^^^^^^^ RUF010
+16 | 
+17 | f"{foo(bla)}"  # OK
+   |
+   = help: Replace f-string function call with conversion
+
+ℹ Fix
+10 10 | 
+11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+12 12 | 
+13    |-f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+   13 |+f"{(str(bla))}, {bla!r}, {(ascii(bla))}"  # RUF010
+14 14 | 
+15 15 | f"{foo(bla)}"  # OK
+16 16 | 
+
+RUF010.py:13:34: RUF010 [*] Use conversion in f-string
+   |
+13 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+14 | 
+15 | f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+   |                                  ^^^^^^^^^^ RUF010
+16 | 
+17 | f"{foo(bla)}"  # OK
+   |
+   = help: Replace f-string function call with conversion
+
+ℹ Fix
+10 10 | 
+11 11 | f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
+12 12 | 
+13    |-f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+   13 |+f"{(str(bla))}, {(repr(bla))}, {bla!a}"  # RUF010
+14 14 | 
+15 15 | f"{foo(bla)}"  # OK
+16 16 | 
 
 

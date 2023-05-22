@@ -1,9 +1,7 @@
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
+use ruff_python_ast::source_code::{Indexer, Locator};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -289,38 +287,52 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) fn todos(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let mut iter = tokens.iter().flatten().multipeek();
-    while let Some((token, token_range)) = iter.next() {
-        let Tok::Comment(comment) = token else {
-            continue;
-        };
+    let mut iter = indexer.comment_ranges().iter().peekable();
+    while let Some(comment_range) = iter.next() {
+        let comment = locator.slice(*comment_range);
 
         // Check that the comment is a TODO (properly formed or not).
-        let Some(tag) = detect_tag(comment, token_range.start()) else {
+        let Some(tag) = detect_tag(comment, comment_range.start()) else {
             continue;
         };
 
         tag_errors(&tag, &mut diagnostics, settings);
-        static_errors(&mut diagnostics, comment, *token_range, &tag);
+        static_errors(&mut diagnostics, comment, *comment_range, &tag);
 
         // TD003
         let mut has_issue_link = false;
-        while let Some((token, token_range)) = iter.peek() {
-            if let Tok::Comment(comment) = token {
-                if detect_tag(comment, token_range.start()).is_some() {
-                    break;
-                }
-                if ISSUE_LINK_REGEX_SET.is_match(comment) {
-                    has_issue_link = true;
-                    break;
-                }
-            } else {
+        let mut curr_range = comment_range;
+        while let Some(next_range) = iter.peek() {
+            // Ensure that next_comment_range is in the same multiline comment "block" as
+            // comment_range.
+            if !locator
+                .slice(TextRange::new(curr_range.end(), next_range.start()))
+                .chars()
+                .all(char::is_whitespace)
+            {
                 break;
             }
+
+            let next_comment = locator.slice(**next_range);
+            if detect_tag(next_comment, next_range.start()).is_some() {
+                break;
+            }
+
+            if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
+                has_issue_link = true;
+            }
+
+            // If the next_comment isn't a tag or an issue, it's worthles in the context of this
+            // linter. We can increment here instead of waiting for the next iteration of the outer
+            // loop.
+            //
+            // Unwrap is safe because peek() is Some()
+            curr_range = iter.next().unwrap();
         }
+
         if !has_issue_link {
             diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
         }
@@ -394,6 +406,7 @@ fn static_errors(
                 trimmed.text_len()
             }
         } else {
+            // TD-002
             diagnostics.push(Diagnostic::new(MissingTodoAuthor, tag.range));
 
             TextSize::new(0)
@@ -405,15 +418,18 @@ fn static_errors(
         if let Some(stripped) = after_colon.strip_prefix(' ') {
             stripped
         } else {
+            // TD-007
             diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range));
             after_colon
         }
     } else {
+        // TD-004
         diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
         ""
     };
 
     if post_colon.is_empty() {
+        // TD-005
         diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
     }
 }

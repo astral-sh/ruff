@@ -3,6 +3,7 @@ use std::path::Path;
 
 use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
@@ -19,8 +20,8 @@ use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::node::{NodeId, Nodes};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
-#[allow(clippy::struct_excessive_bools)]
-pub struct Context<'a> {
+/// A semantic model for a Python module, to enable querying the module's semantic information.
+pub struct SemanticModel<'a> {
     pub typing_modules: &'a [String],
     pub module_path: Option<&'a [String]>,
     // Stack of all visited statements, along with the identifier of the current statement.
@@ -48,7 +49,7 @@ pub struct Context<'a> {
     pub handled_exceptions: Vec<Exceptions>,
 }
 
-impl<'a> Context<'a> {
+impl<'a> SemanticModel<'a> {
     pub fn new(typing_modules: &'a [String], path: &'a Path, module: Module<'a>) -> Self {
         Self {
             typing_modules,
@@ -113,6 +114,141 @@ impl<'a> Context<'a> {
             .map_or(false, |binding| binding.kind.is_builtin())
     }
 
+    /// Resolve a reference to the given symbol.
+    pub fn resolve_reference(&mut self, symbol: &str, range: TextRange) -> ResolvedReference {
+        // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
+        // should prefer it over local resolutions.
+        if self.in_deferred_type_definition() {
+            if let Some(binding_id) = self.scopes.global().get(symbol) {
+                // Mark the binding as used.
+                let context = self.execution_context();
+                self.bindings[*binding_id].mark_used(ScopeId::global(), range, context);
+
+                // Mark any submodule aliases as used.
+                if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), *binding_id) {
+                    self.bindings[binding_id].mark_used(ScopeId::global(), range, context);
+                }
+
+                return ResolvedReference::Resolved(*binding_id);
+            }
+        }
+
+        let mut seen_function = false;
+        let mut import_starred = false;
+        for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
+            let scope = &self.scopes[scope_id];
+            if scope.kind.is_class() {
+                // Allow usages of `__class__` within methods, e.g.:
+                //
+                // ```python
+                // class Foo:
+                //     def __init__(self):
+                //         print(__class__)
+                // ```
+                if seen_function && matches!(symbol, "__class__") {
+                    return ResolvedReference::ImplicitGlobal;
+                }
+                if index > 0 {
+                    continue;
+                }
+            }
+
+            if let Some(binding_id) = scope.get(symbol) {
+                // Mark the binding as used.
+                let context = self.execution_context();
+                self.bindings[*binding_id].mark_used(self.scope_id, range, context);
+
+                // Mark any submodule aliases as used.
+                if let Some(binding_id) = self.resolve_submodule(scope_id, *binding_id) {
+                    self.bindings[binding_id].mark_used(ScopeId::global(), range, context);
+                }
+
+                // But if it's a type annotation, don't treat it as resolved, unless we're in a
+                // forward reference. For example, given:
+                //
+                // ```python
+                // name: str
+                // print(name)
+                // ```
+                //
+                // The `name` in `print(name)` should be treated as unresolved, but the `name` in
+                // `name: str` should be treated as used.
+                if !self.in_deferred_type_definition()
+                    && self.bindings[*binding_id].kind.is_annotation()
+                {
+                    continue;
+                }
+
+                return ResolvedReference::Resolved(*binding_id);
+            }
+
+            // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
+            //
+            // ```python
+            // class Foo:
+            //     print(__qualname__)
+            // ```
+            //
+            // Intentionally defer this check to _after_ the standard `scope.get` logic, so that
+            // we properly attribute reads to overridden class members, e.g.:
+            //
+            // ```python
+            // class Foo:
+            //     __qualname__ = "Bar"
+            //     print(__qualname__)
+            // ```
+            if index == 0 && scope.kind.is_class() {
+                if matches!(symbol, "__module__" | "__qualname__") {
+                    return ResolvedReference::ImplicitGlobal;
+                }
+            }
+
+            seen_function |= scope.kind.is_function();
+            import_starred = import_starred || scope.uses_star_imports();
+        }
+
+        if import_starred {
+            ResolvedReference::StarImport
+        } else {
+            ResolvedReference::NotFound
+        }
+    }
+
+    /// Given a `BindingId`, return the `BindingId` of the submodule import that it aliases.
+    fn resolve_submodule(&self, scope_id: ScopeId, binding_id: BindingId) -> Option<BindingId> {
+        // If the name of a submodule import is the same as an alias of another import, and the
+        // alias is used, then the submodule import should be marked as used too.
+        //
+        // For example, mark `pyarrow.csv` as used in:
+        //
+        // ```python
+        // import pyarrow as pa
+        // import pyarrow.csv
+        // print(pa.csv.read_csv("test.csv"))
+        // ```
+        let (name, full_name) = match &self.bindings[binding_id].kind {
+            BindingKind::Importation(Importation { name, full_name }) => (*name, *full_name),
+            BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) => {
+                (*name, *full_name)
+            }
+            BindingKind::FromImportation(FromImportation { name, full_name }) => {
+                (*name, full_name.as_str())
+            }
+            _ => return None,
+        };
+
+        let has_alias = full_name
+            .split('.')
+            .last()
+            .map(|segment| segment != name)
+            .unwrap_or_default();
+        if !has_alias {
+            return None;
+        }
+
+        self.scopes[scope_id].get(full_name).copied()
+    }
+
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
     /// or builtin symbol.
     ///
@@ -125,10 +261,7 @@ impl<'a> Context<'a> {
     /// ```
     ///
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
-    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
-    where
-        'b: 'a,
-    {
+    pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
         let Some(call_path) = collect_call_path(value) else {
             return None;
         };
@@ -334,6 +467,11 @@ impl<'a> Context<'a> {
         let node_id = self.stmt_id.expect("No current statement");
         let parent_id = self.stmts.parent_id(node_id)?;
         Some(self.stmts[parent_id])
+    }
+
+    /// Return the current `Expr`.
+    pub fn expr(&self) -> Option<&'a Expr> {
+        self.exprs.iter().last().copied()
     }
 
     /// Return the parent `Expr` of the current `Expr`.
@@ -695,11 +833,25 @@ impl ContextFlags {
     }
 }
 
-/// A snapshot of the [`Context`] at a given point in the AST traversal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A snapshot of the [`SemanticModel`] at a given point in the AST traversal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Snapshot {
     scope_id: ScopeId,
     stmt_id: Option<NodeId>,
     definition_id: DefinitionId,
     flags: ContextFlags,
+}
+
+#[derive(Debug)]
+pub enum ResolvedReference {
+    /// The reference is resolved to a specific binding.
+    Resolved(BindingId),
+    /// The reference is resolved to a context-specific, implicit global (e.g., `__class__` within
+    /// a class scope).
+    ImplicitGlobal,
+    /// The reference is unresolved, but at least one of the containing scopes contains a star
+    /// import.
+    StarImport,
+    /// The reference is definitively unresolved.
+    NotFound,
 }

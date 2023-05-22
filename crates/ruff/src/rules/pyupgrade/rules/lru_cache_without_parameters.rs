@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -38,7 +37,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
         if args.is_empty()
             && keywords.is_empty()
             && checker
-                .ctx
+                .semantic_model()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["functools", "lru_cache"]
@@ -51,7 +50,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
             if checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(func, checker.stylist),
+                    checker.generator().expr(func),
                     expr.range(),
                 )));
             }

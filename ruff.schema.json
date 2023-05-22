@@ -66,6 +66,16 @@
         "type": "string"
       }
     },
+    "extend-fixable": {
+      "description": "A list of rule codes or prefixes to consider autofixable, in addition to those specified by `fixable`.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/definitions/RuleSelector"
+      }
+    },
     "extend-include": {
       "description": "A list of file patterns to include when linting, in addition to those specified by `include`.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
@@ -74,6 +84,19 @@
       ],
       "items": {
         "type": "string"
+      }
+    },
+    "extend-per-file-ignores": {
+      "description": "A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by `per-file-ignores`.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/RuleSelector"
+        }
       }
     },
     "extend-select": {
@@ -286,7 +309,7 @@
       ]
     },
     "force-exclude": {
-      "description": "Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to respect these exclusions unequivocally.\n\nThis is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit) plugin, regardless of whether they're marked as excluded by Ruff's own settings.",
+      "description": "Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to respect these exclusions unequivocally.\n\nThis is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit) plugin, regardless of whether they're marked as excluded by Ruff's own settings.",
       "type": [
         "boolean",
         "null"
@@ -1688,6 +1711,37 @@
         "E1",
         "E10",
         "E101",
+        "E111",
+        "E112",
+        "E113",
+        "E114",
+        "E115",
+        "E116",
+        "E117",
+        "E201",
+        "E202",
+        "E203",
+        "E211",
+        "E221",
+        "E222",
+        "E223",
+        "E224",
+        "E225",
+        "E226",
+        "E227",
+        "E228",
+        "E231",
+        "E251",
+        "E252",
+        "E261",
+        "E262",
+        "E265",
+        "E266",
+        "E271",
+        "E272",
+        "E273",
+        "E274",
+        "E275",
         "E4",
         "E40",
         "E401",
@@ -2022,6 +2076,9 @@
         "PLW012",
         "PLW0120",
         "PLW0129",
+        "PLW013",
+        "PLW0130",
+        "PLW0131",
         "PLW04",
         "PLW040",
         "PLW0406",
@@ -2116,6 +2173,7 @@
         "PYI010",
         "PYI011",
         "PYI012",
+        "PYI013",
         "PYI014",
         "PYI015",
         "PYI016",
@@ -2216,6 +2274,7 @@
         "S509",
         "S6",
         "S60",
+        "S601",
         "S602",
         "S603",
         "S604",
@@ -2318,6 +2377,7 @@
         "TRY30",
         "TRY300",
         "TRY301",
+        "TRY302",
         "TRY4",
         "TRY40",
         "TRY400",

@@ -4,6 +4,7 @@ use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -99,11 +100,11 @@ impl fmt::Display for ContentType {
     }
 }
 
-fn get_element_type(checker: &Checker, element: &Stmt) -> Option<ContentType> {
+fn get_element_type(model: &SemanticModel, element: &Stmt) -> Option<ContentType> {
     match element {
         Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                if helpers::is_model_field(&checker.ctx, func) {
+                if helpers::is_model_field(model, func) {
                     return Some(ContentType::FieldDeclaration);
                 }
             }
@@ -144,13 +145,13 @@ pub(crate) fn unordered_body_content_in_model(
 ) {
     if !bases
         .iter()
-        .any(|base| helpers::is_model(&checker.ctx, base))
+        .any(|base| helpers::is_model(checker.semantic_model(), base))
     {
         return;
     }
     let mut elements_type_found = Vec::new();
     for element in body.iter() {
-        let Some(current_element_type) = get_element_type(checker, element) else {
+        let Some(current_element_type) = get_element_type(checker.semantic_model(), element) else {
             continue;
         };
         let Some(&element_type) = elements_type_found

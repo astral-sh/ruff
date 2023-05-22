@@ -74,8 +74,8 @@ def query40():
 
 def query41():
     return (
-        "SELECT *"
-        "FROM table"
+        "SELECT * "
+        "FROM table "
         f"WHERE var = {var}"
     )
 
@@ -84,7 +84,7 @@ query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
 query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
 query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
 query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
- 
+
 # # pass
 query = "SELECT * FROM table WHERE id = 1"
 query = "DELETE FROM table WHERE id = 1"
@@ -93,3 +93,12 @@ query = "UPDATE table SET id = 1"
 cursor.execute('SELECT * FROM table WHERE id = %s', var)
 cursor.execute('SELECT * FROM table WHERE id = 1')
 cursor.executemany('SELECT * FROM table WHERE id = %s', [var, var2])
+
+# # INSERT without INTO (e.g. MySQL and derivatives)
+query = "INSERT table VALUES (%s)" % (var,)
+
+# # REPLACE (e.g. MySQL and derivatives, SQLite)
+query = "REPLACE INTO table VALUES (%s)" % (var,)
+query = "REPLACE table VALUES (%s)" % (var,)
+
+query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"

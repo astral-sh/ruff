@@ -289,7 +289,7 @@ pub(crate) fn unused_arguments(
             ..
         }) => {
             match function_type::classify(
-                &checker.ctx,
+                checker.semantic_model(),
                 parent,
                 name,
                 decorator_list,
@@ -301,7 +301,7 @@ pub(crate) fn unused_arguments(
                         .settings
                         .rules
                         .enabled(Argumentable::Function.rule_code())
-                        && !visibility::is_overload(&checker.ctx, decorator_list)
+                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
                     {
                         function(
                             Argumentable::Function,
@@ -328,9 +328,9 @@ pub(crate) fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(&checker.ctx, decorator_list)
-                        && !visibility::is_override(&checker.ctx, decorator_list)
-                        && !visibility::is_overload(&checker.ctx, decorator_list)
+                        && !visibility::is_abstract(checker.semantic_model(), decorator_list)
+                        && !visibility::is_override(checker.semantic_model(), decorator_list)
+                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
                     {
                         method(
                             Argumentable::Method,
@@ -357,9 +357,9 @@ pub(crate) fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(&checker.ctx, decorator_list)
-                        && !visibility::is_override(&checker.ctx, decorator_list)
-                        && !visibility::is_overload(&checker.ctx, decorator_list)
+                        && !visibility::is_abstract(checker.semantic_model(), decorator_list)
+                        && !visibility::is_override(checker.semantic_model(), decorator_list)
+                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
                     {
                         method(
                             Argumentable::ClassMethod,
@@ -386,9 +386,9 @@ pub(crate) fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(&checker.ctx, decorator_list)
-                        && !visibility::is_override(&checker.ctx, decorator_list)
-                        && !visibility::is_overload(&checker.ctx, decorator_list)
+                        && !visibility::is_abstract(checker.semantic_model(), decorator_list)
+                        && !visibility::is_override(checker.semantic_model(), decorator_list)
+                        && !visibility::is_overload(checker.semantic_model(), decorator_list)
                     {
                         function(
                             Argumentable::StaticMethod,

@@ -56,7 +56,7 @@ pub(crate) fn native_literals(
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.ctx.is_builtin(id) {
+    if (id == "str" || id == "bytes") && checker.semantic_model().is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str
@@ -64,20 +64,15 @@ pub(crate) fn native_literals(
                 LiteralType::Bytes
             }}, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
+                let constant = if id == "bytes" {
+                    Constant::Bytes(vec![])
+                } else {
+                    Constant::Str(String::new())
+                };
+                let content = checker.generator().constant(&constant);
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    if id == "bytes" {
-                        let mut content = String::with_capacity(3);
-                        content.push('b');
-                        content.push(checker.stylist.quote().into());
-                        content.push(checker.stylist.quote().into());
-                        content
-                    } else {
-                        let mut content = String::with_capacity(2);
-                        content.push(checker.stylist.quote().into());
-                        content.push(checker.stylist.quote().into());
-                        content
-                    },
+                    content,
                     expr.range(),
                 )));
             }

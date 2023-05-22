@@ -6,7 +6,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -23,6 +22,8 @@ mod tests {
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
+    #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.py"))]
+    #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.pyi"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.py"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.pyi"))]
     #[test_case(Rule::PassInClassBody, Path::new("PYI012.py"))]

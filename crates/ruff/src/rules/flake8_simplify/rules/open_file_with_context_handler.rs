@@ -2,6 +2,7 @@ use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -41,8 +42,8 @@ impl Violation for OpenFileWithContextHandler {
 
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.
-fn match_async_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.expr_grandparent() else {
+fn match_async_exit_stack(model: &SemanticModel) -> bool {
+    let Some(expr) = model.expr_grandparent() else {
         return false;
     };
     let Expr::Await(ast::ExprAwait { value, range: _ }) = expr else {
@@ -57,17 +58,13 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_async_context" {
         return false;
     }
-    for parent in checker.ctx.parents() {
+    for parent in model.parents() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if checker
-                        .ctx
-                        .resolve_call_path(func)
-                        .map_or(false, |call_path| {
-                            call_path.as_slice() == ["contextlib", "AsyncExitStack"]
-                        })
-                    {
+                    if model.resolve_call_path(func).map_or(false, |call_path| {
+                        call_path.as_slice() == ["contextlib", "AsyncExitStack"]
+                    }) {
                         return true;
                     }
                 }
@@ -79,8 +76,8 @@ fn match_async_exit_stack(checker: &Checker) -> bool {
 
 /// Return `true` if the current expression is nested in an
 /// `exit_stack.enter_context` call.
-fn match_exit_stack(checker: &Checker) -> bool {
-    let Some(expr) = checker.ctx.expr_parent() else {
+fn match_exit_stack(model: &SemanticModel) -> bool {
+    let Some(expr) = model.expr_parent() else {
         return false;
     };
     let Expr::Call(ast::ExprCall { func,  .. }) = expr else {
@@ -92,17 +89,13 @@ fn match_exit_stack(checker: &Checker) -> bool {
     if attr != "enter_context" {
         return false;
     }
-    for parent in checker.ctx.parents() {
+    for parent in model.parents() {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if checker
-                        .ctx
-                        .resolve_call_path(func)
-                        .map_or(false, |call_path| {
-                            call_path.as_slice() == ["contextlib", "ExitStack"]
-                        })
-                    {
+                    if model.resolve_call_path(func).map_or(false, |call_path| {
+                        call_path.as_slice() == ["contextlib", "ExitStack"]
+                    }) {
                         return true;
                     }
                 }
@@ -115,23 +108,23 @@ fn match_exit_stack(checker: &Checker) -> bool {
 /// SIM115
 pub(crate) fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "open"])
     {
-        if checker.ctx.is_builtin("open") {
+        if checker.semantic_model().is_builtin("open") {
             // Ex) `with open("foo.txt") as f: ...`
-            if matches!(checker.ctx.stmt(), Stmt::With(_)) {
+            if matches!(checker.semantic_model().stmt(), Stmt::With(_)) {
                 return;
             }
 
             // Ex) `with contextlib.ExitStack() as exit_stack: ...`
-            if match_exit_stack(checker) {
+            if match_exit_stack(checker.semantic_model()) {
                 return;
             }
 
             // Ex) `with contextlib.AsyncExitStack() as exit_stack: ...`
-            if match_async_exit_stack(checker) {
+            if match_async_exit_stack(checker.semantic_model()) {
                 return;
             }
 

@@ -46,12 +46,12 @@ pub(crate) fn use_pep585_annotation(
         },
         expr.range(),
     );
-    let fixable = !checker.ctx.in_complex_string_type_definition();
+    let fixable = !checker.semantic_model().in_complex_string_type_definition();
     if fixable && checker.patch(diagnostic.kind.rule()) {
         match replacement {
             ModuleMember::BuiltIn(name) => {
                 // Built-in type, like `list`.
-                if checker.ctx.is_builtin(name) {
+                if checker.semantic_model().is_builtin(name) {
                     diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                         (*name).to_string(),
                         expr.range(),
@@ -65,7 +65,7 @@ pub(crate) fn use_pep585_annotation(
                         module,
                         member,
                         expr.start(),
-                        &checker.ctx,
+                        checker.semantic_model(),
                         &checker.importer,
                         checker.locator,
                     )?;

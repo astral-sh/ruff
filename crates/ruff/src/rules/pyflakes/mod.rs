@@ -9,13 +9,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use regex::Regex;
-    use ruff_diagnostics::Diagnostic;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
 
+    use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::linter::{check_path, LinterResult};
@@ -36,6 +35,9 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_9.py"); "F401_9")]
     #[test_case(Rule::UnusedImport, Path::new("F401_10.py"); "F401_10")]
     #[test_case(Rule::UnusedImport, Path::new("F401_11.py"); "F401_11")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_12.py"); "F401_12")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_13.py"); "F401_13")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_14.py"); "F401_14")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
@@ -469,6 +471,16 @@ mod tests {
                 __qualname__
         "#,
             &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        def f():
+            __qualname__ = 1
+
+            class Foo:
+                __qualname__
+        "#,
+            &[Rule::UnusedVariable],
         );
     }
 
@@ -1030,6 +1042,23 @@ mod tests {
         "#,
             &[],
         );
+
+        flakes(
+            r#"
+        class A:
+            T = 1
+
+            # In each case, `T` is undefined. Only the first `iter` uses the class scope.
+            X = (T for x in range(10))
+            Y = [x for x in range(10) if T]
+            Z = [x for x in range(10) for y in T]
+        "#,
+            &[
+                Rule::UndefinedName,
+                Rule::UndefinedName,
+                Rule::UndefinedName,
+            ],
+        );
     }
 
     #[test]
@@ -1130,6 +1159,40 @@ mod tests {
         t = Test()
         "#,
             &[],
+        );
+        flakes(
+            r#"
+        class Test(object):
+            print(__class__.__name__)
+
+            def __init__(self):
+                self.x = 1
+
+        t = Test()
+        "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        class Test(object):
+            X = [__class__ for _ in range(10)]
+
+            def __init__(self):
+                self.x = 1
+
+        t = Test()
+        "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        def f(self):
+            print(__class__.__name__)
+            self.x = 1
+
+        f()
+        "#,
+            &[Rule::UndefinedName],
         );
     }
 

@@ -1,8 +1,6 @@
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::source_code::{Indexer, Locator};
 
 use crate::registry::Rule;
 use crate::settings::Settings;
@@ -47,24 +45,28 @@ fn is_standalone_comment(line: &str) -> bool {
 
 /// ERA001
 pub(crate) fn commented_out_code(
+    indexer: &Indexer,
     locator: &Locator,
-    range: TextRange,
     settings: &Settings,
-) -> Option<Diagnostic> {
-    let line = locator.full_lines(range);
+) -> Vec<Diagnostic> {
+    let mut diagnostics = vec![];
 
-    // Verify that the comment is on its own line, and that it contains code.
-    if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-        let mut diagnostic = Diagnostic::new(CommentedOutCode, range);
+    for range in indexer.comment_ranges() {
+        let line = locator.full_lines(*range);
 
-        if settings.rules.should_fix(Rule::CommentedOutCode) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
-                locator.full_lines_range(range),
-            )));
+        // Verify that the comment is on its own line, and that it contains code.
+        if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
+            let mut diagnostic = Diagnostic::new(CommentedOutCode, *range);
+
+            if settings.rules.should_fix(Rule::CommentedOutCode) {
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                    locator.full_lines_range(*range),
+                )));
+            }
+            diagnostics.push(diagnostic);
         }
-        Some(diagnostic)
-    } else {
-        None
     }
+
+    diagnostics
 }

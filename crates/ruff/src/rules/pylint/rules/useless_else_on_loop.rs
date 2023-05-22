@@ -6,6 +6,38 @@ use ruff_python_ast::helpers;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `else` clauses on loops without a `break` statement.
+///
+/// ## Why is this bad?
+/// When a loop includes an `else` statement, the code inside the `else` clause
+/// will be executed if the loop terminates "normally" (i.e., without a
+/// `break`).
+///
+/// If a loop _always_ terminates "normally" (i.e., does _not_ contain a
+/// `break`), then the `else` clause is redundant, as the code inside the
+/// `else` clause will always be executed.
+///
+/// In such cases, the code inside the `else` clause can be moved outside the
+/// loop entirely, and the `else` clause can be removed.
+///
+/// ## Example
+/// ```python
+/// for item in items:
+///     print(item)
+/// else:
+///     print("All items printed")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for item in items:
+///     print(item)
+/// print("All items printed")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
 #[violation]
 pub struct UselessElseOnLoop;
 

@@ -232,13 +232,17 @@ Rule selection:
       --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
       --extend-select <RULE_CODE>
-          Like --select, but adds additional rule codes on top of the selected ones
+          Like --select, but adds additional rule codes on top of those already specified
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
+      --extend-per-file-ignores <EXTEND_PER_FILE_IGNORES>
+          Like `--per-file-ignores`, but adds additional ignores on top of those already specified
       --fixable <RULE_CODE>
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>
           List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
+      --extend-fixable <RULE_CODE>
+          Like --fixable, but adds additional rule codes on top of those already specified
 
 File selection:
       --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis

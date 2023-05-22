@@ -11,7 +11,7 @@ use crate::args::Overrides;
 use crate::diagnostics::{lint_stdin, Diagnostics};
 
 /// Read a `String` from `stdin`.
-fn read_from_stdin() -> Result<String> {
+pub(crate) fn read_from_stdin() -> Result<String> {
     let mut buffer = String::new();
     io::stdin().lock().read_to_string(&mut buffer)?;
     Ok(buffer)

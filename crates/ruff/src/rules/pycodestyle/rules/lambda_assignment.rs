@@ -1,13 +1,14 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_leading_content, has_trailing_content, unparse_stmt};
-use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::source_code::Stylist;
-use ruff_python_ast::whitespace::leading_space;
-use ruff_python_semantic::context::Context;
-use ruff_python_semantic::scope::ScopeKind;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt};
+
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
+use ruff_python_ast::newlines::StrExt;
+use ruff_python_ast::source_code::Generator;
+use ruff_python_ast::whitespace::leading_space;
+use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -71,7 +72,7 @@ pub(crate) fn lambda_assignment(
             // package like dataclasses, which wouldn't consider the
             // rewritten function definition to be equivalent.
             // See https://github.com/charliermarsh/ruff/issues/3046
-            let fixable = !matches!(checker.ctx.scope().kind, ScopeKind::Class(_));
+            let fixable = !matches!(checker.semantic_model().scope().kind, ScopeKind::Class(_));
 
             let mut diagnostic = Diagnostic::new(
                 LambdaAssignment {
@@ -88,10 +89,16 @@ pub(crate) fn lambda_assignment(
                 let first_line = checker.locator.line(stmt.start());
                 let indentation = &leading_space(first_line);
                 let mut indented = String::new();
-                for (idx, line) in
-                    function(&checker.ctx, id, args, body, annotation, checker.stylist)
-                        .universal_newlines()
-                        .enumerate()
+                for (idx, line) in function(
+                    checker.semantic_model(),
+                    id,
+                    args,
+                    body,
+                    annotation,
+                    checker.generator(),
+                )
+                .universal_newlines()
+                .enumerate()
                 {
                     if idx == 0 {
                         indented.push_str(&line);
@@ -117,7 +124,7 @@ pub(crate) fn lambda_assignment(
 /// The `Callable` import can be from either `collections.abc` or `typing`.
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
-fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
+fn extract_types(model: &SemanticModel, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
         return None;
     };
@@ -128,9 +135,9 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
         return None;
     }
 
-    if !ctx.resolve_call_path(value).map_or(false, |call_path| {
+    if !model.resolve_call_path(value).map_or(false, |call_path| {
         call_path.as_slice() == ["collections", "abc", "Callable"]
-            || ctx.match_typing_call_path(&call_path, "Callable")
+            || model.match_typing_call_path(&call_path, "Callable")
     }) {
         return None;
     }
@@ -153,19 +160,19 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
 }
 
 fn function(
-    ctx: &Context,
+    model: &SemanticModel,
     name: &str,
     args: &Arguments,
     body: &Expr,
     annotation: Option<&Expr>,
-    stylist: &Stylist,
+    generator: Generator,
 ) -> String {
     let body = Stmt::Return(ast::StmtReturn {
         value: Some(Box::new(body.clone())),
         range: TextRange::default(),
     });
     if let Some(annotation) = annotation {
-        if let Some((arg_types, return_type)) = extract_types(ctx, annotation) {
+        if let Some((arg_types, return_type)) = extract_types(model, annotation) {
             // A `lambda` expression can only have positional and positional-only
             // arguments. The order is always positional-only first, then positional.
             let new_posonlyargs = args
@@ -203,7 +210,7 @@ fn function(
                 type_comment: None,
                 range: TextRange::default(),
             });
-            return unparse_stmt(&func, stylist);
+            return generator.stmt(&func);
         }
     }
     let func = Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -215,5 +222,5 @@ fn function(
         type_comment: None,
         range: TextRange::default(),
     });
-    unparse_stmt(&func, stylist)
+    generator.stmt(&func)
 }

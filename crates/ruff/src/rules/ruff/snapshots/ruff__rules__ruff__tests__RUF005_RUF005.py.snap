@@ -265,5 +265,7 @@ RUF005.py:44:1: RUF005 [*] Consider `[*foo]` instead of concatenation
 44    |-[] + foo + [  # This will be preserved, but doesn't prevent the fix
    44 |+[*foo] + [  # This will be preserved, but doesn't prevent the fix
 45 45 | ]
+46 46 | 
+47 47 | # Uses the non-preferred quote style, which should be retained.
 
 

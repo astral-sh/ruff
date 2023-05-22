@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{Cmpop, Expr, Ranged};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for usages of comparators other than `<` and `>=` for
@@ -68,7 +69,7 @@ pub(crate) fn bad_version_info_comparison(
     };
 
     if !checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(left)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["sys", "version_info"]

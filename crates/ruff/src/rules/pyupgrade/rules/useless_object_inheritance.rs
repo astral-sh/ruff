@@ -62,7 +62,12 @@ pub(crate) fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) {
+    if let Some(mut diagnostic) = rule(
+        name,
+        bases,
+        checker.semantic_model().scope(),
+        &checker.semantic_model().bindings,
+    ) {
         if checker.patch(diagnostic.kind.rule()) {
             let expr_range = diagnostic.range();
             #[allow(deprecated)]

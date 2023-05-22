@@ -4,6 +4,21 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::resolve_imported_module_path;
 
+/// ## What it does
+/// Checks for import statements that import the current module.
+///
+/// ## Why is this bad?
+/// Importing a module from itself is a circular dependency.
+///
+/// ## Example
+/// ```python
+/// # file: this_file.py
+/// from this_file import foo
+///
+///
+/// def foo():
+///     ...
+/// ```
 #[violation]
 pub struct ImportSelf {
     name: String,

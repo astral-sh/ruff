@@ -9,7 +9,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -67,7 +66,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "logical_lines")]
     #[test_case(Rule::IndentationWithInvalidMultiple, Path::new("E11.py"))]
     #[test_case(Rule::IndentationWithInvalidMultipleComment, Path::new("E11.py"))]
     #[test_case(Rule::MultipleLeadingHashesForBlockComment, Path::new("E26.py"))]
@@ -123,6 +121,21 @@ mod tests {
                 Rule::NoneComparison,
                 Rule::TrueFalseComparison,
                 Rule::IsLiteral,
+            ]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn shebang() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle/shebang.py"),
+            &settings::Settings::for_rules(vec![
+                Rule::TooFewSpacesBeforeInlineComment,
+                Rule::NoSpaceAfterInlineComment,
+                Rule::NoSpaceAfterBlockComment,
+                Rule::MultipleLeadingHashesForBlockComment,
             ]),
         )?;
         assert_messages!(diagnostics);

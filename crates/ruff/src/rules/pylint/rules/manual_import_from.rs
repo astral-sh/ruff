@@ -3,11 +3,29 @@ use rustpython_parser::ast::{self, Alias, Int, Ranged, Stmt};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for submodule imports that are aliased to the submodule name.
+///
+/// ## Why is this bad?
+/// Using the `from` keyword to import the submodule is more concise and
+/// readable.
+///
+/// ## Example
+/// ```python
+/// import concurrent.futures as futures
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from concurrent import futures
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/import.html#submodules)
 #[violation]
 pub struct ManualFromImport {
     module: String,
@@ -67,7 +85,7 @@ pub(crate) fn manual_from_import(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_stmt(&node.into(), checker.stylist),
+            checker.generator().stmt(&node.into()),
             stmt.range(),
         )));
     }

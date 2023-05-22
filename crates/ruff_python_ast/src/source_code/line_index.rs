@@ -1,12 +1,14 @@
-use crate::source_code::SourceLocation;
-use ruff_text_size::{TextLen, TextRange, TextSize};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::sync::Arc;
+
+use ruff_text_size::{TextLen, TextRange, TextSize};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use crate::source_code::SourceLocation;
 
 /// Index for fast [byte offset](TextSize) to [`SourceLocation`] conversions.
 ///
@@ -295,8 +297,8 @@ impl OneIndexed {
     }
 }
 
-impl std::fmt::Display for OneIndexed {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for OneIndexed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         std::fmt::Debug::fmt(&self.0.get(), f)
     }
 }
@@ -312,9 +314,10 @@ const fn unwrap<T: Copy>(option: Option<T>) -> T {
 
 #[cfg(test)]
 mod tests {
+    use ruff_text_size::TextSize;
+
     use crate::source_code::line_index::LineIndex;
     use crate::source_code::{OneIndexed, SourceLocation};
-    use ruff_text_size::TextSize;
 
     #[test]
     fn ascii_index() {

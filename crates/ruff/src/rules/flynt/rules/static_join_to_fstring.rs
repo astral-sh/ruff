@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -80,7 +79,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     // convertible to f-string parts).
     let Some(new_expr) = build_fstring(joiner, joinees) else { return };
 
-    let contents = unparse_expr(&new_expr, checker.stylist);
+    let contents = checker.generator().expr(&new_expr);
 
     let mut diagnostic = Diagnostic::new(
         StaticJoinToFString {

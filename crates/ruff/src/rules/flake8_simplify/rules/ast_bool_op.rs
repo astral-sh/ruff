@@ -10,9 +10,7 @@ use rustpython_parser::ast::{self, Boolop, Cmpop, Expr, ExprContext, Ranged, Una
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, has_comments, unparse_expr, Truthiness};
-use ruff_python_ast::source_code::Stylist;
-use ruff_python_semantic::context::Context;
+use ruff_python_ast::helpers::{contains_effect, has_comments, Truthiness};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -273,7 +271,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if func_name != "isinstance" {
             continue;
         }
-        if !checker.ctx.is_builtin("isinstance") {
+        if !checker.semantic_model().is_builtin("isinstance") {
             continue;
         }
 
@@ -295,7 +293,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
+            let fixable = !contains_effect(target, |id| checker.semantic_model().is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
                     name: if let Expr::Name(ast::ExprName { id, .. }) = target {
@@ -370,7 +368,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 // multiple duplicates, the fixes will conflict.
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    unparse_expr(&bool_op, checker.stylist),
+                    checker.generator().expr(&bool_op),
                     expr.range(),
                 )));
             }
@@ -427,7 +425,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(expr, |id| checker.ctx.is_builtin(id)))
+            .any(|expr| contains_effect(expr, |id| checker.semantic_model().is_builtin(id)))
         {
             continue;
         }
@@ -457,7 +455,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         let in_expr = node2.into();
         let mut diagnostic = Diagnostic::new(
             CompareWithTuple {
-                replacement: unparse_expr(&in_expr, checker.stylist),
+                replacement: checker.generator().expr(&in_expr),
             },
             expr.range(),
         );
@@ -481,7 +479,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&in_expr, checker.stylist),
+                checker.generator().expr(&in_expr),
                 expr.range(),
             )));
         }
@@ -518,7 +516,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
+    if contains_effect(expr, |id| checker.semantic_model().is_builtin(id)) {
         return;
     }
 
@@ -573,7 +571,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
+    if contains_effect(expr, |id| checker.semantic_model().is_builtin(id)) {
         return;
     }
 
@@ -604,7 +602,7 @@ pub(crate) fn get_short_circuit_edit(
     range: TextRange,
     truthiness: Truthiness,
     in_boolean_test: bool,
-    stylist: &Stylist,
+    checker: &Checker,
 ) -> Edit {
     let content = if in_boolean_test {
         match truthiness {
@@ -615,7 +613,7 @@ pub(crate) fn get_short_circuit_edit(
             }
         }
     } else {
-        unparse_expr(expr, stylist)
+        checker.generator().expr(expr)
     };
     Edit::range_replacement(content, range)
 }
@@ -623,8 +621,7 @@ pub(crate) fn get_short_circuit_edit(
 fn is_short_circuit(
     expr: &Expr,
     expected_op: Boolop,
-    context: &Context,
-    stylist: &Stylist,
+    checker: &Checker,
 ) -> Option<(Edit, ContentAround)> {
     let Expr::BoolOp(ast::ExprBoolOp { op, values, range: _, }) = expr else {
         return None;
@@ -643,12 +640,15 @@ fn is_short_circuit(
 
     for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
         // Keep track of the location of the furthest-right, truthy or falsey expression.
-        let value_truthiness = Truthiness::from_expr(value, |id| context.is_builtin(id));
-        let next_value_truthiness = Truthiness::from_expr(next_value, |id| context.is_builtin(id));
+        let value_truthiness =
+            Truthiness::from_expr(value, |id| checker.semantic_model().is_builtin(id));
+        let next_value_truthiness =
+            Truthiness::from_expr(next_value, |id| checker.semantic_model().is_builtin(id));
 
         // Keep track of the location of the furthest-right, non-effectful expression.
         if value_truthiness.is_unknown()
-            && (!context.in_boolean_test() || contains_effect(value, |id| context.is_builtin(id)))
+            && (!checker.semantic_model().in_boolean_test()
+                || contains_effect(value, |id| checker.semantic_model().is_builtin(id)))
         {
             location = next_value.start();
             continue;
@@ -668,8 +668,8 @@ fn is_short_circuit(
                 value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                context.in_boolean_test(),
-                stylist,
+                checker.semantic_model().in_boolean_test(),
+                checker,
             ));
             break;
         }
@@ -686,8 +686,8 @@ fn is_short_circuit(
                 next_value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                context.in_boolean_test(),
-                stylist,
+                checker.semantic_model().in_boolean_test(),
+                checker,
             ));
             break;
         }
@@ -701,8 +701,7 @@ fn is_short_circuit(
 
 /// SIM222
 pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    if let Some((edit, remove)) = is_short_circuit(expr, Boolop::Or, &checker.ctx, checker.stylist)
-    {
+    if let Some((edit, remove)) = is_short_circuit(expr, Boolop::Or, checker) {
         let mut diagnostic = Diagnostic::new(
             ExprOrTrue {
                 expr: edit.content().unwrap_or_default().to_string(),
@@ -720,8 +719,7 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 
 /// SIM223
 pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    if let Some((edit, remove)) = is_short_circuit(expr, Boolop::And, &checker.ctx, checker.stylist)
-    {
+    if let Some((edit, remove)) = is_short_circuit(expr, Boolop::And, checker) {
         let mut diagnostic = Diagnostic::new(
             ExprAndFalse {
                 expr: edit.content().unwrap_or_default().to_string(),

@@ -7,6 +7,64 @@ use ruff_python_ast::call_path::collect_call_path;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for boolean positional arguments in function definitions.
+///
+/// ## Why is this bad?
+/// Calling a function with boolean positional arguments is confusing as the
+/// meaning of the boolean value is not clear to the caller, and to future
+/// readers of the code.
+///
+/// The use of a boolean will also limit the function to only two possible
+/// behaviors, which makes the function difficult to extend in the future.
+///
+/// ## Example
+/// ```python
+/// from math import ceil, floor
+///
+///
+/// def round_number(number: float, up: bool) -> int:
+///     return ceil(number) if up else floor(number)
+///
+///
+/// round_number(1.5, True)  # What does `True` mean?
+/// round_number(1.5, False)  # What does `False` mean?
+/// ```
+///
+/// Instead, refactor into separate implementations:
+/// ```python
+/// from math import ceil, floor
+///
+///
+/// def round_up(number: float) -> int:
+///     return ceil(number)
+///
+///
+/// def round_down(number: float) -> int:
+///     return floor(number)
+///
+///
+/// round_up(1.5)
+/// round_down(1.5)
+/// ```
+///
+/// Or, refactor to use an `Enum`:
+/// ```python
+/// from enum import Enum
+///
+///
+/// class RoundingMethod(Enum):
+///     UP = 1
+///     DOWN = 2
+///
+///
+/// def round_number(value: float, method: RoundingMethod) -> float:
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[violation]
 pub struct BooleanPositionalArgInFunctionDefinition;
 
@@ -17,6 +75,44 @@ impl Violation for BooleanPositionalArgInFunctionDefinition {
     }
 }
 
+/// ## What it does
+/// Checks for the use of booleans as default values in function definitions.
+///
+/// ## Why is this bad?
+/// Calling a function with boolean default means that the keyword argument
+/// argument can be omitted, which makes the function call ambiguous.
+///
+/// Instead, define the relevant argument as keyword-only.
+///
+/// ## Example
+/// ```python
+/// from math import ceil, floor
+///
+///
+/// def round_number(number: float, *, up: bool = True) -> int:
+///     return ceil(number) if up else floor(number)
+///
+///
+/// round_number(1.5)
+/// round_number(1.5, up=False)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from math import ceil, floor
+///
+///
+/// def round_number(number: float, *, up: bool) -> int:
+///     return ceil(number) if up else floor(number)
+///
+///
+/// round_number(1.5, up=True)
+/// round_number(1.5, up=False)
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[violation]
 pub struct BooleanDefaultValueInFunctionDefinition;
 
@@ -27,6 +123,35 @@ impl Violation for BooleanDefaultValueInFunctionDefinition {
     }
 }
 
+/// ## What it does
+/// Checks for boolean positional arguments in function calls.
+///
+/// ## Why is this bad?
+/// Calling a function with boolean positional arguments is confusing as the
+/// meaning of the boolean value is not clear to the caller, and to future
+/// readers of the code.
+///
+/// ## Example
+/// ```python
+/// def foo(flag: bool) -> None:
+///     ...
+///
+///
+/// foo(True)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(flag: bool) -> None:
+///     ...
+///
+///
+/// foo(flag=True)
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#calls)
+/// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
 #[violation]
 pub struct BooleanPositionalValueInFunctionCall;
 

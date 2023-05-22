@@ -1,5 +1,6 @@
-use crate::rules::isort::types::TrailingComma;
 use std::collections::BTreeSet;
+
+use crate::rules::isort::types::TrailingComma;
 
 use super::types::{AliasData, ImportBlock, ImportFromData};
 use super::AnnotatedImport;
