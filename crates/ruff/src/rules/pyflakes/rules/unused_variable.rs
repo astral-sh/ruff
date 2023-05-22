@@ -354,38 +354,4 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
 
         checker.diagnostics.push(diagnostic);
     }
-
-    // for (name, binding) in scope
-    //     .bindings()
-    //     .map(|(name, index)| (*name, &checker.semantic_model().bindings[*index]))
-    // {
-    //     if !binding.used()
-    //         && (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
-    //         && !checker.settings.dummy_variable_rgx.is_match(name)
-    //         && name != "__tracebackhide__"
-    //         && name != "__traceback_info__"
-    //         && name != "__traceback_supplement__"
-    //         && name != "__debuggerskip__"
-    //     {
-    //         let mut diagnostic = Diagnostic::new(
-    //             UnusedVariable {
-    //                 name: (*name).to_string(),
-    //             },
-    //             binding.range,
-    //         );
-    //         if checker.patch(diagnostic.kind.rule()) {
-    //             if let Some(source) = binding.source {
-    //                 let stmt = checker.semantic_model().stmts[source];
-    //                 if let Some((kind, fix)) = remove_unused_variable(stmt, binding.range, checker)
-    //                 {
-    //                     if matches!(kind, DeletionKind::Whole) {
-    //                         checker.deletions.insert(RefEquality(stmt));
-    //                     }
-    //                     diagnostic.set_fix(fix);
-    //                 }
-    //             }
-    //         }
-    //         checker.diagnostics.push(diagnostic);
-    //     }
-    // }
 }
