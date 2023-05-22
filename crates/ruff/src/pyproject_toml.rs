@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use pyproject_toml::PyProjectToml;
 use ruff_text_size::{TextRange, TextSize};
 
@@ -7,6 +7,7 @@ use ruff_python_ast::source_code::SourceFile;
 
 use crate::message::Message;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
+use crate::IOError;
 
 pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
     let err = match toml::from_str::<PyProjectToml>(source_file.source_text()) {
@@ -19,10 +20,26 @@ pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
         // TODO(konstin,micha): https://github.com/charliermarsh/ruff/issues/4571
         None => TextRange::default(),
         Some(range) => {
-            let expect_err = "pyproject.toml should be smaller than 4GB";
+            let end = match TextSize::try_from(range.end) {
+                Ok(end) => end,
+                Err(_) => {
+                    let diagnostic = Diagnostic::new(
+                        IOError {
+                            message: format!("pyproject.toml is larger than 4GB"),
+                        },
+                        TextRange::default(),
+                    );
+                    return Ok(vec![Message::from_diagnostic(
+                        diagnostic,
+                        source_file,
+                        TextSize::default(),
+                    )]);
+                }
+            };
             TextRange::new(
-                TextSize::try_from(range.start).context(expect_err)?,
-                TextSize::try_from(range.end).context(expect_err)?,
+                // start <= end, so if end < 4GB follows start < 4GB
+                TextSize::try_from(range.start).unwrap(),
+                end,
             )
         }
     };
