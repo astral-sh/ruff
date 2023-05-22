@@ -946,30 +946,30 @@ impl<R> Pyo3Node for crate::generic::TypeIgnoreTypeIgnore<R> {
 
 impl ToPyo3Ast for crate::generic::ExprContext {
     #[inline]
-    fn to_pyo3_ast(&self, _py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
             crate::ExprContext::Load => crate::ExprContextLoad::py_type_cache(),
             crate::ExprContext::Store => crate::ExprContextStore::py_type_cache(),
             crate::ExprContext::Del => crate::ExprContextDel::py_type_cache(),
         };
-        Ok(cell.get().unwrap().1.clone())
+        Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
 }
 
 impl ToPyo3Ast for crate::generic::Boolop {
     #[inline]
-    fn to_pyo3_ast(&self, _py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
             crate::Boolop::And => crate::BoolopAnd::py_type_cache(),
             crate::Boolop::Or => crate::BoolopOr::py_type_cache(),
         };
-        Ok(cell.get().unwrap().1.clone())
+        Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
 }
 
 impl ToPyo3Ast for crate::generic::Operator {
     #[inline]
-    fn to_pyo3_ast(&self, _py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
             crate::Operator::Add => crate::OperatorAdd::py_type_cache(),
             crate::Operator::Sub => crate::OperatorSub::py_type_cache(),
@@ -985,26 +985,26 @@ impl ToPyo3Ast for crate::generic::Operator {
             crate::Operator::BitAnd => crate::OperatorBitAnd::py_type_cache(),
             crate::Operator::FloorDiv => crate::OperatorFloorDiv::py_type_cache(),
         };
-        Ok(cell.get().unwrap().1.clone())
+        Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
 }
 
 impl ToPyo3Ast for crate::generic::Unaryop {
     #[inline]
-    fn to_pyo3_ast(&self, _py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
             crate::Unaryop::Invert => crate::UnaryopInvert::py_type_cache(),
             crate::Unaryop::Not => crate::UnaryopNot::py_type_cache(),
             crate::Unaryop::UAdd => crate::UnaryopUAdd::py_type_cache(),
             crate::Unaryop::USub => crate::UnaryopUSub::py_type_cache(),
         };
-        Ok(cell.get().unwrap().1.clone())
+        Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
 }
 
 impl ToPyo3Ast for crate::generic::Cmpop {
     #[inline]
-    fn to_pyo3_ast(&self, _py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cell = match &self {
             crate::Cmpop::Eq => crate::CmpopEq::py_type_cache(),
             crate::Cmpop::NotEq => crate::CmpopNotEq::py_type_cache(),
@@ -1017,13 +1017,13 @@ impl ToPyo3Ast for crate::generic::Cmpop {
             crate::Cmpop::In => crate::CmpopIn::py_type_cache(),
             crate::Cmpop::NotIn => crate::CmpopNotIn::py_type_cache(),
         };
-        Ok(cell.get().unwrap().1.clone())
+        Ok(Py::<PyAny>::as_ref(&cell.get().unwrap().1, py))
     }
 }
 
 impl ToPyo3Ast for crate::generic::Mod<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Mod::Module(cons) => cons.to_pyo3_ast(py)?,
             crate::Mod::Interactive(cons) => cons.to_pyo3_ast(py)?,
@@ -1036,7 +1036,7 @@ impl ToPyo3Ast for crate::generic::Mod<TextRange> {
 
 impl ToPyo3Ast for crate::ModModule<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1044,9 +1044,9 @@ impl ToPyo3Ast for crate::ModModule<TextRange> {
             type_ignores,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (body.to_pyo3_ast(py)?, type_ignores.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((body.to_pyo3_ast(py)?, type_ignores.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1054,14 +1054,15 @@ impl ToPyo3Ast for crate::ModModule<TextRange> {
 
 impl ToPyo3Ast for crate::ModInteractive<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (body.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((body.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1069,14 +1070,15 @@ impl ToPyo3Ast for crate::ModInteractive<TextRange> {
 
 impl ToPyo3Ast for crate::ModExpression<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (body.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((body.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1084,7 +1086,7 @@ impl ToPyo3Ast for crate::ModExpression<TextRange> {
 
 impl ToPyo3Ast for crate::ModFunctionType<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1092,9 +1094,9 @@ impl ToPyo3Ast for crate::ModFunctionType<TextRange> {
             returns,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (argtypes.to_pyo3_ast(py)?, returns.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((argtypes.to_pyo3_ast(py)?, returns.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1102,7 +1104,7 @@ impl ToPyo3Ast for crate::ModFunctionType<TextRange> {
 
 impl ToPyo3Ast for crate::generic::Stmt<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Stmt::FunctionDef(cons) => cons.to_pyo3_ast(py)?,
             crate::Stmt::AsyncFunctionDef(cons) => cons.to_pyo3_ast(py)?,
@@ -1138,7 +1140,7 @@ impl ToPyo3Ast for crate::generic::Stmt<TextRange> {
 
 impl ToPyo3Ast for crate::StmtFunctionDef<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1150,17 +1152,15 @@ impl ToPyo3Ast for crate::StmtFunctionDef<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                name.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                decorator_list.to_pyo3_ast(py)?,
-                returns.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            name.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            decorator_list.to_pyo3_ast(py)?,
+            returns.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1168,7 +1168,7 @@ impl ToPyo3Ast for crate::StmtFunctionDef<TextRange> {
 
 impl ToPyo3Ast for crate::StmtAsyncFunctionDef<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1180,17 +1180,15 @@ impl ToPyo3Ast for crate::StmtAsyncFunctionDef<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                name.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                decorator_list.to_pyo3_ast(py)?,
-                returns.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            name.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            decorator_list.to_pyo3_ast(py)?,
+            returns.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1198,7 +1196,7 @@ impl ToPyo3Ast for crate::StmtAsyncFunctionDef<TextRange> {
 
 impl ToPyo3Ast for crate::StmtClassDef<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1209,16 +1207,14 @@ impl ToPyo3Ast for crate::StmtClassDef<TextRange> {
             decorator_list,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                name.to_pyo3_ast(py)?,
-                bases.to_pyo3_ast(py)?,
-                keywords.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                decorator_list.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            name.to_pyo3_ast(py)?,
+            bases.to_pyo3_ast(py)?,
+            keywords.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            decorator_list.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1226,14 +1222,15 @@ impl ToPyo3Ast for crate::StmtClassDef<TextRange> {
 
 impl ToPyo3Ast for crate::StmtReturn<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1241,14 +1238,15 @@ impl ToPyo3Ast for crate::StmtReturn<TextRange> {
 
 impl ToPyo3Ast for crate::StmtDelete<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             targets,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (targets.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((targets.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1256,7 +1254,7 @@ impl ToPyo3Ast for crate::StmtDelete<TextRange> {
 
 impl ToPyo3Ast for crate::StmtAssign<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1265,14 +1263,12 @@ impl ToPyo3Ast for crate::StmtAssign<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                targets.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            targets.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1280,7 +1276,7 @@ impl ToPyo3Ast for crate::StmtAssign<TextRange> {
 
 impl ToPyo3Ast for crate::StmtAugAssign<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1289,14 +1285,12 @@ impl ToPyo3Ast for crate::StmtAugAssign<TextRange> {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                op.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            op.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1304,7 +1298,7 @@ impl ToPyo3Ast for crate::StmtAugAssign<TextRange> {
 
 impl ToPyo3Ast for crate::StmtAnnAssign<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1314,15 +1308,13 @@ impl ToPyo3Ast for crate::StmtAnnAssign<TextRange> {
             simple,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                annotation.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-                simple.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            annotation.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+            simple.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1330,7 +1322,7 @@ impl ToPyo3Ast for crate::StmtAnnAssign<TextRange> {
 
 impl ToPyo3Ast for crate::StmtFor<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1341,16 +1333,14 @@ impl ToPyo3Ast for crate::StmtFor<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                iter.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            iter.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1358,7 +1348,7 @@ impl ToPyo3Ast for crate::StmtFor<TextRange> {
 
 impl ToPyo3Ast for crate::StmtAsyncFor<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1369,16 +1359,14 @@ impl ToPyo3Ast for crate::StmtAsyncFor<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                iter.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            iter.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1386,7 +1374,7 @@ impl ToPyo3Ast for crate::StmtAsyncFor<TextRange> {
 
 impl ToPyo3Ast for crate::StmtWhile<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1395,14 +1383,12 @@ impl ToPyo3Ast for crate::StmtWhile<TextRange> {
             orelse,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                test.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            test.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1410,7 +1396,7 @@ impl ToPyo3Ast for crate::StmtWhile<TextRange> {
 
 impl ToPyo3Ast for crate::StmtIf<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1419,14 +1405,12 @@ impl ToPyo3Ast for crate::StmtIf<TextRange> {
             orelse,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                test.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            test.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1434,7 +1418,7 @@ impl ToPyo3Ast for crate::StmtIf<TextRange> {
 
 impl ToPyo3Ast for crate::StmtWith<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1443,14 +1427,12 @@ impl ToPyo3Ast for crate::StmtWith<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                items.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            items.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1458,7 +1440,7 @@ impl ToPyo3Ast for crate::StmtWith<TextRange> {
 
 impl ToPyo3Ast for crate::StmtAsyncWith<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1467,14 +1449,12 @@ impl ToPyo3Ast for crate::StmtAsyncWith<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                items.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            items.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1482,7 +1462,7 @@ impl ToPyo3Ast for crate::StmtAsyncWith<TextRange> {
 
 impl ToPyo3Ast for crate::StmtMatch<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1490,9 +1470,9 @@ impl ToPyo3Ast for crate::StmtMatch<TextRange> {
             cases,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (subject.to_pyo3_ast(py)?, cases.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((subject.to_pyo3_ast(py)?, cases.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1500,7 +1480,7 @@ impl ToPyo3Ast for crate::StmtMatch<TextRange> {
 
 impl ToPyo3Ast for crate::StmtRaise<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1508,9 +1488,9 @@ impl ToPyo3Ast for crate::StmtRaise<TextRange> {
             cause,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (exc.to_pyo3_ast(py)?, cause.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((exc.to_pyo3_ast(py)?, cause.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1518,7 +1498,7 @@ impl ToPyo3Ast for crate::StmtRaise<TextRange> {
 
 impl ToPyo3Ast for crate::StmtTry<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1528,15 +1508,13 @@ impl ToPyo3Ast for crate::StmtTry<TextRange> {
             finalbody,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                body.to_pyo3_ast(py)?,
-                handlers.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                finalbody.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            body.to_pyo3_ast(py)?,
+            handlers.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            finalbody.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1544,7 +1522,7 @@ impl ToPyo3Ast for crate::StmtTry<TextRange> {
 
 impl ToPyo3Ast for crate::StmtTryStar<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1554,15 +1532,13 @@ impl ToPyo3Ast for crate::StmtTryStar<TextRange> {
             finalbody,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                body.to_pyo3_ast(py)?,
-                handlers.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                finalbody.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            body.to_pyo3_ast(py)?,
+            handlers.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            finalbody.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1570,7 +1546,7 @@ impl ToPyo3Ast for crate::StmtTryStar<TextRange> {
 
 impl ToPyo3Ast for crate::StmtAssert<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1578,9 +1554,9 @@ impl ToPyo3Ast for crate::StmtAssert<TextRange> {
             msg,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (test.to_pyo3_ast(py)?, msg.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((test.to_pyo3_ast(py)?, msg.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1588,14 +1564,15 @@ impl ToPyo3Ast for crate::StmtAssert<TextRange> {
 
 impl ToPyo3Ast for crate::StmtImport<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             names,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (names.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((names.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1603,7 +1580,7 @@ impl ToPyo3Ast for crate::StmtImport<TextRange> {
 
 impl ToPyo3Ast for crate::StmtImportFrom<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1612,14 +1589,12 @@ impl ToPyo3Ast for crate::StmtImportFrom<TextRange> {
             level,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                module.to_pyo3_ast(py)?,
-                names.to_pyo3_ast(py)?,
-                level.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            module.to_pyo3_ast(py)?,
+            names.to_pyo3_ast(py)?,
+            level.map_or_else(|| py.None(), |level| level.to_u32().to_object(py)),
+        ))?;
 
         Ok(instance)
     }
@@ -1627,14 +1602,15 @@ impl ToPyo3Ast for crate::StmtImportFrom<TextRange> {
 
 impl ToPyo3Ast for crate::StmtGlobal<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             names,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (names.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((names.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1642,14 +1618,15 @@ impl ToPyo3Ast for crate::StmtGlobal<TextRange> {
 
 impl ToPyo3Ast for crate::StmtNonlocal<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             names,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (names.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((names.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1657,14 +1634,15 @@ impl ToPyo3Ast for crate::StmtNonlocal<TextRange> {
 
 impl ToPyo3Ast for crate::StmtExpr<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1672,10 +1650,10 @@ impl ToPyo3Ast for crate::StmtExpr<TextRange> {
 
 impl ToPyo3Ast for crate::StmtPass<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = cache.0.call0(py)?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
 
         Ok(instance)
@@ -1684,10 +1662,10 @@ impl ToPyo3Ast for crate::StmtPass<TextRange> {
 
 impl ToPyo3Ast for crate::StmtBreak<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = cache.0.call0(py)?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
 
         Ok(instance)
@@ -1696,10 +1674,10 @@ impl ToPyo3Ast for crate::StmtBreak<TextRange> {
 
 impl ToPyo3Ast for crate::StmtContinue<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = cache.0.call0(py)?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
 
         Ok(instance)
@@ -1708,7 +1686,7 @@ impl ToPyo3Ast for crate::StmtContinue<TextRange> {
 
 impl ToPyo3Ast for crate::generic::Expr<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Expr::BoolOp(cons) => cons.to_pyo3_ast(py)?,
             crate::Expr::NamedExpr(cons) => cons.to_pyo3_ast(py)?,
@@ -1744,7 +1722,7 @@ impl ToPyo3Ast for crate::generic::Expr<TextRange> {
 
 impl ToPyo3Ast for crate::ExprBoolOp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1752,9 +1730,9 @@ impl ToPyo3Ast for crate::ExprBoolOp<TextRange> {
             values,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (op.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((op.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1762,7 +1740,7 @@ impl ToPyo3Ast for crate::ExprBoolOp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprNamedExpr<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1770,9 +1748,9 @@ impl ToPyo3Ast for crate::ExprNamedExpr<TextRange> {
             value,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (target.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((target.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1780,7 +1758,7 @@ impl ToPyo3Ast for crate::ExprNamedExpr<TextRange> {
 
 impl ToPyo3Ast for crate::ExprBinOp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1789,14 +1767,12 @@ impl ToPyo3Ast for crate::ExprBinOp<TextRange> {
             right,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                left.to_pyo3_ast(py)?,
-                op.to_pyo3_ast(py)?,
-                right.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            left.to_pyo3_ast(py)?,
+            op.to_pyo3_ast(py)?,
+            right.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1804,7 +1780,7 @@ impl ToPyo3Ast for crate::ExprBinOp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprUnaryOp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1812,9 +1788,9 @@ impl ToPyo3Ast for crate::ExprUnaryOp<TextRange> {
             operand,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (op.to_pyo3_ast(py)?, operand.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((op.to_pyo3_ast(py)?, operand.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1822,7 +1798,7 @@ impl ToPyo3Ast for crate::ExprUnaryOp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprLambda<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1830,9 +1806,9 @@ impl ToPyo3Ast for crate::ExprLambda<TextRange> {
             body,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (args.to_pyo3_ast(py)?, body.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((args.to_pyo3_ast(py)?, body.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1840,7 +1816,7 @@ impl ToPyo3Ast for crate::ExprLambda<TextRange> {
 
 impl ToPyo3Ast for crate::ExprIfExp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1849,14 +1825,12 @@ impl ToPyo3Ast for crate::ExprIfExp<TextRange> {
             orelse,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                test.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            test.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1864,7 +1838,7 @@ impl ToPyo3Ast for crate::ExprIfExp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprDict<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1872,9 +1846,9 @@ impl ToPyo3Ast for crate::ExprDict<TextRange> {
             values,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (keys.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((keys.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1882,14 +1856,15 @@ impl ToPyo3Ast for crate::ExprDict<TextRange> {
 
 impl ToPyo3Ast for crate::ExprSet<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             elts,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (elts.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((elts.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1897,7 +1872,7 @@ impl ToPyo3Ast for crate::ExprSet<TextRange> {
 
 impl ToPyo3Ast for crate::ExprListComp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1905,9 +1880,9 @@ impl ToPyo3Ast for crate::ExprListComp<TextRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1915,7 +1890,7 @@ impl ToPyo3Ast for crate::ExprListComp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprSetComp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1923,9 +1898,9 @@ impl ToPyo3Ast for crate::ExprSetComp<TextRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1933,7 +1908,7 @@ impl ToPyo3Ast for crate::ExprSetComp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprDictComp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1942,14 +1917,12 @@ impl ToPyo3Ast for crate::ExprDictComp<TextRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                key.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-                generators.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            key.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+            generators.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -1957,7 +1930,7 @@ impl ToPyo3Ast for crate::ExprDictComp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprGeneratorExp<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -1965,9 +1938,9 @@ impl ToPyo3Ast for crate::ExprGeneratorExp<TextRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -1975,14 +1948,15 @@ impl ToPyo3Ast for crate::ExprGeneratorExp<TextRange> {
 
 impl ToPyo3Ast for crate::ExprAwait<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -1990,14 +1964,15 @@ impl ToPyo3Ast for crate::ExprAwait<TextRange> {
 
 impl ToPyo3Ast for crate::ExprYield<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2005,14 +1980,15 @@ impl ToPyo3Ast for crate::ExprYield<TextRange> {
 
 impl ToPyo3Ast for crate::ExprYieldFrom<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2020,7 +1996,7 @@ impl ToPyo3Ast for crate::ExprYieldFrom<TextRange> {
 
 impl ToPyo3Ast for crate::ExprCompare<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2029,14 +2005,12 @@ impl ToPyo3Ast for crate::ExprCompare<TextRange> {
             comparators,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                left.to_pyo3_ast(py)?,
-                ops.to_pyo3_ast(py)?,
-                comparators.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            left.to_pyo3_ast(py)?,
+            ops.to_pyo3_ast(py)?,
+            comparators.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2044,7 +2018,7 @@ impl ToPyo3Ast for crate::ExprCompare<TextRange> {
 
 impl ToPyo3Ast for crate::ExprCall<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2053,14 +2027,12 @@ impl ToPyo3Ast for crate::ExprCall<TextRange> {
             keywords,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                func.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                keywords.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            func.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            keywords.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2068,7 +2040,7 @@ impl ToPyo3Ast for crate::ExprCall<TextRange> {
 
 impl ToPyo3Ast for crate::ExprFormattedValue<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2077,14 +2049,12 @@ impl ToPyo3Ast for crate::ExprFormattedValue<TextRange> {
             format_spec,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                value.to_pyo3_ast(py)?,
-                conversion.to_pyo3_ast(py)?,
-                format_spec.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            value.to_pyo3_ast(py)?,
+            conversion.to_pyo3_ast(py)?,
+            format_spec.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2092,14 +2062,15 @@ impl ToPyo3Ast for crate::ExprFormattedValue<TextRange> {
 
 impl ToPyo3Ast for crate::ExprJoinedStr<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             values,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (values.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((values.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2107,7 +2078,7 @@ impl ToPyo3Ast for crate::ExprJoinedStr<TextRange> {
 
 impl ToPyo3Ast for crate::ExprConstant<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2115,9 +2086,9 @@ impl ToPyo3Ast for crate::ExprConstant<TextRange> {
             kind,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (value.to_pyo3_ast(py)?, kind.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((value.to_object(py), kind.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2125,7 +2096,7 @@ impl ToPyo3Ast for crate::ExprConstant<TextRange> {
 
 impl ToPyo3Ast for crate::ExprAttribute<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2134,14 +2105,12 @@ impl ToPyo3Ast for crate::ExprAttribute<TextRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                value.to_pyo3_ast(py)?,
-                attr.to_pyo3_ast(py)?,
-                ctx.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            value.to_pyo3_ast(py)?,
+            attr.to_pyo3_ast(py)?,
+            ctx.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2149,7 +2118,7 @@ impl ToPyo3Ast for crate::ExprAttribute<TextRange> {
 
 impl ToPyo3Ast for crate::ExprSubscript<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2158,14 +2127,12 @@ impl ToPyo3Ast for crate::ExprSubscript<TextRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                value.to_pyo3_ast(py)?,
-                slice.to_pyo3_ast(py)?,
-                ctx.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            value.to_pyo3_ast(py)?,
+            slice.to_pyo3_ast(py)?,
+            ctx.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2173,7 +2140,7 @@ impl ToPyo3Ast for crate::ExprSubscript<TextRange> {
 
 impl ToPyo3Ast for crate::ExprStarred<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2181,9 +2148,9 @@ impl ToPyo3Ast for crate::ExprStarred<TextRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (value.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((value.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2191,7 +2158,7 @@ impl ToPyo3Ast for crate::ExprStarred<TextRange> {
 
 impl ToPyo3Ast for crate::ExprName<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2199,9 +2166,9 @@ impl ToPyo3Ast for crate::ExprName<TextRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (id.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let instance =
+            Py::<PyAny>::as_ref(&cache.0, py).call1((id.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2209,7 +2176,7 @@ impl ToPyo3Ast for crate::ExprName<TextRange> {
 
 impl ToPyo3Ast for crate::ExprList<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2217,9 +2184,9 @@ impl ToPyo3Ast for crate::ExprList<TextRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2227,7 +2194,7 @@ impl ToPyo3Ast for crate::ExprList<TextRange> {
 
 impl ToPyo3Ast for crate::ExprTuple<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2235,9 +2202,9 @@ impl ToPyo3Ast for crate::ExprTuple<TextRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2245,7 +2212,7 @@ impl ToPyo3Ast for crate::ExprTuple<TextRange> {
 
 impl ToPyo3Ast for crate::ExprSlice<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2254,14 +2221,12 @@ impl ToPyo3Ast for crate::ExprSlice<TextRange> {
             step,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                lower.to_pyo3_ast(py)?,
-                upper.to_pyo3_ast(py)?,
-                step.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            lower.to_pyo3_ast(py)?,
+            upper.to_pyo3_ast(py)?,
+            step.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2269,7 +2234,7 @@ impl ToPyo3Ast for crate::ExprSlice<TextRange> {
 
 impl ToPyo3Ast for crate::Comprehension<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2279,15 +2244,13 @@ impl ToPyo3Ast for crate::Comprehension<TextRange> {
             is_async,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                iter.to_pyo3_ast(py)?,
-                ifs.to_pyo3_ast(py)?,
-                is_async.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            iter.to_pyo3_ast(py)?,
+            ifs.to_pyo3_ast(py)?,
+            is_async.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2295,7 +2258,7 @@ impl ToPyo3Ast for crate::Comprehension<TextRange> {
 
 impl ToPyo3Ast for crate::generic::Excepthandler<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Excepthandler::ExceptHandler(cons) => cons.to_pyo3_ast(py)?,
         };
@@ -2305,7 +2268,7 @@ impl ToPyo3Ast for crate::generic::Excepthandler<TextRange> {
 
 impl ToPyo3Ast for crate::ExcepthandlerExceptHandler<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2314,14 +2277,12 @@ impl ToPyo3Ast for crate::ExcepthandlerExceptHandler<TextRange> {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                type_.to_pyo3_ast(py)?,
-                name.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            type_.to_pyo3_ast(py)?,
+            name.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2329,7 +2290,7 @@ impl ToPyo3Ast for crate::ExcepthandlerExceptHandler<TextRange> {
 
 impl ToPyo3Ast for crate::Arguments<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2342,18 +2303,16 @@ impl ToPyo3Ast for crate::Arguments<TextRange> {
             defaults,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                posonlyargs.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                vararg.to_pyo3_ast(py)?,
-                kwonlyargs.to_pyo3_ast(py)?,
-                kw_defaults.to_pyo3_ast(py)?,
-                kwarg.to_pyo3_ast(py)?,
-                defaults.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            posonlyargs.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            vararg.to_pyo3_ast(py)?,
+            kwonlyargs.to_pyo3_ast(py)?,
+            kw_defaults.to_pyo3_ast(py)?,
+            kwarg.to_pyo3_ast(py)?,
+            defaults.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2361,7 +2320,7 @@ impl ToPyo3Ast for crate::Arguments<TextRange> {
 
 impl ToPyo3Ast for crate::Arg<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2370,14 +2329,12 @@ impl ToPyo3Ast for crate::Arg<TextRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                arg.to_pyo3_ast(py)?,
-                annotation.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            arg.to_pyo3_ast(py)?,
+            annotation.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2385,7 +2342,7 @@ impl ToPyo3Ast for crate::Arg<TextRange> {
 
 impl ToPyo3Ast for crate::Keyword<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2393,9 +2350,9 @@ impl ToPyo3Ast for crate::Keyword<TextRange> {
             value,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (arg.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((arg.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2403,7 +2360,7 @@ impl ToPyo3Ast for crate::Keyword<TextRange> {
 
 impl ToPyo3Ast for crate::Alias<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2411,9 +2368,9 @@ impl ToPyo3Ast for crate::Alias<TextRange> {
             asname,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (name.to_pyo3_ast(py)?, asname.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((name.to_pyo3_ast(py)?, asname.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2421,7 +2378,7 @@ impl ToPyo3Ast for crate::Alias<TextRange> {
 
 impl ToPyo3Ast for crate::Withitem<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2429,13 +2386,11 @@ impl ToPyo3Ast for crate::Withitem<TextRange> {
             optional_vars,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                context_expr.to_pyo3_ast(py)?,
-                optional_vars.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            context_expr.to_pyo3_ast(py)?,
+            optional_vars.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2443,7 +2398,7 @@ impl ToPyo3Ast for crate::Withitem<TextRange> {
 
 impl ToPyo3Ast for crate::MatchCase<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2452,14 +2407,12 @@ impl ToPyo3Ast for crate::MatchCase<TextRange> {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                pattern.to_pyo3_ast(py)?,
-                guard.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            pattern.to_pyo3_ast(py)?,
+            guard.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2467,7 +2420,7 @@ impl ToPyo3Ast for crate::MatchCase<TextRange> {
 
 impl ToPyo3Ast for crate::generic::Pattern<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Pattern::MatchValue(cons) => cons.to_pyo3_ast(py)?,
             crate::Pattern::MatchSingleton(cons) => cons.to_pyo3_ast(py)?,
@@ -2484,14 +2437,15 @@ impl ToPyo3Ast for crate::generic::Pattern<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchValue<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2499,14 +2453,15 @@ impl ToPyo3Ast for crate::PatternMatchValue<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchSingleton<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_object(py),))?;
 
         Ok(instance)
     }
@@ -2514,14 +2469,15 @@ impl ToPyo3Ast for crate::PatternMatchSingleton<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchSequence<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             patterns,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (patterns.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((patterns.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2529,7 +2485,7 @@ impl ToPyo3Ast for crate::PatternMatchSequence<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchMapping<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2538,14 +2494,12 @@ impl ToPyo3Ast for crate::PatternMatchMapping<TextRange> {
             rest,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                keys.to_pyo3_ast(py)?,
-                patterns.to_pyo3_ast(py)?,
-                rest.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            keys.to_pyo3_ast(py)?,
+            patterns.to_pyo3_ast(py)?,
+            rest.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2553,7 +2507,7 @@ impl ToPyo3Ast for crate::PatternMatchMapping<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchClass<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2563,15 +2517,13 @@ impl ToPyo3Ast for crate::PatternMatchClass<TextRange> {
             kwd_patterns,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                cls.to_pyo3_ast(py)?,
-                patterns.to_pyo3_ast(py)?,
-                kwd_attrs.to_pyo3_ast(py)?,
-                kwd_patterns.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            cls.to_pyo3_ast(py)?,
+            patterns.to_pyo3_ast(py)?,
+            kwd_attrs.to_pyo3_ast(py)?,
+            kwd_patterns.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -2579,14 +2531,15 @@ impl ToPyo3Ast for crate::PatternMatchClass<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchStar<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             name,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (name.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((name.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2594,7 +2547,7 @@ impl ToPyo3Ast for crate::PatternMatchStar<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchAs<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2602,9 +2555,9 @@ impl ToPyo3Ast for crate::PatternMatchAs<TextRange> {
             name,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (pattern.to_pyo3_ast(py)?, name.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((pattern.to_pyo3_ast(py)?, name.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2612,14 +2565,15 @@ impl ToPyo3Ast for crate::PatternMatchAs<TextRange> {
 
 impl ToPyo3Ast for crate::PatternMatchOr<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             patterns,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (patterns.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((patterns.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2627,7 +2581,7 @@ impl ToPyo3Ast for crate::PatternMatchOr<TextRange> {
 
 impl ToPyo3Ast for crate::generic::TypeIgnore<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::TypeIgnore::TypeIgnore(cons) => cons.to_pyo3_ast(py)?,
         };
@@ -2637,7 +2591,7 @@ impl ToPyo3Ast for crate::generic::TypeIgnore<TextRange> {
 
 impl ToPyo3Ast for crate::TypeIgnoreTypeIgnore<TextRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2645,9 +2599,9 @@ impl ToPyo3Ast for crate::TypeIgnoreTypeIgnore<TextRange> {
             tag,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (lineno.to_pyo3_ast(py)?, tag.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((lineno.to_u32().to_object(py), tag.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2655,7 +2609,7 @@ impl ToPyo3Ast for crate::TypeIgnoreTypeIgnore<TextRange> {
 
 impl ToPyo3Ast for crate::generic::Mod<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Mod::Module(cons) => cons.to_pyo3_ast(py)?,
             crate::Mod::Interactive(cons) => cons.to_pyo3_ast(py)?,
@@ -2668,7 +2622,7 @@ impl ToPyo3Ast for crate::generic::Mod<SourceRange> {
 
 impl ToPyo3Ast for crate::ModModule<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2676,9 +2630,9 @@ impl ToPyo3Ast for crate::ModModule<SourceRange> {
             type_ignores,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (body.to_pyo3_ast(py)?, type_ignores.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((body.to_pyo3_ast(py)?, type_ignores.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2686,14 +2640,15 @@ impl ToPyo3Ast for crate::ModModule<SourceRange> {
 
 impl ToPyo3Ast for crate::ModInteractive<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (body.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((body.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2701,14 +2656,15 @@ impl ToPyo3Ast for crate::ModInteractive<SourceRange> {
 
 impl ToPyo3Ast for crate::ModExpression<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (body.to_pyo3_ast(py)?,))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((body.to_pyo3_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -2716,7 +2672,7 @@ impl ToPyo3Ast for crate::ModExpression<SourceRange> {
 
 impl ToPyo3Ast for crate::ModFunctionType<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2724,9 +2680,9 @@ impl ToPyo3Ast for crate::ModFunctionType<SourceRange> {
             returns,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (argtypes.to_pyo3_ast(py)?, returns.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((argtypes.to_pyo3_ast(py)?, returns.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
@@ -2734,7 +2690,7 @@ impl ToPyo3Ast for crate::ModFunctionType<SourceRange> {
 
 impl ToPyo3Ast for crate::generic::Stmt<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Stmt::FunctionDef(cons) => cons.to_pyo3_ast(py)?,
             crate::Stmt::AsyncFunctionDef(cons) => cons.to_pyo3_ast(py)?,
@@ -2770,7 +2726,7 @@ impl ToPyo3Ast for crate::generic::Stmt<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtFunctionDef<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2782,24 +2738,22 @@ impl ToPyo3Ast for crate::StmtFunctionDef<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                name.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                decorator_list.to_pyo3_ast(py)?,
-                returns.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            name.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            decorator_list.to_pyo3_ast(py)?,
+            returns.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -2808,7 +2762,7 @@ impl ToPyo3Ast for crate::StmtFunctionDef<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtAsyncFunctionDef<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2820,24 +2774,22 @@ impl ToPyo3Ast for crate::StmtAsyncFunctionDef<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                name.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                decorator_list.to_pyo3_ast(py)?,
-                returns.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            name.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            decorator_list.to_pyo3_ast(py)?,
+            returns.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -2846,7 +2798,7 @@ impl ToPyo3Ast for crate::StmtAsyncFunctionDef<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtClassDef<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2857,23 +2809,21 @@ impl ToPyo3Ast for crate::StmtClassDef<SourceRange> {
             decorator_list,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                name.to_pyo3_ast(py)?,
-                bases.to_pyo3_ast(py)?,
-                keywords.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                decorator_list.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            name.to_pyo3_ast(py)?,
+            bases.to_pyo3_ast(py)?,
+            keywords.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            decorator_list.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -2882,21 +2832,22 @@ impl ToPyo3Ast for crate::StmtClassDef<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtReturn<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -2905,21 +2856,22 @@ impl ToPyo3Ast for crate::StmtReturn<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtDelete<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             targets,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (targets.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((targets.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -2928,7 +2880,7 @@ impl ToPyo3Ast for crate::StmtDelete<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtAssign<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2937,21 +2889,19 @@ impl ToPyo3Ast for crate::StmtAssign<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                targets.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            targets.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -2960,7 +2910,7 @@ impl ToPyo3Ast for crate::StmtAssign<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtAugAssign<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -2969,21 +2919,19 @@ impl ToPyo3Ast for crate::StmtAugAssign<SourceRange> {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                op.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            op.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -2992,7 +2940,7 @@ impl ToPyo3Ast for crate::StmtAugAssign<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtAnnAssign<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3002,22 +2950,20 @@ impl ToPyo3Ast for crate::StmtAnnAssign<SourceRange> {
             simple,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                annotation.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-                simple.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            annotation.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+            simple.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3026,7 +2972,7 @@ impl ToPyo3Ast for crate::StmtAnnAssign<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtFor<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3037,23 +2983,21 @@ impl ToPyo3Ast for crate::StmtFor<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                iter.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            iter.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3062,7 +3006,7 @@ impl ToPyo3Ast for crate::StmtFor<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtAsyncFor<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3073,23 +3017,21 @@ impl ToPyo3Ast for crate::StmtAsyncFor<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                iter.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            iter.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3098,7 +3040,7 @@ impl ToPyo3Ast for crate::StmtAsyncFor<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtWhile<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3107,21 +3049,19 @@ impl ToPyo3Ast for crate::StmtWhile<SourceRange> {
             orelse,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                test.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            test.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3130,7 +3070,7 @@ impl ToPyo3Ast for crate::StmtWhile<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtIf<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3139,21 +3079,19 @@ impl ToPyo3Ast for crate::StmtIf<SourceRange> {
             orelse,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                test.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            test.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3162,7 +3100,7 @@ impl ToPyo3Ast for crate::StmtIf<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtWith<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3171,21 +3109,19 @@ impl ToPyo3Ast for crate::StmtWith<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                items.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            items.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3194,7 +3130,7 @@ impl ToPyo3Ast for crate::StmtWith<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtAsyncWith<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3203,21 +3139,19 @@ impl ToPyo3Ast for crate::StmtAsyncWith<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                items.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            items.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3226,7 +3160,7 @@ impl ToPyo3Ast for crate::StmtAsyncWith<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtMatch<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3234,16 +3168,16 @@ impl ToPyo3Ast for crate::StmtMatch<SourceRange> {
             cases,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (subject.to_pyo3_ast(py)?, cases.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((subject.to_pyo3_ast(py)?, cases.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3252,7 +3186,7 @@ impl ToPyo3Ast for crate::StmtMatch<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtRaise<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3260,16 +3194,16 @@ impl ToPyo3Ast for crate::StmtRaise<SourceRange> {
             cause,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (exc.to_pyo3_ast(py)?, cause.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((exc.to_pyo3_ast(py)?, cause.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3278,7 +3212,7 @@ impl ToPyo3Ast for crate::StmtRaise<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtTry<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3288,22 +3222,20 @@ impl ToPyo3Ast for crate::StmtTry<SourceRange> {
             finalbody,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                body.to_pyo3_ast(py)?,
-                handlers.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                finalbody.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            body.to_pyo3_ast(py)?,
+            handlers.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            finalbody.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3312,7 +3244,7 @@ impl ToPyo3Ast for crate::StmtTry<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtTryStar<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3322,22 +3254,20 @@ impl ToPyo3Ast for crate::StmtTryStar<SourceRange> {
             finalbody,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                body.to_pyo3_ast(py)?,
-                handlers.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-                finalbody.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            body.to_pyo3_ast(py)?,
+            handlers.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+            finalbody.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3346,7 +3276,7 @@ impl ToPyo3Ast for crate::StmtTryStar<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtAssert<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3354,16 +3284,16 @@ impl ToPyo3Ast for crate::StmtAssert<SourceRange> {
             msg,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (test.to_pyo3_ast(py)?, msg.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((test.to_pyo3_ast(py)?, msg.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3372,21 +3302,22 @@ impl ToPyo3Ast for crate::StmtAssert<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtImport<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             names,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (names.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((names.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3395,7 +3326,7 @@ impl ToPyo3Ast for crate::StmtImport<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtImportFrom<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3404,21 +3335,19 @@ impl ToPyo3Ast for crate::StmtImportFrom<SourceRange> {
             level,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                module.to_pyo3_ast(py)?,
-                names.to_pyo3_ast(py)?,
-                level.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            module.to_pyo3_ast(py)?,
+            names.to_pyo3_ast(py)?,
+            level.map_or_else(|| py.None(), |level| level.to_u32().to_object(py)),
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3427,21 +3356,22 @@ impl ToPyo3Ast for crate::StmtImportFrom<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtGlobal<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             names,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (names.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((names.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3450,21 +3380,22 @@ impl ToPyo3Ast for crate::StmtGlobal<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtNonlocal<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             names,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (names.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((names.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3473,21 +3404,22 @@ impl ToPyo3Ast for crate::StmtNonlocal<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtExpr<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3496,18 +3428,18 @@ impl ToPyo3Ast for crate::StmtExpr<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtPass<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = cache.0.call0(py)?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3516,18 +3448,18 @@ impl ToPyo3Ast for crate::StmtPass<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtBreak<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = cache.0.call0(py)?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3536,18 +3468,18 @@ impl ToPyo3Ast for crate::StmtBreak<SourceRange> {
 
 impl ToPyo3Ast for crate::StmtContinue<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = cache.0.call0(py)?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3556,7 +3488,7 @@ impl ToPyo3Ast for crate::StmtContinue<SourceRange> {
 
 impl ToPyo3Ast for crate::generic::Expr<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Expr::BoolOp(cons) => cons.to_pyo3_ast(py)?,
             crate::Expr::NamedExpr(cons) => cons.to_pyo3_ast(py)?,
@@ -3592,7 +3524,7 @@ impl ToPyo3Ast for crate::generic::Expr<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprBoolOp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3600,16 +3532,16 @@ impl ToPyo3Ast for crate::ExprBoolOp<SourceRange> {
             values,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (op.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((op.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3618,7 +3550,7 @@ impl ToPyo3Ast for crate::ExprBoolOp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprNamedExpr<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3626,16 +3558,16 @@ impl ToPyo3Ast for crate::ExprNamedExpr<SourceRange> {
             value,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (target.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((target.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3644,7 +3576,7 @@ impl ToPyo3Ast for crate::ExprNamedExpr<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprBinOp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3653,21 +3585,19 @@ impl ToPyo3Ast for crate::ExprBinOp<SourceRange> {
             right,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                left.to_pyo3_ast(py)?,
-                op.to_pyo3_ast(py)?,
-                right.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            left.to_pyo3_ast(py)?,
+            op.to_pyo3_ast(py)?,
+            right.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3676,7 +3606,7 @@ impl ToPyo3Ast for crate::ExprBinOp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprUnaryOp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3684,16 +3614,16 @@ impl ToPyo3Ast for crate::ExprUnaryOp<SourceRange> {
             operand,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (op.to_pyo3_ast(py)?, operand.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((op.to_pyo3_ast(py)?, operand.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3702,7 +3632,7 @@ impl ToPyo3Ast for crate::ExprUnaryOp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprLambda<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3710,16 +3640,16 @@ impl ToPyo3Ast for crate::ExprLambda<SourceRange> {
             body,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (args.to_pyo3_ast(py)?, body.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((args.to_pyo3_ast(py)?, body.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3728,7 +3658,7 @@ impl ToPyo3Ast for crate::ExprLambda<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprIfExp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3737,21 +3667,19 @@ impl ToPyo3Ast for crate::ExprIfExp<SourceRange> {
             orelse,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                test.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-                orelse.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            test.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+            orelse.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3760,7 +3688,7 @@ impl ToPyo3Ast for crate::ExprIfExp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprDict<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3768,16 +3696,16 @@ impl ToPyo3Ast for crate::ExprDict<SourceRange> {
             values,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (keys.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((keys.to_pyo3_ast(py)?, values.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3786,21 +3714,22 @@ impl ToPyo3Ast for crate::ExprDict<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprSet<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             elts,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (elts.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((elts.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3809,7 +3738,7 @@ impl ToPyo3Ast for crate::ExprSet<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprListComp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3817,16 +3746,16 @@ impl ToPyo3Ast for crate::ExprListComp<SourceRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3835,7 +3764,7 @@ impl ToPyo3Ast for crate::ExprListComp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprSetComp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3843,16 +3772,16 @@ impl ToPyo3Ast for crate::ExprSetComp<SourceRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3861,7 +3790,7 @@ impl ToPyo3Ast for crate::ExprSetComp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprDictComp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3870,21 +3799,19 @@ impl ToPyo3Ast for crate::ExprDictComp<SourceRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                key.to_pyo3_ast(py)?,
-                value.to_pyo3_ast(py)?,
-                generators.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            key.to_pyo3_ast(py)?,
+            value.to_pyo3_ast(py)?,
+            generators.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3893,7 +3820,7 @@ impl ToPyo3Ast for crate::ExprDictComp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprGeneratorExp<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3901,16 +3828,16 @@ impl ToPyo3Ast for crate::ExprGeneratorExp<SourceRange> {
             generators,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elt.to_pyo3_ast(py)?, generators.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3919,21 +3846,22 @@ impl ToPyo3Ast for crate::ExprGeneratorExp<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprAwait<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3942,21 +3870,22 @@ impl ToPyo3Ast for crate::ExprAwait<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprYield<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3965,21 +3894,22 @@ impl ToPyo3Ast for crate::ExprYield<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprYieldFrom<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -3988,7 +3918,7 @@ impl ToPyo3Ast for crate::ExprYieldFrom<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprCompare<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -3997,21 +3927,19 @@ impl ToPyo3Ast for crate::ExprCompare<SourceRange> {
             comparators,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                left.to_pyo3_ast(py)?,
-                ops.to_pyo3_ast(py)?,
-                comparators.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            left.to_pyo3_ast(py)?,
+            ops.to_pyo3_ast(py)?,
+            comparators.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4020,7 +3948,7 @@ impl ToPyo3Ast for crate::ExprCompare<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprCall<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4029,21 +3957,19 @@ impl ToPyo3Ast for crate::ExprCall<SourceRange> {
             keywords,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                func.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                keywords.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            func.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            keywords.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4052,7 +3978,7 @@ impl ToPyo3Ast for crate::ExprCall<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprFormattedValue<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4061,21 +3987,19 @@ impl ToPyo3Ast for crate::ExprFormattedValue<SourceRange> {
             format_spec,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                value.to_pyo3_ast(py)?,
-                conversion.to_pyo3_ast(py)?,
-                format_spec.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            value.to_pyo3_ast(py)?,
+            conversion.to_pyo3_ast(py)?,
+            format_spec.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4084,21 +4008,22 @@ impl ToPyo3Ast for crate::ExprFormattedValue<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprJoinedStr<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             values,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (values.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((values.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4107,7 +4032,7 @@ impl ToPyo3Ast for crate::ExprJoinedStr<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprConstant<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4115,16 +4040,16 @@ impl ToPyo3Ast for crate::ExprConstant<SourceRange> {
             kind,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (value.to_pyo3_ast(py)?, kind.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((value.to_object(py), kind.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4133,7 +4058,7 @@ impl ToPyo3Ast for crate::ExprConstant<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprAttribute<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4142,21 +4067,19 @@ impl ToPyo3Ast for crate::ExprAttribute<SourceRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                value.to_pyo3_ast(py)?,
-                attr.to_pyo3_ast(py)?,
-                ctx.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            value.to_pyo3_ast(py)?,
+            attr.to_pyo3_ast(py)?,
+            ctx.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4165,7 +4088,7 @@ impl ToPyo3Ast for crate::ExprAttribute<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprSubscript<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4174,21 +4097,19 @@ impl ToPyo3Ast for crate::ExprSubscript<SourceRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                value.to_pyo3_ast(py)?,
-                slice.to_pyo3_ast(py)?,
-                ctx.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            value.to_pyo3_ast(py)?,
+            slice.to_pyo3_ast(py)?,
+            ctx.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4197,7 +4118,7 @@ impl ToPyo3Ast for crate::ExprSubscript<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprStarred<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4205,16 +4126,16 @@ impl ToPyo3Ast for crate::ExprStarred<SourceRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (value.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((value.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4223,7 +4144,7 @@ impl ToPyo3Ast for crate::ExprStarred<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprName<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4231,16 +4152,16 @@ impl ToPyo3Ast for crate::ExprName<SourceRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (id.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance =
+            Py::<PyAny>::as_ref(&cache.0, py).call1((id.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4249,7 +4170,7 @@ impl ToPyo3Ast for crate::ExprName<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprList<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4257,16 +4178,16 @@ impl ToPyo3Ast for crate::ExprList<SourceRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4275,7 +4196,7 @@ impl ToPyo3Ast for crate::ExprList<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprTuple<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4283,16 +4204,16 @@ impl ToPyo3Ast for crate::ExprTuple<SourceRange> {
             ctx,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((elts.to_pyo3_ast(py)?, ctx.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4301,7 +4222,7 @@ impl ToPyo3Ast for crate::ExprTuple<SourceRange> {
 
 impl ToPyo3Ast for crate::ExprSlice<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4310,21 +4231,19 @@ impl ToPyo3Ast for crate::ExprSlice<SourceRange> {
             step,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                lower.to_pyo3_ast(py)?,
-                upper.to_pyo3_ast(py)?,
-                step.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            lower.to_pyo3_ast(py)?,
+            upper.to_pyo3_ast(py)?,
+            step.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4333,7 +4252,7 @@ impl ToPyo3Ast for crate::ExprSlice<SourceRange> {
 
 impl ToPyo3Ast for crate::Comprehension<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4343,15 +4262,13 @@ impl ToPyo3Ast for crate::Comprehension<SourceRange> {
             is_async,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                target.to_pyo3_ast(py)?,
-                iter.to_pyo3_ast(py)?,
-                ifs.to_pyo3_ast(py)?,
-                is_async.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            target.to_pyo3_ast(py)?,
+            iter.to_pyo3_ast(py)?,
+            ifs.to_pyo3_ast(py)?,
+            is_async.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -4359,7 +4276,7 @@ impl ToPyo3Ast for crate::Comprehension<SourceRange> {
 
 impl ToPyo3Ast for crate::generic::Excepthandler<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Excepthandler::ExceptHandler(cons) => cons.to_pyo3_ast(py)?,
         };
@@ -4369,7 +4286,7 @@ impl ToPyo3Ast for crate::generic::Excepthandler<SourceRange> {
 
 impl ToPyo3Ast for crate::ExcepthandlerExceptHandler<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4378,21 +4295,19 @@ impl ToPyo3Ast for crate::ExcepthandlerExceptHandler<SourceRange> {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                type_.to_pyo3_ast(py)?,
-                name.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            type_.to_pyo3_ast(py)?,
+            name.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4401,7 +4316,7 @@ impl ToPyo3Ast for crate::ExcepthandlerExceptHandler<SourceRange> {
 
 impl ToPyo3Ast for crate::Arguments<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4414,18 +4329,16 @@ impl ToPyo3Ast for crate::Arguments<SourceRange> {
             defaults,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                posonlyargs.to_pyo3_ast(py)?,
-                args.to_pyo3_ast(py)?,
-                vararg.to_pyo3_ast(py)?,
-                kwonlyargs.to_pyo3_ast(py)?,
-                kw_defaults.to_pyo3_ast(py)?,
-                kwarg.to_pyo3_ast(py)?,
-                defaults.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            posonlyargs.to_pyo3_ast(py)?,
+            args.to_pyo3_ast(py)?,
+            vararg.to_pyo3_ast(py)?,
+            kwonlyargs.to_pyo3_ast(py)?,
+            kw_defaults.to_pyo3_ast(py)?,
+            kwarg.to_pyo3_ast(py)?,
+            defaults.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -4433,7 +4346,7 @@ impl ToPyo3Ast for crate::Arguments<SourceRange> {
 
 impl ToPyo3Ast for crate::Arg<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4442,21 +4355,19 @@ impl ToPyo3Ast for crate::Arg<SourceRange> {
             type_comment,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                arg.to_pyo3_ast(py)?,
-                annotation.to_pyo3_ast(py)?,
-                type_comment.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            arg.to_pyo3_ast(py)?,
+            annotation.to_pyo3_ast(py)?,
+            type_comment.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4465,7 +4376,7 @@ impl ToPyo3Ast for crate::Arg<SourceRange> {
 
 impl ToPyo3Ast for crate::Keyword<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4473,16 +4384,16 @@ impl ToPyo3Ast for crate::Keyword<SourceRange> {
             value,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (arg.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((arg.to_pyo3_ast(py)?, value.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4491,7 +4402,7 @@ impl ToPyo3Ast for crate::Keyword<SourceRange> {
 
 impl ToPyo3Ast for crate::Alias<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4499,16 +4410,16 @@ impl ToPyo3Ast for crate::Alias<SourceRange> {
             asname,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (name.to_pyo3_ast(py)?, asname.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((name.to_pyo3_ast(py)?, asname.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4517,7 +4428,7 @@ impl ToPyo3Ast for crate::Alias<SourceRange> {
 
 impl ToPyo3Ast for crate::Withitem<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4525,13 +4436,11 @@ impl ToPyo3Ast for crate::Withitem<SourceRange> {
             optional_vars,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                context_expr.to_pyo3_ast(py)?,
-                optional_vars.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            context_expr.to_pyo3_ast(py)?,
+            optional_vars.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -4539,7 +4448,7 @@ impl ToPyo3Ast for crate::Withitem<SourceRange> {
 
 impl ToPyo3Ast for crate::MatchCase<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4548,14 +4457,12 @@ impl ToPyo3Ast for crate::MatchCase<SourceRange> {
             body,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                pattern.to_pyo3_ast(py)?,
-                guard.to_pyo3_ast(py)?,
-                body.to_pyo3_ast(py)?,
-            ),
-        )?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            pattern.to_pyo3_ast(py)?,
+            guard.to_pyo3_ast(py)?,
+            body.to_pyo3_ast(py)?,
+        ))?;
 
         Ok(instance)
     }
@@ -4563,7 +4470,7 @@ impl ToPyo3Ast for crate::MatchCase<SourceRange> {
 
 impl ToPyo3Ast for crate::generic::Pattern<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::Pattern::MatchValue(cons) => cons.to_pyo3_ast(py)?,
             crate::Pattern::MatchSingleton(cons) => cons.to_pyo3_ast(py)?,
@@ -4580,21 +4487,22 @@ impl ToPyo3Ast for crate::generic::Pattern<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchValue<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4603,21 +4511,22 @@ impl ToPyo3Ast for crate::PatternMatchValue<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchSingleton<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             value,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (value.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((value.to_object(py),))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4626,21 +4535,22 @@ impl ToPyo3Ast for crate::PatternMatchSingleton<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchSequence<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             patterns,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (patterns.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((patterns.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4649,7 +4559,7 @@ impl ToPyo3Ast for crate::PatternMatchSequence<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchMapping<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4658,21 +4568,19 @@ impl ToPyo3Ast for crate::PatternMatchMapping<SourceRange> {
             rest,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                keys.to_pyo3_ast(py)?,
-                patterns.to_pyo3_ast(py)?,
-                rest.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            keys.to_pyo3_ast(py)?,
+            patterns.to_pyo3_ast(py)?,
+            rest.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4681,7 +4589,7 @@ impl ToPyo3Ast for crate::PatternMatchMapping<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchClass<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4691,22 +4599,20 @@ impl ToPyo3Ast for crate::PatternMatchClass<SourceRange> {
             kwd_patterns,
             range: _range,
         } = self;
-        let instance = cache.0.call1(
-            py,
-            (
-                cls.to_pyo3_ast(py)?,
-                patterns.to_pyo3_ast(py)?,
-                kwd_attrs.to_pyo3_ast(py)?,
-                kwd_patterns.to_pyo3_ast(py)?,
-            ),
-        )?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((
+            cls.to_pyo3_ast(py)?,
+            patterns.to_pyo3_ast(py)?,
+            kwd_attrs.to_pyo3_ast(py)?,
+            kwd_patterns.to_pyo3_ast(py)?,
+        ))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4715,21 +4621,22 @@ impl ToPyo3Ast for crate::PatternMatchClass<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchStar<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             name,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (name.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((name.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4738,7 +4645,7 @@ impl ToPyo3Ast for crate::PatternMatchStar<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchAs<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4746,16 +4653,16 @@ impl ToPyo3Ast for crate::PatternMatchAs<SourceRange> {
             name,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (pattern.to_pyo3_ast(py)?, name.to_pyo3_ast(py)?))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((pattern.to_pyo3_ast(py)?, name.to_pyo3_ast(py)?))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4764,21 +4671,22 @@ impl ToPyo3Ast for crate::PatternMatchAs<SourceRange> {
 
 impl ToPyo3Ast for crate::PatternMatchOr<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
             patterns,
             range: _range,
         } = self;
-        let instance = cache.0.call1(py, (patterns.to_pyo3_ast(py)?,))?;
 
-        let cache = ast_key_cache().get().unwrap();
-        instance.setattr(py, cache.lineno.as_ref(py), _range.start.row.get())?;
-        instance.setattr(py, cache.col_offset.as_ref(py), _range.start.column.get())?;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((patterns.to_pyo3_ast(py)?,))?;
+
+        let cache = ast_cache();
+        instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
+        instance.setattr(cache.col_offset.as_ref(py), _range.start.column.get())?;
         if let Some(end) = _range.end {
-            instance.setattr(py, cache.end_lineno.as_ref(py), end.row.get())?;
-            instance.setattr(py, cache.end_col_offset.as_ref(py), end.column.get())?;
+            instance.setattr(cache.end_lineno.as_ref(py), end.row.get())?;
+            instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
         }
 
         Ok(instance)
@@ -4787,7 +4695,7 @@ impl ToPyo3Ast for crate::PatternMatchOr<SourceRange> {
 
 impl ToPyo3Ast for crate::generic::TypeIgnore<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let instance = match &self {
             crate::TypeIgnore::TypeIgnore(cons) => cons.to_pyo3_ast(py)?,
         };
@@ -4797,7 +4705,7 @@ impl ToPyo3Ast for crate::generic::TypeIgnore<SourceRange> {
 
 impl ToPyo3Ast for crate::TypeIgnoreTypeIgnore<SourceRange> {
     #[inline]
-    fn to_pyo3_ast(&self, py: Python) -> PyResult<Py<PyAny>> {
+    fn to_pyo3_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
         let Self {
@@ -4805,9 +4713,9 @@ impl ToPyo3Ast for crate::TypeIgnoreTypeIgnore<SourceRange> {
             tag,
             range: _range,
         } = self;
-        let instance = cache
-            .0
-            .call1(py, (lineno.to_pyo3_ast(py)?, tag.to_pyo3_ast(py)?))?;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py)
+            .call1((lineno.to_u32().to_object(py), tag.to_pyo3_ast(py)?))?;
 
         Ok(instance)
     }
