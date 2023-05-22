@@ -107,60 +107,63 @@ pub(crate) fn ambiguous_unicode_character(
     }
 
     // Iterate over the "words" in the text.
-    let mut flags = WordFlags::empty();
-    let mut buffer = vec![];
+    let mut word_flags = WordFlags::empty();
+    let mut word_candidates: Vec<Candidate> = vec![];
     for (relative_offset, current_char) in text.char_indices() {
         // Word boundary.
         if !current_char.is_alphanumeric() {
-            if !buffer.is_empty() {
-                if flags.is_candidate_word() {
-                    diagnostics.append(&mut buffer);
+            if !word_candidates.is_empty() {
+                if word_flags.is_candidate_word() {
+                    for candidate in word_candidates.drain(..) {
+                        if let Some(diagnostic) = candidate.into_diagnostic(context, settings) {
+                            diagnostics.push(diagnostic);
+                        }
+                    }
                 }
-                buffer.clear();
+                word_candidates.clear();
             }
-            flags = WordFlags::empty();
+            word_flags = WordFlags::empty();
 
             // Check if the boundary character is itself an ambiguous unicode character, in which
             // case, it's always included as a diagnostic.
             if !current_char.is_ascii() {
                 if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
-                    if let Some(diagnostic) = diagnostic_for_char(
+                    let candidate = Candidate::new(
+                        TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
                         representant as char,
-                        TextSize::try_from(relative_offset).unwrap() + range.start(),
-                        context,
-                        settings,
-                    ) {
+                    );
+                    if let Some(diagnostic) = candidate.into_diagnostic(context, settings) {
                         diagnostics.push(diagnostic);
                     }
                 }
             }
         } else if current_char.is_ascii() {
             // The current word contains at least one ASCII character.
-            flags |= WordFlags::ASCII;
+            word_flags |= WordFlags::ASCII;
         } else if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
             // The current word contains an ambiguous unicode character.
-            if let Some(diagnostic) = diagnostic_for_char(
+            word_candidates.push(Candidate::new(
+                TextSize::try_from(relative_offset).unwrap() + range.start(),
                 current_char,
                 representant as char,
-                TextSize::try_from(relative_offset).unwrap() + range.start(),
-                context,
-                settings,
-            ) {
-                buffer.push(diagnostic);
-            }
+            ));
         } else {
             // The current word contains at least one unambiguous unicode character.
-            flags |= WordFlags::UNAMBIGUOUS_UNICODE;
+            word_flags |= WordFlags::UNAMBIGUOUS_UNICODE;
         }
     }
 
     // End of the text.
-    if !buffer.is_empty() {
-        if flags.is_candidate_word() {
-            diagnostics.append(&mut buffer);
+    if !word_candidates.is_empty() {
+        if word_flags.is_candidate_word() {
+            for candidate in word_candidates.drain(..) {
+                if let Some(diagnostic) = candidate.into_diagnostic(context, settings) {
+                    diagnostics.push(diagnostic);
+                }
+            }
         }
-        buffer.clear();
+        word_candidates.clear();
     }
 
     diagnostics
@@ -183,51 +186,66 @@ impl WordFlags {
     /// We follow VS Code's logic for determining whether ambiguous unicode characters within a
     /// given word should be flagged, i.e., we flag a word if it contains at least one ASCII
     /// character, or is purely unicode but _only_ consists of ambiguous characters.
+    ///
+    /// See: [VS Code](https://github.com/microsoft/vscode/issues/143720#issuecomment-1048757234)
     const fn is_candidate_word(self) -> bool {
         self.contains(WordFlags::ASCII) || !self.contains(WordFlags::UNAMBIGUOUS_UNICODE)
     }
 }
 
-/// Create a [`Diagnostic`] to report an ambiguous unicode character.
-fn diagnostic_for_char(
-    confusable: char,
-    representant: char,
+/// An ambiguous unicode character in the text.
+struct Candidate {
+    /// The offset of the candidate in the text.
     offset: TextSize,
-    context: Context,
-    settings: &Settings,
-) -> Option<Diagnostic> {
-    if !settings.allowed_confusables.contains(&confusable) {
-        let char_range = TextRange::at(offset, confusable.text_len());
-        let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
-            match context {
-                Context::String => AmbiguousUnicodeCharacterString {
-                    confusable,
-                    representant,
-                }
-                .into(),
-                Context::Docstring => AmbiguousUnicodeCharacterDocstring {
-                    confusable,
-                    representant,
-                }
-                .into(),
-                Context::Comment => AmbiguousUnicodeCharacterComment {
-                    confusable,
-                    representant,
-                }
-                .into(),
-            },
-            char_range,
-        );
-        if settings.rules.enabled(diagnostic.kind.rule()) {
-            if settings.rules.should_fix(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    representant.to_string(),
-                    char_range,
-                )));
-            }
-            return Some(diagnostic);
+    /// The ambiguous unicode character.
+    confusable: char,
+    /// The character with which the ambiguous unicode character is confusable.
+    representant: char,
+}
+
+impl Candidate {
+    fn new(offset: TextSize, confusable: char, representant: char) -> Self {
+        Self {
+            offset,
+            confusable,
+            representant,
         }
     }
-    None
+
+    fn into_diagnostic(self, context: Context, settings: &Settings) -> Option<Diagnostic> {
+        if !settings.allowed_confusables.contains(&self.confusable) {
+            let char_range = TextRange::at(self.offset, self.confusable.text_len());
+            let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
+                match context {
+                    Context::String => AmbiguousUnicodeCharacterString {
+                        confusable: self.confusable,
+                        representant: self.representant,
+                    }
+                    .into(),
+                    Context::Docstring => AmbiguousUnicodeCharacterDocstring {
+                        confusable: self.confusable,
+                        representant: self.representant,
+                    }
+                    .into(),
+                    Context::Comment => AmbiguousUnicodeCharacterComment {
+                        confusable: self.confusable,
+                        representant: self.representant,
+                    }
+                    .into(),
+                },
+                char_range,
+            );
+            if settings.rules.enabled(diagnostic.kind.rule()) {
+                if settings.rules.should_fix(diagnostic.kind.rule()) {
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        self.representant.to_string(),
+                        char_range,
+                    )));
+                }
+                return Some(diagnostic);
+            }
+        }
+        None
+    }
 }
