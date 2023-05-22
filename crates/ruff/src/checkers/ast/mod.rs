@@ -811,13 +811,10 @@ where
                 }
                 //dlint
                 if self.settings.rules.enabled(Rule::ShelveUse) {
-                    dlint::rules::bad_shelve_use(self, dlint::helpers::AnyStmtImport::from(import));
+                    dlint::rules::shelve_use(self, dlint::helpers::AnyStmtImport::from(import));
                 }
                 if self.settings.rules.enabled(Rule::MarshalUse) {
-                    dlint::rules::bad_marshal_use(
-                        self,
-                        dlint::helpers::AnyStmtImport::from(import),
-                    );
+                    dlint::rules::marshal_use(self, dlint::helpers::AnyStmtImport::from(import));
                 }
 
                 if self
@@ -1110,13 +1107,13 @@ where
 
                 //dlint
                 if self.settings.rules.enabled(Rule::ShelveUse) {
-                    dlint::rules::bad_shelve_use(
+                    dlint::rules::shelve_use(
                         self,
                         dlint::helpers::AnyStmtImport::from(import_from),
                     );
                 }
                 if self.settings.rules.enabled(Rule::MarshalUse) {
-                    dlint::rules::bad_marshal_use(
+                    dlint::rules::marshal_use(
                         self,
                         dlint::helpers::AnyStmtImport::from(import_from),
                     );
@@ -2738,13 +2735,13 @@ where
                 }
                 // dlint
                 if self.settings.rules.enabled(Rule::EvalUse) {
-                    dlint::rules::bad_eval_use(self, expr_call);
+                    dlint::rules::eval_use(self, expr_call);
                 }
                 if self.settings.rules.enabled(Rule::ExecUse) {
-                    dlint::rules::bad_exec_use(self, expr_call);
+                    dlint::rules::exec_use(self, expr_call);
                 }
                 if self.settings.rules.enabled(Rule::CompileUse) {
-                    dlint::rules::bad_compile_use(self, expr_call);
+                    dlint::rules::compile_use(self, expr_call);
                 }
                 // flake8-async
                 if self

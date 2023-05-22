@@ -8,7 +8,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     self, Arguments, Cmpop, Constant, Excepthandler, Expr, Keyword, MatchCase, Pattern, Ranged,
-    Stmt,
+    Stmt, StmtImportFrom,
 };
 use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
@@ -1103,6 +1103,20 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
         }
         error!("Failed to find identifier for {:?}", stmt);
     }
+
+    stmt.range()
+}
+
+/// Return the appropriate visual `Range` for the module of a `StmtImportFrom`
+pub fn import_from_module_range(stmt: &StmtImportFrom, locator: &Locator) -> TextRange {
+    let contents = &locator.contents()[stmt.range()];
+
+    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
+        if matches!(tok, Tok::Name { .. }) {
+            return range;
+        }
+    }
+    error!("Failed to find module range for {:?}", stmt);
 
     stmt.range()
 }

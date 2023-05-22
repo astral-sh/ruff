@@ -2,6 +2,7 @@ use rustpython_parser::ast::Identifier;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::import_from_module_range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::dlint::helpers::AnyStmtImport;
@@ -28,7 +29,7 @@ impl Violation for MarshalUse {
 }
 
 /// DUO120
-pub(crate) fn bad_marshal_use(checker: &mut Checker, stmt: AnyStmtImport) {
+pub(crate) fn marshal_use(checker: &mut Checker, stmt: AnyStmtImport) {
     match stmt {
         AnyStmtImport::Import(imp) => {
             for name in &imp.names {
@@ -41,9 +42,10 @@ pub(crate) fn bad_marshal_use(checker: &mut Checker, stmt: AnyStmtImport) {
         }
         AnyStmtImport::ImportFrom(imp) => {
             if imp.module == Some(Identifier::from("marshal")) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(MarshalUse, imp.range));
+                checker.diagnostics.push(Diagnostic::new(
+                    MarshalUse,
+                    import_from_module_range(imp, checker.locator),
+                ));
             }
         }
     }
