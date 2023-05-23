@@ -1930,6 +1930,7 @@ dependencies = [
  "once_cell",
  "ruff_text_size",
  "rustc-hash",
+ "rustpython-ast",
  "rustpython-literal",
  "rustpython-parser",
  "serde",
