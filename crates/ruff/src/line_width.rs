@@ -3,11 +3,13 @@ use unicode_width::UnicodeWidthChar;
 
 use ruff_macros::CacheKey;
 
+/// The length of a line of text that is considered too long.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LineLength(usize);
 
 impl Default for LineLength {
+    /// The default line length.
     fn default() -> Self {
         Self(88)
     }
@@ -25,13 +27,18 @@ impl From<usize> for LineLength {
     }
 }
 
+/// A measure of the width of a line of text.
+///
+/// This is used to determine if a line is too long.
+/// It should be compared to a [`LineLength`].
 #[derive(Clone, Copy, Debug)]
 pub struct LineWidth {
-    /// The current width of the line.
+    /// The width of the line.
     width: usize,
-    /// The current column of the line.
+    /// The column of the line.
+    /// This is used to calculate the width of tabs.
     column: usize,
-    /// The tab width.
+    /// The tab size to use when calculating the width of tabs.
     tab_size: TabSize,
 }
 
@@ -66,6 +73,7 @@ impl LineWidth {
         self.width
     }
 
+    /// Creates a new `LineWidth` with the given tab size.
     pub fn new(tab_size: TabSize) -> Self {
         LineWidth {
             width: 0,
@@ -96,16 +104,23 @@ impl LineWidth {
         self
     }
 
+    /// Adds the given text to the line width.
     #[must_use]
     pub fn add_str(self, text: &str) -> Self {
         self.update(text.chars())
     }
 
+    /// Adds the given character to the line width.
     #[must_use]
     pub fn add_char(self, c: char) -> Self {
         self.update(std::iter::once(c))
     }
 
+    /// Adds the given width to the line width.
+    /// Also adds the given width to the column.
+    /// It is generally better to use [`add_str`] or [`add_char`].
+    /// The width and column should be the same for the corresponding text.
+    /// Currently, this is only used to add spaces.
     #[must_use]
     pub fn add_width(mut self, width: usize) -> Self {
         self.width += width;
@@ -126,6 +141,7 @@ impl PartialOrd<LineLength> for LineWidth {
     }
 }
 
+/// The size of a tab.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct TabSize(pub u8);
