@@ -6,23 +6,28 @@ use ruff_text_size::TextRange;
 
 use crate::scope::ScopeId;
 
-// enum Context {
-//     /// The reference occurs in a runtime context.
-//     Runtime,
-//     /// The reference occurs in a typing-only context.
-//     Typing,
-//     /// The reference occurs in a synthetic context, used for `__future__` imports, explicit
-//     /// re-exports, and other bindings that should be considered used even if they're never
-//     /// "referenced".
-//     Synthetic,
-// }
+#[derive(Debug, Clone)]
+pub enum ReferenceContext {
+    /// The reference occurs in a runtime context.
+    Runtime,
+    /// The reference occurs in a typing-only context.
+    Typing,
+    /// The reference occurs in a synthetic context, used for `__future__` imports, explicit
+    /// re-exports, and other bindings that should be considered used even if they're never
+    /// "referenced".
+    Synthetic,
+}
 
 #[derive(Debug, Clone)]
 pub struct Reference {
+    /// The binding that is referenced.
+    binding_id: BindingId,
     /// The scope in which the reference is defined.
     scope_id: ScopeId,
     /// The range of the reference in the source code.
     range: TextRange,
+    /// The context in which the reference occurs.
+    context: ReferenceContext,
 }
 
 impl Reference {
@@ -59,10 +64,28 @@ pub struct References(Vec<Reference>);
 
 impl References {
     /// Pushes a new reference and returns its unique id
-    pub fn push_reference(&mut self, scope_id: ScopeId, range: TextRange) -> ReferenceId {
+    pub fn push_reference(
+        &mut self,
+        binding_id: BindingId,
+        scope_id: ScopeId,
+        range: TextRange,
+        context: ReferenceContext,
+    ) -> ReferenceId {
         let next_id = ReferenceId::try_from(self.0.len()).unwrap();
-        self.0.push(Reference { scope_id, range });
+        self.0.push(Reference {
+            binding_id,
+            scope_id,
+            range,
+            context,
+        });
         next_id
+    }
+
+    /// Return `true` if the given binding is referenced in this program.
+    pub fn used(&self, binding_id: BindingId) -> bool {
+        self.0
+            .iter()
+            .any(|reference| reference.binding_id == binding_id)
     }
 }
 

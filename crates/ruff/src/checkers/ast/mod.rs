@@ -30,6 +30,7 @@ use ruff_python_semantic::binding::{
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::node::NodeId;
+use ruff_python_semantic::reference::ReferenceContext;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -175,7 +176,7 @@ impl<'a> Checker<'a> {
 
     #[inline]
     pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.settings.rules.enabled(rule)
+        self.enabled(rule)
     }
 }
 
@@ -236,21 +237,23 @@ where
                     let exceptions = self.semantic_model.exceptions();
                     let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        let reference = self
-                            .semantic_model
-                            .references
-                            .push_reference(self.semantic_model.scope_id, stmt.range());
+                        // Add a binding to the current scope.
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Global,
-                            runtime_usage: Vec::new(),
-                            synthetic_usage: vec![reference],
-                            typing_usage: Vec::new(),
                             range: *range,
                             source: self.semantic_model.stmt_id,
                             context,
                             exceptions,
                         });
                         scope.add(name, id);
+
+                        // Push a reference to the global binding.
+                        self.semantic_model.references.push_reference(
+                            id,
+                            self.semantic_model.scope_id,
+                            stmt.range(),
+                            ReferenceContext::Synthetic,
+                        );
                     }
                 }
 
@@ -268,22 +271,23 @@ where
                     let exceptions = self.semantic_model.exceptions();
                     let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        let reference = self
-                            .semantic_model
-                            .references
-                            .push_reference(self.semantic_model.scope_id, stmt.range());
                         // Add a binding to the current scope.
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
-                            runtime_usage: Vec::new(),
-                            synthetic_usage: vec![reference],
-                            typing_usage: Vec::new(),
                             range: *range,
                             source: self.semantic_model.stmt_id,
                             context,
                             exceptions,
                         });
                         scope.add(name, id);
+
+                        // Push a reference to the global binding.
+                        self.semantic_model.references.push_reference(
+                            id,
+                            self.semantic_model.scope_id,
+                            stmt.range(),
+                            ReferenceContext::Synthetic,
+                        );
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
@@ -298,13 +302,12 @@ where
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
-                            let reference = self
-                                .semantic_model
-                                .references
-                                .push_reference(self.semantic_model.scope_id, stmt.range());
-                            self.semantic_model.bindings[*binding_id]
-                                .runtime_usage
-                                .push(reference);
+                            self.semantic_model.references.push_reference(
+                                *binding_id,
+                                self.semantic_model.scope_id,
+                                stmt.range(),
+                                ReferenceContext::Runtime,
+                            );
                         } else {
                             // Ensure that every nonlocal has an existing binding from a parent scope.
                             if self.enabled(Rule::NonlocalWithoutBinding) {
@@ -809,23 +812,24 @@ where
                 for alias in names {
                     if &alias.name == "__future__" {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let reference = self
-                            .semantic_model
-                            .references
-                            .push_reference(self.semantic_model.scope_id, alias.range());
-                        self.add_binding(
+
+                        let binding_id = self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
-                                runtime_usage: Vec::new(),
-                                // Always mark `__future__` imports as used.
-                                synthetic_usage: vec![reference],
-                                typing_usage: Vec::new(),
                                 range: alias.range(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
+                        );
+
+                        // Always mark `__future__` imports as used.
+                        self.semantic_model.references.push_reference(
+                            binding_id,
+                            self.semantic_model.scope_id,
+                            alias.range(),
+                            ReferenceContext::Synthetic,
                         );
 
                         if self.enabled(Rule::LateFutureImport) {
@@ -848,9 +852,6 @@ where
                                     name,
                                     full_name,
                                 }),
-                                runtime_usage: Vec::new(),
-                                synthetic_usage: Vec::new(),
-                                typing_usage: Vec::new(),
                                 range: alias.range(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
@@ -858,38 +859,33 @@ where
                             },
                         );
                     } else {
-                        // Treat explicit re-export as usage (e.g., `from .applications
-                        // import FastAPI as FastAPI`).
-                        let is_explicit_reexport = alias
-                            .asname
-                            .as_ref()
-                            .map_or(false, |asname| asname == &alias.name);
-
-                        let synthetic_usage = if is_explicit_reexport {
-                            let reference = self
-                                .semantic_model
-                                .references
-                                .push_reference(self.semantic_model.scope_id, alias.range());
-                            vec![reference]
-                        } else {
-                            vec![]
-                        };
-
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let full_name = &alias.name;
-                        self.add_binding(
+                        let binding_id = self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::Importation(Importation { name, full_name }),
-                                runtime_usage: Vec::new(),
-                                synthetic_usage,
-                                typing_usage: Vec::new(),
                                 range: alias.range(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
                         );
+
+                        // Treat explicit re-export as usage (e.g., `from .applications
+                        // import FastAPI as FastAPI`).
+                        let is_explicit_reexport = alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.name);
+                        if is_explicit_reexport {
+                            self.semantic_model.references.push_reference(
+                                binding_id,
+                                self.semantic_model.scope_id,
+                                alias.range(),
+                                ReferenceContext::Synthetic,
+                            );
+                        }
 
                         if let Some(asname) = &alias.asname {
                             if self.enabled(Rule::BuiltinVariableShadowing) {
@@ -1104,23 +1100,24 @@ where
                 for alias in names {
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let reference = self
-                            .semantic_model
-                            .references
-                            .push_reference(self.semantic_model.scope_id, alias.range());
-                        self.add_binding(
+
+                        let binding_id = self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
-                                runtime_usage: Vec::new(),
-                                // Always mark `__future__` imports as used.
-                                synthetic_usage: vec![reference],
-                                typing_usage: Vec::new(),
                                 range: alias.range(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
+                        );
+
+                        // Always mark `__future__` imports as used.
+                        self.semantic_model.references.push_reference(
+                            binding_id,
+                            self.semantic_model.scope_id,
+                            alias.range(),
+                            ReferenceContext::Synthetic,
                         );
 
                         if self.enabled(Rule::FutureFeatureNotDefined) {
@@ -1171,45 +1168,40 @@ where
                             }
                         }
 
-                        // Treat explicit re-export as usage (e.g., `from .applications
-                        // import FastAPI as FastAPI`).
-                        let is_explicit_reexport = alias
-                            .asname
-                            .as_ref()
-                            .map_or(false, |asname| asname == &alias.name);
-
-                        let synthetic_usage = if is_explicit_reexport {
-                            let reference = self
-                                .semantic_model
-                                .references
-                                .push_reference(self.semantic_model.scope_id, alias.range());
-                            vec![reference]
-                        } else {
-                            vec![]
-                        };
-
                         // Given `from foo import bar`, `name` would be "bar" and `full_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `full_name` would be "foo.bar".
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let full_name =
                             helpers::format_import_from_member(level, module, &alias.name);
-                        self.add_binding(
+                        let binding_id = self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FromImportation(FromImportation {
                                     name,
                                     full_name,
                                 }),
-                                runtime_usage: Vec::new(),
-                                synthetic_usage,
-                                typing_usage: Vec::new(),
                                 range: alias.range(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
                         );
+
+                        // Treat explicit re-export as usage (e.g., `from .applications
+                        // import FastAPI as FastAPI`).
+                        let is_explicit_reexport = alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.name);
+                        if is_explicit_reexport {
+                            self.semantic_model.references.push_reference(
+                                binding_id,
+                                self.semantic_model.scope_id,
+                                alias.range(),
+                                ReferenceContext::Synthetic,
+                            );
+                        }
                     }
 
                     if self.enabled(Rule::RelativeImports) {
@@ -1915,9 +1907,6 @@ where
                     name,
                     Binding {
                         kind: BindingKind::FunctionDefinition,
-                        runtime_usage: Vec::new(),
-                        synthetic_usage: Vec::new(),
-                        typing_usage: Vec::new(),
                         range: stmt.range(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
@@ -1940,9 +1929,6 @@ where
                     {
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
-                            runtime_usage: Vec::new(),
-                            synthetic_usage: Vec::new(),
-                            typing_usage: Vec::new(),
                             range: stmt.range(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
@@ -2005,9 +1991,6 @@ where
                     {
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
-                            runtime_usage: Vec::new(),
-                            synthetic_usage: Vec::new(),
-                            typing_usage: Vec::new(),
                             range: stmt.range(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
@@ -2193,9 +2176,6 @@ where
                     name,
                     Binding {
                         kind: BindingKind::ClassDefinition,
-                        runtime_usage: Vec::new(),
-                        synthetic_usage: Vec::new(),
-                        typing_usage: Vec::new(),
                         range: stmt.range(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
@@ -4046,7 +4026,7 @@ where
                             let scope = self.semantic_model.scope_mut();
                             &scope.remove(name)
                         } {
-                            if !self.semantic_model.bindings[*binding_id].used() {
+                            if !self.semantic_model.references.used(*binding_id) {
                                 if self.enabled(Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         pyflakes::rules::UnusedVariable { name: name.into() },
@@ -4133,9 +4113,6 @@ where
             &arg.arg,
             Binding {
                 kind: BindingKind::Argument,
-                runtime_usage: Vec::new(),
-                synthetic_usage: Vec::new(),
-                typing_usage: Vec::new(),
                 range: arg.range(),
                 source: self.semantic_model.stmt_id,
                 context: self.semantic_model.execution_context(),
@@ -4182,9 +4159,6 @@ where
                 name,
                 Binding {
                     kind: BindingKind::Assignment,
-                    runtime_usage: Vec::new(),
-                    synthetic_usage: Vec::new(),
-                    typing_usage: Vec::new(),
                     range: pattern.range(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
@@ -4313,7 +4287,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Add a [`Binding`] to the current scope, bound to the given name.
-    fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) {
+    fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) -> BindingId {
         let binding_id = self.semantic_model.bindings.next_id();
         if let Some((stack_index, existing_binding_id)) = self
             .semantic_model
@@ -4426,17 +4400,19 @@ impl<'a> Checker<'a> {
                     // If the original binding was a global or nonlocal, and the new binding conflicts within
                     // the current scope, then the new binding is also as the same.
                     Binding {
-                        runtime_usage: existing.runtime_usage.clone(),
-                        synthetic_usage: existing.synthetic_usage.clone(),
-                        typing_usage: existing.typing_usage.clone(),
+                        // STOPSHIP(charlie): Copy references?
+                        // runtime_usage: existing.runtime_usage.clone(),
+                        // synthetic_usage: existing.synthetic_usage.clone(),
+                        // typing_usage: existing.typing_usage.clone(),
                         kind: kind.clone(),
                         ..binding
                     }
                 }
                 _ => Binding {
-                    runtime_usage: existing.runtime_usage.clone(),
-                    synthetic_usage: existing.synthetic_usage.clone(),
-                    typing_usage: existing.typing_usage.clone(),
+                    // STOPSHIP(charlie): Copy references?
+                    // runtime_usage: existing.runtime_usage.clone(),
+                    // synthetic_usage: existing.synthetic_usage.clone(),
+                    // typing_usage: existing.typing_usage.clone(),
                     ..binding
                 },
             }
@@ -4447,15 +4423,14 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         if binding.kind.is_annotation() && scope.defines(name) {
-            self.semantic_model.bindings.push(binding);
-            return;
+            return self.semantic_model.bindings.push(binding);
         }
 
         // Add the binding to the scope.
         scope.add(name, binding_id);
 
         // Add the binding to the arena.
-        self.semantic_model.bindings.push(binding);
+        self.semantic_model.bindings.push(binding)
     }
 
     fn bind_builtins(&mut self) {
@@ -4467,21 +4442,22 @@ impl<'a> Checker<'a> {
             .copied()
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
-            let reference = self
-                .semantic_model
-                .references
-                .push_reference(ScopeId::global(), TextRange::default());
             let id = self.semantic_model.bindings.push(Binding {
                 kind: BindingKind::Builtin,
                 range: TextRange::default(),
-                runtime_usage: Vec::new(),
-                synthetic_usage: vec![reference],
-                typing_usage: Vec::new(),
                 source: None,
                 context: ExecutionContext::Runtime,
                 exceptions: Exceptions::empty(),
             });
             scope.add(builtin, id);
+
+            // Add a reference to the builtin.
+            self.semantic_model.references.push_reference(
+                id,
+                ScopeId::global(),
+                TextRange::default(),
+                ReferenceContext::Synthetic,
+            );
         }
     }
 
@@ -4594,9 +4570,6 @@ impl<'a> Checker<'a> {
                 id,
                 Binding {
                     kind: BindingKind::Annotation,
-                    runtime_usage: Vec::new(),
-                    synthetic_usage: Vec::new(),
-                    typing_usage: Vec::new(),
                     range: expr.range(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
@@ -4611,9 +4584,6 @@ impl<'a> Checker<'a> {
                 id,
                 Binding {
                     kind: BindingKind::LoopVar,
-                    runtime_usage: Vec::new(),
-                    synthetic_usage: Vec::new(),
-                    typing_usage: Vec::new(),
                     range: expr.range(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
@@ -4628,9 +4598,6 @@ impl<'a> Checker<'a> {
                 id,
                 Binding {
                     kind: BindingKind::Binding,
-                    runtime_usage: Vec::new(),
-                    synthetic_usage: Vec::new(),
-                    typing_usage: Vec::new(),
                     range: expr.range(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
@@ -4709,9 +4676,6 @@ impl<'a> Checker<'a> {
                     id,
                     Binding {
                         kind: BindingKind::Export(Export { names: all_names }),
-                        runtime_usage: Vec::new(),
-                        synthetic_usage: Vec::new(),
-                        typing_usage: Vec::new(),
                         range: expr.range(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
@@ -4731,9 +4695,6 @@ impl<'a> Checker<'a> {
                 id,
                 Binding {
                     kind: BindingKind::NamedExprAssignment,
-                    runtime_usage: Vec::new(),
-                    synthetic_usage: Vec::new(),
-                    typing_usage: Vec::new(),
                     range: expr.range(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
@@ -4747,9 +4708,6 @@ impl<'a> Checker<'a> {
             id,
             Binding {
                 kind: BindingKind::Assignment,
-                runtime_usage: Vec::new(),
-                synthetic_usage: Vec::new(),
-                typing_usage: Vec::new(),
                 range: expr.range(),
                 source: self.semantic_model.stmt_id,
                 context: self.semantic_model.execution_context(),
@@ -4992,12 +4950,12 @@ impl<'a> Checker<'a> {
 
         if let Some((bindings, range)) = all_bindings {
             for binding_id in bindings {
-                let reference = self
-                    .semantic_model
-                    .references
-                    .push_reference(ScopeId::global(), range);
-                self.semantic_model.bindings[binding_id]
-                    .mark_used(reference, ExecutionContext::Runtime);
+                self.semantic_model.references.push_reference(
+                    binding_id,
+                    ScopeId::global(),
+                    range,
+                    ReferenceContext::Runtime,
+                );
             }
         }
 
@@ -5119,7 +5077,7 @@ impl<'a> Checker<'a> {
                             | BindingKind::SubmoduleImportation(..)
                             | BindingKind::FutureImportation
                     ) {
-                        if binding.used() {
+                        if self.semantic_model.references.unused(binding_id) {
                             continue;
                         }
 
@@ -5218,7 +5176,7 @@ impl<'a> Checker<'a> {
                         _ => continue,
                     };
 
-                    if binding.used() {
+                    if self.semantic_model.references.used(*binding_id) {
                         continue;
                     }
 

@@ -7,6 +7,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
+use crate::binding;
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -18,7 +19,7 @@ use crate::binding::{
 };
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::node::{NodeId, Nodes};
-use crate::reference::References;
+use crate::reference::{ReferenceContext, References};
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
@@ -126,12 +127,27 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                let reference_id = self.references.push_reference(ScopeId::global(), range);
-                self.bindings[*binding_id].mark_used(reference_id, context);
+                self.references.push_reference(
+                    *binding_id,
+                    ScopeId::global(),
+                    range,
+                    match context {
+                        ExecutionContext::Runtime => ReferenceContext::Runtime,
+                        ExecutionContext::Typing => ReferenceContext::Typing,
+                    },
+                );
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), *binding_id) {
-                    self.bindings[binding_id].mark_used(reference_id, context);
+                    self.references.push_reference(
+                        binding_id,
+                        ScopeId::global(),
+                        range,
+                        match context {
+                            ExecutionContext::Runtime => ReferenceContext::Runtime,
+                            ExecutionContext::Typing => ReferenceContext::Typing,
+                        },
+                    );
                 }
 
                 return ResolvedReference::Resolved(*binding_id);
@@ -161,12 +177,27 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = scope.get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                let reference_id = self.references.push_reference(self.scope_id, range);
-                self.bindings[*binding_id].mark_used(reference_id, context);
+                self.references.push_reference(
+                    *binding_id,
+                    self.scope_id,
+                    range,
+                    match context {
+                        ExecutionContext::Runtime => ReferenceContext::Runtime,
+                        ExecutionContext::Typing => ReferenceContext::Typing,
+                    },
+                );
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(scope_id, *binding_id) {
-                    self.bindings[binding_id].mark_used(reference_id, context);
+                    self.references.push_reference(
+                        binding_id,
+                        self.scope_id,
+                        range,
+                        match context {
+                            ExecutionContext::Runtime => ReferenceContext::Runtime,
+                            ExecutionContext::Typing => ReferenceContext::Typing,
+                        },
+                    );
                 }
 
                 // But if it's a type annotation, don't treat it as resolved, unless we're in a

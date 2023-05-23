@@ -1,15 +1,14 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::model::SemanticModel;
 use bitflags::bitflags;
+use ruff_text_size::TextRange;
+
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::Locator;
-use ruff_text_size::TextRange;
 
+use crate::model::SemanticModel;
 use crate::node::NodeId;
-use crate::reference::ReferenceId;
-use crate::scope::ScopeId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
@@ -19,35 +18,11 @@ pub struct Binding<'a> {
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a runtime context.
-    pub runtime_usage: Vec<ReferenceId>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a typing-time context.
-    pub typing_usage: Vec<ReferenceId>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a synthetic context. This is used for
-    /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
-    /// that should be considered used even if they're never referenced.
-    pub synthetic_usage: Vec<ReferenceId>,
     /// The exceptions that were handled when the binding was defined.
     pub exceptions: Exceptions,
 }
 
 impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, reference_id: ReferenceId, context: ExecutionContext) {
-        match context {
-            ExecutionContext::Runtime => self.runtime_usage.push(reference_id),
-            ExecutionContext::Typing => self.typing_usage.push(reference_id),
-        }
-    }
-
-    pub fn used(&self) -> bool {
-        !self.runtime_usage.is_empty()
-            || !self.synthetic_usage.is_empty()
-            || !self.typing_usage.is_empty()
-    }
-
     pub const fn is_definition(&self) -> bool {
         matches!(
             self.kind,
