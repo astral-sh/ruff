@@ -63,8 +63,7 @@ pub(crate) fn match_aliases<'a, 'b>(
     }
 }
 
-#[allow(clippy::borrowed_box)]
-pub(crate) fn match_call<'a, 'b>(expression: &'a Expression<'b>) -> Result<&'a Box<Call<'b>>> {
+pub(crate) fn match_call<'a, 'b>(expression: &'a Expression<'b>) -> Result<&'a Call<'b>> {
     if let Expression::Call(call) = expression {
         Ok(call)
     } else {

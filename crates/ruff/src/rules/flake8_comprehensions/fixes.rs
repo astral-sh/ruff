@@ -659,7 +659,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
 
     if let Expression::Name(outer_name) = &*outer_call.func {
         if outer_name.value == "list" {
-            tree = Expression::Call(inner_call.clone());
+            tree = Expression::Call(Box::new((*inner_call).clone()));
         } else {
             // If the `reverse` argument is used
             let args = if inner_call.args.iter().any(|arg| {
