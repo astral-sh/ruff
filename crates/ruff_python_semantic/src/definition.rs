@@ -4,7 +4,7 @@
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use ruff_index::{Idx, IndexSlice, IndexVec, U32Index};
+use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use rustpython_parser::ast::{self, Stmt};
 
 use crate::analyze::visibility::{
@@ -12,26 +12,14 @@ use crate::analyze::visibility::{
 };
 
 /// Id uniquely identifying a definition in a program.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct DefinitionId(U32Index);
+#[newtype_index]
+pub struct DefinitionId;
 
 impl DefinitionId {
     /// Returns the ID for the module definition.
     #[inline]
     pub const fn module() -> Self {
-        DefinitionId(U32Index::from_u32(0))
-    }
-}
-
-impl Idx for DefinitionId {
-    #[inline]
-    fn new(value: usize) -> Self {
-        Self(U32Index::from_usize(value))
-    }
-
-    #[inline]
-    fn index(self) -> usize {
-        self.0.index()
+        DefinitionId::from_u32(0)
     }
 }
 

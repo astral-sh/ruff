@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::model::SemanticModel;
 use bitflags::bitflags;
-use ruff_index::{Idx, IndexSlice, IndexVec, U32Index};
+use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::Locator;
 use ruff_text_size::TextRange;
@@ -130,20 +130,8 @@ impl<'a> Binding<'a> {
 /// Using a `u32` to identify [Binding]s should is sufficient because Ruff only supports documents with a
 /// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
 /// bindings because bindings must be separated by whitespace (and have an assignment).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct BindingId(U32Index);
-
-impl Idx for BindingId {
-    #[inline(always)]
-    fn new(value: usize) -> Self {
-        BindingId(U32Index::new(value))
-    }
-
-    #[inline(always)]
-    fn index(self) -> usize {
-        self.0.index()
-    }
-}
+#[newtype_index]
+pub struct BindingId;
 
 impl nohash_hasher::IsEnabled for BindingId {}
 

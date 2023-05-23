@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use ruff_index::{Idx, IndexSlice, IndexVec, U32Index};
+use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
 
@@ -151,35 +151,19 @@ pub struct Lambda<'a> {
 /// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
 /// and it is impossible to have more scopes than characters in the file (because defining a function or class
 /// requires more than one character).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct ScopeId(U32Index);
+#[newtype_index]
+pub struct ScopeId;
 
 impl ScopeId {
     /// Returns the ID for the global scope
     #[inline]
     pub const fn global() -> Self {
-        ScopeId(U32Index::from_u32(0))
+        ScopeId::from_u32(0)
     }
 
     /// Returns `true` if this is the id of the global scope
-    pub const fn is_global(self) -> bool {
-        self.0.index() == 0
-    }
-
-    pub const fn as_usize(self) -> usize {
-        self.0.as_usize()
-    }
-}
-
-impl Idx for ScopeId {
-    #[inline(always)]
-    fn new(value: usize) -> Self {
-        Self(U32Index::from_usize(value))
-    }
-
-    #[inline(always)]
-    fn index(self) -> usize {
-        self.0.index()
+    pub const fn is_global(&self) -> bool {
+        self.index() == 0
     }
 }
 

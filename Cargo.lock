@@ -1908,6 +1908,7 @@ dependencies = [
 name = "ruff_index"
 version = "0.0.0"
 dependencies = [
+ "ruff_macros",
  "static_assertions",
 ]
 

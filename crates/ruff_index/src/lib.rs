@@ -7,6 +7,7 @@ mod idx;
 mod slice;
 mod vec;
 
-pub use idx::{Idx, U32Index};
+pub use idx::Idx;
+pub use ruff_macros::newtype_index;
 pub use slice::IndexSlice;
 pub use vec::IndexVec;

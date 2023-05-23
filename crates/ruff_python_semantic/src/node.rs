@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use ruff_index::{Idx, IndexVec, U32Index};
+use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Stmt;
 
@@ -11,20 +11,9 @@ use ruff_python_ast::types::RefEquality;
 /// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
 /// and it is impossible to have more statements than characters in the file. We use a `NonZeroU32` to
 /// take advantage of memory layout optimizations.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct NodeId(U32Index);
-
-impl Idx for NodeId {
-    #[inline]
-    fn new(value: usize) -> Self {
-        Self(U32Index::from_usize(value))
-    }
-
-    #[inline]
-    fn index(self) -> usize {
-        self.0.index()
-    }
-}
+#[newtype_index]
+#[derive(Ord, PartialOrd)]
+pub struct NodeId;
 
 /// A [`Node`] represents a statement in a program, along with a pointer to its parent (if any).
 #[derive(Debug)]
