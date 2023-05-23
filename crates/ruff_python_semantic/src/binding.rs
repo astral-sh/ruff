@@ -9,6 +9,7 @@ use ruff_python_ast::source_code::Locator;
 
 use crate::model::SemanticModel;
 use crate::node::NodeId;
+use crate::reference::ReferenceId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
@@ -18,11 +19,17 @@ pub struct Binding<'a> {
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
+    /// The references to the binding.
+    pub references: Vec<ReferenceId>,
     /// The exceptions that were handled when the binding was defined.
     pub exceptions: Exceptions,
 }
 
 impl<'a> Binding<'a> {
+    pub fn is_used(&self) -> bool {
+        !self.references.is_empty()
+    }
+
     pub const fn is_definition(&self) -> bool {
         matches!(
             self.kind,

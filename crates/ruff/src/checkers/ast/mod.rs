@@ -237,23 +237,23 @@ where
                     let exceptions = self.semantic_model.exceptions();
                     let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        // Add a binding to the current scope.
-                        let id = self.semantic_model.bindings.push(Binding {
-                            kind: BindingKind::Global,
-                            range: *range,
-                            source: self.semantic_model.stmt_id,
-                            context,
-                            exceptions,
-                        });
-                        scope.add(name, id);
-
-                        // Push a reference to the global binding.
-                        self.semantic_model.references.push_reference(
-                            id,
+                        // Add a reference to the global binding.
+                        let reference_id = self.semantic_model.references.push(
                             self.semantic_model.scope_id,
                             stmt.range(),
                             ReferenceContext::Synthetic,
                         );
+
+                        // Add a binding to the current scope.
+                        let binding_id = self.semantic_model.bindings.push(Binding {
+                            kind: BindingKind::Global,
+                            range: *range,
+                            references: vec![reference_id],
+                            source: self.semantic_model.stmt_id,
+                            context,
+                            exceptions,
+                        });
+                        scope.add(name, binding_id);
                     }
                 }
 
@@ -271,23 +271,23 @@ where
                     let exceptions = self.semantic_model.exceptions();
                     let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        // Add a binding to the current scope.
-                        let id = self.semantic_model.bindings.push(Binding {
-                            kind: BindingKind::Nonlocal,
-                            range: *range,
-                            source: self.semantic_model.stmt_id,
-                            context,
-                            exceptions,
-                        });
-                        scope.add(name, id);
-
-                        // Push a reference to the global binding.
-                        self.semantic_model.references.push_reference(
-                            id,
+                        // Add a reference to the global binding.
+                        let reference_id = self.semantic_model.references.push(
                             self.semantic_model.scope_id,
                             stmt.range(),
                             ReferenceContext::Synthetic,
                         );
+
+                        // Add a binding to the current scope.
+                        let binding_id = self.semantic_model.bindings.push(Binding {
+                            kind: BindingKind::Nonlocal,
+                            range: *range,
+                            references: vec![reference_id],
+                            source: self.semantic_model.stmt_id,
+                            context,
+                            exceptions,
+                        });
+                        scope.add(name, binding_id);
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
@@ -302,12 +302,14 @@ where
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
-                            self.semantic_model.references.push_reference(
-                                *binding_id,
+                            let reference_id = self.semantic_model.references.push(
                                 self.semantic_model.scope_id,
                                 stmt.range(),
                                 ReferenceContext::Runtime,
                             );
+                            self.semantic_model.bindings[*binding_id]
+                                .references
+                                .push(reference_id);
                         } else {
                             // Ensure that every nonlocal has an existing binding from a parent scope.
                             if self.enabled(Rule::NonlocalWithoutBinding) {
@@ -813,23 +815,23 @@ where
                     if &alias.name == "__future__" {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
 
-                        let binding_id = self.add_binding(
+                        // Always mark `__future__` imports as used.
+                        let reference_id = self.semantic_model.references.push(
+                            self.semantic_model.scope_id,
+                            alias.range(),
+                            ReferenceContext::Synthetic,
+                        );
+
+                        self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
                                 range: alias.range(),
+                                references: vec![reference_id],
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
-                        );
-
-                        // Always mark `__future__` imports as used.
-                        self.semantic_model.references.push_reference(
-                            binding_id,
-                            self.semantic_model.scope_id,
-                            alias.range(),
-                            ReferenceContext::Synthetic,
                         );
 
                         if self.enabled(Rule::LateFutureImport) {
@@ -853,39 +855,42 @@ where
                                     full_name,
                                 }),
                                 range: alias.range(),
+                                references: Vec::new(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
                         );
                     } else {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let full_name = &alias.name;
-                        let binding_id = self.add_binding(
-                            name,
-                            Binding {
-                                kind: BindingKind::Importation(Importation { name, full_name }),
-                                range: alias.range(),
-                                source: self.semantic_model.stmt_id,
-                                context: self.semantic_model.execution_context(),
-                                exceptions: self.semantic_model.exceptions(),
-                            },
-                        );
-
                         // Treat explicit re-export as usage (e.g., `from .applications
                         // import FastAPI as FastAPI`).
                         let is_explicit_reexport = alias
                             .asname
                             .as_ref()
                             .map_or(false, |asname| asname == &alias.name);
-                        if is_explicit_reexport {
-                            self.semantic_model.references.push_reference(
-                                binding_id,
+                        let references = if is_explicit_reexport {
+                            vec![self.semantic_model.references.push(
                                 self.semantic_model.scope_id,
                                 alias.range(),
                                 ReferenceContext::Synthetic,
-                            );
-                        }
+                            )]
+                        } else {
+                            vec![]
+                        };
+
+                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let full_name = &alias.name;
+                        self.add_binding(
+                            name,
+                            Binding {
+                                kind: BindingKind::Importation(Importation { name, full_name }),
+                                range: alias.range(),
+                                references,
+                                source: self.semantic_model.stmt_id,
+                                context: self.semantic_model.execution_context(),
+                                exceptions: self.semantic_model.exceptions(),
+                            },
+                        );
 
                         if let Some(asname) = &alias.asname {
                             if self.enabled(Rule::BuiltinVariableShadowing) {
@@ -1101,23 +1106,23 @@ where
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
 
-                        let binding_id = self.add_binding(
+                        // Always mark `__future__` imports as used.
+                        let reference_id = self.semantic_model.references.push(
+                            self.semantic_model.scope_id,
+                            alias.range(),
+                            ReferenceContext::Synthetic,
+                        );
+
+                        self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FutureImportation,
                                 range: alias.range(),
+                                references: vec![reference_id],
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
-                        );
-
-                        // Always mark `__future__` imports as used.
-                        self.semantic_model.references.push_reference(
-                            binding_id,
-                            self.semantic_model.scope_id,
-                            alias.range(),
-                            ReferenceContext::Synthetic,
                         );
 
                         if self.enabled(Rule::FutureFeatureNotDefined) {
@@ -1168,13 +1173,29 @@ where
                             }
                         }
 
+                        // Treat explicit re-export as usage (e.g., `from .applications
+                        // import FastAPI as FastAPI`).
+                        let is_explicit_reexport = alias
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.name);
+                        let references = if is_explicit_reexport {
+                            vec![self.semantic_model.references.push(
+                                self.semantic_model.scope_id,
+                                alias.range(),
+                                ReferenceContext::Synthetic,
+                            )]
+                        } else {
+                            vec![]
+                        };
+
                         // Given `from foo import bar`, `name` would be "bar" and `full_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `full_name` would be "foo.bar".
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let full_name =
                             helpers::format_import_from_member(level, module, &alias.name);
-                        let binding_id = self.add_binding(
+                        self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FromImportation(FromImportation {
@@ -1182,26 +1203,12 @@ where
                                     full_name,
                                 }),
                                 range: alias.range(),
+                                references,
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
                             },
                         );
-
-                        // Treat explicit re-export as usage (e.g., `from .applications
-                        // import FastAPI as FastAPI`).
-                        let is_explicit_reexport = alias
-                            .asname
-                            .as_ref()
-                            .map_or(false, |asname| asname == &alias.name);
-                        if is_explicit_reexport {
-                            self.semantic_model.references.push_reference(
-                                binding_id,
-                                self.semantic_model.scope_id,
-                                alias.range(),
-                                ReferenceContext::Synthetic,
-                            );
-                        }
                     }
 
                     if self.enabled(Rule::RelativeImports) {
@@ -1908,6 +1915,7 @@ where
                     Binding {
                         kind: BindingKind::FunctionDefinition,
                         range: stmt.range(),
+                        references: Vec::new(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
                         exceptions: self.semantic_model.exceptions(),
@@ -1930,6 +1938,7 @@ where
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             range: stmt.range(),
+                            references: Vec::new(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
                             exceptions: self.semantic_model.exceptions(),
@@ -1992,6 +2001,7 @@ where
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             range: stmt.range(),
+                            references: Vec::new(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
                             exceptions: self.semantic_model.exceptions(),
@@ -2177,6 +2187,7 @@ where
                     Binding {
                         kind: BindingKind::ClassDefinition,
                         range: stmt.range(),
+                        references: Vec::new(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
                         exceptions: self.semantic_model.exceptions(),
@@ -4026,7 +4037,7 @@ where
                             let scope = self.semantic_model.scope_mut();
                             &scope.remove(name)
                         } {
-                            if !self.semantic_model.references.used(*binding_id) {
+                            if !self.semantic_model.bindings[*binding_id].is_used() {
                                 if self.enabled(Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         pyflakes::rules::UnusedVariable { name: name.into() },
@@ -4114,6 +4125,7 @@ where
             Binding {
                 kind: BindingKind::Argument,
                 range: arg.range(),
+                references: Vec::new(),
                 source: self.semantic_model.stmt_id,
                 context: self.semantic_model.execution_context(),
                 exceptions: self.semantic_model.exceptions(),
@@ -4160,6 +4172,7 @@ where
                 Binding {
                     kind: BindingKind::Assignment,
                     range: pattern.range(),
+                    references: Vec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4328,7 +4341,7 @@ impl<'a> Checker<'a> {
                         ));
                     }
                 } else if in_current_scope {
-                    if !existing.used()
+                    if !existing.is_used()
                         && binding.redefines(existing)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
                         && !(existing.kind.is_function_definition()
@@ -4343,7 +4356,7 @@ impl<'a> Checker<'a> {
                             #[allow(deprecated)]
                             let line = self.locator.compute_line_index(
                                 existing
-                                    .trimmed_range(self.semantic_model(), self.locator)
+                                    .trimmed_range(&self.semantic_model, self.locator)
                                     .start(),
                             );
 
@@ -4352,7 +4365,7 @@ impl<'a> Checker<'a> {
                                     name: name.to_string(),
                                     line,
                                 },
-                                binding.trimmed_range(self.semantic_model(), self.locator),
+                                binding.trimmed_range(&self.semantic_model, self.locator),
                             );
                             if let Some(parent) = binding.source {
                                 let parent = self.semantic_model.stmts[parent];
@@ -4400,19 +4413,13 @@ impl<'a> Checker<'a> {
                     // If the original binding was a global or nonlocal, and the new binding conflicts within
                     // the current scope, then the new binding is also as the same.
                     Binding {
-                        // STOPSHIP(charlie): Copy references?
-                        // runtime_usage: existing.runtime_usage.clone(),
-                        // synthetic_usage: existing.synthetic_usage.clone(),
-                        // typing_usage: existing.typing_usage.clone(),
+                        references: existing.references.clone(),
                         kind: kind.clone(),
                         ..binding
                     }
                 }
                 _ => Binding {
-                    // STOPSHIP(charlie): Copy references?
-                    // runtime_usage: existing.runtime_usage.clone(),
-                    // synthetic_usage: existing.synthetic_usage.clone(),
-                    // typing_usage: existing.typing_usage.clone(),
+                    references: existing.references.clone(),
                     ..binding
                 },
             }
@@ -4436,6 +4443,13 @@ impl<'a> Checker<'a> {
     fn bind_builtins(&mut self) {
         let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
 
+        // Add a reference to the builtin.
+        let reference_id = self.semantic_model.references.push(
+            ScopeId::global(),
+            TextRange::default(),
+            ReferenceContext::Synthetic,
+        );
+
         for builtin in BUILTINS
             .iter()
             .chain(MAGIC_GLOBALS.iter())
@@ -4446,18 +4460,11 @@ impl<'a> Checker<'a> {
                 kind: BindingKind::Builtin,
                 range: TextRange::default(),
                 source: None,
+                references: vec![reference_id],
                 context: ExecutionContext::Runtime,
                 exceptions: Exceptions::empty(),
             });
             scope.add(builtin, id);
-
-            // Add a reference to the builtin.
-            self.semantic_model.references.push_reference(
-                id,
-                ScopeId::global(),
-                TextRange::default(),
-                ReferenceContext::Synthetic,
-            );
         }
     }
 
@@ -4571,6 +4578,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::Annotation,
                     range: expr.range(),
+                    references: Vec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4585,6 +4593,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::LoopVar,
                     range: expr.range(),
+                    references: Vec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4599,6 +4608,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::Binding,
                     range: expr.range(),
+                    references: Vec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4677,6 +4687,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Export(Export { names: all_names }),
                         range: expr.range(),
+                        references: Vec::new(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
                         exceptions: self.semantic_model.exceptions(),
@@ -4696,6 +4707,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::NamedExprAssignment,
                     range: expr.range(),
+                    references: Vec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4709,6 +4721,7 @@ impl<'a> Checker<'a> {
             Binding {
                 kind: BindingKind::Assignment,
                 range: expr.range(),
+                references: Vec::new(),
                 source: self.semantic_model.stmt_id,
                 context: self.semantic_model.execution_context(),
                 exceptions: self.semantic_model.exceptions(),
@@ -4949,13 +4962,15 @@ impl<'a> Checker<'a> {
         };
 
         if let Some((bindings, range)) = all_bindings {
+            let reference_id = self.semantic_model.references.push(
+                ScopeId::global(),
+                range,
+                ReferenceContext::Runtime,
+            );
             for binding_id in bindings {
-                self.semantic_model.references.push_reference(
-                    binding_id,
-                    ScopeId::global(),
-                    range,
-                    ReferenceContext::Runtime,
-                );
+                self.semantic_model.bindings[binding_id]
+                    .references
+                    .push(reference_id);
             }
         }
 
@@ -4985,7 +5000,10 @@ impl<'a> Checker<'a> {
                             .binding_ids()
                             .map(|binding_id| &self.semantic_model.bindings[*binding_id])
                             .filter(|binding| {
-                                flake8_type_checking::helpers::is_valid_runtime_import(binding)
+                                flake8_type_checking::helpers::is_valid_runtime_import(
+                                    &self.semantic_model,
+                                    binding,
+                                )
                             })
                             .collect()
                     })
@@ -5077,7 +5095,7 @@ impl<'a> Checker<'a> {
                             | BindingKind::SubmoduleImportation(..)
                             | BindingKind::FutureImportation
                     ) {
-                        if self.semantic_model.references.unused(binding_id) {
+                        if binding.is_used() {
                             continue;
                         }
 
@@ -5089,7 +5107,7 @@ impl<'a> Checker<'a> {
                                 #[allow(deprecated)]
                                 let line = self.locator.compute_line_index(
                                     binding
-                                        .trimmed_range(self.semantic_model(), self.locator)
+                                        .trimmed_range(&self.semantic_model, self.locator)
                                         .start(),
                                 );
 
@@ -5098,7 +5116,7 @@ impl<'a> Checker<'a> {
                                         name: (*name).to_string(),
                                         line,
                                     },
-                                    rebound.trimmed_range(self.semantic_model(), self.locator),
+                                    rebound.trimmed_range(&self.semantic_model, self.locator),
                                 );
                                 if let Some(source) = rebound.source {
                                     let parent = &self.semantic_model.stmts[source];
@@ -5130,7 +5148,10 @@ impl<'a> Checker<'a> {
                     let binding = &self.semantic_model.bindings[*binding_id];
 
                     if let Some(diagnostic) =
-                        flake8_type_checking::rules::runtime_import_in_type_checking_block(binding)
+                        flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                            binding,
+                            &self.semantic_model,
+                        )
                     {
                         if self.enabled(diagnostic.kind.rule()) {
                             diagnostics.push(diagnostic);
@@ -5140,6 +5161,7 @@ impl<'a> Checker<'a> {
                         flake8_type_checking::rules::typing_only_runtime_import(
                             binding,
                             &runtime_imports,
+                            &self.semantic_model,
                             self.package,
                             self.settings,
                         )
@@ -5164,6 +5186,10 @@ impl<'a> Checker<'a> {
                 for binding_id in scope.binding_ids() {
                     let binding = &self.semantic_model.bindings[*binding_id];
 
+                    if binding.is_used() {
+                        continue;
+                    }
+
                     let full_name = match &binding.kind {
                         BindingKind::Importation(Importation { full_name, .. }) => full_name,
                         BindingKind::FromImportation(FromImportation { full_name, .. }) => {
@@ -5175,10 +5201,6 @@ impl<'a> Checker<'a> {
                         }) => full_name,
                         _ => continue,
                     };
-
-                    if self.semantic_model.references.used(*binding_id) {
-                        continue;
-                    }
 
                     let child_id = binding.source.unwrap();
                     let parent_id = self.semantic_model.stmts.parent_id(child_id);

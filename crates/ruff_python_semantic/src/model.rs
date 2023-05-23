@@ -7,7 +7,6 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
-use crate::binding;
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -127,8 +126,7 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                self.references.push_reference(
-                    *binding_id,
+                let reference_id = self.references.push(
                     ScopeId::global(),
                     range,
                     match context {
@@ -136,11 +134,11 @@ impl<'a> SemanticModel<'a> {
                         ExecutionContext::Typing => ReferenceContext::Typing,
                     },
                 );
+                self.bindings[*binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), *binding_id) {
-                    self.references.push_reference(
-                        binding_id,
+                    let reference_id = self.references.push(
                         ScopeId::global(),
                         range,
                         match context {
@@ -148,6 +146,7 @@ impl<'a> SemanticModel<'a> {
                             ExecutionContext::Typing => ReferenceContext::Typing,
                         },
                     );
+                    self.bindings[binding_id].references.push(reference_id);
                 }
 
                 return ResolvedReference::Resolved(*binding_id);
@@ -177,8 +176,7 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = scope.get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                self.references.push_reference(
-                    *binding_id,
+                let reference_id = self.references.push(
                     self.scope_id,
                     range,
                     match context {
@@ -186,11 +184,11 @@ impl<'a> SemanticModel<'a> {
                         ExecutionContext::Typing => ReferenceContext::Typing,
                     },
                 );
+                self.bindings[*binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(scope_id, *binding_id) {
-                    self.references.push_reference(
-                        binding_id,
+                    let reference_id = self.references.push(
                         self.scope_id,
                         range,
                         match context {
@@ -198,6 +196,7 @@ impl<'a> SemanticModel<'a> {
                             ExecutionContext::Typing => ReferenceContext::Typing,
                         },
                     );
+                    self.bindings[binding_id].references.push(reference_id);
                 }
 
                 // But if it's a type annotation, don't treat it as resolved, unless we're in a

@@ -3,6 +3,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
     Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
 };
+use ruff_python_semantic::model::SemanticModel;
+use ruff_python_semantic::reference::ReferenceContext;
 
 /// ## What it does
 /// Checks for runtime imports defined in a type-checking block.
@@ -51,7 +53,10 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
 }
 
 /// TCH004
-pub(crate) fn runtime_import_in_type_checking_block(binding: &Binding) -> Option<Diagnostic> {
+pub(crate) fn runtime_import_in_type_checking_block(
+    binding: &Binding,
+    semantic_model: &SemanticModel,
+) -> Option<Diagnostic> {
     let full_name = match &binding.kind {
         BindingKind::Importation(Importation { full_name, .. }) => full_name,
         BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
@@ -59,7 +64,14 @@ pub(crate) fn runtime_import_in_type_checking_block(binding: &Binding) -> Option
         _ => return None,
     };
 
-    if matches!(binding.context, ExecutionContext::Typing) && !binding.runtime_usage.is_empty() {
+    if matches!(binding.context, ExecutionContext::Typing)
+        && binding.references.iter().any(|reference_id| {
+            matches!(
+                semantic_model.references.resolve(*reference_id).context(),
+                ReferenceContext::Runtime
+            )
+        })
+    {
         Some(Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
                 full_name: full_name.to_string(),
