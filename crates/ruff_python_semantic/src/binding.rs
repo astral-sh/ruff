@@ -30,6 +30,11 @@ impl<'a> Binding<'a> {
         !self.references.is_empty()
     }
 
+    /// Returns an iterator over all references for the current [`Binding`].
+    pub fn references(&self) -> impl Iterator<Item = ReferenceId> + '_ {
+        self.references.iter().copied()
+    }
+
     pub const fn is_definition(&self) -> bool {
         matches!(
             self.kind,

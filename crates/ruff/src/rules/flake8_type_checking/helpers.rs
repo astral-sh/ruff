@@ -53,9 +53,9 @@ pub(crate) fn is_valid_runtime_import(semantic_model: &SemanticModel, binding: &
             | BindingKind::SubmoduleImportation(..)
     ) {
         matches!(binding.context, ExecutionContext::Runtime)
-            && binding.references.iter().any(|reference_id| {
+            && binding.references().any(|reference_id| {
                 matches!(
-                    semantic_model.references.resolve(*reference_id).context(),
+                    semantic_model.references.resolve(reference_id).context(),
                     ReferenceContext::Runtime
                 )
             })

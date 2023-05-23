@@ -45,7 +45,7 @@ pub enum ReferenceContext {
 pub struct ReferenceId;
 
 /// The references of a program indexed by [`ReferenceId`].
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct References(IndexVec<ReferenceId, Reference>);
 
 impl References {
@@ -66,11 +66,5 @@ impl References {
     /// Returns the [`Reference`] with the given id.
     pub fn resolve(&self, id: ReferenceId) -> &Reference {
         &self.0[id]
-    }
-}
-
-impl Default for References {
-    fn default() -> Self {
-        Self(IndexVec::new())
     }
 }

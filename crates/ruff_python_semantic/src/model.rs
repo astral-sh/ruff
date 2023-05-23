@@ -123,7 +123,7 @@ impl<'a> SemanticModel<'a> {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_deferred_type_definition() {
-            if let Some(binding_id) = self.scopes.global().get(symbol) {
+            if let Some(binding_id) = self.scopes.global().get(symbol).copied() {
                 // Mark the binding as used.
                 let context = self.execution_context();
                 let reference_id = self.references.push(
@@ -134,10 +134,10 @@ impl<'a> SemanticModel<'a> {
                         ExecutionContext::Typing => ReferenceContext::Typing,
                     },
                 );
-                self.bindings[*binding_id].references.push(reference_id);
+                self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), *binding_id) {
+                if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), binding_id) {
                     let reference_id = self.references.push(
                         ScopeId::global(),
                         range,
@@ -149,7 +149,7 @@ impl<'a> SemanticModel<'a> {
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
-                return ResolvedReference::Resolved(*binding_id);
+                return ResolvedReference::Resolved(binding_id);
             }
         }
 
@@ -173,7 +173,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            if let Some(binding_id) = scope.get(symbol) {
+            if let Some(binding_id) = scope.get(symbol).copied() {
                 // Mark the binding as used.
                 let context = self.execution_context();
                 let reference_id = self.references.push(
@@ -184,10 +184,10 @@ impl<'a> SemanticModel<'a> {
                         ExecutionContext::Typing => ReferenceContext::Typing,
                     },
                 );
-                self.bindings[*binding_id].references.push(reference_id);
+                self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) = self.resolve_submodule(scope_id, *binding_id) {
+                if let Some(binding_id) = self.resolve_submodule(scope_id, binding_id) {
                     let reference_id = self.references.push(
                         self.scope_id,
                         range,
@@ -210,12 +210,12 @@ impl<'a> SemanticModel<'a> {
                 // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                 // `name: str` should be treated as used.
                 if !self.in_deferred_type_definition()
-                    && self.bindings[*binding_id].kind.is_annotation()
+                    && self.bindings[binding_id].kind.is_annotation()
                 {
                     continue;
                 }
 
-                return ResolvedReference::Resolved(*binding_id);
+                return ResolvedReference::Resolved(binding_id);
             }
 
             // Allow usages of `__module__` and `__qualname__` within class scopes, e.g.:
@@ -379,8 +379,8 @@ impl<'a> SemanticModel<'a> {
         member: &str,
     ) -> Option<(&Stmt, String)> {
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
-            scope.binding_ids().find_map(|binding_index| {
-                let binding = &self.bindings[*binding_index];
+            scope.binding_ids().copied().find_map(|binding_id| {
+                let binding = &self.bindings[binding_id];
                 match &binding.kind {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
@@ -555,6 +555,7 @@ impl<'a> SemanticModel<'a> {
         self.scopes.ancestors(self.scope_id)
     }
 
+    /// Returns an iterator over all parent statements.
     pub fn parents(&self) -> impl Iterator<Item = &Stmt> + '_ {
         let node_id = self.stmt_id.expect("No current statement");
         self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
@@ -567,6 +568,33 @@ impl<'a> SemanticModel<'a> {
             && self
                 .stmt_id
                 .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
+    }
+
+    /// Returns `true` if the given [`BindingId`] is used.
+    pub fn is_used(&self, binding_id: BindingId) -> bool {
+        self.bindings[binding_id].is_used()
+    }
+
+    /// Add a reference to the given [`BindingId`] in the local scope.
+    pub fn add_local_reference(
+        &mut self,
+        binding_id: BindingId,
+        range: TextRange,
+        context: ReferenceContext,
+    ) {
+        let reference_id = self.references.push(self.scope_id, range, context);
+        self.bindings[binding_id].references.push(reference_id);
+    }
+
+    /// Add a reference to the given [`BindingId`] in the global scope.
+    pub fn add_global_reference(
+        &mut self,
+        binding_id: BindingId,
+        range: TextRange,
+        context: ReferenceContext,
+    ) {
+        let reference_id = self.references.push(ScopeId::global(), range, context);
+        self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Return the [`ExecutionContext`] of the current scope.

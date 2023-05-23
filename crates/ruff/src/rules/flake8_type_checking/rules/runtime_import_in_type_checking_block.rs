@@ -65,9 +65,9 @@ pub(crate) fn runtime_import_in_type_checking_block(
     };
 
     if matches!(binding.context, ExecutionContext::Typing)
-        && binding.references.iter().any(|reference_id| {
+        && binding.references().any(|reference_id| {
             matches!(
-                semantic_model.references.resolve(*reference_id).context(),
+                semantic_model.references.resolve(reference_id).context(),
                 ReferenceContext::Runtime
             )
         })

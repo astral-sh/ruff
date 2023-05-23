@@ -279,10 +279,10 @@ pub(crate) fn typing_only_runtime_import(
     }
 
     if matches!(binding.context, ExecutionContext::Runtime)
-        && !binding.references.is_empty()
-        && binding.references.iter().all(|reference_id| {
+        && binding.is_used()
+        && binding.references().all(|reference_id| {
             matches!(
-                semantic_model.references.resolve(*reference_id).context(),
+                semantic_model.references.resolve(reference_id).context(),
                 ReferenceContext::Typing
             )
         })
