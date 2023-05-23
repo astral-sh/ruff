@@ -1,7 +1,7 @@
 //! Provides new-type wrappers for collections that are indexed by a [`Idx`] rather
-//! than `usize.
+//! than `usize`.
 //!
-//! Inspired by https://github.com/rust-lang/rust/blob/master/compiler/rustc_index/src/lib.rs
+//! Inspired by [rustc_index](https://github.com/rust-lang/rust/blob/master/compiler/rustc_index/src/lib.rs).
 
 mod idx;
 mod slice;

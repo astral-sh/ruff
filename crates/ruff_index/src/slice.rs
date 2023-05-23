@@ -20,19 +20,23 @@ impl<I: Idx, T> IndexSlice<I, T> {
 
     #[inline]
     pub const fn from_raw(raw: &[T]) -> &Self {
-        // SAFETY: `IndexSlice` is `repr(transparent)` over a normal slice
+        let ptr: *const [T] = raw;
+
         #[allow(unsafe_code)]
+        // SAFETY: `IndexSlice` is `repr(transparent)` over a normal slice
         unsafe {
-            std::mem::transmute(raw)
+            &*(ptr as *const Self)
         }
     }
 
     #[inline]
     pub fn from_raw_mut(raw: &mut [T]) -> &mut Self {
-        // SAFETY: `IndexSlice` is `repr(transparent)` over a normal slice
+        let ptr: *mut [T] = raw;
+
         #[allow(unsafe_code)]
+        // SAFETY: `IndexSlice` is `repr(transparent)` over a normal slice
         unsafe {
-            std::mem::transmute(raw)
+            &mut *(ptr as *mut Self)
         }
     }
 
@@ -71,7 +75,7 @@ impl<I: Idx, T> IndexSlice<I, T> {
 
     #[inline]
     pub fn swap(&mut self, a: I, b: I) {
-        self.raw.swap(a.index(), b.index())
+        self.raw.swap(a.index(), b.index());
     }
 
     #[inline]
@@ -150,7 +154,7 @@ impl<I: Idx, T: Clone> ToOwned for IndexSlice<I, T> {
     }
 
     fn clone_into(&self, target: &mut IndexVec<I, T>) {
-        self.raw.clone_into(&mut target.raw)
+        self.raw.clone_into(&mut target.raw);
     }
 }
 

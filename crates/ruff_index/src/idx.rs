@@ -18,10 +18,8 @@ mod tests {
     // Allows the macro invocation below to work
     use crate as ruff_index;
 
-    // The two derives are intentional to test that the order doesn't matter
-    #[derive(Ord)]
     #[newtype_index]
-    #[derive(PartialOrd)]
+    #[derive(PartialOrd, Ord)]
     struct MyIndex;
 
     assert_impl_all!(MyIndex: Ord, PartialOrd);
@@ -57,6 +55,6 @@ mod tests {
     fn debug() {
         let output = format!("{:?}", MyIndex::from(10u32));
 
-        assert_eq!(output, "MyIndex(10)")
+        assert_eq!(output, "MyIndex(10)");
     }
 }

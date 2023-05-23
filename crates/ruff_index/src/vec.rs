@@ -39,18 +39,13 @@ impl<I: Idx, T> IndexVec<I, T> {
     }
 
     #[inline]
-    pub fn into_iter(self) -> std::vec::IntoIter<T> {
-        self.raw.into_iter()
-    }
-
-    #[inline]
     pub fn drain<R: RangeBounds<usize>>(&mut self, range: R) -> impl Iterator<Item = T> + '_ {
         self.raw.drain(range)
     }
 
     #[inline]
     pub fn truncate(&mut self, a: usize) {
-        self.raw.truncate(a)
+        self.raw.truncate(a);
     }
 
     #[inline]
@@ -114,7 +109,7 @@ impl<I: Idx, T> BorrowMut<IndexSlice<I, T>> for IndexVec<I, T> {
 impl<I, T> Extend<T> for IndexVec<I, T> {
     #[inline]
     fn extend<Iter: IntoIterator<Item = T>>(&mut self, iter: Iter) {
-        self.raw.extend(iter)
+        self.raw.extend(iter);
     }
 }
 
