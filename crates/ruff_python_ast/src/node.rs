@@ -78,6 +78,13 @@ pub enum AnyNode {
     PatternMatchAs(PatternMatchAs<TextRange>),
     PatternMatchOr(PatternMatchOr<TextRange>),
     TypeIgnoreTypeIgnore(TypeIgnoreTypeIgnore<TextRange>),
+    Comprehension(Comprehension<TextRange>),
+    Arguments(Arguments<TextRange>),
+    Arg(Arg<TextRange>),
+    Keyword(Keyword<TextRange>),
+    Alias(Alias<TextRange>),
+    Withitem(Withitem<TextRange>),
+    MatchCase(MatchCase<TextRange>),
 }
 
 impl AnyNode {
@@ -151,7 +158,14 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_) => None,
+            | AnyNode::TypeIgnoreTypeIgnore(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Arg(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::Withitem(_)
+            | AnyNode::MatchCase(_) => None,
         }
     }
 
@@ -225,7 +239,14 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_) => None,
+            | AnyNode::TypeIgnoreTypeIgnore(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Arg(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::Withitem(_)
+            | AnyNode::MatchCase(_) => None,
         }
     }
 
@@ -299,7 +320,14 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_) => None,
+            | AnyNode::TypeIgnoreTypeIgnore(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Arg(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::Withitem(_)
+            | AnyNode::MatchCase(_) => None,
         }
     }
 
@@ -373,7 +401,14 @@ impl AnyNode {
             | AnyNode::ExprTuple(_)
             | AnyNode::ExprSlice(_)
             | AnyNode::ExcepthandlerExceptHandler(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_) => None,
+            | AnyNode::TypeIgnoreTypeIgnore(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Arg(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::Withitem(_)
+            | AnyNode::MatchCase(_) => None,
         }
     }
 
@@ -447,7 +482,14 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::TypeIgnoreTypeIgnore(_) => None,
+            | AnyNode::TypeIgnoreTypeIgnore(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Arg(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::Withitem(_)
+            | AnyNode::MatchCase(_) => None,
         }
     }
 
@@ -521,7 +563,14 @@ impl AnyNode {
             | AnyNode::PatternMatchStar(_)
             | AnyNode::PatternMatchAs(_)
             | AnyNode::PatternMatchOr(_)
-            | AnyNode::ExcepthandlerExceptHandler(_) => None,
+            | AnyNode::ExcepthandlerExceptHandler(_)
+            | AnyNode::Comprehension(_)
+            | AnyNode::Arguments(_)
+            | AnyNode::Arg(_)
+            | AnyNode::Keyword(_)
+            | AnyNode::Alias(_)
+            | AnyNode::Withitem(_)
+            | AnyNode::MatchCase(_) => None,
         }
     }
 
@@ -595,7 +644,19 @@ impl AnyNode {
             Self::PatternMatchAs(node) => AnyNodeRef::PatternMatchAs(node),
             Self::PatternMatchOr(node) => AnyNodeRef::PatternMatchOr(node),
             Self::TypeIgnoreTypeIgnore(node) => AnyNodeRef::TypeIgnoreTypeIgnore(node),
+            Self::Comprehension(node) => AnyNodeRef::Comprehension(node),
+            Self::Arguments(node) => AnyNodeRef::Arguments(node),
+            Self::Arg(node) => AnyNodeRef::Arg(node),
+            Self::Keyword(node) => AnyNodeRef::Keyword(node),
+            Self::Alias(node) => AnyNodeRef::Alias(node),
+            Self::Withitem(node) => AnyNodeRef::Withitem(node),
+            Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
         }
+    }
+
+    /// Returns the node's [`kind`](NodeKind) that has no data associated and is [`Copy`].
+    pub const fn kind(&self) -> NodeKind {
+        self.as_ref().kind()
     }
 }
 
@@ -1960,6 +2021,147 @@ impl AstNode for TypeIgnoreTypeIgnore<TextRange> {
     }
 }
 
+impl AstNode for Comprehension<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Comprehension(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Comprehension(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+impl AstNode for Arguments<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Arguments(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+impl AstNode for Arg<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Arg(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Arg(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+impl AstNode for Keyword<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Keyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Keyword(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+impl AstNode for Alias<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Alias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Alias(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+impl AstNode for Withitem<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Withitem(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Withitem(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+impl AstNode for MatchCase<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::MatchCase(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::MatchCase(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+}
+
 impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
@@ -2478,6 +2680,42 @@ impl From<TypeIgnoreTypeIgnore> for AnyNode {
     }
 }
 
+impl From<Comprehension> for AnyNode {
+    fn from(node: Comprehension) -> Self {
+        AnyNode::Comprehension(node)
+    }
+}
+impl From<Arguments> for AnyNode {
+    fn from(node: Arguments) -> Self {
+        AnyNode::Arguments(node)
+    }
+}
+impl From<Arg> for AnyNode {
+    fn from(node: Arg) -> Self {
+        AnyNode::Arg(node)
+    }
+}
+impl From<Keyword> for AnyNode {
+    fn from(node: Keyword) -> Self {
+        AnyNode::Keyword(node)
+    }
+}
+impl From<Alias> for AnyNode {
+    fn from(node: Alias) -> Self {
+        AnyNode::Alias(node)
+    }
+}
+impl From<Withitem> for AnyNode {
+    fn from(node: Withitem) -> Self {
+        AnyNode::Withitem(node)
+    }
+}
+impl From<MatchCase> for AnyNode {
+    fn from(node: MatchCase) -> Self {
+        AnyNode::MatchCase(node)
+    }
+}
+
 impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
         match self {
@@ -2549,6 +2787,13 @@ impl Ranged for AnyNode {
             AnyNode::PatternMatchAs(node) => node.range(),
             AnyNode::PatternMatchOr(node) => node.range(),
             AnyNode::TypeIgnoreTypeIgnore(node) => node.range(),
+            AnyNode::Comprehension(node) => node.range(),
+            AnyNode::Arguments(node) => node.range(),
+            AnyNode::Arg(node) => node.range(),
+            AnyNode::Keyword(node) => node.range(),
+            AnyNode::Alias(node) => node.range(),
+            AnyNode::Withitem(node) => node.range(),
+            AnyNode::MatchCase(node) => node.range(),
         }
     }
 }
@@ -2623,6 +2868,96 @@ pub enum AnyNodeRef<'a> {
     PatternMatchAs(&'a PatternMatchAs<TextRange>),
     PatternMatchOr(&'a PatternMatchOr<TextRange>),
     TypeIgnoreTypeIgnore(&'a TypeIgnoreTypeIgnore<TextRange>),
+    Comprehension(&'a Comprehension<TextRange>),
+    Arguments(&'a Arguments<TextRange>),
+    Arg(&'a Arg<TextRange>),
+    Keyword(&'a Keyword<TextRange>),
+    Alias(&'a Alias<TextRange>),
+    Withitem(&'a Withitem<TextRange>),
+    MatchCase(&'a MatchCase<TextRange>),
+}
+
+impl AnyNodeRef<'_> {
+    /// Returns the node's [`kind`](NodeKind) that has no data associated and is [`Copy`].
+    pub const fn kind(self) -> NodeKind {
+        match self {
+            AnyNodeRef::ModModule(_) => NodeKind::ModModule,
+            AnyNodeRef::ModInteractive(_) => NodeKind::ModInteractive,
+            AnyNodeRef::ModExpression(_) => NodeKind::ModExpression,
+            AnyNodeRef::ModFunctionType(_) => NodeKind::ModFunctionType,
+            AnyNodeRef::StmtFunctionDef(_) => NodeKind::StmtFunctionDef,
+            AnyNodeRef::StmtAsyncFunctionDef(_) => NodeKind::StmtAsyncFunctionDef,
+            AnyNodeRef::StmtClassDef(_) => NodeKind::StmtClassDef,
+            AnyNodeRef::StmtReturn(_) => NodeKind::StmtReturn,
+            AnyNodeRef::StmtDelete(_) => NodeKind::StmtDelete,
+            AnyNodeRef::StmtAssign(_) => NodeKind::StmtAssign,
+            AnyNodeRef::StmtAugAssign(_) => NodeKind::StmtAugAssign,
+            AnyNodeRef::StmtAnnAssign(_) => NodeKind::StmtAnnAssign,
+            AnyNodeRef::StmtFor(_) => NodeKind::StmtFor,
+            AnyNodeRef::StmtAsyncFor(_) => NodeKind::StmtAsyncFor,
+            AnyNodeRef::StmtWhile(_) => NodeKind::StmtWhile,
+            AnyNodeRef::StmtIf(_) => NodeKind::StmtIf,
+            AnyNodeRef::StmtWith(_) => NodeKind::StmtWith,
+            AnyNodeRef::StmtAsyncWith(_) => NodeKind::StmtAsyncWith,
+            AnyNodeRef::StmtMatch(_) => NodeKind::StmtMatch,
+            AnyNodeRef::StmtRaise(_) => NodeKind::StmtRaise,
+            AnyNodeRef::StmtTry(_) => NodeKind::StmtTry,
+            AnyNodeRef::StmtTryStar(_) => NodeKind::StmtTryStar,
+            AnyNodeRef::StmtAssert(_) => NodeKind::StmtAssert,
+            AnyNodeRef::StmtImport(_) => NodeKind::StmtImport,
+            AnyNodeRef::StmtImportFrom(_) => NodeKind::StmtImportFrom,
+            AnyNodeRef::StmtGlobal(_) => NodeKind::StmtGlobal,
+            AnyNodeRef::StmtNonlocal(_) => NodeKind::StmtNonlocal,
+            AnyNodeRef::StmtExpr(_) => NodeKind::StmtExpr,
+            AnyNodeRef::StmtPass(_) => NodeKind::StmtPass,
+            AnyNodeRef::StmtBreak(_) => NodeKind::StmtBreak,
+            AnyNodeRef::StmtContinue(_) => NodeKind::StmtContinue,
+            AnyNodeRef::ExprBoolOp(_) => NodeKind::ExprBoolOp,
+            AnyNodeRef::ExprNamedExpr(_) => NodeKind::ExprNamedExpr,
+            AnyNodeRef::ExprBinOp(_) => NodeKind::ExprBinOp,
+            AnyNodeRef::ExprUnaryOp(_) => NodeKind::ExprUnaryOp,
+            AnyNodeRef::ExprLambda(_) => NodeKind::ExprLambda,
+            AnyNodeRef::ExprIfExp(_) => NodeKind::ExprIfExp,
+            AnyNodeRef::ExprDict(_) => NodeKind::ExprDict,
+            AnyNodeRef::ExprSet(_) => NodeKind::ExprSet,
+            AnyNodeRef::ExprListComp(_) => NodeKind::ExprListComp,
+            AnyNodeRef::ExprSetComp(_) => NodeKind::ExprSetComp,
+            AnyNodeRef::ExprDictComp(_) => NodeKind::ExprDictComp,
+            AnyNodeRef::ExprGeneratorExp(_) => NodeKind::ExprGeneratorExp,
+            AnyNodeRef::ExprAwait(_) => NodeKind::ExprAwait,
+            AnyNodeRef::ExprYield(_) => NodeKind::ExprYield,
+            AnyNodeRef::ExprYieldFrom(_) => NodeKind::ExprYieldFrom,
+            AnyNodeRef::ExprCompare(_) => NodeKind::ExprCompare,
+            AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
+            AnyNodeRef::ExprFormattedValue(_) => NodeKind::ExprFormattedValue,
+            AnyNodeRef::ExprJoinedStr(_) => NodeKind::ExprJoinedStr,
+            AnyNodeRef::ExprConstant(_) => NodeKind::ExprConstant,
+            AnyNodeRef::ExprAttribute(_) => NodeKind::ExprAttribute,
+            AnyNodeRef::ExprSubscript(_) => NodeKind::ExprSubscript,
+            AnyNodeRef::ExprStarred(_) => NodeKind::ExprStarred,
+            AnyNodeRef::ExprName(_) => NodeKind::ExprName,
+            AnyNodeRef::ExprList(_) => NodeKind::ExprList,
+            AnyNodeRef::ExprTuple(_) => NodeKind::ExprTuple,
+            AnyNodeRef::ExprSlice(_) => NodeKind::ExprSlice,
+            AnyNodeRef::ExcepthandlerExceptHandler(_) => NodeKind::ExcepthandlerExceptHandler,
+            AnyNodeRef::PatternMatchValue(_) => NodeKind::PatternMatchValue,
+            AnyNodeRef::PatternMatchSingleton(_) => NodeKind::PatternMatchSingleton,
+            AnyNodeRef::PatternMatchSequence(_) => NodeKind::PatternMatchSequence,
+            AnyNodeRef::PatternMatchMapping(_) => NodeKind::PatternMatchMapping,
+            AnyNodeRef::PatternMatchClass(_) => NodeKind::PatternMatchClass,
+            AnyNodeRef::PatternMatchStar(_) => NodeKind::PatternMatchStar,
+            AnyNodeRef::PatternMatchAs(_) => NodeKind::PatternMatchAs,
+            AnyNodeRef::PatternMatchOr(_) => NodeKind::PatternMatchOr,
+            AnyNodeRef::TypeIgnoreTypeIgnore(_) => NodeKind::TypeIgnoreTypeIgnore,
+            AnyNodeRef::Comprehension(_) => NodeKind::Comprehension,
+            AnyNodeRef::Arguments(_) => NodeKind::Arguments,
+            AnyNodeRef::Arg(_) => NodeKind::Arg,
+            AnyNodeRef::Keyword(_) => NodeKind::Keyword,
+            AnyNodeRef::Alias(_) => NodeKind::Alias,
+            AnyNodeRef::Withitem(_) => NodeKind::Withitem,
+            AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
+        }
+    }
 }
 
 impl<'a> From<&'a ModModule> for AnyNodeRef<'a> {
@@ -3145,6 +3480,42 @@ impl<'a> From<&'a TypeIgnore> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a Comprehension> for AnyNodeRef<'a> {
+    fn from(node: &'a Comprehension) -> Self {
+        AnyNodeRef::Comprehension(node)
+    }
+}
+impl<'a> From<&'a Arguments> for AnyNodeRef<'a> {
+    fn from(node: &'a Arguments) -> Self {
+        AnyNodeRef::Arguments(node)
+    }
+}
+impl<'a> From<&'a Arg> for AnyNodeRef<'a> {
+    fn from(node: &'a Arg) -> Self {
+        AnyNodeRef::Arg(node)
+    }
+}
+impl<'a> From<&'a Keyword> for AnyNodeRef<'a> {
+    fn from(node: &'a Keyword) -> Self {
+        AnyNodeRef::Keyword(node)
+    }
+}
+impl<'a> From<&'a Alias> for AnyNodeRef<'a> {
+    fn from(node: &'a Alias) -> Self {
+        AnyNodeRef::Alias(node)
+    }
+}
+impl<'a> From<&'a Withitem> for AnyNodeRef<'a> {
+    fn from(node: &'a Withitem) -> Self {
+        AnyNodeRef::Withitem(node)
+    }
+}
+impl<'a> From<&'a MatchCase> for AnyNodeRef<'a> {
+    fn from(node: &'a MatchCase) -> Self {
+        AnyNodeRef::MatchCase(node)
+    }
+}
+
 impl Ranged for AnyNodeRef<'_> {
     fn range(&self) -> TextRange {
         match self {
@@ -3216,6 +3587,92 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::PatternMatchAs(node) => node.range(),
             AnyNodeRef::PatternMatchOr(node) => node.range(),
             AnyNodeRef::TypeIgnoreTypeIgnore(node) => node.range(),
+            AnyNodeRef::Comprehension(node) => node.range(),
+            AnyNodeRef::Arguments(node) => node.range(),
+            AnyNodeRef::Arg(node) => node.range(),
+            AnyNodeRef::Keyword(node) => node.range(),
+            AnyNodeRef::Alias(node) => node.range(),
+            AnyNodeRef::Withitem(node) => node.range(),
+            AnyNodeRef::MatchCase(node) => node.range(),
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum NodeKind {
+    ModModule,
+    ModInteractive,
+    ModExpression,
+    ModFunctionType,
+    StmtFunctionDef,
+    StmtAsyncFunctionDef,
+    StmtClassDef,
+    StmtReturn,
+    StmtDelete,
+    StmtAssign,
+    StmtAugAssign,
+    StmtAnnAssign,
+    StmtFor,
+    StmtAsyncFor,
+    StmtWhile,
+    StmtIf,
+    StmtWith,
+    StmtAsyncWith,
+    StmtMatch,
+    StmtRaise,
+    StmtTry,
+    StmtTryStar,
+    StmtAssert,
+    StmtImport,
+    StmtImportFrom,
+    StmtGlobal,
+    StmtNonlocal,
+    StmtExpr,
+    StmtPass,
+    StmtBreak,
+    StmtContinue,
+    ExprBoolOp,
+    ExprNamedExpr,
+    ExprBinOp,
+    ExprUnaryOp,
+    ExprLambda,
+    ExprIfExp,
+    ExprDict,
+    ExprSet,
+    ExprListComp,
+    ExprSetComp,
+    ExprDictComp,
+    ExprGeneratorExp,
+    ExprAwait,
+    ExprYield,
+    ExprYieldFrom,
+    ExprCompare,
+    ExprCall,
+    ExprFormattedValue,
+    ExprJoinedStr,
+    ExprConstant,
+    ExprAttribute,
+    ExprSubscript,
+    ExprStarred,
+    ExprName,
+    ExprList,
+    ExprTuple,
+    ExprSlice,
+    ExcepthandlerExceptHandler,
+    PatternMatchValue,
+    PatternMatchSingleton,
+    PatternMatchSequence,
+    PatternMatchMapping,
+    PatternMatchClass,
+    PatternMatchStar,
+    PatternMatchAs,
+    PatternMatchOr,
+    TypeIgnoreTypeIgnore,
+    Comprehension,
+    Arguments,
+    Arg,
+    Keyword,
+    Alias,
+    Withitem,
+    MatchCase,
 }
