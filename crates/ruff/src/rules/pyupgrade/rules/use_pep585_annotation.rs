@@ -5,7 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 
-use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -61,13 +60,11 @@ pub(crate) fn use_pep585_annotation(
             ModuleMember::Member(module, member) => {
                 // Imported type, like `collections.deque`.
                 diagnostic.try_set_fix(|| {
-                    let (import_edit, binding) = get_or_import_symbol(
+                    let (import_edit, binding) = checker.importer.get_or_import_symbol(
                         module,
                         member,
                         expr.start(),
                         checker.semantic_model(),
-                        &checker.importer,
-                        checker.locator,
                     )?;
                     let reference_edit = Edit::range_replacement(binding, expr.range());
                     Ok(Fix::suggested_edits(import_edit, [reference_edit]))
