@@ -61,7 +61,7 @@ pub(crate) fn delete_stmt(
     }
 }
 
-/// Generate a `Fix` to remove any unused imports from an `import` statement.
+/// Generate a `Fix` to remove the specified imports from an `import` statement.
 pub(crate) fn remove_unused_imports<'a>(
     unused_imports: impl Iterator<Item = &'a str>,
     stmt: &Stmt,

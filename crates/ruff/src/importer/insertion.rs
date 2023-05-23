@@ -1,6 +1,4 @@
 //! Insert statements into Python code.
-#![allow(dead_code)]
-
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
@@ -182,6 +180,7 @@ impl<'a> Insertion<'a> {
                 },
                 // Once we've seen the newline, we're looking for the indentation of the block body.
                 Awaiting::Indent => match tok {
+                    Tok::Comment(..) => {}
                     Tok::NonLogicalNewline => {}
                     Tok::Indent => {
                         // This is like:

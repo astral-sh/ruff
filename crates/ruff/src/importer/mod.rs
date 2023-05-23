@@ -7,10 +7,12 @@ use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
+use crate::autofix;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_semantic::model::SemanticModel;
+use ruff_textwrap::indent;
 
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::importer::insertion::Insertion;
@@ -71,6 +73,55 @@ impl<'a> Importer<'a> {
             Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
                 .into_edit(&required_import)
         }
+    }
+
+    /// Move an existing import into a `TYPE_CHECKING` block.
+    ///
+    /// If there are no existing `TYPE_CHECKING` blocks, a new one will be added at the top
+    /// of the file. Otherwise, it will be added after the most recent top-level
+    /// `TYPE_CHECKING` block.
+    pub(crate) fn typing_import_edit(
+        &self,
+        import: &StmtImport,
+        at: TextSize,
+        semantic_model: &SemanticModel,
+    ) -> Result<TypingImportEdit> {
+        // Generate the modified import statement.
+        let content = autofix::codemods::retain_imports(
+            &[import.full_name],
+            import.stmt,
+            self.locator,
+            self.stylist,
+        )?;
+
+        // Import the `TYPE_CHECKING` symbol from the typing module.
+        let (type_checking_edit, type_checking) = self.get_or_import_symbol(
+            &ImportRequest::import_from("typing", "TYPE_CHECKING"),
+            at,
+            semantic_model,
+        )?;
+
+        // Add the import to a `TYPE_CHECKING` block.
+        let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
+            // Add the import to the `TYPE_CHECKING` block.
+            self.add_to_type_checking_block(&content, block.start())
+        } else {
+            // Add the import to a new `TYPE_CHECKING` block.
+            self.add_type_checking_block(
+                &format!(
+                    "{}if {type_checking}:{}{}",
+                    self.stylist.line_ending().as_str(),
+                    self.stylist.line_ending().as_str(),
+                    indent(&content, self.stylist.indentation())
+                ),
+                at,
+            )?
+        };
+
+        Ok(TypingImportEdit {
+            type_checking_edit,
+            add_import_edit,
+        })
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make
@@ -204,14 +255,6 @@ impl<'a> Importer<'a> {
         }
     }
 
-    /// Return the import statement that precedes the given position, if any.
-    fn preceding_import(&self, at: TextSize) -> Option<&Stmt> {
-        self.runtime_imports
-            .partition_point(|stmt| stmt.start() < at)
-            .checked_sub(1)
-            .map(|idx| self.runtime_imports[idx])
-    }
-
     /// Return the top-level [`Stmt`] that imports the given module using `Stmt::ImportFrom`
     /// preceding the given position, if any.
     fn find_import_from(&self, module: &str, at: TextSize) -> Option<&Stmt> {
@@ -258,6 +301,62 @@ impl<'a> Importer<'a> {
         statement.codegen(&mut state);
         Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
+
+    /// Add a `TYPE_CHECKING` block to the given module.
+    fn add_type_checking_block(&self, content: &str, at: TextSize) -> Result<Edit> {
+        let insertion = if let Some(stmt) = self.preceding_import(at) {
+            // Insert after the last top-level import.
+            Insertion::end_of_statement(stmt, self.locator, self.stylist)
+        } else {
+            // Insert at the start of the file.
+            Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
+        };
+        if insertion.is_inline() {
+            Err(anyhow::anyhow!(
+                "Cannot insert `TYPE_CHECKING` block inline"
+            ))
+        } else {
+            Ok(insertion.into_edit(content))
+        }
+    }
+
+    /// Add an import statement to an existing `TYPE_CHECKING` block.
+    fn add_to_type_checking_block(&self, content: &str, at: TextSize) -> Edit {
+        Insertion::start_of_block(at, self.locator, self.stylist).into_edit(content)
+    }
+
+    /// Return the import statement that precedes the given position, if any.
+    fn preceding_import(&self, at: TextSize) -> Option<&'a Stmt> {
+        self.runtime_imports
+            .partition_point(|stmt| stmt.start() < at)
+            .checked_sub(1)
+            .map(|idx| self.runtime_imports[idx])
+    }
+
+    /// Return the `TYPE_CHECKING` block that precedes the given position, if any.
+    fn preceding_type_checking_block(&self, at: TextSize) -> Option<&'a Stmt> {
+        let block = self.type_checking_blocks.first()?;
+        if block.start() <= at {
+            Some(block)
+        } else {
+            None
+        }
+    }
+}
+
+/// An edit to an import to a typing-only context.
+#[derive(Debug)]
+pub(crate) struct TypingImportEdit {
+    /// The edit to add the `TYPE_CHECKING` symbol to the module.
+    type_checking_edit: Edit,
+    /// The edit to add the import to a `TYPE_CHECKING` block.
+    add_import_edit: Edit,
+}
+
+impl TypingImportEdit {
+    pub(crate) fn into_edits(self) -> Vec<Edit> {
+        vec![self.type_checking_edit, self.add_import_edit]
+    }
 }
 
 #[derive(Debug)]
@@ -299,6 +398,14 @@ impl<'a> ImportRequest<'a> {
             style: ImportStyle::ImportFrom,
         }
     }
+}
+
+/// An existing module or member import, located within an import statement.
+pub(crate) struct StmtImport<'a> {
+    /// The import statement.
+    pub(crate) stmt: &'a Stmt,
+    /// The "full name" of the imported module or member.
+    pub(crate) full_name: &'a str,
 }
 
 /// The result of an [`Importer::get_or_import_symbol`] call.
