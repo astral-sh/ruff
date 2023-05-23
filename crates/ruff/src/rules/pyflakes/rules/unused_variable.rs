@@ -320,7 +320,7 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
 
     let bindings: Vec<_> = scope
         .bindings()
-        .map(|(name, index)| (*name, &checker.semantic_model().bindings[*index]))
+        .map(|(name, binding_id)| (*name, &checker.semantic_model().bindings[*binding_id]))
         .filter_map(|(name, binding)| {
             if !binding.used()
                 && (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())

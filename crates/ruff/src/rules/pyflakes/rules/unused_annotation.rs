@@ -23,9 +23,9 @@ pub(crate) fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
 
     let bindings: Vec<_> = scope
         .bindings()
-        .filter_map(|(name, index)| {
+        .filter_map(|(name, binding_id)| {
             let name = *name;
-            let binding = &checker.semantic_model().bindings[*index];
+            let binding = &checker.semantic_model().bindings[*binding_id];
 
             if !binding.used()
                 && binding.kind.is_annotation()

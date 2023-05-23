@@ -105,7 +105,7 @@ impl<'a> SemanticModel<'a> {
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.scopes()
             .find_map(|scope| scope.get(member))
-            .map(|index| &self.bindings[*index])
+            .map(|binding_id| &self.bindings[*binding_id])
     }
 
     /// Return `true` if `member` is bound as a builtin.
