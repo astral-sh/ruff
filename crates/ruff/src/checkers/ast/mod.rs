@@ -28,7 +28,7 @@ use ruff_python_semantic::binding::{
     Importation, StarImportation, SubmoduleImportation,
 };
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
-use ruff_python_semantic::model::{ContextFlags, ResolvedReference, SemanticModel};
+use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -190,22 +190,22 @@ where
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
-                        self.semantic_model.flags |= ContextFlags::FUTURE_ANNOTATIONS;
+                        self.semantic_model.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
                     }
                 } else {
-                    self.semantic_model.flags |= ContextFlags::FUTURES_BOUNDARY;
+                    self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 }
             }
             Stmt::Import(_) => {
-                self.semantic_model.flags |= ContextFlags::FUTURES_BOUNDARY;
+                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
-                self.semantic_model.flags |= ContextFlags::FUTURES_BOUNDARY;
+                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !self.semantic_model.seen_import_boundary()
                     && !helpers::is_assignment_to_a_dunder(stmt)
                     && !helpers::in_nested_block(self.semantic_model.parents())
                 {
-                    self.semantic_model.flags |= ContextFlags::IMPORT_BOUNDARY;
+                    self.semantic_model.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
             }
         }
@@ -2210,7 +2210,7 @@ where
                 self.visit_body(body);
                 self.semantic_model.handled_exceptions.pop();
 
-                self.semantic_model.flags |= ContextFlags::EXCEPTION_HANDLER;
+                self.semantic_model.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
@@ -2345,7 +2345,7 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let flags_snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::ANNOTATION;
+        self.semantic_model.flags |= SemanticModelFlags::ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic_model.flags = flags_snapshot;
     }
@@ -2390,7 +2390,7 @@ where
                     ..
                 })
         ) {
-            self.semantic_model.flags -= ContextFlags::BOOLEAN_TEST;
+            self.semantic_model.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
         // Pre-visit.
@@ -2434,7 +2434,7 @@ where
                 }
 
                 if self.semantic_model.match_typing_expr(value, "Literal") {
-                    self.semantic_model.flags |= ContextFlags::LITERAL;
+                    self.semantic_model.flags |= SemanticModelFlags::LITERAL;
                 }
 
                 if self.settings.rules.any_enabled(&[
@@ -4200,7 +4200,7 @@ where
                 if self.semantic_model.in_subscript() {
                     visitor::walk_expr(self, expr);
                 } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
-                    self.semantic_model.flags |= ContextFlags::SUBSCRIPT;
+                    self.semantic_model.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
                     match analyze::typing::match_annotated_subscript(
@@ -4248,7 +4248,7 @@ where
                 }
             }
             Expr::JoinedStr(_) => {
-                self.semantic_model.flags |= ContextFlags::F_STRING;
+                self.semantic_model.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
             _ => visitor::walk_expr(self, expr),
@@ -4629,7 +4629,7 @@ impl<'a> Checker<'a> {
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::TYPE_CHECKING_BLOCK;
+        self.semantic_model.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
         self.semantic_model.flags = snapshot;
     }
@@ -4637,7 +4637,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a type definition.
     pub(crate) fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::TYPE_DEFINITION;
+        self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
         self.semantic_model.flags = snapshot;
     }
@@ -4645,7 +4645,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
     pub(crate) fn visit_non_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags -= ContextFlags::TYPE_DEFINITION;
+        self.semantic_model.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
         self.semantic_model.flags = snapshot;
     }
@@ -4655,7 +4655,7 @@ impl<'a> Checker<'a> {
     /// its truthiness.
     pub(crate) fn visit_boolean_test(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::BOOLEAN_TEST;
+        self.semantic_model.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
         self.semantic_model.flags = snapshot;
     }
@@ -5148,8 +5148,8 @@ impl<'a> Checker<'a> {
             for (expr, snapshot) in type_definitions {
                 self.semantic_model.restore(snapshot);
 
-                self.semantic_model.flags |=
-                    ContextFlags::TYPE_DEFINITION | ContextFlags::FUTURE_TYPE_DEFINITION;
+                self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION
+                    | SemanticModelFlags::FUTURE_TYPE_DEFINITION;
                 self.visit_expr(expr);
             }
         }
@@ -5178,12 +5178,14 @@ impl<'a> Checker<'a> {
                     }
 
                     let type_definition_flag = match kind {
-                        AnnotationKind::Simple => ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
-                        AnnotationKind::Complex => ContextFlags::COMPLEX_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Complex => {
+                            SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                        }
                     };
 
                     self.semantic_model.flags |=
-                        ContextFlags::TYPE_DEFINITION | type_definition_flag;
+                        SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                     self.visit_expr(expr);
                 } else {
                     if self
