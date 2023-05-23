@@ -4152,6 +4152,10 @@ where
             }
         }
 
+        if self.settings.rules.enabled(Rule::ImplicitOptional) {
+            ruff::rules::implicit_optional(self, arguments);
+        }
+
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg in &arguments.posonlyargs {

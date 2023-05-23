@@ -9,6 +9,7 @@ pub(crate) use collection_literal_concatenation::{
 pub(crate) use explicit_f_string_type_conversion::{
     explicit_f_string_type_conversion, ExplicitFStringTypeConversion,
 };
+pub(crate) use implicit_optional::{implicit_optional, ImplicitOptional};
 pub(crate) use invalid_pyproject_toml::InvalidPyprojectToml;
 pub(crate) use mutable_defaults_in_dataclass_fields::{
     function_call_in_dataclass_defaults, is_dataclass, mutable_dataclass_default,
@@ -26,6 +27,7 @@ mod asyncio_dangling_task;
 mod collection_literal_concatenation;
 mod confusables;
 mod explicit_f_string_type_conversion;
+mod implicit_optional;
 mod invalid_pyproject_toml;
 mod mutable_defaults_in_dataclass_fields;
 mod pairwise_over_zipped;
