@@ -19,7 +19,7 @@ root = Path(
 ruff_json = Path("src/schemas/json/ruff.json")
 
 
-def update_schemastore(schemastore: Path) -> None:  # noqa: D103
+def update_schemastore(schemastore: Path) -> None:
     if not schemastore.is_dir():
         check_call(["git", "clone", schemastore_fork, schemastore])
         check_call(
@@ -84,7 +84,7 @@ def update_schemastore(schemastore: Path) -> None:  # noqa: D103
         print("No changes")
 
 
-def main() -> None:  # noqa: D103
+def main() -> None:
     schemastore_existing = root.joinpath("schemastore")
     if schemastore_existing.is_dir():
         update_schemastore(schemastore_existing)
