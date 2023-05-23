@@ -166,6 +166,14 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
 /// This suggestion could be unsafe if the non-literal expression in the
 /// expression has overridden the `__add__` (or `__radd__`) magic methods.
 pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
+    // Skip the current node if a diagnostic and fix for the parent node has already been generated.
+    if let Some(Expr::BinOp(ast::ExprBinOp {
+        op: Operator::Add, ..
+    })) = checker.ctx.expr_parent()
+    {
+        return;
+    }
+
     let Some((new_expr, kind)) = build_new_expr(expr) else {
         return
     };
