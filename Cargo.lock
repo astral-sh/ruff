@@ -2012,6 +2012,7 @@ dependencies = [
  "bitflags 2.3.1",
  "is-macro",
  "nohash-hasher",
+ "num-traits",
  "ruff_index",
  "ruff_python_ast",
  "ruff_python_stdlib",

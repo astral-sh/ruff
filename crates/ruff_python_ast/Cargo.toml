@@ -16,8 +16,8 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
-num-bigint = { version = "0.4.3" }
-num-traits = { version = "0.2.15" }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-literal = { workspace = true }
