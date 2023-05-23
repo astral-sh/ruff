@@ -152,24 +152,19 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
         );
         if let Some(rename) = rename {
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
-                // Find the `BindingKind::LoopVar` corresponding to the name.
+                // Avoid fixing if the variable, or any future bindings to the variable, are
+                // used _after_ the loop.
                 let scope = checker.semantic_model().scope();
-                let binding = scope.bindings_for_name(name).find_map(|binding_id| {
-                    let binding = &checker.semantic_model().bindings[*binding_id];
-                    binding.source.and_then(|source| {
-                        (Some(source) == checker.semantic_model().stmt_id).then_some(binding)
-                    })
-                });
-                if let Some(binding) = binding {
-                    if binding.kind.is_loop_var() {
-                        if !binding.used() {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                rename,
-                                expr.range(),
-                            )));
-                        }
-                    }
+                if scope
+                    .bindings_for_name(name)
+                    .map(|binding_id| &checker.semantic_model().bindings[*binding_id])
+                    .all(|binding| !binding.used())
+                {
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        rename,
+                        expr.range(),
+                    )));
                 }
             }
         }
