@@ -38,6 +38,7 @@ TD007.py:8:3: TD007 Missing space after colon in TODO
 10 | # FIXME:and lastly neither does this
    |   ^^^^^ TD007
 11 | # foo # TODO:this is really the last one
+12 | # TODO this colon doesn't terminate the tag, so don't check it. https://www.google.com
    |
 
 TD007.py:9:9: TD007 Missing space after colon in TODO
@@ -46,6 +47,7 @@ TD007.py:9:9: TD007 Missing space after colon in TODO
 10 | # FIXME:and lastly neither does this
 11 | # foo # TODO:this is really the last one
    |         ^^^^ TD007
+12 | # TODO this colon doesn't terminate the tag, so don't check it. https://www.google.com
    |
 
 

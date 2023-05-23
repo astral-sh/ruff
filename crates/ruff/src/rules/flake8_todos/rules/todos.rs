@@ -421,25 +421,28 @@ fn static_errors(
             TextSize::new(0)
         };
 
-    let post_author = &post_tag[usize::from(author_end)..];
+    let mut post_author = post_tag[usize::from(author_end)..]
+        .trim_start()
+        .chars()
+        .peekable();
 
-    let post_colon = if let Some((.., after_colon)) = post_author.split_once(':') {
-        if let Some(stripped) = after_colon.strip_prefix(' ') {
-            stripped
-        } else {
+    let Some(char) = post_author.next() else {
+        // TD-005
+        diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
+        return;
+    };
+
+    if char == ':' {
+        match post_author.peek() {
+            Some(' ') => (),
             // TD-007
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range));
-            after_colon
+            Some(_) => diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range)),
+            // TD-005
+            None => diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range)),
         }
     } else {
         // TD-004
         diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
-        ""
-    };
-
-    if post_colon.is_empty() {
-        // TD-005
-        diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
     }
 }
 
