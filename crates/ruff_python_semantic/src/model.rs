@@ -45,7 +45,7 @@ pub struct SemanticModel<'a> {
     pub body: &'a [Stmt],
     pub body_index: usize,
     // Internal, derivative state.
-    pub flags: ContextFlags,
+    pub flags: SemanticModelFlags,
     pub handled_exceptions: Vec<Exceptions>,
 }
 
@@ -66,7 +66,7 @@ impl<'a> SemanticModel<'a> {
             shadowed_bindings: IntMap::default(),
             body: &[],
             body_index: 0,
-            flags: ContextFlags::new(path),
+            flags: SemanticModelFlags::new(path),
             handled_exceptions: Vec::default(),
         }
     }
@@ -581,29 +581,30 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the context is in a type annotation.
     pub const fn in_annotation(&self) -> bool {
-        self.flags.contains(ContextFlags::ANNOTATION)
+        self.flags.contains(SemanticModelFlags::ANNOTATION)
     }
 
     /// Return `true` if the context is in a type definition.
     pub const fn in_type_definition(&self) -> bool {
-        self.flags.contains(ContextFlags::TYPE_DEFINITION)
+        self.flags.contains(SemanticModelFlags::TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in a "simple" string type definition.
     pub const fn in_simple_string_type_definition(&self) -> bool {
         self.flags
-            .contains(ContextFlags::SIMPLE_STRING_TYPE_DEFINITION)
+            .contains(SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in a "complex" string type definition.
     pub const fn in_complex_string_type_definition(&self) -> bool {
         self.flags
-            .contains(ContextFlags::COMPLEX_STRING_TYPE_DEFINITION)
+            .contains(SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in a `__future__` type definition.
     pub const fn in_future_type_definition(&self) -> bool {
-        self.flags.contains(ContextFlags::FUTURE_TYPE_DEFINITION)
+        self.flags
+            .contains(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
 
     /// Return `true` if the context is in any kind of deferred type definition.
@@ -615,54 +616,54 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the context is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
-        self.flags.contains(ContextFlags::EXCEPTION_HANDLER)
+        self.flags.contains(SemanticModelFlags::EXCEPTION_HANDLER)
     }
 
     /// Return `true` if the context is in an f-string.
     pub const fn in_f_string(&self) -> bool {
-        self.flags.contains(ContextFlags::F_STRING)
+        self.flags.contains(SemanticModelFlags::F_STRING)
     }
 
     /// Return `true` if the context is in boolean test.
     pub const fn in_boolean_test(&self) -> bool {
-        self.flags.contains(ContextFlags::BOOLEAN_TEST)
+        self.flags.contains(SemanticModelFlags::BOOLEAN_TEST)
     }
 
     /// Return `true` if the context is in a `typing::Literal` annotation.
     pub const fn in_literal(&self) -> bool {
-        self.flags.contains(ContextFlags::LITERAL)
+        self.flags.contains(SemanticModelFlags::LITERAL)
     }
 
     /// Return `true` if the context is in a subscript expression.
     pub const fn in_subscript(&self) -> bool {
-        self.flags.contains(ContextFlags::SUBSCRIPT)
+        self.flags.contains(SemanticModelFlags::SUBSCRIPT)
     }
 
     /// Return `true` if the context is in a type-checking block.
     pub const fn in_type_checking_block(&self) -> bool {
-        self.flags.contains(ContextFlags::TYPE_CHECKING_BLOCK)
+        self.flags.contains(SemanticModelFlags::TYPE_CHECKING_BLOCK)
     }
 
     /// Return `true` if the context has traversed past the "top-of-file" import boundary.
     pub const fn seen_import_boundary(&self) -> bool {
-        self.flags.contains(ContextFlags::IMPORT_BOUNDARY)
+        self.flags.contains(SemanticModelFlags::IMPORT_BOUNDARY)
     }
 
     /// Return `true` if the context has traverse past the `__future__` import boundary.
     pub const fn seen_futures_boundary(&self) -> bool {
-        self.flags.contains(ContextFlags::FUTURES_BOUNDARY)
+        self.flags.contains(SemanticModelFlags::FUTURES_BOUNDARY)
     }
 
     /// Return `true` if `__future__`-style type annotations are enabled.
     pub const fn future_annotations(&self) -> bool {
-        self.flags.contains(ContextFlags::FUTURE_ANNOTATIONS)
+        self.flags.contains(SemanticModelFlags::FUTURE_ANNOTATIONS)
     }
 }
 
 bitflags! {
     /// Flags indicating the current context of the analysis.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-    pub struct ContextFlags: u16 {
+    pub struct SemanticModelFlags: u16 {
         /// The context is in a type annotation.
         ///
         /// For example, the context could be visiting `int` in:
@@ -823,7 +824,7 @@ bitflags! {
     }
 }
 
-impl ContextFlags {
+impl SemanticModelFlags {
     pub fn new(path: &Path) -> Self {
         let mut flags = Self::default();
         if is_python_stub_file(path) {
@@ -839,7 +840,7 @@ pub struct Snapshot {
     scope_id: ScopeId,
     stmt_id: Option<NodeId>,
     definition_id: DefinitionId,
-    flags: ContextFlags,
+    flags: SemanticModelFlags,
 }
 
 #[derive(Debug)]
