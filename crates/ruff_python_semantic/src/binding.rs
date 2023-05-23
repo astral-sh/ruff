@@ -15,17 +15,20 @@ use crate::reference::ReferenceId;
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: TextRange,
-    /// The context in which the binding was created.
+    /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
-    /// The references to the binding.
+    /// The references to the [`Binding`].
     pub references: Vec<ReferenceId>,
-    /// The exceptions that were handled when the binding was defined.
+    /// The exceptions that were handled when the [`Binding`] was defined.
     pub exceptions: Exceptions,
+    /// Flags for the [`Binding`].
+    pub flags: BindingFlags,
 }
 
 impl<'a> Binding<'a> {
+    /// Return `true` if this [`Binding`] is used.
     pub fn is_used(&self) -> bool {
         !self.references.is_empty()
     }
@@ -35,19 +38,13 @@ impl<'a> Binding<'a> {
         self.references.iter().copied()
     }
 
-    pub const fn is_definition(&self) -> bool {
-        matches!(
-            self.kind,
-            BindingKind::ClassDefinition
-                | BindingKind::FunctionDefinition
-                | BindingKind::Builtin
-                | BindingKind::FutureImportation
-                | BindingKind::Importation(..)
-                | BindingKind::FromImportation(..)
-                | BindingKind::SubmoduleImportation(..)
-        )
+    /// Return `true` if this [`Binding`] represents an explicit re-export
+    /// (e.g., `import FastAPI as FastAPI`).
+    pub const fn is_explicit_export(&self) -> bool {
+        self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
     }
 
+    /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
             BindingKind::Importation(Importation { full_name, .. }) => {
@@ -97,7 +94,15 @@ impl<'a> Binding<'a> {
             }
             _ => {}
         }
-        existing.is_definition()
+        matches!(
+            existing.kind,
+            BindingKind::ClassDefinition
+                | BindingKind::FunctionDefinition
+                | BindingKind::Builtin
+                | BindingKind::Importation(..)
+                | BindingKind::FromImportation(..)
+                | BindingKind::SubmoduleImportation(..)
+        )
     }
 
     /// Returns the appropriate visual range for highlighting this binding.
@@ -110,6 +115,20 @@ impl<'a> Binding<'a> {
             }
             _ => self.range,
         }
+    }
+}
+
+bitflags! {
+    /// Flags on a [`Binding`].
+    #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+    pub struct BindingFlags: u8 {
+        /// The binding represents an explicit re-export.
+        ///
+        /// For example, the binding could be `FastAPI` in:
+        /// ```python
+        /// import FastAPI as FastAPI
+        /// ```
+        const EXPLICIT_EXPORT = 1 << 0;
     }
 }
 
