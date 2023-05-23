@@ -1290,6 +1290,7 @@
       "additionalProperties": false
     },
     "LineLength": {
+      "description": "The length of a line of text that is considered too long.",
       "type": "integer",
       "format": "uint",
       "minimum": 0.0
@@ -2510,6 +2511,7 @@
       ]
     },
     "TabSize": {
+      "description": "The size of a tab.",
       "type": "integer",
       "format": "uint8",
       "minimum": 0.0
