@@ -5529,7 +5529,7 @@ impl<'a> Checker<'a> {
                     self.semantic_model
                         .scopes
                         .ancestor_ids(*scope_id)
-                        .flat_map(|scope_id| runtime_imports[usize::from(scope_id)].iter())
+                        .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
                         .copied()
                         .collect()
                 };

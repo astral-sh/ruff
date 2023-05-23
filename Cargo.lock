@@ -1905,6 +1905,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_index"
+version = "0.0.0"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
 name = "ruff_macros"
 version = "0.0.0"
 dependencies = [
@@ -1965,6 +1972,7 @@ dependencies = [
  "bitflags 2.3.1",
  "is-macro",
  "nohash-hasher",
+ "ruff_index",
  "ruff_python_ast",
  "ruff_python_stdlib",
  "ruff_text_size",
