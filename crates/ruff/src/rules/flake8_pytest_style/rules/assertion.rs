@@ -5,7 +5,7 @@ use anyhow::Result;
 use libcst_native::{
     Assert, BooleanOp, Codegen, CodegenState, CompoundStatement, Expression,
     ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
-    SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
+    SmallStatement, Statement, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
 
@@ -17,6 +17,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
 
 use crate::checkers::ast::Checker;
+use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::registry::AsRule;
 
@@ -345,9 +346,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
             bail!("Expected statement to be embedded in a function definition")
         };
 
-        let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
-            bail!("Expected indented block")
-        };
+        let indented_block = match_indented_block(&mut embedding.body)?;
         indented_block.indent = Some(outer_indent);
 
         &mut indented_block.body
