@@ -5,11 +5,11 @@ use clap::{command, Parser};
 use regex::Regex;
 use rustc_hash::FxHashMap;
 
+use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
 use ruff::settings::configuration::RuleSelection;
-use ruff::settings::line_width::LineLength;
 use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };

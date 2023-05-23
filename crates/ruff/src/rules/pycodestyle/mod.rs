@@ -11,8 +11,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use crate::line_width::LineLength;
     use crate::registry::Rule;
-    use crate::settings::line_width::LineLength;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 

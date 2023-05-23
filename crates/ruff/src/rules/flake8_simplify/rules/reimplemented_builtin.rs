@@ -8,8 +8,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineWidth;
 use crate::registry::{AsRule, Rule};
-use crate::settings::line_width::LineWidth;
 
 #[violation]
 pub struct ReimplementedBuiltin {

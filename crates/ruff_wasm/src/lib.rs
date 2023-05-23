@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use ruff::directives;
+use ruff::line_width::{LineLength, TabSize};
 use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::rules::{
@@ -14,7 +15,6 @@ use ruff::rules::{
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
 };
 use ruff::settings::configuration::Configuration;
-use ruff::settings::line_width::{LineLength, TabSize};
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_diagnostics::Edit;

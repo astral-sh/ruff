@@ -1,6 +1,6 @@
 use ruff_python_ast::source_code::Stylist;
 
-use crate::settings::line_width::{LineLength, LineWidth};
+use crate::line_width::{LineLength, LineWidth};
 
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 

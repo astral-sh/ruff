@@ -13,6 +13,7 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
+use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -24,8 +25,6 @@ use crate::settings::options::Options;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
-
-use super::line_width::{LineLength, TabSize};
 
 #[derive(Debug, Default)]
 pub struct RuleSelection {

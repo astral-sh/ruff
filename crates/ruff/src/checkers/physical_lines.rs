@@ -183,8 +183,8 @@ mod tests {
 
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
+    use crate::line_width::LineLength;
     use crate::registry::Rule;
-    use crate::settings::line_width::LineLength;
     use crate::settings::Settings;
 
     use super::check_physical_lines;

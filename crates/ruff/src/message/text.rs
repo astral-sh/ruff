@@ -11,10 +11,10 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 
 use crate::fs::relativize_path;
+use crate::line_width::{LineWidth, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use crate::settings::line_width::{LineWidth, TabSize};
 
 bitflags! {
     #[derive(Default)]

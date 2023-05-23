@@ -5,7 +5,7 @@ use unicode_width::UnicodeWidthStr;
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Generator;
 
-use crate::settings::line_width::{LineLength, LineWidth, TabSize};
+use crate::line_width::{LineLength, LineWidth, TabSize};
 
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"

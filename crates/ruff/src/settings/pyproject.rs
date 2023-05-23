@@ -151,6 +151,7 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::codes::{self, RuleCodePrefix};
+    use crate::line_width::LineLength;
     use crate::rules::flake8_quotes::settings::Quote;
     use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
     use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
@@ -158,7 +159,6 @@ mod tests {
         flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_import_conventions,
         flake8_pytest_style, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
     };
-    use crate::settings::line_width::LineLength;
     use crate::settings::pyproject::{
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };

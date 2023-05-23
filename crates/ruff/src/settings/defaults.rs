@@ -6,6 +6,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::codes::{self, RuleCodePrefix};
+use crate::line_width::{LineLength, TabSize};
 use crate::registry::Linter;
 use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::rules::{
@@ -16,7 +17,6 @@ use crate::rules::{
 };
 use crate::settings::types::FilePatternSet;
 
-use super::line_width::{LineLength, TabSize};
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
 

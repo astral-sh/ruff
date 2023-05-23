@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::ConfigurationOptions;
 
+use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -13,8 +14,6 @@ use crate::rules::{
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
-
-use super::line_width::{LineLength, TabSize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]

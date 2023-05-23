@@ -13,9 +13,9 @@ use ruff_python_ast::newlines::StrExt;
 use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineWidth;
 use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::settings::line_width::LineWidth;
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)

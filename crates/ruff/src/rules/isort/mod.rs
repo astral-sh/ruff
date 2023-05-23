@@ -17,9 +17,9 @@ use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, TrailingComma};
 
+use crate::line_width::{LineLength, LineWidth};
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
-use crate::settings::line_width::{LineLength, LineWidth};
 use crate::settings::types::PythonVersion;
 
 mod annotate;
