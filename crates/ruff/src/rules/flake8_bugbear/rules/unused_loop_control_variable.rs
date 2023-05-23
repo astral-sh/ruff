@@ -154,8 +154,8 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
                 let scope = checker.semantic_model().scope();
-                let binding = scope.bindings_for_name(name).find_map(|index| {
-                    let binding = &checker.semantic_model().bindings[*index];
+                let binding = scope.bindings_for_name(name).find_map(|binding_id| {
+                    let binding = &checker.semantic_model().bindings[*binding_id];
                     binding.source.and_then(|source| {
                         (Some(source) == checker.semantic_model().stmt_id).then_some(binding)
                     })

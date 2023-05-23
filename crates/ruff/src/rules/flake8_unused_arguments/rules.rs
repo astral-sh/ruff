@@ -258,7 +258,10 @@ fn call<'a>(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args {
-        if let Some(binding) = values.get(arg.arg.as_str()).map(|index| &bindings[*index]) {
+        if let Some(binding) = values
+            .get(arg.arg.as_str())
+            .map(|binding_id| &bindings[*binding_id])
+        {
             if !binding.used()
                 && binding.kind.is_argument()
                 && !dummy_variable_rgx.is_match(arg.arg.as_str())
