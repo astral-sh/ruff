@@ -8,6 +8,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_text_size::TextRange;
 
 use crate::node::NodeId;
+use crate::reference::ReferenceId;
 use crate::scope::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -20,31 +21,31 @@ pub struct Binding<'a> {
     pub source: Option<NodeId>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a runtime context.
-    pub runtime_usage: Option<(ScopeId, TextRange)>,
+    pub runtime_usage: Vec<ReferenceId>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a typing-time context.
-    pub typing_usage: Option<(ScopeId, TextRange)>,
+    pub typing_usage: Vec<ReferenceId>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a synthetic context. This is used for
     /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
     /// that should be considered used even if they're never referenced.
-    pub synthetic_usage: Option<(ScopeId, TextRange)>,
+    pub synthetic_usage: Vec<ReferenceId>,
     /// The exceptions that were handled when the binding was defined.
     pub exceptions: Exceptions,
 }
 
 impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, scope: ScopeId, range: TextRange, context: ExecutionContext) {
+    pub fn mark_used(&mut self, reference_id: ReferenceId, context: ExecutionContext) {
         match context {
-            ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
-            ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
+            ExecutionContext::Runtime => self.runtime_usage.push(reference_id),
+            ExecutionContext::Typing => self.typing_usage.push(reference_id),
         }
     }
 
-    pub const fn used(&self) -> bool {
-        self.runtime_usage.is_some()
-            || self.synthetic_usage.is_some()
-            || self.typing_usage.is_some()
+    pub fn used(&self) -> bool {
+        !self.runtime_usage.is_empty()
+            || !self.synthetic_usage.is_empty()
+            || !self.typing_usage.is_empty()
     }
 
     pub const fn is_definition(&self) -> bool {

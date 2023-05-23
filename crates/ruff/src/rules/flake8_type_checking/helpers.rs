@@ -41,14 +41,14 @@ pub(crate) fn is_type_checking_block(model: &SemanticModel, test: &Expr) -> bool
     false
 }
 
-pub(crate) const fn is_valid_runtime_import(binding: &Binding) -> bool {
+pub(crate) fn is_valid_runtime_import(binding: &Binding) -> bool {
     if matches!(
         binding.kind,
         BindingKind::Importation(..)
             | BindingKind::FromImportation(..)
             | BindingKind::SubmoduleImportation(..)
     ) {
-        binding.runtime_usage.is_some() && matches!(binding.context, ExecutionContext::Runtime)
+        !binding.runtime_usage.is_empty() && matches!(binding.context, ExecutionContext::Runtime)
     } else {
         false
     }

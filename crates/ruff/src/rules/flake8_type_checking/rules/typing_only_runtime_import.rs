@@ -276,9 +276,9 @@ pub(crate) fn typing_only_runtime_import(
     }
 
     if matches!(binding.context, ExecutionContext::Runtime)
-        && binding.typing_usage.is_some()
-        && binding.runtime_usage.is_none()
-        && binding.synthetic_usage.is_none()
+        && !binding.typing_usage.is_empty()
+        && binding.runtime_usage.is_empty()
+        && binding.synthetic_usage.is_empty()
     {
         // Extract the module base and level from the full name.
         // Ex) `foo.bar.baz` -> `foo`, `0`

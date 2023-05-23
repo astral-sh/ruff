@@ -18,6 +18,7 @@ use crate::binding::{
 };
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::node::{NodeId, Nodes};
+use crate::reference::References;
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
@@ -39,6 +40,8 @@ pub struct SemanticModel<'a> {
     pub definition_id: DefinitionId,
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
+    // Stack of all references created in any scope, at any point in execution.
+    pub references: References,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
     pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
@@ -63,6 +66,7 @@ impl<'a> SemanticModel<'a> {
             definitions: Definitions::for_module(module),
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
+            references: References::default(),
             shadowed_bindings: IntMap::default(),
             body: &[],
             body_index: 0,
@@ -122,11 +126,12 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                self.bindings[*binding_id].mark_used(ScopeId::global(), range, context);
+                let reference_id = self.references.push_reference(ScopeId::global(), range);
+                self.bindings[*binding_id].mark_used(reference_id, context);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), *binding_id) {
-                    self.bindings[binding_id].mark_used(ScopeId::global(), range, context);
+                    self.bindings[binding_id].mark_used(reference_id, context);
                 }
 
                 return ResolvedReference::Resolved(*binding_id);
@@ -156,11 +161,12 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = scope.get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                self.bindings[*binding_id].mark_used(self.scope_id, range, context);
+                let reference_id = self.references.push_reference(self.scope_id, range);
+                self.bindings[*binding_id].mark_used(reference_id, context);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(scope_id, *binding_id) {
-                    self.bindings[binding_id].mark_used(ScopeId::global(), range, context);
+                    self.bindings[binding_id].mark_used(reference_id, context);
                 }
 
                 // But if it's a type annotation, don't treat it as resolved, unless we're in a

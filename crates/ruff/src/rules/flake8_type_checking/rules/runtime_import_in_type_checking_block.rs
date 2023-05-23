@@ -59,7 +59,7 @@ pub(crate) fn runtime_import_in_type_checking_block(binding: &Binding) -> Option
         _ => return None,
     };
 
-    if matches!(binding.context, ExecutionContext::Typing) && binding.runtime_usage.is_some() {
+    if matches!(binding.context, ExecutionContext::Typing) && !binding.runtime_usage.is_empty() {
         Some(Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
                 full_name: full_name.to_string(),
