@@ -421,27 +421,25 @@ fn static_errors(
             TextSize::new(0)
         };
 
-    let mut post_author = post_tag[usize::from(author_end)..]
-        .trim_start()
-        .chars()
-        .peekable();
+    let post_author = &post_tag[usize::from(author_end)..].to_owned();
+    let mut post_author_chars = post_author.trim_start().chars().peekable();
 
-    let Some(char) = post_author.next() else {
+    let Some(char) = post_author_chars.next() else {
+        // TD-004
+        diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
         // TD-005
         diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
         return;
     };
 
     if char == ':' {
-        match post_author.peek() {
+        match post_author_chars.peek() {
             Some(' ') => (),
             // TD-007
             Some(_) => diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range)),
-            // TD-005
             None => diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range)),
         }
     } else {
-        // TD-004
         diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
     }
 }
