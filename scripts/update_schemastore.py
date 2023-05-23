@@ -32,6 +32,8 @@ def update_schemastore(schemastore: Path) -> None:  # noqa: D103
             ],
             cwd=schemastore,
         )
+    # Create a new branch tagged with the current ruff commit up to date with the latest
+    # upstream schemastore
     check_call(["git", "fetch", "upstream"], cwd=schemastore)
     current_sha = check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     branch = f"update-ruff-{current_sha}"
@@ -44,6 +46,7 @@ def update_schemastore(schemastore: Path) -> None:  # noqa: D103
         cwd=schemastore,
     )
 
+    # Update the schema and format appropriately
     schema = json.loads(root.joinpath("ruff.schema.json").read_text())
     schema["$id"] = "https://json.schemastore.org/ruff.json"
     schemastore.joinpath(ruff_json).write_text(
@@ -51,8 +54,10 @@ def update_schemastore(schemastore: Path) -> None:  # noqa: D103
     )
     check_call(["prettier", "--write", ruff_json], cwd=schemastore)
 
+    # Check if the schema has changed
     # https://stackoverflow.com/a/9393642/3549270
     if check_output(["git", "status", "-s"], cwd=schemastore).strip():
+        # Schema has changed, commit and push
         commit_url = f"{ruff_repo}/commit/{current_sha}"
         commit_body = (
             f"This updates ruff's JSON schema to [{current_sha}]({commit_url})"
@@ -70,6 +75,7 @@ def update_schemastore(schemastore: Path) -> None:  # noqa: D103
             ],
             cwd=schemastore,
         )
+        # This should show the link to create a PR
         check_call(
             ["git", "push", "--set-upstream", "origin", branch],
             cwd=schemastore,
@@ -79,7 +85,6 @@ def update_schemastore(schemastore: Path) -> None:  # noqa: D103
 
 
 def main() -> None:  # noqa: D103
-
     schemastore_existing = root.joinpath("schemastore")
     if schemastore_existing.is_dir():
         update_schemastore(schemastore_existing)
