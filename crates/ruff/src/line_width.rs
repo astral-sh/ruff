@@ -118,7 +118,7 @@ impl LineWidth {
 
     /// Adds the given width to the line width.
     /// Also adds the given width to the column.
-    /// It is generally better to use [`add_str`] or [`add_char`].
+    /// It is generally better to use [`LineWidth::add_str`] or [`LineWidth::add_char`].
     /// The width and column should be the same for the corresponding text.
     /// Currently, this is only used to add spaces.
     #[must_use]
