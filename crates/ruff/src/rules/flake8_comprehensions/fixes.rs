@@ -2,33 +2,20 @@ use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
     Arg, AssignEqual, AssignTargetExpression, Call, Codegen, CodegenState, Comment, CompFor, Dict,
-    DictComp, DictElement, Element, EmptyLine, Expr, Expression, GeneratorExp, LeftCurlyBrace,
-    LeftParen, LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace,
-    ParenthesizedWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp,
-    SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
+    DictComp, DictElement, Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
+    LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedWhitespace,
+    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
+    TrailingWhitespace, Tuple,
 };
 use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
-use crate::cst::matchers::{match_expr, match_module};
-
-fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
-    if let Expression::Call(call) = &mut expr.value {
-        Ok(call)
-    } else {
-        bail!("Expected Expression::Call")
-    }
-}
-
-fn match_arg<'a, 'b>(call: &'a Call<'b>) -> Result<&'a Arg<'b>> {
-    if let Some(arg) = call.args.first() {
-        Ok(arg)
-    } else {
-        bail!("Expected Arg")
-    }
-}
+use crate::cst::matchers::{
+    match_arg, match_call, match_call_mut, match_expression, match_generator_exp, match_lambda,
+    match_list_comp, match_name, match_tuple,
+};
 
 /// (C400) Convert `list(x for x in y)` to `[x for x in y]`.
 pub(crate) fn fix_unnecessary_generator_list(
@@ -38,18 +25,13 @@ pub(crate) fn fix_unnecessary_generator_list(
 ) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
-    let Expression::GeneratorExp(generator_exp) = &arg.value else {
-        bail!(
-            "Expected Expression::GeneratorExp"
-        );
-    };
+    let generator_exp = match_generator_exp(&arg.value)?;
 
-    body.value = Expression::ListComp(Box::new(ListComp {
+    tree = Expression::ListComp(Box::new(ListComp {
         elt: generator_exp.elt.clone(),
         for_in: generator_exp.for_in.clone(),
         lbracket: LeftSquareBracket {
@@ -81,18 +63,13 @@ pub(crate) fn fix_unnecessary_generator_set(
 ) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
-    let Expression::GeneratorExp(generator_exp) = &arg.value else {
-        bail!(
-            "Expected Expression::GeneratorExp"
-        );
-    };
+    let generator_exp = match_generator_exp(&arg.value)?;
 
-    body.value = Expression::SetComp(Box::new(SetComp {
+    tree = Expression::SetComp(Box::new(SetComp {
         elt: generator_exp.elt.clone(),
         for_in: generator_exp.for_in.clone(),
         lbrace: LeftCurlyBrace {
@@ -132,32 +109,18 @@ pub(crate) fn fix_unnecessary_generator_dict(
     parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
     // Extract the (k, v) from `(k, v) for ...`.
-    let Expression::GeneratorExp(generator_exp) = &arg.value else {
-        bail!(
-            "Expected Expression::GeneratorExp"
-        );
-    };
-    let Expression::Tuple(tuple) = &generator_exp.elt.as_ref() else {
-        bail!("Expected Expression::Tuple");
-    };
-    let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
-        bail!(
-            "Expected tuple to contain a key as the first element"
-        );
-    };
-    let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) else {
-        bail!(
-            "Expected tuple to contain a key as the second element"
-        );
+    let generator_exp = match_generator_exp(&arg.value)?;
+    let tuple = match_tuple(&generator_exp.elt)?;
+    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..] else {
+        bail!("Expected tuple to contain two elements");
     };
 
-    body.value = Expression::DictComp(Box::new(DictComp {
+    tree = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
         value: Box::new(value.clone()),
         for_in: generator_exp.for_in.clone(),
@@ -200,16 +163,13 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
-    let Expression::ListComp(list_comp) = &arg.value else {
-        bail!("Expected Expression::ListComp");
-    };
+    let list_comp = match_list_comp(&arg.value)?;
 
-    body.value = Expression::SetComp(Box::new(SetComp {
+    tree = Expression::SetComp(Box::new(SetComp {
         elt: list_comp.elt.clone(),
         for_in: list_comp.for_in.clone(),
         lbrace: LeftCurlyBrace {
@@ -240,25 +200,20 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
-    let Expression::ListComp(list_comp) = &arg.value else {
-        bail!("Expected Expression::ListComp")
-    };
+    let list_comp = match_list_comp(&arg.value)?;
 
-    let Expression::Tuple(tuple) = &*list_comp.elt else {
-        bail!("Expected Expression::Tuple")
-    };
+    let tuple = match_tuple(&list_comp.elt)?;
 
     let [Element::Simple {
             value: key,
             comma: Some(comma),
         }, Element::Simple { value, .. }] = &tuple.elements[..] else { bail!("Expected tuple with two elements"); };
 
-    body.value = Expression::DictComp(Box::new(DictComp {
+    tree = Expression::DictComp(Box::new(DictComp {
         key: Box::new(key.clone()),
         value: Box::new(value.clone()),
         for_in: list_comp.for_in.clone(),
@@ -335,9 +290,8 @@ pub(crate) fn fix_unnecessary_literal_set(
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let mut call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let mut call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
     let (elements, whitespace_after, whitespace_before) = match &arg.value {
@@ -355,7 +309,7 @@ pub(crate) fn fix_unnecessary_literal_set(
     if elements.is_empty() {
         call.args = vec![];
     } else {
-        body.value = Expression::Set(Box::new(Set {
+        tree = Expression::Set(Box::new(Set {
             elements,
             lbrace: LeftCurlyBrace { whitespace_after },
             rbrace: RightCurlyBrace { whitespace_before },
@@ -382,9 +336,8 @@ pub(crate) fn fix_unnecessary_literal_dict(
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
     let elements = match &arg.value {
@@ -421,7 +374,7 @@ pub(crate) fn fix_unnecessary_literal_dict(
         })
         .collect::<Result<Vec<DictElement>>>()?;
 
-    body.value = Expression::Dict(Box::new(Dict {
+    tree = Expression::Dict(Box::new(Dict {
         elements,
         lbrace: LeftCurlyBrace {
             whitespace_after: call.whitespace_before_args.clone(),
@@ -451,12 +404,9 @@ pub(crate) fn fix_unnecessary_collection_call(
 ) -> Result<Edit> {
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
-    let Expression::Name(name) = &call.func.as_ref() else {
-        bail!("Expected Expression::Name");
-    };
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
+    let name = match_name(&call.func)?;
 
     // Arena allocator used to create formatted strings of sufficient lifetime,
     // below.
@@ -464,14 +414,14 @@ pub(crate) fn fix_unnecessary_collection_call(
 
     match name.value {
         "tuple" => {
-            body.value = Expression::Tuple(Box::new(Tuple {
+            tree = Expression::Tuple(Box::new(Tuple {
                 elements: vec![],
                 lpar: vec![LeftParen::default()],
                 rpar: vec![RightParen::default()],
             }));
         }
         "list" => {
-            body.value = Expression::List(Box::new(List {
+            tree = Expression::List(Box::new(List {
                 elements: vec![],
                 lbracket: LeftSquareBracket::default(),
                 rbracket: RightSquareBracket::default(),
@@ -481,7 +431,7 @@ pub(crate) fn fix_unnecessary_collection_call(
         }
         "dict" => {
             if call.args.is_empty() {
-                body.value = Expression::Dict(Box::new(Dict {
+                tree = Expression::Dict(Box::new(Dict {
                     elements: vec![],
                     lbrace: LeftCurlyBrace::default(),
                     rbrace: RightCurlyBrace::default(),
@@ -522,7 +472,7 @@ pub(crate) fn fix_unnecessary_collection_call(
                     })
                     .collect();
 
-                body.value = Expression::Dict(Box::new(Dict {
+                tree = Expression::Dict(Box::new(Dict {
                     elements,
                     lbrace: LeftCurlyBrace {
                         whitespace_after: call.whitespace_before_args.clone(),
@@ -562,9 +512,8 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
     let (elements, whitespace_after, whitespace_before) = match &arg.value {
         Expression::Tuple(inner) => (
@@ -590,7 +539,7 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
         }
     };
 
-    body.value = Expression::Tuple(Box::new(Tuple {
+    tree = Expression::Tuple(Box::new(Tuple {
         elements: elements.clone(),
         lpar: vec![LeftParen {
             whitespace_after: whitespace_after.clone(),
@@ -617,9 +566,8 @@ pub(crate) fn fix_unnecessary_literal_within_list_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
     let (elements, whitespace_after, whitespace_before) = match &arg.value {
         Expression::Tuple(inner) => (
@@ -645,7 +593,7 @@ pub(crate) fn fix_unnecessary_literal_within_list_call(
         }
     };
 
-    body.value = Expression::List(Box::new(List {
+    tree = Expression::List(Box::new(List {
         elements: elements.clone(),
         lbracket: LeftSquareBracket {
             whitespace_after: whitespace_after.clone(),
@@ -675,12 +623,11 @@ pub(crate) fn fix_unnecessary_list_call(
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
-    body.value = arg.value.clone();
+    tree = arg.value.clone();
 
     let mut state = CodegenState {
         default_newline: &stylist.line_ending(),
@@ -701,17 +648,10 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let outer_call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let outer_call = match_call_mut(&mut tree)?;
     let inner_call = match &outer_call.args[..] {
-        [arg] => {
-            if let Expression::Call(call) = &arg.value {
-                call
-            } else {
-                bail!("Expected Expression::Call ");
-            }
-        }
+        [arg] => match_call(&arg.value)?,
         _ => {
             bail!("Expected one argument in outer function call");
         }
@@ -719,7 +659,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
 
     if let Expression::Name(outer_name) = &*outer_call.func {
         if outer_name.value == "list" {
-            body.value = Expression::Call(inner_call.clone());
+            tree = Expression::Call(Box::new((*inner_call).clone()));
         } else {
             // If the `reverse` argument is used
             let args = if inner_call.args.iter().any(|arg| {
@@ -796,7 +736,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
                 args
             };
 
-            body.value = Expression::Call(Box::new(Call {
+            tree = Expression::Call(Box::new(Call {
                 func: inner_call.func.clone(),
                 args,
                 lpar: inner_call.lpar.clone(),
@@ -824,15 +764,12 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let body = match_expr(&mut tree)?;
-    let mut outer_call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let mut outer_call = match_call_mut(&mut tree)?;
 
     outer_call.args = match outer_call.args.split_first() {
         Some((first, rest)) => {
-            let Expression::Call(inner_call) = &first.value else {
-                bail!("Expected Expression::Call ");
-            };
+            let inner_call = match_call(&first.value)?;
             if let Some(iterable) = inner_call.args.first() {
                 let mut args = vec![iterable.clone()];
                 args.extend_from_slice(rest);
@@ -861,12 +798,11 @@ pub(crate) fn fix_unnecessary_comprehension(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
+    let mut tree = match_expression(module_text)?;
 
-    match &body.value {
+    match &tree {
         Expression::ListComp(inner) => {
-            body.value = Expression::Call(Box::new(Call {
+            tree = Expression::Call(Box::new(Call {
                 func: Box::new(Expression::Name(Box::new(Name {
                     value: "list",
                     lpar: vec![],
@@ -888,7 +824,7 @@ pub(crate) fn fix_unnecessary_comprehension(
             }));
         }
         Expression::SetComp(inner) => {
-            body.value = Expression::Call(Box::new(Call {
+            tree = Expression::Call(Box::new(Call {
                 func: Box::new(Expression::Name(Box::new(Name {
                     value: "set",
                     lpar: vec![],
@@ -910,7 +846,7 @@ pub(crate) fn fix_unnecessary_comprehension(
             }));
         }
         Expression::DictComp(inner) => {
-            body.value = Expression::Call(Box::new(Call {
+            tree = Expression::Call(Box::new(Call {
                 func: Box::new(Expression::Name(Box::new(Name {
                     value: "dict",
                     lpar: vec![],
@@ -955,9 +891,8 @@ pub(crate) fn fix_unnecessary_map(
     kind: &str,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
     let (args, lambda_func) = match &arg.value {
@@ -976,9 +911,7 @@ pub(crate) fn fix_unnecessary_map(
         }
     };
 
-    let Expression::Lambda(func_body) = &lambda_func else {
-        bail!("Expected a lambda")
-    };
+    let func_body = match_lambda(&lambda_func)?;
 
     if args.len() == 2 {
         if func_body.params.params.iter().any(|f| f.default.is_some()) {
@@ -1017,7 +950,7 @@ pub(crate) fn fix_unnecessary_map(
 
         match kind {
             "generator" => {
-                body.value = Expression::GeneratorExp(Box::new(GeneratorExp {
+                tree = Expression::GeneratorExp(Box::new(GeneratorExp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
                     lpar: vec![LeftParen::default()],
@@ -1025,7 +958,7 @@ pub(crate) fn fix_unnecessary_map(
                 }));
             }
             "list" => {
-                body.value = Expression::ListComp(Box::new(ListComp {
+                tree = Expression::ListComp(Box::new(ListComp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
                     lbracket: LeftSquareBracket::default(),
@@ -1035,7 +968,7 @@ pub(crate) fn fix_unnecessary_map(
                 }));
             }
             "set" => {
-                body.value = Expression::SetComp(Box::new(SetComp {
+                tree = Expression::SetComp(Box::new(SetComp {
                     elt: func_body.body.clone(),
                     for_in: compfor,
                     lpar: vec![],
@@ -1066,7 +999,7 @@ pub(crate) fn fix_unnecessary_map(
                     bail!("Expected tuple for dict comprehension")
                 };
 
-                body.value = Expression::DictComp(Box::new(DictComp {
+                tree = Expression::DictComp(Box::new(DictComp {
                     for_in: compfor,
                     lpar: vec![],
                     rpar: vec![],
@@ -1115,12 +1048,11 @@ pub(crate) fn fix_unnecessary_literal_within_dict_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
-    body.value = arg.value.clone();
+    tree = arg.value.clone();
 
     let mut state = CodegenState {
         default_newline: &stylist.line_ending(),
@@ -1140,9 +1072,8 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
 ) -> Result<Fix> {
     // Expr(ListComp) -> Expr(GeneratorExp)
     let module_text = locator.slice(expr.range());
-    let mut tree = match_module(module_text)?;
-    let body = match_expr(&mut tree)?;
-    let call = match_call(body)?;
+    let mut tree = match_expression(module_text)?;
+    let call = match_call_mut(&mut tree)?;
 
     let Expression::ListComp(list_comp) = &call.args[0].value else {
         bail!(

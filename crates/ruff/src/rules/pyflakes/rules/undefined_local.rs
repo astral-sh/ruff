@@ -43,13 +43,12 @@ pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
             // If the name was defined in that scope...
             if let Some(binding) = scope
                 .get(name)
-                .map(|index| &checker.semantic_model().bindings[*index])
+                .map(|binding_id| &checker.semantic_model().bindings[*binding_id])
             {
                 // And has already been accessed in the current scope...
                 if let Some((scope_id, location)) = binding.runtime_usage {
                     if scope_id == checker.semantic_model().scope_id {
                         // Then it's probably an error.
-
                         return Some(location);
                     }
                 }

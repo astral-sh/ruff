@@ -10,14 +10,11 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers;
-use ruff_python_ast::imports::{AnyImport, Import};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_semantic::model::SemanticModel;
 
 use crate::cst::helpers::compose_module_path;
-use crate::cst::matchers::match_module;
-use crate::importer::Importer;
+use crate::cst::matchers::match_statement;
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -215,9 +212,9 @@ pub(crate) fn remove_unused_imports<'a>(
     stylist: &Stylist,
 ) -> Result<Edit> {
     let module_text = locator.slice(stmt.range());
-    let mut tree = match_module(module_text)?;
+    let mut tree = match_statement(module_text)?;
 
-    let Some(Statement::Simple(body)) = tree.body.first_mut() else {
+    let Statement::Simple(body) = &mut tree else {
         bail!("Expected Statement::Simple");
     };
 
@@ -419,86 +416,6 @@ pub(crate) fn remove_argument(
         (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
         _ => {
             bail!("No fix could be constructed")
-        }
-    }
-}
-
-/// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make the
-/// symbol available in the current scope along with the bound name of the symbol.
-///
-/// For example, assuming `module` is `"functools"` and `member` is `"lru_cache"`, this function
-/// could return an [`Edit`] to add `import functools` to the top of the file, alongside with the
-/// name on which the `lru_cache` symbol would be made available (`"functools.lru_cache"`).
-///
-/// Attempts to reuse existing imports when possible.
-pub(crate) fn get_or_import_symbol(
-    module: &str,
-    member: &str,
-    at: TextSize,
-    model: &SemanticModel,
-    importer: &Importer,
-    locator: &Locator,
-) -> Result<(Edit, String)> {
-    if let Some((source, binding)) = model.resolve_qualified_import_name(module, member) {
-        // If the symbol is already available in the current scope, use it.
-
-        // The exception: the symbol source (i.e., the import statement) comes after the current
-        // location. For example, we could be generating an edit within a function, and the import
-        // could be defined in the module scope, but after the function definition. In this case,
-        // it's unclear whether we can use the symbol (the function could be called between the
-        // import and the current location, and thus the symbol would not be available). It's also
-        // unclear whether should add an import statement at the top of the file, since it could
-        // be shadowed between the import and the current location.
-        if source.start() > at {
-            bail!("Unable to use existing symbol `{binding}` due to late-import");
-        }
-
-        // We also add a no-op edit to force conflicts with any other fixes that might try to
-        // remove the import. Consider:
-        //
-        // ```py
-        // import sys
-        //
-        // quit()
-        // ```
-        //
-        // Assume you omit this no-op edit. If you run Ruff with `unused-imports` and
-        // `sys-exit-alias` over this snippet, it will generate two fixes: (1) remove the unused
-        // `sys` import; and (2) replace `quit()` with `sys.exit()`, under the assumption that `sys`
-        // is already imported and available.
-        //
-        // By adding this no-op edit, we force the `unused-imports` fix to conflict with the
-        // `sys-exit-alias` fix, and thus will avoid applying both fixes in the same pass.
-        let import_edit =
-            Edit::range_replacement(locator.slice(source.range()).to_string(), source.range());
-        Ok((import_edit, binding))
-    } else {
-        if let Some(stmt) = importer.find_import_from(module, at) {
-            // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
-            // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
-            // bound name.
-            if model
-                .find_binding(member)
-                .map_or(true, |binding| binding.kind.is_builtin())
-            {
-                let import_edit = importer.add_member(stmt, member)?;
-                Ok((import_edit, member.to_string()))
-            } else {
-                bail!("Unable to insert `{member}` into scope due to name conflict")
-            }
-        } else {
-            // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
-            // return `"functools.cache"` as the bound name.
-            if model
-                .find_binding(module)
-                .map_or(true, |binding| binding.kind.is_builtin())
-            {
-                let import_edit =
-                    importer.add_import(&AnyImport::Import(Import::module(module)), at);
-                Ok((import_edit, format!("{module}.{member}")))
-            } else {
-                bail!("Unable to insert `{module}` into scope due to name conflict")
-            }
         }
     }
 }

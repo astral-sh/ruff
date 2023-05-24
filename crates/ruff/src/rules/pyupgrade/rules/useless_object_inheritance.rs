@@ -35,7 +35,9 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Optio
             continue;
         }
         if !matches!(
-            scope.get(id.as_str()).map(|index| &bindings[*index]),
+            scope
+                .get(id.as_str())
+                .map(|binding_id| &bindings[*binding_id]),
             None | Some(Binding {
                 kind: BindingKind::Builtin,
                 ..

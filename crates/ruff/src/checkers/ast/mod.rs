@@ -28,7 +28,7 @@ use ruff_python_semantic::binding::{
     Importation, StarImportation, SubmoduleImportation,
 };
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
-use ruff_python_semantic::model::{ContextFlags, ResolvedReference, SemanticModel};
+use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -190,22 +190,22 @@ where
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
-                        self.semantic_model.flags |= ContextFlags::FUTURE_ANNOTATIONS;
+                        self.semantic_model.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
                     }
                 } else {
-                    self.semantic_model.flags |= ContextFlags::FUTURES_BOUNDARY;
+                    self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 }
             }
             Stmt::Import(_) => {
-                self.semantic_model.flags |= ContextFlags::FUTURES_BOUNDARY;
+                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
-                self.semantic_model.flags |= ContextFlags::FUTURES_BOUNDARY;
+                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !self.semantic_model.seen_import_boundary()
                     && !helpers::is_assignment_to_a_dunder(stmt)
                     && !helpers::in_nested_block(self.semantic_model.parents())
                 {
-                    self.semantic_model.flags |= ContextFlags::IMPORT_BOUNDARY;
+                    self.semantic_model.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
             }
         }
@@ -2065,8 +2065,10 @@ where
                         .semantic_model
                         .global_scope()
                         .get(name)
-                        .map_or(true, |index| {
-                            self.semantic_model.bindings[*index].kind.is_annotation()
+                        .map_or(true, |binding_id| {
+                            self.semantic_model.bindings[*binding_id]
+                                .kind
+                                .is_annotation()
                         })
                     {
                         let id = self.semantic_model.bindings.push(Binding {
@@ -2128,8 +2130,10 @@ where
                         .semantic_model
                         .global_scope()
                         .get(name)
-                        .map_or(true, |index| {
-                            self.semantic_model.bindings[*index].kind.is_annotation()
+                        .map_or(true, |binding_id| {
+                            self.semantic_model.bindings[*binding_id]
+                                .kind
+                                .is_annotation()
                         })
                     {
                         let id = self.semantic_model.bindings.push(Binding {
@@ -2206,7 +2210,7 @@ where
                 self.visit_body(body);
                 self.semantic_model.handled_exceptions.pop();
 
-                self.semantic_model.flags |= ContextFlags::EXCEPTION_HANDLER;
+                self.semantic_model.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
@@ -2341,7 +2345,7 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let flags_snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::ANNOTATION;
+        self.semantic_model.flags |= SemanticModelFlags::ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic_model.flags = flags_snapshot;
     }
@@ -2386,7 +2390,7 @@ where
                     ..
                 })
         ) {
-            self.semantic_model.flags -= ContextFlags::BOOLEAN_TEST;
+            self.semantic_model.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
         // Pre-visit.
@@ -2430,7 +2434,7 @@ where
                 }
 
                 if self.semantic_model.match_typing_expr(value, "Literal") {
-                    self.semantic_model.flags |= ContextFlags::LITERAL;
+                    self.semantic_model.flags |= SemanticModelFlags::LITERAL;
                 }
 
                 if self.settings.rules.any_enabled(&[
@@ -4196,7 +4200,7 @@ where
                 if self.semantic_model.in_subscript() {
                     visitor::walk_expr(self, expr);
                 } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
-                    self.semantic_model.flags |= ContextFlags::SUBSCRIPT;
+                    self.semantic_model.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
                     match analyze::typing::match_annotated_subscript(
@@ -4244,7 +4248,7 @@ where
                 }
             }
             Expr::JoinedStr(_) => {
-                self.semantic_model.flags |= ContextFlags::F_STRING;
+                self.semantic_model.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
             _ => visitor::walk_expr(self, expr),
@@ -4378,11 +4382,11 @@ where
 
                         walk_excepthandler(self, excepthandler);
 
-                        if let Some(index) = {
+                        if let Some(binding_id) = {
                             let scope = self.semantic_model.scope_mut();
                             &scope.remove(name)
                         } {
-                            if !self.semantic_model.bindings[*index].used() {
+                            if !self.semantic_model.bindings[*binding_id].used() {
                                 if self.settings.rules.enabled(Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         pyflakes::rules::UnusedVariable { name: name.into() },
@@ -4402,9 +4406,9 @@ where
                             }
                         }
 
-                        if let Some(index) = definition {
+                        if let Some(binding_id) = definition {
                             let scope = self.semantic_model.scope_mut();
-                            scope.add(name, index);
+                            scope.add(name, binding_id);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -4625,7 +4629,7 @@ impl<'a> Checker<'a> {
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::TYPE_CHECKING_BLOCK;
+        self.semantic_model.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
         self.semantic_model.flags = snapshot;
     }
@@ -4633,7 +4637,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a type definition.
     pub(crate) fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::TYPE_DEFINITION;
+        self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
         self.semantic_model.flags = snapshot;
     }
@@ -4641,7 +4645,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
     pub(crate) fn visit_non_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags -= ContextFlags::TYPE_DEFINITION;
+        self.semantic_model.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
         self.semantic_model.flags = snapshot;
     }
@@ -4651,7 +4655,7 @@ impl<'a> Checker<'a> {
     /// its truthiness.
     pub(crate) fn visit_boolean_test(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
-        self.semantic_model.flags |= ContextFlags::BOOLEAN_TEST;
+        self.semantic_model.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
         self.semantic_model.flags = snapshot;
     }
@@ -4759,8 +4763,8 @@ impl<'a> Checker<'a> {
         };
         let scope = &mut self.semantic_model.scopes[scope_id];
 
-        let binding = if let Some(index) = scope.get(name) {
-            let existing = &self.semantic_model.bindings[*index];
+        let binding = if let Some(binding_id) = scope.get(name) {
+            let existing = &self.semantic_model.bindings[*binding_id];
             match &existing.kind {
                 BindingKind::Builtin => {
                     // Avoid overriding builtins.
@@ -4903,9 +4907,14 @@ impl<'a> Checker<'a> {
         {
             if matches!(self.semantic_model.scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
-                if !self.semantic_model.scope().get(id).map_or(false, |index| {
-                    self.semantic_model.bindings[*index].kind.is_global()
-                }) {
+                if !self
+                    .semantic_model
+                    .scope()
+                    .get(id)
+                    .map_or(false, |binding_id| {
+                        self.semantic_model.bindings[*binding_id].kind.is_global()
+                    })
+                {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
             }
@@ -5030,9 +5039,9 @@ impl<'a> Checker<'a> {
 
                     // Grab the existing bound __all__ values.
                     if let Stmt::AugAssign(_) = parent {
-                        if let Some(index) = scope.get("__all__") {
+                        if let Some(binding_id) = scope.get("__all__") {
                             if let BindingKind::Export(Export { names: existing }) =
-                                &self.semantic_model.bindings[*index].kind
+                                &self.semantic_model.bindings[*binding_id].kind
                             {
                                 names.extend_from_slice(existing);
                             }
@@ -5139,8 +5148,8 @@ impl<'a> Checker<'a> {
             for (expr, snapshot) in type_definitions {
                 self.semantic_model.restore(snapshot);
 
-                self.semantic_model.flags |=
-                    ContextFlags::TYPE_DEFINITION | ContextFlags::FUTURE_TYPE_DEFINITION;
+                self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION
+                    | SemanticModelFlags::FUTURE_TYPE_DEFINITION;
                 self.visit_expr(expr);
             }
         }
@@ -5169,12 +5178,14 @@ impl<'a> Checker<'a> {
                     }
 
                     let type_definition_flag = match kind {
-                        AnnotationKind::Simple => ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
-                        AnnotationKind::Complex => ContextFlags::COMPLEX_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Complex => {
+                            SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                        }
                     };
 
                     self.semantic_model.flags |=
-                        ContextFlags::TYPE_DEFINITION | type_definition_flag;
+                        SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                     self.visit_expr(expr);
                 } else {
                     if self
@@ -5324,7 +5335,7 @@ impl<'a> Checker<'a> {
             let global_scope = self.semantic_model.global_scope();
             let all_names: Option<(&[&str], TextRange)> = global_scope
                 .get("__all__")
-                .map(|index| &self.semantic_model.bindings[*index])
+                .map(|binding_id| &self.semantic_model.bindings[*binding_id])
                 .and_then(|binding| match &binding.kind {
                     BindingKind::Export(Export { names }) => {
                         Some((names.as_slice(), binding.range))
@@ -5344,8 +5355,8 @@ impl<'a> Checker<'a> {
         };
 
         if let Some((bindings, range)) = all_bindings {
-            for index in bindings {
-                self.semantic_model.bindings[index].mark_used(
+            for binding_id in bindings {
+                self.semantic_model.bindings[binding_id].mark_used(
                     ScopeId::global(),
                     range,
                     ExecutionContext::Runtime,
@@ -5358,7 +5369,7 @@ impl<'a> Checker<'a> {
             .semantic_model
             .global_scope()
             .get("__all__")
-            .map(|index| &self.semantic_model.bindings[*index])
+            .map(|binding_id| &self.semantic_model.bindings[*binding_id])
             .and_then(|binding| match &binding.kind {
                 BindingKind::Export(Export { names }) => Some((names.as_slice(), binding.range)),
                 _ => None,
@@ -5377,7 +5388,7 @@ impl<'a> Checker<'a> {
                     .map(|scope| {
                         scope
                             .binding_ids()
-                            .map(|index| &self.semantic_model.bindings[*index])
+                            .map(|binding_id| &self.semantic_model.bindings[*binding_id])
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(binding)
                             })
@@ -5438,8 +5449,8 @@ impl<'a> Checker<'a> {
 
             // PLW0602
             if self.settings.rules.enabled(Rule::GlobalVariableNotAssigned) {
-                for (name, index) in scope.bindings() {
-                    let binding = &self.semantic_model.bindings[*index];
+                for (name, binding_id) in scope.bindings() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
                     if binding.kind.is_global() {
                         if let Some(source) = binding.source {
                             let stmt = &self.semantic_model.stmts[source];
@@ -5465,8 +5476,8 @@ impl<'a> Checker<'a> {
             // unused. Note that we only store references in `redefinitions` if
             // the bindings are in different scopes.
             if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
-                for (name, index) in scope.bindings() {
-                    let binding = &self.semantic_model.bindings[*index];
+                for (name, binding_id) in scope.bindings() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
 
                     if matches!(
                         binding.kind,
@@ -5479,9 +5490,11 @@ impl<'a> Checker<'a> {
                             continue;
                         }
 
-                        if let Some(indices) = self.semantic_model.shadowed_bindings.get(index) {
-                            for index in indices {
-                                let rebound = &self.semantic_model.bindings[*index];
+                        if let Some(shadowed_ids) =
+                            self.semantic_model.shadowed_bindings.get(binding_id)
+                        {
+                            for binding_id in shadowed_ids {
+                                let rebound = &self.semantic_model.bindings[*binding_id];
                                 #[allow(deprecated)]
                                 let line = self.locator.compute_line_index(
                                     binding
@@ -5518,12 +5531,12 @@ impl<'a> Checker<'a> {
                     self.semantic_model
                         .scopes
                         .ancestor_ids(*scope_id)
-                        .flat_map(|scope_id| runtime_imports[usize::from(scope_id)].iter())
+                        .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
                         .copied()
                         .collect()
                 };
-                for index in scope.binding_ids() {
-                    let binding = &self.semantic_model.bindings[*index];
+                for binding_id in scope.binding_ids() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
 
                     if let Some(diagnostic) =
                         flake8_type_checking::rules::runtime_import_in_type_checking_block(binding)
@@ -5557,8 +5570,8 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for index in scope.binding_ids() {
-                    let binding = &self.semantic_model.bindings[*index];
+                for binding_id in scope.binding_ids() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
 
                     let full_name = match &binding.kind {
                         BindingKind::Importation(Importation { full_name, .. }) => full_name,
@@ -5781,7 +5794,7 @@ impl<'a> Checker<'a> {
         let global_scope = self.semantic_model.global_scope();
         let exports: Option<&[&str]> = global_scope
             .get("__all__")
-            .map(|index| &self.semantic_model.bindings[*index])
+            .map(|binding_id| &self.semantic_model.bindings[*binding_id])
             .and_then(|binding| match &binding.kind {
                 BindingKind::Export(Export { names }) => Some(names.as_slice()),
                 _ => None,
