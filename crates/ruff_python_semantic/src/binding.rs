@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
+use smallvec::SmallVec;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
@@ -20,7 +21,7 @@ pub struct Binding<'a> {
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
     /// The references to the [`Binding`].
-    pub references: Vec<ReferenceId>,
+    pub references: SmallVec<[ReferenceId; 4]>,
     /// The exceptions that were handled when the [`Binding`] was defined.
     pub exceptions: Exceptions,
     /// Flags for the [`Binding`].

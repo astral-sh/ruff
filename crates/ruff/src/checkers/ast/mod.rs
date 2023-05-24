@@ -9,6 +9,7 @@ use rustpython_parser::ast::{
     self, Arg, Arguments, Comprehension, Constant, Excepthandler, Expr, ExprContext, Keyword,
     Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
 };
+use smallvec::SmallVec;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
@@ -248,7 +249,7 @@ where
                         let binding_id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Global,
                             range: *range,
-                            references: Vec::new(),
+                            references: SmallVec::new(),
                             source: self.semantic_model.stmt_id,
                             context,
                             exceptions,
@@ -276,7 +277,7 @@ where
                         let binding_id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             range: *range,
-                            references: Vec::new(),
+                            references: SmallVec::new(),
                             source: self.semantic_model.stmt_id,
                             context,
                             exceptions,
@@ -812,7 +813,7 @@ where
                             Binding {
                                 kind: BindingKind::FutureImportation,
                                 range: alias.range(),
-                                references: Vec::new(),
+                                references: SmallVec::new(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
@@ -841,7 +842,7 @@ where
                                     full_name,
                                 }),
                                 range: alias.range(),
-                                references: Vec::new(),
+                                references: SmallVec::new(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
@@ -856,7 +857,7 @@ where
                             Binding {
                                 kind: BindingKind::Importation(Importation { name, full_name }),
                                 range: alias.range(),
-                                references: Vec::new(),
+                                references: SmallVec::new(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
@@ -1091,7 +1092,7 @@ where
                             Binding {
                                 kind: BindingKind::FutureImportation,
                                 range: alias.range(),
-                                references: Vec::new(),
+                                references: SmallVec::new(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
@@ -1161,7 +1162,7 @@ where
                                     full_name,
                                 }),
                                 range: alias.range(),
-                                references: Vec::new(),
+                                references: SmallVec::new(),
                                 source: self.semantic_model.stmt_id,
                                 context: self.semantic_model.execution_context(),
                                 exceptions: self.semantic_model.exceptions(),
@@ -1882,7 +1883,7 @@ where
                     Binding {
                         kind: BindingKind::FunctionDefinition,
                         range: stmt.range(),
-                        references: Vec::new(),
+                        references: SmallVec::new(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
                         exceptions: self.semantic_model.exceptions(),
@@ -1906,7 +1907,7 @@ where
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             range: stmt.range(),
-                            references: Vec::new(),
+                            references: SmallVec::new(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
                             exceptions: self.semantic_model.exceptions(),
@@ -1970,7 +1971,7 @@ where
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             range: stmt.range(),
-                            references: Vec::new(),
+                            references: SmallVec::new(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
                             exceptions: self.semantic_model.exceptions(),
@@ -2157,7 +2158,7 @@ where
                     Binding {
                         kind: BindingKind::ClassDefinition,
                         range: stmt.range(),
-                        references: Vec::new(),
+                        references: SmallVec::new(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
                         exceptions: self.semantic_model.exceptions(),
@@ -4111,7 +4112,7 @@ where
             Binding {
                 kind: BindingKind::Argument,
                 range: arg.range(),
-                references: Vec::new(),
+                references: SmallVec::new(),
                 source: self.semantic_model.stmt_id,
                 context: self.semantic_model.execution_context(),
                 exceptions: self.semantic_model.exceptions(),
@@ -4159,7 +4160,7 @@ where
                 Binding {
                     kind: BindingKind::Assignment,
                     range: pattern.range(),
-                    references: Vec::new(),
+                    references: SmallVec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4441,7 +4442,7 @@ impl<'a> Checker<'a> {
                 kind: BindingKind::Builtin,
                 range: TextRange::default(),
                 source: None,
-                references: Vec::new(),
+                references: SmallVec::new(),
                 context: ExecutionContext::Runtime,
                 exceptions: Exceptions::empty(),
                 flags: BindingFlags::empty(),
@@ -4560,7 +4561,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::Annotation,
                     range: expr.range(),
-                    references: Vec::new(),
+                    references: SmallVec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4576,7 +4577,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::LoopVar,
                     range: expr.range(),
-                    references: Vec::new(),
+                    references: SmallVec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4592,7 +4593,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::Binding,
                     range: expr.range(),
-                    references: Vec::new(),
+                    references: SmallVec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4672,7 +4673,7 @@ impl<'a> Checker<'a> {
                     Binding {
                         kind: BindingKind::Export(Export { names: all_names }),
                         range: expr.range(),
-                        references: Vec::new(),
+                        references: SmallVec::new(),
                         source: self.semantic_model.stmt_id,
                         context: self.semantic_model.execution_context(),
                         exceptions: self.semantic_model.exceptions(),
@@ -4693,7 +4694,7 @@ impl<'a> Checker<'a> {
                 Binding {
                     kind: BindingKind::NamedExprAssignment,
                     range: expr.range(),
-                    references: Vec::new(),
+                    references: SmallVec::new(),
                     source: self.semantic_model.stmt_id,
                     context: self.semantic_model.execution_context(),
                     exceptions: self.semantic_model.exceptions(),
@@ -4708,7 +4709,7 @@ impl<'a> Checker<'a> {
             Binding {
                 kind: BindingKind::Assignment,
                 range: expr.range(),
-                references: Vec::new(),
+                references: SmallVec::new(),
                 source: self.semantic_model.stmt_id,
                 context: self.semantic_model.execution_context(),
                 exceptions: self.semantic_model.exceptions(),
