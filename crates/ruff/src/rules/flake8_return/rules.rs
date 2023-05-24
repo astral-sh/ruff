@@ -710,7 +710,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         return;
     }
 
-    if checker.settings.rules.any_enabled(&[
+    if checker.any_enabled(&[
         Rule::SuperfluousElseReturn,
         Rule::SuperfluousElseRaise,
         Rule::SuperfluousElseContinue,
