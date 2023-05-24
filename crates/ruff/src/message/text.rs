@@ -11,6 +11,7 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 
 use crate::fs::relativize_path;
+use crate::line_width::{LineWidth, TabSize};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
@@ -237,39 +238,35 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `pycodestyle.tab-size`
+    static TAB_SIZE: TabSize = TabSize(4); // TODO(jonathan): use `tab-size`
 
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut column = 0;
+    let mut line_width = LineWidth::new(TAB_SIZE);
 
-    for (index, c) in source.chars().enumerate() {
-        match c {
-            '\t' => {
-                let tab_width = TAB_SIZE - column % TAB_SIZE;
-                column += tab_width;
+    for (index, c) in source.char_indices() {
+        let old_width = line_width.get();
+        line_width = line_width.add_char(c);
 
-                if index < usize::from(annotation_range.start()) {
-                    range += TextSize::new(tab_width - 1);
-                } else if index < usize::from(annotation_range.end()) {
-                    range = range.add_end(TextSize::new(tab_width - 1));
-                }
+        if matches!(c, '\t') {
+            // SAFETY: The difference is a value in the range [1..TAB_SIZE] which is guaranteed to be less than `u32`.
+            #[allow(clippy::cast_possible_truncation)]
+            let tab_width = (line_width.get() - old_width) as u32;
 
-                result.push_str(&source[last_end..index]);
-
-                for _ in 0..tab_width {
-                    result.push(' ');
-                }
-
-                last_end = index + 1;
+            if index < usize::from(annotation_range.start()) {
+                range += TextSize::new(tab_width - 1);
+            } else if index < usize::from(annotation_range.end()) {
+                range = range.add_end(TextSize::new(tab_width - 1));
             }
-            '\n' | '\r' => {
-                column = 0;
+
+            result.push_str(&source[last_end..index]);
+
+            for _ in 0..tab_width {
+                result.push(' ');
             }
-            _ => {
-                column += 1;
-            }
+
+            last_end = index + 1;
         }
     }
 

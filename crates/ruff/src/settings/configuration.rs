@@ -13,6 +13,7 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
+use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -56,7 +57,8 @@ pub struct Configuration {
     pub format: Option<SerializationFormat>,
     pub ignore_init_module_imports: Option<bool>,
     pub include: Option<Vec<FilePattern>>,
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
+    pub tab_size: Option<TabSize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
@@ -194,6 +196,7 @@ impl Configuration {
                     .collect()
             }),
             line_length: options.line_length,
+            tab_size: options.tab_size,
             namespace_packages: options
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
@@ -281,6 +284,7 @@ impl Configuration {
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
             line_length: self.line_length.or(config.line_length),
+            tab_size: self.tab_size.or(config.tab_size),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             required_version: self.required_version.or(config.required_version),

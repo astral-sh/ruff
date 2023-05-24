@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use ruff::directives;
+use ruff::line_width::{LineLength, TabSize};
 use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::rules::{
@@ -102,7 +103,8 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         extend_unfixable: Some(Vec::default()),
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
-        line_length: Some(defaults::LINE_LENGTH),
+        line_length: Some(LineLength::default()),
+        tab_size: Some(TabSize::default()),
         select: Some(defaults::PREFIXES.to_vec()),
         target_version: Some(defaults::TARGET_VERSION),
         // Ignore a bunch of options that don't make sense in a single-file editor.
