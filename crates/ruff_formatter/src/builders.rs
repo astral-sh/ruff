@@ -297,7 +297,8 @@ impl std::fmt::Debug for StaticText {
 ///     source_position(TextSize::new(8)),
 ///     text("'Ruff'"),
 ///     source_position(TextSize::new(14)),
-///     text("\"")
+///     text("\""),
+///     source_position(TextSize::new(20))
 /// ])?;
 ///
 /// let printed = elements.print()?;
@@ -307,9 +308,10 @@ impl std::fmt::Debug for StaticText {
 ///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(0) },
 ///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(7) },
 ///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(7) },
-///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(14) },
+///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(13) },
 ///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(13) },
 ///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(14) },
+///     SourceMarker { source: TextSize::new(20), dest: TextSize::new(14) },
 /// ]);
 ///
 /// # Ok(())

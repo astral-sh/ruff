@@ -128,6 +128,7 @@ impl<'a> Printer<'a> {
 
             FormatElement::SourcePosition(position) => {
                 self.state.source_position = *position;
+                self.push_marker();
             }
 
             FormatElement::LineSuffixBoundary => {
@@ -316,10 +317,7 @@ impl<'a> Printer<'a> {
             self.state.source_position = range.start();
         }
 
-        self.push_marker(SourceMarker {
-            source: self.state.source_position,
-            dest: self.state.buffer.text_len(),
-        });
+        self.push_marker();
 
         self.print_str(text);
 
@@ -327,13 +325,15 @@ impl<'a> Printer<'a> {
             self.state.source_position = range.end();
         }
 
-        self.push_marker(SourceMarker {
-            source: self.state.source_position,
-            dest: self.state.buffer.text_len(),
-        });
+        self.push_marker();
     }
 
-    fn push_marker(&mut self, marker: SourceMarker) {
+    fn push_marker(&mut self) {
+        let marker = SourceMarker {
+            source: self.state.source_position,
+            dest: self.state.buffer.text_len(),
+        };
+
         if let Some(last) = self.state.source_markers.last() {
             if last != &marker {
                 self.state.source_markers.push(marker)
