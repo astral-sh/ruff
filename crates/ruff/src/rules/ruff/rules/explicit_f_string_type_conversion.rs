@@ -8,7 +8,7 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{
-    match_call, match_expression, match_formatted_string, match_formatted_string_expression,
+    match_call_mut, match_expression, match_formatted_string, match_formatted_string_expression,
     match_name,
 };
 use crate::registry::AsRule;
@@ -61,8 +61,8 @@ fn fix_explicit_f_string_type_conversion(
     // Replace the formatted call expression at `index` with a conversion flag.
     let mut formatted_string_expression =
         match_formatted_string_expression(&mut formatted_string.parts[index])?;
-    let call = match_call(&mut formatted_string_expression.expression)?;
-    let name = match_name(&mut call.func)?;
+    let call = match_call_mut(&mut formatted_string_expression.expression)?;
+    let name = match_name(&call.func)?;
     match name.value {
         "str" => {
             formatted_string_expression.conversion = Some("s");
@@ -131,7 +131,7 @@ pub(crate) fn explicit_f_string_type_conversion(
             return;
         };
 
-        if !checker.model.is_builtin(id) {
+        if !checker.semantic_model().is_builtin(id) {
             return;
         }
 

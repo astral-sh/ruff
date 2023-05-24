@@ -1,10 +1,8 @@
 #![allow(unused_variables, clippy::too_many_arguments)]
 
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{format_args, write};
-use ruff_text_size::TextSize;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{
     Alias, Arguments, Body, Excepthandler, Expr, ExprKind, Keyword, MatchCase, Operator, Stmt,
     StmtKind, Withitem,
@@ -12,7 +10,6 @@ use crate::cst::{
 use crate::format::builders::{block, join_names};
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
 use crate::format::helpers::is_self_closing;
-use crate::shared_traits::AsFormat;
 
 fn format_break(f: &mut Formatter<ASTFormatContext>, stmt: &Stmt) -> FormatResult<()> {
     write!(f, [text("break")])?;
@@ -110,14 +107,7 @@ fn format_class_def(
 
     write!(f, [leading_comments(body)])?;
 
-    write!(
-        f,
-        [
-            text("class"),
-            space(),
-            dynamic_text(name, TextSize::default())
-        ]
-    )?;
+    write!(f, [text("class"), space(), dynamic_text(name, None)])?;
 
     if !bases.is_empty() || !keywords.is_empty() {
         let format_bases = format_with(|f| {
@@ -180,7 +170,7 @@ fn format_func_def(
         [
             text("def"),
             space(),
-            dynamic_text(name, TextSize::default()),
+            dynamic_text(name, None),
             text("("),
             group(&soft_block_indent(&format_with(|f| {
                 if stmt.trivia.iter().any(|c| c.kind.is_magic_trailing_comma()) {
@@ -653,7 +643,7 @@ fn format_import_from(
         }
     }
     if let Some(module) = module {
-        write!(f, [dynamic_text(module, TextSize::default())])?;
+        write!(f, [dynamic_text(module, None)])?;
     }
     write!(f, [space()])?;
 
@@ -760,11 +750,11 @@ fn format_with_(
     Ok(())
 }
 
-pub struct FormatStmt<'a> {
+pub(crate) struct FormatStmt<'a> {
     item: &'a Stmt,
 }
 
-impl Format<ASTFormatContext> for FormatStmt<'_> {
+impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         write!(f, [leading_comments(self.item)])?;
 
@@ -947,7 +937,7 @@ impl Format<ASTFormatContext> for FormatStmt<'_> {
     }
 }
 
-impl AsFormat<ASTFormatContext> for Stmt {
+impl AsFormat<ASTFormatContext<'_>> for Stmt {
     type Format<'a> = FormatStmt<'a>;
 
     fn format(&self) -> Self::Format<'_> {

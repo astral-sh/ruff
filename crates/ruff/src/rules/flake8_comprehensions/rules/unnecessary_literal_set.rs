@@ -58,7 +58,7 @@ pub(crate) fn unnecessary_literal_set(
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("set", func, args, keywords) else {
         return;
     };
-    if !checker.model.is_builtin("set") {
+    if !checker.semantic_model().is_builtin("set") {
         return;
     }
     let kind = match argument {

@@ -51,7 +51,7 @@ pub(crate) fn locals_in_render_function(
     keywords: &[Keyword],
 ) {
     if !checker
-        .model
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["django", "shortcuts", "render"]
@@ -61,7 +61,7 @@ pub(crate) fn locals_in_render_function(
     }
 
     let locals = if args.len() >= 3 {
-        if !is_locals_call(&checker.model, &args[2]) {
+        if !is_locals_call(checker.semantic_model(), &args[2]) {
             return;
         }
         &args[2]
@@ -69,7 +69,7 @@ pub(crate) fn locals_in_render_function(
         .iter()
         .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "context"))
     {
-        if !is_locals_call(&checker.model, &keyword.value) {
+        if !is_locals_call(checker.semantic_model(), &keyword.value) {
             return;
         }
         &keyword.value

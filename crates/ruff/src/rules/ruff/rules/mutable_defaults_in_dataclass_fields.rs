@@ -195,12 +195,12 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
             ..
         }) = statement
         {
-            if is_class_var_annotation(&checker.model, annotation) {
+            if is_class_var_annotation(checker.semantic_model(), annotation) {
                 continue;
             }
             if let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() {
-                if !is_immutable_func(&checker.model, func, &extend_immutable_calls)
-                    && !is_allowed_dataclass_function(&checker.model, func)
+                if !is_immutable_func(checker.semantic_model(), func, &extend_immutable_calls)
+                    && !is_allowed_dataclass_function(checker.semantic_model(), func)
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {
@@ -223,8 +223,8 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
                 value: Some(value),
                 ..
             }) => {
-                if !is_class_var_annotation(&checker.model, annotation)
-                    && !is_immutable_annotation(&checker.model, annotation)
+                if !is_class_var_annotation(checker.semantic_model(), annotation)
+                    && !is_immutable_annotation(checker.semantic_model(), annotation)
                     && is_mutable_expr(value)
                 {
                     checker

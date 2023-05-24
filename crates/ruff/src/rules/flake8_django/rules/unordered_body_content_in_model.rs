@@ -145,13 +145,13 @@ pub(crate) fn unordered_body_content_in_model(
 ) {
     if !bases
         .iter()
-        .any(|base| helpers::is_model(&checker.model, base))
+        .any(|base| helpers::is_model(checker.semantic_model(), base))
     {
         return;
     }
     let mut elements_type_found = Vec::new();
     for element in body.iter() {
-        let Some(current_element_type) = get_element_type(&checker.model, element) else {
+        let Some(current_element_type) = get_element_type(checker.semantic_model(), element) else {
             continue;
         };
         let Some(&element_type) = elements_type_found

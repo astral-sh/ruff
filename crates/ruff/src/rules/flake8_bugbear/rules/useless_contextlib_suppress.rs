@@ -27,7 +27,7 @@ pub(crate) fn useless_contextlib_suppress(
 ) {
     if args.is_empty()
         && checker
-            .model
+            .semantic_model()
             .resolve_call_path(func)
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["contextlib", "suppress"]

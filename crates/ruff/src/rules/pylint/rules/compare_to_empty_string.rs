@@ -98,7 +98,7 @@ pub(crate) fn compare_to_empty_string(
 ) {
     // Omit string comparison rules within subscripts. This is mostly commonly used within
     // DataFrame and np.ndarray indexing.
-    for parent in checker.model.expr_ancestors() {
+    for parent in checker.semantic_model().expr_ancestors() {
         if matches!(parent, Expr::Subscript(_)) {
             return;
         }

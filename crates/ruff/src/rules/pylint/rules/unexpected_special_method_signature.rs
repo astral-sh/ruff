@@ -145,7 +145,7 @@ pub(crate) fn unexpected_special_method_signature(
     args: &Arguments,
     locator: &Locator,
 ) {
-    if !checker.model.scope().kind.is_class() {
+    if !checker.semantic_model().scope().kind.is_class() {
         return;
     }
 
@@ -163,7 +163,7 @@ pub(crate) fn unexpected_special_method_signature(
     let optional_params = args.defaults.len();
     let mandatory_params = actual_params - optional_params;
 
-    let Some(expected_params) = ExpectedParams::from_method(name, is_staticmethod(&checker.model, decorator_list)) else {
+    let Some(expected_params) = ExpectedParams::from_method(name, is_staticmethod(checker.semantic_model(), decorator_list)) else {
         return;
     };
 

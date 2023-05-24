@@ -17,8 +17,10 @@ mod cst;
 mod format;
 mod newlines;
 mod parentheses;
-pub mod shared_traits;
-pub mod trivia;
+mod prelude;
+mod trivia;
+
+include!("../../ruff_formatter/shared_traits.rs");
 
 pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     // Create a reusable locator.
@@ -67,7 +69,6 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_testing_macros::fixture;
-    use ruff_text_size::TextSize;
     use similar::TextDiff;
 
     use crate::fmt;
@@ -180,7 +181,7 @@ mod tests {
 
     #[test]
     fn string_processing() {
-        use ruff_formatter::prelude::*;
+        use crate::prelude::*;
         use ruff_formatter::{format, format_args, write};
 
         struct FormatString<'a>(&'a str);
@@ -208,7 +209,7 @@ mod tests {
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [dynamic_text(word, TextSize::default())])?;
+                            write!(f, [dynamic_text(word, None)])?;
 
                             if is_last {
                                 write!(f, [text("\"")])?;

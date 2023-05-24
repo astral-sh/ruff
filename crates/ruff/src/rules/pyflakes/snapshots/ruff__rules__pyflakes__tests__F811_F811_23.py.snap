@@ -1,0 +1,11 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+---
+F811_23.py:4:8: F811 Redefinition of unused `foo` from line 3
+  |
+4 | import foo as foo
+5 | import bar as foo
+  |        ^^^^^^^^^^ F811
+  |
+
+

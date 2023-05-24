@@ -193,7 +193,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
 
     TextEmitter::default()
         .with_show_fix_status(true)
-        .with_show_fix(true)
+        .with_show_fix_diff(true)
         .with_show_source(true)
         .emit(
             &mut output,

@@ -184,21 +184,17 @@ pub(crate) fn shell_injection(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let call_kind = get_call_kind(func, &checker.model);
+    let call_kind = get_call_kind(func, checker.semantic_model());
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
-            match find_shell_keyword(&checker.model, keywords) {
+            match find_shell_keyword(checker.semantic_model(), keywords) {
                 // S602
                 Some(ShellKeyword {
                     truthiness: Truthiness::Truthy,
                     keyword,
                 }) => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Rule::SubprocessPopenWithShellEqualsTrue)
-                    {
+                    if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessPopenWithShellEqualsTrue {
                                 seems_safe: shell_call_seems_safe(arg),
@@ -212,11 +208,7 @@ pub(crate) fn shell_injection(
                     truthiness: Truthiness::Falsey | Truthiness::Unknown,
                     keyword,
                 }) => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Rule::SubprocessWithoutShellEqualsTrue)
-                    {
+                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
                             keyword.range(),
@@ -225,11 +217,7 @@ pub(crate) fn shell_injection(
                 }
                 // S603
                 None => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Rule::SubprocessWithoutShellEqualsTrue)
-                    {
+                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
                             arg.range(),
@@ -241,14 +229,10 @@ pub(crate) fn shell_injection(
     } else if let Some(ShellKeyword {
         truthiness: Truthiness::Truthy,
         keyword,
-    }) = find_shell_keyword(&checker.model, keywords)
+    }) = find_shell_keyword(checker.semantic_model(), keywords)
     {
         // S604
-        if checker
-            .settings
-            .rules
-            .enabled(Rule::CallWithShellEqualsTrue)
-        {
+        if checker.enabled(Rule::CallWithShellEqualsTrue) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(CallWithShellEqualsTrue, keyword.range()));
@@ -258,7 +242,7 @@ pub(crate) fn shell_injection(
     // S605
     if matches!(call_kind, Some(CallKind::Shell)) {
         if let Some(arg) = args.first() {
-            if checker.settings.rules.enabled(Rule::StartProcessWithAShell) {
+            if checker.enabled(Rule::StartProcessWithAShell) {
                 checker.diagnostics.push(Diagnostic::new(
                     StartProcessWithAShell {
                         seems_safe: shell_call_seems_safe(arg),
@@ -271,11 +255,7 @@ pub(crate) fn shell_injection(
 
     // S606
     if matches!(call_kind, Some(CallKind::NoShell)) {
-        if checker
-            .settings
-            .rules
-            .enabled(Rule::StartProcessWithNoShell)
-        {
+        if checker.enabled(Rule::StartProcessWithNoShell) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(StartProcessWithNoShell, func.range()));
@@ -285,11 +265,7 @@ pub(crate) fn shell_injection(
     // S607
     if call_kind.is_some() {
         if let Some(arg) = args.first() {
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::StartProcessWithPartialPath)
-            {
+            if checker.enabled(Rule::StartProcessWithPartialPath) {
                 if let Some(value) = try_string_literal(arg) {
                     if FULL_PATH_REGEX.find(value).is_none() {
                         checker

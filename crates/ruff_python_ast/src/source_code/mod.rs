@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -204,6 +205,23 @@ impl SourceFile {
     #[inline]
     pub fn source_text(&self) -> &str {
         &self.inner.code
+    }
+}
+
+impl PartialOrd for SourceFile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SourceFile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Short circuit if these are the same source files
+        if Arc::ptr_eq(&self.inner, &other.inner) {
+            Ordering::Equal
+        } else {
+            self.inner.name.cmp(&other.inner.name)
+        }
     }
 }
 

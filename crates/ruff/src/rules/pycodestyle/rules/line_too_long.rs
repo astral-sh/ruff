@@ -43,6 +43,7 @@ pub(crate) fn line_too_long(line: &Line, settings: &Settings) -> Option<Diagnost
         limit,
         settings.pycodestyle.ignore_overlong_task_comments,
         &settings.task_tags,
+        settings.tab_size,
     )
-    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit), overlong.range()))
+    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit.get()), overlong.range()))
 }

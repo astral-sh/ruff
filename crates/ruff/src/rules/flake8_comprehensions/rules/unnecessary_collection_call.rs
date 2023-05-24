@@ -79,7 +79,7 @@ pub(crate) fn unnecessary_collection_call(
         }
         _ => return,
     };
-    if !checker.model.is_builtin(id) {
+    if !checker.semantic_model().is_builtin(id) {
         return;
     }
     let mut diagnostic = Diagnostic::new(

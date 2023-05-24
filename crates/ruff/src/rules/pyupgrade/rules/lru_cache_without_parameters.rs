@@ -37,7 +37,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &mut Checker, decorator_list
         if args.is_empty()
             && keywords.is_empty()
             && checker
-                .model
+                .semantic_model()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["functools", "lru_cache"]

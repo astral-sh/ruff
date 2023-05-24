@@ -43,17 +43,21 @@ pub(crate) fn request_with_no_cert_validation(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(target) = checker.model.resolve_call_path(func).and_then(|call_path| {
-        if call_path.len() == 2 {
-            if call_path[0] == "requests" && REQUESTS_HTTP_VERBS.contains(&call_path[1]) {
-                return Some("requests");
+    if let Some(target) = checker
+        .semantic_model()
+        .resolve_call_path(func)
+        .and_then(|call_path| {
+            if call_path.len() == 2 {
+                if call_path[0] == "requests" && REQUESTS_HTTP_VERBS.contains(&call_path[1]) {
+                    return Some("requests");
+                }
+                if call_path[0] == "httpx" && HTTPX_METHODS.contains(&call_path[1]) {
+                    return Some("httpx");
+                }
             }
-            if call_path[0] == "httpx" && HTTPX_METHODS.contains(&call_path[1]) {
-                return Some("httpx");
-            }
-        }
-        None
-    }) {
+            None
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(verify_arg) = call_args.keyword_argument("verify") {
             if let Expr::Constant(ast::ExprConstant {

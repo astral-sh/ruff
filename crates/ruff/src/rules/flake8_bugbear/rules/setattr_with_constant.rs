@@ -75,14 +75,12 @@ pub(crate) fn setattr_with_constant(
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
         range: _,
-    }) = &checker.model.stmt()
+    }) = checker.semantic_model().stmt()
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
-
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     assignment(obj, name, value, checker.generator()),
                     expr.range(),
                 )));

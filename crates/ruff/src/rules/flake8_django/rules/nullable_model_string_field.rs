@@ -84,7 +84,7 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
         return None;
     };
 
-    let Some(valid_field_name) = helpers::get_model_field_name(&checker.model, func) else {
+    let Some(valid_field_name) = helpers::get_model_field_name(checker.semantic_model(), func) else {
         return None;
     };
 

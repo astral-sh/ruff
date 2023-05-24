@@ -264,5 +264,34 @@ SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` ins
 156     |-            return False
 157     |-    return True
     154 |+    return all(not check(x) for x in iterable)
+158 155 | 
+159 156 | 
+160 157 | def f():
+
+SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")` instead of `for` loop
+    |
+162 |   def f():
+163 |       # SIM110
+164 |       for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ":
+    |  _____^
+165 | |         if x.isdigit():
+166 | |             return True
+167 | |     return False
+    | |________________^ SIM110
+    |
+    = help: Replace with `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")`
+
+ℹ Suggested fix
+159 159 | 
+160 160 | def f():
+161 161 |     # SIM110
+162     |-    for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ":
+163     |-        if x.isdigit():
+164     |-            return True
+165     |-    return False
+    162 |+    return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")
+166 163 | 
+167 164 | 
+168 165 | def f():
 
 

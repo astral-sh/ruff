@@ -6,6 +6,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 
 use crate::codes::{self, RuleCodePrefix};
+use crate::line_width::{LineLength, TabSize};
 use crate::registry::Linter;
 use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::rules::{
@@ -25,8 +26,6 @@ pub const PREFIXES: &[RuleSelector] = &[
 ];
 
 pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
-
-pub const LINE_LENGTH: usize = 88;
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
@@ -76,7 +75,8 @@ impl Default for Settings {
             force_exclude: false,
             ignore_init_module_imports: false,
             include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
-            line_length: LINE_LENGTH,
+            line_length: LineLength::default(),
+            tab_size: TabSize::default(),
             namespace_packages: vec![],
             per_file_ignores: vec![],
             respect_gitignore: true,
@@ -97,7 +97,7 @@ impl Default for Settings {
             flake8_quotes: flake8_quotes::settings::Settings::default(),
             flake8_gettext: flake8_gettext::settings::Settings::default(),
             flake8_self: flake8_self::settings::Settings::default(),
-            flake8_tidy_imports: flake8_tidy_imports::Settings::default(),
+            flake8_tidy_imports: flake8_tidy_imports::settings::Settings::default(),
             flake8_type_checking: flake8_type_checking::settings::Settings::default(),
             flake8_unused_arguments: flake8_unused_arguments::settings::Settings::default(),
             isort: isort::settings::Settings::default(),

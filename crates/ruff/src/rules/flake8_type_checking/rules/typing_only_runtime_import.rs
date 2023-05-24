@@ -3,8 +3,9 @@ use std::path::Path;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
-    Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
+    Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
 };
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 use crate::settings::Settings;
@@ -243,6 +244,7 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 pub(crate) fn typing_only_runtime_import(
     binding: &Binding,
     runtime_imports: &[&Binding],
+    semantic_model: &SemanticModel,
     package: Option<&Path>,
     settings: &Settings,
 ) -> Option<Diagnostic> {
@@ -275,10 +277,15 @@ pub(crate) fn typing_only_runtime_import(
         return None;
     }
 
-    if matches!(binding.context, ExecutionContext::Runtime)
-        && binding.typing_usage.is_some()
-        && binding.runtime_usage.is_none()
-        && binding.synthetic_usage.is_none()
+    if binding.context.is_runtime()
+        && binding.is_used()
+        && binding.references().all(|reference_id| {
+            semantic_model
+                .references
+                .resolve(reference_id)
+                .context()
+                .is_typing()
+        })
     {
         // Extract the module base and level from the full name.
         // Ex) `foo.bar.baz` -> `foo`, `0`

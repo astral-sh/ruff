@@ -12,7 +12,7 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::raw_contents;
 
 use crate::cst::matchers::{
-    match_attribute, match_call, match_dict, match_expression, match_simple_string,
+    match_attribute, match_call_mut, match_dict, match_expression, match_simple_string,
 };
 
 /// Generate a [`Edit`] to remove unused keys from format dict.
@@ -52,7 +52,7 @@ pub(crate) fn remove_unused_keyword_arguments_from_format_call(
 ) -> Result<Edit> {
     let module_text = locator.slice(location);
     let mut tree = match_expression(module_text)?;
-    let call = match_call(&mut tree)?;
+    let call = match_call_mut(&mut tree)?;
 
     call.args
         .retain(|e| !matches!(&e.keyword, Some(kw) if unused_arguments.contains(&kw.value)));
@@ -135,7 +135,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
 ) -> Result<Edit> {
     let module_text = locator.slice(location);
     let mut tree = match_expression(module_text)?;
-    let call = match_call(&mut tree)?;
+    let call = match_call_mut(&mut tree)?;
 
     let mut index = 0;
     call.args.retain(|_| {

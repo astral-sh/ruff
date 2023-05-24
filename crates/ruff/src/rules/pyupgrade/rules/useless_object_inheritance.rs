@@ -35,7 +35,9 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Optio
             continue;
         }
         if !matches!(
-            scope.get(id.as_str()).map(|index| &bindings[*index]),
+            scope
+                .get(id.as_str())
+                .map(|binding_id| &bindings[binding_id]),
             None | Some(Binding {
                 kind: BindingKind::Builtin,
                 ..
@@ -62,8 +64,12 @@ pub(crate) fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(mut diagnostic) = rule(name, bases, checker.model.scope(), &checker.model.bindings)
-    {
+    if let Some(mut diagnostic) = rule(
+        name,
+        bases,
+        checker.semantic_model().scope(),
+        &checker.semantic_model().bindings,
+    ) {
         if checker.patch(diagnostic.kind.rule()) {
             let expr_range = diagnostic.range();
             #[allow(deprecated)]

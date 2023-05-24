@@ -1,4 +1,5 @@
 //! Rules from [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]

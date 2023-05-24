@@ -1,9 +1,9 @@
 name: mkdocs
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+  release:
+    types: [ published ]
 
 jobs:
   mkdocs:

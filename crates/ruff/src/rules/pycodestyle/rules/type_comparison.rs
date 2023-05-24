@@ -52,7 +52,7 @@ pub(crate) fn type_comparison(
             Expr::Call(ast::ExprCall { func, args, .. }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     // Ex) `type(False)`
-                    if id == "type" && checker.model.is_builtin("type") {
+                    if id == "type" && checker.semantic_model().is_builtin("type") {
                         if let Some(arg) = args.first() {
                             // Allow comparison for types which are not obvious.
                             if !matches!(
@@ -76,12 +76,12 @@ pub(crate) fn type_comparison(
                 if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                     // Ex) `types.NoneType`
                     if id == "types"
-                        && checker
-                            .model
-                            .resolve_call_path(value)
-                            .map_or(false, |call_path| {
+                        && checker.semantic_model().resolve_call_path(value).map_or(
+                            false,
+                            |call_path| {
                                 call_path.first().map_or(false, |module| *module == "types")
-                            })
+                            },
+                        )
                     {
                         checker
                             .diagnostics

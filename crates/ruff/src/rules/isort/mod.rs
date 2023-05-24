@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use annotate::annotate_imports;
+use block::{Block, Trailer};
 pub(crate) use categorize::categorize;
 use categorize::categorize_imports;
 pub use categorize::{ImportSection, ImportType};
@@ -13,15 +14,16 @@ use order::order_imports;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;
-use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, TrailingComma};
 
+use crate::line_width::{LineLength, LineWidth};
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
 
 mod annotate;
+pub(crate) mod block;
 mod categorize;
 mod comments;
 mod format;
@@ -32,7 +34,6 @@ pub(crate) mod rules;
 pub mod settings;
 mod sorting;
 mod split;
-pub(crate) mod track;
 mod types;
 
 #[derive(Debug)]
@@ -65,7 +66,8 @@ pub(crate) fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
     locator: &Locator,
-    line_length: usize,
+    line_length: LineLength,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -107,6 +109,7 @@ pub(crate) fn format_imports(
         let block_output = format_import_block(
             block,
             line_length,
+            indentation_width,
             stylist,
             src,
             package,
@@ -162,7 +165,8 @@ pub(crate) fn format_imports(
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn format_import_block(
     block: ImportBlock,
-    line_length: usize,
+    line_length: LineLength,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -264,6 +268,7 @@ fn format_import_block(
                         &comments,
                         &aliases,
                         line_length,
+                        indentation_width,
                         stylist,
                         force_wrap_aliases,
                         is_first_statement,
@@ -687,11 +692,16 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("comment.py"))]
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
-    #[test_case(Path::new("multiline_docstring.py"))]
+    #[test_case(Path::new("docstring_with_continuation.py"))]
+    #[test_case(Path::new("docstring_with_semicolon.py"))]
     #[test_case(Path::new("empty.py"))]
+    #[test_case(Path::new("existing_import.py"))]
+    #[test_case(Path::new("multiline_docstring.py"))]
+    #[test_case(Path::new("off.py"))]
     fn required_import(path: &Path) -> Result<()> {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(

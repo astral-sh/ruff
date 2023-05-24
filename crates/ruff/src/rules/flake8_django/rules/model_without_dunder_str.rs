@@ -56,7 +56,7 @@ pub(crate) fn model_without_dunder_str(
     body: &[Stmt],
     class_location: &Stmt,
 ) -> Option<Diagnostic> {
-    if !checker_applies(&checker.model, bases, body) {
+    if !checker_applies(checker.semantic_model(), bases, body) {
         return None;
     }
     if !has_dunder_method(body) {

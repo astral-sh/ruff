@@ -63,7 +63,7 @@ impl Violation for RaiseVanillaClass {
 /// TRY002
 pub(crate) fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
     if checker
-        .model
+        .semantic_model()
         .resolve_call_path(if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             func
         } else {

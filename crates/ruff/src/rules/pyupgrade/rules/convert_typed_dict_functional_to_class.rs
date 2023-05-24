@@ -240,7 +240,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     value: &Expr,
 ) {
     let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(&checker.model, targets, value) else
+        match_typed_dict_assign(checker.semantic_model(), targets, value) else
     {
         return;
     };

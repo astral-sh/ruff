@@ -50,7 +50,10 @@ pub(crate) fn exclude_with_model_form(
     bases: &[Expr],
     body: &[Stmt],
 ) -> Option<Diagnostic> {
-    if !bases.iter().any(|base| is_model_form(&checker.model, base)) {
+    if !bases
+        .iter()
+        .any(|base| is_model_form(checker.semantic_model(), base))
+    {
         return None;
     }
     for element in body.iter() {

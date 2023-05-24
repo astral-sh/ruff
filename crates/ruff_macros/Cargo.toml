@@ -12,6 +12,6 @@ doctest = false
 [dependencies]
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
-syn = { workspace = true, features = ["derive", "parsing", "extra-traits"] }
+syn = { workspace = true, features = ["derive", "parsing", "extra-traits", "full"] }
 textwrap = { workspace = true }
 itertools = { workspace = true }

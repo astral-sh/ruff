@@ -75,7 +75,9 @@ pub(crate) fn mixed_case_variable_in_global_scope(
     {
         return;
     }
-    if helpers::is_mixed_case(name) && !helpers::is_named_tuple_assignment(&checker.model, stmt) {
+    if helpers::is_mixed_case(name)
+        && !helpers::is_named_tuple_assignment(checker.semantic_model(), stmt)
+    {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInGlobalScope {
                 name: name.to_string(),

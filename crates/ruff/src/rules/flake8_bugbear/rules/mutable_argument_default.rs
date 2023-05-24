@@ -64,11 +64,10 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, arguments: &Argume
                 .zip(arguments.defaults.iter().rev()),
         )
     {
-        if is_mutable_expr(&checker.model, default)
-            && !arg
-                .annotation
-                .as_ref()
-                .map_or(false, |expr| is_immutable_annotation(&checker.model, expr))
+        if is_mutable_expr(checker.semantic_model(), default)
+            && !arg.annotation.as_ref().map_or(false, |expr| {
+                is_immutable_annotation(checker.semantic_model(), expr)
+            })
         {
             checker
                 .diagnostics

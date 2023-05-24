@@ -125,14 +125,8 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
 }
 
 pub(crate) fn marks(checker: &mut Checker, decorators: &[Expr]) {
-    let enforce_parentheses = checker
-        .settings
-        .rules
-        .enabled(Rule::PytestIncorrectMarkParenthesesStyle);
-    let enforce_useless_usefixtures = checker
-        .settings
-        .rules
-        .enabled(Rule::PytestUseFixturesWithoutParameters);
+    let enforce_parentheses = checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle);
+    let enforce_useless_usefixtures = checker.enabled(Rule::PytestUseFixturesWithoutParameters);
 
     for (expr, call_path) in get_mark_decorators(decorators) {
         if enforce_parentheses {

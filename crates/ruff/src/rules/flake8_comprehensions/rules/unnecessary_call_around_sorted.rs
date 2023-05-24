@@ -75,7 +75,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     if inner != "sorted" {
         return;
     }
-    if !checker.model.is_builtin(inner) || !checker.model.is_builtin(outer) {
+    if !checker.semantic_model().is_builtin(inner) || !checker.semantic_model().is_builtin(outer) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
