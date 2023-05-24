@@ -2,7 +2,6 @@ use rustpython_parser::ast::Constant;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::write;
-use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::{Pattern, PatternKind};
@@ -12,7 +11,7 @@ pub struct FormatPattern<'a> {
     item: &'a Pattern,
 }
 
-impl AsFormat<ASTFormatContext> for Pattern {
+impl AsFormat<ASTFormatContext<'_>> for Pattern {
     type Format<'a> = FormatPattern<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -20,7 +19,7 @@ impl AsFormat<ASTFormatContext> for Pattern {
     }
 }
 
-impl Format<ASTFormatContext> for FormatPattern<'_> {
+impl Format<ASTFormatContext<'_>> for FormatPattern<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let pattern = self.item;
 
@@ -79,7 +78,7 @@ impl Format<ASTFormatContext> for FormatPattern<'_> {
                             space(),
                             text("**"),
                             space(),
-                            dynamic_text(rest, TextSize::default())
+                            dynamic_text(rest, None)
                         ]
                     )?;
                 }
@@ -105,13 +104,10 @@ impl Format<ASTFormatContext> for FormatPattern<'_> {
                 if !kwd_attrs.is_empty() {
                     write!(f, [text("(")])?;
                     if let Some(attr) = kwd_attrs.first() {
-                        write!(f, [dynamic_text(attr, TextSize::default())])?;
+                        write!(f, [dynamic_text(attr, None)])?;
                     }
                     for attr in kwd_attrs.iter().skip(1) {
-                        write!(
-                            f,
-                            [text(","), space(), dynamic_text(attr, TextSize::default())]
-                        )?;
+                        write!(f, [text(","), space(), dynamic_text(attr, None)])?;
                     }
                     write!(f, [text(")")])?;
                 }
@@ -128,7 +124,7 @@ impl Format<ASTFormatContext> for FormatPattern<'_> {
             }
             PatternKind::MatchStar { name } => {
                 if let Some(name) = name {
-                    write!(f, [text("*"), dynamic_text(name, TextSize::default())])?;
+                    write!(f, [text("*"), dynamic_text(name, None)])?;
                 } else {
                     write!(f, [text("*_")])?;
                 }
@@ -141,7 +137,7 @@ impl Format<ASTFormatContext> for FormatPattern<'_> {
                     write!(f, [space()])?;
                 }
                 if let Some(name) = name {
-                    write!(f, [dynamic_text(name, TextSize::default())])?;
+                    write!(f, [dynamic_text(name, None)])?;
                 } else {
                     write!(f, [text("_")])?;
                 }

@@ -52,7 +52,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
     {
         let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, expr.range());
 
-        if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+        if checker.enabled(diagnostic.kind.rule()) {
             checker.diagnostics.push(diagnostic);
         }
     }

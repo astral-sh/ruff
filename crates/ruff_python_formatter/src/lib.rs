@@ -67,7 +67,6 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_testing_macros::fixture;
-    use ruff_text_size::TextSize;
     use similar::TextDiff;
 
     use crate::fmt;
@@ -208,7 +207,7 @@ mod tests {
                     while let Some(word) = words.next() {
                         let is_last = words.peek().is_none();
                         let format_word = format_with(|f| {
-                            write!(f, [dynamic_text(word, TextSize::default())])?;
+                            write!(f, [dynamic_text(word, None)])?;
 
                             if is_last {
                                 write!(f, [text("\"")])?;

@@ -135,15 +135,11 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     ..
                 }) = upper.as_ref()
                 {
-                    if *i == BigInt::from(1)
-                        && checker.settings.rules.enabled(Rule::SysVersionSlice1)
-                    {
+                    if *i == BigInt::from(1) && checker.enabled(Rule::SysVersionSlice1) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(SysVersionSlice1, value.range()));
-                    } else if *i == BigInt::from(3)
-                        && checker.settings.rules.enabled(Rule::SysVersionSlice3)
-                    {
+                    } else if *i == BigInt::from(3) && checker.enabled(Rule::SysVersionSlice3) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(SysVersionSlice3, value.range()));
@@ -155,12 +151,11 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 value: Constant::Int(i),
                 ..
             }) => {
-                if *i == BigInt::from(2) && checker.settings.rules.enabled(Rule::SysVersion2) {
+                if *i == BigInt::from(2) && checker.enabled(Rule::SysVersion2) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersion2, value.range()));
-                } else if *i == BigInt::from(0) && checker.settings.rules.enabled(Rule::SysVersion0)
-                {
+                } else if *i == BigInt::from(0) && checker.enabled(Rule::SysVersion0) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersion0, value.range()));
@@ -192,9 +187,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
                         })],
                     ) = (ops, comparators)
                     {
-                        if *n == BigInt::from(3)
-                            && checker.settings.rules.enabled(Rule::SysVersionInfo0Eq3)
-                        {
+                        if *n == BigInt::from(3) && checker.enabled(Rule::SysVersionInfo0Eq3) {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(SysVersionInfo0Eq3, left.range()));
@@ -209,7 +202,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
                         })],
                     ) = (ops, comparators)
                     {
-                        if checker.settings.rules.enabled(Rule::SysVersionInfo1CmpInt) {
+                        if checker.enabled(Rule::SysVersionInfo1CmpInt) {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(SysVersionInfo1CmpInt, left.range()));
@@ -230,11 +223,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
                 })],
             ) = (ops, comparators)
             {
-                if checker
-                    .settings
-                    .rules
-                    .enabled(Rule::SysVersionInfoMinorCmpInt)
-                {
+                if checker.enabled(Rule::SysVersionInfoMinorCmpInt) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersionInfoMinorCmpInt, left.range()));
@@ -255,12 +244,12 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
         ) = (ops, comparators)
         {
             if s.len() == 1 {
-                if checker.settings.rules.enabled(Rule::SysVersionCmpStr10) {
+                if checker.enabled(Rule::SysVersionCmpStr10) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersionCmpStr10, left.range()));
                 }
-            } else if checker.settings.rules.enabled(Rule::SysVersionCmpStr3) {
+            } else if checker.enabled(Rule::SysVersionCmpStr3) {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(SysVersionCmpStr3, left.range()));

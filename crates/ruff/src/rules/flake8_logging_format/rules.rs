@@ -44,14 +44,14 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
-                if checker.settings.rules.enabled(Rule::LoggingStringConcat) {
+                if checker.enabled(Rule::LoggingStringConcat) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(LoggingStringConcat, msg.range()));
                 }
             }
             Operator::Mod => {
-                if checker.settings.rules.enabled(Rule::LoggingPercentFormat) {
+                if checker.enabled(Rule::LoggingPercentFormat) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(LoggingPercentFormat, msg.range()));
@@ -61,7 +61,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         },
         // Check for f-strings.
         Expr::JoinedStr(_) => {
-            if checker.settings.rules.enabled(Rule::LoggingFString) {
+            if checker.enabled(Rule::LoggingFString) {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(LoggingFString, msg.range()));
@@ -69,7 +69,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
-            if checker.settings.rules.enabled(Rule::LoggingStringFormat) {
+            if checker.enabled(Rule::LoggingStringFormat) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     if attr == "format" && value.is_constant_expr() {
                         checker
@@ -167,7 +167,7 @@ pub(crate) fn logging_call(
             }
 
             // G010
-            if checker.settings.rules.enabled(Rule::LoggingWarn)
+            if checker.enabled(Rule::LoggingWarn)
                 && matches!(
                     logging_call_type,
                     LoggingCallType::LevelCall(LoggingLevel::Warn)
@@ -185,18 +185,15 @@ pub(crate) fn logging_call(
             }
 
             // G101
-            if checker.settings.rules.enabled(Rule::LoggingExtraAttrClash) {
+            if checker.enabled(Rule::LoggingExtraAttrClash) {
                 if let Some(extra) = find_keyword(keywords, "extra") {
                     check_log_record_attr_clash(checker, extra);
                 }
             }
 
             // G201, G202
-            if checker.settings.rules.enabled(Rule::LoggingExcInfo)
-                || checker
-                    .settings
-                    .rules
-                    .enabled(Rule::LoggingRedundantExcInfo)
+            if checker.enabled(Rule::LoggingExcInfo)
+                || checker.enabled(Rule::LoggingRedundantExcInfo)
             {
                 if !checker.semantic_model().in_exception_handler() {
                     return;
@@ -226,18 +223,14 @@ pub(crate) fn logging_call(
                     if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
                         match logging_level {
                             LoggingLevel::Error => {
-                                if checker.settings.rules.enabled(Rule::LoggingExcInfo) {
+                                if checker.enabled(Rule::LoggingExcInfo) {
                                     checker
                                         .diagnostics
                                         .push(Diagnostic::new(LoggingExcInfo, level_call_range));
                                 }
                             }
                             LoggingLevel::Exception => {
-                                if checker
-                                    .settings
-                                    .rules
-                                    .enabled(Rule::LoggingRedundantExcInfo)
-                                {
+                                if checker.enabled(Rule::LoggingRedundantExcInfo) {
                                     checker.diagnostics.push(Diagnostic::new(
                                         LoggingRedundantExcInfo,
                                         exc_info.range(),

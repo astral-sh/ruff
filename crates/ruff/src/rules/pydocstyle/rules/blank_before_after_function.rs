@@ -59,11 +59,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         return;
     };
 
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::NoBlankLineBeforeFunction)
-    {
+    if checker.enabled(Rule::NoBlankLineBeforeFunction) {
         let before = checker
             .locator
             .slice(TextRange::new(stmt.start(), docstring.start()));
@@ -100,11 +96,7 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::NoBlankLineAfterFunction)
-    {
+    if checker.enabled(Rule::NoBlankLineAfterFunction) {
         let after = checker
             .locator
             .slice(TextRange::new(docstring.end(), stmt.end()));

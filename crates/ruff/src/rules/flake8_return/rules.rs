@@ -633,7 +633,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseReturn { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
-            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -642,7 +642,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseBreak { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
-            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -651,7 +651,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseRaise { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
-            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -660,7 +660,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseContinue { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
-            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+            if checker.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -710,7 +710,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
         return;
     }
 
-    if checker.settings.rules.any_enabled(&[
+    if checker.any_enabled(&[
         Rule::SuperfluousElseReturn,
         Rule::SuperfluousElseRaise,
         Rule::SuperfluousElseContinue,
@@ -727,14 +727,14 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
 
     // If we have at least one non-`None` return...
     if result_exists(&stack.returns) {
-        if checker.settings.rules.enabled(Rule::ImplicitReturnValue) {
+        if checker.enabled(Rule::ImplicitReturnValue) {
             implicit_return_value(checker, &stack);
         }
-        if checker.settings.rules.enabled(Rule::ImplicitReturn) {
+        if checker.enabled(Rule::ImplicitReturn) {
             implicit_return(checker, last_stmt);
         }
 
-        if checker.settings.rules.enabled(Rule::UnnecessaryAssign) {
+        if checker.enabled(Rule::UnnecessaryAssign) {
             for (_, expr) in &stack.returns {
                 if let Some(expr) = expr {
                     unnecessary_assign(checker, &stack, expr);
@@ -742,7 +742,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
             }
         }
     } else {
-        if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
+        if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.map_or(true, is_const_none) {
                 unnecessary_return_none(checker, &stack);

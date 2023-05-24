@@ -1900,6 +1900,7 @@ dependencies = [
  "rustc-hash",
  "schemars",
  "serde",
+ "static_assertions",
  "tracing",
  "unicode-width",
 ]

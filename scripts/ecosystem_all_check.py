@@ -6,6 +6,7 @@ It's a less elaborate, more hacky version of check_ecosystem.py
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import NamedTuple, Optional
@@ -22,8 +23,9 @@ class Repository(NamedTuple):
 
 
 def main() -> None:
+    ruff_args = sys.argv[1:]
     checkouts = Path("checkouts")
-    out_dir = Path("ecosystem_fix_all_results")
+    out_dir = Path("ecosystem_all_results")
     github_search_json = Path("github_search.jsonl")
     # Somehow it doesn't like plain ruff
     ruff = Path.cwd().joinpath("ruff")
@@ -54,14 +56,6 @@ def main() -> None:
             continue
 
         try:
-            ruff_args = [
-                "check",
-                "--no-cache",
-                "--exit-zero",
-                "--select",
-                "ALL",
-                "--fix",
-            ]
             output = subprocess.run(
                 [ruff, *ruff_args, "."],
                 cwd=project_dir,

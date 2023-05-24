@@ -143,7 +143,8 @@ pub(crate) fn run(
             acc
         });
 
-    diagnostics.messages.sort_unstable();
+    diagnostics.messages.sort();
+
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
 
@@ -254,7 +255,6 @@ mod test {
             LogLevel::Default,
             FixMode::None,
             Flags::SHOW_VIOLATIONS,
-            false,
         );
         let mut writer: Vec<u8> = Vec::new();
         // Mute the terminal color codes

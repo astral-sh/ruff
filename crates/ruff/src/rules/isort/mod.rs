@@ -17,6 +17,7 @@ use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, TrailingComma};
 
+use crate::line_width::{LineLength, LineWidth};
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
@@ -65,7 +66,8 @@ pub(crate) fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
     locator: &Locator,
-    line_length: usize,
+    line_length: LineLength,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -107,6 +109,7 @@ pub(crate) fn format_imports(
         let block_output = format_import_block(
             block,
             line_length,
+            indentation_width,
             stylist,
             src,
             package,
@@ -162,7 +165,8 @@ pub(crate) fn format_imports(
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn format_import_block(
     block: ImportBlock,
-    line_length: usize,
+    line_length: LineLength,
+    indentation_width: LineWidth,
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -264,6 +268,7 @@ fn format_import_block(
                         &comments,
                         &aliases,
                         line_length,
+                        indentation_width,
                         stylist,
                         force_wrap_aliases,
                         is_first_statement,

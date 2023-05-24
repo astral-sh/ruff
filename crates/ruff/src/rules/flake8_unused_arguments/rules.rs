@@ -262,8 +262,8 @@ fn call<'a>(
             .get(arg.arg.as_str())
             .map(|binding_id| &bindings[*binding_id])
         {
-            if !binding.used()
-                && binding.kind.is_argument()
+            if binding.kind.is_argument()
+                && !binding.is_used()
                 && !dummy_variable_rgx.is_match(arg.arg.as_str())
             {
                 diagnostics.push(Diagnostic::new(
@@ -300,10 +300,7 @@ pub(crate) fn unused_arguments(
                 &checker.settings.pep8_naming.staticmethod_decorators,
             ) {
                 FunctionType::Function => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Argumentable::Function.rule_code())
+                    if checker.enabled(Argumentable::Function.rule_code())
                         && !visibility::is_overload(checker.semantic_model(), decorator_list)
                     {
                         function(
@@ -322,10 +319,7 @@ pub(crate) fn unused_arguments(
                     }
                 }
                 FunctionType::Method => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Argumentable::Method.rule_code())
+                    if checker.enabled(Argumentable::Method.rule_code())
                         && !helpers::is_empty(body)
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
@@ -351,10 +345,7 @@ pub(crate) fn unused_arguments(
                     }
                 }
                 FunctionType::ClassMethod => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Argumentable::ClassMethod.rule_code())
+                    if checker.enabled(Argumentable::ClassMethod.rule_code())
                         && !helpers::is_empty(body)
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
@@ -380,10 +371,7 @@ pub(crate) fn unused_arguments(
                     }
                 }
                 FunctionType::StaticMethod => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Argumentable::StaticMethod.rule_code())
+                    if checker.enabled(Argumentable::StaticMethod.rule_code())
                         && !helpers::is_empty(body)
                         && (!visibility::is_magic(name)
                             || visibility::is_init(name)
@@ -411,11 +399,7 @@ pub(crate) fn unused_arguments(
             }
         }
         ScopeKind::Lambda(Lambda { args, .. }) => {
-            if checker
-                .settings
-                .rules
-                .enabled(Argumentable::Lambda.rule_code())
-            {
+            if checker.enabled(Argumentable::Lambda.rule_code()) {
                 function(
                     Argumentable::Lambda,
                     args,

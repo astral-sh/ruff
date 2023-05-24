@@ -1,7 +1,6 @@
 use log::error;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Ranged, Stmt, Withitem};
-use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
@@ -10,6 +9,7 @@ use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
 use ruff_python_ast::newlines::StrExt;
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineWidth;
 use crate::registry::AsRule;
 
 use super::fix_with;
@@ -111,7 +111,10 @@ pub(crate) fn multiple_with_statements(
                         .content()
                         .unwrap_or_default()
                         .universal_newlines()
-                        .all(|line| line.width() <= checker.settings.line_length)
+                        .all(|line| {
+                            LineWidth::new(checker.settings.tab_size).add_str(&line)
+                                <= checker.settings.line_length
+                        })
                     {
                         #[allow(deprecated)]
                         diagnostic.set_fix(Fix::unspecified(edit));

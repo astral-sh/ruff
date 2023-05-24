@@ -3,7 +3,7 @@ use rustpython_parser::{Mode, Tok};
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 
 use crate::context::ASTFormatContext;
 use crate::cst::Expr;
@@ -13,7 +13,7 @@ pub(crate) struct StringLiteralPart {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext> for StringLiteralPart {
+impl Format<ASTFormatContext<'_>> for StringLiteralPart {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
@@ -64,7 +64,6 @@ impl Format<ASTFormatContext> for StringLiteralPart {
                     } else {
                         double_escape(body).into()
                     },
-                    source_position: TextSize::default(),
                 })?;
                 f.write_element(FormatElement::StaticText { text: "\"" })?;
                 Ok(())
@@ -76,7 +75,6 @@ impl Format<ASTFormatContext> for StringLiteralPart {
                     } else {
                         single_escape(body).into()
                     },
-                    source_position: TextSize::default(),
                 })?;
                 f.write_element(FormatElement::StaticText { text: "'" })?;
                 Ok(())
@@ -90,7 +88,6 @@ impl Format<ASTFormatContext> for StringLiteralPart {
                 f.write_element(FormatElement::StaticText { text: "'''" })?;
                 f.write_element(FormatElement::DynamicText {
                     text: body.to_string().into_boxed_str(),
-                    source_position: TextSize::default(),
                 })?;
                 f.write_element(FormatElement::StaticText { text: "'''" })?;
                 Ok(())
@@ -98,7 +95,6 @@ impl Format<ASTFormatContext> for StringLiteralPart {
                 f.write_element(FormatElement::StaticText { text: "\"\"\"" })?;
                 f.write_element(FormatElement::DynamicText {
                     text: body.to_string().into_boxed_str(),
-                    source_position: TextSize::default(),
                 })?;
                 f.write_element(FormatElement::StaticText { text: "\"\"\"" })?;
                 Ok(())
@@ -119,7 +115,7 @@ pub(crate) struct StringLiteral<'a> {
     expr: &'a Expr,
 }
 
-impl Format<ASTFormatContext> for StringLiteral<'_> {
+impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let expr = self.expr;
 

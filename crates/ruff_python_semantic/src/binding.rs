@@ -1,65 +1,50 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::model::SemanticModel;
 use bitflags::bitflags;
+use ruff_text_size::TextRange;
+
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::Locator;
-use ruff_text_size::TextRange;
 
+use crate::model::SemanticModel;
 use crate::node::NodeId;
-use crate::scope::ScopeId;
+use crate::reference::ReferenceId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
     pub range: TextRange,
-    /// The context in which the binding was created.
+    /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a runtime context.
-    pub runtime_usage: Option<(ScopeId, TextRange)>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a typing-time context.
-    pub typing_usage: Option<(ScopeId, TextRange)>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a synthetic context. This is used for
-    /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
-    /// that should be considered used even if they're never referenced.
-    pub synthetic_usage: Option<(ScopeId, TextRange)>,
-    /// The exceptions that were handled when the binding was defined.
+    /// The references to the [`Binding`].
+    pub references: Vec<ReferenceId>,
+    /// The exceptions that were handled when the [`Binding`] was defined.
     pub exceptions: Exceptions,
+    /// Flags for the [`Binding`].
+    pub flags: BindingFlags,
 }
 
 impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, scope: ScopeId, range: TextRange, context: ExecutionContext) {
-        match context {
-            ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
-            ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
-        }
+    /// Return `true` if this [`Binding`] is used.
+    pub fn is_used(&self) -> bool {
+        !self.references.is_empty()
     }
 
-    pub const fn used(&self) -> bool {
-        self.runtime_usage.is_some()
-            || self.synthetic_usage.is_some()
-            || self.typing_usage.is_some()
+    /// Returns an iterator over all references for the current [`Binding`].
+    pub fn references(&self) -> impl Iterator<Item = ReferenceId> + '_ {
+        self.references.iter().copied()
     }
 
-    pub const fn is_definition(&self) -> bool {
-        matches!(
-            self.kind,
-            BindingKind::ClassDefinition
-                | BindingKind::FunctionDefinition
-                | BindingKind::Builtin
-                | BindingKind::FutureImportation
-                | BindingKind::Importation(..)
-                | BindingKind::FromImportation(..)
-                | BindingKind::SubmoduleImportation(..)
-        )
+    /// Return `true` if this [`Binding`] represents an explicit re-export
+    /// (e.g., `import FastAPI as FastAPI`).
+    pub const fn is_explicit_export(&self) -> bool {
+        self.flags.contains(BindingFlags::EXPLICIT_EXPORT)
     }
 
+    /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
             BindingKind::Importation(Importation { full_name, .. }) => {
@@ -109,7 +94,15 @@ impl<'a> Binding<'a> {
             }
             _ => {}
         }
-        existing.is_definition()
+        matches!(
+            existing.kind,
+            BindingKind::ClassDefinition
+                | BindingKind::FunctionDefinition
+                | BindingKind::Builtin
+                | BindingKind::Importation(..)
+                | BindingKind::FromImportation(..)
+                | BindingKind::SubmoduleImportation(..)
+        )
     }
 
     /// Returns the appropriate visual range for highlighting this binding.
@@ -122,6 +115,20 @@ impl<'a> Binding<'a> {
             }
             _ => self.range,
         }
+    }
+}
+
+bitflags! {
+    /// Flags on a [`Binding`].
+    #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+    pub struct BindingFlags: u8 {
+        /// The binding represents an explicit re-export.
+        ///
+        /// For example, the binding could be `FastAPI` in:
+        /// ```python
+        /// import FastAPI as FastAPI
+        /// ```
+        const EXPLICIT_EXPORT = 1 << 0;
     }
 }
 
@@ -266,7 +273,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, is_macro::Is)]
 pub enum ExecutionContext {
     Runtime,
     Typing,

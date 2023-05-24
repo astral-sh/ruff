@@ -105,18 +105,18 @@ SIM401.py:30:1: SIM401 [*] Use `var = dicts[idx].get(key, "default")` instead of
 35 32 | # SIM401 (complex expression in var)
 36 33 | if key in a_dict:
 
-SIM401.py:36:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "default")` instead of an `if` block
+SIM401.py:36:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")` instead of an `if` block
    |
 36 |   # SIM401 (complex expression in var)
 37 | / if key in a_dict:
 38 | |     vars[idx] = a_dict[key]
 39 | | else:
-40 | |     vars[idx] = "default"
-   | |_________________________^ SIM401
+40 | |     vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
+   | |___________________________________________________________________________^ SIM401
 41 |   
 42 |   ###
    |
-   = help: Replace with `vars[idx] = a_dict.get(key, "default")`
+   = help: Replace with `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")`
 
 ℹ Suggested fix
 33 33 |     var = "default"
@@ -125,8 +125,8 @@ SIM401.py:36:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "default")` instead 
 36    |-if key in a_dict:
 37    |-    vars[idx] = a_dict[key]
 38    |-else:
-39    |-    vars[idx] = "default"
-   36 |+vars[idx] = a_dict.get(key, "default")
+39    |-    vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
+   36 |+vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")
 40 37 | 
 41 38 | ###
 42 39 | # Negative cases
