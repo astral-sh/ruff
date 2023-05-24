@@ -12,7 +12,7 @@ struct FloatAtom {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext> for FloatAtom {
+impl Format<ASTFormatContext<'_>> for FloatAtom {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
@@ -26,12 +26,15 @@ impl Format<ASTFormatContext> for FloatAtom {
             } else {
                 write!(
                     f,
-                    [literal(TextRange::new(
-                        self.range.start(),
-                        self.range
-                            .start()
-                            .add(TextSize::try_from(dot_index).unwrap())
-                    ))]
+                    [literal(
+                        TextRange::new(
+                            self.range.start(),
+                            self.range
+                                .start()
+                                .add(TextSize::try_from(dot_index).unwrap())
+                        ),
+                        ContainsNewLines::No
+                    )]
                 )?;
             }
 
@@ -42,16 +45,19 @@ impl Format<ASTFormatContext> for FloatAtom {
             } else {
                 write!(
                     f,
-                    [literal(TextRange::new(
-                        self.range
-                            .start()
-                            .add(TextSize::try_from(dot_index + 1).unwrap()),
-                        self.range.end()
-                    ))]
+                    [literal(
+                        TextRange::new(
+                            self.range
+                                .start()
+                                .add(TextSize::try_from(dot_index + 1).unwrap()),
+                            self.range.end()
+                        ),
+                        ContainsNewLines::No
+                    )]
                 )?;
             }
         } else {
-            write!(f, [literal(self.range)])?;
+            write!(f, [literal(self.range, ContainsNewLines::No)])?;
         }
 
         Ok(())
@@ -68,7 +74,7 @@ pub(crate) struct FloatLiteral {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext> for FloatLiteral {
+impl Format<ASTFormatContext<'_>> for FloatLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
@@ -93,12 +99,15 @@ impl Format<ASTFormatContext> for FloatLiteral {
             let plus = content[exponent_index + 1..].starts_with('+');
             write!(
                 f,
-                [literal(TextRange::new(
-                    self.range
-                        .start()
-                        .add(TextSize::try_from(exponent_index + 1 + usize::from(plus)).unwrap()),
-                    self.range.end()
-                ))]
+                [literal(
+                    TextRange::new(
+                        self.range.start().add(
+                            TextSize::try_from(exponent_index + 1 + usize::from(plus)).unwrap()
+                        ),
+                        self.range.end()
+                    ),
+                    ContainsNewLines::No
+                )]
             )?;
         } else {
             write!(f, [float_atom(self.range)])?;
@@ -118,7 +127,7 @@ pub(crate) struct IntLiteral {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext> for IntLiteral {
+impl Format<ASTFormatContext<'_>> for IntLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
@@ -142,14 +151,14 @@ impl Format<ASTFormatContext> for IntLiteral {
                     )?;
                 } else {
                     // Use the existing source.
-                    write!(f, [literal(self.range)])?;
+                    write!(f, [literal(self.range, ContainsNewLines::No)])?;
                 }
 
                 return Ok(());
             }
         }
 
-        write!(f, [literal(self.range)])?;
+        write!(f, [literal(self.range, ContainsNewLines::No)])?;
 
         Ok(())
     }
@@ -165,20 +174,20 @@ pub(crate) struct ComplexLiteral {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext> for ComplexLiteral {
+impl Format<ASTFormatContext<'_>> for ComplexLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
         let content = &contents[self.range];
 
         if content.ends_with('j') {
-            write!(f, [literal(self.range)])?;
+            write!(f, [literal(self.range, ContainsNewLines::No)])?;
         } else if content.ends_with('J') {
             write!(
                 f,
-                [literal(TextRange::new(
-                    self.range.start(),
-                    self.range.end().sub(TextSize::from(1))
-                ))]
+                [literal(
+                    TextRange::new(self.range.start(), self.range.end().sub(TextSize::from(1))),
+                    ContainsNewLines::No
+                )]
             )?;
             write!(f, [text("j")])?;
         } else {

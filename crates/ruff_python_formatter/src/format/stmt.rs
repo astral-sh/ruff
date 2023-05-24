@@ -756,7 +756,7 @@ pub struct FormatStmt<'a> {
     item: &'a Stmt,
 }
 
-impl Format<ASTFormatContext> for FormatStmt<'_> {
+impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         write!(f, [leading_comments(self.item)])?;
 
@@ -939,7 +939,7 @@ impl Format<ASTFormatContext> for FormatStmt<'_> {
     }
 }
 
-impl AsFormat<ASTFormatContext> for Stmt {
+impl AsFormat<ASTFormatContext<'_>> for Stmt {
     type Format<'a> = FormatStmt<'a>;
 
     fn format(&self) -> Self::Format<'_> {
