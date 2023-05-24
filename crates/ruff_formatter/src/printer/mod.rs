@@ -95,10 +95,7 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::StaticText { text } => self.print_text(text, None),
-            FormatElement::DynamicText {
-                text,
-                source_position,
-            } => self.print_text(text, Some(*source_position)),
+            FormatElement::DynamicText { text } => self.print_text(text, None),
             FormatElement::StaticTextSlice { text, range } => self.print_text(&text[*range], None),
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
@@ -127,6 +124,11 @@ impl<'a> Printer<'a> {
 
             FormatElement::ExpandParent => {
                 // Handled in `Document::propagate_expands()
+            }
+
+            FormatElement::SourcePosition(position) => {
+                self.state.source_position = *position;
+                self.push_marker();
             }
 
             FormatElement::LineSuffixBoundary => {
@@ -273,7 +275,7 @@ impl<'a> Printer<'a> {
         result
     }
 
-    fn print_text(&mut self, text: &str, source_position: Option<TextSize>) {
+    fn print_text(&mut self, text: &str, source_range: Option<TextRange>) {
         if !self.state.pending_indent.is_empty() {
             let (indent_char, repeat_count) = match self.options.indent_style() {
                 IndentStyle::Tab => ('\t', 1),
@@ -311,28 +313,27 @@ impl<'a> Printer<'a> {
         // If the token has no source position (was created by the formatter)
         // both the start and end marker will use the last known position
         // in the input source (from state.source_position)
-        if let Some(source) = source_position {
-            self.state.source_position = source;
+        if let Some(range) = source_range {
+            self.state.source_position = range.start();
         }
 
-        self.push_marker(SourceMarker {
-            source: self.state.source_position,
-            dest: self.state.buffer.text_len(),
-        });
+        self.push_marker();
 
         self.print_str(text);
 
-        if source_position.is_some() {
-            self.state.source_position += text.text_len();
+        if let Some(range) = source_range {
+            self.state.source_position = range.end();
         }
 
-        self.push_marker(SourceMarker {
-            source: self.state.source_position,
-            dest: self.state.buffer.text_len(),
-        });
+        self.push_marker();
     }
 
-    fn push_marker(&mut self, marker: SourceMarker) {
+    fn push_marker(&mut self) {
+        let marker = SourceMarker {
+            source: self.state.source_position,
+            dest: self.state.buffer.text_len(),
+        };
+
         if let Some(last) = self.state.source_markers.last() {
             if last != &marker {
                 self.state.source_markers.push(marker)
@@ -1007,6 +1008,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     return Ok(Fits::No);
                 }
             }
+
+            FormatElement::SourcePosition(_) => {}
 
             FormatElement::BestFitting(best_fitting) => {
                 let slice = match args.mode() {

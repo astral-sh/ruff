@@ -136,8 +136,8 @@ impl Format<ASTFormatContext> for IntLiteral {
                     write!(
                         f,
                         [
-                            dynamic_text(&prefix.to_lowercase(), TextSize::default()),
-                            dynamic_text(&suffix.to_uppercase(), TextSize::default())
+                            dynamic_text(&prefix.to_lowercase(), None),
+                            dynamic_text(&suffix.to_uppercase(), None)
                         ]
                     )?;
                 } else {

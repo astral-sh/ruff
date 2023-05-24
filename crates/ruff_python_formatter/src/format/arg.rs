@@ -1,6 +1,5 @@
 use ruff_formatter::prelude::*;
 use ruff_formatter::write;
-use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::Arg;
@@ -23,7 +22,7 @@ impl Format<ASTFormatContext> for FormatArg<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let arg = self.item;
 
-        write!(f, [dynamic_text(&arg.arg, TextSize::default())])?;
+        write!(f, [dynamic_text(&arg.arg, None)])?;
         if let Some(annotation) = &arg.annotation {
             write!(f, [text(": ")])?;
             write!(f, [annotation.format()])?;

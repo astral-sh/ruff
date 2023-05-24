@@ -1,6 +1,5 @@
 use ruff_formatter::prelude::*;
 use ruff_formatter::write;
-use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::Alias;
@@ -23,10 +22,10 @@ impl Format<ASTFormatContext> for FormatAlias<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let alias = self.item;
 
-        write!(f, [dynamic_text(&alias.name, TextSize::default())])?;
+        write!(f, [dynamic_text(&alias.name, None)])?;
         if let Some(asname) = &alias.asname {
             write!(f, [text(" as ")])?;
-            write!(f, [dynamic_text(asname, TextSize::default())])?;
+            write!(f, [dynamic_text(asname, None)])?;
         }
 
         write!(f, [end_of_line_comments(alias)])?;
