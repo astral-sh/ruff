@@ -94,7 +94,7 @@ jobs:
       - name: "Build wheels - universal2"
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --universal2 --out dist
+          args: --release --target universal2-apple-darwin --out dist
       - name: "Test wheel - universal2"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
