@@ -118,7 +118,7 @@ pub struct Settings {
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_self: flake8_self::settings::Settings,
-    pub flake8_tidy_imports: flake8_tidy_imports::Settings,
+    pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub flake8_type_checking: flake8_type_checking::settings::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
     pub isort: isort::settings::Settings,

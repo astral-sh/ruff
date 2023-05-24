@@ -148,7 +148,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_import_conventions: Some(
             flake8_import_conventions::settings::Settings::default().into(),
         ),
-        flake8_tidy_imports: Some(flake8_tidy_imports::Settings::default().into()),
+        flake8_tidy_imports: Some(flake8_tidy_imports::settings::Settings::default().into()),
         flake8_type_checking: Some(flake8_type_checking::settings::Settings::default().into()),
         flake8_unused_arguments: Some(
             flake8_unused_arguments::settings::Settings::default().into(),
