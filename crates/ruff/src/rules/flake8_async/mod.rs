@@ -1,4 +1,5 @@
 //! Rules from [flake8-async](https://pypi.org/project/flake8-async/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]

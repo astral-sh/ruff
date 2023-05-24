@@ -28,9 +28,14 @@ use crate::diagnostics::Diagnostics;
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
     pub(crate) struct Flags: u8 {
+        /// Whether to show violations when emitting diagnostics.
         const SHOW_VIOLATIONS = 0b0000_0001;
-        const SHOW_FIXES = 0b0000_0010;
-        const SHOW_SOURCE = 0b000_0100;
+        /// Whether to show the source code when emitting diagnostics.
+        const SHOW_SOURCE = 0b000_0010;
+        /// Whether to show a summary of the fixed violations when emitting diagnostics.
+        const SHOW_FIX_SUMMARY = 0b0000_0100;
+        /// Whether to show a diff of each fixed violation when emitting diagnostics.
+        const SHOW_FIX_DIFF = 0b0000_1000;
     }
 }
 
@@ -70,8 +75,6 @@ pub(crate) struct Printer {
     log_level: LogLevel,
     autofix_level: flags::FixMode,
     flags: Flags,
-    /// Dev-only argument to show fixes
-    ecosystem_ci: bool,
 }
 
 impl Printer {
@@ -80,14 +83,12 @@ impl Printer {
         log_level: LogLevel,
         autofix_level: flags::FixMode,
         flags: Flags,
-        ecosystem_ci: bool,
     ) -> Self {
         Self {
             format,
             log_level,
             autofix_level,
             flags,
-            ecosystem_ci,
         }
     }
 
@@ -165,10 +166,10 @@ impl Printer {
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
-                if self.flags.contains(Flags::SHOW_FIXES) {
+                if self.flags.contains(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fixed(writer, &diagnostics.fixed)?;
+                        print_fix_summary(writer, &diagnostics.fixed)?;
                         writeln!(writer)?;
                     }
                 }
@@ -187,18 +188,16 @@ impl Printer {
                 JunitEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Text => {
-                let show_fixes = self.ecosystem_ci && self.flags.contains(Flags::SHOW_FIXES);
-
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.autofix_level))
-                    .with_show_fix(show_fixes)
+                    .with_show_fix_diff(self.flags.contains(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
 
-                if self.flags.contains(Flags::SHOW_FIXES) {
+                if self.flags.contains(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fixed(writer, &diagnostics.fixed)?;
+                        print_fix_summary(writer, &diagnostics.fixed)?;
                         writeln!(writer)?;
                     }
                 }
@@ -211,10 +210,10 @@ impl Printer {
                     .with_show_fix_status(show_fix_status(self.autofix_level))
                     .emit(writer, &diagnostics.messages, &context)?;
 
-                if self.flags.contains(Flags::SHOW_FIXES) {
+                if self.flags.contains(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fixed(writer, &diagnostics.fixed)?;
+                        print_fix_summary(writer, &diagnostics.fixed)?;
                         writeln!(writer)?;
                     }
                 }
@@ -392,7 +391,7 @@ const fn show_fix_status(autofix_level: flags::FixMode) -> bool {
     !matches!(autofix_level, flags::FixMode::Apply)
 }
 
-fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
+fn print_fix_summary<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.values().sum::<usize>())

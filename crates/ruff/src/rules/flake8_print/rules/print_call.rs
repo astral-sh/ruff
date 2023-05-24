@@ -112,7 +112,7 @@ pub(crate) fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword
         }
     };
 
-    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
+    if !checker.enabled(diagnostic.kind.rule()) {
         return;
     }
 

@@ -1,15 +1,13 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{format_args, write, Format};
 
-use crate::context::ASTFormatContext;
 use crate::cst::Arguments;
-use crate::shared_traits::AsFormat;
 
-pub struct FormatArguments<'a> {
+pub(crate) struct FormatArguments<'a> {
     item: &'a Arguments,
 }
 
-impl AsFormat<ASTFormatContext> for Arguments {
+impl AsFormat<ASTFormatContext<'_>> for Arguments {
     type Format<'a> = FormatArguments<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -17,7 +15,7 @@ impl AsFormat<ASTFormatContext> for Arguments {
     }
 }
 
-impl Format<ASTFormatContext> for FormatArguments<'_> {
+impl Format<ASTFormatContext<'_>> for FormatArguments<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let args = self.item;
 

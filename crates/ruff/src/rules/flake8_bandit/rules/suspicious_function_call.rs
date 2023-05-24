@@ -512,7 +512,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
         Reason::FTPLib => SuspiciousFTPLibUsage.into(),
     };
     let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, expr.range());
-    if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+    if checker.enabled(diagnostic.kind.rule()) {
         checker.diagnostics.push(diagnostic);
     }
 }

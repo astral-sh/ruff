@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::ConfigurationOptions;
 
+use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -303,13 +304,22 @@ pub struct Options {
         default = "88",
         value_type = "int",
         example = r#"
-            # Allow lines to be as long as 120 characters.
-            line-length = 120
+        # Allow lines to be as long as 120 characters.
+        line-length = 120
         "#
     )]
     /// The line length to use when enforcing long-lines violations (like
     /// `E501`).
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
+    #[option(
+        default = "4",
+        value_type = "int",
+        example = r#"
+            tab_size = 8
+        "#
+    )]
+    /// The tabulation size to calculate line length.
+    pub tab_size: Option<TabSize>,
     #[option(
         default = "None",
         value_type = "str",

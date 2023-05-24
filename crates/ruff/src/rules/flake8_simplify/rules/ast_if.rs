@@ -2,7 +2,6 @@ use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
-use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -14,6 +13,7 @@ use ruff_python_ast::newlines::StrExt;
 use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineWidth;
 use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
 
@@ -288,7 +288,10 @@ pub(crate) fn nested_if_statements(
                     .content()
                     .unwrap_or_default()
                     .universal_newlines()
-                    .all(|line| line.width() <= checker.settings.line_length)
+                    .all(|line| {
+                        LineWidth::new(checker.settings.tab_size).add_str(&line)
+                            <= checker.settings.line_length
+                    })
                 {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(edit));
@@ -508,8 +511,9 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-        + contents.width()
+    if LineWidth::new(checker.settings.tab_size)
+        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(&contents)
         > checker.settings.line_length
     {
         return;
@@ -863,8 +867,9 @@ pub(crate) fn use_dict_get_with_default(
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-        + contents.width()
+    if LineWidth::new(checker.settings.tab_size)
+        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(&contents)
         > checker.settings.line_length
     {
         return;

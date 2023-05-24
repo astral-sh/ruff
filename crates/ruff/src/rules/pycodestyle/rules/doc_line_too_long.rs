@@ -48,6 +48,12 @@ pub(crate) fn doc_line_too_long(line: &Line, settings: &Settings) -> Option<Diag
         limit,
         settings.pycodestyle.ignore_overlong_task_comments,
         &settings.task_tags,
+        settings.tab_size,
     )
-    .map(|overlong| Diagnostic::new(DocLineTooLong(overlong.width(), limit), overlong.range()))
+    .map(|overlong| {
+        Diagnostic::new(
+            DocLineTooLong(overlong.width(), limit.get()),
+            overlong.range(),
+        )
+    })
 }
