@@ -3685,32 +3685,42 @@ where
                 match callable {
                     Some(Callable::Bool) => {
                         self.visit_expr(func);
-                        if !args.is_empty() {
-                            self.visit_boolean_test(&args[0]);
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_boolean_test(arg);
                         }
-                        for expr in args.iter().skip(1) {
-                            self.visit_expr(expr);
+                        for arg in args {
+                            self.visit_expr(arg);
                         }
                     }
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
-                        if !args.is_empty() {
-                            self.visit_type_definition(&args[0]);
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_type_definition(arg);
                         }
-                        for expr in args.iter().skip(1) {
-                            self.visit_expr(expr);
+                        for arg in args {
+                            self.visit_expr(arg);
                         }
                     }
                     Some(Callable::NewType) => {
                         self.visit_expr(func);
-                        for expr in args.iter().skip(1) {
-                            self.visit_type_definition(expr);
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_type_definition(arg);
                         }
                     }
                     Some(Callable::TypeVar) => {
                         self.visit_expr(func);
-                        for expr in args.iter().skip(1) {
-                            self.visit_type_definition(expr);
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_type_definition(arg);
                         }
                         for keyword in keywords {
                             let Keyword {
@@ -3731,24 +3741,30 @@ where
                         self.visit_expr(func);
 
                         // Ex) NamedTuple("a", [("a", int)])
-                        if args.len() > 1 {
-                            match &args[1] {
-                                Expr::List(ast::ExprList { elts, .. })
-                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                                    for elt in elts {
-                                        match elt {
-                                            Expr::List(ast::ExprList { elts, .. })
-                                            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                                                if elts.len() == 2 {
-                                                    self.visit_non_type_definition(&elts[0]);
-                                                    self.visit_type_definition(&elts[1]);
-                                                }
-                                            }
-                                            _ => {}
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
+                            if let Expr::List(ast::ExprList { elts, .. })
+                            | Expr::Tuple(ast::ExprTuple { elts, .. }) = arg
+                            {
+                                for elt in elts {
+                                    match elt {
+                                        Expr::List(ast::ExprList { elts, .. })
+                                        | Expr::Tuple(ast::ExprTuple { elts, .. })
+                                            if elts.len() == 2 =>
+                                        {
+                                            self.visit_non_type_definition(&elts[0]);
+                                            self.visit_type_definition(&elts[1]);
+                                        }
+                                        _ => {
+                                            self.visit_non_type_definition(elt);
                                         }
                                     }
                                 }
-                                _ => {}
+                            } else {
+                                self.visit_non_type_definition(arg);
                             }
                         }
 
@@ -3762,12 +3778,16 @@ where
                         self.visit_expr(func);
 
                         // Ex) TypedDict("a", {"a": int})
-                        if args.len() > 1 {
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for arg in args {
                             if let Expr::Dict(ast::ExprDict {
                                 keys,
                                 values,
                                 range: _,
-                            }) = &args[1]
+                            }) = arg
                             {
                                 for key in keys.iter().flatten() {
                                     self.visit_non_type_definition(key);
@@ -3775,6 +3795,8 @@ where
                                 for value in values {
                                     self.visit_type_definition(value);
                                 }
+                            } else {
+                                self.visit_non_type_definition(arg);
                             }
                         }
 
@@ -3787,11 +3809,12 @@ where
                     Some(Callable::MypyExtension) => {
                         self.visit_expr(func);
 
-                        if let Some(arg) = args.first() {
+                        let mut args = args.iter();
+                        if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
                             self.visit_type_definition(arg);
 
-                            for arg in args.iter().skip(1) {
+                            for arg in args {
                                 self.visit_non_type_definition(arg);
                             }
                             for keyword in keywords {
