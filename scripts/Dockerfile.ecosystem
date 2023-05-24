@@ -13,7 +13,7 @@
 # ```
 # From the project root:
 # ```
-# cargo build --target x86_64-unknown-linux-musl --features ecosystem_ci
+# cargo build --target x86_64-unknown-linux-musl
 # docker buildx build -f scripts/Dockerfile.ecosystem -t ruff-ecosystem-checker --load .
 # docker run --rm -v ./target/x86_64-unknown-linux-musl/debug/ruff:/app/ruff-new -v ./ruff-old:/app/ruff-old ruff-ecosystem-checker
 # ```

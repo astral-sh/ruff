@@ -113,12 +113,7 @@ pub(crate) fn unrecognized_platform(
     }
 
     // "in" might also make sense but we don't currently have one.
-    if !matches!(op, Cmpop::Eq | Cmpop::NotEq)
-        && checker
-            .settings
-            .rules
-            .enabled(Rule::UnrecognizedPlatformCheck)
-    {
+    if !matches!(op, Cmpop::Eq | Cmpop::NotEq) && checker.enabled(Rule::UnrecognizedPlatformCheck) {
         checker
             .diagnostics
             .push(diagnostic_unrecognized_platform_check);
@@ -133,10 +128,7 @@ pub(crate) fn unrecognized_platform(
             // Other values are possible but we don't need them right now.
             // This protects against typos.
             if !["linux", "win32", "cygwin", "darwin"].contains(&value.as_str())
-                && checker
-                    .settings
-                    .rules
-                    .enabled(Rule::UnrecognizedPlatformName)
+                && checker.enabled(Rule::UnrecognizedPlatformName)
             {
                 checker.diagnostics.push(Diagnostic::new(
                     UnrecognizedPlatformName {
@@ -147,11 +139,7 @@ pub(crate) fn unrecognized_platform(
             }
         }
         _ => {
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::UnrecognizedPlatformCheck)
-            {
+            if checker.enabled(Rule::UnrecognizedPlatformCheck) {
                 checker
                     .diagnostics
                     .push(diagnostic_unrecognized_platform_check);

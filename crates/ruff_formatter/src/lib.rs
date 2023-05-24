@@ -33,7 +33,7 @@ pub mod group_id;
 pub mod macros;
 pub mod prelude;
 pub mod printer;
-mod utility_types;
+mod source_code;
 
 use crate::formatter::Formatter;
 use crate::group_id::UniqueGroupIdBuilder;
@@ -48,6 +48,7 @@ pub use buffer::{
     VecBuffer,
 };
 pub use builders::BestFitting;
+pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
@@ -203,6 +204,9 @@ pub trait FormatContext {
 
     /// Returns the formatting options
     fn options(&self) -> &Self::Options;
+
+    /// Returns the source code from the document that gets formatted.
+    fn source_code(&self) -> SourceCode;
 }
 
 /// Options customizing how the source code should be formatted.
@@ -220,11 +224,20 @@ pub trait FormatOptions {
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct SimpleFormatContext {
     options: SimpleFormatOptions,
+    source_code: String,
 }
 
 impl SimpleFormatContext {
     pub fn new(options: SimpleFormatOptions) -> Self {
-        Self { options }
+        Self {
+            options,
+            source_code: String::new(),
+        }
+    }
+
+    pub fn with_source_code(mut self, code: &str) -> Self {
+        self.source_code = String::from(code);
+        self
     }
 }
 
@@ -234,9 +247,13 @@ impl FormatContext for SimpleFormatContext {
     fn options(&self) -> &Self::Options {
         &self.options
     }
+
+    fn source_code(&self) -> SourceCode {
+        SourceCode::new(&self.source_code)
+    }
 }
 
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct SimpleFormatOptions {
     pub indent_style: IndentStyle,
     pub line_width: LineWidth,
@@ -303,15 +320,18 @@ where
     Context: FormatContext,
 {
     pub fn print(&self) -> PrintResult<Printed> {
+        let source_code = self.context.source_code();
         let print_options = self.context.options().as_print_options();
-        let printed = Printer::new(print_options).print(&self.document)?;
+        let printed = Printer::new(source_code, print_options).print(&self.document)?;
 
         Ok(printed)
     }
 
     pub fn print_with_indent(&self, indent: u16) -> PrintResult<Printed> {
+        let source_code = self.context.source_code();
         let print_options = self.context.options().as_print_options();
-        let printed = Printer::new(print_options).print_with_indent(&self.document, indent)?;
+        let printed =
+            Printer::new(source_code, print_options).print_with_indent(&self.document, indent)?;
 
         Ok(printed)
     }
@@ -428,7 +448,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 ///     fn fmt(&self, f: &mut Formatter<SimpleFormatContext>) -> FormatResult<()> {
 ///         write!(f, [
 ///             hard_line_break(),
-///             dynamic_text(&self.0, TextSize::from(0)),
+///             dynamic_text(&self.0, None),
 ///             hard_line_break(),
 ///         ])
 ///     }

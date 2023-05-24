@@ -6,6 +6,7 @@ use std::ops::Deref;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
+use crate::jupyter::JupyterIndex;
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
@@ -16,9 +17,6 @@ pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 pub use text::TextEmitter;
-
-use crate::jupyter::JupyterIndex;
-use crate::registry::AsRule;
 
 mod azure;
 mod diff;
@@ -77,11 +75,7 @@ impl Message {
 
 impl Ord for Message {
     fn cmp(&self, other: &Self) -> Ordering {
-        (self.filename(), self.start(), self.kind.rule()).cmp(&(
-            other.filename(),
-            other.start(),
-            other.kind.rule(),
-        ))
+        (&self.file, self.start()).cmp(&(&other.file, other.start()))
     }
 }
 
