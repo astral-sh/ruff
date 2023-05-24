@@ -18,8 +18,11 @@ use crate::registry::AsRule;
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
+        /// Whether to show the fix status of a diagnostic.
         const SHOW_FIX_STATUS = 0b0000_0001;
-        const SHOW_FIX        = 0b0000_0010;
+        /// Whether to show the diff of a fix, for diagnostics that have a fix.
+        const SHOW_FIX_DIFF   = 0b0000_0010;
+        /// Whether to show the source code of a diagnostic.
         const SHOW_SOURCE     = 0b0000_0100;
     }
 }
@@ -38,8 +41,8 @@ impl TextEmitter {
     }
 
     #[must_use]
-    pub fn with_show_fix(mut self, show_fix: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_FIX, show_fix);
+    pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
+        self.flags.set(EmitterFlags::SHOW_FIX_DIFF, show_fix_diff);
         self
     }
 
@@ -104,7 +107,7 @@ impl Emitter for TextEmitter {
                 writeln!(writer, "{}", MessageCodeFrame { message })?;
             }
 
-            if self.flags.contains(EmitterFlags::SHOW_FIX) {
+            if self.flags.contains(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
                 }
