@@ -83,4 +83,3 @@ colored = { workspace = true, features = ["no-color"] }
 default = []
 schemars = ["dep:schemars"]
 jupyter_notebook = []
-ecosystem_ci = []

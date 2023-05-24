@@ -325,7 +325,6 @@ pub struct CheckArgs {
     )]
     pub show_settings: bool,
     /// Dev-only argument to show fixes
-    #[cfg(feature = "ecosystem_ci")]
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
 }
