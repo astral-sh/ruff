@@ -3689,6 +3689,16 @@ mod tests {
         "#,
             &[],
         );
+        flakes(
+            r#"
+            from typing import NewType
+
+            def f():
+                name = "x"
+                NewType(name, int)
+        "#,
+            &[],
+        );
     }
 
     #[test]
