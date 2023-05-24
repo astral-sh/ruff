@@ -110,7 +110,7 @@ impl<'a> SemanticModel<'a> {
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.scopes()
             .find_map(|scope| scope.get(member))
-            .map(|binding_id| &self.bindings[*binding_id])
+            .map(|binding_id| &self.bindings[binding_id])
     }
 
     /// Return `true` if `member` is bound as a builtin.
@@ -124,7 +124,7 @@ impl<'a> SemanticModel<'a> {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_deferred_type_definition() {
-            if let Some(binding_id) = self.scopes.global().get(symbol).copied() {
+            if let Some(binding_id) = self.scopes.global().get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
                 let reference_id = self.references.push(ScopeId::global(), range, context);
@@ -160,7 +160,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            if let Some(binding_id) = scope.get(symbol).copied() {
+            if let Some(binding_id) = scope.get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
                 let reference_id = self.references.push(self.scope_id, range, context);
@@ -255,7 +255,7 @@ impl<'a> SemanticModel<'a> {
             return None;
         }
 
-        self.scopes[scope_id].get(full_name).copied()
+        self.scopes[scope_id].get(full_name)
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
@@ -352,7 +352,7 @@ impl<'a> SemanticModel<'a> {
         member: &str,
     ) -> Option<(&Stmt, String)> {
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
-            scope.binding_ids().copied().find_map(|binding_id| {
+            scope.binding_ids().find_map(|binding_id| {
                 let binding = &self.bindings[binding_id];
                 match &binding.kind {
                     // Ex) Given `module="sys"` and `object="exit"`:
