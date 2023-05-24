@@ -90,8 +90,9 @@ impl Violation for PercentFormatExpectedMapping {
 /// named placeholders.
 ///
 /// ## Why is this bad?
-/// When using mapping type values in `printf`-style format strings, the keys
-/// named. Otherwise, the expression will raise a `TypeError`.
+/// When using mapping type values (such as `dict`) in `printf`-style format
+/// strings, the keys must be named. Otherwise, the expression will raise a
+/// `TypeError`.
 ///
 /// ## Example
 /// ```python
@@ -360,8 +361,8 @@ impl Violation for StringDotFormatInvalidFormat {
 /// Checks for `str.format` calls with unused keyword arguments.
 ///
 /// ## Why is this bad?
-/// Unused keyword arguments are redundant and indicate a mistake. They should
-/// be removed.
+/// Unused keyword arguments are redundant and are indicative of a mistake.
+/// They should be removed.
 ///
 /// ## Example
 /// ```python
