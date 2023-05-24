@@ -13,10 +13,14 @@ def dir_name(linter_name: str) -> str:
 
 def pascal_case(linter_name: str) -> str:
     """Convert from snake-case to PascalCase."""
-    if linter_name == "pep8-naming":
-        return "PEP8Naming"
     if linter_name == "flake8-errmsg":
         return "Flake8ErrMsg"
+    if linter_name == "flake8-gettext":
+        return "Flake8GetText"
+    if linter_name == "mccabe":
+        return "McCabe"
+    if linter_name == "pep8-naming":
+        return "PEP8Naming"
     return "".join(
         word.title() for word in linter_name.split(" ")[0].split("_")[0].split("-")
     )
@@ -84,6 +88,7 @@ def get_linters_with_deprecated_architecture() -> list[str]:
         for linter in get_linters()
         if not (RULES_DIR / dir_name(linter) / "rules" / "mod.rs").exists()
     ]
+
 
 if __name__ == "__main__":
     linters_with_deprecated_architecture = get_linters_with_deprecated_architecture()
