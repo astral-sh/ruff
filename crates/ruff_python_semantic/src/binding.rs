@@ -1,14 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::model::SemanticModel;
 use bitflags::bitflags;
+use ruff_text_size::TextRange;
+
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::Locator;
-use ruff_text_size::TextRange;
 
+use crate::model::SemanticModel;
 use crate::node::NodeId;
-use crate::scope::ScopeId;
+use crate::reference::ReferenceId;
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
@@ -18,33 +19,20 @@ pub struct Binding<'a> {
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
     pub source: Option<NodeId>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a runtime context.
-    pub runtime_usage: Option<(ScopeId, TextRange)>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a typing-time context.
-    pub typing_usage: Option<(ScopeId, TextRange)>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a synthetic context. This is used for
-    /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
-    /// that should be considered used even if they're never referenced.
-    pub synthetic_usage: Option<(ScopeId, TextRange)>,
+    /// The references to the binding.
+    pub references: Vec<ReferenceId>,
     /// The exceptions that were handled when the binding was defined.
     pub exceptions: Exceptions,
 }
 
 impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, scope: ScopeId, range: TextRange, context: ExecutionContext) {
-        match context {
-            ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
-            ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
-        }
+    pub fn is_used(&self) -> bool {
+        !self.references.is_empty()
     }
 
-    pub const fn used(&self) -> bool {
-        self.runtime_usage.is_some()
-            || self.synthetic_usage.is_some()
-            || self.typing_usage.is_some()
+    /// Returns an iterator over all references for the current [`Binding`].
+    pub fn references(&self) -> impl Iterator<Item = ReferenceId> + '_ {
+        self.references.iter().copied()
     }
 
     pub const fn is_definition(&self) -> bool {
@@ -266,7 +254,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, is_macro::Is)]
 pub enum ExecutionContext {
     Runtime,
     Typing,

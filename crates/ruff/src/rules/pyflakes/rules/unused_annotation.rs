@@ -27,8 +27,8 @@ pub(crate) fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
             let name = *name;
             let binding = &checker.semantic_model().bindings[*binding_id];
 
-            if !binding.used()
-                && binding.kind.is_annotation()
+            if binding.kind.is_annotation()
+                && !binding.is_used()
                 && !checker.settings.dummy_variable_rgx.is_match(name)
             {
                 Some((name.to_string(), binding.range))

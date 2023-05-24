@@ -322,8 +322,8 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
         .bindings()
         .map(|(name, binding_id)| (*name, &checker.semantic_model().bindings[*binding_id]))
         .filter_map(|(name, binding)| {
-            if !binding.used()
-                && (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
+            if (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
+                && !binding.is_used()
                 && !checker.settings.dummy_variable_rgx.is_match(name)
                 && name != "__tracebackhide__"
                 && name != "__traceback_info__"

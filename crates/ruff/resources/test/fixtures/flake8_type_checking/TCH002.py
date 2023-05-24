@@ -146,3 +146,7 @@ def f():
     import pandas as pd
 
     x = dict[pd.DataFrame, pd.DataFrame]
+
+
+def f():
+    import pandas as pd
