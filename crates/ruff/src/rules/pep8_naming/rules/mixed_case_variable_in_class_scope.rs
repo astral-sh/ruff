@@ -67,8 +67,8 @@ pub(crate) fn mixed_case_variable_in_class_scope(
         return;
     }
     if helpers::is_mixed_case(name)
-        && !helpers::is_named_tuple_assignment(&checker.ctx, stmt)
-        && !helpers::is_typed_dict_class(&checker.ctx, bases)
+        && !helpers::is_named_tuple_assignment(checker.semantic_model(), stmt)
+        && !helpers::is_typed_dict_class(checker.semantic_model(), bases)
     {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInClassScope {

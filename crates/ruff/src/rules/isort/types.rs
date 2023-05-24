@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::helpers::format_import_from;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum TrailingComma {
+pub(crate) enum TrailingComma {
     Present,
     #[default]
     Absent,
@@ -18,9 +18,9 @@ pub(crate) struct ImportFromData<'a> {
 }
 
 #[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq)]
-pub struct AliasData<'a> {
-    pub name: &'a str,
-    pub asname: Option<&'a str>,
+pub(crate) struct AliasData<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) asname: Option<&'a str>,
 }
 
 #[derive(Debug, Default, Clone)]

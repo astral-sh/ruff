@@ -24,7 +24,6 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     )
     .unwrap()
 });
-static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
 #[derive(Debug)]
 pub(crate) enum Directive<'a> {
@@ -46,12 +45,12 @@ pub(crate) fn extract_noqa_directive<'a>(range: TextRange, locator: &'a Locator)
             caps.name("trailing_spaces"),
         ) {
             (Some(leading_spaces), Some(noqa), Some(codes), Some(trailing_spaces)) => {
-                let codes: Vec<&str> = SPLIT_COMMA_REGEX
-                    .split(codes.as_str().trim())
+                let codes = codes
+                    .as_str()
+                    .split(|c: char| c.is_whitespace() || c == ',')
                     .map(str::trim)
                     .filter(|code| !code.is_empty())
-                    .collect();
-
+                    .collect_vec();
                 let start = range.start() + TextSize::try_from(noqa.start()).unwrap();
                 if codes.is_empty() {
                     #[allow(deprecated)]
@@ -105,11 +104,11 @@ fn parse_file_exemption(line: &str) -> ParsedExemption {
         if remainder.is_empty() {
             return ParsedExemption::All;
         } else if let Some(codes) = remainder.strip_prefix(':') {
-            let codes: Vec<&str> = SPLIT_COMMA_REGEX
-                .split(codes.trim())
+            let codes = codes
+                .split(|c: char| c.is_whitespace() || c == ',')
                 .map(str::trim)
                 .filter(|code| !code.is_empty())
-                .collect();
+                .collect_vec();
             if codes.is_empty() {
                 warn!("Expected rule codes on `noqa` directive: \"{line}\"");
             }

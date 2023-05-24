@@ -96,11 +96,16 @@ where
 /// TID251
 pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
-    if let Some((banned_path, ban)) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
-        banned_api
-            .iter()
-            .find(|(banned_path, ..)| call_path == from_qualified_name(banned_path))
-    }) {
+    if let Some((banned_path, ban)) =
+        checker
+            .semantic_model()
+            .resolve_call_path(expr)
+            .and_then(|call_path| {
+                banned_api
+                    .iter()
+                    .find(|(banned_path, ..)| call_path == from_qualified_name(banned_path))
+            })
+    {
         checker.diagnostics.push(Diagnostic::new(
             BannedApi {
                 name: banned_path.to_string(),

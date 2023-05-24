@@ -164,8 +164,8 @@ fn fix_py2_block(
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.ctx.stmt();
-        let defined_in = checker.ctx.stmt_parent();
+        let defined_by = checker.semantic_model().stmt();
+        let defined_in = checker.semantic_model().stmt_parent();
         return match delete_stmt(
             defined_by,
             if block.starter == Tok::If {
@@ -323,7 +323,7 @@ pub(crate) fn outdated_version_block(
     };
 
     if !checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(left)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["sys", "version_info"]

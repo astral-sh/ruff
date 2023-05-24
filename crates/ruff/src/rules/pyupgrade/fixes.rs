@@ -1,8 +1,5 @@
-use anyhow::{bail, Result};
-use libcst_native::{
-    Codegen, CodegenState, CompoundStatement, Expression, ParenthesizableWhitespace,
-    SmallStatement, Statement, Suite,
-};
+use anyhow::Result;
+use libcst_native::{Codegen, CodegenState, ParenthesizableWhitespace};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
@@ -10,7 +7,9 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 
-use crate::cst::matchers::match_module;
+use crate::cst::matchers::{
+    match_call_mut, match_expression, match_function_def, match_indented_block, match_statement,
+};
 
 /// Safely adjust the indentation of the indented block at [`TextRange`].
 pub(crate) fn adjust_indentation(
@@ -23,15 +22,11 @@ pub(crate) fn adjust_indentation(
 
     let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
 
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_statement(&module_text)?;
 
-    let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
-        bail!("Expected statement to be embedded in a function definition")
-    };
+    let embedding = match_function_def(&mut tree)?;
 
-    let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
-        bail!("Expected indented block")
-    };
+    let indented_block = match_indented_block(&mut embedding.body)?;
     indented_block.indent = Some(indentation);
 
     let mut state = CodegenState {
@@ -58,17 +53,9 @@ pub(crate) fn remove_super_arguments(
     let range = expr.range();
     let contents = locator.slice(range);
 
-    let mut tree = libcst_native::parse_module(contents, None).ok()?;
+    let mut tree = match_expression(contents).ok()?;
 
-    let Statement::Simple(body) = tree.body.first_mut()? else {
-        return None;
-    };
-    let SmallStatement::Expr(body) = body.body.first_mut()? else {
-        return None;
-    };
-    let Expression::Call(body) = &mut body.value else {
-        return None;
-    };
+    let body = match_call_mut(&mut tree).ok()?;
 
     body.args = vec![];
     body.whitespace_before_args = ParenthesizableWhitespace::default();

@@ -737,13 +737,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flynt, "002") => (RuleGroup::Unspecified, Rule::StaticJoinToFString),
 
         // flake8-todos
-        (Flake8Todo, "001") => (RuleGroup::Unspecified, Rule::InvalidTodoTag),
-        (Flake8Todo, "002") => (RuleGroup::Unspecified, Rule::MissingTodoAuthor),
-        (Flake8Todo, "003") => (RuleGroup::Unspecified, Rule::MissingTodoLink),
-        (Flake8Todo, "004") => (RuleGroup::Unspecified, Rule::MissingTodoColon),
-        (Flake8Todo, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
-        (Flake8Todo, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
-        (Flake8Todo, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
+        (Flake8Todos, "001") => (RuleGroup::Unspecified, Rule::InvalidTodoTag),
+        (Flake8Todos, "002") => (RuleGroup::Unspecified, Rule::MissingTodoAuthor),
+        (Flake8Todos, "003") => (RuleGroup::Unspecified, Rule::MissingTodoLink),
+        (Flake8Todos, "004") => (RuleGroup::Unspecified, Rule::MissingTodoColon),
+        (Flake8Todos, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
+        (Flake8Todos, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
+        (Flake8Todos, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
 
         _ => return None,
     })

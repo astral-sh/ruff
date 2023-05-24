@@ -4,15 +4,16 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use annotate::annotate_imports;
+use block::{Block, Trailer};
+pub(crate) use categorize::categorize;
 use categorize::categorize_imports;
-pub use categorize::{categorize, ImportSection, ImportType};
+pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;
-use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, TrailingComma};
 
@@ -21,6 +22,7 @@ use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
 
 mod annotate;
+pub(crate) mod block;
 mod categorize;
 mod comments;
 mod format;
@@ -31,19 +33,18 @@ pub(crate) mod rules;
 pub mod settings;
 mod sorting;
 mod split;
-pub(crate) mod track;
 mod types;
 
 #[derive(Debug)]
-pub struct AnnotatedAliasData<'a> {
-    pub name: &'a str,
-    pub asname: Option<&'a str>,
-    pub atop: Vec<Comment<'a>>,
-    pub inline: Vec<Comment<'a>>,
+pub(crate) struct AnnotatedAliasData<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) asname: Option<&'a str>,
+    pub(crate) atop: Vec<Comment<'a>>,
+    pub(crate) inline: Vec<Comment<'a>>,
 }
 
 #[derive(Debug)]
-pub enum AnnotatedImport<'a> {
+pub(crate) enum AnnotatedImport<'a> {
     Import {
         names: Vec<AliasData<'a>>,
         atop: Vec<Comment<'a>>,
@@ -60,7 +61,7 @@ pub enum AnnotatedImport<'a> {
 }
 
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
-pub fn format_imports(
+pub(crate) fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
     locator: &Locator,
@@ -282,12 +283,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
-    use crate::message::Message;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use crate::assert_messages;
+    use crate::message::Message;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;
@@ -687,11 +687,16 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("comment.py"))]
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
-    #[test_case(Path::new("multiline_docstring.py"))]
+    #[test_case(Path::new("docstring_with_continuation.py"))]
+    #[test_case(Path::new("docstring_with_semicolon.py"))]
     #[test_case(Path::new("empty.py"))]
+    #[test_case(Path::new("existing_import.py"))]
+    #[test_case(Path::new("multiline_docstring.py"))]
+    #[test_case(Path::new("off.py"))]
     fn required_import(path: &Path) -> Result<()> {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(

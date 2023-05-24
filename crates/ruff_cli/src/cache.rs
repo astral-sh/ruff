@@ -2,23 +2,24 @@ use std::cell::RefCell;
 use std::fs;
 use std::hash::Hasher;
 use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use anyhow::Result;
 use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
+use ruff_text_size::{TextRange, TextSize};
+use serde::ser::{SerializeSeq, SerializeStruct};
+use serde::{Deserialize, Serialize, Serializer};
+
 use ruff::message::Message;
 use ruff::settings::{AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
-use serde::ser::{SerializeSeq, SerializeStruct};
-use serde::{Deserialize, Serialize, Serializer};
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 

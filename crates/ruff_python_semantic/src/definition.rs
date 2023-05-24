@@ -2,9 +2,9 @@
 //! can be documented, such as a module, class, or function.
 
 use std::fmt::Debug;
-use std::num::TryFromIntError;
-use std::ops::{Deref, Index};
+use std::ops::Deref;
 
+use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use rustpython_parser::ast::{self, Stmt};
 
 use crate::analyze::visibility::{
@@ -12,28 +12,14 @@ use crate::analyze::visibility::{
 };
 
 /// Id uniquely identifying a definition in a program.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct DefinitionId(u32);
+#[newtype_index]
+pub struct DefinitionId;
 
 impl DefinitionId {
     /// Returns the ID for the module definition.
     #[inline]
     pub const fn module() -> Self {
-        DefinitionId(0)
-    }
-}
-
-impl TryFrom<usize> for DefinitionId {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(u32::try_from(value)?))
-    }
-}
-
-impl From<DefinitionId> for usize {
-    fn from(value: DefinitionId) -> Self {
-        value.0 as usize
+        DefinitionId::from_u32(0)
     }
 }
 
@@ -118,11 +104,11 @@ impl Definition<'_> {
 
 /// The definitions within a Python program indexed by [`DefinitionId`].
 #[derive(Debug, Default)]
-pub struct Definitions<'a>(Vec<Definition<'a>>);
+pub struct Definitions<'a>(IndexVec<DefinitionId, Definition<'a>>);
 
 impl<'a> Definitions<'a> {
     pub fn for_module(definition: Module<'a>) -> Self {
-        Self(vec![Definition::Module(definition)])
+        Self(IndexVec::from_raw(vec![Definition::Module(definition)]))
     }
 
     /// Pushes a new member definition and returns its unique id.
@@ -130,14 +116,13 @@ impl<'a> Definitions<'a> {
     /// Members are assumed to be pushed in traversal order, such that parents are pushed before
     /// their children.
     pub fn push_member(&mut self, member: Member<'a>) -> DefinitionId {
-        let next_id = DefinitionId::try_from(self.0.len()).unwrap();
-        self.0.push(Definition::Member(member));
-        next_id
+        self.0.push(Definition::Member(member))
     }
 
     /// Resolve the visibility of each definition in the collection.
     pub fn resolve(self, exports: Option<&[&str]>) -> ContextualizedDefinitions<'a> {
-        let mut definitions: Vec<ContextualizedDefinition<'a>> = Vec::with_capacity(self.len());
+        let mut definitions: IndexVec<DefinitionId, ContextualizedDefinition<'a>> =
+            IndexVec::with_capacity(self.len());
 
         for definition in self {
             // Determine the visibility of the next definition, taking into account its parent's
@@ -147,7 +132,7 @@ impl<'a> Definitions<'a> {
                     Definition::Module(module) => module.source.to_visibility(),
                     Definition::Member(member) => match member.kind {
                         MemberKind::Class => {
-                            let parent = &definitions[usize::from(member.parent)];
+                            let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
                                 || exports
                                     .map_or(false, |exports| !exports.contains(&member.name()))
@@ -158,7 +143,7 @@ impl<'a> Definitions<'a> {
                             }
                         }
                         MemberKind::NestedClass => {
-                            let parent = &definitions[usize::from(member.parent)];
+                            let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
                                 || matches!(
                                     parent.definition,
@@ -176,7 +161,7 @@ impl<'a> Definitions<'a> {
                             }
                         }
                         MemberKind::Function => {
-                            let parent = &definitions[usize::from(member.parent)];
+                            let parent = &definitions[member.parent];
                             if parent.visibility.is_private()
                                 || exports
                                     .map_or(false, |exports| !exports.contains(&member.name()))
@@ -188,7 +173,7 @@ impl<'a> Definitions<'a> {
                         }
                         MemberKind::NestedFunction => Visibility::Private,
                         MemberKind::Method => {
-                            let parent = &definitions[usize::from(member.parent)];
+                            let parent = &definitions[member.parent];
                             if parent.visibility.is_private() {
                                 Visibility::Private
                             } else {
@@ -204,20 +189,13 @@ impl<'a> Definitions<'a> {
             });
         }
 
-        ContextualizedDefinitions(definitions)
-    }
-}
-
-impl<'a> Index<DefinitionId> for Definitions<'a> {
-    type Output = Definition<'a>;
-
-    fn index(&self, index: DefinitionId) -> &Self::Output {
-        &self.0[usize::from(index)]
+        ContextualizedDefinitions(definitions.raw)
     }
 }
 
 impl<'a> Deref for Definitions<'a> {
-    type Target = [Definition<'a>];
+    type Target = IndexSlice<DefinitionId, Definition<'a>>;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }

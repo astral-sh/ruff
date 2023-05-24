@@ -5,8 +5,8 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged,
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::source_code::Generator;
+use ruff_python_semantic::model::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
@@ -36,7 +36,7 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
 fn match_typed_dict_assign<'a>(
-    checker: &Checker,
+    model: &SemanticModel,
     targets: &'a [Expr],
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
@@ -52,13 +52,9 @@ fn match_typed_dict_assign<'a>(
     }) = value else {
         return None;
     };
-    if !checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TypedDict"]
-        })
-    {
+    if !model.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypedDict"]
+    }) {
         return None;
     }
     Some((class_name, args, keywords, func))
@@ -244,7 +240,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     value: &Expr,
 ) {
     let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(checker, targets, value) else
+        match_typed_dict_assign(checker.semantic_model(), targets, value) else
     {
         return;
     };

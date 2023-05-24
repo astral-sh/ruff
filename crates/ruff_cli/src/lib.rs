@@ -388,8 +388,9 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
 #[cfg(test)]
 mod test_file_change_detector {
-    use crate::{change_detected, ChangeKind};
     use std::path::PathBuf;
+
+    use crate::{change_detected, ChangeKind};
 
     #[test]
     fn detect_correct_file_change() {

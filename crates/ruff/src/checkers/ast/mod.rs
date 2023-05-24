@@ -27,8 +27,8 @@ use ruff_python_semantic::binding::{
     Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
     Importation, StarImportation, SubmoduleImportation,
 };
-use ruff_python_semantic::context::{Context, ContextFlags, ResolvedReference};
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
+use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
@@ -41,6 +41,7 @@ use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::registry::{AsRule, Rule};
+use crate::rules::flake8_builtins::rules::AnyShadowing;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
     flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez,
@@ -71,7 +72,7 @@ pub(crate) struct Checker<'a> {
     pub(crate) indexer: &'a Indexer,
     pub(crate) importer: Importer<'a>,
     // Stateful fields.
-    pub(crate) ctx: Context<'a>,
+    semantic_model: SemanticModel<'a>,
     pub(crate) diagnostics: Vec<Diagnostic>,
     pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
     deferred: Deferred<'a>,
@@ -105,7 +106,7 @@ impl<'a> Checker<'a> {
             stylist,
             indexer,
             importer,
-            ctx: Context::new(&settings.typing_modules, path, module),
+            semantic_model: SemanticModel::new(&settings.typing_modules, path, module),
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
             deletions: FxHashSet::default(),
@@ -138,13 +139,17 @@ impl<'a> Checker<'a> {
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
-        fn quote_style(context: &Context, locator: &Locator, indexer: &Indexer) -> Option<Quote> {
-            if !context.in_f_string() {
+        fn quote_style(
+            model: &SemanticModel,
+            locator: &Locator,
+            indexer: &Indexer,
+        ) -> Option<Quote> {
+            if !model.in_f_string() {
                 return None;
             }
 
             // Find the quote character used to start the containing f-string.
-            let expr = context.expr()?;
+            let expr = model.expr()?;
             let string_range = indexer.f_string_range(expr.start())?;
             let trailing_quote = trailing_quote(locator.slice(string_range))?;
 
@@ -158,9 +163,14 @@ impl<'a> Checker<'a> {
 
         Generator::new(
             self.stylist.indentation(),
-            quote_style(&self.ctx, self.locator, self.indexer).unwrap_or(self.stylist.quote()),
+            quote_style(&self.semantic_model, self.locator, self.indexer)
+                .unwrap_or(self.stylist.quote()),
             self.stylist.line_ending(),
         )
+    }
+
+    pub(crate) fn semantic_model(&self) -> &SemanticModel<'a> {
+        &self.semantic_model
     }
 }
 
@@ -169,7 +179,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        self.ctx.push_stmt(stmt);
+        self.semantic_model.push_stmt(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -180,55 +190,55 @@ where
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
-                        self.ctx.flags |= ContextFlags::FUTURE_ANNOTATIONS;
+                        self.semantic_model.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
                     }
                 } else {
-                    self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
+                    self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 }
             }
             Stmt::Import(_) => {
-                self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
+                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
-                self.ctx.flags |= ContextFlags::FUTURES_BOUNDARY;
-                if !self.ctx.seen_import_boundary()
+                self.semantic_model.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
+                if !self.semantic_model.seen_import_boundary()
                     && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !helpers::in_nested_block(self.ctx.parents())
+                    && !helpers::in_nested_block(self.semantic_model.parents())
                 {
-                    self.ctx.flags |= ContextFlags::IMPORT_BOUNDARY;
+                    self.semantic_model.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
             }
         }
 
         // Track each top-level import, to guide import insertions.
         if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_)) {
-            if self.ctx.at_top_level() {
+            if self.semantic_model.at_top_level() {
                 self.importer.visit_import(stmt);
             }
         }
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
-        let flags_snapshot = self.ctx.flags;
+        let flags_snapshot = self.semantic_model.flags;
 
         // Pre-visit.
         match stmt {
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !self.ctx.scope_id.is_global() {
+                if !self.semantic_model.scope_id.is_global() {
                     // Add the binding to the current scope.
-                    let context = self.ctx.execution_context();
-                    let exceptions = self.ctx.exceptions();
-                    let scope = &mut self.ctx.scopes[self.ctx.scope_id];
-                    let usage = Some((self.ctx.scope_id, stmt.range()));
+                    let context = self.semantic_model.execution_context();
+                    let exceptions = self.semantic_model.exceptions();
+                    let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
+                    let usage = Some((self.semantic_model.scope_id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        let id = self.ctx.bindings.push(Binding {
+                        let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Global,
                             runtime_usage: None,
                             synthetic_usage: usage,
                             typing_usage: None,
                             range: *range,
-                            source: self.ctx.stmt_id,
+                            source: self.semantic_model.stmt_id,
                             context,
                             exceptions,
                         });
@@ -245,20 +255,20 @@ where
             }
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !self.ctx.scope_id.is_global() {
-                    let context = self.ctx.execution_context();
-                    let exceptions = self.ctx.exceptions();
-                    let scope = &mut self.ctx.scopes[self.ctx.scope_id];
-                    let usage = Some((self.ctx.scope_id, stmt.range()));
+                if !self.semantic_model.scope_id.is_global() {
+                    let context = self.semantic_model.execution_context();
+                    let exceptions = self.semantic_model.exceptions();
+                    let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
+                    let usage = Some((self.semantic_model.scope_id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let id = self.ctx.bindings.push(Binding {
+                        let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             runtime_usage: None,
                             synthetic_usage: usage,
                             typing_usage: None,
                             range: *range,
-                            source: self.ctx.stmt_id,
+                            source: self.semantic_model.stmt_id,
                             context,
                             exceptions,
                         });
@@ -269,15 +279,15 @@ where
                     // and the current scope.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let binding_id = self
-                            .ctx
+                            .semantic_model
                             .scopes
-                            .ancestors(self.ctx.scope_id)
+                            .ancestors(self.semantic_model.scope_id)
                             .skip(1)
                             .take_while(|scope| !scope.kind.is_module())
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
-                            self.ctx.bindings[*binding_id].runtime_usage = usage;
+                            self.semantic_model.bindings[*binding_id].runtime_usage = usage;
                         } else {
                             // Ensure that every nonlocal has an existing binding from a parent scope.
                             if self.settings.rules.enabled(Rule::NonlocalWithoutBinding) {
@@ -301,9 +311,10 @@ where
             }
             Stmt::Break(_) => {
                 if self.settings.rules.enabled(Rule::BreakOutsideLoop) {
-                    if let Some(diagnostic) =
-                        pyflakes::rules::break_outside_loop(stmt, &mut self.ctx.parents().skip(1))
-                    {
+                    if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
+                        stmt,
+                        &mut self.semantic_model.parents().skip(1),
+                    ) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -312,7 +323,7 @@ where
                 if self.settings.rules.enabled(Rule::ContinueOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                         stmt,
-                        &mut self.ctx.parents().skip(1),
+                        &mut self.semantic_model.parents().skip(1),
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -342,7 +353,7 @@ where
                     self.diagnostics
                         .extend(flake8_django::rules::non_leading_receiver_decorator(
                             decorator_list,
-                            |expr| self.ctx.resolve_call_path(expr),
+                            |expr| self.semantic_model.resolve_call_path(expr),
                         ));
                 }
 
@@ -362,7 +373,7 @@ where
                         name,
                         decorator_list,
                         &self.settings.pep8_naming.ignore_names,
-                        &self.ctx,
+                        &self.semantic_model,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -377,7 +388,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_class_method(
                             self,
-                            self.ctx.scope(),
+                            self.semantic_model.scope(),
                             name,
                             decorator_list,
                             args,
@@ -395,7 +406,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_method(
                             self,
-                            self.ctx.scope(),
+                            self.semantic_model.scope(),
                             name,
                             decorator_list,
                             args,
@@ -416,7 +427,7 @@ where
 
                 if self.settings.rules.enabled(Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                        self.ctx.scope(),
+                        self.semantic_model.scope(),
                         stmt,
                         name,
                         self.locator,
@@ -614,13 +625,21 @@ where
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
 
-                if self.ctx.scope().kind.is_class() {
+                if self.semantic_model.scope().kind.is_class() {
                     if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
-                        flake8_builtins::rules::builtin_attribute_shadowing(self, name, stmt);
+                        flake8_builtins::rules::builtin_attribute_shadowing(
+                            self,
+                            name,
+                            AnyShadowing::from(stmt),
+                        );
                     }
                 } else {
                     if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                        flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                        flake8_builtins::rules::builtin_variable_shadowing(
+                            self,
+                            name,
+                            AnyShadowing::from(stmt),
+                        );
                     }
                 }
             }
@@ -774,7 +793,7 @@ where
                 if self.settings.rules.any_enabled(&[
                     Rule::MutableDataclassDefault,
                     Rule::FunctionCallInDataclassDefaultArgument,
-                ]) && ruff::rules::is_dataclass(self, decorator_list)
+                ]) && ruff::rules::is_dataclass(&self.semantic_model, decorator_list)
                 {
                     if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
                         ruff::rules::mutable_dataclass_default(self, body);
@@ -794,7 +813,11 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                    flake8_builtins::rules::builtin_variable_shadowing(self, name, stmt);
+                    flake8_builtins::rules::builtin_variable_shadowing(
+                        self,
+                        name,
+                        AnyShadowing::from(stmt),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::DuplicateBases) {
@@ -839,17 +862,20 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((self.ctx.scope_id, alias.range())),
+                                synthetic_usage: Some((
+                                    self.semantic_model.scope_id,
+                                    alias.range(),
+                                )),
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: self.ctx.stmt_id,
-                                context: self.ctx.execution_context(),
-                                exceptions: self.ctx.exceptions(),
+                                source: self.semantic_model.stmt_id,
+                                context: self.semantic_model.execution_context(),
+                                exceptions: self.semantic_model.exceptions(),
                             },
                         );
 
                         if self.settings.rules.enabled(Rule::LateFutureImport) {
-                            if self.ctx.seen_futures_boundary() {
+                            if self.semantic_model.seen_futures_boundary() {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::LateFutureImport,
                                     stmt.range(),
@@ -872,9 +898,9 @@ where
                                 synthetic_usage: None,
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: self.ctx.stmt_id,
-                                context: self.ctx.execution_context(),
-                                exceptions: self.ctx.exceptions(),
+                                source: self.semantic_model.stmt_id,
+                                context: self.semantic_model.execution_context(),
+                                exceptions: self.semantic_model.exceptions(),
                             },
                         );
                     } else {
@@ -893,22 +919,24 @@ where
                                 kind: BindingKind::Importation(Importation { name, full_name }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
-                                    Some((self.ctx.scope_id, alias.range()))
+                                    Some((self.semantic_model.scope_id, alias.range()))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: self.ctx.stmt_id,
-                                context: self.ctx.execution_context(),
-                                exceptions: self.ctx.exceptions(),
+                                source: self.semantic_model.stmt_id,
+                                context: self.semantic_model.execution_context(),
+                                exceptions: self.semantic_model.exceptions(),
                             },
                         );
 
                         if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
-                                    self, asname, stmt,
+                                    self,
+                                    asname,
+                                    AnyShadowing::from(stmt),
                                 );
                             }
                         }
@@ -1154,12 +1182,15 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((self.ctx.scope_id, alias.range())),
+                                synthetic_usage: Some((
+                                    self.semantic_model.scope_id,
+                                    alias.range(),
+                                )),
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: self.ctx.stmt_id,
-                                context: self.ctx.execution_context(),
-                                exceptions: self.ctx.exceptions(),
+                                source: self.semantic_model.stmt_id,
+                                context: self.semantic_model.execution_context(),
+                                exceptions: self.semantic_model.exceptions(),
                             },
                         );
 
@@ -1168,7 +1199,7 @@ where
                         }
 
                         if self.settings.rules.enabled(Rule::LateFutureImport) {
-                            if self.ctx.seen_futures_boundary() {
+                            if self.semantic_model.seen_futures_boundary() {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::LateFutureImport,
                                     stmt.range(),
@@ -1176,7 +1207,7 @@ where
                             }
                         }
                     } else if &alias.name == "*" {
-                        self.ctx
+                        self.semantic_model
                             .scope_mut()
                             .add_star_import(StarImportation { level, module });
 
@@ -1185,7 +1216,7 @@ where
                             .rules
                             .enabled(Rule::UndefinedLocalWithNestedImportStarUsage)
                         {
-                            let scope = self.ctx.scope();
+                            let scope = self.semantic_model.scope();
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
@@ -1212,7 +1243,9 @@ where
                         if let Some(asname) = &alias.asname {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                                 flake8_builtins::rules::builtin_variable_shadowing(
-                                    self, asname, stmt,
+                                    self,
+                                    asname,
+                                    AnyShadowing::from(stmt),
                                 );
                             }
                         }
@@ -1239,15 +1272,15 @@ where
                                 }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
-                                    Some((self.ctx.scope_id, alias.range()))
+                                    Some((self.semantic_model.scope_id, alias.range()))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: self.ctx.stmt_id,
-                                context: self.ctx.execution_context(),
-                                exceptions: self.ctx.exceptions(),
+                                source: self.semantic_model.stmt_id,
+                                context: self.semantic_model.execution_context(),
+                                exceptions: self.semantic_model.exceptions(),
                             },
                         );
                     }
@@ -1491,11 +1524,15 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.stmt_parent(),
+                        self.semantic_model.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::IfWithSameArms) {
-                    flake8_simplify::rules::if_with_same_arms(self, stmt, self.ctx.stmt_parent());
+                    flake8_simplify::rules::if_with_same_arms(
+                        self,
+                        stmt,
+                        self.semantic_model.stmt_parent(),
+                    );
                 }
                 if self.settings.rules.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
@@ -1511,14 +1548,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.stmt_parent(),
+                        self.semantic_model.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::IfElseBlockInsteadOfIfExp) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
-                        self.ctx.stmt_parent(),
+                        self.semantic_model.stmt_parent(),
                     );
                 }
                 if self
@@ -1532,7 +1569,7 @@ where
                         test,
                         body,
                         orelse,
-                        self.ctx.stmt_parent(),
+                        self.semantic_model.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::TypeCheckWithoutTypeError) {
@@ -1541,7 +1578,7 @@ where
                         body,
                         test,
                         orelse,
-                        self.ctx.stmt_parent(),
+                        self.semantic_model.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::OutdatedVersionBlock) {
@@ -1560,7 +1597,7 @@ where
                 msg,
                 range: _,
             }) => {
-                if !self.ctx.in_type_checking_block() {
+                if !self.semantic_model.in_type_checking_block() {
                     if self.settings.rules.enabled(Rule::Assert) {
                         self.diagnostics
                             .push(flake8_bandit::rules::assert_used(stmt));
@@ -1606,7 +1643,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.ctx.stmt_parent(),
+                        self.semantic_model.stmt_parent(),
                     );
                 }
                 if self.settings.rules.enabled(Rule::RedefinedLoopName) {
@@ -1636,7 +1673,7 @@ where
                 ..
             }) => {
                 if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
-                    self.deferred.for_loops.push(self.ctx.snapshot());
+                    self.deferred.for_loops.push(self.semantic_model.snapshot());
                 }
                 if self
                     .settings
@@ -1662,7 +1699,7 @@ where
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
-                            self.ctx.sibling_stmt(),
+                            self.semantic_model.sibling_stmt(),
                         );
                     }
                     if self.settings.rules.enabled(Rule::InDictKeys) {
@@ -1806,7 +1843,11 @@ where
                         Rule::UnannotatedAssignmentInStub,
                     ]) {
                         // Ignore assignments in function bodies; those are covered by other rules.
-                        if !self.ctx.scopes().any(|scope| scope.kind.is_function()) {
+                        if !self
+                            .semantic_model
+                            .scopes()
+                            .any(|scope| scope.kind.is_function())
+                        {
                             if self.settings.rules.enabled(Rule::UnprefixedTypeParam) {
                                 flake8_pyi::rules::prefix_type_params(self, value, targets);
                             }
@@ -1859,14 +1900,21 @@ where
                     if let Some(value) = value {
                         if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
                             // Ignore assignments in function bodies; those are covered by other rules.
-                            if !self.ctx.scopes().any(|scope| scope.kind.is_function()) {
+                            if !self
+                                .semantic_model
+                                .scopes()
+                                .any(|scope| scope.kind.is_function())
+                            {
                                 flake8_pyi::rules::annotated_assignment_default_in_stub(
                                     self, target, value, annotation,
                                 );
                             }
                         }
                     }
-                    if self.ctx.match_typing_expr(annotation, "TypeAlias") {
+                    if self
+                        .semantic_model
+                        .match_typing_expr(annotation, "TypeAlias")
+                    {
                         if self.settings.rules.enabled(Rule::SnakeCaseTypeAlias) {
                             flake8_pyi::rules::snake_case_type_alias(self, target);
                         }
@@ -1900,7 +1948,7 @@ where
                 }
                 if self.settings.rules.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
-                        self.ctx.resolve_call_path(expr)
+                        self.semantic_model.resolve_call_path(expr)
                     }) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -1935,7 +1983,7 @@ where
 
                 // Function annotations are always evaluated at runtime, unless future annotations
                 // are enabled.
-                let runtime_annotation = !self.ctx.future_annotations();
+                let runtime_annotation = !self.semantic_model.future_annotations();
 
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.annotation {
@@ -2004,9 +2052,9 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: stmt.range(),
-                        source: self.ctx.stmt_id,
-                        context: self.ctx.execution_context(),
-                        exceptions: self.ctx.exceptions(),
+                        source: self.semantic_model.stmt_id,
+                        context: self.semantic_model.execution_context(),
+                        exceptions: self.semantic_model.exceptions(),
                     },
                 );
 
@@ -2014,43 +2062,48 @@ where
                 let globals = helpers::extract_globals(body);
                 for (name, stmt) in helpers::extract_globals(body) {
                     if self
-                        .ctx
+                        .semantic_model
                         .global_scope()
                         .get(name)
-                        .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
+                        .map_or(true, |binding_id| {
+                            self.semantic_model.bindings[*binding_id]
+                                .kind
+                                .is_annotation()
+                        })
                     {
-                        let id = self.ctx.bindings.push(Binding {
+                        let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
                             typing_usage: None,
                             range: stmt.range(),
-                            source: self.ctx.stmt_id,
-                            context: self.ctx.execution_context(),
-                            exceptions: self.ctx.exceptions(),
+                            source: self.semantic_model.stmt_id,
+                            context: self.semantic_model.execution_context(),
+                            exceptions: self.semantic_model.exceptions(),
                         });
-                        self.ctx.global_scope_mut().add(name, id);
+                        self.semantic_model.global_scope_mut().add(name, id);
                     }
                 }
 
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Function,
                     stmt,
-                    self.ctx.definition_id,
-                    &self.ctx.definitions,
+                    self.semantic_model.definition_id,
+                    &self.semantic_model.definitions,
                 );
-                self.ctx.push_definition(definition);
+                self.semantic_model.push_definition(definition);
 
-                self.ctx.push_scope(ScopeKind::Function(FunctionDef {
-                    name,
-                    body,
-                    args,
-                    decorator_list,
-                    async_: matches!(stmt, Stmt::AsyncFunctionDef(_)),
-                    globals,
-                }));
+                self.semantic_model
+                    .push_scope(ScopeKind::Function(FunctionDef {
+                        name,
+                        body,
+                        args,
+                        decorator_list,
+                        async_: matches!(stmt, Stmt::AsyncFunctionDef(_)),
+                        globals,
+                    }));
 
-                self.deferred.functions.push(self.ctx.snapshot());
+                self.deferred.functions.push(self.semantic_model.snapshot());
             }
             Stmt::ClassDef(ast::StmtClassDef {
                 body,
@@ -2074,34 +2127,38 @@ where
                 let globals = helpers::extract_globals(body);
                 for (name, stmt) in &globals {
                     if self
-                        .ctx
+                        .semantic_model
                         .global_scope()
                         .get(name)
-                        .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
+                        .map_or(true, |binding_id| {
+                            self.semantic_model.bindings[*binding_id]
+                                .kind
+                                .is_annotation()
+                        })
                     {
-                        let id = self.ctx.bindings.push(Binding {
+                        let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
                             typing_usage: None,
                             range: stmt.range(),
-                            source: self.ctx.stmt_id,
-                            context: self.ctx.execution_context(),
-                            exceptions: self.ctx.exceptions(),
+                            source: self.semantic_model.stmt_id,
+                            context: self.semantic_model.execution_context(),
+                            exceptions: self.semantic_model.exceptions(),
                         });
-                        self.ctx.global_scope_mut().add(name, id);
+                        self.semantic_model.global_scope_mut().add(name, id);
                     }
                 }
 
                 let definition = docstrings::extraction::extract_definition(
                     ExtractionTarget::Class,
                     stmt,
-                    self.ctx.definition_id,
-                    &self.ctx.definitions,
+                    self.semantic_model.definition_id,
+                    &self.semantic_model.definitions,
                 );
-                self.ctx.push_definition(definition);
+                self.semantic_model.push_definition(definition);
 
-                self.ctx.push_scope(ScopeKind::Class(ClassDef {
+                self.semantic_model.push_scope(ScopeKind::Class(ClassDef {
                     name,
                     bases,
                     keywords,
@@ -2127,7 +2184,7 @@ where
             }) => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(call_path) = self.ctx.resolve_call_path(type_) {
+                    if let Some(call_path) = self.semantic_model.resolve_call_path(type_) {
                         if call_path.as_slice() == ["", "NameError"] {
                             handled_exceptions |= Exceptions::NAME_ERROR;
                         } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
@@ -2136,7 +2193,9 @@ where
                     }
                 }
 
-                self.ctx.handled_exceptions.push(handled_exceptions);
+                self.semantic_model
+                    .handled_exceptions
+                    .push(handled_exceptions);
 
                 if self.settings.rules.enabled(Rule::JumpStatementInFinally) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
@@ -2149,9 +2208,9 @@ where
                 }
 
                 self.visit_body(body);
-                self.ctx.handled_exceptions.pop();
+                self.semantic_model.handled_exceptions.pop();
 
-                self.ctx.flags |= ContextFlags::EXCEPTION_HANDLER;
+                self.semantic_model.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
@@ -2168,8 +2227,8 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = if self.ctx.future_annotations() {
-                    if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
+                let runtime_annotation = if self.semantic_model.future_annotations() {
+                    if matches!(self.semantic_model.scope().kind, ScopeKind::Class(..)) {
                         let baseclasses = &self
                             .settings
                             .flake8_type_checking
@@ -2179,7 +2238,7 @@ where
                             .flake8_type_checking
                             .runtime_evaluated_decorators;
                         flake8_type_checking::helpers::runtime_evaluated(
-                            &self.ctx,
+                            &self.semantic_model,
                             baseclasses,
                             decorators,
                         )
@@ -2188,7 +2247,7 @@ where
                     }
                 } else {
                     matches!(
-                        self.ctx.scope().kind,
+                        self.semantic_model.scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
                     )
                 };
@@ -2199,7 +2258,10 @@ where
                     self.visit_annotation(annotation);
                 }
                 if let Some(expr) = value {
-                    if self.ctx.match_typing_expr(annotation, "TypeAlias") {
+                    if self
+                        .semantic_model
+                        .match_typing_expr(annotation, "TypeAlias")
+                    {
                         self.visit_type_definition(expr);
                     } else {
                         self.visit_expr(expr);
@@ -2235,7 +2297,8 @@ where
             }) => {
                 self.visit_boolean_test(test);
 
-                if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
+                if flake8_type_checking::helpers::is_type_checking_block(&self.semantic_model, test)
+                {
                     if self.settings.rules.enabled(Rule::EmptyTypeCheckingBlock) {
                         flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
                     }
@@ -2253,12 +2316,12 @@ where
         // Post-visit.
         match stmt {
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
-                self.ctx.pop_scope();
-                self.ctx.pop_definition();
+                self.semantic_model.pop_scope();
+                self.semantic_model.pop_definition();
             }
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-                self.ctx.pop_scope();
-                self.ctx.pop_definition();
+                self.semantic_model.pop_scope();
+                self.semantic_model.pop_definition();
                 self.add_binding(
                     name,
                     Binding {
@@ -2267,31 +2330,31 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: stmt.range(),
-                        source: self.ctx.stmt_id,
-                        context: self.ctx.execution_context(),
-                        exceptions: self.ctx.exceptions(),
+                        source: self.semantic_model.stmt_id,
+                        context: self.semantic_model.execution_context(),
+                        exceptions: self.semantic_model.exceptions(),
                     },
                 );
             }
             _ => {}
         }
 
-        self.ctx.flags = flags_snapshot;
-        self.ctx.pop_stmt();
+        self.semantic_model.flags = flags_snapshot;
+        self.semantic_model.pop_stmt();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
-        let flags_snapshot = self.ctx.flags;
-        self.ctx.flags |= ContextFlags::ANNOTATION;
+        let flags_snapshot = self.semantic_model.flags;
+        self.semantic_model.flags |= SemanticModelFlags::ANNOTATION;
         self.visit_type_definition(expr);
-        self.ctx.flags = flags_snapshot;
+        self.semantic_model.flags = flags_snapshot;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if !self.ctx.in_f_string()
-            && !self.ctx.in_deferred_type_definition()
-            && self.ctx.in_type_definition()
-            && self.ctx.future_annotations()
+        if !self.semantic_model.in_f_string()
+            && !self.semantic_model.in_deferred_type_definition()
+            && self.semantic_model.in_type_definition()
+            && self.semantic_model.future_annotations()
         {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
@@ -2301,21 +2364,21 @@ where
                 self.deferred.string_type_definitions.push((
                     expr.range(),
                     value,
-                    self.ctx.snapshot(),
+                    self.semantic_model.snapshot(),
                 ));
             } else {
                 self.deferred
                     .future_type_definitions
-                    .push((expr, self.ctx.snapshot()));
+                    .push((expr, self.semantic_model.snapshot()));
             }
             return;
         }
 
-        self.ctx.push_expr(expr);
+        self.semantic_model.push_expr(expr);
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.
-        let flags_snapshot = self.ctx.flags;
+        let flags_snapshot = self.semantic_model.flags;
 
         // If we're in a boolean test (e.g., the `test` of a `Stmt::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
@@ -2327,7 +2390,7 @@ where
                     ..
                 })
         ) {
-            self.ctx.flags -= ContextFlags::BOOLEAN_TEST;
+            self.semantic_model.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
         // Pre-visit.
@@ -2339,7 +2402,7 @@ where
                     Rule::NonPEP604Annotation,
                 ]) {
                     if let Some(operator) =
-                        analyze::typing::to_pep604_operator(value, slice, &self.ctx)
+                        analyze::typing::to_pep604_operator(value, slice, &self.semantic_model)
                     {
                         if self
                             .settings
@@ -2348,8 +2411,8 @@ where
                         {
                             if self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
-                                && !self.ctx.future_annotations()
-                                && self.ctx.in_annotation()
+                                && !self.semantic_model.future_annotations()
+                                && self.semantic_model.in_annotation()
                             {
                                 flake8_future_annotations::rules::missing_future_annotations(
                                     self, value,
@@ -2359,8 +2422,8 @@ where
                         if self.settings.rules.enabled(Rule::NonPEP604Annotation) {
                             if self.settings.target_version >= PythonVersion::Py310
                                 || (self.settings.target_version >= PythonVersion::Py37
-                                    && self.ctx.future_annotations()
-                                    && self.ctx.in_annotation())
+                                    && self.semantic_model.future_annotations()
+                                    && self.semantic_model.in_annotation())
                             {
                                 pyupgrade::rules::use_pep604_annotation(
                                     self, expr, slice, operator,
@@ -2370,8 +2433,8 @@ where
                     }
                 }
 
-                if self.ctx.match_typing_expr(value, "Literal") {
-                    self.ctx.flags |= ContextFlags::LITERAL;
+                if self.semantic_model.match_typing_expr(value, "Literal") {
+                    self.semantic_model.flags |= SemanticModelFlags::LITERAL;
                 }
 
                 if self.settings.rules.any_enabled(&[
@@ -2438,7 +2501,7 @@ where
                             Rule::NonPEP585Annotation,
                         ]) {
                             if let Some(replacement) =
-                                analyze::typing::to_pep585_generic(expr, &self.ctx)
+                                analyze::typing::to_pep585_generic(expr, &self.semantic_model)
                             {
                                 if self
                                     .settings
@@ -2447,8 +2510,8 @@ where
                                 {
                                     if self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
-                                        && !self.ctx.future_annotations()
-                                        && self.ctx.in_annotation()
+                                        && !self.semantic_model.future_annotations()
+                                        && self.semantic_model.in_annotation()
                                     {
                                         flake8_future_annotations::rules::missing_future_annotations(
                                             self, expr,
@@ -2458,8 +2521,8 @@ where
                                 if self.settings.rules.enabled(Rule::NonPEP585Annotation) {
                                     if self.settings.target_version >= PythonVersion::Py39
                                         || (self.settings.target_version >= PythonVersion::Py37
-                                            && self.ctx.future_annotations()
-                                            && self.ctx.in_annotation())
+                                            && self.semantic_model.future_annotations()
+                                            && self.semantic_model.in_annotation())
                                     {
                                         pyupgrade::rules::use_pep585_annotation(
                                             self,
@@ -2482,13 +2545,21 @@ where
                             }
                         }
 
-                        if self.ctx.scope().kind.is_class() {
+                        if self.semantic_model.scope().kind.is_class() {
                             if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
-                                flake8_builtins::rules::builtin_attribute_shadowing(self, id, expr);
+                                flake8_builtins::rules::builtin_attribute_shadowing(
+                                    self,
+                                    id,
+                                    AnyShadowing::from(expr),
+                                );
                             }
                         } else {
                             if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
-                                flake8_builtins::rules::builtin_variable_shadowing(self, id, expr);
+                                flake8_builtins::rules::builtin_variable_shadowing(
+                                    self,
+                                    id,
+                                    AnyShadowing::from(expr),
+                                );
                             }
                         }
 
@@ -2515,7 +2586,9 @@ where
                     Rule::MissingFutureAnnotationsImport,
                     Rule::NonPEP585Annotation,
                 ]) {
-                    if let Some(replacement) = analyze::typing::to_pep585_generic(expr, &self.ctx) {
+                    if let Some(replacement) =
+                        analyze::typing::to_pep585_generic(expr, &self.semantic_model)
+                    {
                         if self
                             .settings
                             .rules
@@ -2523,8 +2596,8 @@ where
                         {
                             if self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
-                                && !self.ctx.future_annotations()
-                                && self.ctx.in_annotation()
+                                && !self.semantic_model.future_annotations()
+                                && self.semantic_model.in_annotation()
                             {
                                 flake8_future_annotations::rules::missing_future_annotations(
                                     self, expr,
@@ -2534,8 +2607,8 @@ where
                         if self.settings.rules.enabled(Rule::NonPEP585Annotation) {
                             if self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
-                                    && self.ctx.future_annotations()
-                                    && self.ctx.in_annotation())
+                                    && self.semantic_model.future_annotations()
+                                    && self.semantic_model.in_annotation())
                             {
                                 pyupgrade::rules::use_pep585_annotation(self, expr, &replacement);
                             }
@@ -2889,7 +2962,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_set(
                         self,
                         expr,
-                        self.ctx.expr_parent(),
+                        self.semantic_model.expr_parent(),
                         func,
                         args,
                         keywords,
@@ -2899,7 +2972,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_dict(
                         self,
                         expr,
-                        self.ctx.expr_parent(),
+                        self.semantic_model.expr_parent(),
                         func,
                         args,
                         keywords,
@@ -3004,7 +3077,7 @@ where
                     flake8_comprehensions::rules::unnecessary_map(
                         self,
                         expr,
-                        self.ctx.expr_parent(),
+                        self.semantic_model.expr_parent(),
                         func,
                         args,
                     );
@@ -3031,7 +3104,7 @@ where
                 }
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = self.ctx.scope_mut();
+                        let scope = self.semantic_model.scope_mut();
                         scope.uses_locals = true;
                     }
                 }
@@ -3540,8 +3613,8 @@ where
             }) => {
                 if self.is_stub {
                     if self.settings.rules.enabled(Rule::DuplicateUnionMember)
-                        && self.ctx.in_type_definition()
-                        && self.ctx.expr_parent().map_or(true, |parent| {
+                        && self.semantic_model.in_type_definition()
+                        && self.semantic_model.expr_parent().map_or(true, |parent| {
                             !matches!(
                                 parent,
                                 Expr::BinOp(ast::ExprBinOp {
@@ -3691,14 +3764,14 @@ where
                 kind,
                 range: _,
             }) => {
-                if self.ctx.in_type_definition()
-                    && !self.ctx.in_literal()
-                    && !self.ctx.in_f_string()
+                if self.semantic_model.in_type_definition()
+                    && !self.semantic_model.in_literal()
+                    && !self.semantic_model.in_f_string()
                 {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
                         value,
-                        self.ctx.snapshot(),
+                        self.semantic_model.snapshot(),
                     ));
                 }
                 if self
@@ -3743,7 +3816,7 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
-                self.ctx
+                self.semantic_model
                     .push_scope(ScopeKind::Lambda(Lambda { args, body }));
             }
             Expr::IfExp(ast::ExprIfExp {
@@ -3900,7 +3973,9 @@ where
                 self.visit_expr(value);
             }
             Expr::Lambda(_) => {
-                self.deferred.lambdas.push((expr, self.ctx.snapshot()));
+                self.deferred
+                    .lambdas
+                    .push((expr, self.semantic_model.snapshot()));
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -3918,35 +3993,53 @@ where
                 keywords,
                 range: _,
             }) => {
-                let callable = self.ctx.resolve_call_path(func).and_then(|call_path| {
-                    if self.ctx.match_typing_call_path(&call_path, "cast") {
-                        Some(Callable::Cast)
-                    } else if self.ctx.match_typing_call_path(&call_path, "NewType") {
-                        Some(Callable::NewType)
-                    } else if self.ctx.match_typing_call_path(&call_path, "TypeVar") {
-                        Some(Callable::TypeVar)
-                    } else if self.ctx.match_typing_call_path(&call_path, "NamedTuple") {
-                        Some(Callable::NamedTuple)
-                    } else if self.ctx.match_typing_call_path(&call_path, "TypedDict") {
-                        Some(Callable::TypedDict)
-                    } else if [
-                        "Arg",
-                        "DefaultArg",
-                        "NamedArg",
-                        "DefaultNamedArg",
-                        "VarArg",
-                        "KwArg",
-                    ]
-                    .iter()
-                    .any(|target| call_path.as_slice() == ["mypy_extensions", target])
-                    {
-                        Some(Callable::MypyExtension)
-                    } else if call_path.as_slice() == ["", "bool"] {
-                        Some(Callable::Bool)
-                    } else {
-                        None
-                    }
-                });
+                let callable = self
+                    .semantic_model
+                    .resolve_call_path(func)
+                    .and_then(|call_path| {
+                        if self
+                            .semantic_model
+                            .match_typing_call_path(&call_path, "cast")
+                        {
+                            Some(Callable::Cast)
+                        } else if self
+                            .semantic_model
+                            .match_typing_call_path(&call_path, "NewType")
+                        {
+                            Some(Callable::NewType)
+                        } else if self
+                            .semantic_model
+                            .match_typing_call_path(&call_path, "TypeVar")
+                        {
+                            Some(Callable::TypeVar)
+                        } else if self
+                            .semantic_model
+                            .match_typing_call_path(&call_path, "NamedTuple")
+                        {
+                            Some(Callable::NamedTuple)
+                        } else if self
+                            .semantic_model
+                            .match_typing_call_path(&call_path, "TypedDict")
+                        {
+                            Some(Callable::TypedDict)
+                        } else if [
+                            "Arg",
+                            "DefaultArg",
+                            "NamedArg",
+                            "DefaultNamedArg",
+                            "VarArg",
+                            "KwArg",
+                        ]
+                        .iter()
+                        .any(|target| call_path.as_slice() == ["mypy_extensions", target])
+                        {
+                            Some(Callable::MypyExtension)
+                        } else if call_path.as_slice() == ["", "bool"] {
+                            Some(Callable::Bool)
+                        } else {
+                            None
+                        }
+                    });
                 match callable {
                     Some(Callable::Bool) => {
                         self.visit_expr(func);
@@ -4104,15 +4197,15 @@ where
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
                 // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
                 // the `ExprContext` at the top-level.
-                if self.ctx.in_subscript() {
+                if self.semantic_model.in_subscript() {
                     visitor::walk_expr(self, expr);
                 } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
-                    self.ctx.flags |= ContextFlags::SUBSCRIPT;
+                    self.semantic_model.flags |= SemanticModelFlags::SUBSCRIPT;
                     visitor::walk_expr(self, expr);
                 } else {
                     match analyze::typing::match_annotated_subscript(
                         value,
-                        &self.ctx,
+                        &self.semantic_model,
                         self.settings.typing_modules.iter().map(String::as_str),
                     ) {
                         Some(subscript) => {
@@ -4155,7 +4248,7 @@ where
                 }
             }
             Expr::JoinedStr(_) => {
-                self.ctx.flags |= ContextFlags::F_STRING;
+                self.semantic_model.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
             _ => visitor::walk_expr(self, expr),
@@ -4168,13 +4261,13 @@ where
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
-                self.ctx.pop_scope();
+                self.semantic_model.pop_scope();
             }
             _ => {}
         };
 
-        self.ctx.flags = flags_snapshot;
-        self.ctx.pop_expr();
+        self.semantic_model.flags = flags_snapshot;
+        self.semantic_model.pop_expr();
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
@@ -4259,14 +4352,14 @@ where
                             flake8_builtins::rules::builtin_variable_shadowing(
                                 self,
                                 name,
-                                excepthandler,
+                                AnyShadowing::from(excepthandler),
                             );
                         }
 
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self.ctx.scope().defines(name) {
+                        if self.semantic_model.scope().defines(name) {
                             self.handle_node_store(
                                 name,
                                 &Expr::Name(ast::ExprName {
@@ -4277,7 +4370,7 @@ where
                             );
                         }
 
-                        let definition = self.ctx.scope().get(name).copied();
+                        let definition = self.semantic_model.scope().get(name).copied();
                         self.handle_node_store(
                             name,
                             &Expr::Name(ast::ExprName {
@@ -4289,11 +4382,11 @@ where
 
                         walk_excepthandler(self, excepthandler);
 
-                        if let Some(index) = {
-                            let scope = self.ctx.scope_mut();
+                        if let Some(binding_id) = {
+                            let scope = self.semantic_model.scope_mut();
                             &scope.remove(name)
                         } {
-                            if !self.ctx.bindings[*index].used() {
+                            if !self.semantic_model.bindings[*binding_id].used() {
                                 if self.settings.rules.enabled(Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         pyflakes::rules::UnusedVariable { name: name.into() },
@@ -4313,9 +4406,9 @@ where
                             }
                         }
 
-                        if let Some(index) = definition {
-                            let scope = self.ctx.scope_mut();
-                            scope.add(name, index);
+                        if let Some(binding_id) = definition {
+                            let scope = self.semantic_model.scope_mut();
+                            scope.add(name, binding_id);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -4392,9 +4485,9 @@ where
                 synthetic_usage: None,
                 typing_usage: None,
                 range: arg.range(),
-                source: self.ctx.stmt_id,
-                context: self.ctx.execution_context(),
-                exceptions: self.ctx.exceptions(),
+                source: self.semantic_model.stmt_id,
+                context: self.semantic_model.execution_context(),
+                exceptions: self.semantic_model.exceptions(),
             },
         );
 
@@ -4417,7 +4510,7 @@ where
         }
 
         if self.settings.rules.enabled(Rule::BuiltinArgumentShadowing) {
-            flake8_builtins::rules::builtin_argument_shadowing(self, &arg.arg, arg);
+            flake8_builtins::rules::builtin_argument_shadowing(self, arg);
         }
     }
 
@@ -4441,9 +4534,9 @@ where
                     synthetic_usage: None,
                     typing_usage: None,
                     range: pattern.range(),
-                    source: self.ctx.stmt_id,
-                    context: self.ctx.execution_context(),
-                    exceptions: self.ctx.exceptions(),
+                    source: self.semantic_model.stmt_id,
+                    context: self.semantic_model.execution_context(),
+                    exceptions: self.semantic_model.exceptions(),
                 },
             );
         }
@@ -4456,18 +4549,18 @@ where
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
-        let prev_body = self.ctx.body;
-        let prev_body_index = self.ctx.body_index;
-        self.ctx.body = body;
-        self.ctx.body_index = 0;
+        let prev_body = self.semantic_model.body;
+        let prev_body_index = self.semantic_model.body_index;
+        self.semantic_model.body = body;
+        self.semantic_model.body_index = 0;
 
         for stmt in body {
             self.visit_stmt(stmt);
-            self.ctx.body_index += 1;
+            self.semantic_model.body_index += 1;
         }
 
-        self.ctx.body = prev_body;
-        self.ctx.body_index = prev_body_index;
+        self.semantic_model.body = prev_body;
+        self.semantic_model.body_index = prev_body_index;
     }
 }
 
@@ -4518,7 +4611,7 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.ctx.push_scope(ScopeKind::Generator);
+        self.semantic_model.push_scope(ScopeKind::Generator);
         self.visit_expr(&generator.target);
         for expr in &generator.ifs {
             self.visit_boolean_test(expr);
@@ -4535,56 +4628,56 @@ impl<'a> Checker<'a> {
 
     /// Visit an body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
-        let snapshot = self.ctx.flags;
-        self.ctx.flags |= ContextFlags::TYPE_CHECKING_BLOCK;
+        let snapshot = self.semantic_model.flags;
+        self.semantic_model.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
-        self.ctx.flags = snapshot;
+        self.semantic_model.flags = snapshot;
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
     pub(crate) fn visit_type_definition(&mut self, expr: &'a Expr) {
-        let snapshot = self.ctx.flags;
-        self.ctx.flags |= ContextFlags::TYPE_DEFINITION;
+        let snapshot = self.semantic_model.flags;
+        self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
-        self.ctx.flags = snapshot;
+        self.semantic_model.flags = snapshot;
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
     pub(crate) fn visit_non_type_definition(&mut self, expr: &'a Expr) {
-        let snapshot = self.ctx.flags;
-        self.ctx.flags -= ContextFlags::TYPE_DEFINITION;
+        let snapshot = self.semantic_model.flags;
+        self.semantic_model.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
-        self.ctx.flags = snapshot;
+        self.semantic_model.flags = snapshot;
     }
 
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
     pub(crate) fn visit_boolean_test(&mut self, expr: &'a Expr) {
-        let snapshot = self.ctx.flags;
-        self.ctx.flags |= ContextFlags::BOOLEAN_TEST;
+        let snapshot = self.semantic_model.flags;
+        self.semantic_model.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
-        self.ctx.flags = snapshot;
+        self.semantic_model.flags = snapshot;
     }
 
     /// Add a [`Binding`] to the current scope, bound to the given name.
     fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) {
-        let binding_id = self.ctx.bindings.next_id();
+        let binding_id = self.semantic_model.bindings.next_id();
         if let Some((stack_index, existing_binding_id)) = self
-            .ctx
+            .semantic_model
             .scopes
-            .ancestors(self.ctx.scope_id)
+            .ancestors(self.semantic_model.scope_id)
             .enumerate()
             .find_map(|(stack_index, scope)| {
                 scope.get(name).map(|binding_id| (stack_index, *binding_id))
             })
         {
-            let existing = &self.ctx.bindings[existing_binding_id];
+            let existing = &self.semantic_model.bindings[existing_binding_id];
             let in_current_scope = stack_index == 0;
             if !existing.kind.is_builtin()
                 && existing.source.map_or(true, |left| {
                     binding.source.map_or(true, |right| {
-                        !branch_detection::different_forks(left, right, &self.ctx.stmts)
+                        !branch_detection::different_forks(left, right, &self.semantic_model.stmts)
                     })
                 })
             {
@@ -4614,35 +4707,29 @@ impl<'a> Checker<'a> {
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
                         && !(existing.kind.is_function_definition()
                             && analyze::visibility::is_overload(
-                                &self.ctx,
-                                cast::decorator_list(self.ctx.stmts[existing.source.unwrap()]),
+                                &self.semantic_model,
+                                cast::decorator_list(
+                                    self.semantic_model.stmts[existing.source.unwrap()],
+                                ),
                             ))
                     {
                         if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
                             #[allow(deprecated)]
-                            let line = self.locator.compute_line_index(existing.range.start());
+                            let line = self.locator.compute_line_index(
+                                existing
+                                    .trimmed_range(self.semantic_model(), self.locator)
+                                    .start(),
+                            );
 
                             let mut diagnostic = Diagnostic::new(
                                 pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
                                     line,
                                 },
-                                matches!(
-                                    binding.kind,
-                                    BindingKind::ClassDefinition | BindingKind::FunctionDefinition
-                                )
-                                .then(|| {
-                                    binding.source.map_or(binding.range, |source| {
-                                        helpers::identifier_range(
-                                            self.ctx.stmts[source],
-                                            self.locator,
-                                        )
-                                    })
-                                })
-                                .unwrap_or(binding.range),
+                                binding.trimmed_range(self.semantic_model(), self.locator),
                             );
                             if let Some(parent) = binding.source {
-                                let parent = self.ctx.stmts[parent];
+                                let parent = self.semantic_model.stmts[parent];
                                 if matches!(parent, Stmt::ImportFrom(_))
                                     && parent.range().contains_range(binding.range)
                                 {
@@ -4653,7 +4740,7 @@ impl<'a> Checker<'a> {
                         }
                     }
                 } else if existing_is_import && binding.redefines(existing) {
-                    self.ctx
+                    self.semantic_model
                         .shadowed_bindings
                         .entry(existing_binding_id)
                         .or_insert_with(Vec::new)
@@ -4666,18 +4753,18 @@ impl<'a> Checker<'a> {
         // expressions in generators and comprehensions bind to the scope that contains the
         // outermost comprehension.
         let scope_id = if binding.kind.is_named_expr_assignment() {
-            self.ctx
+            self.semantic_model
                 .scopes
-                .ancestor_ids(self.ctx.scope_id)
-                .find_or_last(|scope_id| !self.ctx.scopes[*scope_id].kind.is_generator())
-                .unwrap_or(self.ctx.scope_id)
+                .ancestor_ids(self.semantic_model.scope_id)
+                .find_or_last(|scope_id| !self.semantic_model.scopes[*scope_id].kind.is_generator())
+                .unwrap_or(self.semantic_model.scope_id)
         } else {
-            self.ctx.scope_id
+            self.semantic_model.scope_id
         };
-        let scope = &mut self.ctx.scopes[scope_id];
+        let scope = &mut self.semantic_model.scopes[scope_id];
 
-        let binding = if let Some(index) = scope.get(name) {
-            let existing = &self.ctx.bindings[*index];
+        let binding = if let Some(binding_id) = scope.get(name) {
+            let existing = &self.semantic_model.bindings[*binding_id];
             match &existing.kind {
                 BindingKind::Builtin => {
                     // Avoid overriding builtins.
@@ -4708,7 +4795,7 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         if binding.kind.is_annotation() && scope.defines(name) {
-            self.ctx.bindings.push(binding);
+            self.semantic_model.bindings.push(binding);
             return;
         }
 
@@ -4716,11 +4803,11 @@ impl<'a> Checker<'a> {
         scope.add(name, binding_id);
 
         // Add the binding to the arena.
-        self.ctx.bindings.push(binding);
+        self.semantic_model.bindings.push(binding);
     }
 
     fn bind_builtins(&mut self) {
-        let scope = &mut self.ctx.scopes[self.ctx.scope_id];
+        let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
 
         for builtin in BUILTINS
             .iter()
@@ -4728,7 +4815,7 @@ impl<'a> Checker<'a> {
             .copied()
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
-            let id = self.ctx.bindings.push(Binding {
+            let id = self.semantic_model.bindings.push(Binding {
                 kind: BindingKind::Builtin,
                 range: TextRange::default(),
                 runtime_usage: None,
@@ -4746,64 +4833,8 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        match self.ctx.resolve_reference(id, expr.range()) {
-            ResolvedReference::Resolved(scope_id, binding_id) => {
-                // If the name of the sub-importation is the same as an alias of another
-                // importation and the alias is used, that sub-importation should be
-                // marked as used too.
-                //
-                // For example, mark `pa` as used in:
-                //
-                // ```python
-                // import pyarrow as pa
-                // import pyarrow.csv
-                // print(pa.csv.read_csv("test.csv"))
-                // ```
-                match &self.ctx.bindings[binding_id].kind {
-                    BindingKind::Importation(Importation { name, full_name })
-                    | BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) =>
-                    {
-                        let has_alias = full_name
-                            .split('.')
-                            .last()
-                            .map(|segment| &segment != name)
-                            .unwrap_or_default();
-                        if has_alias {
-                            // Mark the sub-importation as used.
-                            if let Some(binding_id) = self.ctx.scopes[scope_id].get(full_name) {
-                                let context = self.ctx.execution_context();
-                                self.ctx.bindings[*binding_id].mark_used(
-                                    self.ctx.scope_id,
-                                    expr.range(),
-                                    context,
-                                );
-                            }
-                        }
-                    }
-                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
-                        let has_alias = full_name
-                            .split('.')
-                            .last()
-                            .map(|segment| &segment != name)
-                            .unwrap_or_default();
-                        if has_alias {
-                            // Mark the sub-importation as used.
-                            if let Some(binding_id) =
-                                self.ctx.scopes[scope_id].get(full_name.as_str())
-                            {
-                                let context = self.ctx.execution_context();
-                                self.ctx.bindings[*binding_id].mark_used(
-                                    self.ctx.scope_id,
-                                    expr.range(),
-                                    context,
-                                );
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            ResolvedReference::ImplicitGlobal => {
+        match self.semantic_model.resolve_reference(id, expr.range()) {
+            ResolvedReference::Resolved(..) | ResolvedReference::ImplicitGlobal => {
                 // Nothing to do.
             }
             ResolvedReference::StarImport => {
@@ -4814,7 +4845,7 @@ impl<'a> Checker<'a> {
                     .enabled(Rule::UndefinedLocalWithImportStarUsage)
                 {
                     let sources: Vec<String> = self
-                        .ctx
+                        .semantic_model
                         .scopes
                         .iter()
                         .flat_map(Scope::star_imports)
@@ -4843,7 +4874,7 @@ impl<'a> Checker<'a> {
 
                     // Avoid flagging if `NameError` is handled.
                     if self
-                        .ctx
+                        .semantic_model
                         .handled_exceptions
                         .iter()
                         .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
@@ -4863,7 +4894,7 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
-        let parent = self.ctx.stmt();
+        let parent = self.semantic_model.stmt();
 
         if self.settings.rules.enabled(Rule::UndefinedLocal) {
             pyflakes::rules::undefined_local(self, id);
@@ -4874,13 +4905,15 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::NonLowercaseVariableInFunction)
         {
-            if matches!(self.ctx.scope().kind, ScopeKind::Function(..)) {
+            if matches!(self.semantic_model.scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
                 if !self
-                    .ctx
+                    .semantic_model
                     .scope()
                     .get(id)
-                    .map_or(false, |index| self.ctx.bindings[*index].kind.is_global())
+                    .map_or(false, |binding_id| {
+                        self.semantic_model.bindings[*binding_id].kind.is_global()
+                    })
                 {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4892,7 +4925,7 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::MixedCaseVariableInClassScope)
         {
-            if let ScopeKind::Class(class) = &self.ctx.scope().kind {
+            if let ScopeKind::Class(class) = &self.semantic_model.scope().kind {
                 pep8_naming::rules::mixed_case_variable_in_class_scope(
                     self,
                     expr,
@@ -4908,7 +4941,7 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::MixedCaseVariableInGlobalScope)
         {
-            if matches!(self.ctx.scope().kind, ScopeKind::Module) {
+            if matches!(self.semantic_model.scope().kind, ScopeKind::Module) {
                 pep8_naming::rules::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
         }
@@ -4925,9 +4958,9 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: self.ctx.stmt_id,
-                    context: self.ctx.execution_context(),
-                    exceptions: self.ctx.exceptions(),
+                    source: self.semantic_model.stmt_id,
+                    context: self.semantic_model.execution_context(),
+                    exceptions: self.semantic_model.exceptions(),
                 },
             );
             return;
@@ -4942,9 +4975,9 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: self.ctx.stmt_id,
-                    context: self.ctx.execution_context(),
-                    exceptions: self.ctx.exceptions(),
+                    source: self.semantic_model.stmt_id,
+                    context: self.semantic_model.execution_context(),
+                    exceptions: self.semantic_model.exceptions(),
                 },
             );
             return;
@@ -4959,15 +4992,15 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: self.ctx.stmt_id,
-                    context: self.ctx.execution_context(),
-                    exceptions: self.ctx.exceptions(),
+                    source: self.semantic_model.stmt_id,
+                    context: self.semantic_model.execution_context(),
+                    exceptions: self.semantic_model.exceptions(),
                 },
             );
             return;
         }
 
-        let scope = self.ctx.scope();
+        let scope = self.semantic_model.scope();
 
         if id == "__all__"
             && scope.kind.is_module()
@@ -5002,13 +5035,13 @@ impl<'a> Checker<'a> {
             } {
                 let (all_names, all_names_flags) = {
                     let (mut names, flags) =
-                        extract_all_names(parent, |name| self.ctx.is_builtin(name));
+                        extract_all_names(parent, |name| self.semantic_model.is_builtin(name));
 
                     // Grab the existing bound __all__ values.
                     if let Stmt::AugAssign(_) = parent {
-                        if let Some(index) = scope.get("__all__") {
+                        if let Some(binding_id) = scope.get("__all__") {
                             if let BindingKind::Export(Export { names: existing }) =
-                                &self.ctx.bindings[*index].kind
+                                &self.semantic_model.bindings[*binding_id].kind
                             {
                                 names.extend_from_slice(existing);
                             }
@@ -5040,9 +5073,9 @@ impl<'a> Checker<'a> {
                         synthetic_usage: None,
                         typing_usage: None,
                         range: expr.range(),
-                        source: self.ctx.stmt_id,
-                        context: self.ctx.execution_context(),
-                        exceptions: self.ctx.exceptions(),
+                        source: self.semantic_model.stmt_id,
+                        context: self.semantic_model.execution_context(),
+                        exceptions: self.semantic_model.exceptions(),
                     },
                 );
                 return;
@@ -5050,7 +5083,7 @@ impl<'a> Checker<'a> {
         }
 
         if self
-            .ctx
+            .semantic_model
             .expr_ancestors()
             .any(|expr| matches!(expr, Expr::NamedExpr(_)))
         {
@@ -5062,9 +5095,9 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: self.ctx.stmt_id,
-                    context: self.ctx.execution_context(),
-                    exceptions: self.ctx.exceptions(),
+                    source: self.semantic_model.stmt_id,
+                    context: self.semantic_model.execution_context(),
+                    exceptions: self.semantic_model.exceptions(),
                 },
             );
             return;
@@ -5078,9 +5111,9 @@ impl<'a> Checker<'a> {
                 synthetic_usage: None,
                 typing_usage: None,
                 range: expr.range(),
-                source: self.ctx.stmt_id,
-                context: self.ctx.execution_context(),
-                exceptions: self.ctx.exceptions(),
+                source: self.semantic_model.stmt_id,
+                context: self.semantic_model.execution_context(),
+                exceptions: self.semantic_model.exceptions(),
             },
         );
     }
@@ -5089,11 +5122,11 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        if helpers::on_conditional_branch(&mut self.ctx.parents()) {
+        if helpers::on_conditional_branch(&mut self.semantic_model.parents()) {
             return;
         }
 
-        let scope = self.ctx.scope_mut();
+        let scope = self.semantic_model.scope_mut();
         if scope.remove(id.as_str()).is_some() {
             return;
         }
@@ -5113,10 +5146,10 @@ impl<'a> Checker<'a> {
         while !self.deferred.future_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.future_type_definitions);
             for (expr, snapshot) in type_definitions {
-                self.ctx.restore(snapshot);
+                self.semantic_model.restore(snapshot);
 
-                self.ctx.flags |=
-                    ContextFlags::TYPE_DEFINITION | ContextFlags::FUTURE_TYPE_DEFINITION;
+                self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION
+                    | SemanticModelFlags::FUTURE_TYPE_DEFINITION;
                 self.visit_expr(expr);
             }
         }
@@ -5129,9 +5162,11 @@ impl<'a> Checker<'a> {
                 if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
                     let expr = allocator.alloc(expr);
 
-                    self.ctx.restore(snapshot);
+                    self.semantic_model.restore(snapshot);
 
-                    if self.ctx.in_annotation() && self.ctx.future_annotations() {
+                    if self.semantic_model.in_annotation()
+                        && self.semantic_model.future_annotations()
+                    {
                         if self.settings.rules.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -5143,11 +5178,14 @@ impl<'a> Checker<'a> {
                     }
 
                     let type_definition_flag = match kind {
-                        AnnotationKind::Simple => ContextFlags::SIMPLE_STRING_TYPE_DEFINITION,
-                        AnnotationKind::Complex => ContextFlags::COMPLEX_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Simple => SemanticModelFlags::SIMPLE_STRING_TYPE_DEFINITION,
+                        AnnotationKind::Complex => {
+                            SemanticModelFlags::COMPLEX_STRING_TYPE_DEFINITION
+                        }
                     };
 
-                    self.ctx.flags |= ContextFlags::TYPE_DEFINITION | type_definition_flag;
+                    self.semantic_model.flags |=
+                        SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                     self.visit_expr(expr);
                 } else {
                     if self
@@ -5171,9 +5209,9 @@ impl<'a> Checker<'a> {
         while !self.deferred.functions.is_empty() {
             let deferred_functions = std::mem::take(&mut self.deferred.functions);
             for snapshot in deferred_functions {
-                self.ctx.restore(snapshot);
+                self.semantic_model.restore(snapshot);
 
-                match &self.ctx.stmt() {
+                match &self.semantic_model.stmt() {
                     Stmt::FunctionDef(ast::StmtFunctionDef { body, args, .. })
                     | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, args, .. }) => {
                         self.visit_arguments(args);
@@ -5193,7 +5231,7 @@ impl<'a> Checker<'a> {
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
             for (expr, snapshot) in lambdas {
-                self.ctx.restore(snapshot);
+                self.semantic_model.restore(snapshot);
 
                 if let Expr::Lambda(ast::ExprLambda {
                     args,
@@ -5216,14 +5254,14 @@ impl<'a> Checker<'a> {
         while !self.deferred.assignments.is_empty() {
             let assignments = std::mem::take(&mut self.deferred.assignments);
             for snapshot in assignments {
-                self.ctx.restore(snapshot);
+                self.semantic_model.restore(snapshot);
 
                 // pyflakes
                 if self.settings.rules.enabled(Rule::UnusedVariable) {
-                    pyflakes::rules::unused_variable(self, self.ctx.scope_id);
+                    pyflakes::rules::unused_variable(self, self.semantic_model.scope_id);
                 }
                 if self.settings.rules.enabled(Rule::UnusedAnnotation) {
-                    pyflakes::rules::unused_annotation(self, self.ctx.scope_id);
+                    pyflakes::rules::unused_annotation(self, self.semantic_model.scope_id);
                 }
 
                 if !self.is_stub {
@@ -5235,14 +5273,14 @@ impl<'a> Checker<'a> {
                         Rule::UnusedStaticMethodArgument,
                         Rule::UnusedLambdaArgument,
                     ]) {
-                        let scope = &self.ctx.scopes[self.ctx.scope_id];
-                        let parent = &self.ctx.scopes[scope.parent.unwrap()];
+                        let scope = &self.semantic_model.scopes[self.semantic_model.scope_id];
+                        let parent = &self.semantic_model.scopes[scope.parent.unwrap()];
                         self.diagnostics
                             .extend(flake8_unused_arguments::rules::unused_arguments(
                                 self,
                                 parent,
                                 scope,
-                                &self.ctx.bindings,
+                                &self.semantic_model.bindings,
                             ));
                     }
                 }
@@ -5255,10 +5293,11 @@ impl<'a> Checker<'a> {
             let for_loops = std::mem::take(&mut self.deferred.for_loops);
 
             for snapshot in for_loops {
-                self.ctx.restore(snapshot);
+                self.semantic_model.restore(snapshot);
 
                 if let Stmt::For(ast::StmtFor { target, body, .. })
-                | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) = &self.ctx.stmt()
+                | Stmt::AsyncFor(ast::StmtAsyncFor { target, body, .. }) =
+                    &self.semantic_model.stmt()
                 {
                     if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                         flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
@@ -5293,10 +5332,10 @@ impl<'a> Checker<'a> {
 
         // Mark anything referenced in `__all__` as used.
         let all_bindings: Option<(Vec<BindingId>, TextRange)> = {
-            let global_scope = self.ctx.global_scope();
+            let global_scope = self.semantic_model.global_scope();
             let all_names: Option<(&[&str], TextRange)> = global_scope
                 .get("__all__")
-                .map(|index| &self.ctx.bindings[*index])
+                .map(|binding_id| &self.semantic_model.bindings[*binding_id])
                 .and_then(|binding| match &binding.kind {
                     BindingKind::Export(Export { names }) => {
                         Some((names.as_slice(), binding.range))
@@ -5316,8 +5355,8 @@ impl<'a> Checker<'a> {
         };
 
         if let Some((bindings, range)) = all_bindings {
-            for index in bindings {
-                self.ctx.bindings[index].mark_used(
+            for binding_id in bindings {
+                self.semantic_model.bindings[binding_id].mark_used(
                     ScopeId::global(),
                     range,
                     ExecutionContext::Runtime,
@@ -5327,10 +5366,10 @@ impl<'a> Checker<'a> {
 
         // Extract `__all__` names from the global scope.
         let all_names: Option<(&[&str], TextRange)> = self
-            .ctx
+            .semantic_model
             .global_scope()
             .get("__all__")
-            .map(|index| &self.ctx.bindings[*index])
+            .map(|binding_id| &self.semantic_model.bindings[*binding_id])
             .and_then(|binding| match &binding.kind {
                 BindingKind::Export(Export { names }) => Some((names.as_slice(), binding.range)),
                 _ => None,
@@ -5343,13 +5382,13 @@ impl<'a> Checker<'a> {
             if self.settings.flake8_type_checking.strict {
                 vec![]
             } else {
-                self.ctx
+                self.semantic_model
                     .scopes
                     .iter()
                     .map(|scope| {
                         scope
                             .binding_ids()
-                            .map(|index| &self.ctx.bindings[*index])
+                            .map(|binding_id| &self.semantic_model.bindings[*binding_id])
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(binding)
                             })
@@ -5362,8 +5401,8 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for scope_id in self.ctx.dead_scopes.iter().rev() {
-            let scope = &self.ctx.scopes[*scope_id];
+        for scope_id in self.semantic_model.dead_scopes.iter().rev() {
+            let scope = &self.semantic_model.scopes[*scope_id];
 
             if scope.kind.is_module() {
                 // F822
@@ -5410,11 +5449,11 @@ impl<'a> Checker<'a> {
 
             // PLW0602
             if self.settings.rules.enabled(Rule::GlobalVariableNotAssigned) {
-                for (name, index) in scope.bindings() {
-                    let binding = &self.ctx.bindings[*index];
+                for (name, binding_id) in scope.bindings() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
                     if binding.kind.is_global() {
                         if let Some(source) = binding.source {
-                            let stmt = &self.ctx.stmts[source];
+                            let stmt = &self.semantic_model.stmts[source];
                             if matches!(stmt, Stmt::Global(_)) {
                                 diagnostics.push(Diagnostic::new(
                                     pylint::rules::GlobalVariableNotAssigned {
@@ -5437,8 +5476,8 @@ impl<'a> Checker<'a> {
             // unused. Note that we only store references in `redefinitions` if
             // the bindings are in different scopes.
             if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
-                for (name, index) in scope.bindings() {
-                    let binding = &self.ctx.bindings[*index];
+                for (name, binding_id) in scope.bindings() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
 
                     if matches!(
                         binding.kind,
@@ -5451,34 +5490,27 @@ impl<'a> Checker<'a> {
                             continue;
                         }
 
-                        if let Some(indices) = self.ctx.shadowed_bindings.get(index) {
-                            for index in indices {
-                                let rebound = &self.ctx.bindings[*index];
+                        if let Some(shadowed_ids) =
+                            self.semantic_model.shadowed_bindings.get(binding_id)
+                        {
+                            for binding_id in shadowed_ids {
+                                let rebound = &self.semantic_model.bindings[*binding_id];
                                 #[allow(deprecated)]
-                                let line = self.locator.compute_line_index(binding.range.start());
+                                let line = self.locator.compute_line_index(
+                                    binding
+                                        .trimmed_range(self.semantic_model(), self.locator)
+                                        .start(),
+                                );
 
                                 let mut diagnostic = Diagnostic::new(
                                     pyflakes::rules::RedefinedWhileUnused {
                                         name: (*name).to_string(),
                                         line,
                                     },
-                                    matches!(
-                                        rebound.kind,
-                                        BindingKind::ClassDefinition
-                                            | BindingKind::FunctionDefinition
-                                    )
-                                    .then(|| {
-                                        rebound.source.map_or(rebound.range, |source| {
-                                            helpers::identifier_range(
-                                                self.ctx.stmts[source],
-                                                self.locator,
-                                            )
-                                        })
-                                    })
-                                    .unwrap_or(rebound.range),
+                                    rebound.trimmed_range(self.semantic_model(), self.locator),
                                 );
                                 if let Some(source) = rebound.source {
-                                    let parent = &self.ctx.stmts[source];
+                                    let parent = &self.semantic_model.stmts[source];
                                     if matches!(parent, Stmt::ImportFrom(_))
                                         && parent.range().contains_range(rebound.range)
                                     {
@@ -5496,15 +5528,15 @@ impl<'a> Checker<'a> {
                 let runtime_imports: Vec<&Binding> = if self.settings.flake8_type_checking.strict {
                     vec![]
                 } else {
-                    self.ctx
+                    self.semantic_model
                         .scopes
                         .ancestor_ids(*scope_id)
-                        .flat_map(|scope_id| runtime_imports[usize::from(scope_id)].iter())
+                        .flat_map(|scope_id| runtime_imports[scope_id.as_usize()].iter())
                         .copied()
                         .collect()
                 };
-                for index in scope.binding_ids() {
-                    let binding = &self.ctx.bindings[*index];
+                for binding_id in scope.binding_ids() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
 
                     if let Some(diagnostic) =
                         flake8_type_checking::rules::runtime_import_in_type_checking_block(binding)
@@ -5538,8 +5570,8 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for index in scope.binding_ids() {
-                    let binding = &self.ctx.bindings[*index];
+                for binding_id in scope.binding_ids() {
+                    let binding = &self.semantic_model.bindings[*binding_id];
 
                     let full_name = match &binding.kind {
                         BindingKind::Importation(Importation { full_name, .. }) => full_name,
@@ -5558,11 +5590,11 @@ impl<'a> Checker<'a> {
                     }
 
                     let child_id = binding.source.unwrap();
-                    let parent_id = self.ctx.stmts.parent_id(child_id);
+                    let parent_id = self.semantic_model.stmts.parent_id(child_id);
 
                     let exceptions = binding.exceptions;
                     let diagnostic_offset = binding.range.start();
-                    let child = &self.ctx.stmts[child_id];
+                    let child = &self.semantic_model.stmts[child_id];
                     let parent_offset = if matches!(child, Stmt::ImportFrom(_)) {
                         Some(child.start())
                     } else {
@@ -5592,8 +5624,8 @@ impl<'a> Checker<'a> {
                     .into_iter()
                     .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
                 {
-                    let child = self.ctx.stmts[defined_by];
-                    let parent = defined_in.map(|defined_in| self.ctx.stmts[defined_in]);
+                    let child = self.semantic_model.stmts[defined_by];
+                    let parent = defined_in.map(|defined_in| self.semantic_model.stmts[defined_in]);
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
@@ -5654,7 +5686,7 @@ impl<'a> Checker<'a> {
                     .into_iter()
                     .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
                 {
-                    let child = self.ctx.stmts[child];
+                    let child = self.semantic_model.stmts[child];
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
@@ -5759,15 +5791,15 @@ impl<'a> Checker<'a> {
         }
 
         // Compute visibility of all definitions.
-        let global_scope = self.ctx.global_scope();
+        let global_scope = self.semantic_model.global_scope();
         let exports: Option<&[&str]> = global_scope
             .get("__all__")
-            .map(|index| &self.ctx.bindings[*index])
+            .map(|binding_id| &self.semantic_model.bindings[*binding_id])
             .and_then(|binding| match &binding.kind {
                 BindingKind::Export(Export { names }) => Some(names.as_slice()),
                 _ => None,
             });
-        let definitions = std::mem::take(&mut self.ctx.definitions);
+        let definitions = std::mem::take(&mut self.semantic_model.definitions);
 
         let mut overloaded_name: Option<String> = None;
         for ContextualizedDefinition {
@@ -5786,7 +5818,7 @@ impl<'a> Checker<'a> {
                 // classes, etc.).
                 if !overloaded_name.map_or(false, |overloaded_name| {
                     flake8_annotations::helpers::is_overload_impl(
-                        self,
+                        &self.semantic_model,
                         definition,
                         &overloaded_name,
                     )
@@ -5798,7 +5830,8 @@ impl<'a> Checker<'a> {
                             *visibility,
                         ));
                 }
-                overloaded_name = flake8_annotations::helpers::overloaded_name(self, definition);
+                overloaded_name =
+                    flake8_annotations::helpers::overloaded_name(&self.semantic_model, definition);
             }
 
             // flake8-pyi
@@ -5813,7 +5846,7 @@ impl<'a> Checker<'a> {
             // pydocstyle
             if enforce_docstrings {
                 if pydocstyle::helpers::should_ignore_definition(
-                    self,
+                    &self.semantic_model,
                     definition,
                     &self.settings.pydocstyle.ignore_decorators,
                 ) {
@@ -6020,8 +6053,8 @@ pub(crate) fn check_ast(
     checker.check_definitions();
 
     // Reset the scope to module-level, and check all consumed scopes.
-    checker.ctx.scope_id = ScopeId::global();
-    checker.ctx.dead_scopes.push(ScopeId::global());
+    checker.semantic_model.scope_id = ScopeId::global();
+    checker.semantic_model.dead_scopes.push(ScopeId::global());
     checker.check_dead_scopes();
 
     checker.diagnostics

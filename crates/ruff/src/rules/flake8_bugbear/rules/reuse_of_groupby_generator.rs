@@ -342,7 +342,7 @@ pub(crate) fn reuse_of_groupby_generator(
     };
     // Check if the function call is `itertools.groupby`
     if !checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["itertools", "groupby"]

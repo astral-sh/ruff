@@ -1,8 +1,12 @@
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::{Arg, Excepthandler, Expr, Ranged, Stmt};
+
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_stdlib::builtins::BUILTINS;
-use rustpython_parser::ast::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -171,46 +175,83 @@ fn shadows_builtin(name: &str, ignorelist: &[String]) -> bool {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing<T>(checker: &mut Checker, name: &str, attributed: &T)
-where
-    T: Ranged,
-{
+pub(crate) fn builtin_variable_shadowing(
+    checker: &mut Checker,
+    name: &str,
+    shadowing: AnyShadowing,
+) {
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinVariableShadowing {
                 name: name.to_string(),
             },
-            attributed.range(),
+            shadowing.range(checker.locator),
         ));
     }
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing<T>(checker: &mut Checker, name: &str, attributed: &T)
-where
-    T: Ranged,
-{
-    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, argument: &Arg) {
+    if shadows_builtin(
+        argument.arg.as_str(),
+        &checker.settings.flake8_builtins.builtins_ignorelist,
+    ) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinArgumentShadowing {
-                name: name.to_string(),
+                name: argument.arg.to_string(),
             },
-            attributed.range(),
+            argument.range(),
         ));
     }
 }
 
 /// A003
-pub(crate) fn builtin_attribute_shadowing<T>(checker: &mut Checker, name: &str, attributed: &T)
-where
-    T: Ranged,
-{
+pub(crate) fn builtin_attribute_shadowing(
+    checker: &mut Checker,
+    name: &str,
+    shadowing: AnyShadowing,
+) {
     if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinAttributeShadowing {
                 name: name.to_string(),
             },
-            attributed.range(),
+            shadowing.range(checker.locator),
         ));
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub(crate) enum AnyShadowing<'a> {
+    Expression(&'a Expr),
+    Statement(&'a Stmt),
+    ExceptHandler(&'a Excepthandler),
+}
+
+impl AnyShadowing<'_> {
+    fn range(self, locator: &Locator) -> TextRange {
+        match self {
+            AnyShadowing::Expression(expr) => expr.range(),
+            AnyShadowing::Statement(stmt) => identifier_range(stmt, locator),
+            AnyShadowing::ExceptHandler(handler) => handler.range(),
+        }
+    }
+}
+
+impl<'a> From<&'a Stmt> for AnyShadowing<'a> {
+    fn from(value: &'a Stmt) -> Self {
+        AnyShadowing::Statement(value)
+    }
+}
+
+impl<'a> From<&'a Expr> for AnyShadowing<'a> {
+    fn from(value: &'a Expr) -> Self {
+        AnyShadowing::Expression(value)
+    }
+}
+
+impl<'a> From<&'a Excepthandler> for AnyShadowing<'a> {
+    fn from(value: &'a Excepthandler) -> Self {
+        AnyShadowing::ExceptHandler(value)
     }
 }

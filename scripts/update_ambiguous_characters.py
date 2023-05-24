@@ -47,7 +47,7 @@ pub(crate) static CONFUSABLES: Lazy<FxHashMap<u32, u8>> = Lazy::new(|| {
     return prelude + "\n".join(tuples) + postlude
 
 
-def main() -> None:  # noqa: D103
+def main() -> None:
     print("Retrieving data...")
     mapping_data = get_mapping_data()
     formatted_data = format_confusables_rs(mapping_data)

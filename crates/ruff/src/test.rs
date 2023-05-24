@@ -5,10 +5,10 @@ use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
-use ruff_diagnostics::{AutofixKind, Diagnostic};
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 
+use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 
 use crate::autofix::fix_file;

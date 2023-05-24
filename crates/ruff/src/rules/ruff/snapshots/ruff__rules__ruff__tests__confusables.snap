@@ -1,13 +1,13 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-confusables.py:1:6: RUF001 [*] String contains ambiguous unicode character `𝐁` (did you mean `B`?)
+confusables.py:1:6: RUF001 [*] String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
   |
 1 | x = "𝐁ad string"
   |      ^ RUF001
 2 | y = "−"
   |
-  = help: Replace `𝐁` with `B`
+  = help: Replace `𝐁` (MATHEMATICAL BOLD CAPITAL B) with `B` (LATIN CAPITAL LETTER B)
 
 ℹ Suggested fix
 1   |-x = "𝐁ad string"
@@ -16,7 +16,7 @@ confusables.py:1:6: RUF001 [*] String contains ambiguous unicode character `𝐁
 3 3 | 
 4 4 | 
 
-confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `）` (did you mean `)`?)
+confusables.py:6:56: RUF002 [*] Docstring contains ambiguous `）` (FULLWIDTH RIGHT PARENTHESIS). Did you mean `)` (RIGHT PARENTHESIS)?
   |
 6 | def f():
 7 |     """Here's a docstring with an unusual parenthesis: ）"""
@@ -24,7 +24,7 @@ confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `
 8 |     # And here's a comment with an unusual punctuation mark: ᜵
 9 |     ...
   |
-  = help: Replace `）` with `)`
+  = help: Replace `）` (FULLWIDTH RIGHT PARENTHESIS) with `)` (RIGHT PARENTHESIS)
 
 ℹ Suggested fix
 3 3 | 
@@ -36,7 +36,7 @@ confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `
 8 8 |     ...
 9 9 | 
 
-confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `᜵` (did you mean `/`?)
+confusables.py:7:62: RUF003 [*] Comment contains ambiguous `᜵` (PHILIPPINE SINGLE PUNCTUATION). Did you mean `/` (SOLIDUS)?
    |
  7 | def f():
  8 |     """Here's a docstring with an unusual parenthesis: ）"""
@@ -44,7 +44,7 @@ confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `�
    |                                                              ^ RUF003
 10 |     ...
    |
-   = help: Replace `᜵` with `/`
+   = help: Replace `᜵` (PHILIPPINE SINGLE PUNCTUATION) with `/` (SOLIDUS)
 
 ℹ Suggested fix
 4 4 | 
@@ -55,5 +55,76 @@ confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `�
 8 8 |     ...
 9 9 | 
 10 10 | 
+
+confusables.py:17:6: RUF001 [*] String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+   |
+17 | x = "𝐁ad string"
+   |      ^ RUF001
+18 | x = "−"
+   |
+   = help: Replace `𝐁` (MATHEMATICAL BOLD CAPITAL B) with `B` (LATIN CAPITAL LETTER B)
+
+ℹ Suggested fix
+14 14 |     ...
+15 15 | 
+16 16 | 
+17    |-x = "𝐁ad string"
+   17 |+x = "Bad string"
+18 18 | x = "−"
+19 19 | 
+20 20 | # This should be ignored, since it contains an unambiguous unicode character, and no
+
+confusables.py:26:10: RUF001 [*] String contains ambiguous `α` (GREEK SMALL LETTER ALPHA). Did you mean `a` (LATIN SMALL LETTER A)?
+   |
+26 | # The first word should be ignored, while the second should be included, since it
+27 | # contains ASCII.
+28 | x = "βα Bαd"
+   |          ^ RUF001
+29 | 
+30 | # The two characters should be flagged here. The first character is a "word"
+   |
+   = help: Replace `α` (GREEK SMALL LETTER ALPHA) with `a` (LATIN SMALL LETTER A)
+
+ℹ Suggested fix
+23 23 | 
+24 24 | # The first word should be ignored, while the second should be included, since it
+25 25 | # contains ASCII.
+26    |-x = "βα Bαd"
+   26 |+x = "βα Bad"
+27 27 | 
+28 28 | # The two characters should be flagged here. The first character is a "word"
+29 29 | # consisting of a single ambiguous character, while the second character is a "word
+
+confusables.py:31:6: RUF001 [*] String contains ambiguous `Р` (CYRILLIC CAPITAL LETTER ER). Did you mean `P` (LATIN CAPITAL LETTER P)?
+   |
+31 | # consisting of a single ambiguous character, while the second character is a "word
+32 | # boundary" (whitespace) that it itself ambiguous.
+33 | x = "Р усский"
+   |      ^ RUF001
+   |
+   = help: Replace `Р` (CYRILLIC CAPITAL LETTER ER) with `P` (LATIN CAPITAL LETTER P)
+
+ℹ Suggested fix
+28 28 | # The two characters should be flagged here. The first character is a "word"
+29 29 | # consisting of a single ambiguous character, while the second character is a "word
+30 30 | # boundary" (whitespace) that it itself ambiguous.
+31    |-x = "Р усский"
+   31 |+x = "P усский"
+
+confusables.py:31:7: RUF001 [*] String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+   |
+31 | # consisting of a single ambiguous character, while the second character is a "word
+32 | # boundary" (whitespace) that it itself ambiguous.
+33 | x = "Р усский"
+   |       ^ RUF001
+   |
+   = help: Replace ` ` (EN QUAD) with ` ` (SPACE)
+
+ℹ Suggested fix
+28 28 | # The two characters should be flagged here. The first character is a "word"
+29 29 | # consisting of a single ambiguous character, while the second character is a "word
+30 30 | # boundary" (whitespace) that it itself ambiguous.
+31    |-x = "Р усский"
+   31 |+x = "Р усский"
 
 

@@ -7,7 +7,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
@@ -97,8 +97,8 @@ enum CallKind {
 }
 
 /// Return the [`CallKind`] of the given function call.
-fn get_call_kind(func: &Expr, context: &Context) -> Option<CallKind> {
-    context
+fn get_call_kind(func: &Expr, model: &SemanticModel) -> Option<CallKind> {
+    model
         .resolve_call_path(func)
         .and_then(|call_path| match call_path.as_slice() {
             &[module, submodule] => match module {
@@ -138,12 +138,15 @@ struct ShellKeyword<'a> {
 }
 
 /// Return the `shell` keyword argument to the given function call, if any.
-fn find_shell_keyword<'a>(ctx: &Context, keywords: &'a [Keyword]) -> Option<ShellKeyword<'a>> {
+fn find_shell_keyword<'a>(
+    model: &SemanticModel,
+    keywords: &'a [Keyword],
+) -> Option<ShellKeyword<'a>> {
     keywords
         .iter()
         .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "shell"))
         .map(|keyword| ShellKeyword {
-            truthiness: Truthiness::from_expr(&keyword.value, |id| ctx.is_builtin(id)),
+            truthiness: Truthiness::from_expr(&keyword.value, |id| model.is_builtin(id)),
             keyword,
         })
 }
@@ -181,11 +184,11 @@ pub(crate) fn shell_injection(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let call_kind = get_call_kind(func, &checker.ctx);
+    let call_kind = get_call_kind(func, checker.semantic_model());
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
-            match find_shell_keyword(&checker.ctx, keywords) {
+            match find_shell_keyword(checker.semantic_model(), keywords) {
                 // S602
                 Some(ShellKeyword {
                     truthiness: Truthiness::Truthy,
@@ -238,7 +241,7 @@ pub(crate) fn shell_injection(
     } else if let Some(ShellKeyword {
         truthiness: Truthiness::Truthy,
         keyword,
-    }) = find_shell_keyword(&checker.ctx, keywords)
+    }) = find_shell_keyword(checker.semantic_model(), keywords)
     {
         // S604
         if checker

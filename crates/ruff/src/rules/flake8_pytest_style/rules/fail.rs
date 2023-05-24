@@ -19,7 +19,7 @@ impl Violation for PytestFailWithoutMessage {
 }
 
 pub(crate) fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_fail(&checker.ctx, func) {
+    if is_pytest_fail(checker.semantic_model(), func) {
         let call_args = SimpleCallArgs::new(args, keywords);
         let msg = call_args.argument("msg", 0);
 

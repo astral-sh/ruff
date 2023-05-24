@@ -1,7 +1,6 @@
 use anyhow::Result;
 use log::error;
 use ruff_text_size::{TextRange, TextSize};
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
