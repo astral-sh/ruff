@@ -13,12 +13,13 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::binding::{
-    Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
-    Importation, SubmoduleImportation,
+    Binding, BindingId, BindingKind, Bindings, Exceptions, FromImportation, Importation,
+    SubmoduleImportation,
 };
+use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::node::{NodeId, Nodes};
-use crate::reference::{ReferenceContext, References};
+use crate::reference::References;
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 /// A semantic model for a Python module, to enable querying the module's semantic information.
@@ -126,26 +127,12 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = self.scopes.global().get(symbol).copied() {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                let reference_id = self.references.push(
-                    ScopeId::global(),
-                    range,
-                    match context {
-                        ExecutionContext::Runtime => ReferenceContext::Runtime,
-                        ExecutionContext::Typing => ReferenceContext::Typing,
-                    },
-                );
+                let reference_id = self.references.push(ScopeId::global(), range, context);
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), binding_id) {
-                    let reference_id = self.references.push(
-                        ScopeId::global(),
-                        range,
-                        match context {
-                            ExecutionContext::Runtime => ReferenceContext::Runtime,
-                            ExecutionContext::Typing => ReferenceContext::Typing,
-                        },
-                    );
+                    let reference_id = self.references.push(ScopeId::global(), range, context);
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
@@ -176,26 +163,12 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = scope.get(symbol).copied() {
                 // Mark the binding as used.
                 let context = self.execution_context();
-                let reference_id = self.references.push(
-                    self.scope_id,
-                    range,
-                    match context {
-                        ExecutionContext::Runtime => ReferenceContext::Runtime,
-                        ExecutionContext::Typing => ReferenceContext::Typing,
-                    },
-                );
+                let reference_id = self.references.push(self.scope_id, range, context);
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) = self.resolve_submodule(scope_id, binding_id) {
-                    let reference_id = self.references.push(
-                        self.scope_id,
-                        range,
-                        match context {
-                            ExecutionContext::Runtime => ReferenceContext::Runtime,
-                            ExecutionContext::Typing => ReferenceContext::Typing,
-                        },
-                    );
+                    let reference_id = self.references.push(self.scope_id, range, context);
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
@@ -585,7 +558,7 @@ impl<'a> SemanticModel<'a> {
         &mut self,
         binding_id: BindingId,
         range: TextRange,
-        context: ReferenceContext,
+        context: ExecutionContext,
     ) {
         let reference_id = self.references.push(self.scope_id, range, context);
         self.bindings[binding_id].references.push(reference_id);
@@ -596,7 +569,7 @@ impl<'a> SemanticModel<'a> {
         &mut self,
         binding_id: BindingId,
         range: TextRange,
-        context: ReferenceContext,
+        context: ExecutionContext,
     ) {
         let reference_id = self.references.push(ScopeId::global(), range, context);
         self.bindings[binding_id].references.push(reference_id);

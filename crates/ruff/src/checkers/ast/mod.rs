@@ -24,13 +24,13 @@ use ruff_python_semantic::analyze::branch_detection;
 use ruff_python_semantic::analyze::typing::{Callable, SubscriptKind};
 use ruff_python_semantic::analyze::visibility::ModuleSource;
 use ruff_python_semantic::binding::{
-    Binding, BindingFlags, BindingId, BindingKind, Exceptions, ExecutionContext, Export,
-    FromImportation, Importation, StarImportation, SubmoduleImportation,
+    Binding, BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImportation,
+    Importation, StarImportation, SubmoduleImportation,
 };
+use ruff_python_semantic::context::ExecutionContext;
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::node::NodeId;
-use ruff_python_semantic::reference::ReferenceContext;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -300,7 +300,7 @@ where
                             self.semantic_model.add_local_reference(
                                 *binding_id,
                                 stmt.range(),
-                                ReferenceContext::Runtime,
+                                ExecutionContext::Runtime,
                             );
                         } else {
                             // Ensure that every nonlocal has an existing binding from a parent scope.
@@ -4955,7 +4955,7 @@ impl<'a> Checker<'a> {
                 self.semantic_model.add_global_reference(
                     binding_id,
                     range,
-                    ReferenceContext::Runtime,
+                    ExecutionContext::Runtime,
                 );
             }
         }

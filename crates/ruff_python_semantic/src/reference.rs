@@ -2,6 +2,7 @@ use ruff_text_size::TextRange;
 
 use ruff_index::{newtype_index, IndexVec};
 
+use crate::context::ExecutionContext;
 use crate::scope::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -11,7 +12,7 @@ pub struct Reference {
     /// The range of the reference in the source code.
     range: TextRange,
     /// The context in which the reference occurs.
-    context: ReferenceContext,
+    context: ExecutionContext,
 }
 
 impl Reference {
@@ -23,17 +24,9 @@ impl Reference {
         self.range
     }
 
-    pub const fn context(&self) -> &ReferenceContext {
+    pub const fn context(&self) -> &ExecutionContext {
         &self.context
     }
-}
-
-#[derive(Debug, Clone, is_macro::Is)]
-pub enum ReferenceContext {
-    /// The reference occurs in a runtime context.
-    Runtime,
-    /// The reference occurs in a typing-only context.
-    Typing,
 }
 
 /// Id uniquely identifying a read reference in a program.
@@ -50,7 +43,7 @@ impl References {
         &mut self,
         scope_id: ScopeId,
         range: TextRange,
-        context: ReferenceContext,
+        context: ExecutionContext,
     ) -> ReferenceId {
         self.0.push(Reference {
             scope_id,

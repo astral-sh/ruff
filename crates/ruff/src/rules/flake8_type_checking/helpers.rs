@@ -3,7 +3,7 @@ use rustpython_parser::ast::{self, Constant, Expr};
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_semantic::binding::{Binding, BindingKind, ExecutionContext};
+use ruff_python_semantic::binding::{Binding, BindingKind};
 use ruff_python_semantic::model::SemanticModel;
 use ruff_python_semantic::scope::ScopeKind;
 
@@ -51,7 +51,7 @@ pub(crate) fn is_valid_runtime_import(semantic_model: &SemanticModel, binding: &
             | BindingKind::FromImportation(..)
             | BindingKind::SubmoduleImportation(..)
     ) {
-        matches!(binding.context, ExecutionContext::Runtime)
+        binding.context.is_runtime()
             && binding.references().any(|reference_id| {
                 semantic_model
                     .references
