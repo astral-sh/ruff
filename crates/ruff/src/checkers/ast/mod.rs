@@ -176,7 +176,7 @@ impl<'a> Checker<'a> {
 
     #[inline]
     pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.enabled(rule)
+        self.settings.rules.enabled(rule)
     }
 }
 

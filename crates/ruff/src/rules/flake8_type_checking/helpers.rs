@@ -5,7 +5,6 @@ use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::binding::{Binding, BindingKind, ExecutionContext};
 use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::reference::ReferenceContext;
 use ruff_python_semantic::scope::ScopeKind;
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
@@ -54,10 +53,11 @@ pub(crate) fn is_valid_runtime_import(semantic_model: &SemanticModel, binding: &
     ) {
         matches!(binding.context, ExecutionContext::Runtime)
             && binding.references().any(|reference_id| {
-                matches!(
-                    semantic_model.references.resolve(reference_id).context(),
-                    ReferenceContext::Runtime
-                )
+                semantic_model
+                    .references
+                    .resolve(reference_id)
+                    .context()
+                    .is_runtime()
             })
     } else {
         false

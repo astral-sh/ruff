@@ -3,10 +3,9 @@ use std::path::Path;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
-    Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
+    Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
 };
 use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::reference::ReferenceContext;
 
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 use crate::settings::Settings;
@@ -278,13 +277,14 @@ pub(crate) fn typing_only_runtime_import(
         return None;
     }
 
-    if matches!(binding.context, ExecutionContext::Runtime)
+    if binding.context.is_runtime()
         && binding.is_used()
         && binding.references().all(|reference_id| {
-            matches!(
-                semantic_model.references.resolve(reference_id).context(),
-                ReferenceContext::Typing
-            )
+            semantic_model
+                .references
+                .resolve(reference_id)
+                .context()
+                .is_typing()
         })
     {
         // Extract the module base and level from the full name.

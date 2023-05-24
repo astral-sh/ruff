@@ -561,6 +561,11 @@ impl<'a> SemanticModel<'a> {
         self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
     }
 
+    /// Return `true` if the given [`ScopeId`] matches that of the current scope.
+    pub fn is_current_scope(&self, scope_id: ScopeId) -> bool {
+        self.scope_id == scope_id
+    }
+
     /// Return `true` if the context is at the top level of the module (i.e., in the module scope,
     /// and not nested within any statements).
     pub fn at_top_level(&self) -> bool {

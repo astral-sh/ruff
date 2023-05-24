@@ -254,7 +254,7 @@ bitflags! {
     }
 }
 
-#[derive(Copy, Debug, Clone)]
+#[derive(Copy, Debug, Clone, is_macro::Is)]
 pub enum ExecutionContext {
     Runtime,
     Typing,

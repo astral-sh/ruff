@@ -28,7 +28,7 @@ impl Reference {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, is_macro::Is)]
 pub enum ReferenceContext {
     /// The reference occurs in a runtime context.
     Runtime,

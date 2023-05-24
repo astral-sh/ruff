@@ -48,7 +48,10 @@ pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
                 // And has already been accessed in the current scope...
                 if let Some(range) = binding.references().find_map(|reference_id| {
                     let reference = checker.semantic_model().references.resolve(reference_id);
-                    if reference.scope_id() == checker.semantic_model().scope_id {
+                    if checker
+                        .semantic_model()
+                        .is_current_scope(reference.scope_id())
+                    {
                         Some(reference.range())
                     } else {
                         None
