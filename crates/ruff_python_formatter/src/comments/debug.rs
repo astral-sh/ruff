@@ -1,7 +1,8 @@
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{CommentsMap, SourceComment};
 use ruff_formatter::SourceCode;
-use std::fmt::{Debug, Formatter};
+use ruff_python_ast::prelude::*;
+use std::fmt::{Debug, Formatter, Write};
 
 /// Prints a debug representation of [`SourceComment`] that includes the comment's text
 pub(crate) struct DebugComment<'a> {
@@ -22,7 +23,9 @@ impl Debug for DebugComment<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut strut = f.debug_struct("SourceComment");
 
-        strut.field("text", &self.comment.slice.text(self.source_code));
+        strut
+            .field("text", &self.comment.slice.text(self.source_code))
+            .field("position", &self.comment.position);
 
         #[cfg(debug_assertions)]
         strut.field("formatted", &self.comment.formatted.get());
@@ -52,7 +55,10 @@ impl Debug for DebugComments<'_> {
 
         for node in self.comments.keys() {
             map.entry(
-                &node,
+                &NodeKindWithSource {
+                    key: *node,
+                    source: self.source_code,
+                },
                 &DebugNodeComments {
                     comments: self.comments,
                     source_code: self.source_code,
@@ -62,6 +68,57 @@ impl Debug for DebugComments<'_> {
         }
 
         map.finish()
+    }
+}
+
+/// Prints the source code up to the first new line character. Truncates the text if it exceeds 40 characters.
+struct NodeKindWithSource<'a> {
+    key: NodeRefEqualityKey<'a>,
+    source: SourceCode<'a>,
+}
+
+impl Debug for NodeKindWithSource<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        struct TruncatedSource<'a>(&'a str);
+
+        impl Debug for TruncatedSource<'_> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                f.write_char('`')?;
+                let first_line = if let Some(line_end_pos) = self.0.find(['\n', '\r']) {
+                    &self.0[..line_end_pos]
+                } else {
+                    self.0
+                };
+
+                if first_line.len() > 40 {
+                    let (head, rest) = first_line.split_at(27);
+
+                    f.write_str(head)?;
+                    f.write_str("...")?;
+
+                    // Take the last 10 characters
+                    let tail = &rest[rest.len().saturating_sub(10)..];
+                    f.write_str(tail)?;
+                } else {
+                    f.write_str(first_line)?;
+                }
+
+                if first_line.len() < self.0.len() {
+                    f.write_str("\u{23ce}")?;
+                }
+
+                f.write_char('`')
+            }
+        }
+
+        let kind = self.key.node().kind();
+        let source = self.source.slice(self.key.node().range()).text(self.source);
+
+        f.debug_struct("Node")
+            .field("kind", &kind)
+            .field("range", &self.key.node().range())
+            .field("source", &TruncatedSource(source))
+            .finish()
     }
 }
 
@@ -120,9 +177,11 @@ impl Debug for DebugNodeCommentSlice<'_> {
 mod tests {
     use crate::comments::map::MultiMap;
     use crate::comments::node_key::NodeRefEqualityKey;
-    use crate::comments::{node_key, Comments, CommentsData};
-    use crate::comments::{CommentsMap, SourceComment};
-    use insta::assert_debug_snapshot;
+    use crate::comments::{
+        CommentTextPosition, Comments, CommentsData, CommentsMap, SourceComment,
+    };
+    use insta::_macro_support::assert_snapshot;
+    use insta::{assert_debug_snapshot, assert_snapshot};
     use ruff_formatter::SourceCode;
     use ruff_python_ast::node::AnyNode;
     use ruff_python_ast::source_code;
@@ -156,6 +215,7 @@ break;
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
                 formatted: Cell::new(false),
+                position: CommentTextPosition::OwnLine,
             },
         );
 
@@ -164,6 +224,7 @@ break;
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
                 formatted: Cell::new(false),
+                position: CommentTextPosition::EndOfLine,
             },
         );
 
@@ -172,14 +233,11 @@ break;
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
                 formatted: Cell::new(false),
+                position: CommentTextPosition::OwnLine,
             },
         );
 
-        let comments = Comments {
-            data: Rc::new(CommentsData {
-                comments: comments_map,
-            }),
-        };
+        let comments = Comments::new(comments_map);
 
         assert_debug_snapshot!(comments.debug(source_code));
     }

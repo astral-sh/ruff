@@ -38,6 +38,10 @@ impl<'a> SourceCode<'a> {
             text: String::from(&self.text[range]).into_boxed_str(),
         }
     }
+
+    pub fn as_str(&self) -> &'a str {
+        self.text
+    }
 }
 
 impl Debug for SourceCode<'_> {

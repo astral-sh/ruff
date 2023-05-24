@@ -1,14 +1,20 @@
-use anyhow::Result;
-use rustpython_parser::lexer::LexResult;
+use anyhow::{anyhow, Context, Result};
+use rustpython_parser::ast::Mod;
+use rustpython_parser::lexer::lex;
+use rustpython_parser::{parse_tokens, Mode};
 
-use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
-use ruff_python_ast::source_code::Locator;
+use ruff_formatter::{
+    format, FormatResult, Formatted, IndentStyle, Printed, SimpleFormatOptions, SourceCode,
+};
+use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 
 use crate::attachment::attach;
+use crate::comments::Comments;
 use crate::context::ASTFormatContext;
 use crate::cst::Stmt;
 use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
+use crate::trivia::TriviaToken;
 
 mod attachment;
 pub mod cli;
@@ -23,22 +29,52 @@ mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
-pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
-    // Create a reusable locator.
-    let locator = Locator::new(contents);
+pub fn fmt(contents: &str) -> Result<Printed> {
+    // Tokenize once
+    let mut tokens = Vec::new();
+    let mut comment_ranges = CommentRangesBuilder::default();
 
-    // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+    for result in lex(contents, Mode::Module) {
+        let (token, range) = match result {
+            Ok((token, range)) => (token, range),
+            Err(err) => return Err(anyhow!("Source contains syntax errors {err:?}")),
+        };
 
-    // Extract trivia.
+        comment_ranges.visit_token(&token, range);
+        tokens.push(Ok((token, range)));
+    }
+
+    let comment_ranges = comment_ranges.finish();
+
     let trivia = trivia::extract_trivia_tokens(&tokens);
 
     // Parse the AST.
-    let python_ast = ruff_rustpython::parse_program_tokens(tokens, "<filename>")?;
+    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
+
+    let formatted = format_node(&python_ast, &comment_ranges, contents, trivia)?;
+
+    formatted
+        .print()
+        .with_context(|| "Failed to print the formatter IR")
+}
+
+pub(crate) fn format_node<'a>(
+    root: &'a Mod,
+    comment_ranges: &'a CommentRanges,
+    source: &'a str,
+    trivia: Vec<TriviaToken>,
+) -> FormatResult<Formatted<ASTFormatContext<'a>>> {
+    let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
+
+    let module = root.as_module().unwrap();
+
+    let locator = Locator::new(source);
 
     // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = python_ast
-        .into_iter()
+    let mut python_cst: Vec<Stmt> = module
+        .body
+        .iter()
+        .cloned()
         .map(|stmt| (stmt, &locator).into())
         .collect();
 
@@ -54,10 +90,10 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
                 line_width: 88.try_into().unwrap(),
             },
             locator.contents(),
+            comments
         ),
         [format::builders::statements(&python_cst)]
     )
-    .map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -68,11 +104,14 @@ mod tests {
 
     use anyhow::Result;
     use insta::assert_snapshot;
+    use rustpython_parser::lexer::lex;
+    use rustpython_parser::{parse_tokens, Mode};
 
+    use ruff_python_ast::source_code::CommentRangesBuilder;
     use ruff_testing_macros::fixture;
     use similar::TextDiff;
 
-    use crate::fmt;
+    use crate::{fmt, format_node, trivia};
 
     #[fixture(
         pattern = "resources/test/fixtures/black/**/*.py",
@@ -85,13 +124,12 @@ mod tests {
     fn black_test(input_path: &Path) -> Result<()> {
         let content = fs::read_to_string(input_path)?;
 
-        let formatted = fmt(&content)?;
+        let printed = fmt(&content)?;
 
         let expected_path = input_path.with_extension("py.expect");
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
-        let printed = formatted.print()?;
         let formatted_code = printed.as_code();
 
         if formatted_code == expected_output {
@@ -162,7 +200,24 @@ mod tests {
     k: v for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
 }
 "#;
-        let formatted = fmt(src).unwrap();
+        // Tokenize once
+        let mut tokens = Vec::new();
+        let mut comment_ranges = CommentRangesBuilder::default();
+
+        for result in lex(src, Mode::Module) {
+            let (token, range) = result.unwrap();
+            comment_ranges.visit_token(&token, range);
+            tokens.push(Ok((token, range)));
+        }
+
+        let comment_ranges = comment_ranges.finish();
+
+        let trivia = trivia::extract_trivia_tokens(&tokens);
+
+        // Parse the AST.
+        let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
+
+        let formatted = format_node(&python_ast, &comment_ranges, src, trivia).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

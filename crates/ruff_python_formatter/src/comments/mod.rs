@@ -89,6 +89,7 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
+use rustpython_parser::ast::Mod;
 use std::cell::Cell;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
@@ -96,12 +97,16 @@ use std::rc::Rc;
 mod debug;
 mod map;
 mod node_key;
+mod placement;
+mod visitor;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
+use crate::comments::visitor::CommentsVisitor;
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::source_code::CommentRanges;
 
 /// A comment in the source document.
 #[derive(Debug, Clone)]
@@ -112,6 +117,8 @@ pub(crate) struct SourceComment {
     /// Whether the comment has been formatted or not.
     #[cfg(debug_assertions)]
     pub(super) formatted: Cell<bool>,
+
+    pub(super) position: CommentTextPosition,
 }
 
 impl SourceComment {
@@ -138,6 +145,59 @@ impl SourceComment {
         DebugComment::new(self, source_code)
     }
 }
+
+/// The position of a comment in the source text.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) enum CommentTextPosition {
+    /// A comment that is on the same line as the preceding token and is separated by at least one line break from the following token.
+    ///
+    /// # Examples
+    ///
+    /// ## End of line
+    ///
+    /// ```python
+    /// a; # comment
+    /// b;
+    /// ```
+    ///
+    /// `# comment` is an end of line comments because it is separated by at least one line break from the following token `b`.
+    ///
+    /// ## Own line
+    ///
+    /// ```python
+    /// a;
+    /// # comment
+    /// b;
+    /// ```
+    ///
+    /// `# comment` isn't an end of line comment because it isn't on the same line as the preceding token `a`.
+    EndOfLine,
+
+    /// A Comment that is separated by at least one line break from the preceding token.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// a;
+    /// # comment
+    /// b;
+    /// ```
+    ///
+    /// `# comment` line comments because they are separated by one line break from the preceding
+    /// token `a`.
+    OwnLine,
+}
+
+impl CommentTextPosition {
+    pub(crate) const fn is_own_line(self) -> bool {
+        matches!(self, CommentTextPosition::OwnLine)
+    }
+
+    pub(crate) const fn is_end_of_line(self) -> bool {
+        matches!(self, CommentTextPosition::EndOfLine)
+    }
+}
+
 type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 
 /// The comments of a syntax tree stored by node.
@@ -171,6 +231,27 @@ pub(crate) struct Comments<'a> {
 }
 
 impl<'a> Comments<'a> {
+    fn new(comments: CommentsMap<'a>) -> Self {
+        Self {
+            data: Rc::new(CommentsData { comments }),
+        }
+    }
+
+    /// Extracts the comments from the AST.
+    pub(crate) fn from_ast(
+        root: &'a Mod,
+        source_code: SourceCode<'a>,
+        comment_ranges: &'a CommentRanges,
+    ) -> Self {
+        let map = if comment_ranges.is_empty() {
+            CommentsMap::new()
+        } else {
+            CommentsVisitor::new(source_code, comment_ranges).visit(root)
+        };
+
+        Self::new(map)
+    }
+
     #[inline]
     pub(crate) fn has_comments(&self, node: AnyNodeRef) -> bool {
         self.data.comments.has(&NodeRefEqualityKey::from_ref(node))
@@ -271,4 +352,220 @@ impl<'a> Comments<'a> {
 #[derive(Default)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::comments::Comments;
+    use insta::assert_debug_snapshot;
+    use ruff_formatter::SourceCode;
+    use ruff_python_ast::prelude::*;
+    use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder};
+    use rustpython_parser::lexer::lex;
+    use rustpython_parser::{parse_tokens, Mode};
+
+    struct CommentsTestCase<'a> {
+        module: Mod,
+        comment_ranges: CommentRanges,
+        source_code: SourceCode<'a>,
+    }
+
+    impl<'a> CommentsTestCase<'a> {
+        fn from_code(code: &'a str) -> Self {
+            let source_code = SourceCode::new(code);
+            let tokens: Vec<_> = lex(code, Mode::Module).collect();
+
+            let mut comment_ranges = CommentRangesBuilder::default();
+
+            for (token, range) in tokens.iter().flatten() {
+                comment_ranges.visit_token(token, *range);
+            }
+
+            let comment_ranges = comment_ranges.finish();
+
+            let parsed = parse_tokens(tokens.into_iter(), Mode::Module, "test.py")
+                .expect("Expect source to be valid Python");
+
+            CommentsTestCase {
+                source_code,
+                module: parsed,
+                comment_ranges,
+            }
+        }
+
+        fn to_comments(&self) -> Comments {
+            Comments::from_ast(&self.module, self.source_code, &self.comment_ranges)
+        }
+    }
+
+    #[test]
+    fn base_test() {
+        let source = r#"
+# Function Leading comment
+def test(x, y):
+    if x == y: # if statement end of line comment
+        print("Equal")
+
+    # Leading comment
+    elif x < y:
+        print("Less")
+    else:
+        print("Greater")
+
+# own line comment
+
+test(10, 20)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn only_comments() {
+        let source = r#"
+# Some comment
+
+# another comment
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn empty_file() {
+        let source = r#""#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn dangling_comment() {
+        let source = r#"
+def test(
+        # Some comment
+    ):
+    pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn parenthesized_expression() {
+        let source = r#"
+a = ( # Trailing comment
+    10 + # More comments
+     3
+    )
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn parenthesized_trailing_comment() {
+        let source = r#"(
+    a
+    # comment
+)
+"#;
+
+        let test_case = CommentsTestCase::from_code(source);
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn trailing_function_comment() {
+        let source = r#"
+def test(x, y):
+    if x == y:
+        pass
+    elif x < y:
+        print("Less")
+    else:
+        print("Greater")
+
+    # Trailing comment
+
+test(10, 20)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn leading_most_outer() {
+        let source = r#"
+# leading comment
+x
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    // Comment should be attached to the statement
+    #[test]
+    fn trailing_most_outer() {
+        let source = r#"
+x # trailing comment
+y # trailing last node
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn trailing_most_outer_nested() {
+        let source = r#"
+x + (
+    3 # trailing comment
+) # outer
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn trailing_after_comma() {
+        let source = r#"
+def test(
+    a, # Trailing comment for argument `a`
+    b,
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
 }
