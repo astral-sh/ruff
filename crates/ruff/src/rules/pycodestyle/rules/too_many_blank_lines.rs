@@ -53,31 +53,32 @@ impl AlwaysAutofixableViolation for TooManyBlankLines {
 
 /// E303
 pub(crate) fn too_many_blank_lines(line: &Line, locator: &Locator) -> Option<Diagnostic> {
-    // If line is blank and line after is not blank (use locator to get line after (using the offset from Line)).  <-- no duplicates
-    // while line before (locator) is blank += 1
-    // if nb_blanks >=3 -> diagnostic.
-
-    if line.trim().is_empty()
+    // Only check for too many blank lines starting from the first blank line of a (potential) series
+    // of blank lines (to avoid duplicate errors).
+    // Also ignore blank lines at the beginning of the file.
+    if line.start().to_u32() > 0
+        && line.trim().is_empty()
         && !locator
-            .line(TextSize::new(line.end().to_u32() + 1))
+            .line(TextSize::new(line.start().to_u32() - 1))
             .trim()
             .is_empty()
     {
         let mut nb_blank_lines = 0;
-        let mut previous_line_end = line.start();
+        let mut previous_line_end = line.end();
         loop {
             nb_blank_lines += 1;
-            previous_line_end = locator.line_start(TextSize::new(previous_line_end.to_u32() - 1)); // FIXME: check bounds
+            previous_line_end = locator.full_line_end(previous_line_end);
             let previous_line = locator.line(previous_line_end);
 
-            if !previous_line.trim().is_empty() {
+            if !previous_line.trim().is_empty() || previous_line_end >= locator.text_len() {
                 break;
             }
         }
-        let first_blank_line = locator.line_end(TextSize::new(previous_line_end.to_u32() + 1));
 
-        if nb_blank_lines > 2 {
-            let range = TextRange::new(first_blank_line, line.end());
+        // Generate a diagnostic if there are too many blank lines not at the end of the file.
+        if nb_blank_lines > 2 && previous_line_end < locator.text_len() {
+            let last_blank_line = TextSize::new(locator.line_start(previous_line_end).to_u32() - 1);
+            let range = locator.full_lines_range(TextRange::new(line.start(), last_blank_line));
             let mut diagnostic = Diagnostic::new(TooManyBlankLines(nb_blank_lines), range);
             diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                 "\n\n".to_string(),
