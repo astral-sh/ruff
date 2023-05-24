@@ -1,11 +1,9 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{UnaryOp, UnaryOpKind};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatUnaryOp<'a> {
+pub(crate) struct FormatUnaryOp<'a> {
     item: &'a UnaryOp,
 }
 

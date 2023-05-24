@@ -1,13 +1,11 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::MatchCase;
 use crate::format::builders::block;
 use crate::format::comments::{end_of_line_comments, leading_comments};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatMatchCase<'a> {
+pub(crate) struct FormatMatchCase<'a> {
     item: &'a MatchCase,
 }
 

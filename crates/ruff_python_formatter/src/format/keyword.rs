@@ -1,12 +1,10 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::Keyword;
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatKeyword<'a> {
+pub(crate) struct FormatKeyword<'a> {
     item: &'a Keyword,
 }
 

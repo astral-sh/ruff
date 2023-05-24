@@ -1,12 +1,10 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::Alias;
 use crate::format::comments::end_of_line_comments;
-use crate::shared_traits::AsFormat;
 
-pub struct FormatAlias<'a> {
+pub(crate) struct FormatAlias<'a> {
     item: &'a Alias,
 }
 

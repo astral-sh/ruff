@@ -1,13 +1,11 @@
 use rustpython_parser::ast::Constant;
 
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{Pattern, PatternKind};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatPattern<'a> {
+pub(crate) struct FormatPattern<'a> {
     item: &'a Pattern,
 }
 

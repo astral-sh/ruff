@@ -1,5 +1,3 @@
-#![allow(clippy::all)]
-
 /// Used to get an object that knows how to format this object.
 pub trait AsFormat<Context> {
     type Format<'a>: ruff_formatter::Format<Context>

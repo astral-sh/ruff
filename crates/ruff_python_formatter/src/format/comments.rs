@@ -1,7 +1,6 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{write, Format};
 
-use crate::context::ASTFormatContext;
 use crate::cst::Attributed;
 use crate::format::builders::literal;
 use crate::trivia::TriviaKind;

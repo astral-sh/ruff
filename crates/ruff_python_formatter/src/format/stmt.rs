@@ -1,9 +1,8 @@
 #![allow(unused_variables, clippy::too_many_arguments)]
 
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{format_args, write};
 
-use crate::context::ASTFormatContext;
 use crate::cst::{
     Alias, Arguments, Body, Excepthandler, Expr, ExprKind, Keyword, MatchCase, Operator, Stmt,
     StmtKind, Withitem,
@@ -11,7 +10,6 @@ use crate::cst::{
 use crate::format::builders::{block, join_names};
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
 use crate::format::helpers::is_self_closing;
-use crate::shared_traits::AsFormat;
 
 fn format_break(f: &mut Formatter<ASTFormatContext>, stmt: &Stmt) -> FormatResult<()> {
     write!(f, [text("break")])?;
@@ -752,7 +750,7 @@ fn format_with_(
     Ok(())
 }
 
-pub struct FormatStmt<'a> {
+pub(crate) struct FormatStmt<'a> {
     item: &'a Stmt,
 }
 

@@ -1,10 +1,9 @@
 use std::ops::{Add, Sub};
 
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{write, Format};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::context::ASTFormatContext;
 use crate::format::builders::literal;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

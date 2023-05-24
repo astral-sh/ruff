@@ -1,13 +1,11 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{Excepthandler, ExcepthandlerKind};
 use crate::format::builders::block;
 use crate::format::comments::end_of_line_comments;
-use crate::shared_traits::AsFormat;
 
-pub struct FormatExcepthandler<'a> {
+pub(crate) struct FormatExcepthandler<'a> {
     item: &'a Excepthandler,
 }
 

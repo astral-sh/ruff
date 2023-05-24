@@ -1,12 +1,10 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{Operator, OperatorKind};
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatOperator<'a> {
+pub(crate) struct FormatOperator<'a> {
     item: &'a Operator,
 }
 
