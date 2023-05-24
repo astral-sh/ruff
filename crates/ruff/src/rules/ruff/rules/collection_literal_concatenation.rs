@@ -48,7 +48,7 @@ fn make_splat_elts(
     new_elts
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone)]
 enum Type {
     List,
     Tuple,
@@ -100,10 +100,10 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
             make_splat_elts(splat_element, other_elements, splat_at_left)
         }
         // If the splat element is itself a list/tuple, insert them in the other list/tuple.
-        Expr::List(ast::ExprList { elts, .. }) if type_ == Type::List => {
+        Expr::List(ast::ExprList { elts, .. }) if matches!(type_, Type::List) => {
             other_elements.iter().chain(elts.iter()).cloned().collect()
         }
-        Expr::Tuple(ast::ExprTuple { elts, .. }) if type_ == Type::Tuple => {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) if matches!(type_, Type::Tuple) => {
             other_elements.iter().chain(elts.iter()).cloned().collect()
         }
         _ => return None,
