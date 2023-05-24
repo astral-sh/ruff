@@ -24,6 +24,7 @@ pub(crate) use missing_newline_at_end_of_file::{
 pub(crate) use mixed_spaces_and_tabs::{mixed_spaces_and_tabs, MixedSpacesAndTabs};
 pub(crate) use not_tests::{not_tests, NotInTest, NotIsTest};
 pub(crate) use tab_indentation::{tab_indentation, TabIndentation};
+pub(crate) use too_many_blank_lines::{too_many_blank_lines, TooManyBlankLines};
 pub(crate) use trailing_whitespace::{
     trailing_whitespace, BlankLineWithWhitespace, TrailingWhitespace,
 };
@@ -46,5 +47,6 @@ mod missing_newline_at_end_of_file;
 mod mixed_spaces_and_tabs;
 mod not_tests;
 mod tab_indentation;
+mod too_many_blank_lines;
 mod trailing_whitespace;
 mod type_comparison;

@@ -63,6 +63,7 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::AmbiguousFunctionName,
     rules::pycodestyle::rules::IOError,
     rules::pycodestyle::rules::SyntaxError,
+    rules::pycodestyle::rules::TooManyBlankLines,
     // pycodestyle warnings
     rules::pycodestyle::rules::TabIndentation,
     rules::pycodestyle::rules::TrailingWhitespace,

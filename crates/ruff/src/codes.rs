@@ -74,6 +74,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E273") => (RuleGroup::Nursery, Rule::TabAfterKeyword),
         (Pycodestyle, "E274") => (RuleGroup::Nursery, Rule::TabBeforeKeyword),
         (Pycodestyle, "E275") => (RuleGroup::Nursery, Rule::MissingWhitespaceAfterKeyword),
+        (Pycodestyle, "E303") => (RuleGroup::Nursery, Rule::TooManyBlankLines),
         (Pycodestyle, "E401") => (RuleGroup::Unspecified, Rule::MultipleImportsOnOneLine),
         (Pycodestyle, "E402") => (RuleGroup::Unspecified, Rule::ModuleImportNotAtTopOfFile),
         (Pycodestyle, "E501") => (RuleGroup::Unspecified, Rule::LineTooLong),

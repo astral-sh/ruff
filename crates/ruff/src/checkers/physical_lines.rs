@@ -14,7 +14,7 @@ use crate::rules::flake8_executable::rules::{
 };
 use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
-    tab_indentation, trailing_whitespace,
+    tab_indentation, too_many_blank_lines, trailing_whitespace,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
@@ -46,6 +46,7 @@ pub(crate) fn check_physical_lines(
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
     let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
     let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
+    let enforce_too_many_blank_lines = settings.rules.enabled(Rule::TooManyBlankLines);
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
@@ -124,6 +125,12 @@ pub(crate) fn check_physical_lines(
                 if let Some(diagnostic) = doc_line_too_long(&line, settings) {
                     diagnostics.push(diagnostic);
                 }
+            }
+        }
+
+        if enforce_too_many_blank_lines {
+            if let Some(diagnostic) = too_many_blank_lines(&line, locator) {
+                diagnostics.push(diagnostic);
             }
         }
 
