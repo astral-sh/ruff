@@ -69,8 +69,7 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                        diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
                             pass_stmt.range().add_end(index),
                         )));
                     } else {

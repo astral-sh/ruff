@@ -170,8 +170,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     range: TextRange::default(),
                 });
                 let bool_op = node;
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().expr(&bool_op),
                     expr.range(),
                 )));
