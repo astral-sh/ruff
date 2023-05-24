@@ -1,13 +1,15 @@
-# Summary
+<!--
+Thank you for contributing to Ruff! To help us out with reviewing, please consider the following:
 
-## Issue
+- Does this pull request include a summary of the change? (See below.)
+- Does this pull request include a descriptive title?
+- Does this pull request include references to any relevant issues?
+-->
 
-<!-- Some issue -->
+## Summary
 
-## Changes
+<!-- What's the purpose of the change? What does it do, and why? -->
 
-<!-- Ipsum lorem. -->
+## Test Plan
 
-## Specific Testing (Optional)
-
-<!-- Any specific text used to test outside of typical Ruff workflows -->
+<!-- How was it tested? -->
