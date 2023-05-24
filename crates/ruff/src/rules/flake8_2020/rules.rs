@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -113,16 +114,15 @@ impl Violation for SysVersionSlice1 {
     }
 }
 
-fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
-    checker
-        .ctx
+fn is_sys(model: &SemanticModel, expr: &Expr, target: &str) -> bool {
+    model
         .resolve_call_path(expr)
         .map_or(false, |call_path| call_path.as_slice() == ["sys", target])
 }
 
 /// YTT101, YTT102, YTT301, YTT303
 pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
-    if is_sys(checker, value, "version") {
+    if is_sys(checker.semantic_model(), value, "version") {
         match slice {
             Expr::Slice(ast::ExprSlice {
                 lower: None,
@@ -176,7 +176,7 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
 pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
     match left {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
-            if is_sys(checker, value, "version_info") =>
+            if is_sys(checker.semantic_model(), value, "version_info") =>
         {
             if let Expr::Constant(ast::ExprConstant {
                 value: Constant::Int(i),
@@ -220,7 +220,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
         }
 
         Expr::Attribute(ast::ExprAttribute { value, attr, .. })
-            if is_sys(checker, value, "version_info") && attr == "minor" =>
+            if is_sys(checker.semantic_model(), value, "version_info") && attr == "minor" =>
         {
             if let (
                 [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
@@ -245,7 +245,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
         _ => {}
     }
 
-    if is_sys(checker, left, "version") {
+    if is_sys(checker.semantic_model(), left, "version") {
         if let (
             [Cmpop::Lt | Cmpop::LtE | Cmpop::Gt | Cmpop::GtE],
             [Expr::Constant(ast::ExprConstant {
@@ -272,7 +272,7 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], compara
 /// YTT202
 pub(crate) fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(expr)
         .map_or(false, |call_path| call_path.as_slice() == ["six", "PY3"])
     {

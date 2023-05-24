@@ -1,13 +1,16 @@
-use crate::fs::{relativize_path, relativize_path_to};
-use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
-use ruff_python_ast::source_code::SourceLocation;
-use serde::ser::SerializeSeq;
-use serde::{Serialize, Serializer};
-use serde_json::json;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
+
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
+use serde_json::json;
+
+use ruff_python_ast::source_code::SourceLocation;
+
+use crate::fs::{relativize_path, relativize_path_to};
+use crate::message::{Emitter, EmitterContext, Message};
+use crate::registry::AsRule;
 
 /// Generate JSON with violations in GitLab CI format
 //  https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
@@ -122,9 +125,10 @@ fn fingerprint(
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::GitlabEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn output() {

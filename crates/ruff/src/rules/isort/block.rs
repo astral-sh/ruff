@@ -7,21 +7,24 @@ use ruff_python_ast::statement_visitor::StatementVisitor;
 use crate::directives::IsortDirectives;
 use crate::rules::isort::helpers;
 
+/// A block of imports within a Python module.
+#[derive(Debug, Default)]
+pub(crate) struct Block<'a> {
+    pub(crate) nested: bool,
+    pub(crate) imports: Vec<&'a Stmt>,
+    pub(crate) trailer: Option<Trailer>,
+}
+
+/// The type of trailer that should follow an import block.
 #[derive(Debug, Copy, Clone)]
-pub enum Trailer {
+pub(crate) enum Trailer {
     Sibling,
     ClassDef,
     FunctionDef,
 }
 
-#[derive(Debug, Default)]
-pub struct Block<'a> {
-    pub nested: bool,
-    pub imports: Vec<&'a Stmt>,
-    pub trailer: Option<Trailer>,
-}
-
-pub(crate) struct ImportTracker<'a> {
+/// A builder for identifying and constructing import blocks within a Python module.
+pub(crate) struct BlockBuilder<'a> {
     locator: &'a Locator<'a>,
     is_stub: bool,
     blocks: Vec<Block<'a>>,
@@ -30,7 +33,7 @@ pub(crate) struct ImportTracker<'a> {
     nested: bool,
 }
 
-impl<'a> ImportTracker<'a> {
+impl<'a> BlockBuilder<'a> {
     pub(crate) fn new(
         locator: &'a Locator<'a>,
         directives: &'a IsortDirectives,
@@ -111,14 +114,14 @@ impl<'a> ImportTracker<'a> {
     }
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ImportTracker<'a>
+impl<'a, 'b> StatementVisitor<'b> for BlockBuilder<'a>
 where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Track manual splits.
         for (index, split) in self.splits.iter().enumerate() {
-            if stmt.end() >= *split {
+            if stmt.start() >= *split {
                 self.finalize(self.trailer_for(stmt));
                 self.splits = &self.splits[index + 1..];
             } else {

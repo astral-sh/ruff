@@ -73,7 +73,18 @@ def f():
 
 
 def f():
-    # Fixable.
+    # Unfixable.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+    else:
+        bar = 1
+
+    print(bar)
+
+
+def f():
+    # Unfixable (false negative) due to usage of `bar` outside of loop.
     for foo, bar, baz in (["1", "2", "3"],):
         if foo or baz:
             break
@@ -85,4 +96,4 @@ def f():
 # Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
 # variable name).
 for line_ in range(self.header_lines):
-     fp.readline()
+    fp.readline()

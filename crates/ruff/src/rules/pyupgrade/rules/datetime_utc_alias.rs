@@ -28,7 +28,7 @@ impl Violation for DatetimeTimezoneUTC {
 /// UP017
 pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(expr)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["datetime", "timezone", "utc"]

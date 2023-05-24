@@ -11,7 +11,7 @@ use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -351,7 +351,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
-        && (test.is_compare_expr() || checker.ctx.is_builtin("bool"));
+        && (test.is_compare_expr() || checker.semantic_model().is_builtin("bool"));
 
     let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
     if fixable && checker.patch(diagnostic.kind.rule()) {
@@ -411,9 +411,10 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
+fn contains_call_path(model: &SemanticModel, expr: &Expr, target: &[&str]) -> bool {
     any_over_expr(expr, &|expr| {
-        ctx.resolve_call_path(expr)
+        model
+            .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
@@ -446,13 +447,13 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(&checker.ctx, test, &["sys", "version_info"]) {
+    if contains_call_path(checker.semantic_model(), test, &["sys", "version_info"]) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(&checker.ctx, test, &["sys", "platform"]) {
+    if contains_call_path(checker.semantic_model(), test, &["sys", "platform"]) {
         return;
     }
 
@@ -647,7 +648,7 @@ pub(crate) fn manual_dict_lookup(
         return;
     };
     if value.as_ref().map_or(false, |value| {
-        contains_effect(value, |id| checker.ctx.is_builtin(id))
+        contains_effect(value, |id| checker.semantic_model().is_builtin(id))
     }) {
         return;
     }
@@ -720,7 +721,7 @@ pub(crate) fn manual_dict_lookup(
             return;
         };
         if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.ctx.is_builtin(id))
+            contains_effect(value, |id| checker.semantic_model().is_builtin(id))
         }) {
             return;
         };
@@ -803,7 +804,7 @@ pub(crate) fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.ctx.is_builtin(id)) {
+    if contains_effect(default_value, |id| checker.semantic_model().is_builtin(id)) {
         return;
     }
 

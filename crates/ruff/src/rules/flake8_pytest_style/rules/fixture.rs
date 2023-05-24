@@ -1,7 +1,8 @@
+use std::fmt;
+
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{self, Arguments, Expr, Keyword, Ranged, Stmt};
-use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -12,7 +13,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
 use ruff_python_semantic::analyze::visibility::is_abstract;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::autofix::actions::remove_argument;
 use crate::checkers::ast::Checker;
@@ -242,9 +243,9 @@ where
     }
 }
 
-fn get_fixture_decorator<'a>(context: &Context, decorators: &'a [Expr]) -> Option<&'a Expr> {
+fn get_fixture_decorator<'a>(model: &SemanticModel, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(context, decorator) || is_pytest_yield_fixture(context, decorator)
+        is_pytest_fixture(model, decorator) || is_pytest_yield_fixture(model, decorator)
     })
 }
 
@@ -456,7 +457,7 @@ fn check_test_function_args(checker: &mut Checker, args: &Arguments) {
 
 /// PT020
 fn check_fixture_decorator_name(checker: &mut Checker, decorator: &Expr) {
-    if is_pytest_yield_fixture(&checker.ctx, decorator) {
+    if is_pytest_yield_fixture(checker.semantic_model(), decorator) {
         checker.diagnostics.push(Diagnostic::new(
             PytestDeprecatedYieldFixture,
             decorator.range(),
@@ -532,7 +533,7 @@ pub(crate) fn fixture(
     decorators: &[Expr],
     body: &[Stmt],
 ) {
-    let decorator = get_fixture_decorator(&checker.ctx, decorators);
+    let decorator = get_fixture_decorator(checker.semantic_model(), decorators);
     if let Some(decorator) = decorator {
         if checker
             .settings
@@ -571,7 +572,7 @@ pub(crate) fn fixture(
                 .settings
                 .rules
                 .enabled(Rule::PytestUselessYieldFixture))
-            && !is_abstract(&checker.ctx, decorators)
+            && !is_abstract(checker.semantic_model(), decorators)
         {
             check_fixture_returns(checker, stmt, name, body);
         }

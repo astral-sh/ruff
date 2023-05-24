@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -38,7 +37,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
         if args.is_empty()
             && keywords.len() == 1
             && checker
-                .ctx
+                .semantic_model()
                 .resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["functools", "lru_cache"]
@@ -65,13 +64,11 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = get_or_import_symbol(
+                        let (import_edit, binding) = checker.importer.get_or_import_symbol(
                             "functools",
                             "cache",
                             expr.start(),
-                            &checker.ctx,
-                            &checker.importer,
-                            checker.locator,
+                            checker.semantic_model(),
                         )?;
                         let reference_edit = Edit::range_replacement(binding, expr.range());
                         #[allow(deprecated)]

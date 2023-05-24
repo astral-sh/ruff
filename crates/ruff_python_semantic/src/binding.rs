@@ -1,7 +1,10 @@
-use std::num::TryFromIntError;
-use std::ops::{Deref, Index, IndexMut};
+use std::ops::{Deref, DerefMut};
 
+use crate::model::SemanticModel;
 use bitflags::bitflags;
+use ruff_index::{newtype_index, IndexSlice, IndexVec};
+use ruff_python_ast::helpers;
+use ruff_python_ast::source_code::Locator;
 use ruff_text_size::TextRange;
 
 use crate::node::NodeId;
@@ -108,6 +111,18 @@ impl<'a> Binding<'a> {
         }
         existing.is_definition()
     }
+
+    /// Returns the appropriate visual range for highlighting this binding.
+    pub fn trimmed_range(&self, semantic_model: &SemanticModel, locator: &Locator) -> TextRange {
+        match self.kind {
+            BindingKind::ClassDefinition | BindingKind::FunctionDefinition => {
+                self.source.map_or(self.range, |source| {
+                    helpers::identifier_range(semantic_model.stmts[source], locator)
+                })
+            }
+            _ => self.range,
+        }
+    }
 }
 
 /// ID uniquely identifying a [Binding] in a program.
@@ -115,16 +130,8 @@ impl<'a> Binding<'a> {
 /// Using a `u32` to identify [Binding]s should is sufficient because Ruff only supports documents with a
 /// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
 /// bindings because bindings must be separated by whitespace (and have an assignment).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct BindingId(u32);
-
-impl TryFrom<usize> for BindingId {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(u32::try_from(value)?))
-    }
-}
+#[newtype_index]
+pub struct BindingId;
 
 impl nohash_hasher::IsEnabled for BindingId {}
 
@@ -132,53 +139,37 @@ impl nohash_hasher::IsEnabled for BindingId {}
 ///
 /// Bindings are indexed by [`BindingId`]
 #[derive(Debug, Clone, Default)]
-pub struct Bindings<'a>(Vec<Binding<'a>>);
+pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
     /// Pushes a new binding and returns its id
     pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
-        let id = self.next_id();
-        self.0.push(binding);
-        id
+        self.0.push(binding)
     }
 
     /// Returns the id that will be assigned when pushing the next binding
     pub fn next_id(&self) -> BindingId {
-        BindingId::try_from(self.0.len()).unwrap()
-    }
-}
-
-impl<'a> Index<BindingId> for Bindings<'a> {
-    type Output = Binding<'a>;
-
-    fn index(&self, index: BindingId) -> &Self::Output {
-        &self.0[usize::from(index)]
-    }
-}
-
-impl<'a> IndexMut<BindingId> for Bindings<'a> {
-    fn index_mut(&mut self, index: BindingId) -> &mut Self::Output {
-        &mut self.0[usize::from(index)]
+        self.0.next_index()
     }
 }
 
 impl<'a> Deref for Bindings<'a> {
-    type Target = [Binding<'a>];
+    type Target = IndexSlice<BindingId, Binding<'a>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
-    fn from_iter<T: IntoIterator<Item = Binding<'a>>>(iter: T) -> Self {
-        Self(Vec::from_iter(iter))
+impl<'a> DerefMut for Bindings<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
-impl From<BindingId> for usize {
-    fn from(value: BindingId) -> Self {
-        value.0 as usize
+impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
+    fn from_iter<T: IntoIterator<Item = Binding<'a>>>(iter: T) -> Self {
+        Self(IndexVec::from_iter(iter))
     }
 }
 

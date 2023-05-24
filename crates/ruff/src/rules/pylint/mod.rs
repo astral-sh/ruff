@@ -7,12 +7,11 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use regex::Regex;
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::types::PythonVersion;
@@ -21,7 +20,7 @@ mod tests {
 
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"); "PLE1142")]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"); "PLW0129")]
-    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
+    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE1310")]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"); "PLW0711")]

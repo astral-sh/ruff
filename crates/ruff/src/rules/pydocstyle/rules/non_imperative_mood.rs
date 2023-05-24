@@ -41,7 +41,7 @@ pub(crate) fn non_imperative_mood(
 
     if is_test(cast::name(stmt))
         || is_property(
-            &checker.ctx,
+            checker.semantic_model(),
             cast::decorator_list(stmt),
             &property_decorators,
         )

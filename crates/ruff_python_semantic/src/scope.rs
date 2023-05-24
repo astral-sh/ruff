@@ -1,6 +1,6 @@
-use std::num::TryFromIntError;
-use std::ops::{Deref, Index, IndexMut};
+use std::ops::{Deref, DerefMut};
 
+use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
 
@@ -151,39 +151,25 @@ pub struct Lambda<'a> {
 /// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
 /// and it is impossible to have more scopes than characters in the file (because defining a function or class
 /// requires more than one character).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct ScopeId(u32);
+#[newtype_index]
+pub struct ScopeId;
 
 impl ScopeId {
     /// Returns the ID for the global scope
     #[inline]
     pub const fn global() -> Self {
-        ScopeId(0)
+        ScopeId::from_u32(0)
     }
 
     /// Returns `true` if this is the id of the global scope
     pub const fn is_global(&self) -> bool {
-        self.0 == 0
-    }
-}
-
-impl TryFrom<usize> for ScopeId {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(u32::try_from(value)?))
-    }
-}
-
-impl From<ScopeId> for usize {
-    fn from(value: ScopeId) -> Self {
-        value.0 as usize
+        self.index() == 0
     }
 }
 
 /// The scopes of a program indexed by [`ScopeId`]
 #[derive(Debug)]
-pub struct Scopes<'a>(Vec<Scope<'a>>);
+pub struct Scopes<'a>(IndexVec<ScopeId, Scope<'a>>);
 
 impl<'a> Scopes<'a> {
     /// Returns a reference to the global scope
@@ -198,7 +184,7 @@ impl<'a> Scopes<'a> {
 
     /// Pushes a new scope and returns its unique id
     pub fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
-        let next_id = ScopeId::try_from(self.0.len()).unwrap();
+        let next_id = ScopeId::new(self.0.len());
         self.0.push(Scope::local(kind, parent));
         next_id
     }
@@ -218,27 +204,19 @@ impl<'a> Scopes<'a> {
 
 impl Default for Scopes<'_> {
     fn default() -> Self {
-        Self(vec![Scope::global()])
-    }
-}
-
-impl<'a> Index<ScopeId> for Scopes<'a> {
-    type Output = Scope<'a>;
-
-    fn index(&self, index: ScopeId) -> &Self::Output {
-        &self.0[usize::from(index)]
-    }
-}
-
-impl<'a> IndexMut<ScopeId> for Scopes<'a> {
-    fn index_mut(&mut self, index: ScopeId) -> &mut Self::Output {
-        &mut self.0[usize::from(index)]
+        Self(IndexVec::from_raw(vec![Scope::global()]))
     }
 }
 
 impl<'a> Deref for Scopes<'a> {
-    type Target = [Scope<'a>];
+    type Target = IndexSlice<ScopeId, Scope<'a>>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<'a> DerefMut for Scopes<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

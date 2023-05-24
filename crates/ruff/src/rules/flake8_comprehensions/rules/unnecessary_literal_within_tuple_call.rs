@@ -1,10 +1,11 @@
 use rustpython_parser::ast::{Expr, Keyword, Ranged};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
@@ -79,7 +80,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     let Some(argument) = helpers::first_argument_with_matching_function("tuple", func, args) else {
         return;
     };
-    if !checker.ctx.is_builtin("tuple") {
+    if !checker.semantic_model().is_builtin("tuple") {
         return;
     }
     let argument_kind = match argument {

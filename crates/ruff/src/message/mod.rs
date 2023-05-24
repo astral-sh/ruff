@@ -1,3 +1,25 @@
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::io::Write;
+use std::ops::Deref;
+
+use ruff_text_size::{TextRange, TextSize};
+use rustc_hash::FxHashMap;
+
+pub use azure::AzureEmitter;
+pub use github::GithubEmitter;
+pub use gitlab::GitlabEmitter;
+pub use grouped::GroupedEmitter;
+pub use json::JsonEmitter;
+pub use junit::JunitEmitter;
+pub use pylint::PylintEmitter;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_python_ast::source_code::{SourceFile, SourceLocation};
+pub use text::TextEmitter;
+
+use crate::jupyter::JupyterIndex;
+use crate::registry::AsRule;
+
 mod azure;
 mod diff;
 mod github;
@@ -7,27 +29,6 @@ mod json;
 mod junit;
 mod pylint;
 mod text;
-
-use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::FxHashMap;
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::io::Write;
-use std::ops::Deref;
-
-pub use azure::AzureEmitter;
-pub use github::GithubEmitter;
-pub use gitlab::GitlabEmitter;
-pub use grouped::GroupedEmitter;
-pub use json::JsonEmitter;
-pub use junit::JunitEmitter;
-pub use pylint::PylintEmitter;
-pub use text::TextEmitter;
-
-use crate::jupyter::JupyterIndex;
-use crate::registry::AsRule;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
-use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Message {
@@ -152,12 +153,14 @@ impl<'a> EmitterContext<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::{Emitter, EmitterContext, Message};
-    use crate::rules::pyflakes::rules::{UndefinedName, UnusedImport, UnusedVariable};
-    use ruff_diagnostics::{Diagnostic, Edit, Fix};
-    use ruff_python_ast::source_code::SourceFileBuilder;
     use ruff_text_size::{TextRange, TextSize};
     use rustc_hash::FxHashMap;
+
+    use ruff_diagnostics::{Diagnostic, Edit, Fix};
+    use ruff_python_ast::source_code::SourceFileBuilder;
+
+    use crate::message::{Emitter, EmitterContext, Message};
+    use crate::rules::pyflakes::rules::{UndefinedName, UnusedImport, UnusedVariable};
 
     pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os

@@ -5,7 +5,7 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
 
-use crate::context::Context;
+use crate::model::SemanticModel;
 
 #[derive(Debug, Clone, Copy, is_macro::Is)]
 pub enum Visibility {
@@ -14,9 +14,10 @@ pub enum Visibility {
 }
 
 /// Returns `true` if a function is a "static method".
-pub fn is_staticmethod(ctx: &Context, decorator_list: &[Expr]) -> bool {
+pub fn is_staticmethod(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        ctx.resolve_call_path(map_callable(expr))
+        model
+            .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "staticmethod"]
             })
@@ -24,9 +25,10 @@ pub fn is_staticmethod(ctx: &Context, decorator_list: &[Expr]) -> bool {
 }
 
 /// Returns `true` if a function is a "class method".
-pub fn is_classmethod(ctx: &Context, decorator_list: &[Expr]) -> bool {
+pub fn is_classmethod(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        ctx.resolve_call_path(map_callable(expr))
+        model
+            .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "classmethod"]
             })
@@ -34,23 +36,24 @@ pub fn is_classmethod(ctx: &Context, decorator_list: &[Expr]) -> bool {
 }
 
 /// Returns `true` if a function definition is an `@overload`.
-pub fn is_overload(ctx: &Context, decorator_list: &[Expr]) -> bool {
+pub fn is_overload(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| ctx.match_typing_expr(map_callable(expr), "overload"))
+        .any(|expr| model.match_typing_expr(map_callable(expr), "overload"))
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
-pub fn is_override(ctx: &Context, decorator_list: &[Expr]) -> bool {
+pub fn is_override(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| ctx.match_typing_expr(map_callable(expr), "override"))
+        .any(|expr| model.match_typing_expr(map_callable(expr), "override"))
 }
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
-pub fn is_abstract(ctx: &Context, decorator_list: &[Expr]) -> bool {
+pub fn is_abstract(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        ctx.resolve_call_path(map_callable(expr))
+        model
+            .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 matches!(
                     call_path.as_slice(),
@@ -69,9 +72,14 @@ pub fn is_abstract(ctx: &Context, decorator_list: &[Expr]) -> bool {
 /// Returns `true` if a function definition is a `@property`.
 /// `extra_properties` can be used to check additional non-standard
 /// `@property`-like decorators.
-pub fn is_property(ctx: &Context, decorator_list: &[Expr], extra_properties: &[CallPath]) -> bool {
+pub fn is_property(
+    model: &SemanticModel,
+    decorator_list: &[Expr],
+    extra_properties: &[CallPath],
+) -> bool {
     decorator_list.iter().any(|expr| {
-        ctx.resolve_call_path(map_callable(expr))
+        model
+            .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "property"]
                     || call_path.as_slice() == ["functools", "cached_property"]

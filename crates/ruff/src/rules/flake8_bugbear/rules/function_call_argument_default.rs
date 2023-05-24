@@ -4,11 +4,11 @@ use rustpython_parser::ast::{self, Arguments, Constant, Expr, Ranged};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::call_path::{compose_call_path, CallPath};
+use ruff_python_ast::call_path::{compose_call_path, from_qualified_name, CallPath};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::typing::is_immutable_func;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
@@ -73,9 +73,19 @@ impl Violation for FunctionCallInDefaultArgument {
 }
 
 struct ArgumentDefaultVisitor<'a> {
-    checker: &'a Checker<'a>,
-    diagnostics: Vec<(DiagnosticKind, TextRange)>,
+    model: &'a SemanticModel<'a>,
     extend_immutable_calls: Vec<CallPath<'a>>,
+    diagnostics: Vec<(DiagnosticKind, TextRange)>,
+}
+
+impl<'a> ArgumentDefaultVisitor<'a> {
+    fn new(model: &'a SemanticModel<'a>, extend_immutable_calls: Vec<CallPath<'a>>) -> Self {
+        Self {
+            model,
+            extend_immutable_calls,
+            diagnostics: Vec::new(),
+        }
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for ArgumentDefaultVisitor<'b>
@@ -85,8 +95,8 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, args, .. }) => {
-                if !is_mutable_func(self.checker, func)
-                    && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)
+                if !is_mutable_func(self.model, func)
+                    && !is_immutable_func(self.model, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
@@ -139,11 +149,8 @@ pub(crate) fn function_call_argument_default(checker: &mut Checker, arguments: &
         .map(|target| from_qualified_name(target))
         .collect();
     let diagnostics = {
-        let mut visitor = ArgumentDefaultVisitor {
-            checker,
-            diagnostics: vec![],
-            extend_immutable_calls,
-        };
+        let mut visitor =
+            ArgumentDefaultVisitor::new(checker.semantic_model(), extend_immutable_calls);
         for expr in arguments
             .defaults
             .iter()

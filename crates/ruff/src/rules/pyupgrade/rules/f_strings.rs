@@ -1,10 +1,11 @@
+use std::borrow::Cow;
+
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
-use std::borrow::Cow;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};

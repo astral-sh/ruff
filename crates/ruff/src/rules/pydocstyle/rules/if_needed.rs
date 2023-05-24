@@ -27,7 +27,7 @@ pub(crate) fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     }) = docstring.definition else {
         return;
     };
-    if !is_overload(&checker.ctx, cast::decorator_list(stmt)) {
+    if !is_overload(checker.semantic_model(), cast::decorator_list(stmt)) {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(

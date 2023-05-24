@@ -1,15 +1,15 @@
 //! Registry of all [`Rule`] implementations.
 
-mod rule_set;
-
 use strum_macros::{AsRefStr, EnumIter};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::RuleNamespace;
+pub use rule_set::{RuleSet, RuleSetIterator};
 
 use crate::codes::{self, RuleCodePrefix};
 use crate::rules;
-pub use rule_set::{RuleSet, RuleSetIterator};
+
+mod rule_set;
 
 ruff_macros::register_rules!(
     // pycodestyle errors
@@ -812,7 +812,7 @@ pub enum Linter {
     Flake8UsePathlib,
     /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
     #[prefix = "TD"]
-    Flake8Todo,
+    Flake8Todos,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
@@ -1003,6 +1003,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
+
     use strum::IntoEnumIterator;
 
     use super::{Linter, Rule, RuleNamespace};

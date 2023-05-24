@@ -12,10 +12,11 @@ use crate::rules::{
 };
 use crate::settings::Settings;
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::source_code::{Indexer, Locator};
 
 pub(crate) fn check_tokens(
     locator: &Locator,
+    indexer: &Indexer,
     tokens: &[LexResult],
     settings: &Settings,
     is_stub: bool,
@@ -100,15 +101,9 @@ pub(crate) fn check_tokens(
 
     // ERA001
     if enforce_commented_out_code {
-        for (tok, range) in tokens.iter().flatten() {
-            if matches!(tok, Tok::Comment(_)) {
-                if let Some(diagnostic) =
-                    eradicate::rules::commented_out_code(locator, *range, settings)
-                {
-                    diagnostics.push(diagnostic);
-                }
-            }
-        }
+        diagnostics.extend(eradicate::rules::commented_out_code(
+            indexer, locator, settings,
+        ));
     }
 
     // W605
@@ -185,13 +180,13 @@ pub(crate) fn check_tokens(
 
     // PYI033
     if enforce_type_comment_in_stub && is_stub {
-        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(tokens));
+        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(indexer, locator));
     }
 
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007
     if enforce_todos {
         diagnostics.extend(
-            flake8_todos::rules::todos(tokens, settings)
+            flake8_todos::rules::todos(indexer, locator, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );

@@ -152,10 +152,10 @@ B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
 70 70 |             break
 71 71 | 
 
-B007.py:77:14: B007 [*] Loop control variable `bar` not used within loop body
+B007.py:77:14: B007 Loop control variable `bar` not used within loop body
    |
 77 | def f():
-78 |     # Fixable.
+78 |     # Unfixable.
 79 |     for foo, bar, baz in (["1", "2", "3"],):
    |              ^^^ B007
 80 |         if foo or baz:
@@ -163,23 +163,24 @@ B007.py:77:14: B007 [*] Loop control variable `bar` not used within loop body
    |
    = help: Rename unused `bar` to `_bar`
 
-ℹ Suggested fix
-74 74 | 
-75 75 | def f():
-76 76 |     # Fixable.
-77    |-    for foo, bar, baz in (["1", "2", "3"],):
-   77 |+    for foo, _bar, baz in (["1", "2", "3"],):
-78 78 |         if foo or baz:
-79 79 |             break
-80 80 | 
+B007.py:88:14: B007 Loop control variable `bar` not used within loop body
+   |
+88 | def f():
+89 |     # Unfixable (false negative) due to usage of `bar` outside of loop.
+90 |     for foo, bar, baz in (["1", "2", "3"],):
+   |              ^^^ B007
+91 |         if foo or baz:
+92 |             break
+   |
+   = help: Rename unused `bar` to `_bar`
 
-B007.py:87:5: B007 Loop control variable `line_` not used within loop body
-   |
-87 | # Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
-88 | # variable name).
-89 | for line_ in range(self.header_lines):
-   |     ^^^^^ B007
-90 |      fp.readline()
-   |
+B007.py:98:5: B007 Loop control variable `line_` not used within loop body
+    |
+ 98 | # Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
+ 99 | # variable name).
+100 | for line_ in range(self.header_lines):
+    |     ^^^^^ B007
+101 |     fp.readline()
+    |
 
 

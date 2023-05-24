@@ -1,6 +1,8 @@
-use ruff_macros::CacheKey;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+
+use serde::{Deserialize, Serialize};
+
+use ruff_macros::CacheKey;
 
 #[derive(Clone, Copy, Debug, CacheKey, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
