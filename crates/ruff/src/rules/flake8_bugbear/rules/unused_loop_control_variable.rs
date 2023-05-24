@@ -160,8 +160,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
                     .map(|binding_id| &checker.semantic_model().bindings[binding_id])
                     .all(|binding| !binding.is_used())
                 {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                         rename,
                         expr.range(),
                     )));
