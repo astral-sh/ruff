@@ -1,14 +1,13 @@
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{format_element, write, Argument, Arguments, GroupId, TextSize};
+use crate::{format_element, write, Argument, Arguments, FormatContext, GroupId, TextSize};
 use crate::{Buffer, VecBuffer};
 
 use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::num::NonZeroU8;
-use std::rc::Rc;
 use Tag::*;
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -361,31 +360,65 @@ impl std::fmt::Debug for DynamicText<'_> {
     }
 }
 
-/// Creates a text from a dynamic string and a range of the input source
-pub fn static_text_slice(text: Rc<str>, range: TextRange) -> StaticTextSlice {
-    debug_assert_no_newlines(&text[range]);
-
-    StaticTextSlice { text, range }
-}
-
-#[derive(Eq, PartialEq)]
-pub struct StaticTextSlice {
-    text: Rc<str>,
+/// Emits a text as it is written in the source document. Optimized to avoid allocations.
+pub const fn source_text_slice(
     range: TextRange,
-}
-
-impl<Context> Format<Context> for StaticTextSlice {
-    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        f.write_element(FormatElement::StaticTextSlice {
-            text: self.text.clone(),
-            range: self.range,
-        })
+    newlines: ContainsNewlines,
+) -> SourceTextSliceBuilder {
+    SourceTextSliceBuilder {
+        range,
+        new_lines: newlines,
     }
 }
 
-impl std::fmt::Debug for StaticTextSlice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "StaticTextSlice({})", &self.text[self.range])
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum ContainsNewlines {
+    /// The string contains newline characters
+    Yes,
+    /// The string contains no newline characters
+    No,
+
+    /// The string may contain newline characters, search the string to determine if there are any newlines.
+    Detect,
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub struct SourceTextSliceBuilder {
+    range: TextRange,
+    new_lines: ContainsNewlines,
+}
+
+impl<Context> Format<Context> for SourceTextSliceBuilder
+where
+    Context: FormatContext,
+{
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        let source_code = f.context().source_code();
+        let slice = source_code.slice(self.range);
+        debug_assert_no_newlines(slice.text(source_code));
+
+        let contains_newlines = match self.new_lines {
+            ContainsNewlines::Yes => {
+                debug_assert!(
+                    slice.text(source_code).contains('\n'),
+                    "Text contains no new line characters but the caller specified that it does."
+                );
+                true
+            }
+            ContainsNewlines::No => {
+                debug_assert!(
+                    !slice.text(source_code).contains('\n'),
+                    "Text contains new line characters but the caller specified that it does not."
+                );
+                false
+            }
+            ContainsNewlines::Detect => slice.text(source_code).contains('\n'),
+        };
+
+        f.write_element(FormatElement::SourceCodeSlice {
+            slice,
+            contains_newlines,
+        })
     }
 }
 

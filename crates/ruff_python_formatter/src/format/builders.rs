@@ -12,7 +12,7 @@ pub(crate) struct Block<'a> {
     body: &'a Body,
 }
 
-impl Format<ASTFormatContext> for Block<'_> {
+impl Format<ASTFormatContext<'_>> for Block<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for (i, stmt) in self.body.iter().enumerate() {
             if i > 0 {
@@ -28,7 +28,7 @@ impl Format<ASTFormatContext> for Block<'_> {
                         write!(f, [empty_line()])?;
                     }
                     TriviaKind::OwnLineComment(range) => {
-                        write!(f, [literal(range), hard_line_break()])?;
+                        write!(f, [literal(range, ContainsNewlines::No), hard_line_break()])?;
                     }
                     _ => {}
                 }
@@ -49,7 +49,7 @@ pub(crate) struct Statements<'a> {
     suite: &'a [Stmt],
 }
 
-impl Format<ASTFormatContext> for Statements<'_> {
+impl Format<ASTFormatContext<'_>> for Statements<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         for (i, stmt) in self.suite.iter().enumerate() {
             if i > 0 {
@@ -70,20 +70,18 @@ pub(crate) struct Literal {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext> for Literal {
+impl Format<ASTFormatContext<'_>> for Literal {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
-        let text = f.context().contents();
-
-        f.write_element(FormatElement::StaticTextSlice {
-            text,
-            range: self.range,
-        })
+        source_text_slice(self.range, ContainsNewlines::Detect).fmt(f)
     }
 }
 
 #[inline]
-pub(crate) const fn literal(range: TextRange) -> Literal {
-    Literal { range }
+pub(crate) const fn literal(
+    range: TextRange,
+    newlines: ContainsNewlines,
+) -> SourceTextSliceBuilder {
+    source_text_slice(range, newlines)
 }
 
 pub(crate) const fn join_names(names: &[String]) -> JoinNames {

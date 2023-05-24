@@ -10,7 +10,7 @@ pub struct FormatBoolOp<'a> {
     item: &'a BoolOp,
 }
 
-impl AsFormat<ASTFormatContext> for BoolOp {
+impl AsFormat<ASTFormatContext<'_>> for BoolOp {
     type Format<'a> = FormatBoolOp<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -18,7 +18,7 @@ impl AsFormat<ASTFormatContext> for BoolOp {
     }
 }
 
-impl Format<ASTFormatContext> for FormatBoolOp<'_> {
+impl Format<ASTFormatContext<'_>> for FormatBoolOp<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let bool_op = self.item;
         write!(f, [leading_comments(bool_op)])?;

@@ -7,8 +7,9 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use crate::format_element::tag::{LabelId, Tag};
+use crate::source_code::SourceCodeSlice;
 use crate::TagKind;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextSize;
 
 /// Language agnostic IR for formatting source code.
 ///
@@ -39,8 +40,12 @@ pub enum FormatElement {
         text: Box<str>,
     },
 
-    /// Token constructed by slicing a defined range from a static string.
-    StaticTextSlice { text: Rc<str>, range: TextRange },
+    /// Text that gets emitted as it is in the source code. Optimized to avoid any allocations.
+    SourceCodeSlice {
+        slice: SourceCodeSlice,
+        /// Whether the string contains any new line characters
+        contains_newlines: bool,
+    },
 
     /// Prevents that line suffixes move past this boundary. Forces the printer to print any pending
     /// line suffixes, potentially by inserting a hard line break.
@@ -70,9 +75,14 @@ impl std::fmt::Debug for FormatElement {
             FormatElement::DynamicText { text, .. } => {
                 fmt.debug_tuple("DynamicText").field(text).finish()
             }
-            FormatElement::StaticTextSlice { text, .. } => {
-                fmt.debug_tuple("Text").field(text).finish()
-            }
+            FormatElement::SourceCodeSlice {
+                slice,
+                contains_newlines,
+            } => fmt
+                .debug_tuple("Text")
+                .field(slice)
+                .field(contains_newlines)
+                .finish(),
             FormatElement::LineSuffixBoundary => write!(fmt, "LineSuffixBoundary"),
             FormatElement::BestFitting(best_fitting) => {
                 fmt.debug_tuple("BestFitting").field(&best_fitting).finish()
@@ -221,7 +231,7 @@ impl FormatElement {
     pub const fn is_text(&self) -> bool {
         matches!(
             self,
-            FormatElement::StaticTextSlice { .. }
+            FormatElement::SourceCodeSlice { .. }
                 | FormatElement::DynamicText { .. }
                 | FormatElement::StaticText { .. }
         )
@@ -240,7 +250,9 @@ impl FormatElements for FormatElement {
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
             FormatElement::StaticText { text } => text.contains('\n'),
             FormatElement::DynamicText { text, .. } => text.contains('\n'),
-            FormatElement::StaticTextSlice { text, range } => text[*range].contains('\n'),
+            FormatElement::SourceCodeSlice {
+                contains_newlines, ..
+            } => *contains_newlines,
             FormatElement::Interned(interned) => interned.will_break(),
             // Traverse into the most flat version because the content is guaranteed to expand when even
             // the most flat version contains some content that forces a break.
@@ -380,20 +392,19 @@ mod sizes {
     // be recomputed at a later point in time?
     // You reduced the size of a format element? Excellent work!
 
-    use crate::format_element::BestFitting;
-    use crate::prelude::tag::VerbatimKind;
-    use crate::prelude::Interned;
-    use ruff_text_size::TextRange;
     use static_assertions::assert_eq_size;
 
-    assert_eq_size!(TextRange, [u8; 8]);
-    assert_eq_size!(VerbatimKind, [u8; 8]);
-    assert_eq_size!(Interned, [u8; 16]);
-    assert_eq_size!(BestFitting, [u8; 16]);
+    assert_eq_size!(ruff_text_size::TextRange, [u8; 8]);
+    assert_eq_size!(crate::prelude::tag::VerbatimKind, [u8; 8]);
+    assert_eq_size!(crate::prelude::Interned, [u8; 16]);
+    assert_eq_size!(crate::format_element::BestFitting, [u8; 16]);
+
+    #[cfg(not(debug_assertions))]
+    assert_eq_size!(crate::SourceCodeSlice, [u8; 8]);
 
     #[cfg(not(debug_assertions))]
     assert_eq_size!(crate::format_element::Tag, [u8; 16]);
 
     #[cfg(not(debug_assertions))]
-    assert_eq_size!(crate::FormatElement, [u8; 32]);
+    assert_eq_size!(crate::FormatElement, [u8; 24]);
 }

@@ -13,7 +13,7 @@ pub(crate) struct StringLiteralPart {
     range: TextRange,
 }
 
-impl Format<ASTFormatContext> for StringLiteralPart {
+impl Format<ASTFormatContext<'_>> for StringLiteralPart {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let contents = f.context().contents();
 
@@ -115,7 +115,7 @@ pub(crate) struct StringLiteral<'a> {
     expr: &'a Expr,
 }
 
-impl Format<ASTFormatContext> for StringLiteral<'_> {
+impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let expr = self.expr;
 

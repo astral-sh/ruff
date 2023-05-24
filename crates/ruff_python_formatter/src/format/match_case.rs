@@ -11,7 +11,7 @@ pub struct FormatMatchCase<'a> {
     item: &'a MatchCase,
 }
 
-impl AsFormat<ASTFormatContext> for MatchCase {
+impl AsFormat<ASTFormatContext<'_>> for MatchCase {
     type Format<'a> = FormatMatchCase<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -19,7 +19,7 @@ impl AsFormat<ASTFormatContext> for MatchCase {
     }
 }
 
-impl Format<ASTFormatContext> for FormatMatchCase<'_> {
+impl Format<ASTFormatContext<'_>> for FormatMatchCase<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let MatchCase {
             pattern,

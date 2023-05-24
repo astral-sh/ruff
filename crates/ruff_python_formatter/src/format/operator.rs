@@ -10,7 +10,7 @@ pub struct FormatOperator<'a> {
     item: &'a Operator,
 }
 
-impl AsFormat<ASTFormatContext> for Operator {
+impl AsFormat<ASTFormatContext<'_>> for Operator {
     type Format<'a> = FormatOperator<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -18,7 +18,7 @@ impl AsFormat<ASTFormatContext> for Operator {
     }
 }
 
-impl Format<ASTFormatContext> for FormatOperator<'_> {
+impl Format<ASTFormatContext<'_>> for FormatOperator<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let operator = self.item;
         write!(f, [leading_comments(operator)])?;

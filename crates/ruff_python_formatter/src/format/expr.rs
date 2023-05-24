@@ -33,7 +33,7 @@ fn format_starred(
 }
 
 fn format_name(f: &mut Formatter<ASTFormatContext>, expr: &Expr, _id: &str) -> FormatResult<()> {
-    write!(f, [literal(expr.range())])?;
+    write!(f, [literal(expr.range(), ContainsNewlines::No)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -57,7 +57,7 @@ fn format_subscript(
                     if let TriviaKind::OwnLineComment(range) = trivia.kind {
                         write!(f, [expand_parent()])?;
                         write!(f, [hard_line_break()])?;
-                        write!(f, [literal(range)])?;
+                        write!(f, [literal(range, ContainsNewlines::No)])?;
                     }
                 }
             }
@@ -573,7 +573,7 @@ fn format_joined_str(
     expr: &Expr,
     _values: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [literal(expr.range())])?;
+    write!(f, [literal(expr.range(), ContainsNewlines::Detect)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -800,7 +800,7 @@ fn format_if_exp(
     Ok(())
 }
 
-impl Format<ASTFormatContext> for FormatExpr<'_> {
+impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         if self.item.parentheses.is_always() {
             write!(f, [text("(")])?;
@@ -871,7 +871,7 @@ impl Format<ASTFormatContext> for FormatExpr<'_> {
             if trivia.relationship.is_trailing() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
-                    write!(f, [literal(range)])?;
+                    write!(f, [literal(range, ContainsNewlines::No)])?;
                     write!(f, [hard_line_break()])?;
                 }
             }
@@ -885,7 +885,7 @@ impl Format<ASTFormatContext> for FormatExpr<'_> {
     }
 }
 
-impl AsFormat<ASTFormatContext> for Expr {
+impl AsFormat<ASTFormatContext<'_>> for Expr {
     type Format<'a> = FormatExpr<'a>;
 
     fn format(&self) -> Self::Format<'_> {

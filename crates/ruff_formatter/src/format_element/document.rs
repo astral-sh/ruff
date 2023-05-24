@@ -3,6 +3,7 @@ use crate::format_element::tag::DedentMode;
 use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::printer::LineEnding;
+use crate::source_code::SourceCode;
 use crate::{format, write};
 use crate::{
     BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
@@ -80,7 +81,9 @@ impl Document {
                     }
                     FormatElement::StaticText { text } => text.contains('\n'),
                     FormatElement::DynamicText { text, .. } => text.contains('\n'),
-                    FormatElement::StaticTextSlice { text, range } => text[*range].contains('\n'),
+                    FormatElement::SourceCodeSlice {
+                        contains_newlines, ..
+                    } => *contains_newlines,
                     FormatElement::ExpandParent
                     | FormatElement::Line(LineMode::Hard | LineMode::Empty) => true,
                     _ => false,
@@ -99,6 +102,13 @@ impl Document {
         let mut interned: FxHashMap<&Interned, bool> = FxHashMap::default();
         propagate_expands(self, &mut enclosing, &mut interned);
     }
+
+    pub fn display<'a>(&'a self, source_code: SourceCode<'a>) -> DisplayDocument {
+        DisplayDocument {
+            elements: self.elements.as_slice(),
+            source_code,
+        }
+    }
 }
 
 impl From<Vec<FormatElement>> for Document {
@@ -115,9 +125,14 @@ impl Deref for Document {
     }
 }
 
-impl std::fmt::Display for Document {
+pub struct DisplayDocument<'a> {
+    elements: &'a [FormatElement],
+    source_code: SourceCode<'a>,
+}
+
+impl std::fmt::Display for DisplayDocument<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let formatted = format!(IrFormatContext::default(), [self.elements.as_slice()])
+        let formatted = format!(IrFormatContext::new(self.source_code), [self.elements])
             .expect("Formatting not to throw any FormatErrors");
 
         f.write_str(
@@ -129,17 +144,32 @@ impl std::fmt::Display for Document {
     }
 }
 
-#[derive(Clone, Default, Debug)]
-struct IrFormatContext {
+#[derive(Clone, Debug)]
+struct IrFormatContext<'a> {
     /// The interned elements that have been printed to this point
     printed_interned_elements: HashMap<Interned, usize>,
+
+    source_code: SourceCode<'a>,
 }
 
-impl FormatContext for IrFormatContext {
+impl<'a> IrFormatContext<'a> {
+    fn new(source_code: SourceCode<'a>) -> Self {
+        Self {
+            source_code,
+            printed_interned_elements: HashMap::new(),
+        }
+    }
+}
+
+impl FormatContext for IrFormatContext<'_> {
     type Options = IrFormatOptions;
 
     fn options(&self) -> &Self::Options {
         &IrFormatOptions
+    }
+
+    fn source_code(&self) -> SourceCode {
+        self.source_code
     }
 }
 
@@ -165,7 +195,7 @@ impl FormatOptions for IrFormatOptions {
     }
 }
 
-impl Format<IrFormatContext> for &[FormatElement] {
+impl Format<IrFormatContext<'_>> for &[FormatElement] {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
         use Tag::*;
 
@@ -189,7 +219,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                 element @ FormatElement::Space
                 | element @ FormatElement::StaticText { .. }
                 | element @ FormatElement::DynamicText { .. }
-                | element @ FormatElement::StaticTextSlice { .. } => {
+                | element @ FormatElement::SourceCodeSlice { .. } => {
                     if !in_text {
                         write!(f, [text("\"")])?;
                     }
@@ -489,7 +519,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
 
 struct ContentArrayStart;
 
-impl Format<IrFormatContext> for ContentArrayStart {
+impl Format<IrFormatContext<'_>> for ContentArrayStart {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
         use Tag::*;
 
@@ -505,7 +535,7 @@ impl Format<IrFormatContext> for ContentArrayStart {
 
 struct ContentArrayEnd;
 
-impl Format<IrFormatContext> for ContentArrayEnd {
+impl Format<IrFormatContext<'_>> for ContentArrayEnd {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
         use Tag::*;
         f.write_elements([
@@ -615,8 +645,9 @@ impl FormatElements for [FormatElement] {
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    use crate::SimpleFormatContext;
     use crate::{format, format_args, write};
+    use crate::{SimpleFormatContext, SourceCode};
+    use ruff_text_size::{TextRange, TextSize};
 
     #[test]
     fn display_elements() {
@@ -641,7 +672,51 @@ mod tests {
         let document = formatted.into_document();
 
         assert_eq!(
-            &std::format!("{document}"),
+            &std::format!("{}", document.display(SourceCode::default())),
+            r#"[
+  group([
+    "(",
+    indent([
+      soft_line_break,
+      "Some longer content That should ultimately break"
+    ]),
+    soft_line_break
+  ])
+]"#
+        );
+    }
+
+    #[test]
+    fn display_elements_with_source_text_slice() {
+        let source_code = "Some longer content\nThat should ultimately break";
+        let formatted = format!(
+            SimpleFormatContext::default().with_source_code(source_code),
+            [format_with(|f| {
+                write!(
+                    f,
+                    [group(&format_args![
+                        text("("),
+                        soft_block_indent(&format_args![
+                            source_text_slice(
+                                TextRange::at(TextSize::new(0), TextSize::new(19)),
+                                ContainsNewlines::No
+                            ),
+                            space(),
+                            source_text_slice(
+                                TextRange::at(TextSize::new(20), TextSize::new(28)),
+                                ContainsNewlines::No
+                            ),
+                        ])
+                    ])]
+                )
+            })]
+        )
+        .unwrap();
+
+        let document = formatted.into_document();
+
+        assert_eq!(
+            &std::format!("{}", document.display(SourceCode::new(source_code))),
             r#"[
   group([
     "(",
@@ -677,7 +752,7 @@ mod tests {
         ]);
 
         assert_eq!(
-            &std::format!("{document}"),
+            &std::format!("{}", document.display(SourceCode::default())),
             r#"[
   "[",
   group([

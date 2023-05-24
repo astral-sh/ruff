@@ -23,6 +23,7 @@ use crate::printer::line_suffixes::{LineSuffixEntry, LineSuffixes};
 use crate::printer::queue::{
     AllPredicate, FitsEndPredicate, FitsQueue, PrintQueue, Queue, SingleEntryPredicate,
 };
+use crate::source_code::SourceCode;
 use drop_bomb::DebugDropBomb;
 use ruff_text_size::{TextLen, TextSize};
 use std::num::NonZeroU8;
@@ -32,12 +33,14 @@ use unicode_width::UnicodeWidthChar;
 #[derive(Debug, Default)]
 pub struct Printer<'a> {
     options: PrinterOptions,
+    source_code: SourceCode<'a>,
     state: PrinterState<'a>,
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(options: PrinterOptions) -> Self {
+    pub fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
         Self {
+            source_code,
             options,
             state: PrinterState::default(),
         }
@@ -96,7 +99,10 @@ impl<'a> Printer<'a> {
 
             FormatElement::StaticText { text } => self.print_text(text, None),
             FormatElement::DynamicText { text } => self.print_text(text, None),
-            FormatElement::StaticTextSlice { text, range } => self.print_text(&text[*range], None),
+            FormatElement::SourceCodeSlice { slice, .. } => {
+                let text = slice.text(self.source_code);
+                self.print_text(text, Some(slice.range()))
+            }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
@@ -994,8 +1000,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::StaticText { text } => return Ok(self.fits_text(text)),
             FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text)),
-            FormatElement::StaticTextSlice { text, range } => {
-                return Ok(self.fits_text(&text[*range]))
+            FormatElement::SourceCodeSlice { slice, .. } => {
+                let text = slice.text(self.printer.source_code);
+                return Ok(self.fits_text(text));
             }
             FormatElement::LineSuffixBoundary => {
                 if self.state.has_line_suffix {
@@ -1256,6 +1263,7 @@ struct FitsState {
 mod tests {
     use crate::prelude::*;
     use crate::printer::{LineEnding, PrintWidth, Printer, PrinterOptions};
+    use crate::source_code::SourceCode;
     use crate::{format_args, write, Document, FormatState, IndentStyle, Printed, VecBuffer};
 
     fn format(root: &dyn Format<SimpleFormatContext>) -> Printed {
@@ -1274,7 +1282,7 @@ mod tests {
     ) -> Printed {
         let formatted = crate::format!(SimpleFormatContext::default(), [root]).unwrap();
 
-        Printer::new(options)
+        Printer::new(SourceCode::default(), options)
             .print(formatted.document())
             .expect("Document to be valid")
     }
@@ -1510,9 +1518,12 @@ two lines`,
 
         let document = Document::from(buffer.into_vec());
 
-        let printed = Printer::new(PrinterOptions::default().with_print_width(PrintWidth::new(10)))
-            .print(&document)
-            .unwrap();
+        let printed = Printer::new(
+            SourceCode::default(),
+            PrinterOptions::default().with_print_width(PrintWidth::new(10)),
+        )
+        .print(&document)
+        .unwrap();
 
         assert_eq!(
             printed.as_code(),
