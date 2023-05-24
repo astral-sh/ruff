@@ -1,6 +1,7 @@
 use anyhow::Result;
-use pyproject_toml::PyProjectToml;
+use pyproject_toml::{BuildSystem, Project};
 use ruff_text_size::{TextRange, TextSize};
+use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::SourceFile;
@@ -8,6 +9,16 @@ use ruff_python_ast::source_code::SourceFile;
 use crate::message::Message;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 use crate::IOError;
+
+/// Unlike [pyproject_toml::PyProjectToml], in our case `build_system` is also optional
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+struct PyProjectToml {
+    /// Build-related data
+    build_system: Option<BuildSystem>,
+    /// Project metadata
+    project: Option<Project>,
+}
 
 pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
     let err = match toml::from_str::<PyProjectToml>(source_file.source_text()) {
