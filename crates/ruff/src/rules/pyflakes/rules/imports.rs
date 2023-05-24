@@ -16,14 +16,14 @@ pub(crate) enum UnusedImportContext {
 }
 
 /// ## What it does
-/// Checks for imports that are never used.
+/// Checks for unused imports.
 ///
 /// ## Why is this bad?
-/// Unused imports confuse the reader and may impact performance. They should
-/// be removed.
+/// Unused imports add a performance overhead at runtime, and risk creating
+/// import cycles. They also increase the cognitive load of reading the code.
 ///
-/// If the import is used to check for availability of a module, consider using
-/// `importlib.util.find_spec` instead.
+/// If an import statement is used to check for the availability or existence
+/// of a module, consider using `importlib.util.find_spec` instead.
 ///
 /// ## Example
 /// ```python
@@ -40,17 +40,7 @@ pub(crate) enum UnusedImportContext {
 ///     return 3.14 * radius**2
 /// ```
 ///
-/// ## Example (checking for availability of a module)
-/// ```python
-/// try:
-///     import numpy as np
-/// except ImportError:
-///     print("numpy is not installed")
-/// else:
-///     print("numpy is installed")
-/// ```
-///
-/// Use instead:
+/// To check the availability of a module, use `importlib.util.find_spec`:
 /// ```python
 /// from importlib.util import find_spec
 ///
@@ -104,34 +94,32 @@ impl Violation for UnusedImport {
 }
 
 /// ## What it does
-/// Checks for imports that are shadowed by a loop variable.
+/// Checks for import bindings that are shadowed by loop variables.
 ///
 /// ## Why is this bad?
-/// Shadowing imports with loop variables makes the code harder to read.
+/// Shadowing an import with loop variables makes the code harder to read and
+/// reason about, as the identify of the imported binding is no longer clear.
+/// It's also often indicative of a mistake, as it's unlikely that the loop
+/// variable is intended to be used as the imported binding.
 ///
 /// Consider using a different name for the loop variable.
 ///
 /// ## Example
 /// ```python
-/// import email
+/// from os import path
 ///
-///
-/// for email in emails:
-///     ...
+/// for path in files:
+///     print(path)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// import email
+/// from os import path
 ///
 ///
-/// for e in emails:
-///     ...
+/// for filename in files:
+///     print(filename)
 /// ```
-///
-/// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
-/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
 #[violation]
 pub struct ImportShadowedByLoopVar {
     pub(crate) name: String,
@@ -147,12 +135,12 @@ impl Violation for ImportShadowedByLoopVar {
 }
 
 /// ## What it does
-/// Checks for `from module import *` statements.
+/// Checks for the use of wildcard imports.
 ///
 /// ## Why is this bad?
-/// Wildcard imports makes it hard to determine from where names are imported.
-/// They also pollute the namespace, making it harder to determine which names
-/// are defined in the current module.
+/// Wildcard imports (e.g., `from module import *`) make it hard to determine
+/// which symbols are available in the current namespace, and from which module
+/// they were imported.
 ///
 /// ## Example
 /// ```python
@@ -174,8 +162,6 @@ impl Violation for ImportShadowedByLoopVar {
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#imports)
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
-/// - [Python documentation](https://docs.python.org/3/tutorial/modules.html#importing-from-a-package)
 #[violation]
 pub struct UndefinedLocalWithImportStar {
     pub(crate) name: String,
@@ -190,17 +176,16 @@ impl Violation for UndefinedLocalWithImportStar {
 }
 
 /// ## What it does
-/// Checks for `__future__` imports that are not at the beginning of the file.
+/// Checks for `__future__` imports that are not located at the beginning of a
+/// file.
 ///
 /// ## Why is this bad?
-/// Imports from `__future__` must be at the beginning of the file before any
-/// other code, except docstrings.
+/// Imports from `__future__` must be placed the beginning of the file, before any
+/// other statements (apart from docstrings). The use of `__future__` imports
+/// elsewhere is invalid and will result in a `SyntaxError`.
 ///
 /// ## Example
 /// ```python
-/// """Example docstring."""
-///
-///
 /// from pathlib import Path
 ///
 /// from __future__ import annotations
@@ -208,9 +193,6 @@ impl Violation for UndefinedLocalWithImportStar {
 ///
 /// Use instead:
 /// ```python
-/// """Example docstring."""
-///
-///
 /// from __future__ import annotations
 ///
 /// from pathlib import Path
@@ -218,8 +200,6 @@ impl Violation for UndefinedLocalWithImportStar {
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#module-level-dunder-names)
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#future-statements)
-/// - [Python documentation](https://docs.python.org/3/library/__future__.html)
 #[violation]
 pub struct LateFutureImport;
 
@@ -231,17 +211,23 @@ impl Violation for LateFutureImport {
 }
 
 /// ## What it does
-/// Checks for names that could be undefined but could be defined in a wildcard
-/// import.
+/// Checks for names that might be undefined, but may also be defined in a
+/// wildcard import.
 ///
 /// ## Why is this bad?
-/// If the name is defined in a wildcard import, it should be imported
-/// explicitly to avoid confusion.
+/// Wildcard imports (e.g., `from module import *`) make it hard to determine
+/// which symbols are available in the current namespace. If a module contains
+/// a wildcard import, and a name in the current namespace has not been
+/// explicitly defined or imported, then it's unclear whether the name is
+/// undefined or was imported by the wildcard import.
 ///
-/// If the name is not defined in a wildcard import, it should be defined or
+/// If the name _is_ defined in via a wildcard import, that member should be
+/// imported explicitly to avoid confusion.
+///
+/// If the name is _not_ defined in a wildcard import, it should be defined or
 /// imported.
 ///
-/// ## Example (name in wildcard import)
+/// ## Example
 /// ```python
 /// from math import *
 ///
@@ -259,30 +245,8 @@ impl Violation for LateFutureImport {
 ///     return pi * radius**2
 /// ```
 ///
-/// ## Example (name undefined)
-/// ```python
-/// from math import *
-///
-///
-/// def weight_on_earth(mass):
-///     return mass * G  # G is undefined
-/// ```
-///
-/// Use instead:
-/// ```python
-/// from math import *
-///
-/// G = 9.8
-///
-///
-/// def weight_on_earth(mass):
-///     return mass * G
-/// ```
-///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#imports)
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
-/// - [Python documentation](https://docs.python.org/3/tutorial/modules.html#importing-from-a-package)
 #[violation]
 pub struct UndefinedLocalWithImportStarUsage {
     pub(crate) name: String,
@@ -302,14 +266,14 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 }
 
 /// ## What it does
-/// Check for wildcard imports not in the module-level namespace.
+/// Check for the use of wildcard imports outside of the module namespace.
 ///
 /// ## Why is this bad?
-/// Wildcard imports at non-module level are confusing and can shadow names
-/// imported in the module-level namespace.
+/// The use of wildcard imports outside of the module namespace (e.g., within
+/// functions) can lead to confusion, as the import can shadow local variables.
 ///
-/// If you are going to use wildcard imports, they should be at the module level
-/// and not nested inside functions or classes.
+/// Though wildcard imports are discouraged, when necessary, they should be placed
+/// in the module namespace (i.e., at the top-level of a module).
 ///
 /// ## Example
 /// ```python
@@ -328,8 +292,6 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 ///
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#imports)
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
-/// - [Python documentation](https://docs.python.org/3/tutorial/modules.html#importing-from-a-package)
 #[violation]
 pub struct UndefinedLocalWithNestedImportStarUsage {
     pub(crate) name: String,
@@ -344,26 +306,12 @@ impl Violation for UndefinedLocalWithNestedImportStarUsage {
 }
 
 /// ## What it does
-/// Checks for `__future__` imports that are not defined.
+/// Checks for `__future__` imports that are not defined in the current Python
+/// version.
 ///
 /// ## Why is this bad?
-/// `__future__` imports must be defined in the Python version you are using.
-///
-/// To fix this, check the Python version you are using and make sure the
-/// `__future__` import is defined in that version. If it is not, remove the
-/// import.
-///
-/// ## Example
-/// ```python
-/// # using Python <3.7
-/// from __future__ import annotations
-/// ```
-///
-/// Use instead:
-/// ```python
-/// # using Python >=3.7
-/// from __future__ import annotations
-/// ```
+/// Importing undefined or unsupported members from the `__future__` module is
+/// a `SyntaxError`.
 ///
 /// ## References
 /// - [Python documentation](https://docs.python.org/3/library/__future__.html)
