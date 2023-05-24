@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
     self, Boolop, Constant, Expr, ExprContext, ExprLambda, Keyword, Ranged, Stmt,
 };
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
@@ -284,14 +284,16 @@ impl Violation for UnnecessaryDictKwargs {
 #[violation]
 pub struct ReimplementedListBuiltin;
 
-impl AlwaysAutofixableViolation for ReimplementedListBuiltin {
+impl Violation for ReimplementedListBuiltin {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `list` over useless lambda")
     }
 
-    fn autofix_title(&self) -> String {
-        "Replace with `list`".to_string()
+    fn autofix_title(&self) -> Option<String> {
+        Some("Replace with `list`".to_string())
     }
 }
 
@@ -637,10 +639,12 @@ pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambd
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        "list".to_string(),
-                        expr.range(),
-                    )));
+                    if checker.semantic_model().is_builtin("list") {
+                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                            "list".to_string(),
+                            expr.range(),
+                        )));
+                    }
                 }
                 checker.diagnostics.push(diagnostic);
             }
