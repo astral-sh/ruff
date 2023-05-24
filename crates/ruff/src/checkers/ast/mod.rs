@@ -1177,16 +1177,14 @@ where
                     }
 
                     if self.enabled(Rule::RelativeImports) {
-                        if let Some(diagnostic) =
-                            flake8_tidy_imports::rules::banned_relative_import(
-                                self,
-                                stmt,
-                                level,
-                                module,
-                                self.module_path,
-                                self.settings.flake8_tidy_imports.ban_relative_imports,
-                            )
-                        {
+                        if let Some(diagnostic) = flake8_tidy_imports::rules::banned_relative_import(
+                            self,
+                            stmt,
+                            level,
+                            module,
+                            self.module_path,
+                            self.settings.flake8_tidy_imports.ban_relative_imports,
+                        ) {
                             self.diagnostics.push(diagnostic);
                         }
                     }
