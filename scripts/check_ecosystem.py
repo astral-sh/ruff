@@ -71,24 +71,26 @@ class Repository(NamedTuple):
 
         process = await create_subprocess_exec(*git_command)
 
-        await process.wait()
+        status_code = await process.wait()
 
-        logger.debug(f"Finished cloning {self.org}/{self.repo}")
+        logger.debug(
+            f"Finished cloning {self.org}/{self.repo} with status {status_code}",
+        )
 
         yield Path(checkout_dir)
 
 
-REPOSITORIES = {
-    "airflow": Repository("apache", "airflow", "main", select="ALL"),
-    "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
-    "build": Repository("pypa", "build", "main"),
-    "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
-    "disnake": Repository("DisnakeDev", "disnake", "master"),
-    "scikit-build": Repository("scikit-build", "scikit-build", "main"),
-    "scikit-build-core": Repository("scikit-build", "scikit-build-core", "main"),
-    "typeshed": Repository("python", "typeshed", "main", select="PYI"),
-    "zulip": Repository("zulip", "zulip", "main", select="ALL"),
-}
+REPOSITORIES: list[Repository] = [
+    Repository("apache", "airflow", "main", select="ALL"),
+    Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
+    Repository("pypa", "build", "main"),
+    Repository("pypa", "cibuildwheel", "main"),
+    Repository("DisnakeDev", "disnake", "master"),
+    Repository("scikit-build", "scikit-build", "main"),
+    Repository("scikit-build", "scikit-build-core", "main"),
+    Repository("python", "typeshed", "main", select="PYI"),
+    Repository("zulip", "zulip", "main", select="ALL"),
+]
 
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
 
@@ -222,7 +224,7 @@ async def compare(
     return Diff(removed, added)
 
 
-def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
+def read_projects_jsonl(projects_jsonl: Path) -> dict[tuple[str, str], Repository]:
     """Read either of the two formats of https://github.com/akx/ruff-usage-aggregate."""
     repositories = {}
     for line in projects_jsonl.read_text().splitlines():
@@ -241,7 +243,7 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
                 # us the revision, but there's no way with git to just do
                 # `git clone --depth 1` with a specific ref.
                 # `ref = item["url"].split("?ref=")[1]` would be exact
-                repositories[repository["name"]] = Repository(
+                repositories[(repository["owner"], repository["repo"])] = Repository(
                     repository["owner"]["login"],
                     repository["name"],
                     None,
@@ -254,7 +256,7 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
             # Pick only the easier case for now.
             if data["path"] != "pyproject.toml":
                 continue
-            repositories[data["repo"]] = Repository(
+            repositories[(data["owner"], data["repo"])] = Repository(
                 data["owner"],
                 data["repo"],
                 data.get("ref"),
@@ -276,7 +278,7 @@ async def main(
     if projects_jsonl:
         repositories = read_projects_jsonl(projects_jsonl)
     else:
-        repositories = REPOSITORIES
+        repositories = {(repo.org, repo.repo): repo for repo in REPOSITORIES}
 
     logger.debug(f"Checking {len(repositories)} projects")
 
@@ -306,11 +308,11 @@ async def main(
         print(f"\u2139\ufe0f ecosystem check **detected changes**. {changes}")
         print()
 
-        for name, diff in diffs.items():
+        for (org, repo), diff in diffs.items():
             if isinstance(diff, Exception):
                 changes = "error"
-                print(f"<details><summary>{name} ({changes})</summary>")
-                repo = repositories[name]
+                print(f"<details><summary>{repo} ({changes})</summary>")
+                repo = repositories[(org, repo)]
                 print(
                     f"https://github.com/{repo.org}/{repo.repo} ref {repo.ref} "
                     f"select {repo.select} ignore {repo.ignore} exclude {repo.exclude}",
@@ -327,7 +329,7 @@ async def main(
                 print("</details>")
             elif diff:
                 changes = f"+{len(diff.added)}, -{len(diff.removed)}"
-                print(f"<details><summary>{name} ({changes})</summary>")
+                print(f"<details><summary>{repo} ({changes})</summary>")
                 print("<p>")
                 print()
 
