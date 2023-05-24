@@ -34,10 +34,6 @@ pub enum ReferenceContext {
     Runtime,
     /// The reference occurs in a typing-only context.
     Typing,
-    /// The reference occurs in a synthetic context, used for `__future__` imports, explicit
-    /// re-exports, and other bindings that should be considered used even if they're never
-    /// "referenced".
-    Synthetic,
 }
 
 /// Id uniquely identifying a read reference in a program.
