@@ -229,7 +229,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                     value: Constant::Str(string),
                     ..
                 }) => {
-                    if checker.settings.rules.enabled(Rule::RawStringInException) {
+                    if checker.enabled(Rule::RawStringInException) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
                             let indentation = whitespace::indentation(checker.locator, stmt)
                                 .and_then(|indentation| {
@@ -258,7 +258,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                 }
                 // Check for f-strings.
                 Expr::JoinedStr(_) => {
-                    if checker.settings.rules.enabled(Rule::FStringInException) {
+                    if checker.enabled(Rule::FStringInException) {
                         let indentation = whitespace::indentation(checker.locator, stmt).and_then(
                             |indentation| {
                                 if checker.semantic_model().find_binding("msg").is_none() {
@@ -285,7 +285,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                 }
                 // Check for .format() calls.
                 Expr::Call(ast::ExprCall { func, .. }) => {
-                    if checker.settings.rules.enabled(Rule::DotFormatInException) {
+                    if checker.enabled(Rule::DotFormatInException) {
                         if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
                             func.as_ref()
                         {

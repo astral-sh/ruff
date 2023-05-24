@@ -213,7 +213,7 @@ pub(crate) fn convert_for_loop_to_any_all(
         .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
     {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.rules.enabled(Rule::ReimplementedBuiltin) {
+            if checker.enabled(Rule::ReimplementedBuiltin) {
                 let contents = return_stmt(
                     "any",
                     loop_info.test,
@@ -253,7 +253,7 @@ pub(crate) fn convert_for_loop_to_any_all(
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.rules.enabled(Rule::ReimplementedBuiltin) {
+            if checker.enabled(Rule::ReimplementedBuiltin) {
                 // Invert the condition.
                 let test = {
                     if let Expr::UnaryOp(ast::ExprUnaryOp {
