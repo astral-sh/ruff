@@ -67,7 +67,7 @@ pub(crate) fn getattr_with_constant(
 
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&attribute(obj, value)),
             expr.range(),
         )));

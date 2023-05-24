@@ -161,7 +161,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
                     .all(|binding| !binding.used())
                 {
                     #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                         rename,
                         expr.range(),
                     )));
