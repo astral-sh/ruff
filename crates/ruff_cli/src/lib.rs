@@ -107,7 +107,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let log_level: LogLevel = (&log_level_args).into();
+    let log_level = LogLevel::from(&log_level_args);
     set_up_logging(&log_level)?;
 
     match command {

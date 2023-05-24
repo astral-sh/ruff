@@ -143,7 +143,8 @@ pub(crate) fn run(
             acc
         });
 
-    diagnostics.messages.sort_unstable();
+    diagnostics.messages.sort();
+
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
 
