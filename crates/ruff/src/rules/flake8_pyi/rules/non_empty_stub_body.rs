@@ -14,6 +14,7 @@ impl AlwaysAutofixableViolation for NonEmptyStubBody {
     fn message(&self) -> String {
         format!("Function body must contain only `...`")
     }
+
     fn autofix_title(&self) -> String {
         format!("Replace function body with `...`")
     }
