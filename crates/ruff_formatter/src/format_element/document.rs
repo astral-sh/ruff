@@ -716,7 +716,7 @@ mod tests {
         let document = formatted.into_document();
 
         assert_eq!(
-            &std::format!("{}", document.display(SourceCode::from_str(source_code))),
+            &std::format!("{}", document.display(SourceCode::new(source_code))),
             r#"[
   group([
     "(",

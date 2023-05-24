@@ -8,7 +8,7 @@ pub struct SourceCode<'a> {
 }
 
 impl<'a> SourceCode<'a> {
-    pub fn from_str(text: &'a str) -> Self {
+    pub fn new(text: &'a str) -> Self {
         Self { text }
     }
 

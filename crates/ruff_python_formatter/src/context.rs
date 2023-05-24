@@ -13,11 +13,11 @@ impl<'source> ASTFormatContext<'source> {
     }
 
     pub fn contents(&self) -> &'source str {
-        &self.contents
+        self.contents
     }
 
     pub fn locator(&self) -> Locator<'source> {
-        Locator::new(&self.contents)
+        Locator::new(self.contents)
     }
 }
 
@@ -29,6 +29,6 @@ impl FormatContext for ASTFormatContext<'_> {
     }
 
     fn source_code(&self) -> SourceCode {
-        SourceCode::from_str(&self.contents)
+        SourceCode::new(self.contents)
     }
 }

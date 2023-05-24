@@ -249,7 +249,7 @@ impl FormatContext for SimpleFormatContext {
     }
 
     fn source_code(&self) -> SourceCode {
-        SourceCode::from_str(&self.source_code)
+        SourceCode::new(&self.source_code)
     }
 }
 
