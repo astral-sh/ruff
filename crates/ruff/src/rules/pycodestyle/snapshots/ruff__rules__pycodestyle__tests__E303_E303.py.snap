@@ -1,0 +1,46 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+---
+E303.py:13:1: E303 [*] Too many blank lines (3)
+   |
+13 |   def func3():
+14 |       pass
+15 | / 
+16 | | 
+17 | | 
+18 | | def func4():
+   | |_^ E303
+19 |       pass
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+12 12 |     pass
+13 13 | 
+14 14 | 
+15    |-
+16 15 | def func4():
+17 16 |     pass
+18 17 | 
+
+E303.py:21:1: E303 [*] Too many blank lines (4)
+   |
+21 |   # E303
+22 | / 
+23 | | 
+24 | | 
+25 | | 
+26 | | a = 1
+   | |_^ E303
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+20 20 | # E303
+21 21 | 
+22 22 | 
+23    |-
+24    |-
+25 23 | a = 1
+
+
