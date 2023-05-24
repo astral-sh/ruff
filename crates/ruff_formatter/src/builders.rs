@@ -363,26 +363,29 @@ impl std::fmt::Debug for DynamicText<'_> {
 /// Emits a text as it is written in the source document. Optimized to avoid allocations.
 pub const fn source_text_slice(
     range: TextRange,
-    new_lines: ContainsNewLines,
+    newlines: ContainsNewlines,
 ) -> SourceTextSliceBuilder {
-    SourceTextSliceBuilder { range, new_lines }
+    SourceTextSliceBuilder {
+        range,
+        new_lines: newlines,
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum ContainsNewLines {
-    /// The string contains new line characters
+pub enum ContainsNewlines {
+    /// The string contains newline characters
     Yes,
-    /// The string contains no new line characters
+    /// The string contains no newline characters
     No,
 
-    /// The string may contain new line characters, search the string to determine if there are any newlines.
+    /// The string may contain newline characters, search the string to determine if there are any newlines.
     Detect,
 }
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct SourceTextSliceBuilder {
     range: TextRange,
-    new_lines: ContainsNewLines,
+    new_lines: ContainsNewlines,
 }
 
 impl<Context> Format<Context> for SourceTextSliceBuilder
@@ -395,21 +398,21 @@ where
         debug_assert_no_newlines(slice.text(source_code));
 
         let contains_newlines = match self.new_lines {
-            ContainsNewLines::Yes => {
+            ContainsNewlines::Yes => {
                 debug_assert!(
                     slice.text(source_code).contains('\n'),
                     "Text contains no new line characters but the caller specified that it does."
                 );
                 true
             }
-            ContainsNewLines::No => {
+            ContainsNewlines::No => {
                 debug_assert!(
                     !slice.text(source_code).contains('\n'),
                     "Text contains new line characters but the caller specified that it does not."
                 );
                 false
             }
-            ContainsNewLines::Detect => slice.text(source_code).contains('\n'),
+            ContainsNewlines::Detect => slice.text(source_code).contains('\n'),
         };
 
         f.write_element(FormatElement::SourceCodeSlice {

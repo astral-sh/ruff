@@ -699,12 +699,12 @@ mod tests {
                         soft_block_indent(&format_args![
                             source_text_slice(
                                 TextRange::at(TextSize::new(0), TextSize::new(19)),
-                                ContainsNewLines::No
+                                ContainsNewlines::No
                             ),
                             space(),
                             source_text_slice(
                                 TextRange::at(TextSize::new(20), TextSize::new(28)),
-                                ContainsNewLines::No
+                                ContainsNewlines::No
                             ),
                         ])
                     ])]

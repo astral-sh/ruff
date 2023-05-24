@@ -33,7 +33,7 @@ fn format_starred(
 }
 
 fn format_name(f: &mut Formatter<ASTFormatContext>, expr: &Expr, _id: &str) -> FormatResult<()> {
-    write!(f, [literal(expr.range(), ContainsNewLines::No)])?;
+    write!(f, [literal(expr.range(), ContainsNewlines::No)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -57,7 +57,7 @@ fn format_subscript(
                     if let TriviaKind::OwnLineComment(range) = trivia.kind {
                         write!(f, [expand_parent()])?;
                         write!(f, [hard_line_break()])?;
-                        write!(f, [literal(range, ContainsNewLines::No)])?;
+                        write!(f, [literal(range, ContainsNewlines::No)])?;
                     }
                 }
             }
@@ -573,7 +573,7 @@ fn format_joined_str(
     expr: &Expr,
     _values: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [literal(expr.range(), ContainsNewLines::Detect)])?;
+    write!(f, [literal(expr.range(), ContainsNewlines::Detect)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -871,7 +871,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             if trivia.relationship.is_trailing() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
-                    write!(f, [literal(range, ContainsNewLines::No)])?;
+                    write!(f, [literal(range, ContainsNewlines::No)])?;
                     write!(f, [hard_line_break()])?;
                 }
             }

@@ -28,7 +28,7 @@ impl Format<ASTFormatContext<'_>> for Block<'_> {
                         write!(f, [empty_line()])?;
                     }
                     TriviaKind::OwnLineComment(range) => {
-                        write!(f, [literal(range, ContainsNewLines::No), hard_line_break()])?;
+                        write!(f, [literal(range, ContainsNewlines::No), hard_line_break()])?;
                     }
                     _ => {}
                 }
@@ -72,14 +72,14 @@ pub(crate) struct Literal {
 
 impl Format<ASTFormatContext<'_>> for Literal {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
-        source_text_slice(self.range, ContainsNewLines::Detect).fmt(f)
+        source_text_slice(self.range, ContainsNewlines::Detect).fmt(f)
     }
 }
 
 #[inline]
 pub(crate) const fn literal(
     range: TextRange,
-    newlines: ContainsNewLines,
+    newlines: ContainsNewlines,
 ) -> SourceTextSliceBuilder {
     source_text_slice(range, newlines)
 }

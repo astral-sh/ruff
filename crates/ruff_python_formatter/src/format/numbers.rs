@@ -33,7 +33,7 @@ impl Format<ASTFormatContext<'_>> for FloatAtom {
                                 .start()
                                 .add(TextSize::try_from(dot_index).unwrap())
                         ),
-                        ContainsNewLines::No
+                        ContainsNewlines::No
                     )]
                 )?;
             }
@@ -52,12 +52,12 @@ impl Format<ASTFormatContext<'_>> for FloatAtom {
                                 .add(TextSize::try_from(dot_index + 1).unwrap()),
                             self.range.end()
                         ),
-                        ContainsNewLines::No
+                        ContainsNewlines::No
                     )]
                 )?;
             }
         } else {
-            write!(f, [literal(self.range, ContainsNewLines::No)])?;
+            write!(f, [literal(self.range, ContainsNewlines::No)])?;
         }
 
         Ok(())
@@ -106,7 +106,7 @@ impl Format<ASTFormatContext<'_>> for FloatLiteral {
                         ),
                         self.range.end()
                     ),
-                    ContainsNewLines::No
+                    ContainsNewlines::No
                 )]
             )?;
         } else {
@@ -151,14 +151,14 @@ impl Format<ASTFormatContext<'_>> for IntLiteral {
                     )?;
                 } else {
                     // Use the existing source.
-                    write!(f, [literal(self.range, ContainsNewLines::No)])?;
+                    write!(f, [literal(self.range, ContainsNewlines::No)])?;
                 }
 
                 return Ok(());
             }
         }
 
-        write!(f, [literal(self.range, ContainsNewLines::No)])?;
+        write!(f, [literal(self.range, ContainsNewlines::No)])?;
 
         Ok(())
     }
@@ -180,13 +180,13 @@ impl Format<ASTFormatContext<'_>> for ComplexLiteral {
         let content = &contents[self.range];
 
         if content.ends_with('j') {
-            write!(f, [literal(self.range, ContainsNewLines::No)])?;
+            write!(f, [literal(self.range, ContainsNewlines::No)])?;
         } else if content.ends_with('J') {
             write!(
                 f,
                 [literal(
                     TextRange::new(self.range.start(), self.range.end().sub(TextSize::from(1))),
-                    ContainsNewLines::No
+                    ContainsNewlines::No
                 )]
             )?;
             write!(f, [text("j")])?;

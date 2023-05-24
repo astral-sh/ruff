@@ -20,7 +20,7 @@ impl<T> Format<ASTFormatContext<'_>> for LeadingComments<'_, T> {
                         write!(f, [empty_line()])?;
                     }
                     TriviaKind::OwnLineComment(range) => {
-                        write!(f, [literal(range, ContainsNewLines::No), hard_line_break()])?;
+                        write!(f, [literal(range, ContainsNewlines::No), hard_line_break()])?;
                     }
                     _ => {}
                 }
@@ -49,7 +49,7 @@ impl<T> Format<ASTFormatContext<'_>> for TrailingComments<'_, T> {
                         write!(f, [empty_line()])?;
                     }
                     TriviaKind::OwnLineComment(range) => {
-                        write!(f, [literal(range, ContainsNewLines::No), hard_line_break()])?;
+                        write!(f, [literal(range, ContainsNewlines::No), hard_line_break()])?;
                     }
                     _ => {}
                 }
@@ -81,7 +81,7 @@ impl<T> Format<ASTFormatContext<'_>> for EndOfLineComments<'_, T> {
             if std::mem::take(&mut first) {
                 write!(f, [line_suffix(&text("  "))])?;
             }
-            write!(f, [line_suffix(&literal(range, ContainsNewLines::No))])?;
+            write!(f, [line_suffix(&literal(range, ContainsNewlines::No))])?;
         }
         Ok(())
     }
@@ -103,7 +103,7 @@ impl<T> Format<ASTFormatContext<'_>> for DanglingComments<'_, T> {
             if trivia.relationship.is_dangling() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [hard_line_break()])?;
-                    write!(f, [literal(range, ContainsNewLines::No)])?;
+                    write!(f, [literal(range, ContainsNewlines::No)])?;
                     write!(f, [hard_line_break()])?;
                 }
             }
