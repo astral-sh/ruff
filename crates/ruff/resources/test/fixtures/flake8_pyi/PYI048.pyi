@@ -2,19 +2,19 @@ def bar():
     ...  # OK
 
 
-def oof():
+def oof():   # OK, docstrings are handled by another rule
   """oof"""
-  print("foo")  # OK, docstrings are handled by another rule
+  print("foo")
 
 
 
-def foo():
+def foo():   # ERROR PYI048
     """foo"""
     print("foo")
-    print("foo")  # ERROR PYI048
+    print("foo")
 
 
-def buzz():
+def buzz():   # ERROR PYI048
     print("fizz")
-    print("buzz")  # ERROR PYI048
-    print("test")  # ERROR PYI048
+    print("buzz")
+    print("test")

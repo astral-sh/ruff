@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{self, Constant, Expr, Stmt};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
 
 #[violation]
 pub struct StubBodyMultipleStatements;
@@ -15,7 +16,7 @@ impl Violation for StubBodyMultipleStatements {
 }
 
 /// PYI010
-pub(crate) fn stub_body_multiple_statements(checker: &mut Checker, body: &[Stmt]) {
+pub(crate) fn stub_body_multiple_statements(checker: &mut Checker, stmt: &Stmt, body: &[Stmt]) {
     match body.len() {
         1 => (),
         2 => {
@@ -23,22 +24,16 @@ pub(crate) fn stub_body_multiple_statements(checker: &mut Checker, body: &[Stmt]
             if is_docstring(&body[0]) {
                 return;
             }
-            checker
-                .diagnostics
-                .push(Diagnostic::new(StubBodyMultipleStatements, body[1].range()));
+            checker.diagnostics.push(Diagnostic::new(
+                StubBodyMultipleStatements,
+                helpers::identifier_range(stmt, checker.locator),
+            ));
         }
         _ => {
-            // Only raise violation for second of N>2 statements if 1st if not a docstring
-            if !is_docstring(&body[0]) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(StubBodyMultipleStatements, body[1].range()));
-            }
-            for b in &body[2..] {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(StubBodyMultipleStatements, b.range()));
-            }
+            checker.diagnostics.push(Diagnostic::new(
+                StubBodyMultipleStatements,
+                helpers::identifier_range(stmt, checker.locator),
+            ));
         }
     }
 }

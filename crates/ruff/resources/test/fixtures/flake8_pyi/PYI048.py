@@ -1,19 +1,19 @@
-def bar():
-    ...  # OK
+def bar():    # OK
+    ...
 
 
-def oof():
+def oof():    # OK, docstrings are handled by another rule
     """oof"""
-    print("foo")  # OK, docstrings are handled by another rule
+    print("foo")
 
 
-def foo():
+def foo():    # Ok not in Stub file
     """foo"""
     print("foo")
-    print("foo")  # Ok not in Stub file
+    print("foo")
 
 
-def buzz():
+def buzz():    # Ok not in Stub file
     print("fizz")
     print("buzz")
-    print("test")  # Ok not in Stub file
+    print("test")

@@ -426,7 +426,7 @@ where
                         flake8_pyi::rules::non_empty_stub_body(self, body);
                     }
                     if self.enabled(Rule::StubBodyMultipleStatements) {
-                        flake8_pyi::rules::stub_body_multiple_statements(self, body);
+                        flake8_pyi::rules::stub_body_multiple_statements(self, stmt, body);
                     }
                 }
 
