@@ -52,11 +52,15 @@ impl AlwaysAutofixableViolation for TooManyBlankLines {
 }
 
 /// E303
-pub(crate) fn too_many_blank_lines(line: &Line, locator: &Locator) -> Option<Diagnostic> {
+pub(crate) fn too_many_blank_lines(
+    line: &Line,
+    is_first_line: bool,
+    locator: &Locator,
+) -> Option<Diagnostic> {
     // Only check for too many blank lines starting from the first blank line of a (potential) series
     // of blank lines (to avoid duplicate errors).
     // Also ignore blank lines at the beginning of the file.
-    if line.start().to_u32() > 0
+    if !is_first_line
         && line.trim().is_empty()
         && !locator
             .line(TextSize::new(line.start().to_u32() - 1))

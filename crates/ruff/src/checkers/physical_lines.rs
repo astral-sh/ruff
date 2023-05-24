@@ -129,7 +129,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_too_many_blank_lines {
-            if let Some(diagnostic) = too_many_blank_lines(&line, locator) {
+            if let Some(diagnostic) = too_many_blank_lines(&line, index == 0, locator) {
                 diagnostics.push(diagnostic);
             }
         }
