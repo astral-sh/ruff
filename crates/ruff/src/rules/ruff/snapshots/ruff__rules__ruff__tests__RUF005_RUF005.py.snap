@@ -5,19 +5,19 @@ RUF005.py:4:1: RUF005 Consider `[*foo]` instead of concatenation
   |
 4 |   # Non-fixable Errors.
 5 |   ###
-6 | / foo + [  # This will be preserved, but doesn't prevent the fix
+6 | / foo + [  # This will be preserved.
 7 | | ]
   | |_^ RUF005
-8 |   [*foo] + [  # This will be preserved, but doesn't prevent the fix
+8 |   [*foo] + [  # This will be preserved.
 9 |   ]
   |
   = help: Replace with `[*foo]`
 
 RUF005.py:6:1: RUF005 Consider `[*foo]` instead of concatenation
    |
- 6 |   foo + [  # This will be preserved, but doesn't prevent the fix
+ 6 |   foo + [  # This will be preserved.
  7 |   ]
- 8 | / [*foo] + [  # This will be preserved, but doesn't prevent the fix
+ 8 | / [*foo] + [  # This will be preserved.
  9 | | ]
    | |_^ RUF005
 10 |   first = [
@@ -311,7 +311,7 @@ RUF005.py:57:21: RUF005 [*] Consider `(sys.executable, "-m", "pylint", *args, pa
    57 |+pylint_call_tuple = (sys.executable, "-m", "pylint", *args, path, path2)
 58 58 | b = a + [2, 3] + [4]
 59 59 | 
-60 60 | 
+60 60 | # Uses the non-preferred quote style, which should be retained.
 
 RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
    |
@@ -319,6 +319,8 @@ RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
 59 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 60 | b = a + [2, 3] + [4]
    |     ^^^^^^^^^^^^^^^^ RUF005
+61 | 
+62 | # Uses the non-preferred quote style, which should be retained.
    |
    = help: Replace with `[*a, 2, 3, 4]`
 
@@ -329,7 +331,27 @@ RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
 58    |-b = a + [2, 3] + [4]
    58 |+b = [*a, 2, 3, 4]
 59 59 | 
-60 60 | 
-61 61 | ###
+60 60 | # Uses the non-preferred quote style, which should be retained.
+61 61 | f"{a() + ['b']}"
+
+RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
+   |
+61 | # Uses the non-preferred quote style, which should be retained.
+62 | f"{a() + ['b']}"
+   |    ^^^^^^^^^^^ RUF005
+63 | 
+64 | ###
+   |
+   = help: Replace with `[*a(), 'b']`
+
+ℹ Suggested fix
+58 58 | b = a + [2, 3] + [4]
+59 59 | 
+60 60 | # Uses the non-preferred quote style, which should be retained.
+61    |-f"{a() + ['b']}"
+   61 |+f"{[*a(), 'b']}"
+62 62 | 
+63 63 | ###
+64 64 | # Non-errors.
 
 

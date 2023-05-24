@@ -1,9 +1,9 @@
 ###
 # Non-fixable Errors.
 ###
-foo + [  # This will be preserved, but doesn't prevent the fix
+foo + [  # This will be preserved.
 ]
-[*foo] + [  # This will be preserved, but doesn't prevent the fix
+[*foo] + [  # This will be preserved.
 ]
 first = [
     # The order
@@ -57,6 +57,8 @@ pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 b = a + [2, 3] + [4]
 
+# Uses the non-preferred quote style, which should be retained.
+f"{a() + ['b']}"
 
 ###
 # Non-errors.
@@ -64,5 +66,8 @@ b = a + [2, 3] + [4]
 a = (1,) + [2]
 a = [1, 2] + (3, 4)
 
-# Uses the non-preferred quote style, which should be retained.
-f"{[*a(), 'b']}"
+
+###
+# False negatives.
+###
+foo = [1, 2, 3] + bar + (4, 5, 6)
