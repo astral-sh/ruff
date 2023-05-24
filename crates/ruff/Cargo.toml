@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.269"
+version = "0.0.270"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
