@@ -7,6 +7,7 @@ use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::Locator;
 
+use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
 use crate::node::NodeId;
 use crate::reference::ReferenceId;
@@ -271,10 +272,4 @@ bitflags! {
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
         const IMPORT_ERROR = 0b0000_0100;
     }
-}
-
-#[derive(Copy, Debug, Clone, is_macro::Is)]
-pub enum ExecutionContext {
-    Runtime,
-    Typing,
 }
