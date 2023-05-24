@@ -316,8 +316,7 @@ pub(crate) fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                        diagnostic.set_fix(Fix::suggested(Edit::range_deletion(
                             pass_stmt.range().add_end(index),
                         )));
                     } else {
@@ -610,8 +609,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                     range: TextRange::default(),
                 });
                 let bool_op = node;
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     checker.generator().expr(&bool_op),
                     expr.range(),
                 )));
@@ -639,8 +637,7 @@ pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambd
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                         "list".to_string(),
                         expr.range(),
                     )));
