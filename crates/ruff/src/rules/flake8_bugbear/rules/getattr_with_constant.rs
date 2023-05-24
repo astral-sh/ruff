@@ -64,9 +64,7 @@ pub(crate) fn getattr_with_constant(
     }
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
-
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
         diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&attribute(obj, value)),
             expr.range(),

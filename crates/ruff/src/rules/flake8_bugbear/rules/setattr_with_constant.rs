@@ -79,9 +79,7 @@ pub(crate) fn setattr_with_constant(
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
-
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
                 diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     assignment(obj, name, value, checker.generator()),
                     expr.range(),
