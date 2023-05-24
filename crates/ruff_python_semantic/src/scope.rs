@@ -45,8 +45,8 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns the [id](BindingId) of the binding bound to the given name.
-    pub fn get(&self, name: &str) -> Option<&BindingId> {
-        self.bindings.get(name)
+    pub fn get(&self, name: &str) -> Option<BindingId> {
+        self.bindings.get(name).copied()
     }
 
     /// Adds a new binding with the given name to this scope.
@@ -70,22 +70,23 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns the ids of all bindings defined in this scope.
-    pub fn binding_ids(&self) -> std::collections::hash_map::Values<&str, BindingId> {
-        self.bindings.values()
+    pub fn binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
+        self.bindings.values().copied()
     }
 
     /// Returns a tuple of the name and id of all bindings defined in this scope.
-    pub fn bindings(&self) -> std::collections::hash_map::Iter<&'a str, BindingId> {
-        self.bindings.iter()
+    pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+        self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
     /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
     /// those that were shadowed by later bindings.
-    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = &BindingId> {
+    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
         self.bindings
             .get(name)
             .into_iter()
             .chain(self.shadowed_bindings.get(name).into_iter().flatten().rev())
+            .copied()
     }
 
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.

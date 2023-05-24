@@ -24,8 +24,8 @@ impl Reference {
         self.range
     }
 
-    pub const fn context(&self) -> &ExecutionContext {
-        &self.context
+    pub const fn context(&self) -> ExecutionContext {
+        self.context
     }
 }
 

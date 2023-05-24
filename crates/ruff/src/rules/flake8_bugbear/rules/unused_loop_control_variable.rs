@@ -157,7 +157,7 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, target: &Expr,
                 let scope = checker.semantic_model().scope();
                 if scope
                     .bindings_for_name(name)
-                    .map(|binding_id| &checker.semantic_model().bindings[*binding_id])
+                    .map(|binding_id| &checker.semantic_model().bindings[binding_id])
                     .all(|binding| !binding.is_used())
                 {
                     #[allow(deprecated)]
