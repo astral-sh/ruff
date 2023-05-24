@@ -49,14 +49,14 @@ fn make_splat_elts(
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum Kind {
+enum Type {
     List,
     Tuple,
 }
 
 /// Recursively merge all the tuples/lists of the expression and return the new suggested expression
 /// along with what kind of expression it is (or return none if the expression is not a concatenation of tuples/lists).
-fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
+fn build_new_expr(expr: &Expr) -> Option<(Expr, Type)> {
     let Expr::BinOp(ast::ExprBinOp { left, op: Operator::Add, right, range: _ }) = expr else {
         return None;
     };
@@ -86,7 +86,7 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
                 range: _,
             }),
             _,
-        ) => (Kind::List, &new_right, l_elts, false, ctx),
+        ) => (Type::List, &new_right, l_elts, false, ctx),
         (
             Expr::Tuple(ast::ExprTuple {
                 elts: l_elts,
@@ -94,7 +94,7 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
                 range: _,
             }),
             _,
-        ) => (Kind::Tuple, &new_right, l_elts, false, ctx),
+        ) => (Type::Tuple, &new_right, l_elts, false, ctx),
         (
             _,
             Expr::List(ast::ExprList {
@@ -102,7 +102,7 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
                 ctx,
                 range: _,
             }),
-        ) => (Kind::List, &new_left, r_elts, true, ctx),
+        ) => (Type::List, &new_left, r_elts, true, ctx),
         (
             _,
             Expr::Tuple(ast::ExprTuple {
@@ -110,7 +110,7 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
                 ctx,
                 range: _,
             }),
-        ) => (Kind::Tuple, &new_left, r_elts, true, ctx),
+        ) => (Type::Tuple, &new_left, r_elts, true, ctx),
         _ => return None,
     };
 
@@ -124,8 +124,8 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
         new_elts = make_splat_elts(splat_element, other_elements, splat_at_left);
     }
     // If the splat element is itself a list/tuple, insert them in the other list/tuple.
-    else if (kind == Kind::List && splat_element.is_list_expr())
-        || (kind == Kind::Tuple && splat_element.is_tuple_expr())
+    else if (kind == Type::List && splat_element.is_list_expr())
+        || (kind == Type::Tuple && splat_element.is_tuple_expr())
     {
         new_elts = other_elements.clone();
 
@@ -141,7 +141,7 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
     }
 
     let new_expr = match kind {
-        Kind::List => {
+        Type::List => {
             let node = ast::ExprList {
                 elts: new_elts,
                 ctx: *ctx,
@@ -149,7 +149,7 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
             };
             node.into()
         }
-        Kind::Tuple => {
+        Type::Tuple => {
             let node = ast::ExprTuple {
                 elts: new_elts,
                 ctx: *ctx,
@@ -166,10 +166,10 @@ fn build_new_expr(expr: &Expr) -> Option<(Expr, Kind)> {
 /// This suggestion could be unsafe if the non-literal expression in the
 /// expression has overridden the `__add__` (or `__radd__`) magic methods.
 pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
-    // Skip the current node if a diagnostic and fix for the parent node has already been generated.
+    // If the expression is already a child of an addition, we'll have analyzed it already.
     if let Some(Expr::BinOp(ast::ExprBinOp {
         op: Operator::Add, ..
-    })) = checker.ctx.expr_parent()
+    })) = checker.semantic_model().expr_parent()
     {
         return;
     }
@@ -180,8 +180,8 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
 
     let contents = match kind {
         // Wrap the new expression in parentheses if it was a tuple
-        Kind::Tuple => format!("({})", checker.generator().expr(&new_expr)),
-        Kind::List => checker.generator().expr(&new_expr),
+        Type::Tuple => format!("({})", checker.generator().expr(&new_expr)),
+        Type::List => checker.generator().expr(&new_expr),
     };
     let fixable = !has_comments(expr, checker.locator);
 
