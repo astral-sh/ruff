@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
+PYI001.pyi:3:5: PYI001 [*] Name of private `TypeVar` must start with `_`
   |
 3 | from typing import ParamSpec, TypeVar, TypeVarTuple
 4 | 
@@ -10,8 +10,18 @@ PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
 6 | 
 7 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
   |
+  = help: Prefix `TypeVar` with `_`
 
-PYI001.pyi:5:10: PYI001 Name of private `TypeVarTuple` must start with `_`
+ℹ Fix
+1 1 | from typing import ParamSpec, TypeVar, TypeVarTuple
+2 2 | 
+3   |-T = TypeVar("T")  # Error: TypeVars in stubs must start with _
+  3 |+_T = TypeVar("_T")  # Error: TypeVars in stubs must start with _
+4 4 | 
+5 5 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+6 6 | 
+
+PYI001.pyi:5:10: PYI001 [*] Name of private `TypeVarTuple` must start with `_`
   |
 5 | T = TypeVar("T")  # Error: TypeVars in stubs must start with _
 6 | 
@@ -20,8 +30,19 @@ PYI001.pyi:5:10: PYI001 Name of private `TypeVarTuple` must start with `_`
 8 | 
 9 | P = ParamSpec("P")  # Error: ParamSpecs must start with _
   |
+  = help: Prefix `TypeVarTuple` with `_`
 
-PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`
+ℹ Fix
+2 2 | 
+3 3 | T = TypeVar("T")  # Error: TypeVars in stubs must start with _
+4 4 | 
+5   |-TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+  5 |+_TTuple = TypeVarTuple("_TTuple")  # Error: TypeVarTuples must also start with _
+6 6 | 
+7 7 | P = ParamSpec("P")  # Error: ParamSpecs must start with _
+8 8 | 
+
+PYI001.pyi:7:5: PYI001 [*] Name of private `ParamSpec` must start with `_`
    |
  7 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
  8 | 
@@ -30,5 +51,16 @@ PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`
 10 | 
 11 | _T = TypeVar("_T")  # OK
    |
+   = help: Prefix `ParamSpec` with `_`
+
+ℹ Fix
+4 4 | 
+5 5 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+6 6 | 
+7   |-P = ParamSpec("P")  # Error: ParamSpecs must start with _
+  7 |+_P = ParamSpec("_P")  # Error: ParamSpecs must start with _
+8 8 | 
+9 9 | _T = TypeVar("_T")  # OK
+10 10 | 
 
 

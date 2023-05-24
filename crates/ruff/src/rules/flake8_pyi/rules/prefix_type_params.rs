@@ -1,11 +1,13 @@
+use ruff_text_size::TextSize;
 use std::fmt;
 
 use rustpython_parser::ast::{self, Expr, Ranged};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::registry::Rule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum VarKind {
@@ -50,11 +52,16 @@ pub struct UnprefixedTypeParam {
     kind: VarKind,
 }
 
-impl Violation for UnprefixedTypeParam {
+impl AlwaysAutofixableViolation for UnprefixedTypeParam {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnprefixedTypeParam { kind } = self;
         format!("Name of private `{kind}` must start with `_`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let UnprefixedTypeParam { kind } = self;
+        format!("Prefix `{kind}` with `_`")
     }
 }
 
@@ -69,7 +76,7 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
         }
     };
 
-    if let Expr::Call(ast::ExprCall { func, .. }) = value {
+    if let Expr::Call(ast::ExprCall { func, args, .. }) = value {
         let Some(kind) = checker.semantic_model().resolve_call_path(func).and_then(|call_path| {
             if checker.semantic_model().match_typing_call_path(&call_path, "ParamSpec") {
                 Some(VarKind::ParamSpec)
@@ -83,8 +90,19 @@ pub(crate) fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &
         }) else {
             return;
         };
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
+        let mut diagnostic = Diagnostic::new(UnprefixedTypeParam { kind }, value.range());
+        if checker.patch(Rule::UnprefixedTypeParam) {
+            if let Expr::Name(ast::ExprName { range, .. }) = &targets[0] {
+                diagnostic.set_fix(Fix::automatic_edits(
+                    Edit::insertion(format!("_"), range.start()),
+                    [Edit::insertion(
+                        format!("_"),
+                        args[0].range().start() + TextSize::from(1),
+                    )],
+                ));
+            };
+        };
+
+        checker.diagnostics.push(diagnostic);
     }
 }
