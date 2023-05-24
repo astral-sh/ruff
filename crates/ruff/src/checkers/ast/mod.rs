@@ -173,9 +173,16 @@ impl<'a> Checker<'a> {
         &self.semantic_model
     }
 
+    /// Returns whether the given rule should be checked.
     #[inline]
     pub(crate) const fn enabled(&self, rule: Rule) -> bool {
         self.settings.rules.enabled(rule)
+    }
+
+    /// Returns whether any of the given rules should be checked.
+    #[inline]
+    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
+        self.settings.rules.any_enabled(rules)
     }
 }
 
@@ -448,7 +455,7 @@ where
                     flake8_bugbear::rules::cached_instance_method(self, decorator_list);
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::UnnecessaryReturnNone,
                     Rule::ImplicitReturnValue,
                     Rule::ImplicitReturn,
@@ -532,7 +539,7 @@ where
                     }
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::PytestFixtureIncorrectParenthesesStyle,
                     Rule::PytestFixturePositionalArgs,
                     Rule::PytestExtraneousScopeFunction,
@@ -555,14 +562,14 @@ where
                     );
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::PytestParametrizeNamesWrongType,
                     Rule::PytestParametrizeValuesWrongType,
                 ]) {
                     flake8_pytest_style::rules::parametrize(self, decorator_list);
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::PytestIncorrectMarkParenthesesStyle,
                     Rule::PytestUseFixturesWithoutParameters,
                 ]) {
@@ -706,7 +713,7 @@ where
                 }
 
                 if !self.is_stub {
-                    if self.settings.rules.any_enabled(&[
+                    if self.any_enabled(&[
                         Rule::AbstractBaseClassWithoutAbstractMethod,
                         Rule::EmptyMethodWithoutAbstractDecorator,
                     ]) {
@@ -739,7 +746,7 @@ where
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::MutableDataclassDefault,
                     Rule::FunctionCallInDataclassDefaultArgument,
                 ]) && ruff::rules::is_dataclass(&self.semantic_model, decorator_list)
@@ -1346,7 +1353,7 @@ where
                         flake8_bugbear::rules::cannot_raise_literal(self, exc);
                     }
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::RawStringInException,
                     Rule::FStringInException,
                     Rule::DotFormatInException,
@@ -1589,7 +1596,7 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::DuplicateHandlerException,
                     Rule::DuplicateTryBlockException,
                 ]) {
@@ -1686,7 +1693,7 @@ where
                 }
 
                 if self.is_stub {
-                    if self.settings.rules.any_enabled(&[
+                    if self.any_enabled(&[
                         Rule::UnprefixedTypeParam,
                         Rule::AssignmentDefaultInStub,
                         Rule::UnannotatedAssignmentInStub,
@@ -2238,7 +2245,7 @@ where
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::MissingFutureAnnotationsImport,
                     Rule::NonPEP604Annotation,
                 ]) {
@@ -2274,7 +2281,7 @@ where
                     self.semantic_model.flags |= SemanticModelFlags::LITERAL;
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::SysVersionSlice3,
                     Rule::SysVersion2,
                     Rule::SysVersion0,
@@ -2325,7 +2332,7 @@ where
                         }
 
                         // Ex) List[...]
-                        if self.settings.rules.any_enabled(&[
+                        if self.any_enabled(&[
                             Rule::MissingFutureAnnotationsImport,
                             Rule::NonPEP585Annotation,
                         ]) {
@@ -2403,7 +2410,7 @@ where
             }
             Expr::Attribute(ast::ExprAttribute { attr, value, .. }) => {
                 // Ex) typing.List[...]
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::MissingFutureAnnotationsImport,
                     Rule::NonPEP585Annotation,
                 ]) {
@@ -2463,7 +2470,7 @@ where
                 keywords,
                 range: _,
             }) => {
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     // pyflakes
                     Rule::StringDotFormatInvalidFormat,
                     Rule::StringDotFormatExtraNamedArguments,
@@ -2593,16 +2600,12 @@ where
                 }
 
                 // flake8-print
-                if self
-                    .settings
-                    .rules
-                    .any_enabled(&[Rule::Print, Rule::PPrint])
-                {
+                if self.any_enabled(&[Rule::Print, Rule::PPrint]) {
                     flake8_print::rules::print_call(self, func, keywords);
                 }
 
                 // flake8-bandit
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::SuspiciousPickleUsage,
                     Rule::SuspiciousMarshalUsage,
                     Rule::SuspiciousInsecureHashUsage,
@@ -2712,7 +2715,7 @@ where
                         self, func, args, keywords,
                     );
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::SubprocessWithoutShellEqualsTrue,
                     Rule::SubprocessPopenWithShellEqualsTrue,
                     Rule::CallWithShellEqualsTrue,
@@ -2960,7 +2963,7 @@ where
                     }
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::PytestRaisesWithoutException,
                     Rule::PytestRaisesTooBroad,
                 ]) {
@@ -2978,7 +2981,7 @@ where
                 }
 
                 // flake8-gettext
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::FStringInGetTextFuncCall,
                     Rule::FormatInGetTextFuncCall,
                     Rule::PrintfInGetTextFuncCall,
@@ -3014,7 +3017,7 @@ where
                 }
 
                 // flake8-use-pathlib
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::OsPathAbspath,
                     Rule::OsChmod,
                     Rule::OsMkdir,
@@ -3049,7 +3052,7 @@ where
                 }
 
                 // flake8-logging-format
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::LoggingStringFormat,
                     Rule::LoggingPercentFormat,
                     Rule::LoggingStringConcat,
@@ -3063,11 +3066,7 @@ where
                 }
 
                 // pylint logging checker
-                if self
-                    .settings
-                    .rules
-                    .any_enabled(&[Rule::LoggingTooFewArgs, Rule::LoggingTooManyArgs])
-                {
+                if self.any_enabled(&[Rule::LoggingTooFewArgs, Rule::LoggingTooManyArgs]) {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }
 
@@ -3081,7 +3080,7 @@ where
                 values,
                 range: _,
             }) => {
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::MultiValueRepeatedKeyLiteral,
                     Rule::MultiValueRepeatedKeyVariable,
                 ]) {
@@ -3152,7 +3151,7 @@ where
                     ..
                 }) = left.as_ref()
                 {
-                    if self.settings.rules.any_enabled(&[
+                    if self.any_enabled(&[
                         Rule::PercentFormatInvalidFormat,
                         Rule::PercentFormatExpectedMapping,
                         Rule::PercentFormatExpectedSequence,
@@ -3341,7 +3340,7 @@ where
                     pycodestyle::rules::type_comparison(self, expr, ops, comparators);
                 }
 
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::SysVersionCmpStr3,
                     Rule::SysVersionInfo0Eq3,
                     Rule::SysVersionInfo1CmpInt,
@@ -3381,7 +3380,7 @@ where
                 }
 
                 if self.is_stub {
-                    if self.settings.rules.any_enabled(&[
+                    if self.any_enabled(&[
                         Rule::UnrecognizedPlatformCheck,
                         Rule::UnrecognizedPlatformName,
                     ]) {
@@ -4895,7 +4894,7 @@ impl<'a> Checker<'a> {
 
                 if !self.is_stub {
                     // flake8-unused-arguments
-                    if self.settings.rules.any_enabled(&[
+                    if self.any_enabled(&[
                         Rule::UnusedFunctionArgument,
                         Rule::UnusedMethodArgument,
                         Rule::UnusedClassMethodArgument,
@@ -4940,7 +4939,7 @@ impl<'a> Checker<'a> {
 
     fn check_dead_scopes(&mut self) {
         let enforce_typing_imports = !self.is_stub
-            && self.settings.rules.any_enabled(&[
+            && self.any_enabled(&[
                 Rule::GlobalVariableNotAssigned,
                 Rule::RuntimeImportInTypeCheckingBlock,
                 Rule::TypingOnlyFirstPartyImport,
@@ -4949,7 +4948,7 @@ impl<'a> Checker<'a> {
             ]);
 
         if !(enforce_typing_imports
-            || self.settings.rules.any_enabled(&[
+            || self.any_enabled(&[
                 Rule::UnusedImport,
                 Rule::UndefinedLocalWithImportStarUsage,
                 Rule::RedefinedWhileUnused,
@@ -5347,7 +5346,7 @@ impl<'a> Checker<'a> {
     /// it is expected that all [`Definition`] nodes have been visited by the time, and that this
     /// method will not recurse into any other nodes.
     fn check_definitions(&mut self) {
-        let enforce_annotations = self.settings.rules.any_enabled(&[
+        let enforce_annotations = self.any_enabled(&[
             Rule::MissingTypeFunctionArgument,
             Rule::MissingTypeArgs,
             Rule::MissingTypeKwargs,
@@ -5360,9 +5359,8 @@ impl<'a> Checker<'a> {
             Rule::MissingReturnTypeClassMethod,
             Rule::AnyType,
         ]);
-        let enforce_stubs =
-            self.is_stub && self.settings.rules.any_enabled(&[Rule::DocstringInStub]);
-        let enforce_docstrings = self.settings.rules.any_enabled(&[
+        let enforce_stubs = self.is_stub && self.any_enabled(&[Rule::DocstringInStub]);
+        let enforce_docstrings = self.any_enabled(&[
             Rule::UndocumentedPublicModule,
             Rule::UndocumentedPublicClass,
             Rule::UndocumentedPublicMethod,
@@ -5520,13 +5518,13 @@ impl<'a> Checker<'a> {
                 if self.enabled(Rule::FitsOnOneLine) {
                     pydocstyle::rules::one_liner(self, &docstring);
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::NoBlankLineBeforeFunction,
                     Rule::NoBlankLineAfterFunction,
                 ]) {
                     pydocstyle::rules::blank_before_after_function(self, &docstring);
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::OneBlankLineBeforeClass,
                     Rule::OneBlankLineAfterClass,
                     Rule::BlankLineBeforeClass,
@@ -5536,7 +5534,7 @@ impl<'a> Checker<'a> {
                 if self.enabled(Rule::BlankLineAfterSummary) {
                     pydocstyle::rules::blank_after_summary(self, &docstring);
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::IndentWithSpaces,
                     Rule::UnderIndentation,
                     Rule::OverIndentation,
@@ -5549,7 +5547,7 @@ impl<'a> Checker<'a> {
                 if self.enabled(Rule::SurroundingWhitespace) {
                     pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::MultiLineSummaryFirstLine,
                     Rule::MultiLineSummarySecondLine,
                 ]) {
@@ -5586,7 +5584,7 @@ impl<'a> Checker<'a> {
                 if self.enabled(Rule::OverloadWithDocstring) {
                     pydocstyle::rules::if_needed(self, &docstring);
                 }
-                if self.settings.rules.any_enabled(&[
+                if self.any_enabled(&[
                     Rule::MultiLineSummaryFirstLine,
                     Rule::SectionNotOverIndented,
                     Rule::SectionUnderlineNotOverIndented,
