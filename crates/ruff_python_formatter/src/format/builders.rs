@@ -1,6 +1,6 @@
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 
 use crate::context::ASTFormatContext;
 use crate::cst::{Body, Stmt};
@@ -98,7 +98,7 @@ impl<Context> Format<Context> for JoinNames<'_> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let mut join = f.join_with(text(", "));
         for name in self.names {
-            join.entry(&dynamic_text(name, TextSize::default()));
+            join.entry(&dynamic_text(name, None));
         }
         join.finish()
     }

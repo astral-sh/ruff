@@ -2,7 +2,6 @@
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
-use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::{
@@ -110,14 +109,7 @@ fn format_class_def(
 
     write!(f, [leading_comments(body)])?;
 
-    write!(
-        f,
-        [
-            text("class"),
-            space(),
-            dynamic_text(name, TextSize::default())
-        ]
-    )?;
+    write!(f, [text("class"), space(), dynamic_text(name, None)])?;
 
     if !bases.is_empty() || !keywords.is_empty() {
         let format_bases = format_with(|f| {
@@ -180,7 +172,7 @@ fn format_func_def(
         [
             text("def"),
             space(),
-            dynamic_text(name, TextSize::default()),
+            dynamic_text(name, None),
             text("("),
             group(&soft_block_indent(&format_with(|f| {
                 if stmt.trivia.iter().any(|c| c.kind.is_magic_trailing_comma()) {
@@ -653,7 +645,7 @@ fn format_import_from(
         }
     }
     if let Some(module) = module {
-        write!(f, [dynamic_text(module, TextSize::default())])?;
+        write!(f, [dynamic_text(module, None)])?;
     }
     write!(f, [space()])?;
 

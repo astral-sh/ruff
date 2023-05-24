@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Constant, ConversionFlag};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
-use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::{
@@ -676,7 +675,7 @@ fn format_attribute(
 ) -> FormatResult<()> {
     write!(f, [value.format()])?;
     write!(f, [text(".")])?;
-    write!(f, [dynamic_text(attr, TextSize::default())])?;
+    write!(f, [dynamic_text(attr, None)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }

@@ -8,7 +8,6 @@ use crate::{
     BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
     IndentStyle, LineWidth, PrinterOptions,
 };
-use ruff_text_size::TextSize;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -231,6 +230,16 @@ impl Format<IrFormatContext> for &[FormatElement] {
                     write!(f, [text("expand_parent")])?;
                 }
 
+                FormatElement::SourcePosition(position) => {
+                    write!(
+                        f,
+                        [dynamic_text(
+                            &std::format!("source_position({:?})", position),
+                            None
+                        )]
+                    )?;
+                }
+
                 FormatElement::LineSuffixBoundary => {
                     write!(f, [text("line_suffix_boundary")])?;
                 }
@@ -265,10 +274,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                             write!(
                                 f,
                                 [
-                                    dynamic_text(
-                                        &std::format!("<interned {index}>"),
-                                        TextSize::default()
-                                    ),
+                                    dynamic_text(&std::format!("<interned {index}>"), None),
                                     space(),
                                     &interned.deref(),
                                 ]
@@ -279,7 +285,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                 f,
                                 [dynamic_text(
                                     &std::format!("<ref interned *{reference}>"),
-                                    TextSize::default()
+                                    None
                                 )]
                             )?;
                         }
@@ -300,10 +306,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                     f,
                                     [
                                         text("<END_TAG_WITHOUT_START<"),
-                                        dynamic_text(
-                                            &std::format!("{:?}", tag.kind()),
-                                            TextSize::default()
-                                        ),
+                                        dynamic_text(&std::format!("{:?}", tag.kind()), None),
                                         text(">>"),
                                     ]
                                 )?;
@@ -318,15 +321,9 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                         text(")"),
                                         soft_line_break_or_space(),
                                         text("ERROR<START_END_TAG_MISMATCH<start: "),
-                                        dynamic_text(
-                                            &std::format!("{start_kind:?}"),
-                                            TextSize::default()
-                                        ),
+                                        dynamic_text(&std::format!("{start_kind:?}"), None),
                                         text(", end: "),
-                                        dynamic_text(
-                                            &std::format!("{:?}", tag.kind()),
-                                            TextSize::default()
-                                        ),
+                                        dynamic_text(&std::format!("{:?}", tag.kind()), None),
                                         text(">>")
                                     ]
                                 )?;
@@ -358,7 +355,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                 f,
                                 [
                                     text("align("),
-                                    dynamic_text(&count.to_string(), TextSize::default()),
+                                    dynamic_text(&count.to_string(), None),
                                     text(","),
                                     space(),
                                 ]
@@ -380,10 +377,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                 write!(
                                     f,
                                     [
-                                        dynamic_text(
-                                            &std::format!("\"{group_id:?}\""),
-                                            TextSize::default()
-                                        ),
+                                        dynamic_text(&std::format!("\"{group_id:?}\""), None),
                                         text(","),
                                         space(),
                                     ]
@@ -406,7 +400,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                 f,
                                 [
                                     text("indent_if_group_breaks("),
-                                    dynamic_text(&std::format!("\"{id:?}\""), TextSize::default()),
+                                    dynamic_text(&std::format!("\"{id:?}\""), None),
                                     text(","),
                                     space(),
                                 ]
@@ -427,10 +421,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                 write!(
                                     f,
                                     [
-                                        dynamic_text(
-                                            &std::format!("\"{group_id:?}\""),
-                                            TextSize::default()
-                                        ),
+                                        dynamic_text(&std::format!("\"{group_id:?}\""), None),
                                         text(","),
                                         space(),
                                     ]
@@ -443,10 +434,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                                 f,
                                 [
                                     text("label("),
-                                    dynamic_text(
-                                        &std::format!("\"{label_id:?}\""),
-                                        TextSize::default()
-                                    ),
+                                    dynamic_text(&std::format!("\"{label_id:?}\""), None),
                                     text(","),
                                     space(),
                                 ]
@@ -490,10 +478,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                     ContentArrayEnd,
                     text(")"),
                     soft_line_break_or_space(),
-                    dynamic_text(
-                        &std::format!("<START_WITHOUT_END<{top:?}>>"),
-                        TextSize::default()
-                    ),
+                    dynamic_text(&std::format!("<START_WITHOUT_END<{top:?}>>"), None),
                 ]
             )?;
         }
