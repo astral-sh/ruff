@@ -1,0 +1,29 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI048.pyi:14:5: PYI048 Function body must contain exactly 1 statement
+   |
+14 |     """foo"""
+15 |     print("foo")
+16 |     print("foo")  # ERROR PYI048
+   |     ^^^^^^^^^^^^ PYI048
+   |
+
+PYI048.pyi:19:5: PYI048 Function body must contain exactly 1 statement
+   |
+19 | def buzz():
+20 |     print("fizz")
+21 |     print("buzz")  # ERROR PYI048
+   |     ^^^^^^^^^^^^^ PYI048
+22 |     print("test")  # ERROR PYI048
+   |
+
+PYI048.pyi:20:5: PYI048 Function body must contain exactly 1 statement
+   |
+20 |     print("fizz")
+21 |     print("buzz")  # ERROR PYI048
+22 |     print("test")  # ERROR PYI048
+   |     ^^^^^^^^^^^^^ PYI048
+   |
+
+

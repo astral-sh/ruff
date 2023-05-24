@@ -34,6 +34,8 @@ mod tests {
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.pyi"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
+    #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.py"))]
+    #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.pyi"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.pyi"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]
