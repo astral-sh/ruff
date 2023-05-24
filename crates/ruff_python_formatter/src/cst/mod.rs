@@ -19,15 +19,15 @@ pub(crate) mod visitor;
 type Ident = String;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Attributed<T> {
-    pub range: TextRange,
-    pub node: T,
-    pub trivia: Vec<Trivia>,
-    pub parentheses: Parenthesize,
+pub(crate) struct Attributed<T> {
+    pub(crate) range: TextRange,
+    pub(crate) node: T,
+    pub(crate) trivia: Vec<Trivia>,
+    pub(crate) parentheses: Parenthesize,
 }
 
 impl<T> Attributed<T> {
-    pub fn new(range: TextRange, node: T) -> Self {
+    pub(crate) fn new(range: TextRange, node: T) -> Self {
         Self {
             range,
             node,
@@ -36,23 +36,19 @@ impl<T> Attributed<T> {
         }
     }
 
-    pub const fn range(&self) -> TextRange {
+    pub(crate) const fn range(&self) -> TextRange {
         self.range
     }
 
-    pub const fn start(&self) -> TextSize {
+    pub(crate) const fn start(&self) -> TextSize {
         self.range.start()
     }
 
-    pub const fn end(&self) -> TextSize {
+    pub(crate) const fn end(&self) -> TextSize {
         self.range.end()
     }
 
-    pub fn add_trivia(&mut self, trivia: Trivia) {
-        self.trivia.push(trivia);
-    }
-
-    pub fn id(&self) -> usize {
+    pub(crate) fn id(&self) -> usize {
         std::ptr::addr_of!(self.node) as usize
     }
 }
@@ -65,7 +61,7 @@ impl<T> Deref for Attributed<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ExprContext {
+pub(crate) enum ExprContext {
     Load,
     Store,
     Del,
@@ -82,7 +78,7 @@ impl From<ast::ExprContext> for ExprContext {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum BoolOpKind {
+pub(crate) enum BoolOpKind {
     And,
     Or,
 }
@@ -99,7 +95,7 @@ impl From<&ast::Boolop> for BoolOpKind {
 pub(crate) type BoolOp = Attributed<BoolOpKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum OperatorKind {
+pub(crate) enum OperatorKind {
     Add,
     Sub,
     Mult,
@@ -138,7 +134,7 @@ impl From<&ast::Operator> for OperatorKind {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum UnaryOpKind {
+pub(crate) enum UnaryOpKind {
     Invert,
     Not,
     UAdd,
@@ -159,7 +155,7 @@ impl From<&ast::Unaryop> for UnaryOpKind {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum CmpOpKind {
+pub(crate) enum CmpOpKind {
     Eq,
     NotEq,
     Lt,
@@ -208,7 +204,7 @@ impl From<(Vec<ast::Stmt>, &Locator<'_>)> for Body {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum StmtKind {
+pub(crate) enum StmtKind {
     FunctionDef {
         name: Ident,
         args: Box<Arguments>,
@@ -338,7 +334,7 @@ pub enum StmtKind {
 pub(crate) type Stmt = Attributed<StmtKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ExprKind {
+pub(crate) enum ExprKind {
     BoolOp {
         ops: Vec<BoolOp>,
         values: Vec<Expr>,
@@ -456,15 +452,15 @@ pub enum ExprKind {
 pub(crate) type Expr = Attributed<ExprKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Comprehension {
-    pub target: Expr,
-    pub iter: Expr,
-    pub ifs: Vec<Expr>,
-    pub is_async: usize,
+pub(crate) struct Comprehension {
+    pub(crate) target: Expr,
+    pub(crate) iter: Expr,
+    pub(crate) ifs: Vec<Expr>,
+    pub(crate) is_async: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ExcepthandlerKind {
+pub(crate) enum ExcepthandlerKind {
     ExceptHandler {
         type_: Option<Box<Expr>>,
         name: Option<Ident>,
@@ -475,7 +471,7 @@ pub enum ExcepthandlerKind {
 pub(crate) type Excepthandler = Attributed<ExcepthandlerKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum SliceIndexKind {
+pub(crate) enum SliceIndexKind {
     /// The index slot exists, but is empty.
     Empty,
     /// The index slot contains an expression.
@@ -485,57 +481,57 @@ pub enum SliceIndexKind {
 pub(crate) type SliceIndex = Attributed<SliceIndexKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Arguments {
-    pub posonlyargs: Vec<Arg>,
-    pub args: Vec<Arg>,
-    pub vararg: Option<Box<Arg>>,
-    pub kwonlyargs: Vec<Arg>,
-    pub kw_defaults: Vec<Expr>,
-    pub kwarg: Option<Box<Arg>>,
-    pub defaults: Vec<Expr>,
+pub(crate) struct Arguments {
+    pub(crate) posonlyargs: Vec<Arg>,
+    pub(crate) args: Vec<Arg>,
+    pub(crate) vararg: Option<Box<Arg>>,
+    pub(crate) kwonlyargs: Vec<Arg>,
+    pub(crate) kw_defaults: Vec<Expr>,
+    pub(crate) kwarg: Option<Box<Arg>>,
+    pub(crate) defaults: Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ArgData {
-    pub arg: Ident,
-    pub annotation: Option<Box<Expr>>,
-    pub type_comment: Option<String>,
+pub(crate) struct ArgData {
+    pub(crate) arg: Ident,
+    pub(crate) annotation: Option<Box<Expr>>,
+    pub(crate) type_comment: Option<String>,
 }
 
 pub(crate) type Arg = Attributed<ArgData>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct KeywordData {
-    pub arg: Option<Ident>,
-    pub value: Expr,
+pub(crate) struct KeywordData {
+    pub(crate) arg: Option<Ident>,
+    pub(crate) value: Expr,
 }
 
 pub(crate) type Keyword = Attributed<KeywordData>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct AliasData {
-    pub name: Ident,
-    pub asname: Option<Ident>,
+pub(crate) struct AliasData {
+    pub(crate) name: Ident,
+    pub(crate) asname: Option<Ident>,
 }
 
 pub(crate) type Alias = Attributed<AliasData>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Withitem {
-    pub context_expr: Expr,
-    pub optional_vars: Option<Box<Expr>>,
+pub(crate) struct Withitem {
+    pub(crate) context_expr: Expr,
+    pub(crate) optional_vars: Option<Box<Expr>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MatchCase {
-    pub pattern: Pattern,
-    pub guard: Option<Box<Expr>>,
-    pub body: Body,
+pub(crate) struct MatchCase {
+    pub(crate) pattern: Pattern,
+    pub(crate) guard: Option<Box<Expr>>,
+    pub(crate) body: Body,
 }
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug, PartialEq)]
-pub enum PatternKind {
+pub(crate) enum PatternKind {
     MatchValue {
         value: Box<Expr>,
     },

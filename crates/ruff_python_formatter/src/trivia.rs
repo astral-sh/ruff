@@ -9,7 +9,7 @@ use crate::cst::{
 };
 
 #[derive(Clone, Copy, Debug)]
-pub enum Node<'a> {
+pub(crate) enum Node<'a> {
     Alias(&'a Alias),
     Arg(&'a Arg),
     Body(&'a Body),
@@ -27,7 +27,7 @@ pub enum Node<'a> {
 }
 
 impl Node<'_> {
-    pub fn id(&self) -> usize {
+    pub(crate) fn id(&self) -> usize {
         match self {
             Node::Alias(node) => node.id(),
             Node::Arg(node) => node.id(),
@@ -46,7 +46,7 @@ impl Node<'_> {
         }
     }
 
-    pub fn start(&self) -> TextSize {
+    pub(crate) fn start(&self) -> TextSize {
         match self {
             Node::Alias(node) => node.start(),
             Node::Arg(node) => node.start(),
@@ -65,7 +65,7 @@ impl Node<'_> {
         }
     }
 
-    pub fn end(&self) -> TextSize {
+    pub(crate) fn end(&self) -> TextSize {
         match self {
             Node::Alias(node) => node.end(),
             Node::Arg(node) => node.end(),
@@ -86,7 +86,7 @@ impl Node<'_> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TriviaTokenKind {
+pub(crate) enum TriviaTokenKind {
     OwnLineComment,
     EndOfLineComment,
     MagicTrailingComma,
@@ -95,23 +95,23 @@ pub enum TriviaTokenKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TriviaToken {
-    pub range: TextRange,
-    pub kind: TriviaTokenKind,
+pub(crate) struct TriviaToken {
+    pub(crate) range: TextRange,
+    pub(crate) kind: TriviaTokenKind,
 }
 
 impl TriviaToken {
-    pub const fn start(&self) -> TextSize {
+    pub(crate) const fn start(&self) -> TextSize {
         self.range.start()
     }
 
-    pub const fn end(&self) -> TextSize {
+    pub(crate) const fn end(&self) -> TextSize {
         self.range.end()
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
-pub enum TriviaKind {
+pub(crate) enum TriviaKind {
     /// A Comment that is separated by at least one line break from the
     /// preceding token.
     ///
@@ -140,14 +140,14 @@ pub enum TriviaKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
-pub enum Relationship {
+pub(crate) enum Relationship {
     Leading,
     Trailing,
     Dangling,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
-pub enum Parenthesize {
+pub(crate) enum Parenthesize {
     /// Always parenthesize the statement or expression.
     Always,
     /// Never parenthesize the statement or expression.
@@ -157,13 +157,13 @@ pub enum Parenthesize {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Trivia {
-    pub kind: TriviaKind,
-    pub relationship: Relationship,
+pub(crate) struct Trivia {
+    pub(crate) kind: TriviaKind,
+    pub(crate) relationship: Relationship,
 }
 
 impl Trivia {
-    pub fn from_token(token: &TriviaToken, relationship: Relationship) -> Self {
+    pub(crate) fn from_token(token: &TriviaToken, relationship: Relationship) -> Self {
         match token.kind {
             TriviaTokenKind::MagicTrailingComma => Self {
                 kind: TriviaKind::MagicTrailingComma,
@@ -189,7 +189,7 @@ impl Trivia {
     }
 }
 
-pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
+pub(crate) fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
     let mut tokens = vec![];
     let mut prev_tok: Option<(&Tok, TextRange)> = None;
     let mut prev_semantic_tok: Option<(&Tok, TextRange)> = None;
@@ -731,14 +731,14 @@ fn sorted_child_nodes_inner<'a>(node: Node<'a>, result: &mut Vec<Node<'a>>) {
     }
 }
 
-pub fn sorted_child_nodes(node: Node) -> Vec<Node> {
+pub(crate) fn sorted_child_nodes(node: Node) -> Vec<Node> {
     let mut result = Vec::new();
     sorted_child_nodes_inner(node, &mut result);
 
     result
 }
 
-pub fn decorate_token<'a>(
+pub(crate) fn decorate_token<'a>(
     token: &TriviaToken,
     node: Node<'a>,
     enclosing_node: Option<Node<'a>>,
@@ -818,20 +818,20 @@ pub fn decorate_token<'a>(
 }
 
 #[derive(Debug, Default)]
-pub struct TriviaIndex {
-    pub alias: FxHashMap<usize, Vec<Trivia>>,
-    pub arg: FxHashMap<usize, Vec<Trivia>>,
-    pub body: FxHashMap<usize, Vec<Trivia>>,
-    pub bool_op: FxHashMap<usize, Vec<Trivia>>,
-    pub cmp_op: FxHashMap<usize, Vec<Trivia>>,
-    pub excepthandler: FxHashMap<usize, Vec<Trivia>>,
-    pub expr: FxHashMap<usize, Vec<Trivia>>,
-    pub keyword: FxHashMap<usize, Vec<Trivia>>,
-    pub operator: FxHashMap<usize, Vec<Trivia>>,
-    pub pattern: FxHashMap<usize, Vec<Trivia>>,
-    pub slice_index: FxHashMap<usize, Vec<Trivia>>,
-    pub stmt: FxHashMap<usize, Vec<Trivia>>,
-    pub unary_op: FxHashMap<usize, Vec<Trivia>>,
+pub(crate) struct TriviaIndex {
+    pub(crate) alias: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) arg: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) body: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) bool_op: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) cmp_op: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) excepthandler: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) expr: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) keyword: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) operator: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) pattern: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) slice_index: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) stmt: FxHashMap<usize, Vec<Trivia>>,
+    pub(crate) unary_op: FxHashMap<usize, Vec<Trivia>>,
 }
 
 fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
@@ -931,7 +931,7 @@ fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
     }
 }
 
-pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaIndex {
+pub(crate) fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaIndex {
     let mut stack = vec![];
     let mut cache = FxHashMap::default();
     for token in &tokens {

@@ -17,8 +17,10 @@ mod cst;
 mod format;
 mod newlines;
 mod parentheses;
-pub mod shared_traits;
-pub mod trivia;
+mod prelude;
+mod trivia;
+
+include!("../../ruff_formatter/shared_traits.rs");
 
 pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     // Create a reusable locator.
@@ -179,7 +181,7 @@ mod tests {
 
     #[test]
     fn string_processing() {
-        use ruff_formatter::prelude::*;
+        use crate::prelude::*;
         use ruff_formatter::{format, format_args, write};
 
         struct FormatString<'a>(&'a str);

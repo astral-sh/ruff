@@ -2,10 +2,9 @@
 
 use rustpython_parser::ast::{Constant, ConversionFlag};
 
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{format_args, write};
 
-use crate::context::ASTFormatContext;
 use crate::cst::{
     Arguments, BoolOp, CmpOp, Comprehension, Expr, ExprKind, Keyword, Operator, OperatorKind,
     SliceIndex, SliceIndexKind, UnaryOp, UnaryOpKind,
@@ -15,10 +14,9 @@ use crate::format::comments::{dangling_comments, end_of_line_comments, leading_c
 use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
 use crate::format::numbers::{complex_literal, float_literal, int_literal};
 use crate::format::strings::string_literal;
-use crate::shared_traits::AsFormat;
 use crate::trivia::{Parenthesize, TriviaKind};
 
-pub struct FormatExpr<'a> {
+pub(crate) struct FormatExpr<'a> {
     item: &'a Expr,
 }
 

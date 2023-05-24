@@ -1,11 +1,9 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{format_args, write, Format};
 
-use crate::context::ASTFormatContext;
 use crate::cst::Arguments;
-use crate::shared_traits::AsFormat;
 
-pub struct FormatArguments<'a> {
+pub(crate) struct FormatArguments<'a> {
     item: &'a Arguments,
 }
 

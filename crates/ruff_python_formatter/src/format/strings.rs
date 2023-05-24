@@ -1,11 +1,10 @@
 use rustpython_parser::{Mode, Tok};
 
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{write, Format};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_text_size::TextRange;
 
-use crate::context::ASTFormatContext;
 use crate::cst::Expr;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

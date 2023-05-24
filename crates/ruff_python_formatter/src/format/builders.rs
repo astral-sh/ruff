@@ -1,10 +1,8 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{write, Format};
 use ruff_text_size::TextRange;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{Body, Stmt};
-use crate::shared_traits::AsFormat;
 use crate::trivia::{Relationship, TriviaKind};
 
 #[derive(Copy, Clone)]
