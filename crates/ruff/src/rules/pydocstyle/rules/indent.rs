@@ -82,7 +82,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if checker.settings.rules.enabled(Rule::UnderIndentation) {
+        if checker.enabled(Rule::UnderIndentation) {
             // We report under-indentation on every line. This isn't great, but enables
             // autofix.
             if (i == lines.len() - 1 || !is_blank)
@@ -116,7 +116,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.rules.enabled(Rule::IndentWithSpaces) {
+    if checker.enabled(Rule::IndentWithSpaces) {
         if has_seen_tab {
             checker
                 .diagnostics
@@ -124,7 +124,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.rules.enabled(Rule::OverIndentation) {
+    if checker.enabled(Rule::OverIndentation) {
         // If every line (except the last) is over-indented...
         if is_over_indented {
             for over_indented in over_indented_lines {

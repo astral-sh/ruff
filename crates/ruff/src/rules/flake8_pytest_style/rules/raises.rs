@@ -65,11 +65,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(func, checker.semantic_model()) {
-        if checker
-            .settings
-            .rules
-            .enabled(Rule::PytestRaisesWithoutException)
-        {
+        if checker.enabled(Rule::PytestRaisesWithoutException) {
             if args.is_empty() && keywords.is_empty() {
                 checker
                     .diagnostics
@@ -77,7 +73,7 @@ pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], key
             }
         }
 
-        if checker.settings.rules.enabled(Rule::PytestRaisesTooBroad) {
+        if checker.enabled(Rule::PytestRaisesTooBroad) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.arg == Some(Identifier::new("match")));

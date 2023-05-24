@@ -502,7 +502,7 @@ pub(crate) fn definition(
         // ANN401 for dynamically typed arguments
         if let Some(annotation) = &arg.annotation {
             has_any_typed_arg = true;
-            if checker.settings.rules.enabled(Rule::AnyType) {
+            if checker.enabled(Rule::AnyType) {
                 check_dynamically_typed(
                     checker.semantic_model(),
                     annotation,
@@ -515,11 +515,7 @@ pub(crate) fn definition(
             if !(checker.settings.flake8_annotations.suppress_dummy_args
                 && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
             {
-                if checker
-                    .settings
-                    .rules
-                    .enabled(Rule::MissingTypeFunctionArgument)
-                {
+                if checker.enabled(Rule::MissingTypeFunctionArgument) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeFunctionArgument {
                             name: arg.arg.to_string(),
@@ -536,7 +532,7 @@ pub(crate) fn definition(
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
-                if checker.settings.rules.enabled(Rule::AnyType) {
+                if checker.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
                         checker.semantic_model(),
@@ -551,7 +547,7 @@ pub(crate) fn definition(
             if !(checker.settings.flake8_annotations.suppress_dummy_args
                 && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
             {
-                if checker.settings.rules.enabled(Rule::MissingTypeArgs) {
+                if checker.enabled(Rule::MissingTypeArgs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeArgs {
                             name: arg.arg.to_string(),
@@ -568,7 +564,7 @@ pub(crate) fn definition(
         if let Some(expr) = &arg.annotation {
             has_any_typed_arg = true;
             if !checker.settings.flake8_annotations.allow_star_arg_any {
-                if checker.settings.rules.enabled(Rule::AnyType) {
+                if checker.enabled(Rule::AnyType) {
                     let name = &arg.arg;
                     check_dynamically_typed(
                         checker.semantic_model(),
@@ -583,7 +579,7 @@ pub(crate) fn definition(
             if !(checker.settings.flake8_annotations.suppress_dummy_args
                 && checker.settings.dummy_variable_rgx.is_match(&arg.arg))
             {
-                if checker.settings.rules.enabled(Rule::MissingTypeKwargs) {
+                if checker.enabled(Rule::MissingTypeKwargs) {
                     diagnostics.push(Diagnostic::new(
                         MissingTypeKwargs {
                             name: arg.arg.to_string(),
@@ -603,7 +599,7 @@ pub(crate) fn definition(
             if arg.annotation.is_none() {
                 if visibility::is_classmethod(checker.semantic_model(), cast::decorator_list(stmt))
                 {
-                    if checker.settings.rules.enabled(Rule::MissingTypeCls) {
+                    if checker.enabled(Rule::MissingTypeCls) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeCls {
                                 name: arg.arg.to_string(),
@@ -612,7 +608,7 @@ pub(crate) fn definition(
                         ));
                     }
                 } else {
-                    if checker.settings.rules.enabled(Rule::MissingTypeSelf) {
+                    if checker.enabled(Rule::MissingTypeSelf) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeSelf {
                                 name: arg.arg.to_string(),
@@ -630,7 +626,7 @@ pub(crate) fn definition(
     // ANN201, ANN202, ANN401
     if let Some(expr) = &returns {
         has_typed_return = true;
-        if checker.settings.rules.enabled(Rule::AnyType) {
+        if checker.enabled(Rule::AnyType) {
             check_dynamically_typed(
                 checker.semantic_model(),
                 expr,
@@ -647,11 +643,7 @@ pub(crate) fn definition(
         if is_method
             && visibility::is_classmethod(checker.semantic_model(), cast::decorator_list(stmt))
         {
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypeClassMethod)
-            {
+            if checker.enabled(Rule::MissingReturnTypeClassMethod) {
                 diagnostics.push(Diagnostic::new(
                     MissingReturnTypeClassMethod {
                         name: name.to_string(),
@@ -662,11 +654,7 @@ pub(crate) fn definition(
         } else if is_method
             && visibility::is_staticmethod(checker.semantic_model(), cast::decorator_list(stmt))
         {
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypeStaticMethod)
-            {
+            if checker.enabled(Rule::MissingReturnTypeStaticMethod) {
                 diagnostics.push(Diagnostic::new(
                     MissingReturnTypeStaticMethod {
                         name: name.to_string(),
@@ -677,11 +665,7 @@ pub(crate) fn definition(
         } else if is_method && visibility::is_init(name) {
             // Allow omission of return annotation in `__init__` functions, as long as at
             // least one argument is typed.
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypeSpecialMethod)
-            {
+            if checker.enabled(Rule::MissingReturnTypeSpecialMethod) {
                 if !(checker.settings.flake8_annotations.mypy_init_return && has_any_typed_arg) {
                     let mut diagnostic = Diagnostic::new(
                         MissingReturnTypeSpecialMethod {
@@ -699,11 +683,7 @@ pub(crate) fn definition(
                 }
             }
         } else if is_method && visibility::is_magic(name) {
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypeSpecialMethod)
-            {
+            if checker.enabled(Rule::MissingReturnTypeSpecialMethod) {
                 let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeSpecialMethod {
                         name: name.to_string(),
@@ -724,11 +704,7 @@ pub(crate) fn definition(
         } else {
             match visibility {
                 Visibility::Public => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Rule::MissingReturnTypeUndocumentedPublicFunction)
-                    {
+                    if checker.enabled(Rule::MissingReturnTypeUndocumentedPublicFunction) {
                         diagnostics.push(Diagnostic::new(
                             MissingReturnTypeUndocumentedPublicFunction {
                                 name: name.to_string(),
@@ -738,11 +714,7 @@ pub(crate) fn definition(
                     }
                 }
                 Visibility::Private => {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(Rule::MissingReturnTypePrivateFunction)
-                    {
+                    if checker.enabled(Rule::MissingReturnTypePrivateFunction) {
                         diagnostics.push(Diagnostic::new(
                             MissingReturnTypePrivateFunction {
                                 name: name.to_string(),
