@@ -1503,7 +1503,7 @@ where
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            Stmt::While(stmt_while @ ast::StmtWhile { body, orelse, .. }) => {
                 if self.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
@@ -1511,7 +1511,7 @@ where
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
                 if self.enabled(Rule::WhileLoop) {
-                    pylint::rules::while_loop(self, stmt);
+                    pylint::rules::while_loop(self, stmt_while);
                 }
             }
             Stmt::For(ast::StmtFor {
