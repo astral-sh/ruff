@@ -45,7 +45,7 @@ pub(crate) fn check_logical_lines(
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
     let mut prev_line = None;
-    let mut nb_blank_lines: usize = 0;
+    let mut nb_blank_lines: u32 = 0;
     let mut follows_decorator = false;
 
     let mut prev_no_comment_line = None;
@@ -113,10 +113,10 @@ pub(crate) fn check_logical_lines(
         if should_fix_blank_lines || true {
             blank_lines(
                 &line,
-                prev_no_comment_line.as_ref(),
+                prev_line.as_ref(),
                 &mut nb_blank_lines,
                 &mut follows_decorator,
-                &indent_level,
+                indent_level,
                 locator,
                 &mut context,
             );

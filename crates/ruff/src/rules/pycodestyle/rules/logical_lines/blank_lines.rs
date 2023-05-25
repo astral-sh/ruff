@@ -3,28 +3,23 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::Locator;
-use ruff_text_size::TextRange;
 
-use ruff_diagnostics::DiagnosticKind;
-use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 use ruff_text_size::TextSize;
-use rustpython_parser::lexer::LexResult;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 
 use super::LogicalLine;
-use super::LogicalLines;
 
 /// Number of blank lines between various code parts.
 struct BlankLinesConfig;
 
 impl BlankLinesConfig {
     /// Top level class and function.
-    const TOP_LEVEL: usize = 2;
+    const TOP_LEVEL: u32 = 2;
     /// Methods and nested class and function.
-    const METHOD: usize = 1;
+    const METHOD: u32 = 1;
 }
 
 /// ## What it does
@@ -151,7 +146,7 @@ impl AlwaysAutofixableViolation for BlankLinesTopLevel {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
 #[violation]
-pub struct TooManyBlankLines(pub usize);
+pub struct TooManyBlankLines(pub u32);
 
 impl AlwaysAutofixableViolation for TooManyBlankLines {
     #[derive_message_formats]
@@ -300,9 +295,9 @@ impl AlwaysAutofixableViolation for BlankLinesBeforeNestedDefinition {
 pub(crate) fn blank_lines(
     line: &LogicalLine,
     prev_line: Option<&LogicalLine>,
-    blank_lines: &mut usize,
+    blank_lines: &mut u32,
     follows_decorator: &mut bool,
-    indent_level: &usize,
+    indent_level: usize,
     locator: &Locator,
     // stylist: &Stylist,
     context: &mut LogicalLinesContext,
@@ -319,13 +314,13 @@ pub(crate) fn blank_lines(
 
                 let range = token.range();
                 diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                    locator.line_start(range.start()) - TextSize::new(2 * *blank_lines as u32),
-                    locator.line_start(range.start()) - TextSize::new(1),
+                    locator.line_start(range.start()) - TextSize::new(*blank_lines),
+                    locator.line_start(range.start()),
                 )));
                 context.push_diagnostic(diagnostic);
             } else if token.kind() != TokenKind::NonLogicalNewline
                 && (*blank_lines > BlankLinesConfig::TOP_LEVEL
-                    || (*indent_level > 0 && *blank_lines == BlankLinesConfig::METHOD + 1))
+                    || (indent_level > 0 && *blank_lines == BlankLinesConfig::METHOD + 1))
             {
                 let mut diagnostic =
                     Diagnostic::new(TooManyBlankLines(*blank_lines), token.range());
@@ -333,16 +328,12 @@ pub(crate) fn blank_lines(
                 context.push_diagnostic(diagnostic);
             }
 
+            *blank_lines = 0;
             if token.kind() == TokenKind::At {
                 *follows_decorator = true;
                 return;
-            } else {
-                *follows_decorator = false;
             }
-
-            if token.kind() != TokenKind::NonLogicalNewline {
-                *blank_lines = 0;
-            }
+            *follows_decorator = false;
         }
     }
 }
