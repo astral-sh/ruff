@@ -1,4 +1,5 @@
 use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
 use ruff_text_size::TextRange;
 
@@ -302,9 +303,29 @@ pub(crate) fn blank_lines(
     for line in &LogicalLines::from_tokens(tokens, locator) {
         // Don't expect blank lines before the first line
         if let Some(previous_logical) = prev_line {
-            if previous_logical.text_trimmed().starts_with("@") && blank_lines > 0 {}
-            // if blank_lines:
-            // yield 0, "E304 blank lines found after function decorator"
+            if previous_logical.text_trimmed().starts_with("@") && blank_lines > 0 {
+                context.push(
+                    DiagnosticKind::from(BlankLineAfterDecorator),
+                    TextRange::at(
+                        line.first_token().unwrap().start(),
+                        line.tokens().last().unwrap().end(),
+                    ),
+                );
+                // diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+                //     "\n\n".to_string(),
+                //     range,
+                // )));
+            } else if (blank_lines > BlankLinesConfig::TopLevel
+                || (indent_level > 0 && blank_lines == BlankLinesConfig::Method + 1))
+            {
+                context.push(
+                    DiagnosticKind::from(TooManyBlankLines(blank_lines)),
+                    TextRange::at(
+                        line.first_token().unwrap().start(),
+                        line.tokens().last().unwrap().end(),
+                    ),
+                );
+            }
         } else {
             continue;
         }
