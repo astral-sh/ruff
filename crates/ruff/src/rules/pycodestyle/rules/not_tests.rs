@@ -101,7 +101,12 @@ pub(crate) fn not_tests(
                             if checker.patch(diagnostic.kind.rule()) {
                                 #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                    compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
+                                    compare(
+                                        left,
+                                        &[Cmpop::NotIn],
+                                        comparators,
+                                        checker.generator(),
+                                    ),
                                     expr.range(),
                                 )));
                             }
@@ -114,7 +119,12 @@ pub(crate) fn not_tests(
                             if checker.patch(diagnostic.kind.rule()) {
                                 #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                                    compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
+                                    compare(
+                                        left,
+                                        &[Cmpop::IsNot],
+                                        comparators,
+                                        checker.generator(),
+                                    ),
                                     expr.range(),
                                 )));
                             }

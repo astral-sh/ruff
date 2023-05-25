@@ -55,7 +55,6 @@ pub(crate) fn check_physical_lines(
 
     let mut commented_lines_iter = indexer.comment_ranges().iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
-    let string_lines = indexer.triple_quoted_string_ranges();
 
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
@@ -151,7 +150,7 @@ pub(crate) fn check_physical_lines(
         }
 
         if enforce_tab_indentation {
-            if let Some(diagnostic) = tab_indentation(&line, string_lines) {
+            if let Some(diagnostic) = tab_indentation(&line, indexer) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -184,6 +183,7 @@ mod tests {
 
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
+    use crate::line_width::LineLength;
     use crate::registry::Rule;
     use crate::settings::Settings;
 
@@ -197,7 +197,7 @@ mod tests {
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let stylist = Stylist::from_tokens(&tokens, &locator);
 
-        let check_with_max_line_length = |line_length: usize| {
+        let check_with_max_line_length = |line_length: LineLength| {
             check_physical_lines(
                 Path::new("foo.py"),
                 &locator,
@@ -210,7 +210,8 @@ mod tests {
                 },
             )
         };
-        assert_eq!(check_with_max_line_length(8), vec![]);
-        assert_eq!(check_with_max_line_length(8), vec![]);
+        let line_length = LineLength::from(8);
+        assert_eq!(check_with_max_line_length(line_length), vec![]);
+        assert_eq!(check_with_max_line_length(line_length), vec![]);
     }
 }

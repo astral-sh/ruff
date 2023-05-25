@@ -10,6 +10,8 @@ f"{str(bla)}, {repr(bla)}, {ascii(bla)}"  # RUF010
 
 f"{str(d['a'])}, {repr(d['b'])}, {ascii(d['c'])}"  # RUF010
 
+f"{(str(bla))}, {(repr(bla))}, {(ascii(bla))}"  # RUF010
+
 f"{foo(bla)}"  # OK
 
 f"{str(bla, 'ascii')}, {str(bla, encoding='cp1255')}"  # OK

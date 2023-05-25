@@ -169,4 +169,14 @@ ENG_PREFIXES = {
     -6: "\u03bc",  # Greek letter mu
     -3: "m",
 }
+
+i = (
+    i +  #
+    1
+)
+
+x[~y]
+
+if i == -1:
+    pass
 #:

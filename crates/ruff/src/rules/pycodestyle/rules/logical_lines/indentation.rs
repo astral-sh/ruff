@@ -219,12 +219,19 @@ impl Violation for UnexpectedIndentationComment {
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
-pub struct OverIndented;
+pub struct OverIndented {
+    is_comment: bool,
+}
 
 impl Violation for OverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Over-indented")
+        let OverIndented { is_comment } = self;
+        if *is_comment {
+            format!("Over-indented (comment)")
+        } else {
+            format!("Over-indented")
+        }
     }
 }
 
@@ -269,7 +276,12 @@ pub(crate) fn indentation(
         let expected_indent_amount = if indent_char == '\t' { 8 } else { 4 };
         let expected_indent_level = prev_indent_level.unwrap_or(0) + expected_indent_amount;
         if indent_level > expected_indent_level {
-            diagnostics.push(OverIndented.into());
+            diagnostics.push(
+                OverIndented {
+                    is_comment: logical_line.is_comment_only(),
+                }
+                .into(),
+            );
         }
     }
 

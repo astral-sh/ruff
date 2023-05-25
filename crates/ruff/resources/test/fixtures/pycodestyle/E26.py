@@ -64,3 +64,11 @@ a = 42  #  (One space one NBSP)
 #: E262:2:9
 #  (Two spaces) Ok for block comment
 a = 42  #  (Two spaces)
+
+#: E265:5:1
+### Means test is not done yet
+# E   Means test is giving error (E)
+# F   Means test is failing (F)
+# EF  Means test is giving error and Failing
+#!   Means test is segfaulting
+# 8   Means test runs forever

@@ -3,8 +3,8 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments, unparse_expr};
-use ruff_python_semantic::context::Context;
+use ruff_python_ast::helpers::has_comments;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::{checkers::ast::Checker, registry::AsRule};
 
@@ -14,6 +14,30 @@ pub(crate) enum MinMax {
     Max,
 }
 
+/// ## What it does
+/// Checks for nested `min` and `max` calls.
+///
+/// ## Why is this bad?
+/// Nested `min` and `max` calls can be flattened into a single call to improve
+/// readability.
+///
+/// ## Example
+/// ```python
+/// minimum = min(1, 2, min(3, 4, 5))
+/// maximum = max(1, 2, max(3, 4, 5))
+/// diff = maximum - minimum
+/// ```
+///
+/// Use instead:
+/// ```python
+/// minimum = min(1, 2, 3, 4, 5)
+/// maximum = max(1, 2, 3, 4, 5)
+/// diff = maximum - minimum
+/// ```
+///
+/// ## References
+/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
+/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[violation]
 pub struct NestedMinMax {
     func: MinMax,
@@ -35,16 +59,16 @@ impl Violation for NestedMinMax {
 
 impl MinMax {
     /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
-    fn try_from_call(func: &Expr, keywords: &[Keyword], context: &Context) -> Option<MinMax> {
+    fn try_from_call(func: &Expr, keywords: &[Keyword], model: &SemanticModel) -> Option<MinMax> {
         if !keywords.is_empty() {
             return None;
         }
         let Expr::Name(ast::ExprName { id, .. }) = func else {
             return None;
         };
-        if id.as_str() == "min" && context.is_builtin("min") {
+        if id.as_str() == "min" && model.is_builtin("min") {
             Some(MinMax::Min)
-        } else if id.as_str() == "max" && context.is_builtin("max") {
+        } else if id.as_str() == "max" && model.is_builtin("max") {
             Some(MinMax::Max)
         } else {
             None
@@ -63,8 +87,8 @@ impl std::fmt::Display for MinMax {
 
 /// Collect a new set of arguments to by either accepting existing args as-is or
 /// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec<Expr> {
-    fn inner(context: &Context, min_max: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
+fn collect_nested_args(model: &SemanticModel, min_max: MinMax, args: &[Expr]) -> Vec<Expr> {
+    fn inner(model: &SemanticModel, min_max: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
         for arg in args {
             if let Expr::Call(ast::ExprCall {
                 func,
@@ -82,8 +106,8 @@ fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec
                     new_args.push(new_arg);
                     continue;
                 }
-                if MinMax::try_from_call(func, keywords, context) == Some(min_max) {
-                    inner(context, min_max, args, new_args);
+                if MinMax::try_from_call(func, keywords, model) == Some(min_max) {
+                    inner(model, min_max, args, new_args);
                     continue;
                 }
             }
@@ -92,7 +116,7 @@ fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec
     }
 
     let mut new_args = Vec::with_capacity(args.len());
-    inner(context, min_max, args, &mut new_args);
+    inner(model, min_max, args, &mut new_args);
     new_args
 }
 
@@ -104,7 +128,7 @@ pub(crate) fn nested_min_max(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(min_max) = MinMax::try_from_call(func, keywords, &checker.ctx) else {
+    let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic_model()) else {
         return;
     };
 
@@ -112,20 +136,21 @@ pub(crate) fn nested_min_max(
         let Expr::Call(ast::ExprCall { func, keywords, ..} )= arg else {
             return false;
         };
-        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), &checker.ctx) == Some(min_max)
+        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic_model())
+            == Some(min_max)
     }) {
         let fixable = !has_comments(expr, checker.locator);
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
             let flattened_expr = Expr::Call(ast::ExprCall {
                 func: Box::new(func.clone()),
-                args: collect_nested_args(&checker.ctx, min_max, args),
+                args: collect_nested_args(checker.semantic_model(), min_max, args),
                 keywords: keywords.to_owned(),
                 range: TextRange::default(),
             });
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&flattened_expr, checker.stylist),
+                checker.generator().expr(&flattened_expr),
                 expr.range(),
             )));
         }

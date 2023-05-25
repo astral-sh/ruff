@@ -88,3 +88,12 @@ import sys  # noqa: F401, RUF100
 print(sys.path)
 
 "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
+
+
+def f():
+    # Ensure that the `noqa` applies to both the overlong line _and_ the unused
+    # variable.
+    a = """Lorem ipsum dolor sit amet.
+
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    """  # noqa

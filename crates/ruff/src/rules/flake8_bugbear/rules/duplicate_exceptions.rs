@@ -8,7 +8,6 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path;
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -76,11 +75,7 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::DuplicateHandlerException)
-    {
+    if checker.enabled(Rule::DuplicateHandlerException) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = Diagnostic::new(
@@ -95,11 +90,11 @@ fn duplicate_handler_exceptions<'a>(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     if unique_elts.len() == 1 {
-                        unparse_expr(unique_elts[0], checker.stylist)
+                        checker.generator().expr(unique_elts[0])
                     } else {
-                        unparse_expr(&type_pattern(unique_elts), checker.stylist)
+                        checker.generator().expr(&type_pattern(unique_elts))
                     },
                     expr.range(),
                 )));
@@ -141,11 +136,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthand
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::DuplicateTryBlockException)
-    {
+    if checker.enabled(Rule::DuplicateTryBlockException) {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 checker.diagnostics.push(Diagnostic::new(

@@ -151,9 +151,9 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::codes::{self, RuleCodePrefix};
+    use crate::line_width::LineLength;
     use crate::rules::flake8_quotes::settings::Quote;
-    use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
-    use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
+    use crate::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
     use crate::rules::{
         flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_import_conventions,
         flake8_pytest_style, flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming,
@@ -200,7 +200,7 @@ line-length = 79
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    line_length: Some(79),
+                    line_length: Some(LineLength::from(79)),
                     ..Options::default()
                 })
             })
@@ -301,7 +301,7 @@ other-attribute = 1
             config,
             Options {
                 allowed_confusables: Some(vec!['−', 'ρ', '∗']),
-                line_length: Some(88),
+                line_length: Some(LineLength::from(88)),
                 extend_exclude: Some(vec![
                     "excluded_file.py".to_string(),
                     "migrations".to_string(),

@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -88,7 +87,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     };
     if !checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["os", "environ", "get"]
@@ -149,7 +148,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         let new_env_var = node.into();
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&new_env_var, checker.stylist),
+            checker.generator().expr(&new_env_var),
             slice.range(),
         )));
     }

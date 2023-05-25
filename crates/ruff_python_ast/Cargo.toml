@@ -19,10 +19,10 @@ memchr = "2.5.0"
 num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { workspace = true }
-regex = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-literal = { workspace = true }
 rustpython-parser = { workspace = true }
+rustpython-ast = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 

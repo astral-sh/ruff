@@ -2,14 +2,13 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
     self, Cmpop, Comprehension, Constant, Expr, ExprContext, Ranged, Stmt, Unaryop,
 };
-use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
-use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::source_code::Generator;
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineWidth;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
@@ -171,7 +170,7 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Stylist) -> String {
+fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
     let node = ast::ExprGeneratorExp {
         elt: Box::new(test.clone()),
         generators: vec![Comprehension {
@@ -198,7 +197,7 @@ fn return_stmt(id: &str, test: &Expr, target: &Expr, iter: &Expr, stylist: &Styl
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
     };
-    unparse_stmt(&node3.into(), stylist)
+    generator.stmt(&node3.into())
 }
 
 /// SIM110, SIM111
@@ -214,19 +213,20 @@ pub(crate) fn convert_for_loop_to_any_all(
         .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
     {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.rules.enabled(Rule::ReimplementedBuiltin) {
+            if checker.enabled(Rule::ReimplementedBuiltin) {
                 let contents = return_stmt(
                     "any",
                     loop_info.test,
                     loop_info.target,
                     loop_info.iter,
-                    checker.stylist,
+                    checker.generator(),
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-                    + contents.width()
+                if LineWidth::new(checker.settings.tab_size)
+                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+                    .add_str(&contents)
                     > checker.settings.line_length
                 {
                     return;
@@ -236,9 +236,11 @@ pub(crate) fn convert_for_loop_to_any_all(
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    stmt.range(),
+                    TextRange::new(stmt.start(), loop_info.terminal),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
+                if checker.patch(diagnostic.kind.rule())
+                    && checker.semantic_model().is_builtin("any")
+                {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,
@@ -251,7 +253,7 @@ pub(crate) fn convert_for_loop_to_any_all(
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.rules.enabled(Rule::ReimplementedBuiltin) {
+            if checker.enabled(Rule::ReimplementedBuiltin) {
                 // Invert the condition.
                 let test = {
                     if let Expr::UnaryOp(ast::ExprUnaryOp {
@@ -310,13 +312,14 @@ pub(crate) fn convert_for_loop_to_any_all(
                     &test,
                     loop_info.target,
                     loop_info.iter,
-                    checker.stylist,
+                    checker.generator(),
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
                 let line_start = checker.locator.line_start(stmt.start());
-                if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-                    + contents.width()
+                if LineWidth::new(checker.settings.tab_size)
+                    .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+                    .add_str(&contents)
                     > checker.settings.line_length
                 {
                     return;
@@ -326,9 +329,11 @@ pub(crate) fn convert_for_loop_to_any_all(
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    stmt.range(),
+                    TextRange::new(stmt.start(), loop_info.terminal),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
+                if checker.patch(diagnostic.kind.rule())
+                    && checker.semantic_model().is_builtin("all")
+                {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::replacement(
                         contents,

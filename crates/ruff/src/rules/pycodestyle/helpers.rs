@@ -1,9 +1,11 @@
-use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::newlines::Line;
-use ruff_python_ast::source_code::Stylist;
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{self, Cmpop, Expr};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthStr;
+
+use ruff_python_ast::newlines::Line;
+use ruff_python_ast::source_code::Generator;
+
+use crate::line_width::{LineLength, LineWidth, TabSize};
 
 pub(crate) fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -13,7 +15,7 @@ pub(crate) fn compare(
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
-    stylist: &Stylist,
+    generator: Generator,
 ) -> String {
     let node = ast::ExprCompare {
         left: Box::new(left.clone()),
@@ -21,24 +23,24 @@ pub(crate) fn compare(
         comparators: comparators.to_vec(),
         range: TextRange::default(),
     };
-    unparse_expr(&node.into(), stylist)
+    generator.expr(&node.into())
 }
 
 pub(super) fn is_overlong(
     line: &Line,
-    limit: usize,
+    limit: LineLength,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
+    tab_size: TabSize,
 ) -> Option<Overlong> {
     let mut start_offset = line.start();
-    let mut width = 0;
+    let mut width = LineWidth::new(tab_size);
 
     for c in line.chars() {
         if width < limit {
             start_offset += c.text_len();
         }
-
-        width += c.width().unwrap_or(0);
+        width = width.add_char(c);
     }
 
     if width <= limit {
@@ -64,14 +66,14 @@ pub(super) fn is_overlong(
     // begins before the limit.
     let last_chunk = chunks.last().unwrap_or(second_chunk);
     if last_chunk.contains("://") {
-        if width - last_chunk.width() <= limit {
+        if width.get() - last_chunk.width() <= limit.get() {
             return None;
         }
     }
 
     Some(Overlong {
         range: TextRange::new(start_offset, line.end()),
-        width,
+        width: width.get(),
     })
 }
 

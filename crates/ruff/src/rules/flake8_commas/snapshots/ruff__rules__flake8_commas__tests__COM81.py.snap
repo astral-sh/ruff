@@ -936,5 +936,7 @@ COM81.py:632:42: COM812 [*] Trailing comma missing
 632     |-    (i for i in range(10) if i // 2 == 0)  # COM812 fix should include the final bracket
     632 |+    (i for i in range(10) if i // 2 == 0),  # COM812 fix should include the final bracket
 633 633 | )
+634 634 | 
+635 635 | foo = namedtuple(
 
 

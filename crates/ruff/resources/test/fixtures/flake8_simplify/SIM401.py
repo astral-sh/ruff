@@ -14,7 +14,7 @@ if key not in a_dict:
 else:
     var = a_dict[key]
 
-# SIM401 (default with a complex expression)
+# OK (default contains effect)
 if key in a_dict:
     var = a_dict[key]
 else:
@@ -36,11 +36,17 @@ else:
 if key in a_dict:
     vars[idx] = a_dict[key]
 else:
-    vars[idx] = "default"
+    vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789"
 
 ###
 # Negative cases
 ###
+
+# OK (too long)
+if key in a_dict:
+    vars[idx] = a_dict[key]
+else:
+    vars[idx] = "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß"
 
 # OK (false negative)
 if not key in a_dict:

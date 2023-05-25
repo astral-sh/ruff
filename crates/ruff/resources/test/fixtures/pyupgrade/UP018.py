@@ -25,3 +25,4 @@ bytes()
 bytes(b"foo")
 bytes(b"""
 foo""")
+f"{str()}"

@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_stmt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -55,8 +54,8 @@ pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
     let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
     if checker.patch(diagnostic.kind.rule()) {
         #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_stmt(&assertion_error(msg), checker.stylist),
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            checker.generator().stmt(&assertion_error(msg)),
             stmt.range(),
         )));
     }

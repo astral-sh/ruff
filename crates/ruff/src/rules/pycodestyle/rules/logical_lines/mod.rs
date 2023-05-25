@@ -151,6 +151,11 @@ pub(crate) struct LogicalLine<'a> {
 }
 
 impl<'a> LogicalLine<'a> {
+    /// Returns `true` if this line is positioned at the start of the file.
+    pub(crate) const fn is_start_of_file(&self) -> bool {
+        self.line.tokens_start == 0
+    }
+
     /// Returns `true` if this is a comment only line
     pub(crate) fn is_comment_only(&self) -> bool {
         self.flags() == TokenFlags::COMMENT
@@ -350,7 +355,7 @@ impl LogicalLineToken {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Whitespace {
     None,
     Single,
@@ -365,7 +370,10 @@ impl Whitespace {
         let mut has_tabs = false;
 
         for c in content.chars() {
-            if c == '\t' {
+            if c == '#' {
+                // Ignore leading whitespace between a token and an end-of-line comment
+                return (Whitespace::None, TextSize::default());
+            } else if c == '\t' {
                 has_tabs = true;
                 len += c.text_len();
             } else if matches!(c, '\n' | '\r') {

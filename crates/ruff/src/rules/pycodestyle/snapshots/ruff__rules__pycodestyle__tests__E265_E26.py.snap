@@ -40,4 +40,13 @@ E26.py:32:1: E265 Block comment should start with `# `
 35 | pass  # an inline comment
    |
 
+E26.py:73:1: E265 Block comment should start with `# `
+   |
+73 | # F   Means test is failing (F)
+74 | # EF  Means test is giving error and Failing
+75 | #!   Means test is segfaulting
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E265
+76 | # 8   Means test runs forever
+   |
+
 

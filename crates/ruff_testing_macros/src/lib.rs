@@ -1,11 +1,12 @@
-use glob::{glob, Pattern};
 use proc_macro::TokenStream;
-use proc_macro2::Span;
-use quote::{format_ident, quote};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::env;
 use std::path::{Component, PathBuf};
+
+use glob::{glob, Pattern};
+use proc_macro2::Span;
+use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;

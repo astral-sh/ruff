@@ -11,7 +11,6 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::importer::Importer;
 use crate::registry::Rule;
-use crate::rules::isort::track::Block;
 use crate::settings::Settings;
 
 /// ## What it does
@@ -53,58 +52,48 @@ impl AlwaysAutofixableViolation for MissingRequiredImport {
     }
 }
 
-fn contains(block: &Block, required_import: &AnyImport) -> bool {
-    block.imports.iter().any(|import| match required_import {
-        AnyImport::Import(required_import) => {
+/// Return `true` if the [`Stmt`] includes the given [`AnyImport`].
+fn includes_import(stmt: &Stmt, target: &AnyImport) -> bool {
+    match target {
+        AnyImport::Import(target) => {
             let Stmt::Import(ast::StmtImport {
                 names,
                  range: _,
-            }) = &import else {
+            }) = &stmt else {
                 return false;
             };
             names.iter().any(|alias| {
-                &alias.name == required_import.name.name
-                    && alias.asname.as_deref() == required_import.name.as_name
+                &alias.name == target.name.name && alias.asname.as_deref() == target.name.as_name
             })
         }
-        AnyImport::ImportFrom(required_import) => {
+        AnyImport::ImportFrom(target) => {
             let Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
                  range: _,
-            }) = &import else {
+            }) = &stmt else {
                 return false;
             };
-            module.as_deref() == required_import.module
-                && level.map(|level| level.to_u32()) == required_import.level
+            module.as_deref() == target.module
+                && level.map(|level| level.to_u32()) == target.level
                 && names.iter().any(|alias| {
-                    &alias.name == required_import.name.name
-                        && alias.asname.as_deref() == required_import.name.as_name
+                    &alias.name == target.name.name
+                        && alias.asname.as_deref() == target.name.as_name
                 })
         }
-    })
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn add_required_import(
     required_import: &AnyImport,
-    blocks: &[&Block],
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
     is_stub: bool,
 ) -> Option<Diagnostic> {
-    // If the import is already present in a top-level block, don't add it.
-    if blocks
-        .iter()
-        .filter(|block| !block.nested)
-        .any(|block| contains(block, required_import))
-    {
-        return None;
-    }
-
     // Don't add imports to semantically-empty files.
     if python_ast.iter().all(is_docstring_stmt) {
         return None;
@@ -112,6 +101,14 @@ fn add_required_import(
 
     // We don't need to add `__future__` imports to stubs.
     if is_stub && required_import.is_future_import() {
+        return None;
+    }
+
+    // If the import is already present in a top-level block, don't add it.
+    if python_ast
+        .iter()
+        .any(|stmt| includes_import(stmt, required_import))
+    {
         return None;
     }
 
@@ -132,7 +129,6 @@ fn add_required_import(
 
 /// I002
 pub(crate) fn add_required_imports(
-    blocks: &[&Block],
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
@@ -174,7 +170,6 @@ pub(crate) fn add_required_imports(
                                 },
                                 level: level.map(|level| level.to_u32()),
                             }),
-                            blocks,
                             python_ast,
                             locator,
                             stylist,
@@ -193,7 +188,6 @@ pub(crate) fn add_required_imports(
                                     as_name: name.asname.as_deref(),
                                 },
                             }),
-                            blocks,
                             python_ast,
                             locator,
                             stylist,

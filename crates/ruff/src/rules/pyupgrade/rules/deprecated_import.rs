@@ -527,7 +527,7 @@ pub(crate) fn deprecated_import(
         return;
     }
 
-    let members: Vec<Alias> = names.iter().map(std::clone::Clone::clone).collect();
+    let members: Vec<Alias> = names.iter().map(Clone::clone).collect();
     let fixer = ImportReplacer::new(
         stmt,
         module,

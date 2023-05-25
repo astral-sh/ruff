@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Unaryop}
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -97,7 +96,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         IfExprWithTrueFalse {
-            expr: unparse_expr(test, checker.stylist),
+            expr: checker.generator().expr(test),
         },
         expr.range(),
     );
@@ -105,10 +104,10 @@ pub(crate) fn explicit_true_false_in_ifexpr(
         if matches!(test, Expr::Compare(_)) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&test.clone(), checker.stylist),
+                checker.generator().expr(&test.clone()),
                 expr.range(),
             )));
-        } else if checker.ctx.is_builtin("bool") {
+        } else if checker.semantic_model().is_builtin("bool") {
             let node = ast::ExprName {
                 id: "bool".into(),
                 ctx: ExprContext::Load,
@@ -122,7 +121,7 @@ pub(crate) fn explicit_true_false_in_ifexpr(
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&node1.into(), checker.stylist),
+                checker.generator().expr(&node1.into()),
                 expr.range(),
             )));
         };
@@ -153,7 +152,7 @@ pub(crate) fn explicit_false_true_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         IfExprWithFalseTrue {
-            expr: unparse_expr(test, checker.stylist),
+            expr: checker.generator().expr(test),
         },
         expr.range(),
     );
@@ -166,7 +165,7 @@ pub(crate) fn explicit_false_true_in_ifexpr(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node1.into(), checker.stylist),
+            checker.generator().expr(&node1.into()),
             expr.range(),
         )));
     }
@@ -201,8 +200,8 @@ pub(crate) fn twisted_arms_in_ifexpr(
 
     let mut diagnostic = Diagnostic::new(
         IfExprWithTwistedArms {
-            expr_body: unparse_expr(body, checker.stylist),
-            expr_else: unparse_expr(orelse, checker.stylist),
+            expr_body: checker.generator().expr(body),
+            expr_else: checker.generator().expr(orelse),
         },
         expr.range(),
     );
@@ -218,7 +217,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node3.into(), checker.stylist),
+            checker.generator().expr(&node3.into()),
             expr.range(),
         )));
     }

@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_attribute, match_call, match_expression};
+use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 
 #[violation]
@@ -35,11 +35,11 @@ impl AlwaysAutofixableViolation for InDictKeys {
 fn get_value_content_for_key_in_dict(
     locator: &Locator,
     stylist: &Stylist,
-    expr: &rustpython_parser::ast::Expr,
+    expr: &Expr,
 ) -> Result<String> {
     let content = locator.slice(expr.range());
     let mut expression = match_expression(content)?;
-    let call = match_call(&mut expression)?;
+    let call = match_call_mut(&mut expression)?;
     let attribute = match_attribute(&mut call.func)?;
 
     let mut state = CodegenState {

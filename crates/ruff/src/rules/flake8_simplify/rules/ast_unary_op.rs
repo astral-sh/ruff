@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Cmpop, Expr, ExprContext, Ranged, Stmt, Unary
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
@@ -94,12 +93,12 @@ pub(crate) fn negation_with_equal_op(
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    if is_exception_check(checker.ctx.stmt()) {
+    if is_exception_check(checker.semantic_model().stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.ctx.scope().kind {
+    if let ScopeKind::Function(def) = &checker.semantic_model().scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -107,8 +106,8 @@ pub(crate) fn negation_with_equal_op(
 
     let mut diagnostic = Diagnostic::new(
         NegateEqualOp {
-            left: unparse_expr(left, checker.stylist),
-            right: unparse_expr(&comparators[0], checker.stylist),
+            left: checker.generator().expr(left),
+            right: checker.generator().expr(&comparators[0]),
         },
         expr.range(),
     );
@@ -121,7 +120,7 @@ pub(crate) fn negation_with_equal_op(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node.into(), checker.stylist),
+            checker.generator().expr(&node.into()),
             expr.range(),
         )));
     }
@@ -144,12 +143,12 @@ pub(crate) fn negation_with_not_equal_op(
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    if is_exception_check(checker.ctx.stmt()) {
+    if is_exception_check(checker.semantic_model().stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.ctx.scope().kind {
+    if let ScopeKind::Function(def) = &checker.semantic_model().scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -157,8 +156,8 @@ pub(crate) fn negation_with_not_equal_op(
 
     let mut diagnostic = Diagnostic::new(
         NegateNotEqualOp {
-            left: unparse_expr(left, checker.stylist),
-            right: unparse_expr(&comparators[0], checker.stylist),
+            left: checker.generator().expr(left),
+            right: checker.generator().expr(&comparators[0]),
         },
         expr.range(),
     );
@@ -171,7 +170,7 @@ pub(crate) fn negation_with_not_equal_op(
         };
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            unparse_expr(&node.into(), checker.stylist),
+            checker.generator().expr(&node.into()),
             expr.range(),
         )));
     }
@@ -192,18 +191,18 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, o
 
     let mut diagnostic = Diagnostic::new(
         DoubleNegation {
-            expr: unparse_expr(operand, checker.stylist),
+            expr: checker.generator().expr(operand),
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if checker.ctx.in_boolean_test() {
+        if checker.semantic_model().in_boolean_test() {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(operand, checker.stylist),
+                checker.generator().expr(operand),
                 expr.range(),
             )));
-        } else if checker.ctx.is_builtin("bool") {
+        } else if checker.semantic_model().is_builtin("bool") {
             let node = ast::ExprName {
                 id: "bool".into(),
                 ctx: ExprContext::Load,
@@ -217,7 +216,7 @@ pub(crate) fn double_negation(checker: &mut Checker, expr: &Expr, op: Unaryop, o
             };
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(&node1.into(), checker.stylist),
+                checker.generator().expr(&node1.into()),
                 expr.range(),
             )));
         };

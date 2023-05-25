@@ -1,8 +1,9 @@
-use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
 use ruff_diagnostics::{DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 // E225
 #[violation]
@@ -49,14 +50,22 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 }
 
 /// E225, E226, E227, E228
-#[allow(clippy::if_same_then_else)]
 pub(crate) fn missing_whitespace_around_operator(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
-    let mut parens = 0u32;
-    let mut prev_token: Option<&LogicalLineToken> = None;
     let mut tokens = line.tokens().iter().peekable();
+    let first_token = tokens.by_ref().find_map(|token| {
+        let kind = token.kind();
+        (!kind.is_trivia()).then_some(token)
+    });
+    let Some(mut prev_token) = first_token else {
+        return;
+    };
+    let mut parens = u32::from(matches!(
+        prev_token.kind(),
+        TokenKind::Lpar | TokenKind::Lambda
+    ));
 
     while let Some(token) = tokens.next() {
         let kind = token.kind();
@@ -86,26 +95,20 @@ pub(crate) fn missing_whitespace_around_operator(
             );
 
             NeedsSpace::from(!slash_in_func)
-        } else if kind.is_unary()
-            || matches!(
-                kind,
-                TokenKind::Star | TokenKind::DoubleStar | TokenKind::At
-            )
-        {
-            let is_binary = prev_token.map_or(false, |prev_token| {
+        } else if kind.is_unary() || matches!(kind, TokenKind::Star | TokenKind::DoubleStar) {
+            let is_binary = {
                 let prev_kind = prev_token.kind();
 
                 // Check if the operator is used as a binary operator.
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
-                // Allow decorators: @foo, @foo(1)
                 matches!(
                     prev_kind,
                     TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
                 ) || !(prev_kind.is_operator()
                     || prev_kind.is_keyword()
                     || prev_kind.is_soft_keyword())
-            });
+            };
 
             if is_binary {
                 if kind == TokenKind::DoubleStar {
@@ -124,20 +127,18 @@ pub(crate) fn missing_whitespace_around_operator(
         };
 
         if needs_space != NeedsSpace::No {
-            let has_leading_trivia = prev_token.map_or(true, |prev| {
-                prev.end() < token.start() || prev.kind().is_trivia()
-            });
+            let has_leading_trivia =
+                prev_token.end() < token.start() || prev_token.kind().is_trivia();
 
             let has_trailing_trivia = tokens.peek().map_or(true, |next| {
                 token.end() < next.start() || next.kind().is_trivia()
             });
 
             match (has_leading_trivia, has_trailing_trivia) {
-                // Operator with trailing but no leading space, enforce consistent spacing
+                // Operator with trailing but no leading space, enforce consistent spacing.
                 (false, true) |
                 // Operator with leading but no trailing space, enforce consistent spacing.
-                (true, false)
-                => {
+                (true, false) => {
                     context.push(MissingWhitespaceAroundOperator, token.range());
                 }
                 // Operator with no space, require spaces if it is required by the operator.
@@ -147,12 +148,12 @@ pub(crate) fn missing_whitespace_around_operator(
                     }
                 }
                 (true, true) => {
-                    // Operator has leading and trailing spaces, all good
+                    // Operator has leading and trailing spaces, all good.
                 }
             }
         }
 
-        prev_token = Some(token);
+        prev_token = token;
     }
 }
 
@@ -224,5 +225,7 @@ fn is_whitespace_needed(kind: TokenKind) -> bool {
             | TokenKind::Slash
             | TokenKind::Percent
     ) || kind.is_arithmetic()
-        || kind.is_bitwise_or_shift()
+        || (kind.is_bitwise_or_shift() &&
+            // As a special-case, pycodestyle seems to ignore whitespace around the tilde.
+            !matches!(kind, TokenKind::Tilde))
 }

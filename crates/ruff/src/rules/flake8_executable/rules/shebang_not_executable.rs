@@ -1,7 +1,8 @@
 #![allow(unused_imports)]
 
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::path::Path;
+
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};

@@ -204,7 +204,7 @@ fn remove_unused_variable(
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
             if target.is_name_expr() {
                 return if targets.len() > 1
-                    || contains_effect(value, |id| checker.ctx.is_builtin(id))
+                    || contains_effect(value, |id| checker.semantic_model().is_builtin(id))
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
@@ -219,7 +219,7 @@ fn remove_unused_variable(
                     ))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let parent = checker.ctx.stmts.parent(stmt);
+                    let parent = checker.semantic_model().stmts.parent(stmt);
                     let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                     match delete_stmt(
                         stmt,
@@ -249,7 +249,7 @@ fn remove_unused_variable(
     }) = stmt
     {
         if target.is_name_expr() {
-            return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
+            return if contains_effect(value, |id| checker.semantic_model().is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 #[allow(deprecated)]
@@ -262,7 +262,7 @@ fn remove_unused_variable(
                 ))
             } else {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = checker.ctx.stmts.parent(stmt);
+                let parent = checker.semantic_model().stmts.parent(stmt);
                 let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 match delete_stmt(
                     stmt,
@@ -313,42 +313,45 @@ fn remove_unused_variable(
 
 /// F841
 pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
-    let scope = &checker.ctx.scopes[scope];
+    let scope = &checker.semantic_model().scopes[scope];
     if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
         return;
     }
 
-    for (name, binding) in scope
+    let bindings: Vec<_> = scope
         .bindings()
-        .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
-    {
-        if !binding.used()
-            && (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
-            && !checker.settings.dummy_variable_rgx.is_match(name)
-            && name != &"__tracebackhide__"
-            && name != &"__traceback_info__"
-            && name != &"__traceback_supplement__"
-            && name != &"__debuggerskip__"
-        {
-            let mut diagnostic = Diagnostic::new(
-                UnusedVariable {
-                    name: (*name).to_string(),
-                },
-                binding.range,
-            );
-            if checker.patch(diagnostic.kind.rule()) {
-                if let Some(source) = binding.source {
-                    let stmt = checker.ctx.stmts[source];
-                    if let Some((kind, fix)) = remove_unused_variable(stmt, binding.range, checker)
-                    {
-                        if matches!(kind, DeletionKind::Whole) {
-                            checker.deletions.insert(RefEquality(stmt));
-                        }
-                        diagnostic.set_fix(fix);
+        .map(|(name, binding_id)| (name, &checker.semantic_model().bindings[binding_id]))
+        .filter_map(|(name, binding)| {
+            if (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
+                && !binding.is_used()
+                && !checker.settings.dummy_variable_rgx.is_match(name)
+                && name != "__tracebackhide__"
+                && name != "__traceback_info__"
+                && name != "__traceback_supplement__"
+                && name != "__debuggerskip__"
+            {
+                return Some((name.to_string(), binding.range, binding.source));
+            }
+
+            None
+        })
+        .collect();
+
+    for (name, range, source) in bindings {
+        let mut diagnostic = Diagnostic::new(UnusedVariable { name }, range);
+
+        if checker.patch(diagnostic.kind.rule()) {
+            if let Some(source) = source {
+                let stmt = checker.semantic_model().stmts[source];
+                if let Some((kind, fix)) = remove_unused_variable(stmt, range, checker) {
+                    if matches!(kind, DeletionKind::Whole) {
+                        checker.deletions.insert(RefEquality(stmt));
                     }
+                    diagnostic.set_fix(fix);
                 }
             }
-            checker.diagnostics.push(diagnostic);
         }
+
+        checker.diagnostics.push(diagnostic);
     }
 }

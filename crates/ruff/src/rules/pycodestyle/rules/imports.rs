@@ -1,9 +1,10 @@
 use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Check for multiple imports on one line.
@@ -87,7 +88,8 @@ pub(crate) fn module_import_not_at_top_of_file(
     stmt: &Stmt,
     locator: &Locator,
 ) {
-    if checker.ctx.seen_import_boundary() && locator.is_at_start_of_line(stmt.start()) {
+    if checker.semantic_model().seen_import_boundary() && locator.is_at_start_of_line(stmt.start())
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(ModuleImportNotAtTopOfFile, stmt.range()));

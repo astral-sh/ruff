@@ -7,6 +7,7 @@ pub(crate) use try_consider_else::{try_consider_else, TryConsiderElse};
 pub(crate) use type_check_without_type_error::{
     type_check_without_type_error, TypeCheckWithoutTypeError,
 };
+pub(crate) use useless_try_except::{useless_try_except, UselessTryExcept};
 pub(crate) use verbose_log_message::{verbose_log_message, VerboseLogMessage};
 pub(crate) use verbose_raise::{verbose_raise, VerboseRaise};
 
@@ -17,5 +18,6 @@ mod raise_within_try;
 mod reraise_no_cause;
 mod try_consider_else;
 mod type_check_without_type_error;
+mod useless_try_except;
 mod verbose_log_message;
 mod verbose_raise;

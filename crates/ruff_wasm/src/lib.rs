@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use ruff::directives;
+use ruff::line_width::{LineLength, TabSize};
 use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::rules::{
@@ -96,11 +97,14 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         allowed_confusables: Some(Vec::default()),
         builtins: Some(Vec::default()),
         dummy_variable_rgx: Some(defaults::DUMMY_VARIABLE_RGX.as_str().to_string()),
+        extend_fixable: Some(Vec::default()),
         extend_ignore: Some(Vec::default()),
         extend_select: Some(Vec::default()),
+        extend_unfixable: Some(Vec::default()),
         external: Some(Vec::default()),
         ignore: Some(Vec::default()),
-        line_length: Some(defaults::LINE_LENGTH),
+        line_length: Some(LineLength::default()),
+        tab_size: Some(TabSize::default()),
         select: Some(defaults::PREFIXES.to_vec()),
         target_version: Some(defaults::TARGET_VERSION),
         // Ignore a bunch of options that don't make sense in a single-file editor.
@@ -109,6 +113,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         extend: None,
         extend_exclude: None,
         extend_include: None,
+        extend_per_file_ignores: None,
         fix: None,
         fix_only: None,
         fixable: None,
@@ -143,7 +148,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_import_conventions: Some(
             flake8_import_conventions::settings::Settings::default().into(),
         ),
-        flake8_tidy_imports: Some(flake8_tidy_imports::Settings::default().into()),
+        flake8_tidy_imports: Some(flake8_tidy_imports::settings::Settings::default().into()),
         flake8_type_checking: Some(flake8_type_checking::settings::Settings::default().into()),
         flake8_unused_arguments: Some(
             flake8_unused_arguments::settings::Settings::default().into(),

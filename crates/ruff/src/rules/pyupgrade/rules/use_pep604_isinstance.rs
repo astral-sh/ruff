@@ -1,11 +1,10 @@
-use ruff_text_size::TextRange;
 use std::fmt;
 
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, Operator, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -75,7 +74,7 @@ pub(crate) fn use_pep604_isinstance(
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
-        if !checker.ctx.is_builtin(id) {
+        if !checker.semantic_model().is_builtin(id) {
             return;
         };
         if let Some(types) = args.get(1) {
@@ -94,7 +93,7 @@ pub(crate) fn use_pep604_isinstance(
                 if checker.patch(diagnostic.kind.rule()) {
                     #[allow(deprecated)]
                     diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                        unparse_expr(&union(elts), checker.stylist),
+                        checker.generator().expr(&union(elts)),
                         types.range(),
                     )));
                 }

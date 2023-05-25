@@ -47,6 +47,8 @@ E26.py:66:9: E262 Inline comment should start with `# `
 67 | #  (Two spaces) Ok for block comment
 68 | a = 42  #  (Two spaces)
    |         ^^^^^^^^^^^^^^^ E262
+69 | 
+70 | #: E265:5:1
    |
 
 

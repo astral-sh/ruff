@@ -3,6 +3,9 @@ use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
+use rustc_hash::FxHashMap;
+
+use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
@@ -11,7 +14,6 @@ use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
-use rustc_hash::FxHashMap;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -57,6 +59,13 @@ pub enum Command {
     /// Generate shell completion.
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
+    /// Format the given files, or stdin when using `-`.
+    #[doc(hidden)]
+    #[clap(hide = true)]
+    Format {
+        /// List of files or directories to format or `-` for stdin
+        files: Vec<PathBuf>,
+    },
 }
 
 #[derive(Debug, clap::Args)]
@@ -126,8 +135,8 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub ignore: Option<Vec<RuleSelector>>,
-    /// Like --select, but adds additional rule codes on top of the selected
-    /// ones.
+    /// Like --select, but adds additional rule codes on top of those already
+    /// specified.
     #[arg(
         long,
         value_delimiter = ',',
@@ -147,9 +156,13 @@ pub struct CheckArgs {
         hide = true
     )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
-    /// List of mappings from file pattern to code to exclude
+    /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    /// Like `--per-file-ignores`, but adds additional ignores on top of
+    /// those already specified.
+    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// List of paths, used to omit files and/or directories from analysis.
     #[arg(
         long,
@@ -189,6 +202,27 @@ pub struct CheckArgs {
         hide_possible_values = true
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
+    /// Like --fixable, but adds additional rule codes on top of those already
+    /// specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    pub extend_fixable: Option<Vec<RuleSelector>>,
+    /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
+        help_heading = "Rule selection",
+        hide = true
+    )]
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore
     /// files.
     #[arg(
@@ -292,7 +326,6 @@ pub struct CheckArgs {
     )]
     pub show_settings: bool,
     /// Dev-only argument to show fixes
-    #[cfg(feature = "ecosystem_ci")]
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
 }
@@ -359,8 +392,9 @@ impl CheckArgs {
                 add_noqa: self.add_noqa,
                 config: self.config,
                 diff: self.diff,
-                exit_zero: self.exit_zero,
+                ecosystem_ci: self.ecosystem_ci,
                 exit_non_zero_on_fix: self.exit_non_zero_on_fix,
+                exit_zero: self.exit_zero,
                 files: self.files,
                 ignore_noqa: self.ignore_noqa,
                 isolated: self.isolated,
@@ -375,8 +409,10 @@ impl CheckArgs {
                 dummy_variable_rgx: self.dummy_variable_rgx,
                 exclude: self.exclude,
                 extend_exclude: self.extend_exclude,
+                extend_fixable: self.extend_fixable,
                 extend_ignore: self.extend_ignore,
                 extend_select: self.extend_select,
+                extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
                 ignore: self.ignore,
                 line_length: self.line_length,
@@ -422,8 +458,9 @@ pub struct Arguments {
     pub add_noqa: bool,
     pub config: Option<PathBuf>,
     pub diff: bool,
-    pub exit_zero: bool,
+    pub ecosystem_ci: bool,
     pub exit_non_zero_on_fix: bool,
+    pub exit_zero: bool,
     pub files: Vec<PathBuf>,
     pub ignore_noqa: bool,
     pub isolated: bool,
@@ -442,8 +479,10 @@ pub struct Overrides {
     pub dummy_variable_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
+    pub extend_fixable: Option<Vec<RuleSelector>>,
     pub extend_ignore: Option<Vec<RuleSelector>>,
     pub extend_select: Option<Vec<RuleSelector>>,
+    pub extend_unfixable: Option<Vec<RuleSelector>>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<usize>,
@@ -493,7 +532,14 @@ impl ConfigProcessor for &Overrides {
                 .collect(),
             extend_select: self.extend_select.clone().unwrap_or_default(),
             fixable: self.fixable.clone(),
-            unfixable: self.unfixable.clone().unwrap_or_default(),
+            unfixable: self
+                .unfixable
+                .iter()
+                .cloned()
+                .chain(self.extend_unfixable.iter().cloned())
+                .flatten()
+                .collect(),
+            extend_fixable: self.extend_fixable.clone().unwrap_or_default(),
         });
         if let Some(format) = &self.format {
             config.format = Some(*format);
@@ -502,7 +548,7 @@ impl ConfigProcessor for &Overrides {
             config.force_exclude = Some(*force_exclude);
         }
         if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+            config.line_length = Some(LineLength::from(*line_length));
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));

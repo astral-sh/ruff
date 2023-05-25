@@ -1,17 +1,15 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::MatchCase;
 use crate::format::builders::block;
 use crate::format::comments::{end_of_line_comments, leading_comments};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatMatchCase<'a> {
+pub(crate) struct FormatMatchCase<'a> {
     item: &'a MatchCase,
 }
 
-impl AsFormat<ASTFormatContext> for MatchCase {
+impl AsFormat<ASTFormatContext<'_>> for MatchCase {
     type Format<'a> = FormatMatchCase<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -19,7 +17,7 @@ impl AsFormat<ASTFormatContext> for MatchCase {
     }
 }
 
-impl Format<ASTFormatContext> for FormatMatchCase<'_> {
+impl Format<ASTFormatContext<'_>> for FormatMatchCase<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let MatchCase {
             pattern,

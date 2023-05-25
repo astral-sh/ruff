@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.267"
+version = "0.0.270"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -50,6 +50,7 @@ path-absolutize = { workspace = true, features = [
 ] }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
+pyproject-toml = { version = "0.6.0" }
 quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
@@ -70,6 +71,7 @@ thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }
+unicode_names2 = { version = "0.6.0", git = "https://github.com/youknowone/unicode_names2.git", rev = "4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde" }
 
 [dev-dependencies]
 insta = { workspace = true }
@@ -82,4 +84,3 @@ colored = { workspace = true, features = ["no-color"] }
 default = []
 schemars = ["dep:schemars"]
 jupyter_notebook = []
-ecosystem_ci = []

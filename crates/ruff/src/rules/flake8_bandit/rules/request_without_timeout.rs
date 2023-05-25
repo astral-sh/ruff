@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{unparse_constant, SimpleCallArgs};
+use ruff_python_ast::helpers::SimpleCallArgs;
 
 use crate::checkers::ast::Checker;
 
@@ -34,7 +34,7 @@ pub(crate) fn request_without_timeout(
     keywords: &[Keyword],
 ) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             HTTP_VERBS
@@ -48,7 +48,7 @@ pub(crate) fn request_without_timeout(
                 Expr::Constant(ast::ExprConstant {
                     value: value @ Constant::None,
                     ..
-                }) => Some(unparse_constant(value, checker.stylist)),
+                }) => Some(checker.generator().constant(value)),
                 _ => None,
             } {
                 checker.diagnostics.push(Diagnostic::new(

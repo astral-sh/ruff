@@ -9,8 +9,8 @@ SIM110.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead o
   |  _____^
 6 | |         if check(x):
 7 | |             return True
-  | |_______________________^ SIM110
-8 |       return False
+8 | |     return False
+  | |________________^ SIM110
   |
   = help: Replace with `return any(check(x) for x in iterable)`
 
@@ -34,8 +34,8 @@ SIM110.py:25:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
    |  _____^
 28 | |         if check(x):
 29 | |             return False
-   | |________________________^ SIM110
-30 |       return True
+30 | |     return True
+   | |_______________^ SIM110
    |
    = help: Replace with `return all(not check(x) for x in iterable)`
 
@@ -60,8 +60,8 @@ SIM110.py:33:5: SIM110 [*] Use `return all(x.is_empty() for x in iterable)` inst
    |  _____^
 36 | |         if not x.is_empty():
 37 | |             return False
-   | |________________________^ SIM110
-38 |       return True
+38 | |     return True
+   | |_______________^ SIM110
    |
    = help: Replace with `return all(x.is_empty() for x in iterable)`
 
@@ -200,8 +200,8 @@ SIM110.py:124:5: SIM110 Use `return any(check(x) for x in iterable)` instead of 
     |  _____^
 127 | |         if check(x):
 128 | |             return True
-    | |_______________________^ SIM110
-129 |       return False
+129 | |     return False
+    | |________________^ SIM110
     |
     = help: Replace with `return any(check(x) for x in iterable)`
 
@@ -213,8 +213,8 @@ SIM110.py:134:5: SIM110 Use `return all(not check(x) for x in iterable)` instead
     |  _____^
 137 | |         if check(x):
 138 | |             return False
-    | |________________________^ SIM110
-139 |       return True
+139 | |     return True
+    | |_______________^ SIM110
     |
     = help: Replace with `return all(not check(x) for x in iterable)`
 
@@ -225,8 +225,8 @@ SIM110.py:144:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
     |  _____^
 146 | |         if check(x):
 147 | |             return True
-    | |_______________________^ SIM110
-148 |       return False
+148 | |     return False
+    | |________________^ SIM110
     |
     = help: Replace with `return any(check(x) for x in iterable)`
 
@@ -250,8 +250,8 @@ SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` ins
     |  _____^
 156 | |         if check(x):
 157 | |             return False
-    | |________________________^ SIM110
-158 |       return True
+158 | |     return True
+    | |_______________^ SIM110
     |
     = help: Replace with `return all(not check(x) for x in iterable)`
 
@@ -264,5 +264,34 @@ SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` ins
 156     |-            return False
 157     |-    return True
     154 |+    return all(not check(x) for x in iterable)
+158 155 | 
+159 156 | 
+160 157 | def f():
+
+SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")` instead of `for` loop
+    |
+162 |   def f():
+163 |       # SIM110
+164 |       for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ":
+    |  _____^
+165 | |         if x.isdigit():
+166 | |             return True
+167 | |     return False
+    | |________________^ SIM110
+    |
+    = help: Replace with `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")`
+
+ℹ Suggested fix
+159 159 | 
+160 160 | def f():
+161 161 |     # SIM110
+162     |-    for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ":
+163     |-        if x.isdigit():
+164     |-            return True
+165     |-    return False
+    162 |+    return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")
+166 163 | 
+167 164 | 
+168 165 | def f():
 
 

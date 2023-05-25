@@ -1,6 +1,6 @@
-use ruff_text_size::TextRange;
 use std::string::ToString;
 
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Constant, Expr, Identifier, Keyword};
 
@@ -269,7 +269,7 @@ pub(crate) fn percent_format_extra_named_arguments(
     let Expr::Dict(ast::ExprDict { keys, .. }) = &right else {
         return;
     };
-    if keys.iter().any(std::option::Option::is_none) {
+    if keys.iter().any(Option::is_none) {
         return; // contains **x splat
     }
 
@@ -326,7 +326,7 @@ pub(crate) fn percent_format_missing_arguments(
     }
 
     if let Expr::Dict(ast::ExprDict { keys, .. }) = &right {
-        if keys.iter().any(std::option::Option::is_none) {
+        if keys.iter().any(Option::is_none) {
             return; // contains **x splat
         }
 

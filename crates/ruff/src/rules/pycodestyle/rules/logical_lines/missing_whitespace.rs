@@ -1,10 +1,13 @@
-use super::LogicalLine;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use ruff_text_size::TextSize;
+
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::TextSize;
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+
+use super::LogicalLine;
 
 #[violation]
 pub struct MissingWhitespace {
@@ -54,7 +57,7 @@ pub(crate) fn missing_whitespace(
                 prev_lsqb = token.start();
             }
             TokenKind::Rsqb => {
-                open_parentheses += 1;
+                open_parentheses -= 1;
             }
             TokenKind::Lbrace => {
                 prev_lbrace = token.start();
@@ -63,7 +66,11 @@ pub(crate) fn missing_whitespace(
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
                 let after = line.text_after(token);
 
-                if !after.chars().next().map_or(false, char::is_whitespace) {
+                if !after
+                    .chars()
+                    .next()
+                    .map_or(false, |c| char::is_whitespace(c) || c == '\\')
+                {
                     if let Some(next_token) = iter.peek() {
                         match (kind, next_token.kind()) {
                             (TokenKind::Colon, _)

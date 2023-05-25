@@ -1,16 +1,14 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{CmpOp, CmpOpKind};
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatCmpOp<'a> {
+pub(crate) struct FormatCmpOp<'a> {
     item: &'a CmpOp,
 }
 
-impl AsFormat<ASTFormatContext> for CmpOp {
+impl AsFormat<ASTFormatContext<'_>> for CmpOp {
     type Format<'a> = FormatCmpOp<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -18,7 +16,7 @@ impl AsFormat<ASTFormatContext> for CmpOp {
     }
 }
 
-impl Format<ASTFormatContext> for FormatCmpOp<'_> {
+impl Format<ASTFormatContext<'_>> for FormatCmpOp<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let cmp_op = self.item;
         write!(f, [leading_comments(cmp_op)])?;

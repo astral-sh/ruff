@@ -7,6 +7,7 @@ use std::{fs, str};
 use anyhow::{bail, Context, Result};
 use clap::CommandFactory;
 use pretty_assertions::StrComparison;
+
 use ruff_cli::args;
 
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
@@ -119,9 +120,11 @@ fn check_help_text() -> String {
 
 #[cfg(test)]
 mod test {
-    use super::{main, Args};
-    use crate::generate_all::Mode;
     use anyhow::Result;
+
+    use crate::generate_all::Mode;
+
+    use super::{main, Args};
 
     #[test]
     fn test_generate_json_schema() -> Result<()> {

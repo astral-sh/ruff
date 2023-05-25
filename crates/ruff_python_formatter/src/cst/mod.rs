@@ -19,15 +19,15 @@ pub(crate) mod visitor;
 type Ident = String;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Attributed<T> {
-    pub range: TextRange,
-    pub node: T,
-    pub trivia: Vec<Trivia>,
-    pub parentheses: Parenthesize,
+pub(crate) struct Attributed<T> {
+    pub(crate) range: TextRange,
+    pub(crate) node: T,
+    pub(crate) trivia: Vec<Trivia>,
+    pub(crate) parentheses: Parenthesize,
 }
 
 impl<T> Attributed<T> {
-    pub fn new(range: TextRange, node: T) -> Self {
+    pub(crate) fn new(range: TextRange, node: T) -> Self {
         Self {
             range,
             node,
@@ -36,23 +36,19 @@ impl<T> Attributed<T> {
         }
     }
 
-    pub const fn range(&self) -> TextRange {
+    pub(crate) const fn range(&self) -> TextRange {
         self.range
     }
 
-    pub const fn start(&self) -> TextSize {
+    pub(crate) const fn start(&self) -> TextSize {
         self.range.start()
     }
 
-    pub const fn end(&self) -> TextSize {
+    pub(crate) const fn end(&self) -> TextSize {
         self.range.end()
     }
 
-    pub fn add_trivia(&mut self, trivia: Trivia) {
-        self.trivia.push(trivia);
-    }
-
-    pub fn id(&self) -> usize {
+    pub(crate) fn id(&self) -> usize {
         std::ptr::addr_of!(self.node) as usize
     }
 }
@@ -65,33 +61,33 @@ impl<T> Deref for Attributed<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ExprContext {
+pub(crate) enum ExprContext {
     Load,
     Store,
     Del,
 }
 
-impl From<rustpython_parser::ast::ExprContext> for ExprContext {
-    fn from(context: rustpython_parser::ast::ExprContext) -> Self {
+impl From<ast::ExprContext> for ExprContext {
+    fn from(context: ast::ExprContext) -> Self {
         match context {
-            rustpython_parser::ast::ExprContext::Load => Self::Load,
-            rustpython_parser::ast::ExprContext::Store => Self::Store,
-            rustpython_parser::ast::ExprContext::Del => Self::Del,
+            ast::ExprContext::Load => Self::Load,
+            ast::ExprContext::Store => Self::Store,
+            ast::ExprContext::Del => Self::Del,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum BoolOpKind {
+pub(crate) enum BoolOpKind {
     And,
     Or,
 }
 
-impl From<&rustpython_parser::ast::Boolop> for BoolOpKind {
-    fn from(op: &rustpython_parser::ast::Boolop) -> Self {
+impl From<&ast::Boolop> for BoolOpKind {
+    fn from(op: &ast::Boolop) -> Self {
         match op {
-            rustpython_parser::ast::Boolop::And => Self::And,
-            rustpython_parser::ast::Boolop::Or => Self::Or,
+            ast::Boolop::And => Self::And,
+            ast::Boolop::Or => Self::Or,
         }
     }
 }
@@ -99,7 +95,7 @@ impl From<&rustpython_parser::ast::Boolop> for BoolOpKind {
 pub(crate) type BoolOp = Attributed<BoolOpKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum OperatorKind {
+pub(crate) enum OperatorKind {
     Add,
     Sub,
     Mult,
@@ -117,28 +113,28 @@ pub enum OperatorKind {
 
 pub(crate) type Operator = Attributed<OperatorKind>;
 
-impl From<&rustpython_parser::ast::Operator> for OperatorKind {
-    fn from(op: &rustpython_parser::ast::Operator) -> Self {
+impl From<&ast::Operator> for OperatorKind {
+    fn from(op: &ast::Operator) -> Self {
         match op {
-            rustpython_parser::ast::Operator::Add => Self::Add,
-            rustpython_parser::ast::Operator::Sub => Self::Sub,
-            rustpython_parser::ast::Operator::Mult => Self::Mult,
-            rustpython_parser::ast::Operator::MatMult => Self::MatMult,
-            rustpython_parser::ast::Operator::Div => Self::Div,
-            rustpython_parser::ast::Operator::Mod => Self::Mod,
-            rustpython_parser::ast::Operator::Pow => Self::Pow,
-            rustpython_parser::ast::Operator::LShift => Self::LShift,
-            rustpython_parser::ast::Operator::RShift => Self::RShift,
-            rustpython_parser::ast::Operator::BitOr => Self::BitOr,
-            rustpython_parser::ast::Operator::BitXor => Self::BitXor,
-            rustpython_parser::ast::Operator::BitAnd => Self::BitAnd,
-            rustpython_parser::ast::Operator::FloorDiv => Self::FloorDiv,
+            ast::Operator::Add => Self::Add,
+            ast::Operator::Sub => Self::Sub,
+            ast::Operator::Mult => Self::Mult,
+            ast::Operator::MatMult => Self::MatMult,
+            ast::Operator::Div => Self::Div,
+            ast::Operator::Mod => Self::Mod,
+            ast::Operator::Pow => Self::Pow,
+            ast::Operator::LShift => Self::LShift,
+            ast::Operator::RShift => Self::RShift,
+            ast::Operator::BitOr => Self::BitOr,
+            ast::Operator::BitXor => Self::BitXor,
+            ast::Operator::BitAnd => Self::BitAnd,
+            ast::Operator::FloorDiv => Self::FloorDiv,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum UnaryOpKind {
+pub(crate) enum UnaryOpKind {
     Invert,
     Not,
     UAdd,
@@ -147,19 +143,19 @@ pub enum UnaryOpKind {
 
 pub(crate) type UnaryOp = Attributed<UnaryOpKind>;
 
-impl From<&rustpython_parser::ast::Unaryop> for UnaryOpKind {
-    fn from(op: &rustpython_parser::ast::Unaryop) -> Self {
+impl From<&ast::Unaryop> for UnaryOpKind {
+    fn from(op: &ast::Unaryop) -> Self {
         match op {
-            rustpython_parser::ast::Unaryop::Invert => Self::Invert,
-            rustpython_parser::ast::Unaryop::Not => Self::Not,
-            rustpython_parser::ast::Unaryop::UAdd => Self::UAdd,
-            rustpython_parser::ast::Unaryop::USub => Self::USub,
+            ast::Unaryop::Invert => Self::Invert,
+            ast::Unaryop::Not => Self::Not,
+            ast::Unaryop::UAdd => Self::UAdd,
+            ast::Unaryop::USub => Self::USub,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum CmpOpKind {
+pub(crate) enum CmpOpKind {
     Eq,
     NotEq,
     Lt,
@@ -174,27 +170,27 @@ pub enum CmpOpKind {
 
 pub(crate) type CmpOp = Attributed<CmpOpKind>;
 
-impl From<&rustpython_parser::ast::Cmpop> for CmpOpKind {
-    fn from(op: &rustpython_parser::ast::Cmpop) -> Self {
+impl From<&ast::Cmpop> for CmpOpKind {
+    fn from(op: &ast::Cmpop) -> Self {
         match op {
-            rustpython_parser::ast::Cmpop::Eq => Self::Eq,
-            rustpython_parser::ast::Cmpop::NotEq => Self::NotEq,
-            rustpython_parser::ast::Cmpop::Lt => Self::Lt,
-            rustpython_parser::ast::Cmpop::LtE => Self::LtE,
-            rustpython_parser::ast::Cmpop::Gt => Self::Gt,
-            rustpython_parser::ast::Cmpop::GtE => Self::GtE,
-            rustpython_parser::ast::Cmpop::Is => Self::Is,
-            rustpython_parser::ast::Cmpop::IsNot => Self::IsNot,
-            rustpython_parser::ast::Cmpop::In => Self::In,
-            rustpython_parser::ast::Cmpop::NotIn => Self::NotIn,
+            ast::Cmpop::Eq => Self::Eq,
+            ast::Cmpop::NotEq => Self::NotEq,
+            ast::Cmpop::Lt => Self::Lt,
+            ast::Cmpop::LtE => Self::LtE,
+            ast::Cmpop::Gt => Self::Gt,
+            ast::Cmpop::GtE => Self::GtE,
+            ast::Cmpop::Is => Self::Is,
+            ast::Cmpop::IsNot => Self::IsNot,
+            ast::Cmpop::In => Self::In,
+            ast::Cmpop::NotIn => Self::NotIn,
         }
     }
 }
 
 pub(crate) type Body = Attributed<Vec<Stmt>>;
 
-impl From<(Vec<rustpython_parser::ast::Stmt>, &Locator<'_>)> for Body {
-    fn from((body, locator): (Vec<rustpython_parser::ast::Stmt>, &Locator)) -> Self {
+impl From<(Vec<ast::Stmt>, &Locator<'_>)> for Body {
+    fn from((body, locator): (Vec<ast::Stmt>, &Locator)) -> Self {
         Body {
             range: body.first().unwrap().range(),
             node: body
@@ -208,7 +204,7 @@ impl From<(Vec<rustpython_parser::ast::Stmt>, &Locator<'_>)> for Body {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum StmtKind {
+pub(crate) enum StmtKind {
     FunctionDef {
         name: Ident,
         args: Box<Arguments>,
@@ -338,7 +334,7 @@ pub enum StmtKind {
 pub(crate) type Stmt = Attributed<StmtKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ExprKind {
+pub(crate) enum ExprKind {
     BoolOp {
         ops: Vec<BoolOp>,
         values: Vec<Expr>,
@@ -456,15 +452,15 @@ pub enum ExprKind {
 pub(crate) type Expr = Attributed<ExprKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Comprehension {
-    pub target: Expr,
-    pub iter: Expr,
-    pub ifs: Vec<Expr>,
-    pub is_async: usize,
+pub(crate) struct Comprehension {
+    pub(crate) target: Expr,
+    pub(crate) iter: Expr,
+    pub(crate) ifs: Vec<Expr>,
+    pub(crate) is_async: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum ExcepthandlerKind {
+pub(crate) enum ExcepthandlerKind {
     ExceptHandler {
         type_: Option<Box<Expr>>,
         name: Option<Ident>,
@@ -475,7 +471,7 @@ pub enum ExcepthandlerKind {
 pub(crate) type Excepthandler = Attributed<ExcepthandlerKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum SliceIndexKind {
+pub(crate) enum SliceIndexKind {
     /// The index slot exists, but is empty.
     Empty,
     /// The index slot contains an expression.
@@ -485,57 +481,57 @@ pub enum SliceIndexKind {
 pub(crate) type SliceIndex = Attributed<SliceIndexKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Arguments {
-    pub posonlyargs: Vec<Arg>,
-    pub args: Vec<Arg>,
-    pub vararg: Option<Box<Arg>>,
-    pub kwonlyargs: Vec<Arg>,
-    pub kw_defaults: Vec<Expr>,
-    pub kwarg: Option<Box<Arg>>,
-    pub defaults: Vec<Expr>,
+pub(crate) struct Arguments {
+    pub(crate) posonlyargs: Vec<Arg>,
+    pub(crate) args: Vec<Arg>,
+    pub(crate) vararg: Option<Box<Arg>>,
+    pub(crate) kwonlyargs: Vec<Arg>,
+    pub(crate) kw_defaults: Vec<Expr>,
+    pub(crate) kwarg: Option<Box<Arg>>,
+    pub(crate) defaults: Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ArgData {
-    pub arg: Ident,
-    pub annotation: Option<Box<Expr>>,
-    pub type_comment: Option<String>,
+pub(crate) struct ArgData {
+    pub(crate) arg: Ident,
+    pub(crate) annotation: Option<Box<Expr>>,
+    pub(crate) type_comment: Option<String>,
 }
 
 pub(crate) type Arg = Attributed<ArgData>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct KeywordData {
-    pub arg: Option<Ident>,
-    pub value: Expr,
+pub(crate) struct KeywordData {
+    pub(crate) arg: Option<Ident>,
+    pub(crate) value: Expr,
 }
 
 pub(crate) type Keyword = Attributed<KeywordData>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct AliasData {
-    pub name: Ident,
-    pub asname: Option<Ident>,
+pub(crate) struct AliasData {
+    pub(crate) name: Ident,
+    pub(crate) asname: Option<Ident>,
 }
 
 pub(crate) type Alias = Attributed<AliasData>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Withitem {
-    pub context_expr: Expr,
-    pub optional_vars: Option<Box<Expr>>,
+pub(crate) struct Withitem {
+    pub(crate) context_expr: Expr,
+    pub(crate) optional_vars: Option<Box<Expr>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MatchCase {
-    pub pattern: Pattern,
-    pub guard: Option<Box<Expr>>,
-    pub body: Body,
+pub(crate) struct MatchCase {
+    pub(crate) pattern: Pattern,
+    pub(crate) guard: Option<Box<Expr>>,
+    pub(crate) body: Body,
 }
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug, PartialEq)]
-pub enum PatternKind {
+pub(crate) enum PatternKind {
     MatchValue {
         value: Box<Expr>,
     },
@@ -570,16 +566,13 @@ pub enum PatternKind {
 
 pub(crate) type Pattern = Attributed<PatternKind>;
 
-impl From<(rustpython_parser::ast::Alias, &Locator<'_>)> for Alias {
-    fn from((alias, _locator): (rustpython_parser::ast::Alias, &Locator)) -> Self {
+impl From<(ast::Alias, &Locator<'_>)> for Alias {
+    fn from((alias, _locator): (ast::Alias, &Locator)) -> Self {
         Alias {
             range: alias.range(),
             node: AliasData {
                 name: alias.name.to_string(),
-                asname: alias
-                    .asname
-                    .as_ref()
-                    .map(rustpython_parser::ast::Identifier::to_string),
+                asname: alias.asname.as_ref().map(ast::Identifier::to_string),
             },
             trivia: vec![],
             parentheses: Parenthesize::Never,
@@ -587,8 +580,8 @@ impl From<(rustpython_parser::ast::Alias, &Locator<'_>)> for Alias {
     }
 }
 
-impl From<(rustpython_parser::ast::Withitem, &Locator<'_>)> for Withitem {
-    fn from((withitem, locator): (rustpython_parser::ast::Withitem, &Locator)) -> Self {
+impl From<(ast::Withitem, &Locator<'_>)> for Withitem {
+    fn from((withitem, locator): (ast::Withitem, &Locator)) -> Self {
         Withitem {
             context_expr: (withitem.context_expr, locator).into(),
             optional_vars: withitem
@@ -598,9 +591,9 @@ impl From<(rustpython_parser::ast::Withitem, &Locator<'_>)> for Withitem {
     }
 }
 
-impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandler {
-    fn from((excepthandler, locator): (rustpython_parser::ast::Excepthandler, &Locator)) -> Self {
-        let rustpython_parser::ast::Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+impl From<(ast::Excepthandler, &Locator<'_>)> for Excepthandler {
+    fn from((excepthandler, locator): (ast::Excepthandler, &Locator)) -> Self {
+        let ast::Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
             type_,
             name,
             body,
@@ -635,35 +628,33 @@ impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandl
     }
 }
 
-impl From<(rustpython_parser::ast::Pattern, &Locator<'_>)> for Pattern {
-    fn from((pattern, locator): (rustpython_parser::ast::Pattern, &Locator)) -> Self {
+impl From<(ast::Pattern, &Locator<'_>)> for Pattern {
+    fn from((pattern, locator): (ast::Pattern, &Locator)) -> Self {
         Pattern {
             range: pattern.range(),
             node: match pattern {
-                rustpython_parser::ast::Pattern::MatchValue(
-                    rustpython_parser::ast::PatternMatchValue { value, range: _ },
-                ) => PatternKind::MatchValue {
-                    value: Box::new((*value, locator).into()),
-                },
-                rustpython_parser::ast::Pattern::MatchSingleton(
-                    rustpython_parser::ast::PatternMatchSingleton { value, range: _ },
-                ) => PatternKind::MatchSingleton { value },
-                rustpython_parser::ast::Pattern::MatchSequence(
-                    rustpython_parser::ast::PatternMatchSequence { patterns, range: _ },
-                ) => PatternKind::MatchSequence {
-                    patterns: patterns
-                        .into_iter()
-                        .map(|pattern| (pattern, locator).into())
-                        .collect(),
-                },
-                rustpython_parser::ast::Pattern::MatchMapping(
-                    rustpython_parser::ast::PatternMatchMapping {
-                        keys,
-                        patterns,
-                        rest,
-                        range: _,
-                    },
-                ) => PatternKind::MatchMapping {
+                ast::Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
+                    PatternKind::MatchValue {
+                        value: Box::new((*value, locator).into()),
+                    }
+                }
+                ast::Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
+                    PatternKind::MatchSingleton { value }
+                }
+                ast::Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
+                    PatternKind::MatchSequence {
+                        patterns: patterns
+                            .into_iter()
+                            .map(|pattern| (pattern, locator).into())
+                            .collect(),
+                    }
+                }
+                ast::Pattern::MatchMapping(ast::PatternMatchMapping {
+                    keys,
+                    patterns,
+                    rest,
+                    range: _,
+                }) => PatternKind::MatchMapping {
                     keys: keys.into_iter().map(|key| (key, locator).into()).collect(),
                     patterns: patterns
                         .into_iter()
@@ -671,15 +662,13 @@ impl From<(rustpython_parser::ast::Pattern, &Locator<'_>)> for Pattern {
                         .collect(),
                     rest: rest.map(Into::into),
                 },
-                rustpython_parser::ast::Pattern::MatchClass(
-                    rustpython_parser::ast::PatternMatchClass {
-                        cls,
-                        patterns,
-                        kwd_attrs,
-                        kwd_patterns,
-                        range: _,
-                    },
-                ) => PatternKind::MatchClass {
+                ast::Pattern::MatchClass(ast::PatternMatchClass {
+                    cls,
+                    patterns,
+                    kwd_attrs,
+                    kwd_patterns,
+                    range: _,
+                }) => PatternKind::MatchClass {
                     cls: Box::new((*cls, locator).into()),
                     patterns: patterns
                         .into_iter()
@@ -691,29 +680,27 @@ impl From<(rustpython_parser::ast::Pattern, &Locator<'_>)> for Pattern {
                         .map(|pattern| (pattern, locator).into())
                         .collect(),
                 },
-                rustpython_parser::ast::Pattern::MatchStar(
-                    rustpython_parser::ast::PatternMatchStar { name, range: _ },
-                ) => PatternKind::MatchStar {
-                    name: name.map(Into::into),
-                },
-                rustpython_parser::ast::Pattern::MatchAs(
-                    rustpython_parser::ast::PatternMatchAs {
-                        pattern,
-                        name,
-                        range: _,
-                    },
-                ) => PatternKind::MatchAs {
+                ast::Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
+                    PatternKind::MatchStar {
+                        name: name.map(Into::into),
+                    }
+                }
+                ast::Pattern::MatchAs(ast::PatternMatchAs {
+                    pattern,
+                    name,
+                    range: _,
+                }) => PatternKind::MatchAs {
                     pattern: pattern.map(|pattern| Box::new((*pattern, locator).into())),
                     name: name.map(Into::into),
                 },
-                rustpython_parser::ast::Pattern::MatchOr(
-                    rustpython_parser::ast::PatternMatchOr { patterns, range: _ },
-                ) => PatternKind::MatchOr {
-                    patterns: patterns
-                        .into_iter()
-                        .map(|pattern| (pattern, locator).into())
-                        .collect(),
-                },
+                ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => {
+                    PatternKind::MatchOr {
+                        patterns: patterns
+                            .into_iter()
+                            .map(|pattern| (pattern, locator).into())
+                            .collect(),
+                    }
+                }
             },
             trivia: vec![],
             parentheses: Parenthesize::Never,
@@ -721,8 +708,8 @@ impl From<(rustpython_parser::ast::Pattern, &Locator<'_>)> for Pattern {
     }
 }
 
-impl From<(rustpython_parser::ast::MatchCase, &Locator<'_>)> for MatchCase {
-    fn from((match_case, locator): (rustpython_parser::ast::MatchCase, &Locator)) -> Self {
+impl From<(ast::MatchCase, &Locator<'_>)> for MatchCase {
+    fn from((match_case, locator): (ast::MatchCase, &Locator)) -> Self {
         // Find the start and end of the `body`.
         let body = {
             let body_range = expand_indented_block(
@@ -752,10 +739,10 @@ impl From<(rustpython_parser::ast::MatchCase, &Locator<'_>)> for MatchCase {
     }
 }
 
-impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
-    fn from((stmt, locator): (rustpython_parser::ast::Stmt, &Locator)) -> Self {
+impl From<(ast::Stmt, &Locator<'_>)> for Stmt {
+    fn from((stmt, locator): (ast::Stmt, &Locator)) -> Self {
         match stmt {
-            rustpython_parser::ast::Stmt::Expr(ast::StmtExpr { value, range }) => Stmt {
+            ast::Stmt::Expr(ast::StmtExpr { value, range }) => Stmt {
                 range,
                 node: StmtKind::Expr {
                     value: Box::new((*value, locator).into()),
@@ -763,13 +750,13 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Pass(ast::StmtPass { range }) => Stmt {
+            ast::Stmt::Pass(ast::StmtPass { range }) => Stmt {
                 range,
                 node: StmtKind::Pass,
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Return(ast::StmtReturn { value, range }) => Stmt {
+            ast::Stmt::Return(ast::StmtReturn { value, range }) => Stmt {
                 range,
                 node: StmtKind::Return {
                     value: value.map(|v| (*v, locator).into()),
@@ -777,7 +764,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Assign(ast::StmtAssign {
+            ast::Stmt::Assign(ast::StmtAssign {
                 targets,
                 value,
                 type_comment,
@@ -795,7 +782,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::ClassDef(ast::StmtClassDef {
+            ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
                 bases,
                 keywords,
@@ -840,7 +827,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::If(ast::StmtIf {
+            ast::Stmt::If(ast::StmtIf {
                 test,
                 body,
                 orelse,
@@ -928,7 +915,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     }
                 }
             }
-            rustpython_parser::ast::Stmt::Assert(ast::StmtAssert { test, msg, range }) => Stmt {
+            ast::Stmt::Assert(ast::StmtAssert { test, msg, range }) => Stmt {
                 range,
                 node: StmtKind::Assert {
                     test: Box::new((*test, locator).into()),
@@ -937,7 +924,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
                 args,
                 body,
@@ -962,12 +949,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 };
 
                 Stmt {
-                    range: TextRange::new(
-                        decorator_list
-                            .first()
-                            .map_or(range.start(), ast::Ranged::start),
-                        body.end(),
-                    ),
+                    range: TextRange::new(range.start(), body.end()),
                     node: StmtKind::FunctionDef {
                         name: name.into(),
                         args: Box::new((*args, locator).into()),
@@ -983,7 +965,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            ast::Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
                 name,
                 args,
                 body,
@@ -1008,12 +990,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 };
 
                 Stmt {
-                    range: TextRange::new(
-                        decorator_list
-                            .first()
-                            .map_or(range.start(), |expr| expr.range().start()),
-                        body.end(),
-                    ),
+                    range: TextRange::new(range.start(), body.end()),
                     node: StmtKind::AsyncFunctionDef {
                         name: name.into(),
                         args: Box::new((*args, locator).into()),
@@ -1029,7 +1006,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::Delete(ast::StmtDelete { targets, range }) => Stmt {
+            ast::Stmt::Delete(ast::StmtDelete { targets, range }) => Stmt {
                 range,
                 node: StmtKind::Delete {
                     targets: targets
@@ -1040,7 +1017,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::AugAssign(ast::StmtAugAssign {
+            ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target,
                 op,
                 value,
@@ -1050,45 +1027,19 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 node: StmtKind::AugAssign {
                     op: {
                         let target_tok = match &op {
-                            rustpython_parser::ast::Operator::Add => {
-                                rustpython_parser::Tok::PlusEqual
-                            }
-                            rustpython_parser::ast::Operator::Sub => {
-                                rustpython_parser::Tok::MinusEqual
-                            }
-                            rustpython_parser::ast::Operator::Mult => {
-                                rustpython_parser::Tok::StarEqual
-                            }
-                            rustpython_parser::ast::Operator::MatMult => {
-                                rustpython_parser::Tok::AtEqual
-                            }
-                            rustpython_parser::ast::Operator::Div => {
-                                rustpython_parser::Tok::SlashEqual
-                            }
-                            rustpython_parser::ast::Operator::Mod => {
-                                rustpython_parser::Tok::PercentEqual
-                            }
-                            rustpython_parser::ast::Operator::Pow => {
-                                rustpython_parser::Tok::DoubleStarEqual
-                            }
-                            rustpython_parser::ast::Operator::LShift => {
-                                rustpython_parser::Tok::LeftShiftEqual
-                            }
-                            rustpython_parser::ast::Operator::RShift => {
-                                rustpython_parser::Tok::RightShiftEqual
-                            }
-                            rustpython_parser::ast::Operator::BitOr => {
-                                rustpython_parser::Tok::VbarEqual
-                            }
-                            rustpython_parser::ast::Operator::BitXor => {
-                                rustpython_parser::Tok::CircumflexEqual
-                            }
-                            rustpython_parser::ast::Operator::BitAnd => {
-                                rustpython_parser::Tok::AmperEqual
-                            }
-                            rustpython_parser::ast::Operator::FloorDiv => {
-                                rustpython_parser::Tok::DoubleSlashEqual
-                            }
+                            ast::Operator::Add => rustpython_parser::Tok::PlusEqual,
+                            ast::Operator::Sub => rustpython_parser::Tok::MinusEqual,
+                            ast::Operator::Mult => rustpython_parser::Tok::StarEqual,
+                            ast::Operator::MatMult => rustpython_parser::Tok::AtEqual,
+                            ast::Operator::Div => rustpython_parser::Tok::SlashEqual,
+                            ast::Operator::Mod => rustpython_parser::Tok::PercentEqual,
+                            ast::Operator::Pow => rustpython_parser::Tok::DoubleStarEqual,
+                            ast::Operator::LShift => rustpython_parser::Tok::LeftShiftEqual,
+                            ast::Operator::RShift => rustpython_parser::Tok::RightShiftEqual,
+                            ast::Operator::BitOr => rustpython_parser::Tok::VbarEqual,
+                            ast::Operator::BitXor => rustpython_parser::Tok::CircumflexEqual,
+                            ast::Operator::BitAnd => rustpython_parser::Tok::AmperEqual,
+                            ast::Operator::FloorDiv => rustpython_parser::Tok::DoubleSlashEqual,
                         };
                         let op_range =
                             find_tok(TextRange::new(target.end(), value.end()), locator, |tok| {
@@ -1102,7 +1053,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
                 annotation,
                 value,
@@ -1119,7 +1070,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::For(ast::StmtFor {
+            ast::Stmt::For(ast::StmtFor {
                 target,
                 iter,
                 body,
@@ -1170,7 +1121,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::AsyncFor(ast::StmtAsyncFor {
+            ast::Stmt::AsyncFor(ast::StmtAsyncFor {
                 target,
                 iter,
                 body,
@@ -1221,7 +1172,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::While(ast::StmtWhile {
+            ast::Stmt::While(ast::StmtWhile {
                 test,
                 body,
                 orelse,
@@ -1268,7 +1219,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::With(ast::StmtWith {
+            ast::Stmt::With(ast::StmtWith {
                 items,
                 body,
                 type_comment,
@@ -1303,7 +1254,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::AsyncWith(ast::StmtAsyncWith {
+            ast::Stmt::AsyncWith(ast::StmtAsyncWith {
                 items,
                 body,
                 type_comment,
@@ -1338,7 +1289,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::Match(ast::StmtMatch {
+            ast::Stmt::Match(ast::StmtMatch {
                 subject,
                 cases,
                 range,
@@ -1354,7 +1305,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Raise(ast::StmtRaise { exc, cause, range }) => Stmt {
+            ast::Stmt::Raise(ast::StmtRaise { exc, cause, range }) => Stmt {
                 range,
                 node: StmtKind::Raise {
                     exc: exc.map(|exc| Box::new((*exc, locator).into())),
@@ -1363,7 +1314,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Try(ast::StmtTry {
+            ast::Stmt::Try(ast::StmtTry {
                 body,
                 handlers,
                 orelse,
@@ -1449,7 +1400,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::TryStar(ast::StmtTryStar {
+            ast::Stmt::TryStar(ast::StmtTryStar {
                 body,
                 handlers,
                 orelse,
@@ -1535,7 +1486,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     parentheses: Parenthesize::Never,
                 }
             }
-            rustpython_parser::ast::Stmt::Import(ast::StmtImport { names, range }) => Stmt {
+            ast::Stmt::Import(ast::StmtImport { names, range }) => Stmt {
                 range,
                 node: StmtKind::Import {
                     names: names
@@ -1546,7 +1497,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::ImportFrom(ast::StmtImportFrom {
+            ast::Stmt::ImportFrom(ast::StmtImportFrom {
                 module,
                 names,
                 level,
@@ -1564,7 +1515,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Global(ast::StmtGlobal { names, range }) => Stmt {
+            ast::Stmt::Global(ast::StmtGlobal { names, range }) => Stmt {
                 range,
                 node: StmtKind::Global {
                     names: names.into_iter().map(Into::into).collect(),
@@ -1572,7 +1523,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Nonlocal(ast::StmtNonlocal { names, range }) => Stmt {
+            ast::Stmt::Nonlocal(ast::StmtNonlocal { names, range }) => Stmt {
                 range,
                 node: StmtKind::Nonlocal {
                     names: names.into_iter().map(Into::into).collect(),
@@ -1580,13 +1531,13 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Break(ast::StmtBreak { range }) => Stmt {
+            ast::Stmt::Break(ast::StmtBreak { range }) => Stmt {
                 range,
                 node: StmtKind::Break,
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Stmt::Continue(ast::StmtContinue { range }) => Stmt {
+            ast::Stmt::Continue(ast::StmtContinue { range }) => Stmt {
                 range,
                 node: StmtKind::Continue,
                 trivia: vec![],
@@ -1596,8 +1547,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
     }
 }
 
-impl From<(rustpython_parser::ast::Keyword, &Locator<'_>)> for Keyword {
-    fn from((keyword, locator): (rustpython_parser::ast::Keyword, &Locator)) -> Self {
+impl From<(ast::Keyword, &Locator<'_>)> for Keyword {
+    fn from((keyword, locator): (ast::Keyword, &Locator)) -> Self {
         Keyword {
             range: keyword.range(),
             node: KeywordData {
@@ -1610,8 +1561,8 @@ impl From<(rustpython_parser::ast::Keyword, &Locator<'_>)> for Keyword {
     }
 }
 
-impl From<(rustpython_parser::ast::Arg, &Locator<'_>)> for Arg {
-    fn from((arg, locator): (rustpython_parser::ast::Arg, &Locator)) -> Self {
+impl From<(ast::Arg, &Locator<'_>)> for Arg {
+    fn from((arg, locator): (ast::Arg, &Locator)) -> Self {
         Arg {
             range: arg.range(),
             node: ArgData {
@@ -1625,8 +1576,8 @@ impl From<(rustpython_parser::ast::Arg, &Locator<'_>)> for Arg {
     }
 }
 
-impl From<(rustpython_parser::ast::Arguments, &Locator<'_>)> for Arguments {
-    fn from((arguments, locator): (rustpython_parser::ast::Arguments, &Locator)) -> Self {
+impl From<(ast::Arguments, &Locator<'_>)> for Arguments {
+    fn from((arguments, locator): (ast::Arguments, &Locator)) -> Self {
         Arguments {
             posonlyargs: arguments
                 .posonlyargs
@@ -1663,8 +1614,8 @@ impl From<(rustpython_parser::ast::Arguments, &Locator<'_>)> for Arguments {
     }
 }
 
-impl From<(rustpython_parser::ast::Comprehension, &Locator<'_>)> for Comprehension {
-    fn from((comprehension, locator): (rustpython_parser::ast::Comprehension, &Locator)) -> Self {
+impl From<(ast::Comprehension, &Locator<'_>)> for Comprehension {
+    fn from((comprehension, locator): (ast::Comprehension, &Locator)) -> Self {
         Comprehension {
             target: (comprehension.target, locator).into(),
             iter: (comprehension.iter, locator).into(),
@@ -1678,10 +1629,10 @@ impl From<(rustpython_parser::ast::Comprehension, &Locator<'_>)> for Comprehensi
     }
 }
 
-impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
-    fn from((expr, locator): (rustpython_parser::ast::Expr, &Locator)) -> Self {
+impl From<(ast::Expr, &Locator<'_>)> for Expr {
+    fn from((expr, locator): (ast::Expr, &Locator)) -> Self {
         match expr {
-            rustpython_parser::ast::Expr::Name(ast::ExprName { id, ctx, range }) => Expr {
+            ast::Expr::Name(ast::ExprName { id, ctx, range }) => Expr {
                 range,
                 node: ExprKind::Name {
                     id: id.into(),
@@ -1690,7 +1641,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::BoolOp(ast::ExprBoolOp { op, values, range }) => Expr {
+            ast::Expr::BoolOp(ast::ExprBoolOp { op, values, range }) => Expr {
                 range,
                 node: ExprKind::BoolOp {
                     ops: values
@@ -1698,8 +1649,8 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                         .tuple_windows()
                         .map(|(left, right)| {
                             let target_tok = match &op {
-                                rustpython_parser::ast::Boolop::And => rustpython_parser::Tok::And,
-                                rustpython_parser::ast::Boolop::Or => rustpython_parser::Tok::Or,
+                                ast::Boolop::And => rustpython_parser::Tok::And,
+                                ast::Boolop::Or => rustpython_parser::Tok::Or,
                             };
                             let op_range = find_tok(
                                 TextRange::new(left.end(), right.start()),
@@ -1717,7 +1668,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::NamedExpr(ast::ExprNamedExpr {
+            ast::Expr::NamedExpr(ast::ExprNamedExpr {
                 target,
                 value,
                 range,
@@ -1730,7 +1681,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::BinOp(ast::ExprBinOp {
+            ast::Expr::BinOp(ast::ExprBinOp {
                 left,
                 op,
                 right,
@@ -1740,33 +1691,19 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 node: ExprKind::BinOp {
                     op: {
                         let target_tok = match &op {
-                            rustpython_parser::ast::Operator::Add => rustpython_parser::Tok::Plus,
-                            rustpython_parser::ast::Operator::Sub => rustpython_parser::Tok::Minus,
-                            rustpython_parser::ast::Operator::Mult => rustpython_parser::Tok::Star,
-                            rustpython_parser::ast::Operator::MatMult => rustpython_parser::Tok::At,
-                            rustpython_parser::ast::Operator::Div => rustpython_parser::Tok::Slash,
-                            rustpython_parser::ast::Operator::Mod => {
-                                rustpython_parser::Tok::Percent
-                            }
-                            rustpython_parser::ast::Operator::Pow => {
-                                rustpython_parser::Tok::DoubleStar
-                            }
-                            rustpython_parser::ast::Operator::LShift => {
-                                rustpython_parser::Tok::LeftShift
-                            }
-                            rustpython_parser::ast::Operator::RShift => {
-                                rustpython_parser::Tok::RightShift
-                            }
-                            rustpython_parser::ast::Operator::BitOr => rustpython_parser::Tok::Vbar,
-                            rustpython_parser::ast::Operator::BitXor => {
-                                rustpython_parser::Tok::CircumFlex
-                            }
-                            rustpython_parser::ast::Operator::BitAnd => {
-                                rustpython_parser::Tok::Amper
-                            }
-                            rustpython_parser::ast::Operator::FloorDiv => {
-                                rustpython_parser::Tok::DoubleSlash
-                            }
+                            ast::Operator::Add => rustpython_parser::Tok::Plus,
+                            ast::Operator::Sub => rustpython_parser::Tok::Minus,
+                            ast::Operator::Mult => rustpython_parser::Tok::Star,
+                            ast::Operator::MatMult => rustpython_parser::Tok::At,
+                            ast::Operator::Div => rustpython_parser::Tok::Slash,
+                            ast::Operator::Mod => rustpython_parser::Tok::Percent,
+                            ast::Operator::Pow => rustpython_parser::Tok::DoubleStar,
+                            ast::Operator::LShift => rustpython_parser::Tok::LeftShift,
+                            ast::Operator::RShift => rustpython_parser::Tok::RightShift,
+                            ast::Operator::BitOr => rustpython_parser::Tok::Vbar,
+                            ast::Operator::BitXor => rustpython_parser::Tok::CircumFlex,
+                            ast::Operator::BitAnd => rustpython_parser::Tok::Amper,
+                            ast::Operator::FloorDiv => rustpython_parser::Tok::DoubleSlash,
                         };
                         let op_range =
                             find_tok(TextRange::new(left.end(), right.start()), locator, |tok| {
@@ -1780,37 +1717,29 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, range }) => {
-                Expr {
-                    range,
-                    node: ExprKind::UnaryOp {
-                        op: {
-                            let target_tok = match &op {
-                                rustpython_parser::ast::Unaryop::Invert => {
-                                    rustpython_parser::Tok::Tilde
-                                }
-                                rustpython_parser::ast::Unaryop::Not => rustpython_parser::Tok::Not,
-                                rustpython_parser::ast::Unaryop::UAdd => {
-                                    rustpython_parser::Tok::Plus
-                                }
-                                rustpython_parser::ast::Unaryop::USub => {
-                                    rustpython_parser::Tok::Minus
-                                }
-                            };
-                            let op_range = find_tok(
-                                TextRange::new(range.start(), operand.start()),
-                                locator,
-                                |tok| tok == target_tok,
-                            );
-                            UnaryOp::new(op_range, (&op).into())
-                        },
-                        operand: Box::new((*operand, locator).into()),
+            ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, range }) => Expr {
+                range,
+                node: ExprKind::UnaryOp {
+                    op: {
+                        let target_tok = match &op {
+                            ast::Unaryop::Invert => rustpython_parser::Tok::Tilde,
+                            ast::Unaryop::Not => rustpython_parser::Tok::Not,
+                            ast::Unaryop::UAdd => rustpython_parser::Tok::Plus,
+                            ast::Unaryop::USub => rustpython_parser::Tok::Minus,
+                        };
+                        let op_range = find_tok(
+                            TextRange::new(range.start(), operand.start()),
+                            locator,
+                            |tok| tok == target_tok,
+                        );
+                        UnaryOp::new(op_range, (&op).into())
                     },
-                    trivia: vec![],
-                    parentheses: Parenthesize::Never,
-                }
-            }
-            rustpython_parser::ast::Expr::Lambda(ast::ExprLambda { args, body, range }) => Expr {
+                    operand: Box::new((*operand, locator).into()),
+                },
+                trivia: vec![],
+                parentheses: Parenthesize::Never,
+            },
+            ast::Expr::Lambda(ast::ExprLambda { args, body, range }) => Expr {
                 range,
                 node: ExprKind::Lambda {
                     args: Box::new((*args, locator).into()),
@@ -1819,7 +1748,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::IfExp(ast::ExprIfExp {
+            ast::Expr::IfExp(ast::ExprIfExp {
                 test,
                 body,
                 orelse,
@@ -1834,7 +1763,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Dict(ast::ExprDict {
+            ast::Expr::Dict(ast::ExprDict {
                 keys,
                 values,
                 range,
@@ -1853,7 +1782,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Set(ast::ExprSet { elts, range }) => Expr {
+            ast::Expr::Set(ast::ExprSet { elts, range }) => Expr {
                 range,
                 node: ExprKind::Set {
                     elts: elts
@@ -1864,7 +1793,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::ListComp(ast::ExprListComp {
+            ast::Expr::ListComp(ast::ExprListComp {
                 elt,
                 generators,
                 range,
@@ -1880,7 +1809,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::SetComp(ast::ExprSetComp {
+            ast::Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
                 range,
@@ -1896,7 +1825,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::DictComp(ast::ExprDictComp {
+            ast::Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
@@ -1914,7 +1843,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::GeneratorExp(ast::ExprGeneratorExp {
+            ast::Expr::GeneratorExp(ast::ExprGeneratorExp {
                 elt,
                 generators,
                 range,
@@ -1930,7 +1859,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Await(ast::ExprAwait { value, range }) => Expr {
+            ast::Expr::Await(ast::ExprAwait { value, range }) => Expr {
                 range,
                 node: ExprKind::Await {
                     value: Box::new((*value, locator).into()),
@@ -1938,7 +1867,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Yield(ast::ExprYield { value, range }) => Expr {
+            ast::Expr::Yield(ast::ExprYield { value, range }) => Expr {
                 range,
                 node: ExprKind::Yield {
                     value: value.map(|v| Box::new((*v, locator).into())),
@@ -1946,7 +1875,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::YieldFrom(ast::ExprYieldFrom { value, range }) => Expr {
+            ast::Expr::YieldFrom(ast::ExprYieldFrom { value, range }) => Expr {
                 range,
                 node: ExprKind::YieldFrom {
                     value: Box::new((*value, locator).into()),
@@ -1954,7 +1883,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Compare(ast::ExprCompare {
+            ast::Expr::Compare(ast::ExprCompare {
                 left,
                 ops,
                 comparators,
@@ -1968,28 +1897,18 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                         .zip(ops.into_iter())
                         .map(|((left, right), op)| {
                             let target_tok = match &op {
-                                rustpython_parser::ast::Cmpop::Eq => {
-                                    rustpython_parser::Tok::EqEqual
-                                }
-                                rustpython_parser::ast::Cmpop::NotEq => {
-                                    rustpython_parser::Tok::NotEqual
-                                }
-                                rustpython_parser::ast::Cmpop::Lt => rustpython_parser::Tok::Less,
-                                rustpython_parser::ast::Cmpop::LtE => {
-                                    rustpython_parser::Tok::LessEqual
-                                }
-                                rustpython_parser::ast::Cmpop::Gt => {
-                                    rustpython_parser::Tok::Greater
-                                }
-                                rustpython_parser::ast::Cmpop::GtE => {
-                                    rustpython_parser::Tok::GreaterEqual
-                                }
-                                rustpython_parser::ast::Cmpop::Is => rustpython_parser::Tok::Is,
+                                ast::Cmpop::Eq => rustpython_parser::Tok::EqEqual,
+                                ast::Cmpop::NotEq => rustpython_parser::Tok::NotEqual,
+                                ast::Cmpop::Lt => rustpython_parser::Tok::Less,
+                                ast::Cmpop::LtE => rustpython_parser::Tok::LessEqual,
+                                ast::Cmpop::Gt => rustpython_parser::Tok::Greater,
+                                ast::Cmpop::GtE => rustpython_parser::Tok::GreaterEqual,
+                                ast::Cmpop::Is => rustpython_parser::Tok::Is,
                                 // TODO(charlie): Break this into two tokens.
-                                rustpython_parser::ast::Cmpop::IsNot => rustpython_parser::Tok::Is,
-                                rustpython_parser::ast::Cmpop::In => rustpython_parser::Tok::In,
+                                ast::Cmpop::IsNot => rustpython_parser::Tok::Is,
+                                ast::Cmpop::In => rustpython_parser::Tok::In,
                                 // TODO(charlie): Break this into two tokens.
-                                rustpython_parser::ast::Cmpop::NotIn => rustpython_parser::Tok::In,
+                                ast::Cmpop::NotIn => rustpython_parser::Tok::In,
                             };
                             let op_range = find_tok(
                                 TextRange::new(left.end(), right.start()),
@@ -2008,7 +1927,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Call(ast::ExprCall {
+            ast::Expr::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
@@ -2029,7 +1948,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::FormattedValue(ast::ExprFormattedValue {
+            ast::Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
                 conversion,
                 format_spec,
@@ -2044,7 +1963,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::JoinedStr(ast::ExprJoinedStr { values, range }) => Expr {
+            ast::Expr::JoinedStr(ast::ExprJoinedStr { values, range }) => Expr {
                 range,
                 node: ExprKind::JoinedStr {
                     values: values
@@ -2055,15 +1974,13 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Constant(ast::ExprConstant { value, kind, range }) => {
-                Expr {
-                    range,
-                    node: ExprKind::Constant { value, kind },
-                    trivia: vec![],
-                    parentheses: Parenthesize::Never,
-                }
-            }
-            rustpython_parser::ast::Expr::Attribute(ast::ExprAttribute {
+            ast::Expr::Constant(ast::ExprConstant { value, kind, range }) => Expr {
+                range,
+                node: ExprKind::Constant { value, kind },
+                trivia: vec![],
+                parentheses: Parenthesize::Never,
+            },
+            ast::Expr::Attribute(ast::ExprAttribute {
                 value,
                 attr,
                 ctx,
@@ -2078,7 +1995,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Subscript(ast::ExprSubscript {
+            ast::Expr::Subscript(ast::ExprSubscript {
                 value,
                 slice,
                 ctx,
@@ -2093,7 +2010,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Starred(ast::ExprStarred { value, ctx, range }) => Expr {
+            ast::Expr::Starred(ast::ExprStarred { value, ctx, range }) => Expr {
                 range,
                 node: ExprKind::Starred {
                     value: Box::new((*value, locator).into()),
@@ -2102,7 +2019,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::List(ast::ExprList { elts, ctx, range }) => Expr {
+            ast::Expr::List(ast::ExprList { elts, ctx, range }) => Expr {
                 range,
                 node: ExprKind::List {
                     elts: elts
@@ -2114,7 +2031,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Tuple(ast::ExprTuple { elts, ctx, range }) => Expr {
+            ast::Expr::Tuple(ast::ExprTuple { elts, ctx, range }) => Expr {
                 range,
                 node: ExprKind::Tuple {
                     elts: elts
@@ -2126,7 +2043,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::Expr::Slice(ast::ExprSlice {
+            ast::Expr::Slice(ast::ExprSlice {
                 lower,
                 upper,
                 step,

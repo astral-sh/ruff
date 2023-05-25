@@ -2,7 +2,6 @@ use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -45,14 +44,14 @@ pub(crate) fn redundant_tuple_in_exception_handler(
         };
         let mut diagnostic = Diagnostic::new(
             RedundantTupleInExceptionHandler {
-                name: unparse_expr(elt, checker.stylist),
+                name: checker.generator().expr(elt),
             },
             type_.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                unparse_expr(elt, checker.stylist),
+            diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+                checker.generator().expr(elt),
                 type_.range(),
             )));
         }

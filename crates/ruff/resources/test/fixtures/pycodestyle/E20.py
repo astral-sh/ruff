@@ -76,3 +76,11 @@ if x == 4:
 a[b1, :] == a[b1, ...]
 b = a[:, b1]
 #:
+
+#: E201:1:6
+spam[ ~ham]
+
+#: Okay
+x = [  #
+    'some value',
+]

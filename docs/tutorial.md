@@ -240,9 +240,9 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 [pre-commit](https://pre-commit.com) hook:
 
 ```yaml
-- repo: https://github.com/charliermarsh/ruff-pre-commit
+- repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.267'
+  rev: v0.0.270
   hooks:
     - id: ruff
 ```
@@ -251,7 +251,7 @@ See [_Usage_](usage.md) for more.
 
 ## Editor Integrations
 
-Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
-alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
+Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or
+alongside any other editor through the [Ruff LSP](https://github.com/astral-sh/ruff-lsp).
 
 See [_Editor Integrations_](editor-integrations.md).

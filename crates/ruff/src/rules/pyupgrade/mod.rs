@@ -9,7 +9,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -59,6 +58,7 @@ mod tests {
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"); "UP031_1")]
     #[test_case(Rule::FString, Path::new("UP032_0.py"); "UP032_0")]
     #[test_case(Rule::FString, Path::new("UP032_1.py"); "UP032_1")]
+    #[test_case(Rule::FString, Path::new("UP032_2.py"); "UP032_2")]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_0.py"); "UP033_0")]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_1.py"); "UP033_1")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]

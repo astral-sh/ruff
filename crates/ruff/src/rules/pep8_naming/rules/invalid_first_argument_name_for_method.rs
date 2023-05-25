@@ -61,7 +61,7 @@ pub(crate) fn invalid_first_argument_name_for_method(
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
-            &checker.ctx,
+            checker.semantic_model(),
             scope,
             name,
             decorator_list,

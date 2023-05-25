@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_format::{
@@ -7,6 +9,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
 
 use crate::checkers::ast::Checker;
@@ -34,21 +37,20 @@ impl AlwaysAutofixableViolation for FString {
 /// respectively.
 #[derive(Debug)]
 struct FormatSummaryValues<'a> {
-    args: Vec<String>,
-    kwargs: FxHashMap<&'a str, String>,
+    args: Vec<&'a Expr>,
+    kwargs: FxHashMap<&'a str, &'a Expr>,
 }
 
 impl<'a> FormatSummaryValues<'a> {
-    fn try_from_expr(checker: &'a Checker, expr: &'a Expr) -> Option<Self> {
-        let mut extracted_args: Vec<String> = Vec::new();
-        let mut extracted_kwargs: FxHashMap<&str, String> = FxHashMap::default();
+    fn try_from_expr(expr: &'a Expr, locator: &'a Locator) -> Option<Self> {
+        let mut extracted_args: Vec<&Expr> = Vec::new();
+        let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
         if let Expr::Call(ast::ExprCall { args, keywords, .. }) = expr {
             for arg in args {
-                let arg = checker.locator.slice(arg.range());
-                if contains_invalids(arg) {
+                if contains_invalids(locator.slice(arg.range())) {
                     return None;
                 }
-                extracted_args.push(arg.to_string());
+                extracted_args.push(arg);
             }
             for keyword in keywords {
                 let Keyword {
@@ -57,11 +59,10 @@ impl<'a> FormatSummaryValues<'a> {
                     range: _,
                 } = keyword;
                 if let Some(key) = arg {
-                    let kwarg = checker.locator.slice(value.range());
-                    if contains_invalids(kwarg) {
+                    if contains_invalids(locator.slice(value.range())) {
                         return None;
                     }
-                    extracted_kwargs.insert(key, kwarg.to_string());
+                    extracted_kwargs.insert(key, value);
                 }
             }
         }
@@ -76,7 +77,7 @@ impl<'a> FormatSummaryValues<'a> {
         })
     }
 
-    fn consume_next(&mut self) -> Option<String> {
+    fn consume_next(&mut self) -> Option<&Expr> {
         if self.args.is_empty() {
             None
         } else {
@@ -84,7 +85,7 @@ impl<'a> FormatSummaryValues<'a> {
         }
     }
 
-    fn consume_arg(&mut self, index: usize) -> Option<String> {
+    fn consume_arg(&mut self, index: usize) -> Option<&Expr> {
         if self.args.len() > index {
             Some(self.args.remove(index))
         } else {
@@ -92,13 +93,13 @@ impl<'a> FormatSummaryValues<'a> {
         }
     }
 
-    fn consume_kwarg(&mut self, key: &str) -> Option<String> {
+    fn consume_kwarg(&mut self, key: &str) -> Option<&Expr> {
         self.kwargs.remove(key)
     }
 }
 
-/// Return `true` if the string contains characters that are forbidden in
-/// argument identifier.
+/// Return `true` if the string contains characters that are forbidden by
+/// argument identifiers.
 fn contains_invalids(string: &str) -> bool {
     string.contains('*')
         || string.contains('\'')
@@ -106,8 +107,61 @@ fn contains_invalids(string: &str) -> bool {
         || string.contains("await")
 }
 
+enum FormatContext {
+    /// The expression is used as a bare format spec (e.g., `{x}`).
+    Bare,
+    /// The expression is used with conversion flags, or attribute or subscript access
+    /// (e.g., `{x!r}`, `{x.y}`, `{x[y]}`).
+    Accessed,
+}
+
+/// Given an [`Expr`], format it for use in a formatted expression within an f-string.
+fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
+    let text = locator.slice(expr.range());
+    let parenthesize = match (context, expr) {
+        // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
+        (
+            FormatContext::Accessed,
+            Expr::BinOp(_)
+            | Expr::UnaryOp(_)
+            | Expr::BoolOp(_)
+            | Expr::NamedExpr(_)
+            | Expr::Compare(_)
+            | Expr::IfExp(_)
+            | Expr::Lambda(_)
+            | Expr::Await(_)
+            | Expr::Yield(_)
+            | Expr::YieldFrom(_)
+            | Expr::Starred(_),
+        ) => true,
+        // E.g., `12` should be parenthesized in `f"{(12).real}"`.
+        (
+            FormatContext::Accessed,
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Int(..),
+                ..
+            }),
+        ) => text.chars().all(|c| c.is_ascii_digit()),
+        // E.g., `{x, y}` should be parenthesized in `f"{(x, y)}"`.
+        (
+            _,
+            Expr::GeneratorExp(_)
+            | Expr::Dict(_)
+            | Expr::Set(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_),
+        ) => true,
+        _ => false,
+    };
+    if parenthesize && !text.starts_with('(') && !text.ends_with(')') {
+        Cow::Owned(format!("({text})"))
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
 /// Generate an f-string from an [`Expr`].
-fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
+fn try_convert_to_f_string(expr: &Expr, locator: &Locator) -> Option<String> {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return None;
     };
@@ -124,11 +178,11 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         return None;
     };
 
-    let Some(mut summary) = FormatSummaryValues::try_from_expr(checker, expr) else {
+    let Some(mut summary) = FormatSummaryValues::try_from_expr( expr, locator) else {
         return None;
     };
 
-    let contents = checker.locator.slice(value.range());
+    let contents = locator.slice(value.range());
 
     // Skip implicit string concatenations.
     if is_implicit_concatenation(contents) {
@@ -171,26 +225,20 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
                 converted.push('{');
 
                 let field = FieldName::parse(&field_name).ok()?;
-                match field.field_type {
-                    FieldType::Auto => {
-                        let Some(arg) = summary.consume_next() else {
-                            return None;
-                        };
-                        converted.push_str(&arg);
-                    }
-                    FieldType::Index(index) => {
-                        let Some(arg) = summary.consume_arg(index) else {
-                            return None;
-                        };
-                        converted.push_str(&arg);
-                    }
-                    FieldType::Keyword(name) => {
-                        let Some(arg) = summary.consume_kwarg(&name) else {
-                            return None;
-                        };
-                        converted.push_str(&arg);
-                    }
-                }
+                let arg = match field.field_type {
+                    FieldType::Auto => summary.consume_next(),
+                    FieldType::Index(index) => summary.consume_arg(index),
+                    FieldType::Keyword(name) => summary.consume_kwarg(&name),
+                }?;
+                converted.push_str(&formatted_expr(
+                    arg,
+                    if field.parts.is_empty() {
+                        FormatContext::Bare
+                    } else {
+                        FormatContext::Accessed
+                    },
+                    locator,
+                ));
 
                 for part in field.parts {
                     match part {
@@ -258,7 +306,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let Some(mut contents) = try_convert_to_f_string(checker, expr) else {
+    let Some(mut contents) = try_convert_to_f_string( expr, checker.locator) else {
         return;
     };
 

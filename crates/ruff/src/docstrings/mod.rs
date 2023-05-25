@@ -57,11 +57,6 @@ impl<'a> DocstringBody<'a> {
         self.range().start()
     }
 
-    #[inline]
-    pub(crate) fn end(self) -> TextSize {
-        self.range().end()
-    }
-
     pub(crate) fn range(self) -> TextRange {
         self.docstring.body_range + self.docstring.start()
     }

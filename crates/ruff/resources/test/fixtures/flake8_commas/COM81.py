@@ -631,3 +631,11 @@ result = function(
 the_first_one = next(
     (i for i in range(10) if i // 2 == 0)  # COM812 fix should include the final bracket
 )
+
+foo = namedtuple(
+    name="foo",
+    status="bar",
+    message="sfdsdfsdgs fsdfsdf output!dsfdfsdjkg  ghfskdjghkdssd sd fsdf  s\n"[
+        :20
+    ],
+)

@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{unparse_constant, unparse_expr};
 
 use crate::checkers::ast::Checker;
 
@@ -99,7 +98,7 @@ pub(crate) fn compare_to_empty_string(
 ) {
     // Omit string comparison rules within subscripts. This is mostly commonly used within
     // DataFrame and np.ndarray indexing.
-    for parent in checker.ctx.expr_ancestors() {
+    for parent in checker.semantic_model().expr_ancestors() {
         if matches!(parent, Expr::Subscript(_)) {
             return;
         }
@@ -117,8 +116,8 @@ pub(crate) fn compare_to_empty_string(
                 if let Expr::Constant(ast::ExprConstant { value, .. }) = &lhs {
                     if let Constant::Str(s) = value {
                         if s.is_empty() {
-                            let constant = unparse_constant(value, checker.stylist);
-                            let expr = unparse_expr(rhs, checker.stylist);
+                            let constant = checker.generator().constant(value);
+                            let expr = checker.generator().expr(rhs);
                             let existing = format!("{constant} {op} {expr}");
                             let replacement = format!("{}{expr}", op.into_unary());
                             checker.diagnostics.push(Diagnostic::new(
@@ -137,8 +136,8 @@ pub(crate) fn compare_to_empty_string(
             if let Expr::Constant(ast::ExprConstant { value, .. }) = &rhs {
                 if let Constant::Str(s) = value {
                     if s.is_empty() {
-                        let expr = unparse_expr(lhs, checker.stylist);
-                        let constant = unparse_constant(value, checker.stylist);
+                        let expr = checker.generator().expr(lhs);
+                        let constant = checker.generator().constant(value);
                         let existing = format!("{expr} {op} {constant}");
                         let replacement = format!("{}{expr}", op.into_unary());
                         checker.diagnostics.push(Diagnostic::new(

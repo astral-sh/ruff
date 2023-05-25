@@ -3,12 +3,13 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use anyhow::{bail, Result};
 use pretty_assertions::StrComparison;
-use ruff::settings::options::Options;
 use schemars::schema_for;
 
+use ruff::settings::options::Options;
+
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
 
 #[derive(clap::Args)]
@@ -48,9 +49,11 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-    use super::{main, Args};
-    use crate::generate_all::Mode;
     use anyhow::Result;
+
+    use crate::generate_all::Mode;
+
+    use super::{main, Args};
 
     #[test]
     fn test_generate_json_schema() -> Result<()> {

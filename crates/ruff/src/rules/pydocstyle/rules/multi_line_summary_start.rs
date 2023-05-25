@@ -60,11 +60,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
     };
 
     if is_triple_quote(&first_line) {
-        if checker
-            .settings
-            .rules
-            .enabled(Rule::MultiLineSummaryFirstLine)
-        {
+        if checker.enabled(Rule::MultiLineSummaryFirstLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummaryFirstLine, docstring.range());
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete until first non-whitespace char.
@@ -82,11 +78,7 @@ pub(crate) fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstr
             checker.diagnostics.push(diagnostic);
         }
     } else {
-        if checker
-            .settings
-            .rules
-            .enabled(Rule::MultiLineSummarySecondLine)
-        {
+        if checker.enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic = Diagnostic::new(MultiLineSummarySecondLine, docstring.range());
             if checker.patch(diagnostic.kind.rule()) {
                 let mut indentation = String::from(docstring.indentation);

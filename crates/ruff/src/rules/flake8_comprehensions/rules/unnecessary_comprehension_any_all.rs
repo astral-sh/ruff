@@ -76,7 +76,7 @@ pub(crate) fn unnecessary_comprehension_any_all(
         if is_async_generator(elt) {
             return;
         }
-        if !checker.ctx.is_builtin(id) {
+        if !checker.semantic_model().is_builtin(id) {
             return;
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, args[0].range());

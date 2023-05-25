@@ -4,8 +4,6 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -17,29 +15,8 @@ use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
 use crate::newlines::UniversalNewlineIterator;
-use crate::source_code::{Generator, Indexer, Locator, Stylist};
+use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
-
-/// Generate source code from an [`Expr`].
-pub fn unparse_expr(expr: &Expr, stylist: &Stylist) -> String {
-    let mut generator: Generator = stylist.into();
-    generator.unparse_expr(expr, 0);
-    generator.generate()
-}
-
-/// Generate source code from a [`Stmt`].
-pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
-    let mut generator: Generator = stylist.into();
-    generator.unparse_stmt(stmt);
-    generator.generate()
-}
-
-/// Generate source code from an [`Constant`].
-pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
-    let mut generator: Generator = stylist.into();
-    generator.unparse_constant(constant);
-    generator.generate()
-}
 
 fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
 where
@@ -563,7 +540,9 @@ where
     body.iter().any(|stmt| any_over_stmt(stmt, func))
 }
 
-static DUNDER_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"__[^\s]+__").unwrap());
+fn is_dunder(id: &str) -> bool {
+    id.starts_with("__") && id.ends_with("__")
+}
 
 /// Return `true` if the [`Stmt`] is an assignment to a dunder (like `__all__`).
 pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
@@ -574,15 +553,19 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
             if targets.len() != 1 {
                 return false;
             }
-            match &targets[0] {
-                Expr::Name(ast::ExprName { id, .. }) => DUNDER_REGEX.is_match(id.as_str()),
-                _ => false,
+            if let Expr::Name(ast::ExprName { id, .. }) = &targets[0] {
+                is_dunder(id)
+            } else {
+                false
             }
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => match target.as_ref() {
-            Expr::Name(ast::ExprName { id, .. }) => DUNDER_REGEX.is_match(id.as_str()),
-            _ => false,
-        },
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                is_dunder(id)
+            } else {
+                false
+            }
+        }
         _ => false,
     }
 }
@@ -1107,21 +1090,40 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 /// Specifically, this method returns the range of a function or class name,
 /// rather than that of the entire function or class body.
 pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
-    if matches!(
-        stmt,
-        Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)
-    ) {
-        let contents = &locator.contents()[stmt.range()];
+    match stmt {
+        Stmt::ClassDef(ast::StmtClassDef {
+            decorator_list,
+            range,
+            ..
+        })
+        | Stmt::FunctionDef(ast::StmtFunctionDef {
+            decorator_list,
+            range,
+            ..
+        })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            decorator_list,
+            range,
+            ..
+        }) => {
+            let header_range = decorator_list.last().map_or(*range, |last_decorator| {
+                TextRange::new(last_decorator.end(), range.end())
+            });
 
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
-            if matches!(tok, Tok::Name { .. }) {
-                return range;
-            }
+            let contents = locator.slice(header_range);
+
+            let mut tokens =
+                lexer::lex_starts_at(contents, Mode::Module, header_range.start()).flatten();
+            tokens
+                .find_map(|(t, range)| t.is_name().then_some(range))
+                .unwrap_or_else(|| {
+                    error!("Failed to find identifier for {:?}", stmt);
+
+                    header_range
+                })
         }
-        error!("Failed to find identifier for {:?}", stmt);
+        _ => stmt.range(),
     }
-
-    stmt.range()
 }
 
 /// Return the ranges of [`Tok::Name`] tokens within a specified node.

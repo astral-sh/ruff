@@ -55,7 +55,7 @@ impl Violation for LoadBeforeGlobalDeclaration {
 }
 /// PLE0118
 pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
-    let globals = match &checker.ctx.scope().kind {
+    let globals = match &checker.semantic_model().scope().kind {
         ScopeKind::Class(class_def) => &class_def.globals,
         ScopeKind::Function(function_def) => &function_def.globals,
         _ => return,

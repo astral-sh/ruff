@@ -1,21 +1,25 @@
-mod generator;
-mod indexer;
-mod line_index;
-mod locator;
-mod stylist;
+use std::cmp::Ordering;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
-pub use crate::source_code::line_index::{LineIndex, OneIndexed};
-pub use generator::Generator;
-pub use indexer::Indexer;
-pub use locator::Locator;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser as parser;
 use rustpython_parser::{lexer, Mode, ParseError};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-pub use stylist::Stylist;
+
+pub use generator::Generator;
+pub use indexer::Indexer;
+pub use locator::Locator;
+pub use stylist::{Quote, Stylist};
+
+pub use crate::source_code::line_index::{LineIndex, OneIndexed};
+
+mod generator;
+mod indexer;
+mod line_index;
+mod locator;
+mod stylist;
 
 /// Run round-trip source code generation on a given Python code.
 pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {
@@ -201,6 +205,23 @@ impl SourceFile {
     #[inline]
     pub fn source_text(&self) -> &str {
         &self.inner.code
+    }
+}
+
+impl PartialOrd for SourceFile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SourceFile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Short circuit if these are the same source files
+        if Arc::ptr_eq(&self.inner, &other.inner) {
+            Ordering::Equal
+        } else {
+            self.inner.name.cmp(&other.inner.name)
+        }
     }
 }
 

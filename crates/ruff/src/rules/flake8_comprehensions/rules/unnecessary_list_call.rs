@@ -1,10 +1,11 @@
 use rustpython_parser::ast::{Expr, Ranged};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
@@ -47,7 +48,7 @@ pub(crate) fn unnecessary_list_call(
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
-    if !checker.ctx.is_builtin("list") {
+    if !checker.semantic_model().is_builtin("list") {
         return;
     }
     if !argument.is_list_comp_expr() {

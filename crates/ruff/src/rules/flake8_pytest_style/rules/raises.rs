@@ -4,6 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::format_call_path;
 use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -46,13 +47,10 @@ impl Violation for PytestRaisesWithoutException {
     }
 }
 
-fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["pytest", "raises"]
-        })
+fn is_pytest_raises(func: &Expr, model: &SemanticModel) -> bool {
+    model.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["pytest", "raises"]
+    })
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -66,12 +64,8 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_raises(checker, func) {
-        if checker
-            .settings
-            .rules
-            .enabled(Rule::PytestRaisesWithoutException)
-        {
+    if is_pytest_raises(func, checker.semantic_model()) {
+        if checker.enabled(Rule::PytestRaisesWithoutException) {
             if args.is_empty() && keywords.is_empty() {
                 checker
                     .diagnostics
@@ -79,7 +73,7 @@ pub(crate) fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], key
             }
         }
 
-        if checker.settings.rules.enabled(Rule::PytestRaisesTooBroad) {
+        if checker.enabled(Rule::PytestRaisesTooBroad) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.arg == Some(Identifier::new("match")));
@@ -106,7 +100,7 @@ pub(crate) fn complex_raises(
     let mut is_too_complex = false;
 
     let raises_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(checker, func),
+        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic_model()),
         _ => false,
     });
 
@@ -147,7 +141,7 @@ pub(crate) fn complex_raises(
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
     if let Some(call_path) = checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(exception)
         .and_then(|call_path| {
             let is_broad_exception = checker

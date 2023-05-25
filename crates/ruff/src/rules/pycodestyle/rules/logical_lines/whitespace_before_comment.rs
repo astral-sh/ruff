@@ -1,10 +1,12 @@
-use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -139,7 +141,6 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 pub(crate) fn whitespace_before_comment(
     line: &LogicalLine,
     locator: &Locator,
-    is_first_row: bool,
     context: &mut LogicalLinesContext,
 ) {
     let mut prev_end = TextSize::default();
@@ -149,13 +150,13 @@ pub(crate) fn whitespace_before_comment(
         if let TokenKind::Comment = kind {
             let range = token.range();
 
-            let line = locator.slice(TextRange::new(
+            let line_text = locator.slice(TextRange::new(
                 locator.line_start(range.start()),
                 range.start(),
             ));
-            let text = locator.slice(range);
+            let token_text = locator.slice(range);
 
-            let is_inline_comment = !line.trim().is_empty();
+            let is_inline_comment = !line_text.trim().is_empty();
             if is_inline_comment {
                 if range.start() - prev_end < "  ".text_len() {
                     context.push(
@@ -166,7 +167,7 @@ pub(crate) fn whitespace_before_comment(
             }
 
             // Split into the portion before and after the first space.
-            let mut parts = text.splitn(2, ' ');
+            let mut parts = token_text.splitn(2, ' ');
             let symbol = parts.next().unwrap_or("");
             let comment = parts.next().unwrap_or("");
 
@@ -182,7 +183,7 @@ pub(crate) fn whitespace_before_comment(
                     context.push(NoSpaceAfterInlineComment, range);
                 }
             } else if let Some(bad_prefix) = bad_prefix {
-                if bad_prefix != '!' || !is_first_row {
+                if bad_prefix != '!' || !line.is_start_of_file() {
                     if bad_prefix != '#' {
                         context.push(NoSpaceAfterBlockComment, range);
                     } else if !comment.is_empty() {

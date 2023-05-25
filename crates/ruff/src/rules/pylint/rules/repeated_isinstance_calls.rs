@@ -5,14 +5,41 @@ use rustpython_parser::ast::{self, Boolop, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for repeated `isinstance` calls on the same object.
+///
+/// ## Why is this bad?
+/// Repeated `isinstance` calls on the same object can be merged into a
+/// single call.
+///
+/// ## Example
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, int) or isinstance(x, float) or isinstance(x, complex)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, (int, float, complex))
+/// ```
+///
+/// Or, for Python 3.10 and later:
+///
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, int | float | complex)
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct RepeatedIsinstanceCalls {
     obj: String,
-    pub types: Vec<String>,
+    types: Vec<String>,
 }
 
 impl Violation for RepeatedIsinstanceCalls {
@@ -31,7 +58,7 @@ pub(crate) fn repeated_isinstance_calls(
     op: Boolop,
     values: &[Expr],
 ) {
-    if !matches!(op, Boolop::Or) || !checker.ctx.is_builtin("isinstance") {
+    if !matches!(op, Boolop::Or) || !checker.semantic_model().is_builtin("isinstance") {
         return;
     }
 
@@ -66,11 +93,11 @@ pub(crate) fn repeated_isinstance_calls(
         if num_calls > 1 && types.len() > 1 {
             checker.diagnostics.push(Diagnostic::new(
                 RepeatedIsinstanceCalls {
-                    obj: unparse_expr(obj.as_expr(), checker.stylist),
+                    obj: checker.generator().expr(obj.as_expr()),
                     types: types
                         .iter()
                         .map(HashableExpr::as_expr)
-                        .map(|expr| unparse_expr(expr, checker.stylist))
+                        .map(|expr| checker.generator().expr(expr))
                         .sorted()
                         .collect(),
                 },

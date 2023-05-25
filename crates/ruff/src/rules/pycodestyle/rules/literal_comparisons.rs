@@ -11,7 +11,7 @@ use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::compare;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum EqCmpop {
+enum EqCmpop {
     Eq,
     NotEq,
 }
@@ -50,7 +50,7 @@ impl From<&Cmpop> for EqCmpop {
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
-pub struct NoneComparison(pub EqCmpop);
+pub struct NoneComparison(EqCmpop);
 
 impl AlwaysAutofixableViolation for NoneComparison {
     #[derive_message_formats]
@@ -97,7 +97,7 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
-pub struct TrueFalseComparison(pub bool, pub EqCmpop);
+pub struct TrueFalseComparison(bool, EqCmpop);
 
 impl AlwaysAutofixableViolation for TrueFalseComparison {
     #[derive_message_formats]
@@ -278,7 +278,7 @@ pub(crate) fn literal_comparisons(
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .copied()
             .collect::<Vec<_>>();
-        let content = compare(left, &ops, comparators, checker.stylist);
+        let content = compare(left, &ops, comparators, checker.generator());
         for diagnostic in &mut diagnostics {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(

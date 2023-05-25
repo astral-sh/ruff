@@ -6,7 +6,6 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
-use ruff_python_ast::helpers::unparse_expr;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -97,16 +96,12 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
             if let Some(seen_values) = seen.get_mut(&dict_key) {
                 match dict_key {
                     DictionaryKey::Constant(..) => {
-                        if checker
-                            .settings
-                            .rules
-                            .enabled(Rule::MultiValueRepeatedKeyLiteral)
-                        {
+                        if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(
                                 MultiValueRepeatedKeyLiteral {
-                                    name: unparse_expr(key, checker.stylist),
+                                    name: checker.generator().expr(key),
                                     repeated_value: is_duplicate_value,
                                 },
                                 key.range(),
@@ -126,11 +121,7 @@ pub(crate) fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values
                         }
                     }
                     DictionaryKey::Variable(dict_key) => {
-                        if checker
-                            .settings
-                            .rules
-                            .enabled(Rule::MultiValueRepeatedKeyVariable)
-                        {
+                        if checker.enabled(Rule::MultiValueRepeatedKeyVariable) {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
                             let mut diagnostic = Diagnostic::new(

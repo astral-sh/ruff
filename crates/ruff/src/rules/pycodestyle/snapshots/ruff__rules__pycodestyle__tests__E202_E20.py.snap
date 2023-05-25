@@ -10,7 +10,7 @@ E20.py:19:23: E202 Whitespace before ')'
 22 | spam(ham[1], {eggs: 2 })
    |
 
-E20.py:21:22: E202 Whitespace before ')'
+E20.py:21:22: E202 Whitespace before '}'
    |
 21 | spam(ham[1], {eggs: 2} )
 22 | #: E202:1:22
@@ -20,7 +20,7 @@ E20.py:21:22: E202 Whitespace before ')'
 25 | spam(ham[1 ], {eggs: 2})
    |
 
-E20.py:23:11: E202 Whitespace before ')'
+E20.py:23:11: E202 Whitespace before ']'
    |
 23 | spam(ham[1], {eggs: 2 })
 24 | #: E202:1:11
@@ -40,7 +40,7 @@ E20.py:25:23: E202 Whitespace before ')'
 29 | spam(ham[1], {eggs: 2   })
    |
 
-E20.py:27:22: E202 Whitespace before ')'
+E20.py:27:22: E202 Whitespace before '}'
    |
 27 | spam(ham[1], {eggs: 2}  )
 28 | #: E202:1:22
@@ -50,7 +50,7 @@ E20.py:27:22: E202 Whitespace before ')'
 31 | spam(ham[1  ], {eggs: 2})
    |
 
-E20.py:29:11: E202 Whitespace before ')'
+E20.py:29:11: E202 Whitespace before ']'
    |
 29 | spam(ham[1], {eggs: 2   })
 30 | #: E202:1:11
