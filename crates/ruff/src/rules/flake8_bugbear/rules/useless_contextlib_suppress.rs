@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{Expr, Ranged};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct UselessContextlibSuppress;
@@ -26,7 +27,7 @@ pub(crate) fn useless_contextlib_suppress(
 ) {
     if args.is_empty()
         && checker
-            .ctx
+            .semantic_model()
             .resolve_call_path(func)
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["contextlib", "suppress"]

@@ -1,22 +1,29 @@
-use crate::fs::relativize_path;
-use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
-use bitflags::bitflags;
-use colored::Colorize;
-use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
-use ruff_text_size::{TextRange, TextSize};
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
+use annotate_snippets::display_list::{DisplayList, FormatOptions};
+use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
+use bitflags::bitflags;
+use colored::Colorize;
+use ruff_text_size::{TextRange, TextSize};
+
+use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
+
+use crate::fs::relativize_path;
+use crate::line_width::{LineWidth, TabSize};
+use crate::message::diff::Diff;
+use crate::message::{Emitter, EmitterContext, Message};
+use crate::registry::AsRule;
+
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
+        /// Whether to show the fix status of a diagnostic.
         const SHOW_FIX_STATUS = 0b0000_0001;
-        const SHOW_FIX        = 0b0000_0010;
+        /// Whether to show the diff of a fix, for diagnostics that have a fix.
+        const SHOW_FIX_DIFF   = 0b0000_0010;
+        /// Whether to show the source code of a diagnostic.
         const SHOW_SOURCE     = 0b0000_0100;
     }
 }
@@ -35,8 +42,8 @@ impl TextEmitter {
     }
 
     #[must_use]
-    pub fn with_show_fix(mut self, show_fix: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_FIX, show_fix);
+    pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
+        self.flags.set(EmitterFlags::SHOW_FIX_DIFF, show_fix_diff);
         self
     }
 
@@ -101,7 +108,7 @@ impl Emitter for TextEmitter {
                 writeln!(writer, "{}", MessageCodeFrame { message })?;
             }
 
-            if self.flags.contains(EmitterFlags::SHOW_FIX) {
+            if self.flags.contains(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
                 }
@@ -234,39 +241,35 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
-    static TAB_SIZE: u32 = 4; // TODO(jonathan): use `pycodestyle.tab-size`
+    static TAB_SIZE: TabSize = TabSize(4); // TODO(jonathan): use `tab-size`
 
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut column = 0;
+    let mut line_width = LineWidth::new(TAB_SIZE);
 
-    for (index, c) in source.chars().enumerate() {
-        match c {
-            '\t' => {
-                let tab_width = TAB_SIZE - column % TAB_SIZE;
-                column += tab_width;
+    for (index, c) in source.char_indices() {
+        let old_width = line_width.get();
+        line_width = line_width.add_char(c);
 
-                if index < usize::from(annotation_range.start()) {
-                    range += TextSize::new(tab_width - 1);
-                } else if index < usize::from(annotation_range.end()) {
-                    range = range.add_end(TextSize::new(tab_width - 1));
-                }
+        if matches!(c, '\t') {
+            // SAFETY: The difference is a value in the range [1..TAB_SIZE] which is guaranteed to be less than `u32`.
+            #[allow(clippy::cast_possible_truncation)]
+            let tab_width = (line_width.get() - old_width) as u32;
 
-                result.push_str(&source[last_end..index]);
-
-                for _ in 0..tab_width {
-                    result.push(' ');
-                }
-
-                last_end = index + 1;
+            if index < usize::from(annotation_range.start()) {
+                range += TextSize::new(tab_width - 1);
+            } else if index < usize::from(annotation_range.end()) {
+                range = range.add_end(TextSize::new(tab_width - 1));
             }
-            '\n' | '\r' => {
-                column = 0;
+
+            result.push_str(&source[last_end..index]);
+
+            for _ in 0..tab_width {
+                result.push(' ');
             }
-            _ => {
-                column += 1;
-            }
+
+            last_end = index + 1;
         }
     }
 
@@ -292,9 +295,10 @@ struct SourceCode<'a> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::TextEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn default() {

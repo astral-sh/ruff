@@ -1,15 +1,13 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{UnaryOp, UnaryOpKind};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatUnaryOp<'a> {
+pub(crate) struct FormatUnaryOp<'a> {
     item: &'a UnaryOp,
 }
 
-impl AsFormat<ASTFormatContext> for UnaryOp {
+impl AsFormat<ASTFormatContext<'_>> for UnaryOp {
     type Format<'a> = FormatUnaryOp<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -17,7 +15,7 @@ impl AsFormat<ASTFormatContext> for UnaryOp {
     }
 }
 
-impl Format<ASTFormatContext> for FormatUnaryOp<'_> {
+impl Format<ASTFormatContext<'_>> for FormatUnaryOp<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let unary_op = self.item;
         write!(

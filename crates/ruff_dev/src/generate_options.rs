@@ -1,5 +1,6 @@
 //! Generate a Markdown-compatible listing of configuration options.
 use itertools::Itertools;
+
 use ruff::settings::options::Options;
 use ruff::settings::options_base::{OptionEntry, OptionField};
 

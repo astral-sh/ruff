@@ -75,11 +75,7 @@ fn duplicate_handler_exceptions<'a>(
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::DuplicateHandlerException)
-    {
+    if checker.enabled(Rule::DuplicateHandlerException) {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = Diagnostic::new(
@@ -94,7 +90,7 @@ fn duplicate_handler_exceptions<'a>(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     if unique_elts.len() == 1 {
                         checker.generator().expr(unique_elts[0])
                     } else {
@@ -140,11 +136,7 @@ pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthand
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::DuplicateTryBlockException)
-    {
+    if checker.enabled(Rule::DuplicateTryBlockException) {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 checker.diagnostics.push(Diagnostic::new(

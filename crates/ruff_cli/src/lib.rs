@@ -1,10 +1,11 @@
-use std::io::{self, BufWriter};
-use std::path::PathBuf;
+use std::io::{self, stdout, BufWriter, Write};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::CommandFactory;
+use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff::logging::{set_up_logging, LogLevel};
@@ -13,6 +14,7 @@ use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
 
 use crate::args::{Args, CheckArgs, Command};
+use crate::commands::run_stdin::read_from_stdin;
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -105,7 +107,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let log_level: LogLevel = (&log_level_args).into();
+    let log_level = LogLevel::from(&log_level_args);
     set_up_logging(&log_level)?;
 
     match command {
@@ -117,14 +119,42 @@ quoting the executed command, along with the relevant file contents and `pyproje
             shell.generate(&mut Args::command(), &mut io::stdout());
         }
         Command::Check(args) => return check(args, log_level),
+        Command::Format { files } => return format(&files),
     }
 
     Ok(ExitStatus::Success)
 }
 
+fn format(files: &[PathBuf]) -> Result<ExitStatus> {
+    warn_user_once!(
+        "`ruff format` is a work-in-progress, subject to change at any time, and intended for \
+        internal use only."
+    );
+
+    // dummy
+    let format_code = |code: &str| code.replace("# DEL", "");
+
+    match &files {
+        // Check if we should read from stdin
+        [path] if path == Path::new("-") => {
+            let unformatted = read_from_stdin()?;
+            let formatted = format_code(&unformatted);
+            stdout().lock().write_all(formatted.as_bytes())?;
+        }
+        _ => {
+            for file in files {
+                let unformatted = std::fs::read_to_string(file)
+                    .with_context(|| format!("Could not read {}: ", file.display()))?;
+                let formatted = format_code(&unformatted);
+                std::fs::write(file, formatted)
+                    .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
+            }
+        }
+    }
+    Ok(ExitStatus::Success)
+}
+
 fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
-    #[cfg(feature = "ecosystem_ci")]
-    let ecosystem_ci = args.ecosystem_ci;
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -182,10 +212,17 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags |= PrinterFlags::SHOW_VIOLATIONS;
     }
     if show_fixes {
-        printer_flags |= PrinterFlags::SHOW_FIXES;
+        printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
     }
     if show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
+    }
+    if cli.ecosystem_ci {
+        warn_user_once!(
+            "The formatting of fixes emitted by this option is a work-in-progress, subject to \
+            change at any time, and intended only for internal use."
+        );
+        printer_flags |= PrinterFlags::SHOW_FIX_DIFF;
     }
 
     #[cfg(debug_assertions)]
@@ -211,14 +248,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(
-        format,
-        log_level,
-        autofix,
-        printer_flags,
-        #[cfg(feature = "ecosystem_ci")]
-        ecosystem_ci,
-    );
+    let printer = Printer::new(format, log_level, autofix, printer_flags);
 
     if cli.watch {
         if format != SerializationFormat::Text {
@@ -356,8 +386,9 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
 #[cfg(test)]
 mod test_file_change_detector {
-    use crate::{change_detected, ChangeKind};
     use std::path::PathBuf;
+
+    use crate::{change_detected, ChangeKind};
 
     #[test]
     fn detect_correct_file_change() {

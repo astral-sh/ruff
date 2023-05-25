@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Expr};
 
 use ruff_python_ast::call_path::collect_call_path;
 
-use crate::context::Context;
+use crate::model::SemanticModel;
 
 /// Return `true` if the given `Expr` is a potential logging call. Matches
 /// `logging.error`, `logger.error`, `self.logger.error`, etc., but not
@@ -16,9 +16,9 @@ use crate::context::Context;
 /// # This is detected to be a logger candidate
 /// bar.error()
 /// ```
-pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
+pub fn is_logger_candidate(func: &Expr, model: &SemanticModel) -> bool {
     if let Expr::Attribute(ast::ExprAttribute { value, .. }) = func {
-        let Some(call_path) = (if let Some(call_path) = context.resolve_call_path(value) {
+        let Some(call_path) = (if let Some(call_path) = model.resolve_call_path(value) {
             if call_path.first().map_or(false, |module| *module == "logging") || call_path.as_slice() == ["flask", "current_app", "logger"] {
                 Some(call_path)
             } else {

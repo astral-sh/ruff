@@ -2,8 +2,8 @@ name: "[Playground] Release"
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  release:
+    types: [ published ]
 
 env:
   CARGO_INCREMENTAL: 0

@@ -7,11 +7,10 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
@@ -44,6 +43,7 @@ mod tests {
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"); "S609")]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"); "S506")]
+    #[test_case(Rule::ParamikoCall, Path::new("S601.py"); "S601")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

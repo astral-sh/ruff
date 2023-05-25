@@ -1,10 +1,11 @@
 use rustpython_parser::ast::{self, Expr, Ranged};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
@@ -74,7 +75,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     if inner != "sorted" {
         return;
     }
-    if !checker.ctx.is_builtin(inner) || !checker.ctx.is_builtin(outer) {
+    if !checker.semantic_model().is_builtin(inner) || !checker.semantic_model().is_builtin(outer) {
         return;
     }
     let mut diagnostic = Diagnostic::new(

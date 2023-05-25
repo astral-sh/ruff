@@ -5,10 +5,10 @@ use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
-use ruff_diagnostics::{AutofixKind, Diagnostic};
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 
+use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 
 use crate::autofix::fix_file;
@@ -193,7 +193,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
 
     TextEmitter::default()
         .with_show_fix_status(true)
-        .with_show_fix(true)
+        .with_show_fix_diff(true)
         .with_show_source(true)
         .emit(
             &mut output,

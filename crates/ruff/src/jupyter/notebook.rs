@@ -1,9 +1,9 @@
-use ruff_text_size::TextRange;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter;
 use std::path::Path;
 
+use ruff_text_size::TextRange;
 use serde::Serialize;
 use serde_json::error::Category;
 

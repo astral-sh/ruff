@@ -1,11 +1,12 @@
-use itertools::Itertools;
-use regex::Regex;
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
+
+use itertools::Itertools;
+use regex::Regex;
 
 #[derive(Clone, Debug, Default)]
 pub struct CacheKeyHasher {

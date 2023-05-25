@@ -1,6 +1,5 @@
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 

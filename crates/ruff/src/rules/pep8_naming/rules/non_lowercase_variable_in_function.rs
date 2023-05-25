@@ -66,9 +66,9 @@ pub(crate) fn non_lowercase_variable_in_function(
     }
 
     if name.to_lowercase() != name
-        && !helpers::is_named_tuple_assignment(&checker.ctx, stmt)
-        && !helpers::is_typed_dict_assignment(&checker.ctx, stmt)
-        && !helpers::is_type_var_assignment(&checker.ctx, stmt)
+        && !helpers::is_named_tuple_assignment(checker.semantic_model(), stmt)
+        && !helpers::is_typed_dict_assignment(checker.semantic_model(), stmt)
+        && !helpers::is_type_var_assignment(checker.semantic_model(), stmt)
     {
         checker.diagnostics.push(Diagnostic::new(
             NonLowercaseVariableInFunction {

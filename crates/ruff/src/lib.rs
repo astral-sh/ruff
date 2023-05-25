@@ -21,6 +21,7 @@ pub mod fs;
 mod importer;
 pub mod jupyter;
 mod lex;
+pub mod line_width;
 pub mod linter;
 pub mod logging;
 pub mod message;

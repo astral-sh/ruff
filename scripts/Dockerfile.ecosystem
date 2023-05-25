@@ -13,15 +13,16 @@
 # ```
 # From the project root:
 # ```
-# cargo build --target x86_64-unknown-linux-musl --features ecosystem_ci
+# cargo build --target x86_64-unknown-linux-musl
 # docker buildx build -f scripts/Dockerfile.ecosystem -t ruff-ecosystem-checker --load .
 # docker run --rm -v ./target/x86_64-unknown-linux-musl/debug/ruff:/app/ruff-new -v ./ruff-old:/app/ruff-old ruff-ecosystem-checker
 # ```
-# You can customize this, e.g. cache the git checkouts and use a custom json file:
+# You can customize this, e.g. cache the git checkouts, a custom json file and a glibc build:
 # ```
-# docker run -v ./target/x86_64-unknown-linux-musl/debug/ruff:/app/ruff-new -v ./ruff-old:/app/ruff-old \
-#   -v ./target/checkouts:/app/checkouts -v ./github_search.jsonl:/app/github_search.jsonl \
-#   --rm ruff-ecosystem-checker python check_ecosystem.py -v ruff-new ruff-old --checkouts checkouts > output.txt
+# docker run -v ./target/debug/ruff:/app/ruff-new -v ./ruff-old:/app/ruff-old -v ./target/checkouts:/app/checkouts \
+#   -v ./github_search.jsonl:/app/github_search.jsonl --rm ruff-ecosystem-checker \
+#   python check_ecosystem.py --verbose ruff-new ruff-old --projects github_search.jsonl --checkouts checkouts  \
+#   > target/ecosystem-ci.txt
 # ```
 
 FROM python:3.11

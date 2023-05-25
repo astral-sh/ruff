@@ -1,4 +1,5 @@
 //! Rules from [flake8-2020](https://pypi.org/project/flake8-2020/).
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -6,7 +7,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;

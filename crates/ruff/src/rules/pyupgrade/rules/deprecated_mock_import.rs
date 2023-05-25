@@ -13,7 +13,7 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_import, match_import_from, match_module};
+use crate::cst::matchers::{match_import, match_import_from, match_statement};
 use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -126,7 +126,7 @@ fn format_import(
     stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice(stmt.range());
-    let mut tree = match_module(module_text)?;
+    let mut tree = match_statement(module_text)?;
     let mut import = match_import(&mut tree)?;
 
     let Import { names, .. } = import.clone();
@@ -160,7 +160,7 @@ fn format_import_from(
     stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice(stmt.range());
-    let mut tree = match_module(module_text).unwrap();
+    let mut tree = match_statement(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 
     if let ImportFrom {

@@ -1,15 +1,13 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::Comprehension;
-use crate::shared_traits::AsFormat;
 
-pub struct FormatComprehension<'a> {
+pub(crate) struct FormatComprehension<'a> {
     item: &'a Comprehension,
 }
 
-impl AsFormat<ASTFormatContext> for Comprehension {
+impl AsFormat<ASTFormatContext<'_>> for Comprehension {
     type Format<'a> = FormatComprehension<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -17,7 +15,7 @@ impl AsFormat<ASTFormatContext> for Comprehension {
     }
 }
 
-impl Format<ASTFormatContext> for FormatComprehension<'_> {
+impl Format<ASTFormatContext<'_>> for FormatComprehension<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let comprehension = self.item;
 

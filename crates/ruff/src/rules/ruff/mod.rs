@@ -7,7 +7,6 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
@@ -42,6 +41,16 @@ mod tests {
                     Rule::AmbiguousUnicodeCharacterComment,
                 ])
             },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn noqa() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/noqa.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedVariable, Rule::AmbiguousVariableName]),
         )?;
         assert_messages!(diagnostics);
         Ok(())

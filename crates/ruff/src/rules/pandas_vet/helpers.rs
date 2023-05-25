@@ -1,7 +1,8 @@
-use ruff_python_semantic::binding::{BindingKind, Importation};
-use ruff_python_semantic::context::Context;
 use rustpython_parser::ast;
 use rustpython_parser::ast::Expr;
+
+use ruff_python_semantic::binding::{BindingKind, Importation};
+use ruff_python_semantic::model::SemanticModel;
 
 pub(crate) enum Resolution {
     /// The expression resolves to an irrelevant expression type (e.g., a constant).
@@ -15,7 +16,7 @@ pub(crate) enum Resolution {
 }
 
 /// Test an [`Expr`] for relevance to Pandas-related operations.
-pub(crate) fn test_expression(expr: &Expr, context: &Context) -> Resolution {
+pub(crate) fn test_expression(expr: &Expr, model: &SemanticModel) -> Resolution {
     match expr {
         Expr::Constant(_)
         | Expr::Tuple(_)
@@ -27,7 +28,7 @@ pub(crate) fn test_expression(expr: &Expr, context: &Context) -> Resolution {
         | Expr::DictComp(_)
         | Expr::GeneratorExp(_) => Resolution::IrrelevantExpression,
         Expr::Name(ast::ExprName { id, .. }) => {
-            context
+            model
                 .find_binding(id)
                 .map_or(Resolution::IrrelevantBinding, |binding| {
                     match binding.kind {

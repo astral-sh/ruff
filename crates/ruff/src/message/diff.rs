@@ -1,11 +1,14 @@
-use crate::message::Message;
-use colored::{Color, ColoredString, Colorize, Styles};
-use ruff_diagnostics::{Applicability, Fix};
-use ruff_python_ast::source_code::{OneIndexed, SourceFile};
-use ruff_text_size::{TextRange, TextSize};
-use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
+
+use colored::{Color, ColoredString, Colorize, Styles};
+use ruff_text_size::{TextRange, TextSize};
+use similar::{ChangeTag, TextDiff};
+
+use ruff_diagnostics::{Applicability, Fix};
+use ruff_python_ast::source_code::{OneIndexed, SourceFile};
+
+use crate::message::Message;
 
 /// Renders a diff that shows the code fixes.
 ///

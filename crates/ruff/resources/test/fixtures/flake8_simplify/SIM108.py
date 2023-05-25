@@ -80,17 +80,25 @@ else:
 
 # SIM108
 if a:
-    b = cccccccccccccccccccccccccccccccccccc
+    b = "cccccccccccccccccccccccccccccccccß"
 else:
-    b = ddddddddddddddddddddddddddddddddddddd
+    b = "ddddddddddddddddddddddddddddddddd💣"
 
 
 # OK (too long)
 if True:
     if a:
-        b = cccccccccccccccccccccccccccccccccccc
+        b = ccccccccccccccccccccccccccccccccccc
     else:
-        b = ddddddddddddddddddddddddddddddddddddd
+        b = ddddddddddddddddddddddddddddddddddd
+
+
+# OK (too long with tabs)
+if True:
+	if a:
+		b = ccccccccccccccccccccccccccccccccccc
+	else:
+		b = ddddddddddddddddddddddddddddddddddd
 
 
 # SIM108 (without fix due to trailing comment)
