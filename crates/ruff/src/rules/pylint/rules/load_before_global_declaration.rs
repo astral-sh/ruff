@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::OneIndexed;
-use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
@@ -55,12 +54,8 @@ impl Violation for LoadBeforeGlobalDeclaration {
 }
 /// PLE0118
 pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
-    let globals = match &checker.semantic_model().scope().kind {
-        ScopeKind::Class(class_def) => &class_def.globals,
-        ScopeKind::Function(function_def) => &function_def.globals,
-        _ => return,
-    };
-    if let Some(stmt) = globals.get(name) {
+    let scope = checker.semantic_model().scope();
+    if let Some(stmt) = scope.get_global(name) {
         if expr.start() < stmt.start() {
             #[allow(deprecated)]
             let location = checker.locator.compute_source_location(stmt.start());

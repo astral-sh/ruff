@@ -1,6 +1,7 @@
 use std::iter;
 
 use regex::Regex;
+use rustpython_parser::ast;
 use rustpython_parser::ast::{Arg, Arguments};
 
 use ruff_diagnostics::DiagnosticKind;
@@ -10,7 +11,7 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::binding::Bindings;
-use ruff_python_semantic::scope::{FunctionDef, Lambda, Scope, ScopeKind};
+use ruff_python_semantic::scope::{Scope, ScopeKind};
 
 use super::super::helpers;
 
@@ -317,7 +318,14 @@ pub(crate) fn unused_arguments(
     bindings: &Bindings,
 ) -> Vec<Diagnostic> {
     match &scope.kind {
-        ScopeKind::Function(FunctionDef {
+        ScopeKind::Function(ast::StmtFunctionDef {
+            name,
+            args,
+            body,
+            decorator_list,
+            ..
+        })
+        | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
             name,
             args,
             body,
@@ -431,7 +439,7 @@ pub(crate) fn unused_arguments(
                 }
             }
         }
-        ScopeKind::Lambda(Lambda { args, .. }) => {
+        ScopeKind::Lambda(ast::ExprLambda { args, .. }) => {
             if checker.enabled(Argumentable::Lambda.rule_code()) {
                 function(
                     Argumentable::Lambda,

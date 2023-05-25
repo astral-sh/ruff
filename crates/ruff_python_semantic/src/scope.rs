@@ -1,8 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
-use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
+use rustpython_parser::ast;
+
+use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
 use crate::binding::{BindingId, StarImportation};
 
@@ -19,6 +21,8 @@ pub struct Scope<'a> {
     bindings: FxHashMap<&'a str, BindingId>,
     /// A map from bound name to binding index, for bindings that were shadowed later in the scope.
     shadowed_bindings: FxHashMap<&'a str, Vec<BindingId>>,
+    /// A map from global name to the range that declares it.
+    globals: FxHashMap<&'a str, TextRange>,
 }
 
 impl<'a> Scope<'a> {
@@ -30,6 +34,7 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: FxHashMap::default(),
+            globals: FxHashMap::default(),
         }
     }
 
@@ -41,6 +46,7 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: FxHashMap::default(),
+            globals: FxHashMap::default(),
         }
     }
 
@@ -103,48 +109,32 @@ impl<'a> Scope<'a> {
     pub fn star_imports(&self) -> impl Iterator<Item = &StarImportation<'a>> {
         self.star_imports.iter()
     }
+
+    /// Add a global name to this scope.
+    pub fn add_global(&mut self, name: &'a str, range: TextRange) {
+        self.globals.insert(name, range);
+    }
+
+    /// Returns the range of the global name with the given name.
+    pub fn get_global(&self, name: &str) -> Option<TextRange> {
+        self.globals.get(name).copied()
+    }
 }
 
 #[derive(Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
-    Class(ClassDef<'a>),
-    Function(FunctionDef<'a>),
+    Class(&'a ast::StmtClassDef),
+    Function(&'a ast::StmtFunctionDef),
+    AsyncFunction(&'a ast::StmtAsyncFunctionDef),
     Generator,
     Module,
-    Lambda(Lambda<'a>),
+    Lambda(&'a ast::ExprLambda),
 }
 
-#[derive(Debug)]
-pub struct FunctionDef<'a> {
-    // Properties derived from Stmt::FunctionDef.
-    pub name: &'a str,
-    pub args: &'a Arguments,
-    pub body: &'a [Stmt],
-    pub decorator_list: &'a [Expr],
-    // pub returns: Option<&'a Expr>,
-    // pub type_comment: Option<&'a str>,
-    // Scope-specific properties.
-    // TODO(charlie): Create AsyncFunctionDef to mirror the AST.
-    pub async_: bool,
-    pub globals: FxHashMap<&'a str, &'a Stmt>,
-}
-
-#[derive(Debug)]
-pub struct ClassDef<'a> {
-    // Properties derived from Stmt::ClassDef.
-    pub name: &'a str,
-    pub bases: &'a [Expr],
-    pub keywords: &'a [Keyword],
-    // pub body: &'a [Stmt],
-    pub decorator_list: &'a [Expr],
-    // Scope-specific properties.
-    pub globals: FxHashMap<&'a str, &'a Stmt>,
-}
-
-#[derive(Debug)]
-pub struct Lambda<'a> {
-    pub args: &'a Arguments,
-    pub body: &'a Expr,
+impl ScopeKind<'_> {
+    pub const fn is_any_function(&self) -> bool {
+        matches!(self, ScopeKind::Function(_) | ScopeKind::AsyncFunction(_))
+    }
 }
 
 /// Id uniquely identifying a scope in a program.

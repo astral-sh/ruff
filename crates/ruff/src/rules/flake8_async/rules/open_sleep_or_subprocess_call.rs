@@ -6,8 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::in_async_function;
-
 /// ## What it does
 /// Checks that async functions do not contain calls to `open`, `time.sleep`,
 /// or `subprocess` methods.
@@ -61,7 +59,7 @@ const OPEN_SLEEP_OR_SUBPROCESS_CALL: &[&[&str]] = &[
 
 /// ASYNC101
 pub(crate) fn open_sleep_or_subprocess_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(checker.semantic_model()) {
+    if checker.semantic_model().in_async_context() {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             let is_open_sleep_or_subprocess_call = checker
                 .semantic_model()

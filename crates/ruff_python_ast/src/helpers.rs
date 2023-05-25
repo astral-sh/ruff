@@ -961,18 +961,15 @@ where
 
 #[derive(Default)]
 struct GlobalStatementVisitor<'a> {
-    globals: FxHashMap<&'a str, &'a Stmt>,
+    globals: FxHashMap<&'a str, TextRange>,
 }
 
 impl<'a> StatementVisitor<'a> for GlobalStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _range,
-            }) => {
+            Stmt::Global(ast::StmtGlobal { names, range }) => {
                 for name in names {
-                    self.globals.insert(name.as_str(), stmt);
+                    self.globals.insert(name.as_str(), *range);
                 }
             }
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
@@ -984,11 +981,9 @@ impl<'a> StatementVisitor<'a> for GlobalStatementVisitor<'a> {
 }
 
 /// Extract a map from global name to its last-defining [`Stmt`].
-pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
+pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, TextRange> {
     let mut visitor = GlobalStatementVisitor::default();
-    for stmt in body {
-        visitor.visit_stmt(stmt);
-    }
+    visitor.visit_body(body);
     visitor.globals
 }
 

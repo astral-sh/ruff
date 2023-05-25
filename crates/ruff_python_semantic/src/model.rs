@@ -212,7 +212,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_function();
+            seen_function |= scope.kind.is_any_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -539,13 +539,26 @@ impl<'a> SemanticModel<'a> {
         self.scope_id == scope_id
     }
 
-    /// Return `true` if the context is at the top level of the module (i.e., in the module scope,
+    /// Return `true` if the model is at the top level of the module (i.e., in the module scope,
     /// and not nested within any statements).
     pub fn at_top_level(&self) -> bool {
         self.scope_id.is_global()
             && self
                 .stmt_id
                 .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
+    }
+
+    /// Return `true` if the model is in an async context.
+    pub fn in_async_context(&self) -> bool {
+        for scope in self.scopes() {
+            if scope.kind.is_async_function() {
+                return true;
+            }
+            if scope.kind.is_function() {
+                return false;
+            }
+        }
+        false
     }
 
     /// Returns `true` if the given [`BindingId`] is used.
