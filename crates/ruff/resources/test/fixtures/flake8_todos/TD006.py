@@ -3,3 +3,4 @@
 # TDO006 - error
 # ToDo (evanrittenhouse): invalid capitalization
 # todo (evanrittenhouse): another invalid capitalization
+# foo # todo: invalid capitalization
