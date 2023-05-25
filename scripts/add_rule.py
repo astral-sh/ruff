@@ -131,9 +131,9 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
             " " * 8
             + f"""({variant}, "{code}") => (RuleGroup::Unspecified, {rule}),\n""",
         )
+        lines.sort()
         text += "".join(lines)
         text += "\n"
-        lines.sort()
         text += fp.read()
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
         fp.write(text)
