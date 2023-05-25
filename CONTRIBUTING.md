@@ -111,7 +111,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 
 1. In that file, define a violation struct. You can grep for `#[violation]` to see examples.
 
-1. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
+1. Map the violation struct to a rule code in `crates/ruff/src/codes.rs` (e.g., `E402`).
 
 1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for
    AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
@@ -119,7 +119,6 @@ At a high level, the steps involved in adding a new lint rule are as follows:
    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
-
 1. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate

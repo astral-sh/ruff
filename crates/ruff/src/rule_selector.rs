@@ -6,7 +6,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::codes::RuleCodePrefix;
-use crate::registry::{Linter, Rule, RuleIter, RuleNamespace};
+use crate::codes::RuleIter;
+use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

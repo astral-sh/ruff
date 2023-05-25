@@ -10,9 +10,12 @@ use syn::{
 
 use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_nursery};
 
+#[derive(Clone)]
 struct LinterToRuleData {
-    /// The rule identifier, e.g., `Rule::UnaryPrefixIncrement`.
+    /// The rule identifier, e.g., `rules::pyflakes::rules::UnusedImport`.
     rule_id: Path,
+    /// The actual name of the rule, e.g., `UnusedImport`.
+    rule_name: Ident,
     /// The rule group identifiers, e.g., `RuleGroup::Unspecified`.
     rule_group_id: Path,
     /// The rule attributes.
@@ -52,10 +55,12 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
 
         let entry = syn::parse::<Entry>(arm.into_token_stream().into())?;
+        let rule_name = entry.rule.segments.last().unwrap().ident.clone();
         linter_to_rules.entry(entry.linter).or_default().insert(
             entry.code.value(),
             LinterToRuleData {
                 rule_id: entry.rule,
+                rule_name,
                 rule_group_id: entry.group,
                 attrs: entry.attrs,
             },
@@ -64,7 +69,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
 
-    let mut output = quote! {
+    let all_rules = linter_to_rules.values().flat_map(BTreeMap::values);
+    let mut output = register_rules(all_rules);
+
+    output.extend(quote! {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum RuleCodePrefix {
             #(#linter_idents(#linter_idents),)*
@@ -83,7 +91,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 }
             }
         }
-    };
+    });
 
     for (linter, rules) in &linter_to_rules {
         output.extend(super::rule_code_prefix::expand(
@@ -184,10 +192,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
     });
 
-    let rule_to_code = generate_rule_to_code(&mut linter_to_rules);
+    let rule_to_code = generate_rule_to_code(&linter_to_rules);
     output.extend(rule_to_code);
 
-    let iter = generate_iter_impl(&mut linter_to_rules, &mut all_codes);
+    let iter = generate_iter_impl(&linter_to_rules, &all_codes);
     output.extend(iter);
 
     Ok(output)
@@ -206,6 +214,7 @@ fn rules_by_prefix(
             rule_id,
             rule_group_id,
             attrs,
+            ..
         },
     ) in rules
     {
@@ -227,6 +236,7 @@ fn rules_by_prefix(
                             rule_id,
                             rule_group_id,
                             attrs,
+                            ..
                         },
                     )| {
                         // Nursery rules have to be explicitly selected, so we ignore them when
@@ -267,6 +277,7 @@ fn generate_rule_to_code(
                 rule_id,
                 rule_group_id,
                 attrs,
+                ..
             },
         ) in map
         {
@@ -395,6 +406,87 @@ fn generate_iter_impl(
         impl RuleCodePrefix {
             pub fn iter() -> ::std::vec::IntoIter<RuleCodePrefix> {
                 vec![ #(#all_codes,)* ].into_iter()
+            }
+        }
+    }
+}
+
+/// Generate the `Rule` enum
+fn register_rules<'a>(input: impl Iterator<Item = &'a LinterToRuleData>) -> TokenStream {
+    let mut rule_variants = quote!();
+    let mut rule_message_formats_match_arms = quote!();
+    let mut rule_autofixable_match_arms = quote!();
+    let mut rule_explanation_match_arms = quote!();
+
+    let mut from_impls_for_diagnostic_kind = quote!();
+
+    for LinterToRuleData {
+        rule_id: path,
+        rule_name: name,
+        rule_group_id: _,
+        attrs,
+    } in input
+    {
+        rule_variants.extend(quote! {
+            #(#attrs)*
+            #name,
+        });
+        // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
+        rule_message_formats_match_arms
+            .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
+        rule_autofixable_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::AUTOFIX,},
+        );
+        rule_explanation_match_arms
+            .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
+
+        // Enable conversion from `DiagnosticKind` to `Rule`.
+        from_impls_for_diagnostic_kind
+            .extend(quote! {#(#attrs)* stringify!(#name) => Rule::#name,});
+    }
+
+    quote! {
+        #[derive(
+            EnumIter,
+            Debug,
+            PartialEq,
+            Eq,
+            Copy,
+            Clone,
+            Hash,
+            PartialOrd,
+            Ord,
+            ::ruff_macros::CacheKey,
+            AsRefStr,
+            ::strum_macros::IntoStaticStr,
+        )]
+        #[repr(u16)]
+        #[strum(serialize_all = "kebab-case")]
+        pub enum Rule { #rule_variants }
+
+        impl Rule {
+            /// Returns the format strings used to report violations of this rule.
+            pub fn message_formats(&self) -> &'static [&'static str] {
+                match self { #rule_message_formats_match_arms }
+            }
+
+            /// Returns the documentation for this rule.
+            pub fn explanation(&self) -> Option<&'static str> {
+                match self { #rule_explanation_match_arms }
+            }
+
+            /// Returns the autofix status of this rule.
+            pub const fn autofixable(&self) -> ruff_diagnostics::AutofixKind {
+                match self { #rule_autofixable_match_arms }
+            }
+        }
+
+        impl AsRule for ruff_diagnostics::DiagnosticKind {
+            fn rule(&self) -> Rule {
+                match self.name.as_str() {
+                    #from_impls_for_diagnostic_kind
+                    _ => unreachable!("invalid rule name: {}", self.name),
+                }
             }
         }
     }

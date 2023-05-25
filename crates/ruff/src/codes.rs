@@ -4,7 +4,12 @@
 /// and E0118 but also C and E01.
 use std::fmt::Formatter;
 
-use crate::registry::{Linter, Rule};
+use strum_macros::{AsRefStr, EnumIter};
+
+use ruff_diagnostics::Violation;
+
+use crate::registry::{AsRule, Linter};
+use crate::rules;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
