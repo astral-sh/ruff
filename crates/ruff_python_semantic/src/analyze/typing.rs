@@ -201,6 +201,7 @@ pub fn is_immutable_annotation(model: &SemanticModel, expr: &Expr) -> bool {
 }
 
 const IMMUTABLE_FUNCS: &[&[&str]] = &[
+    &["", "float"],
     &["", "tuple"],
     &["", "frozenset"],
     &["datetime", "date"],

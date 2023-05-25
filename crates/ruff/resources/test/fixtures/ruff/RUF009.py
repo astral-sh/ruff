@@ -25,6 +25,7 @@ class A:
     fine_timedelta: datetime.timedelta = datetime.timedelta(hours=7)
     fine_tuple: tuple[int] = tuple([1])
     fine_regex: re.Pattern = re.compile(r".*")
+    fine_float: float = float('-inf')
 
 
 DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES = ImmutableType(40)
