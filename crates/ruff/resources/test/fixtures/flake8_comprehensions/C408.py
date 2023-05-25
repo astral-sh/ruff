@@ -14,6 +14,9 @@ a = list()
 f"{dict(x='y')}"
 f'{dict(x="y")}'
 f"{dict()}"
+f"a {dict()} b"
 
 f"{dict(x='y') | dict(y='z')}"
 f"{ dict(x='y') | dict(y='z') }"
+f"a {dict(x='y') | dict(y='z')} b"
+f"a { dict(x='y') | dict(y='z') } b"

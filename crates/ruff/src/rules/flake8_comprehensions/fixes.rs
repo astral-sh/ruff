@@ -8,10 +8,10 @@ use libcst_native::{
     TrailingWhitespace, Tuple,
 };
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
+use rustpython_parser::ast::Ranged;
 
 use crate::{
     checkers::ast::Checker,
@@ -536,40 +536,47 @@ pub(crate) fn fix_unnecessary_collection_call(
 
 /// Adds spaces around the code generated from `state` if `wrap_in_spaces` is true.
 fn wrap_code_in_spaces(state: &CodegenState, checker: &Checker, expr_range: TextRange) -> String {
+    let code = state.to_string();
+
     if checker.semantic_model().in_f_string() {
-        if let Some(f_string_range) = checker.indexer.f_string_range(expr_range.start()) {
-            let f_string = checker.locator.slice(f_string_range);
+        let str = checker.locator.contents().chars().collect_vec();
 
-            // find the braces that delimit the f-string
-            let f_string_start = f_string_range.start();
-            let f_string_sbrace =
-                f_string_start + TextSize::try_from(f_string.find('{').unwrap()).unwrap();
-            let f_string_ebrace =
-                f_string_start + TextSize::try_from(f_string.rfind('}').unwrap()).unwrap();
-
-            let mut buf = Vec::with_capacity(3);
-
-            // check if left padding is required
-            // this is true when between the opening brace of the f-string and the start of the
-            // current expression there are no characters
-            let one = TextSize::from(1u32);
-            if f_string_sbrace + one == expr_range.start() {
-                buf.push(" ".to_string());
-            }
-
-            buf.push(state.to_string());
-
-            // check if right padding is required
-            // this is true when between the end of the current expression and the closing
-            // brace of the f-string there are no characters
-            if expr_range.end() == f_string_ebrace {
-                buf.push(" ".to_string());
-            }
-
-            return buf.join("");
+        // find the braces that delimit the f-string token
+        let mut si: usize = expr_range.start().into();
+        while str[si] != '{' {
+            si -= 1;
         }
+        let si = TextSize::try_from(si).unwrap();
+
+        let mut ei: usize = expr_range.end().into();
+        while str[ei] != '}' {
+            ei += 1;
+        }
+        let ei = TextSize::try_from(ei).unwrap();
+
+        let mut buf = String::with_capacity(code.len() + 2);
+
+        // check if left padding is required
+        // this is true when between the opening brace of the f-string and the start of the
+        // current expression there are no characters
+        let one = TextSize::from(1u32);
+        if si + one == expr_range.start() {
+            buf.push(' ');
+        }
+
+        buf.push_str(&code);
+
+        // check if right padding is required
+        // this is true when between the end of the current expression and the closing
+        // brace of the f-string there are no characters
+        if expr_range.end() == ei {
+            buf.push(' ');
+        }
+
+        buf
+    } else {
+        code
     }
-    state.to_string()
 }
 
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`

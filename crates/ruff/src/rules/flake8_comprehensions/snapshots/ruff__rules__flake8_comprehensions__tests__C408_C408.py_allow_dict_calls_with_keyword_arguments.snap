@@ -61,8 +61,7 @@ C408.py:16:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
 17 | f'{dict(x="y")}'
 18 | f"{dict()}"
    |    ^^^^^^ C408
-19 | 
-20 | f"{dict(x='y') | dict(y='z')}"
+19 | f"a {dict()} b"
    |
    = help: Rewrite as a literal
 
@@ -72,8 +71,29 @@ C408.py:16:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
 15 15 | f'{dict(x="y")}'
 16    |-f"{dict()}"
    16 |+f"{ {} }"
-17 17 | 
-18 18 | f"{dict(x='y') | dict(y='z')}"
-19 19 | f"{ dict(x='y') | dict(y='z') }"
+17 17 | f"a {dict()} b"
+18 18 | 
+19 19 | f"{dict(x='y') | dict(y='z')}"
+
+C408.py:17:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+   |
+17 | f'{dict(x="y")}'
+18 | f"{dict()}"
+19 | f"a {dict()} b"
+   |      ^^^^^^ C408
+20 | 
+21 | f"{dict(x='y') | dict(y='z')}"
+   |
+   = help: Rewrite as a literal
+
+ℹ Suggested fix
+14 14 | f"{dict(x='y')}"
+15 15 | f'{dict(x="y")}'
+16 16 | f"{dict()}"
+17    |-f"a {dict()} b"
+   17 |+f"a { {} } b"
+18 18 | 
+19 19 | f"{dict(x='y') | dict(y='z')}"
+20 20 | f"{ dict(x='y') | dict(y='z') }"
 
 
