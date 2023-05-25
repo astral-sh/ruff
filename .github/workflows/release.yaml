@@ -408,12 +408,12 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
-          packages-dir: .
+          packages-dir: wheels
           verbose: true
       - uses: actions/download-artifact@v3
         with:
           name: binaries
-          path: wheels
+          path: binaries
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
