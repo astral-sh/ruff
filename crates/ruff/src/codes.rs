@@ -1,3 +1,7 @@
+/// In this module we generate [RuleCodePrefix], an enum of all rules categories. A rule category
+/// is something like pyflakes or flake8-todos. Each rule category contains all rules and their
+/// common prefixes, i.e. everything you can specify in `--select`. For pylint this is e.g. C0414
+/// and E0118 but also C and E01.
 use std::fmt::Formatter;
 
 use crate::registry::{Linter, Rule};
