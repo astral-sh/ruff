@@ -1,4 +1,5 @@
-//! Registry of all [`Rule`] implementations.
+//! Remnant of the registry of all [`Rule`] implementations, now it's reexporting from codes.rs
+//! with some helper symbols
 
 use strum_macros::EnumIter;
 
