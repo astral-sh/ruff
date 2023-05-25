@@ -6,8 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::in_async_function;
-
 /// ## What it does
 /// Checks that async functions do not contain calls to blocking synchronous
 /// process calls via the `os` module.
@@ -58,7 +56,7 @@ const UNSAFE_OS_METHODS: &[&[&str]] = &[
 
 /// ASYNC102
 pub(crate) fn blocking_os_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(checker.semantic_model()) {
+    if checker.semantic_model().in_async_context() {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             let is_unsafe_os_method = checker
                 .semantic_model()

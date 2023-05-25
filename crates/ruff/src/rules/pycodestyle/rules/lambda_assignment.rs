@@ -8,7 +8,6 @@ use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_ast::whitespace::leading_space;
 use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -66,14 +65,6 @@ pub(crate) fn lambda_assignment(
 ) {
     if let Expr::Name(ast::ExprName { id, .. }) = target {
         if let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value {
-            // If the assignment is in a class body, it might not be safe
-            // to replace it because the assignment might be
-            // carrying a type annotation that will be used by some
-            // package like dataclasses, which wouldn't consider the
-            // rewritten function definition to be equivalent.
-            // See https://github.com/charliermarsh/ruff/issues/3046
-            let fixable = !matches!(checker.semantic_model().scope().kind, ScopeKind::Class(_));
-
             let mut diagnostic = Diagnostic::new(
                 LambdaAssignment {
                     name: id.to_string(),
@@ -81,8 +72,14 @@ pub(crate) fn lambda_assignment(
                 stmt.range(),
             );
 
+            // If the assignment is in a class body, it might not be safe
+            // to replace it because the assignment might be
+            // carrying a type annotation that will be used by some
+            // package like dataclasses, which wouldn't consider the
+            // rewritten function definition to be equivalent.
+            // See https://github.com/charliermarsh/ruff/issues/3046
             if checker.patch(diagnostic.kind.rule())
-                && fixable
+                && !checker.semantic_model().scope().kind.is_class()
                 && !has_leading_content(stmt, checker.locator)
                 && !has_trailing_content(stmt, checker.locator)
             {

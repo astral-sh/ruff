@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violat
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::{ClassDef, ScopeKind};
+use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -558,7 +558,8 @@ pub(crate) fn unannotated_assignment_in_stub(
         return;
     }
 
-    if let ScopeKind::Class(ClassDef { bases, .. }) = checker.semantic_model().scope().kind {
+    if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = checker.semantic_model().scope().kind
+    {
         if is_enum(checker.semantic_model(), bases) {
             return;
         }
