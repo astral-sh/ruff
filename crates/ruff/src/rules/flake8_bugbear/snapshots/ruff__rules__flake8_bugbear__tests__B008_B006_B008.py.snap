@@ -46,37 +46,6 @@ B006_B008.py:119:30: B008 Do not perform function call in argument defaults
 120 |     ...
     |
 
-B006_B008.py:157:34: B008 Do not perform function call `float` in argument defaults
-    |
-157 | def float_infinity_literal(value=float("1e999")):
-    |                                  ^^^^^^^^^^^^^^ B008
-158 |     pass
-    |
-
-B006_B008.py:162:30: B008 Do not perform function call `float` in argument defaults
-    |
-162 | # But don't allow standard floats
-163 | def float_int_is_wrong(value=float(3)):
-    |                              ^^^^^^^^ B008
-164 |     pass
-    |
-
-B006_B008.py:166:45: B008 Do not perform function call `float` in argument defaults
-    |
-166 | def float_str_not_inf_or_nan_is_wrong(value=float("3.14")):
-    |                                             ^^^^^^^^^^^^^ B008
-167 |     pass
-    |
-
-B006_B008.py:192:21: B008 Do not perform function call `float` in argument defaults
-    |
-192 | # B006 and B008
-193 | # We should handle arbitrary nesting of these B008.
-194 | def nested_combo(a=[float(3), dt.datetime.now()]):
-    |                     ^^^^^^^^ B008
-195 |     pass
-    |
-
 B006_B008.py:192:31: B008 Do not perform function call `dt.datetime.now` in argument defaults
     |
 192 | # B006 and B008

@@ -26,6 +26,8 @@ class A:
     fine_tuple: tuple[int] = tuple([1])
     fine_regex: re.Pattern = re.compile(r".*")
     fine_float: float = float('-inf')
+    fine_int: int = int(12)
+    fine_complex: complex = complex(1, 2)
 
 
 DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES = ImmutableType(40)
