@@ -307,8 +307,6 @@ pub(crate) fn blank_lines(
     // stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
-    dbg!("#############################");
-    dbg!(line.text());
     if let Some(previous_logical) = prev_line {
         for token in line.tokens() {
             if token.kind() == TokenKind::NonLogicalNewline {
@@ -316,15 +314,10 @@ pub(crate) fn blank_lines(
                 return;
             }
 
-            dbg!(&token);
-            dbg!(&blank_lines);
             if *follows_decorator && *blank_lines > 0 {
                 let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
 
                 let range = token.range();
-                dbg!(locator.line_start(range.start()));
-                dbg!(locator.line_start(range.start()) - TextSize::new(2 * *blank_lines as u32));
-
                 diagnostic.set_fix(Fix::suggested(Edit::deletion(
                     locator.line_start(range.start()) - TextSize::new(2 * *blank_lines as u32),
                     locator.line_start(range.start()) - TextSize::new(1),
