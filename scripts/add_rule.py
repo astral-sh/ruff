@@ -103,8 +103,7 @@ pub struct {name};
 impl Violation for {name} {{
     #[derive_message_formats]
     fn message(&self) -> String {{
-        todo!("implement message");
-        format!("TODO: write message")
+        format!("TODO: write message: {{}}", todo!("implement message"))
     }}
 }}
 """,
@@ -127,17 +126,15 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
             lines.append(line)
 
         variant = pascal_case(linter)
+        rule = f"""rules::{linter.split(" ")[0]}::rules::{name}"""
         lines.append(
             " " * 8
-            + f"""({variant}, "{code}") => (RuleGroup::Unspecified, Rule::{name}),\n""",
+            + f"""({variant}, "{code}") => (RuleGroup::Unspecified, {rule}),\n""",
         )
-        lines.sort()
-
         text += "".join(lines)
         text += "\n"
-
+        lines.sort()
         text += fp.read()
-
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
         fp.write(text)
 
