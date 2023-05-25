@@ -396,22 +396,24 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     environment:
       name: release
+    permissions:
+      # For pypi trusted publishing
+      id-token: write
     steps:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
-      - uses: actions/setup-python@v4
+          path: wheels
       - name: "Publish to PyPi"
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.RUFF_TOKEN }}
-        run: |
-          pip install --upgrade twine
-          twine upload --skip-existing *
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          packages-dir: .
+          verbose: true
       - uses: actions/download-artifact@v3
         with:
           name: binaries
-          path: binaries
+          path: wheels
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
