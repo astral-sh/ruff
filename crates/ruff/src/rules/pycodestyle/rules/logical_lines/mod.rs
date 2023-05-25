@@ -7,6 +7,10 @@ use std::iter::FusedIterator;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
 
+pub(crate) use blank_lines::{
+    blank_lines, BlankLineAfterDecorator, BlankLineBetweenMethods, BlankLinesAfterFunctionOrClass,
+    BlankLinesBeforeNestedDefinition, BlankLinesTopLevel, TooManyBlankLines,
+};
 pub(crate) use extraneous_whitespace::{
     extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,
     WhitespaceBeforePunctuation,
@@ -45,6 +49,7 @@ pub(crate) use whitespace_before_parameters::{
     whitespace_before_parameters, WhitespaceBeforeParameters,
 };
 
+mod blank_lines;
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;
@@ -511,13 +516,11 @@ impl LogicalLinesBuilder {
             let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
                 .iter()
                 .all(|token| token.kind.is_newline());
-            if !is_empty {
-                self.lines.push(Line {
-                    flags: self.current_line.flags,
-                    tokens_start: self.current_line.tokens_start,
-                    tokens_end: end,
-                });
-            }
+            self.lines.push(Line {
+                flags: self.current_line.flags,
+                tokens_start: self.current_line.tokens_start,
+                tokens_end: end,
+            });
 
             self.current_line = CurrentLine {
                 flags: TokenFlags::default(),

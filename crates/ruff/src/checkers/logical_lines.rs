@@ -7,10 +7,10 @@ use ruff_python_ast::token_kind::TokenKind;
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
-    whitespace_around_named_parameter_equals, whitespace_before_comment,
-    whitespace_before_parameters, LogicalLines, TokenFlags,
+    blank_lines, extraneous_whitespace, indentation, missing_whitespace,
+    missing_whitespace_after_keyword, missing_whitespace_around_operator, space_around_operator,
+    whitespace_around_keywords, whitespace_around_named_parameter_equals,
+    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::Settings;
 
@@ -38,6 +38,7 @@ pub(crate) fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
+    let should_fix_blank_lines = settings.rules.should_fix(Rule::BlankLineBetweenMethods); // FIXME: Rule::BlankLines
     let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
 
     let should_fix_whitespace_before_parameters =
@@ -46,6 +47,10 @@ pub(crate) fn check_logical_lines(
     let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
+
+    if should_fix_blank_lines || true {
+        blank_lines(tokens, locator, &mut context);
+    }
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {

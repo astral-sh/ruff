@@ -14,6 +14,12 @@ mod rule_set;
 ruff_macros::register_rules!(
     // pycodestyle errors
     rules::pycodestyle::rules::MixedSpacesAndTabs,
+    rules::pycodestyle::rules::logical_lines::BlankLineBetweenMethods,
+    rules::pycodestyle::rules::logical_lines::BlankLinesTopLevel,
+    rules::pycodestyle::rules::logical_lines::TooManyBlankLines,
+    rules::pycodestyle::rules::logical_lines::BlankLineAfterDecorator,
+    rules::pycodestyle::rules::logical_lines::BlankLinesAfterFunctionOrClass,
+    rules::pycodestyle::rules::logical_lines::BlankLinesBeforeNestedDefinition,
     rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultiple,
     rules::pycodestyle::rules::logical_lines::NoIndentedBlock,
     rules::pycodestyle::rules::logical_lines::UnexpectedIndentation,
@@ -950,6 +956,12 @@ impl Rule {
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::BlankLineBetweenMethods
+            | Rule::BlankLinesTopLevel
+            | Rule::TooManyBlankLines
+            | Rule::BlankLineAfterDecorator
+            | Rule::BlankLinesAfterFunctionOrClass
+            | Rule::BlankLinesBeforeNestedDefinition
             | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
             | Rule::MissingWhitespaceAroundArithmeticOperator

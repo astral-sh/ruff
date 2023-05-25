@@ -104,6 +104,12 @@ mod tests {
         Path::new("E25.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
+    #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLineAfterDecorator, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesAfterFunctionOrClass, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesBeforeNestedDefinition, Path::new("E30.py"))]
     fn logical(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
