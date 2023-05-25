@@ -182,9 +182,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         let mut prefix_into_iter_match_arms = quote!();
 
         for (prefix, rules) in rules_by_prefix {
-            let rule_paths = rules
-                .iter()
-                .map(|(path, .., attrs)| quote!(#(#attrs)* #path));
+            let rule_paths = rules.iter().map(|(path, .., attrs)| {
+                let rule_name = path.segments.last().unwrap();
+                quote!(#(#attrs)* Rule::#rule_name)
+            });
             let prefix_ident = get_prefix_ident(&prefix);
             let attr = match if_all_same(rules.iter().map(|(.., attrs)| attrs)) {
                 Some(attr) => quote!(#(#attr)*),
@@ -259,8 +260,9 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                     rule_group_id,
                     attrs,
                 });
+            let rule_name = rule_id.segments.last().unwrap();
             linter_code_for_rule_match_arms.extend(quote! {
-                #(#attrs)* (Self::#linter, #rule_id) => Some(#code),
+                #(#attrs)* (Self::#linter, Rule::#rule_name) => Some(#code),
             });
         }
     }
@@ -286,6 +288,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
 ",
             rule.segments.last().unwrap().ident
         );
+        let rule_name = rule.segments.last().unwrap();
 
         let RuleToLinterData {
             linter,
@@ -299,11 +302,11 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
             .unwrap();
 
         rule_noqa_code_match_arms.extend(quote! {
-            #(#attrs)* #rule => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
+            #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
         });
 
         rule_group_match_arms.extend(quote! {
-            #(#attrs)* #rule => #rule_group_id,
+            #(#attrs)* Rule::#rule_name => #rule_group_id,
         });
     }
 
@@ -342,9 +345,10 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
 
     let mut linter_into_iter_match_arms = quote!();
     for (linter, map) in &linter_to_rules {
-        let rule_paths = map
-            .values()
-            .map(|LinterToRuleData { rule_id, attrs, .. }| quote!(#(#attrs)* #rule_id));
+        let rule_paths = map.values().map(|LinterToRuleData { rule_id, attrs, .. }| {
+            let rule_name = rule_id.segments.last().unwrap();
+            quote!(#(#attrs)* Rule::#rule_name)
+        });
         linter_into_iter_match_arms.extend(quote! {
             Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
         });
