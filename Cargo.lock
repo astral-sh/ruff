@@ -1961,6 +1961,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.3.1",
+ "insta",
  "is-macro",
  "itertools",
  "log",
