@@ -16,6 +16,9 @@ pub(crate) use simple_defaults::{
     typed_argument_simple_defaults, unannotated_assignment_in_stub, ArgumentDefaultInStub,
     AssignmentDefaultInStub, TypedArgumentDefaultInStub, UnannotatedAssignmentInStub,
 };
+pub(crate) use stub_body_multiple_statements::{
+    stub_body_multiple_statements, StubBodyMultipleStatements,
+};
 pub(crate) use type_alias_naming::{
     snake_case_type_alias, t_suffixed_type_alias, SnakeCaseTypeAlias, TSuffixedTypeAlias,
 };
@@ -34,6 +37,7 @@ mod pass_statement_stub_body;
 mod prefix_type_params;
 mod quoted_annotation_in_stub;
 mod simple_defaults;
+mod stub_body_multiple_statements;
 mod type_alias_naming;
 mod type_comment_in_stub;
 mod unrecognized_platform;

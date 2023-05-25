@@ -519,6 +519,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::PassStatementStubBody,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
+    rules::flake8_pyi::rules::StubBodyMultipleStatements,
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
     rules::flake8_pyi::rules::TypeCommentInStub,
     rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
