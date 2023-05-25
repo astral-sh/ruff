@@ -28,6 +28,7 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 use crate::{
+    ast::bigint::BigInt,
     soft_keywords::SoftKeywordTransformer,
     string::FStringErrorType,
     text_size::{TextLen, TextRange, TextSize},
@@ -35,7 +36,6 @@ use crate::{
     Mode,
 };
 use log::trace;
-use num_bigint::BigInt;
 use num_traits::{Num, Zero};
 use std::{char, cmp::Ordering, ops::Index, slice::SliceIndex, str::FromStr};
 use unic_emoji_char::is_emoji_presentation;
@@ -212,7 +212,7 @@ pub fn lex_starts_at(
     source: &str,
     mode: Mode,
     start_offset: TextSize,
-) -> impl Iterator<Item = LexResult> + '_ {
+) -> SoftKeywordTransformer<Lexer<std::str::Chars<'_>>> {
     SoftKeywordTransformer::new(Lexer::new(source.chars(), start_offset), mode)
 }
 
@@ -466,6 +466,13 @@ where
         }
     }
 
+    #[cfg(feature = "full-lexer")]
+    fn lex_and_emit_comment(&mut self) -> Result<(), LexicalError> {
+        let comment = self.lex_comment()?;
+        self.emit(comment);
+        Ok(())
+    }
+
     /// Discard comment if full-lexer is not enabled.
     #[cfg(not(feature = "full-lexer"))]
     fn lex_comment(&mut self) {
@@ -478,6 +485,13 @@ where
             }
             self.next_char().unwrap();
         }
+    }
+
+    #[cfg(not(feature = "full-lexer"))]
+    #[inline]
+    fn lex_and_emit_comment(&mut self) -> Result<(), LexicalError> {
+        self.lex_comment();
+        Ok(())
     }
 
     /// Lex a string literal.
@@ -626,9 +640,7 @@ where
                     tabs += 1;
                 }
                 Some('#') => {
-                    let _comment = self.lex_comment();
-                    #[cfg(feature = "full-lexer")]
-                    self.emit(_comment?);
+                    self.lex_and_emit_comment()?;
                     spaces = 0;
                     tabs = 0;
                 }
@@ -775,9 +787,7 @@ where
                 self.emit(number);
             }
             '#' => {
-                let _comment = self.lex_comment();
-                #[cfg(feature = "full-lexer")]
-                self.emit(_comment?);
+                self.lex_and_emit_comment()?;
             }
             '"' | '\'' => {
                 let string = self.lex_string(StringKind::String)?;
@@ -1360,7 +1370,7 @@ impl std::fmt::Display for LexicalErrorType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_bigint::BigInt;
+    use crate::ast::bigint::BigInt;
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";

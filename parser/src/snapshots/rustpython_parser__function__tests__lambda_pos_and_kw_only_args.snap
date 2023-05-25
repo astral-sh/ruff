@@ -11,56 +11,74 @@ Ok(
                     ExprLambda {
                         range: 0..26,
                         args: Arguments {
-                            range: (),
+                            range: 7..23,
                             posonlyargs: [],
                             args: [
-                                Arg {
+                                ArgWithDefault {
                                     range: 7..8,
-                                    arg: Identifier(
-                                        "a",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 7..8,
+                                        arg: Identifier(
+                                            "a",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
-                                Arg {
+                                ArgWithDefault {
                                     range: 10..11,
-                                    arg: Identifier(
-                                        "b",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 10..11,
+                                        arg: Identifier(
+                                            "b",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
-                                Arg {
+                                ArgWithDefault {
                                     range: 13..14,
-                                    arg: Identifier(
-                                        "c",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 13..14,
+                                        arg: Identifier(
+                                            "c",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
                             ],
                             vararg: None,
                             kwonlyargs: [
-                                Arg {
+                                ArgWithDefault {
                                     range: 19..20,
-                                    arg: Identifier(
-                                        "d",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 19..20,
+                                        arg: Identifier(
+                                            "d",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
-                                Arg {
+                                ArgWithDefault {
                                     range: 22..23,
-                                    arg: Identifier(
-                                        "e",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 22..23,
+                                        arg: Identifier(
+                                            "e",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
                             ],
-                            kw_defaults: [],
                             kwarg: None,
-                            defaults: [],
                         },
                         body: Constant(
                             ExprConstant {

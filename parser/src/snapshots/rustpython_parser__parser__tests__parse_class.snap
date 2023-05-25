@@ -38,23 +38,25 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             "__init__",
                         ),
                         args: Arguments {
-                            range: (),
+                            range: 31..35,
                             posonlyargs: [],
                             args: [
-                                Arg {
+                                ArgWithDefault {
                                     range: 31..35,
-                                    arg: Identifier(
-                                        "self",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 31..35,
+                                        arg: Identifier(
+                                            "self",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
                             ],
                             vararg: None,
                             kwonlyargs: [],
-                            kw_defaults: [],
                             kwarg: None,
-                            defaults: [],
                         },
                         body: [
                             Pass(
@@ -75,41 +77,47 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                             "method_with_default",
                         ),
                         args: Arguments {
-                            range: (),
+                            range: 70..89,
                             posonlyargs: [],
                             args: [
-                                Arg {
+                                ArgWithDefault {
                                     range: 70..74,
-                                    arg: Identifier(
-                                        "self",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 70..74,
+                                        arg: Identifier(
+                                            "self",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
-                                Arg {
+                                ArgWithDefault {
                                     range: 76..79,
-                                    arg: Identifier(
-                                        "arg",
+                                    def: Arg {
+                                        range: 76..79,
+                                        arg: Identifier(
+                                            "arg",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: Some(
+                                        Constant(
+                                            ExprConstant {
+                                                range: 80..89,
+                                                value: Str(
+                                                    "default",
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
                                     ),
-                                    annotation: None,
-                                    type_comment: None,
                                 },
                             ],
                             vararg: None,
                             kwonlyargs: [],
-                            kw_defaults: [],
                             kwarg: None,
-                            defaults: [
-                                Constant(
-                                    ExprConstant {
-                                        range: 80..89,
-                                        value: Str(
-                                            "default",
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                            ],
                         },
                         body: [
                             Pass(

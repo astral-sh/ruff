@@ -1,5 +1,6 @@
 use itertools::{Itertools, PeekingNext};
-use num_bigint::{BigInt, Sign};
+use malachite_bigint::{BigInt, Sign};
+use num_traits::FromPrimitive;
 use num_traits::{cast::ToPrimitive, Signed};
 use rustpython_literal::float;
 use rustpython_literal::format::Case;
@@ -419,15 +420,25 @@ impl FormatSpec {
 
     pub fn format_bool(&self, input: bool) -> Result<String, FormatSpecError> {
         let x = u8::from(input);
-        let result: Result<String, FormatSpecError> = match &self.format_type {
-            Some(FormatType::Decimal) => Ok(x.to_string()),
+        match &self.format_type {
+            Some(
+                FormatType::Binary
+                | FormatType::Decimal
+                | FormatType::Octal
+                | FormatType::Number(Case::Lower)
+                | FormatType::Hex(_)
+                | FormatType::GeneralFormat(_)
+                | FormatType::Character,
+            ) => self.format_int(&BigInt::from_u8(x).unwrap()),
+            Some(FormatType::Exponent(_) | FormatType::FixedPoint(_) | FormatType::Percentage) => {
+                self.format_float(x as f64)
+            }
             None => {
                 let first_letter = (input.to_string().as_bytes()[0] as char).to_uppercase();
                 Ok(first_letter.collect::<String>() + &input.to_string()[1..])
             }
             _ => Err(FormatSpecError::InvalidFormatSpecifier),
-        };
-        result
+        }
     }
 
     pub fn format_float(&self, num: f64) -> Result<String, FormatSpecError> {
@@ -1028,6 +1039,42 @@ mod tests {
             format_type: Some(FormatType::Binary),
         });
         assert_eq!(FormatSpec::parse("<>-#23,.11b"), expected);
+    }
+
+    fn format_bool(text: &str, value: bool) -> Result<String, FormatSpecError> {
+        FormatSpec::parse(text).and_then(|spec| spec.format_bool(value))
+    }
+
+    #[test]
+    fn test_format_bool() {
+        assert_eq!(format_bool("b", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("b", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("d", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("d", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("o", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("o", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("n", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("n", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("x", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("x", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("X", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("X", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("g", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("g", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("G", true), Ok("1".to_owned()));
+        assert_eq!(format_bool("G", false), Ok("0".to_owned()));
+        assert_eq!(format_bool("c", true), Ok("\x01".to_owned()));
+        assert_eq!(format_bool("c", false), Ok("\x00".to_owned()));
+        assert_eq!(format_bool("e", true), Ok("1.000000e+00".to_owned()));
+        assert_eq!(format_bool("e", false), Ok("0.000000e+00".to_owned()));
+        assert_eq!(format_bool("E", true), Ok("1.000000E+00".to_owned()));
+        assert_eq!(format_bool("E", false), Ok("0.000000E+00".to_owned()));
+        assert_eq!(format_bool("f", true), Ok("1.000000".to_owned()));
+        assert_eq!(format_bool("f", false), Ok("0.000000".to_owned()));
+        assert_eq!(format_bool("F", true), Ok("1.000000".to_owned()));
+        assert_eq!(format_bool("F", false), Ok("0.000000".to_owned()));
+        assert_eq!(format_bool("%", true), Ok("100.000000%".to_owned()));
+        assert_eq!(format_bool("%", false), Ok("0.000000%".to_owned()));
     }
 
     #[test]

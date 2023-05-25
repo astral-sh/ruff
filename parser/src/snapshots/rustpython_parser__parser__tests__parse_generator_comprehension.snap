@@ -16,7 +16,7 @@ GeneratorExp(
         ),
         generators: [
             Comprehension {
-                range: (),
+                range: 3..13,
                 target: Name(
                     ExprName {
                         range: 7..8,

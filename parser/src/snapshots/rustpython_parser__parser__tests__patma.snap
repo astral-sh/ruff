@@ -17,7 +17,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 80..103,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 85..88,
@@ -86,7 +86,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 139..167,
                     pattern: MatchClass(
                         PatternMatchClass {
                             range: 144..152,
@@ -163,7 +163,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 203..229,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 208..209,
@@ -219,7 +219,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 234..260,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 239..240,
@@ -291,7 +291,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 296..332,
                     pattern: MatchOr(
                         PatternMatchOr {
                             range: 301..314,
@@ -402,7 +402,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 368..403,
                     pattern: MatchOr(
                         PatternMatchOr {
                             range: 373..388,
@@ -527,7 +527,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 458..489,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 463..467,
@@ -562,7 +562,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 494..523,
                     pattern: MatchMapping(
                         PatternMatchMapping {
                             range: 499..501,
@@ -608,7 +608,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 559..594,
                     pattern: MatchMapping(
                         PatternMatchMapping {
                             range: 564..579,
@@ -702,7 +702,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 599..687,
                     pattern: MatchOr(
                         PatternMatchOr {
                             range: 604..672,
@@ -940,7 +940,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 692..714,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 697..699,
@@ -994,7 +994,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 750..782,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 755..767,
@@ -1072,7 +1072,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 818..841,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 823..826,
@@ -1141,7 +1141,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 877..913,
                     pattern: MatchOr(
                         PatternMatchOr {
                             range: 882..895,
@@ -1252,7 +1252,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 949..975,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 954..955,
@@ -1324,7 +1324,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1011..1037,
                     pattern: MatchMapping(
                         PatternMatchMapping {
                             range: 1016..1022,
@@ -1389,7 +1389,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 1042..1068,
                     pattern: MatchMapping(
                         PatternMatchMapping {
                             range: 1047..1053,
@@ -1454,7 +1454,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 1073..1098,
                     pattern: MatchMapping(
                         PatternMatchMapping {
                             range: 1078..1083,
@@ -1521,7 +1521,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1138..1162,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 1143..1147,
@@ -1582,7 +1582,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1198..1219,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 1203..1204,
@@ -1628,7 +1628,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 1224..1245,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 1229..1230,
@@ -1690,7 +1690,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1281..1315,
                     pattern: MatchMapping(
                         PatternMatchMapping {
                             range: 1286..1298,
@@ -1794,7 +1794,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1359..1392,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 1364..1377,
@@ -1901,7 +1901,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1428..1451,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 1433..1436,
@@ -1954,7 +1954,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 1456..1498,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 1461..1467,
@@ -2069,7 +2069,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 1503..1529,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 1508..1514,
@@ -2152,7 +2152,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1565..1595,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 1570..1580,
@@ -2235,7 +2235,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1631..1664,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 1636..1649,
@@ -2327,7 +2327,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1703..1726,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 1708..1711,
@@ -2393,7 +2393,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1762..1789,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 1767..1774,
@@ -2482,7 +2482,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1825..1849,
                     pattern: MatchSingleton(
                         PatternMatchSingleton {
                             range: 1830..1834,
@@ -2536,7 +2536,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1885..1906,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 1890..1891,
@@ -2598,7 +2598,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 1942..1967,
                     pattern: MatchSingleton(
                         PatternMatchSingleton {
                             range: 1947..1952,
@@ -2654,7 +2654,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2003..2025,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2008..2010,
@@ -2692,7 +2692,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 2030..2054,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2035..2039,
@@ -2745,7 +2745,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 2059..2081,
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 2064..2066,
@@ -2807,7 +2807,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2117..2138,
                     pattern: MatchAs(
                         PatternMatchAs {
                             range: 2122..2123,
@@ -2866,7 +2866,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2174..2207,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2179..2192,
@@ -2953,7 +2953,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2243..2307,
                     pattern: MatchOr(
                         PatternMatchOr {
                             range: 2248..2278,
@@ -3130,7 +3130,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2343..2378,
                     pattern: MatchMapping(
                         PatternMatchMapping {
                             range: 2348..2363,
@@ -3224,7 +3224,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 2383..2472,
                     pattern: MatchOr(
                         PatternMatchOr {
                             range: 2388..2457,
@@ -3462,7 +3462,7 @@ expression: parse_ast
                     ],
                 },
                 MatchCase {
-                    range: (),
+                    range: 2477..2499,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2482..2484,
@@ -3542,7 +3542,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2543..2568,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2548..2553,
@@ -3647,7 +3647,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2612..2638,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2617..2623,
@@ -3726,7 +3726,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2675..2697,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2680..2682,
@@ -3809,7 +3809,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2736..2760,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2741..2745,
@@ -3900,7 +3900,7 @@ expression: parse_ast
             ),
             cases: [
                 MatchCase {
-                    range: (),
+                    range: 2802..2829,
                     pattern: MatchSequence(
                         PatternMatchSequence {
                             range: 2807..2814,

@@ -13,5 +13,5 @@ rust-version = { workspace = true }
 [dependencies]
 ruff_text_size = { path = "../ruff_text_size" }
 
-memchr = "2.5.0"
+memchr = { workspace = true }
 once_cell = { workspace = true }

@@ -15,9 +15,7 @@ expression: parse_ast
                 args: [],
                 vararg: None,
                 kwonlyargs: [],
-                kw_defaults: [],
                 kwarg: None,
-                defaults: [],
             },
             body: [
                 Pass(

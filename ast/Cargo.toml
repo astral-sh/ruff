@@ -8,26 +8,19 @@ repository = "https://github.com/RustPython/Parser/"
 license = "MIT"
 
 [features]
-default = ["location"]
+default = ["location", "malachite-bigint"]
 constant-optimization = ["fold"]
 location = ["fold", "rustpython-parser-core/location"]
 fold = []
 unparse = ["rustpython-literal"]
 visitor = []
 all-nodes-with-ranges = []
-pyo3 = ["dep:pyo3", "num-complex", "once_cell"]
-
-# This feature is experimental
-# It reimplements AST types, but currently both slower than python AST types and limited to use in other API
-pyo3-wrapper = ["pyo3"]
 
 [dependencies]
 rustpython-parser-core = { workspace = true }
 rustpython-literal = { workspace = true, optional = true }
 
 is-macro = { workspace = true }
-num-bigint = { workspace = true }
+num-bigint = { workspace = true, optional = true }
+malachite-bigint = { workspace = true, optional = true }
 static_assertions = "1.1.0"
-num-complex = { workspace = true, optional = true }
-once_cell = { workspace = true, optional = true }
-pyo3 = { workspace = true, optional = true, features = ["num-bigint", "num-complex"] }

@@ -1,9 +1,31 @@
+//! Python AST node definitions and utilities.
+//!
+//! AST nodes are very similary defined like [Python AST](https://docs.python.org/3/library/ast.html).
+//! But a few exceptions exist due to parser optimization.
+//! They can be transformed to matching Python-styled AST in reasonable cost.
+//!
+//! [PythonArguments] is replaced by [Arguments]. The new [Arguments] type representation uses a new type
+//! [ArgWithDefault] to represent arguments with default values. See each type documentation for more details.
+//!
+//! A few top-level sum types are renamed to human friendly names.
+//! [CmpOp] refers `cmpop`
+//! [UnaryOp] refers `unaryop`
+//! [BoolOp] refers `boolop`
+//! [WithItem] refers `withitem`
+//! [ExceptHandler] refers `excepthandler`
+//!
+
 mod builtin;
 mod generic;
 mod impls;
 mod ranged;
 #[cfg(feature = "unparse")]
 mod unparse;
+
+#[cfg(feature = "malachite-bigint")]
+pub use malachite_bigint as bigint;
+#[cfg(feature = "num-bigint")]
+pub use num_bigint as bigint;
 
 pub use builtin::*;
 pub use generic::*;
@@ -41,8 +63,3 @@ pub use visitor::Visitor;
 mod optimizer;
 #[cfg(feature = "constant-optimization")]
 pub use optimizer::ConstantOptimizer;
-
-#[cfg(feature = "pyo3")]
-pub mod pyo3;
-#[cfg(feature = "pyo3-wrapper")]
-pub mod pyo3_wrapper;

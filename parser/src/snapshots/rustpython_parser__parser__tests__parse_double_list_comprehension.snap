@@ -16,7 +16,7 @@ ListComp(
         ),
         generators: [
             Comprehension {
-                range: (),
+                range: 3..17,
                 target: Tuple(
                     ExprTuple {
                         range: 7..12,
@@ -56,7 +56,7 @@ ListComp(
                 is_async: false,
             },
             Comprehension {
-                range: (),
+                range: 18..47,
                 target: Name(
                     ExprName {
                         range: 22..23,

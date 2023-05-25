@@ -38,7 +38,7 @@ Call(
                     ),
                     generators: [
                         Comprehension {
-                            range: (),
+                            range: 22..139,
                             target: Name(
                                 ExprName {
                                     range: 26..29,

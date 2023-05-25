@@ -10,31 +10,37 @@ expression: parse_ast
                 ExprLambda {
                     range: 0..18,
                     args: Arguments {
-                        range: (),
+                        range: 7..11,
                         posonlyargs: [],
                         args: [
-                            Arg {
+                            ArgWithDefault {
                                 range: 7..8,
-                                arg: Identifier(
-                                    "x",
-                                ),
-                                annotation: None,
-                                type_comment: None,
+                                def: Arg {
+                                    range: 7..8,
+                                    arg: Identifier(
+                                        "x",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                },
+                                default: None,
                             },
-                            Arg {
+                            ArgWithDefault {
                                 range: 10..11,
-                                arg: Identifier(
-                                    "y",
-                                ),
-                                annotation: None,
-                                type_comment: None,
+                                def: Arg {
+                                    range: 10..11,
+                                    arg: Identifier(
+                                        "y",
+                                    ),
+                                    annotation: None,
+                                    type_comment: None,
+                                },
+                                default: None,
                             },
                         ],
                         vararg: None,
                         kwonlyargs: [],
-                        kw_defaults: [],
                         kwarg: None,
-                        defaults: [],
                     },
                     body: BinOp(
                         ExprBinOp {

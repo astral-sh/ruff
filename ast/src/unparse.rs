@@ -1,5 +1,7 @@
-use crate::ConversionFlag;
-use crate::{Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, Identifier, Operator};
+use crate::{
+    Arg, ArgWithDefault, Arguments, BoolOp, Comprehension, Constant, ConversionFlag, Expr,
+    Identifier, Operator, PythonArguments,
+};
 use std::fmt;
 
 mod precedence {
@@ -77,7 +79,7 @@ impl<'a> Unparser<'a> {
                 values,
                 range: _range,
             }) => {
-                let (op, prec) = op_prec!(bin, op, Boolop, And("and", AND), Or("or", OR));
+                let (op, prec) = op_prec!(bin, op, BoolOp, And("and", AND), Or("or", OR));
                 group_if!(prec, {
                     let mut first = true;
                     for val in values {
@@ -136,7 +138,7 @@ impl<'a> Unparser<'a> {
                 let (op, prec) = op_prec!(
                     un,
                     op,
-                    crate::Unaryop,
+                    crate::UnaryOp,
                     Invert("~", FACTOR),
                     Not("not ", NOT),
                     UAdd("+", FACTOR),
@@ -155,7 +157,7 @@ impl<'a> Unparser<'a> {
                 group_if!(precedence::TEST, {
                     let pos = args.args.len() + args.posonlyargs.len();
                     self.p(if pos > 0 { "lambda " } else { "lambda" })?;
-                    self.unparse_args(args)?;
+                    self.unparse_arguments(args)?;
                     write!(self, ": {}", **body)?;
                 })
             }
@@ -285,19 +287,9 @@ impl<'a> Unparser<'a> {
                     let new_lvl = precedence::CMP + 1;
                     self.unparse_expr(left, new_lvl)?;
                     for (op, cmp) in ops.iter().zip(comparators) {
-                        let op = match op {
-                            Cmpop::Eq => " == ",
-                            Cmpop::NotEq => " != ",
-                            Cmpop::Lt => " < ",
-                            Cmpop::LtE => " <= ",
-                            Cmpop::Gt => " > ",
-                            Cmpop::GtE => " >= ",
-                            Cmpop::Is => " is ",
-                            Cmpop::IsNot => " is not ",
-                            Cmpop::In => " in ",
-                            Cmpop::NotIn => " not in ",
-                        };
-                        self.p(op)?;
+                        self.p(" ")?;
+                        self.p(op.as_str())?;
+                        self.p(" ")?;
                         self.unparse_expr(cmp, new_lvl)?;
                     }
                 })
@@ -447,7 +439,44 @@ impl<'a> Unparser<'a> {
         Ok(())
     }
 
-    fn unparse_args<U>(&mut self, args: &Arguments<U>) -> fmt::Result {
+    fn unparse_arguments<U>(&mut self, args: &Arguments<U>) -> fmt::Result {
+        let mut first = true;
+        for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {
+            self.p_delim(&mut first, ", ")?;
+            self.unparse_function_arg(arg)?;
+            self.p_if(i + 1 == args.posonlyargs.len(), ", /")?;
+        }
+        if args.vararg.is_some() || !args.kwonlyargs.is_empty() {
+            self.p_delim(&mut first, ", ")?;
+            self.p("*")?;
+        }
+        if let Some(vararg) = &args.vararg {
+            self.unparse_arg(vararg)?;
+        }
+        for kwarg in args.kwonlyargs.iter() {
+            self.p_delim(&mut first, ", ")?;
+            self.unparse_function_arg(kwarg)?;
+        }
+        if let Some(kwarg) = &args.kwarg {
+            self.p_delim(&mut first, ", ")?;
+            self.p("**")?;
+            self.unparse_arg(kwarg)?;
+        }
+        Ok(())
+    }
+    fn unparse_function_arg<U>(&mut self, arg: &ArgWithDefault<U>) -> fmt::Result {
+        self.p_id(&arg.def.arg)?;
+        if let Some(ann) = &arg.def.annotation {
+            write!(self, ": {}", **ann)?;
+        }
+        if let Some(default) = &arg.default {
+            write!(self, "={}", default)?;
+        }
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn unparse_python_arguments<U>(&mut self, args: &PythonArguments<U>) -> fmt::Result {
         let mut first = true;
         let defaults_start = args.posonlyargs.len() + args.args.len() - args.defaults.len();
         for (i, arg) in args.posonlyargs.iter().chain(&args.args).enumerate() {

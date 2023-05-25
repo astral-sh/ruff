@@ -5,40 +5,60 @@ pub type Mod = crate::generic::Mod<SourceRange>;
 pub type ModModule = crate::generic::ModModule<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
 impl Located for ModModule {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for ModModule {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
 pub type ModInteractive = crate::generic::ModInteractive<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
 impl Located for ModInteractive {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for ModInteractive {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
 pub type ModExpression = crate::generic::ModExpression<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
 impl Located for ModExpression {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for ModExpression {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
 pub type ModFunctionType = crate::generic::ModFunctionType<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
 impl Located for ModFunctionType {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for ModFunctionType {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -53,6 +73,17 @@ impl Located for Mod {
         }
     }
 }
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for Mod {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        match self {
+            Self::Module(node) => node.range_mut(),
+            Self::Interactive(node) => node.range_mut(),
+            Self::Expression(node) => node.range_mut(),
+            Self::FunctionType(node) => node.range_mut(),
+        }
+    }
+}
 
 pub type Stmt = crate::generic::Stmt<SourceRange>;
 
@@ -64,11 +95,23 @@ impl Located for StmtFunctionDef {
     }
 }
 
+impl LocatedMut for StmtFunctionDef {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtAsyncFunctionDef = crate::generic::StmtAsyncFunctionDef<SourceRange>;
 
 impl Located for StmtAsyncFunctionDef {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtAsyncFunctionDef {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -80,11 +123,23 @@ impl Located for StmtClassDef {
     }
 }
 
+impl LocatedMut for StmtClassDef {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtReturn = crate::generic::StmtReturn<SourceRange>;
 
 impl Located for StmtReturn {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtReturn {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -96,11 +151,23 @@ impl Located for StmtDelete {
     }
 }
 
+impl LocatedMut for StmtDelete {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtAssign = crate::generic::StmtAssign<SourceRange>;
 
 impl Located for StmtAssign {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtAssign {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -112,11 +179,23 @@ impl Located for StmtAugAssign {
     }
 }
 
+impl LocatedMut for StmtAugAssign {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtAnnAssign = crate::generic::StmtAnnAssign<SourceRange>;
 
 impl Located for StmtAnnAssign {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtAnnAssign {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -128,11 +207,23 @@ impl Located for StmtFor {
     }
 }
 
+impl LocatedMut for StmtFor {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtAsyncFor = crate::generic::StmtAsyncFor<SourceRange>;
 
 impl Located for StmtAsyncFor {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtAsyncFor {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -144,11 +235,23 @@ impl Located for StmtWhile {
     }
 }
 
+impl LocatedMut for StmtWhile {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtIf = crate::generic::StmtIf<SourceRange>;
 
 impl Located for StmtIf {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtIf {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -160,11 +263,23 @@ impl Located for StmtWith {
     }
 }
 
+impl LocatedMut for StmtWith {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtAsyncWith = crate::generic::StmtAsyncWith<SourceRange>;
 
 impl Located for StmtAsyncWith {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtAsyncWith {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -176,11 +291,23 @@ impl Located for StmtMatch {
     }
 }
 
+impl LocatedMut for StmtMatch {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtRaise = crate::generic::StmtRaise<SourceRange>;
 
 impl Located for StmtRaise {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtRaise {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -192,11 +319,23 @@ impl Located for StmtTry {
     }
 }
 
+impl LocatedMut for StmtTry {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtTryStar = crate::generic::StmtTryStar<SourceRange>;
 
 impl Located for StmtTryStar {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtTryStar {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -208,11 +347,23 @@ impl Located for StmtAssert {
     }
 }
 
+impl LocatedMut for StmtAssert {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtImport = crate::generic::StmtImport<SourceRange>;
 
 impl Located for StmtImport {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtImport {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -224,11 +375,23 @@ impl Located for StmtImportFrom {
     }
 }
 
+impl LocatedMut for StmtImportFrom {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtGlobal = crate::generic::StmtGlobal<SourceRange>;
 
 impl Located for StmtGlobal {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtGlobal {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -240,11 +403,23 @@ impl Located for StmtNonlocal {
     }
 }
 
+impl LocatedMut for StmtNonlocal {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtExpr = crate::generic::StmtExpr<SourceRange>;
 
 impl Located for StmtExpr {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtExpr {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -256,6 +431,12 @@ impl Located for StmtPass {
     }
 }
 
+impl LocatedMut for StmtPass {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtBreak = crate::generic::StmtBreak<SourceRange>;
 
 impl Located for StmtBreak {
@@ -264,11 +445,23 @@ impl Located for StmtBreak {
     }
 }
 
+impl LocatedMut for StmtBreak {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type StmtContinue = crate::generic::StmtContinue<SourceRange>;
 
 impl Located for StmtContinue {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for StmtContinue {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -306,6 +499,40 @@ impl Located for Stmt {
     }
 }
 
+impl LocatedMut for Stmt {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        match self {
+            Self::FunctionDef(node) => node.range_mut(),
+            Self::AsyncFunctionDef(node) => node.range_mut(),
+            Self::ClassDef(node) => node.range_mut(),
+            Self::Return(node) => node.range_mut(),
+            Self::Delete(node) => node.range_mut(),
+            Self::Assign(node) => node.range_mut(),
+            Self::AugAssign(node) => node.range_mut(),
+            Self::AnnAssign(node) => node.range_mut(),
+            Self::For(node) => node.range_mut(),
+            Self::AsyncFor(node) => node.range_mut(),
+            Self::While(node) => node.range_mut(),
+            Self::If(node) => node.range_mut(),
+            Self::With(node) => node.range_mut(),
+            Self::AsyncWith(node) => node.range_mut(),
+            Self::Match(node) => node.range_mut(),
+            Self::Raise(node) => node.range_mut(),
+            Self::Try(node) => node.range_mut(),
+            Self::TryStar(node) => node.range_mut(),
+            Self::Assert(node) => node.range_mut(),
+            Self::Import(node) => node.range_mut(),
+            Self::ImportFrom(node) => node.range_mut(),
+            Self::Global(node) => node.range_mut(),
+            Self::Nonlocal(node) => node.range_mut(),
+            Self::Expr(node) => node.range_mut(),
+            Self::Pass(node) => node.range_mut(),
+            Self::Break(node) => node.range_mut(),
+            Self::Continue(node) => node.range_mut(),
+        }
+    }
+}
+
 pub type Expr = crate::generic::Expr<SourceRange>;
 
 pub type ExprBoolOp = crate::generic::ExprBoolOp<SourceRange>;
@@ -313,6 +540,12 @@ pub type ExprBoolOp = crate::generic::ExprBoolOp<SourceRange>;
 impl Located for ExprBoolOp {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprBoolOp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -324,11 +557,23 @@ impl Located for ExprNamedExpr {
     }
 }
 
+impl LocatedMut for ExprNamedExpr {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprBinOp = crate::generic::ExprBinOp<SourceRange>;
 
 impl Located for ExprBinOp {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprBinOp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -340,11 +585,23 @@ impl Located for ExprUnaryOp {
     }
 }
 
+impl LocatedMut for ExprUnaryOp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprLambda = crate::generic::ExprLambda<SourceRange>;
 
 impl Located for ExprLambda {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprLambda {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -356,11 +613,23 @@ impl Located for ExprIfExp {
     }
 }
 
+impl LocatedMut for ExprIfExp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprDict = crate::generic::ExprDict<SourceRange>;
 
 impl Located for ExprDict {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprDict {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -372,11 +641,23 @@ impl Located for ExprSet {
     }
 }
 
+impl LocatedMut for ExprSet {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprListComp = crate::generic::ExprListComp<SourceRange>;
 
 impl Located for ExprListComp {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprListComp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -388,11 +669,23 @@ impl Located for ExprSetComp {
     }
 }
 
+impl LocatedMut for ExprSetComp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprDictComp = crate::generic::ExprDictComp<SourceRange>;
 
 impl Located for ExprDictComp {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprDictComp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -404,11 +697,23 @@ impl Located for ExprGeneratorExp {
     }
 }
 
+impl LocatedMut for ExprGeneratorExp {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprAwait = crate::generic::ExprAwait<SourceRange>;
 
 impl Located for ExprAwait {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprAwait {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -420,11 +725,23 @@ impl Located for ExprYield {
     }
 }
 
+impl LocatedMut for ExprYield {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprYieldFrom = crate::generic::ExprYieldFrom<SourceRange>;
 
 impl Located for ExprYieldFrom {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprYieldFrom {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -436,11 +753,23 @@ impl Located for ExprCompare {
     }
 }
 
+impl LocatedMut for ExprCompare {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprCall = crate::generic::ExprCall<SourceRange>;
 
 impl Located for ExprCall {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprCall {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -452,11 +781,23 @@ impl Located for ExprFormattedValue {
     }
 }
 
+impl LocatedMut for ExprFormattedValue {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprJoinedStr = crate::generic::ExprJoinedStr<SourceRange>;
 
 impl Located for ExprJoinedStr {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprJoinedStr {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -468,11 +809,23 @@ impl Located for ExprConstant {
     }
 }
 
+impl LocatedMut for ExprConstant {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprAttribute = crate::generic::ExprAttribute<SourceRange>;
 
 impl Located for ExprAttribute {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprAttribute {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -484,11 +837,23 @@ impl Located for ExprSubscript {
     }
 }
 
+impl LocatedMut for ExprSubscript {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprStarred = crate::generic::ExprStarred<SourceRange>;
 
 impl Located for ExprStarred {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprStarred {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -500,11 +865,23 @@ impl Located for ExprName {
     }
 }
 
+impl LocatedMut for ExprName {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprList = crate::generic::ExprList<SourceRange>;
 
 impl Located for ExprList {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprList {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -516,11 +893,23 @@ impl Located for ExprTuple {
     }
 }
 
+impl LocatedMut for ExprTuple {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type ExprSlice = crate::generic::ExprSlice<SourceRange>;
 
 impl Located for ExprSlice {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for ExprSlice {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -558,6 +947,40 @@ impl Located for Expr {
     }
 }
 
+impl LocatedMut for Expr {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        match self {
+            Self::BoolOp(node) => node.range_mut(),
+            Self::NamedExpr(node) => node.range_mut(),
+            Self::BinOp(node) => node.range_mut(),
+            Self::UnaryOp(node) => node.range_mut(),
+            Self::Lambda(node) => node.range_mut(),
+            Self::IfExp(node) => node.range_mut(),
+            Self::Dict(node) => node.range_mut(),
+            Self::Set(node) => node.range_mut(),
+            Self::ListComp(node) => node.range_mut(),
+            Self::SetComp(node) => node.range_mut(),
+            Self::DictComp(node) => node.range_mut(),
+            Self::GeneratorExp(node) => node.range_mut(),
+            Self::Await(node) => node.range_mut(),
+            Self::Yield(node) => node.range_mut(),
+            Self::YieldFrom(node) => node.range_mut(),
+            Self::Compare(node) => node.range_mut(),
+            Self::Call(node) => node.range_mut(),
+            Self::FormattedValue(node) => node.range_mut(),
+            Self::JoinedStr(node) => node.range_mut(),
+            Self::Constant(node) => node.range_mut(),
+            Self::Attribute(node) => node.range_mut(),
+            Self::Subscript(node) => node.range_mut(),
+            Self::Starred(node) => node.range_mut(),
+            Self::Name(node) => node.range_mut(),
+            Self::List(node) => node.range_mut(),
+            Self::Tuple(node) => node.range_mut(),
+            Self::Slice(node) => node.range_mut(),
+        }
+    }
+}
+
 pub type ExprContext = crate::generic::ExprContext;
 
 pub type ExprContextLoad = crate::generic::ExprContextLoad;
@@ -566,11 +989,11 @@ pub type ExprContextStore = crate::generic::ExprContextStore;
 
 pub type ExprContextDel = crate::generic::ExprContextDel;
 
-pub type Boolop = crate::generic::Boolop;
+pub type BoolOp = crate::generic::BoolOp;
 
-pub type BoolopAnd = crate::generic::BoolopAnd;
+pub type BoolOpAnd = crate::generic::BoolOpAnd;
 
-pub type BoolopOr = crate::generic::BoolopOr;
+pub type BoolOpOr = crate::generic::BoolOpOr;
 
 pub type Operator = crate::generic::Operator;
 
@@ -600,59 +1023,70 @@ pub type OperatorBitAnd = crate::generic::OperatorBitAnd;
 
 pub type OperatorFloorDiv = crate::generic::OperatorFloorDiv;
 
-pub type Unaryop = crate::generic::Unaryop;
+pub type UnaryOp = crate::generic::UnaryOp;
 
-pub type UnaryopInvert = crate::generic::UnaryopInvert;
+pub type UnaryOpInvert = crate::generic::UnaryOpInvert;
 
-pub type UnaryopNot = crate::generic::UnaryopNot;
+pub type UnaryOpNot = crate::generic::UnaryOpNot;
 
-pub type UnaryopUAdd = crate::generic::UnaryopUAdd;
+pub type UnaryOpUAdd = crate::generic::UnaryOpUAdd;
 
-pub type UnaryopUSub = crate::generic::UnaryopUSub;
+pub type UnaryOpUSub = crate::generic::UnaryOpUSub;
 
-pub type Cmpop = crate::generic::Cmpop;
+pub type CmpOp = crate::generic::CmpOp;
 
-pub type CmpopEq = crate::generic::CmpopEq;
+pub type CmpOpEq = crate::generic::CmpOpEq;
 
-pub type CmpopNotEq = crate::generic::CmpopNotEq;
+pub type CmpOpNotEq = crate::generic::CmpOpNotEq;
 
-pub type CmpopLt = crate::generic::CmpopLt;
+pub type CmpOpLt = crate::generic::CmpOpLt;
 
-pub type CmpopLtE = crate::generic::CmpopLtE;
+pub type CmpOpLtE = crate::generic::CmpOpLtE;
 
-pub type CmpopGt = crate::generic::CmpopGt;
+pub type CmpOpGt = crate::generic::CmpOpGt;
 
-pub type CmpopGtE = crate::generic::CmpopGtE;
+pub type CmpOpGtE = crate::generic::CmpOpGtE;
 
-pub type CmpopIs = crate::generic::CmpopIs;
+pub type CmpOpIs = crate::generic::CmpOpIs;
 
-pub type CmpopIsNot = crate::generic::CmpopIsNot;
+pub type CmpOpIsNot = crate::generic::CmpOpIsNot;
 
-pub type CmpopIn = crate::generic::CmpopIn;
+pub type CmpOpIn = crate::generic::CmpOpIn;
 
-pub type CmpopNotIn = crate::generic::CmpopNotIn;
+pub type CmpOpNotIn = crate::generic::CmpOpNotIn;
 
 pub type Comprehension = crate::generic::Comprehension<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
 impl Located for Comprehension {
     fn range(&self) -> SourceRange {
         self.range
     }
 }
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for Comprehension {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
 
-pub type Excepthandler = crate::generic::Excepthandler<SourceRange>;
+pub type ExceptHandler = crate::generic::ExceptHandler<SourceRange>;
 
-pub type ExcepthandlerExceptHandler = crate::generic::ExcepthandlerExceptHandler<SourceRange>;
+pub type ExceptHandlerExceptHandler = crate::generic::ExceptHandlerExceptHandler<SourceRange>;
 
-impl Located for ExcepthandlerExceptHandler {
+impl Located for ExceptHandlerExceptHandler {
     fn range(&self) -> SourceRange {
         self.range
     }
 }
 
-impl Located for Excepthandler {
+impl LocatedMut for ExceptHandlerExceptHandler {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
+impl Located for ExceptHandler {
     fn range(&self) -> SourceRange {
         match self {
             Self::ExceptHandler(node) => node.range(),
@@ -660,13 +1094,26 @@ impl Located for Excepthandler {
     }
 }
 
-pub type Arguments = crate::generic::Arguments<SourceRange>;
+impl LocatedMut for ExceptHandler {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        match self {
+            Self::ExceptHandler(node) => node.range_mut(),
+        }
+    }
+}
+
+pub type PythonArguments = crate::generic::PythonArguments<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
-impl Located for Arguments {
+impl Located for PythonArguments {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for PythonArguments {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -678,11 +1125,23 @@ impl Located for Arg {
     }
 }
 
+impl LocatedMut for Arg {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type Keyword = crate::generic::Keyword<SourceRange>;
 
 impl Located for Keyword {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for Keyword {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -694,23 +1153,39 @@ impl Located for Alias {
     }
 }
 
-pub type Withitem = crate::generic::Withitem<SourceRange>;
+impl LocatedMut for Alias {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
+pub type WithItem = crate::generic::WithItem<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
-impl Located for Withitem {
+impl Located for WithItem {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for WithItem {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
 pub type MatchCase = crate::generic::MatchCase<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
 impl Located for MatchCase {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for MatchCase {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -724,11 +1199,23 @@ impl Located for PatternMatchValue {
     }
 }
 
+impl LocatedMut for PatternMatchValue {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type PatternMatchSingleton = crate::generic::PatternMatchSingleton<SourceRange>;
 
 impl Located for PatternMatchSingleton {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for PatternMatchSingleton {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -740,11 +1227,23 @@ impl Located for PatternMatchSequence {
     }
 }
 
+impl LocatedMut for PatternMatchSequence {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type PatternMatchMapping = crate::generic::PatternMatchMapping<SourceRange>;
 
 impl Located for PatternMatchMapping {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for PatternMatchMapping {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -756,11 +1255,23 @@ impl Located for PatternMatchClass {
     }
 }
 
+impl LocatedMut for PatternMatchClass {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type PatternMatchStar = crate::generic::PatternMatchStar<SourceRange>;
 
 impl Located for PatternMatchStar {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for PatternMatchStar {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -772,11 +1283,23 @@ impl Located for PatternMatchAs {
     }
 }
 
+impl LocatedMut for PatternMatchAs {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
 pub type PatternMatchOr = crate::generic::PatternMatchOr<SourceRange>;
 
 impl Located for PatternMatchOr {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+
+impl LocatedMut for PatternMatchOr {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -795,15 +1318,35 @@ impl Located for Pattern {
     }
 }
 
+impl LocatedMut for Pattern {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        match self {
+            Self::MatchValue(node) => node.range_mut(),
+            Self::MatchSingleton(node) => node.range_mut(),
+            Self::MatchSequence(node) => node.range_mut(),
+            Self::MatchMapping(node) => node.range_mut(),
+            Self::MatchClass(node) => node.range_mut(),
+            Self::MatchStar(node) => node.range_mut(),
+            Self::MatchAs(node) => node.range_mut(),
+            Self::MatchOr(node) => node.range_mut(),
+        }
+    }
+}
+
 pub type TypeIgnore = crate::generic::TypeIgnore<SourceRange>;
 
 pub type TypeIgnoreTypeIgnore = crate::generic::TypeIgnoreTypeIgnore<SourceRange>;
 
 #[cfg(feature = "all-nodes-with-ranges")]
-
 impl Located for TypeIgnoreTypeIgnore {
     fn range(&self) -> SourceRange {
         self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for TypeIgnoreTypeIgnore {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }
 
@@ -813,5 +1356,43 @@ impl Located for TypeIgnore {
         match self {
             Self::TypeIgnore(node) => node.range(),
         }
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for TypeIgnore {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        match self {
+            Self::TypeIgnore(node) => node.range_mut(),
+        }
+    }
+}
+
+pub type Arguments = crate::generic::Arguments<SourceRange>;
+
+#[cfg(feature = "all-nodes-with-ranges")]
+impl Located for Arguments {
+    fn range(&self) -> SourceRange {
+        self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for Arguments {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
+    }
+}
+
+pub type ArgWithDefault = crate::generic::ArgWithDefault<SourceRange>;
+
+#[cfg(feature = "all-nodes-with-ranges")]
+impl Located for ArgWithDefault {
+    fn range(&self) -> SourceRange {
+        self.range
+    }
+}
+#[cfg(feature = "all-nodes-with-ranges")]
+impl LocatedMut for ArgWithDefault {
+    fn range_mut(&mut self) -> &mut SourceRange {
+        &mut self.range
     }
 }

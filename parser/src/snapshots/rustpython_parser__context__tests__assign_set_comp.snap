@@ -31,7 +31,7 @@ expression: parse_ast
                     ),
                     generators: [
                         Comprehension {
-                            range: (),
+                            range: 7..25,
                             target: Name(
                                 ExprName {
                                     range: 11..12,

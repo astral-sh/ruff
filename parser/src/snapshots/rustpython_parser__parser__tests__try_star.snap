@@ -156,7 +156,7 @@ expression: parse_ast
             ],
             handlers: [
                 ExceptHandler(
-                    ExcepthandlerExceptHandler {
+                    ExceptHandlerExceptHandler {
                         range: 99..180,
                         type_: Some(
                             Name(
@@ -284,7 +284,7 @@ expression: parse_ast
                     },
                 ),
                 ExceptHandler(
-                    ExcepthandlerExceptHandler {
+                    ExceptHandlerExceptHandler {
                         range: 181..260,
                         type_: Some(
                             Name(
