@@ -117,56 +117,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let mut all_codes = Vec::new();
 
     for (linter, rules) in &linter_to_rules {
-        // Group the rules by their common prefixes.
-        // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
-        let mut rules_by_prefix = BTreeMap::new();
-
-        for (
-            code,
-            LinterToRuleData {
-                rule_id,
-                rule_group_id,
-                attrs,
-            },
-        ) in rules
-        {
-            // Nursery rules have to be explicitly selected, so we ignore them when looking at
-            // prefixes.
-            if is_nursery(rule_group_id) {
-                rules_by_prefix.insert(code.clone(), vec![(rule_id.clone(), attrs.clone())]);
-                continue;
-            }
-
-            for i in 1..=code.len() {
-                let prefix = code[..i].to_string();
-                let rules: Vec<_> = rules
-                    .iter()
-                    .filter_map(
-                        |(
-                            code,
-                            LinterToRuleData {
-                                rule_id,
-                                rule_group_id,
-                                attrs,
-                            },
-                        )| {
-                            // Nursery rules have to be explicitly selected, so we ignore them when
-                            // looking at prefixes.
-                            if is_nursery(rule_group_id) {
-                                return None;
-                            }
-
-                            if code.starts_with(&prefix) {
-                                Some((rule_id.clone(), attrs.clone()))
-                            } else {
-                                None
-                            }
-                        },
-                    )
-                    .collect();
-                rules_by_prefix.insert(prefix, rules);
-            }
-        }
+        let rules_by_prefix = rules_by_prefix(rules);
 
         for (prefix, rules) in &rules_by_prefix {
             let prefix_ident = get_prefix_ident(prefix);
@@ -233,15 +184,83 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
     });
 
-    // Map from rule to codes that can be used to select it.
-    // This abstraction exists to support a one-to-many mapping, whereby a single rule could map
-    // to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
-    // different codes). We haven't actually activated this functionality yet, but some work was
-    // done to support it, so the logic exists here.
+    let rule_to_code = generate_rule_to_code(&mut linter_to_rules);
+    output.extend(rule_to_code);
+
+    let iter = generate_iter_impl(&mut linter_to_rules, &mut all_codes);
+    output.extend(iter);
+
+    Ok(output)
+}
+
+/// Group the rules by their common prefixes.
+fn rules_by_prefix(
+    rules: &BTreeMap<String, LinterToRuleData>,
+) -> BTreeMap<String, Vec<(Path, Vec<Attribute>)>> {
+    // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
+    let mut rules_by_prefix = BTreeMap::new();
+
+    for (
+        code,
+        LinterToRuleData {
+            rule_id,
+            rule_group_id,
+            attrs,
+        },
+    ) in rules
+    {
+        // Nursery rules have to be explicitly selected, so we ignore them when looking at
+        // prefixes.
+        if is_nursery(rule_group_id) {
+            rules_by_prefix.insert(code.clone(), vec![(rule_id.clone(), attrs.clone())]);
+            continue;
+        }
+
+        for i in 1..=code.len() {
+            let prefix = code[..i].to_string();
+            let rules: Vec<_> = rules
+                .iter()
+                .filter_map(
+                    |(
+                        code,
+                        LinterToRuleData {
+                            rule_id,
+                            rule_group_id,
+                            attrs,
+                        },
+                    )| {
+                        // Nursery rules have to be explicitly selected, so we ignore them when
+                        // looking at prefixes.
+                        if is_nursery(rule_group_id) {
+                            return None;
+                        }
+
+                        if code.starts_with(&prefix) {
+                            Some((rule_id.clone(), attrs.clone()))
+                        } else {
+                            None
+                        }
+                    },
+                )
+                .collect();
+            rules_by_prefix.insert(prefix, rules);
+        }
+    }
+    rules_by_prefix
+}
+
+/// Map from rule to codes that can be used to select it.
+/// This abstraction exists to support a one-to-many mapping, whereby a single rule could map
+/// to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
+/// different codes). We haven't actually activated this functionality yet, but some work was
+/// done to support it, so the logic exists here.
+fn generate_rule_to_code(
+    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, LinterToRuleData>>,
+) -> TokenStream {
     let mut rule_to_codes: HashMap<&Path, Vec<RuleToLinterData>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
-    for (linter, map) in &linter_to_rules {
+    for (linter, map) in linter_to_rules {
         for (
             code,
             LinterToRuleData {
@@ -310,7 +329,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
         });
     }
 
-    output.extend(quote! {
+    let rule_to_code = quote! {
         impl Rule {
             pub fn noqa_code(&self) -> NoqaCode {
                 use crate::registry::RuleNamespace;
@@ -341,10 +360,17 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
                 }
             }
         }
-    });
+    };
+    rule_to_code
+}
 
+/// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
+fn generate_iter_impl(
+    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, LinterToRuleData>>,
+    all_codes: &[TokenStream],
+) -> TokenStream {
     let mut linter_into_iter_match_arms = quote!();
-    for (linter, map) in &linter_to_rules {
+    for (linter, map) in linter_to_rules {
         let rule_paths = map.values().map(|LinterToRuleData { rule_id, attrs, .. }| {
             let rule_name = rule_id.segments.last().unwrap();
             quote!(#(#attrs)* Rule::#rule_name)
@@ -354,7 +380,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
         });
     }
 
-    output.extend(quote! {
+    quote! {
         impl IntoIterator for &Linter {
             type Item = Rule;
             type IntoIter = ::std::vec::IntoIter<Self::Item>;
@@ -366,17 +392,12 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
             }
         }
 
-    });
-
-    output.extend(quote! {
         impl RuleCodePrefix {
             pub fn iter() -> ::std::vec::IntoIter<RuleCodePrefix> {
                 vec![ #(#all_codes,)* ].into_iter()
             }
         }
-    });
-
-    Ok(output)
+    }
 }
 
 struct Entry {
