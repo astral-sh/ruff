@@ -1,5 +1,7 @@
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::Edit;
+use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::Locator;
 use ruff_text_size::TextRange;
 
@@ -7,6 +9,7 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
+use ruff_text_size::TextSize;
 use rustpython_parser::lexer::LexResult;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -15,11 +18,13 @@ use super::LogicalLine;
 use super::LogicalLines;
 
 /// Number of blank lines between various code parts.
-pub(crate) enum BlankLinesConfig {
+struct BlankLinesConfig;
+
+impl BlankLinesConfig {
     /// Top level class and function.
-    TopLevel = 2,
+    const TOP_LEVEL: usize = 2;
     /// Methods and nested class and function.
-    Method = 1,
+    const METHOD: usize = 1;
 }
 
 /// ## What it does
@@ -293,56 +298,58 @@ impl AlwaysAutofixableViolation for BlankLinesBeforeNestedDefinition {
 
 /// E301, E303
 pub(crate) fn blank_lines(
-    tokens: &[LexResult],
+    line: &LogicalLine,
+    prev_line: Option<&LogicalLine>,
+    blank_lines: &mut usize,
+    follows_decorator: &mut bool,
+    indent_level: &usize,
     locator: &Locator,
     // stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
-    let mut prev_line: Option<LogicalLine> = None;
-    let mut blank_lines: u32 = 0;
-    for line in &LogicalLines::from_tokens(tokens, locator) {
-        // Don't expect blank lines before the first line
-        if let Some(previous_logical) = prev_line {
-            if previous_logical.text_trimmed().starts_with("@") && blank_lines > 0 {
-                context.push(
-                    DiagnosticKind::from(BlankLineAfterDecorator),
-                    TextRange::at(
-                        line.first_token().unwrap().start(),
-                        line.tokens().last().unwrap().end(),
-                    ),
-                );
-                // diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                //     "\n\n".to_string(),
-                //     range,
-                // )));
-            } else if (blank_lines > BlankLinesConfig::TopLevel
-                || (indent_level > 0 && blank_lines == BlankLinesConfig::Method + 1))
-            {
-                context.push(
-                    DiagnosticKind::from(TooManyBlankLines(blank_lines)),
-                    TextRange::at(
-                        line.first_token().unwrap().start(),
-                        line.tokens().last().unwrap().end(),
-                    ),
-                );
-            }
-        } else {
-            continue;
-        }
-
-        // dbg!(line);
-        dbg!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-        dbg!(line.text());
+    dbg!("#############################");
+    dbg!(line.text());
+    if let Some(previous_logical) = prev_line {
         for token in line.tokens() {
-            dbg!(token);
-        }
-        if let Some(prev_line) = prev_line {
-            dbg!("Previous");
-            dbg!(prev_line.text());
-            for token in prev_line.tokens() {
-                dbg!(token);
+            if token.kind() == TokenKind::NonLogicalNewline {
+                *blank_lines += 1;
+                return;
+            }
+
+            dbg!(&token);
+            dbg!(&blank_lines);
+            if *follows_decorator && *blank_lines > 0 {
+                let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
+
+                let range = token.range();
+                dbg!(locator.line_start(range.start()));
+                dbg!(locator.line_start(range.start()) - TextSize::new(2 * *blank_lines as u32));
+
+                diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                    locator.line_start(range.start()) - TextSize::new(2 * *blank_lines as u32),
+                    locator.line_start(range.start()) - TextSize::new(1),
+                )));
+                context.push_diagnostic(diagnostic);
+            } else if token.kind() != TokenKind::NonLogicalNewline
+                && (*blank_lines > BlankLinesConfig::TOP_LEVEL
+                    || (*indent_level > 0 && *blank_lines == BlankLinesConfig::METHOD + 1))
+            {
+                let mut diagnostic =
+                    Diagnostic::new(TooManyBlankLines(*blank_lines), token.range());
+                // TODO: diagnostic.set_fix // FIXME: Use stylist to use the user's preferred newline character
+                context.push_diagnostic(diagnostic);
+            }
+
+            if token.kind() == TokenKind::At {
+                *follows_decorator = true;
+                return;
+            } else {
+                *follows_decorator = false;
+            }
+
+            if token.kind() != TokenKind::NonLogicalNewline {
+                *blank_lines = 0;
             }
         }
-        prev_line = Some(line);
     }
 }

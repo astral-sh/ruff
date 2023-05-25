@@ -149,7 +149,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 ///     2
 /// ]
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct LogicalLine<'a> {
     lines: &'a LogicalLines<'a>,
     line: &'a Line,
@@ -516,6 +516,7 @@ impl LogicalLinesBuilder {
             let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
                 .iter()
                 .all(|token| token.kind.is_newline());
+
             self.lines.push(Line {
                 flags: self.current_line.flags,
                 tokens_start: self.current_line.tokens_start,

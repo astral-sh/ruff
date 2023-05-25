@@ -45,13 +45,12 @@ pub(crate) fn check_logical_lines(
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
     let mut prev_line = None;
+    let mut nb_blank_lines: usize = 0;
+    let mut follows_decorator = false;
+
+    let mut prev_no_comment_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
-
-    if should_fix_blank_lines || true {
-        blank_lines(tokens, locator, &mut context);
-    }
-
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             space_around_operator(&line, &mut context);
@@ -101,7 +100,7 @@ pub(crate) fn check_logical_lines(
 
         for kind in indentation(
             &line,
-            prev_line.as_ref(),
+            prev_no_comment_line.as_ref(),
             indent_char,
             indent_level,
             prev_indent_level,
@@ -111,9 +110,21 @@ pub(crate) fn check_logical_lines(
                 context.push(kind, range);
             }
         }
+        if should_fix_blank_lines || true {
+            blank_lines(
+                &line,
+                prev_no_comment_line.as_ref(),
+                &mut nb_blank_lines,
+                &mut follows_decorator,
+                &indent_level,
+                locator,
+                &mut context,
+            );
+        }
 
+        prev_line = Some(line.clone());
         if !line.is_comment_only() {
-            prev_line = Some(line);
+            prev_no_comment_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
     }
