@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: a33e9abb4be2a3730161519ce0f298452edbc50335b9e0c812d5a1730f1d8816
+// sha3: 978b442f9e59b7597dbf53a952a1528232a8ad35ee3a9c9cae78d3d3234a5abe
 use crate::{
     ast::{self as ast, Ranged},
     lexer::{LexicalError, LexicalErrorType},
@@ -28915,11 +28915,11 @@ fn __action24<
             let mut targets = vec![set_context(expression, ast::ExprContext::Store)];
             let mut values = suffix;
 
-            while values.len() > 1 {
-                targets.push(set_context(values.remove(0), ast::ExprContext::Store));
-            }
+            let value = Box::new(values.pop().unwrap());
 
-            let value = Box::new(values.into_iter().next().unwrap());
+            for target in values {
+                targets.push(set_context(target, ast::ExprContext::Store));
+            }
 
             ast::Stmt::Assign(
                 ast::StmtAssign { targets, value, type_comment: None, range: (location..end_location).into() }
