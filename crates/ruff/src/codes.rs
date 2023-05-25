@@ -722,6 +722,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "009") => (RuleGroup::Unspecified, Rule::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Unspecified, Rule::ExplicitFStringTypeConversion),
         (Ruff, "100") => (RuleGroup::Unspecified, Rule::UnusedNOQA),
+        (Ruff, "200") => (RuleGroup::Unspecified, Rule::InvalidPyprojectToml),
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Unspecified, Rule::DjangoNullableModelStringField),

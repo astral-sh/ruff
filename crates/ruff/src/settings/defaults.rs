@@ -58,8 +58,13 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     ]
 });
 
-pub static INCLUDE: Lazy<Vec<FilePattern>> =
-    Lazy::new(|| vec![FilePattern::Builtin("*.py"), FilePattern::Builtin("*.pyi")]);
+pub static INCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
+    vec![
+        FilePattern::Builtin("*.py"),
+        FilePattern::Builtin("*.pyi"),
+        FilePattern::Builtin("**/pyproject.toml"),
+    ]
+});
 
 impl Default for Settings {
     fn default() -> Self {
