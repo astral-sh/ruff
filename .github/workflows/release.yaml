@@ -394,6 +394,8 @@ jobs:
       - musllinux
       - musllinux-cross
     if: "startsWith(github.ref, 'refs/tags/')"
+    environment:
+      name: release
     steps:
       - uses: actions/download-artifact@v3
         with:
