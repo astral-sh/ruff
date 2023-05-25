@@ -116,56 +116,6 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
 """,
         )
 
-    # Add the relevant code-to-violation pair to `src/registry.rs`.
-    content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
-
-    seen_macro = False
-    has_written = False
-    has_seen_linter = False
-    with (ROOT_DIR / "crates/ruff/src/registry.rs").open("w") as fp:
-        lines = []
-        for line in content.splitlines():
-            if has_written:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if line.startswith("ruff_macros::register_rules!"):
-                seen_macro = True
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not seen_macro:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if line.strip() == f"// {linter}":
-                indent = get_indent(line)
-                lines.append(f"{indent}rules::{dir_name(linter)}::rules::{name},")
-                has_seen_linter = True
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not has_seen_linter:
-                fp.write(line)
-                fp.write("\n")
-                continue
-
-            if not line.strip().startswith("// "):
-                lines.append(line)
-            else:
-                lines.sort()
-                fp.write("\n".join(lines))
-                fp.write("\n")
-                fp.write(line)
-                fp.write("\n")
-                has_written = True
-
-    assert has_written
-
     text = ""
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
         while (line := next(fp)).strip() != f"// {linter}":

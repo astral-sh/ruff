@@ -196,6 +196,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R5501") => (RuleGroup::Unspecified, rules::pylint::rules::CollapsibleElseIf),
         (Pylint, "W0120") => (RuleGroup::Unspecified, rules::pylint::rules::UselessElseOnLoop),
         (Pylint, "W0129") => (RuleGroup::Unspecified, rules::pylint::rules::AssertOnStringLiteral),
+        (Pylint, "W0130") => (RuleGroup::Unspecified, rules::pylint::rules::DuplicateValue),
         (Pylint, "W0131") => (RuleGroup::Unspecified, rules::pylint::rules::NamedExprWithoutContext),
         (Pylint, "W0406") => (RuleGroup::Unspecified, rules::pylint::rules::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Unspecified, rules::pylint::rules::GlobalVariableNotAssigned),
@@ -204,7 +205,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1508") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidEnvvarDefault),
         (Pylint, "W2901") => (RuleGroup::Unspecified, rules::pylint::rules::RedefinedLoopName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, rules::pylint::rules::NestedMinMax),
-        (Pylint, "W0130") => (RuleGroup::Unspecified, rules::pylint::rules::DuplicateValue),
 
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Unspecified, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
