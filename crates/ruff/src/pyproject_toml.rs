@@ -10,7 +10,7 @@ use crate::message::Message;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 use crate::IOError;
 
-/// Unlike [pyproject_toml::PyProjectToml], in our case `build_system` is also optional
+/// Unlike [`pyproject_toml::PyProjectToml`], in our case `build_system` is also optional
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 struct PyProjectToml {
@@ -31,21 +31,18 @@ pub fn lint_pyproject_toml(source_file: SourceFile) -> Result<Vec<Message>> {
         // TODO(konstin,micha): https://github.com/charliermarsh/ruff/issues/4571
         None => TextRange::default(),
         Some(range) => {
-            let end = match TextSize::try_from(range.end) {
-                Ok(end) => end,
-                Err(_) => {
-                    let diagnostic = Diagnostic::new(
-                        IOError {
-                            message: format!("pyproject.toml is larger than 4GB"),
-                        },
-                        TextRange::default(),
-                    );
-                    return Ok(vec![Message::from_diagnostic(
-                        diagnostic,
-                        source_file,
-                        TextSize::default(),
-                    )]);
-                }
+            let Ok(end) = TextSize::try_from(range.end) else {
+                let diagnostic = Diagnostic::new(
+                    IOError {
+                        message: "pyproject.toml is larger than 4GB".to_string(),
+                    },
+                    TextRange::default(),
+                );
+                return Ok(vec![Message::from_diagnostic(
+                    diagnostic,
+                    source_file,
+                    TextSize::default(),
+                )]);
             };
             TextRange::new(
                 // start <= end, so if end < 4GB follows start < 4GB
