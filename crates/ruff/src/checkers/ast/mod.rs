@@ -1510,6 +1510,9 @@ where
                 if self.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
+                if self.enabled(Rule::WhileLoop) {
+                    pylint::rules::while_loop(self, stmt);
+                }
             }
             Stmt::For(ast::StmtFor {
                 target,

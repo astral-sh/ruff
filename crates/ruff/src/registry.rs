@@ -162,6 +162,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::DuplicateValue,
     rules::pylint::rules::DuplicateBases,
     rules::pylint::rules::NamedExprWithoutContext,
+    rules::pylint::rules::WhileLoop,
     // flake8-async
     rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
     rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,

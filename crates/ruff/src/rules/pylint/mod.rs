@@ -74,6 +74,7 @@ mod tests {
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"); "PLR1711")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"); "PLW3301")]
+    #[test_case(Rule::WhileLoop, Path::new("while_loop.py"); "PLW0149")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
