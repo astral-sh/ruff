@@ -11,34 +11,34 @@ RUF009.py:19:41: RUF009 Do not perform function call `default_function` in datac
 23 |     another_class_var: ClassVar[list[int]] = default_function()
    |
 
-RUF009.py:39:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+RUF009.py:41:41: RUF009 Do not perform function call `default_function` in dataclass defaults
    |
-39 | @dataclass
-40 | class B:
-41 |     hidden_mutable_default: list[int] = default_function()
+41 | @dataclass
+42 | class B:
+43 |     hidden_mutable_default: list[int] = default_function()
    |                                         ^^^^^^^^^^^^^^^^^^ RUF009
-42 |     another_dataclass: A = A()
-43 |     not_optimal: ImmutableType = ImmutableType(20)
+44 |     another_dataclass: A = A()
+45 |     not_optimal: ImmutableType = ImmutableType(20)
    |
 
-RUF009.py:40:28: RUF009 Do not perform function call `A` in dataclass defaults
+RUF009.py:42:28: RUF009 Do not perform function call `A` in dataclass defaults
    |
-40 | class B:
-41 |     hidden_mutable_default: list[int] = default_function()
-42 |     another_dataclass: A = A()
+42 | class B:
+43 |     hidden_mutable_default: list[int] = default_function()
+44 |     another_dataclass: A = A()
    |                            ^^^ RUF009
-43 |     not_optimal: ImmutableType = ImmutableType(20)
-44 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
+45 |     not_optimal: ImmutableType = ImmutableType(20)
+46 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
    |
 
-RUF009.py:41:34: RUF009 Do not perform function call `ImmutableType` in dataclass defaults
+RUF009.py:43:34: RUF009 Do not perform function call `ImmutableType` in dataclass defaults
    |
-41 |     hidden_mutable_default: list[int] = default_function()
-42 |     another_dataclass: A = A()
-43 |     not_optimal: ImmutableType = ImmutableType(20)
+43 |     hidden_mutable_default: list[int] = default_function()
+44 |     another_dataclass: A = A()
+45 |     not_optimal: ImmutableType = ImmutableType(20)
    |                                  ^^^^^^^^^^^^^^^^^ RUF009
-44 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
-45 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
+46 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
+47 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
    |
 
 
