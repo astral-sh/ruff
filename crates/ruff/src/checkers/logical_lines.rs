@@ -46,6 +46,7 @@ pub(crate) fn check_logical_lines(
 
     let mut prev_line = None;
     let mut nb_blank_lines: u32 = 0;
+    let mut blank_characters: usize = 0;
     let mut follows_decorator = false;
 
     let mut prev_no_comment_line = None;
@@ -115,6 +116,7 @@ pub(crate) fn check_logical_lines(
                 &line,
                 prev_line.as_ref(),
                 &mut nb_blank_lines,
+                &mut blank_characters,
                 &mut follows_decorator,
                 indent_level,
                 locator,

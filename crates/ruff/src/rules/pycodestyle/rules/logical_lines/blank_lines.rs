@@ -296,6 +296,7 @@ pub(crate) fn blank_lines(
     line: &LogicalLine,
     prev_line: Option<&LogicalLine>,
     blank_lines: &mut u32,
+    blank_characters: &mut usize,
     follows_decorator: &mut bool,
     indent_level: usize,
     locator: &Locator,
@@ -303,18 +304,24 @@ pub(crate) fn blank_lines(
     context: &mut LogicalLinesContext,
 ) {
     if let Some(previous_logical) = prev_line {
-        for token in line.tokens() {
-            if token.kind() == TokenKind::NonLogicalNewline {
-                *blank_lines += 1;
-                return;
-            }
+        if line.is_empty() {
+            *blank_lines += 1;
+            *blank_characters += line.text().len();
+            return;
+        }
 
+        for token in line.tokens() {
             if *follows_decorator && *blank_lines > 0 {
                 let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
 
                 let range = token.range();
                 diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                    locator.line_start(range.start()) - TextSize::new(*blank_lines),
+                    locator.line_start(range.start())
+                        - TextSize::new(
+                            u32::try_from(*blank_characters).expect(
+                                "The number of blank characters should be relatively small",
+                            ),
+                        ),
                     locator.line_start(range.start()),
                 )));
                 context.push_diagnostic(diagnostic);
@@ -329,6 +336,7 @@ pub(crate) fn blank_lines(
             }
 
             *blank_lines = 0;
+            *blank_characters = 0;
             if token.kind() == TokenKind::At {
                 *follows_decorator = true;
                 return;
