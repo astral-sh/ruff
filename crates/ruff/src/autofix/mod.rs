@@ -15,10 +15,10 @@ pub(crate) mod codemods;
 pub(crate) mod edits;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub(crate) fn fix_file(
-    diagnostics: &[Diagnostic],
-    locator: &Locator,
-) -> Option<(String, FixTable)> {
+pub(crate) fn fix_file<'a>(
+    diagnostics: &'a [Diagnostic],
+    locator: &'a Locator,
+) -> Option<(String, FixTable, BTreeSet<&'a Edit>)> {
     let mut with_fixes = diagnostics
         .iter()
         .filter(|diag| diag.fix.is_some())
@@ -35,7 +35,7 @@ pub(crate) fn fix_file(
 fn apply_fixes<'a>(
     diagnostics: impl Iterator<Item = &'a Diagnostic>,
     locator: &'a Locator<'a>,
-) -> (String, FixTable) {
+) -> (String, FixTable, BTreeSet<&'a Edit>) {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
@@ -99,7 +99,7 @@ fn apply_fixes<'a>(
     let slice = locator.after(last_pos.unwrap_or_default());
     output.push_str(slice);
 
-    (output, fixed)
+    (output, fixed, applied)
 }
 
 /// Compare two fixes.
@@ -150,7 +150,7 @@ mod tests {
     fn empty_file() {
         let locator = Locator::new(r#""#);
         let diagnostics = create_diagnostics([]);
-        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
+        let (contents, fixed, _) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(contents, "");
         assert_eq!(fixed.values().sum::<usize>(), 0);
     }
@@ -169,7 +169,7 @@ class A(object):
             TextSize::new(8),
             TextSize::new(14),
         )]);
-        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
+        let (contents, fixed, _) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"
@@ -191,7 +191,7 @@ class A(object):
             .trim(),
         );
         let diagnostics = create_diagnostics([Edit::deletion(TextSize::new(7), TextSize::new(15))]);
-        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
+        let (contents, fixed, _) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"
@@ -216,7 +216,7 @@ class A(object, object, object):
             Edit::deletion(TextSize::from(8), TextSize::from(16)),
             Edit::deletion(TextSize::from(22), TextSize::from(30)),
         ]);
-        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
+        let (contents, fixed, _) = apply_fixes(diagnostics.iter(), &locator);
 
         assert_eq!(
             contents,
@@ -242,7 +242,7 @@ class A(object):
             Edit::deletion(TextSize::from(7), TextSize::from(15)),
             Edit::replacement("ignored".to_string(), TextSize::from(9), TextSize::from(11)),
         ]);
-        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
+        let (contents, fixed, _) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"

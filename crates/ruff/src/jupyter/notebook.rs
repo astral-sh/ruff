@@ -1,32 +1,22 @@
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
-use std::iter;
 use std::path::Path;
 
-use ruff_text_size::TextRange;
+use itertools::Itertools;
 use serde::Serialize;
 use serde_json::error::Category;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_text_size::{TextRange, TextSize};
 
+use crate::jupyter::index::{JupyterIndex, JupyterIndexBuilder};
 use crate::jupyter::{CellType, JupyterNotebook, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
 use crate::IOError;
 
 pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
-
-/// Jupyter Notebook indexing table
-///
-/// When we lint a jupyter notebook, we have to translate the row/column based on
-/// [`ruff_text_size::TextSize`]
-/// to jupyter notebook cell/row/column.
-#[derive(Debug, Eq, PartialEq)]
-pub struct JupyterIndex {
-    /// Enter a row (1-based), get back the cell (1-based)
-    pub row_to_cell: Vec<u32>,
-    /// Enter a row (1-based), get back the cell (1-based)
-    pub row_to_row_in_cell: Vec<u32>,
-}
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
 pub fn is_jupyter_notebook(path: &Path) -> bool {
@@ -37,7 +27,15 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
         && cfg!(feature = "jupyter_notebook")
 }
 
-impl JupyterNotebook {
+#[derive(Debug)]
+pub struct Notebook {
+    pub index: JupyterIndex,
+    pub content: String,
+    raw: JupyterNotebook,
+    cell_offsets: Vec<TextSize>,
+}
+
+impl Notebook {
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
     pub fn read(path: &Path) -> Result<Self, Box<Diagnostic>> {
@@ -130,60 +128,145 @@ impl JupyterNotebook {
             )));
         }
 
-        Ok(notebook)
+        let size_hint = notebook
+            .cells
+            .iter()
+            .filter(|cell| cell.cell_type == CellType::Code)
+            .count();
+
+        let mut current_offset = TextSize::from(0);
+        let mut cell_offsets = Vec::with_capacity(notebook.cells.len());
+        cell_offsets.push(TextSize::from(0));
+
+        let mut contents = Vec::with_capacity(size_hint);
+        let mut builder = JupyterIndexBuilder::default();
+
+        for (pos, cell) in notebook
+            .cells
+            .iter()
+            .enumerate()
+            .filter(|(_, cell)| cell.cell_type == CellType::Code)
+        {
+            let cell_contents = builder.add_cell(pos, cell);
+            current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
+            cell_offsets.push(current_offset);
+            contents.push(cell_contents);
+        }
+
+        if cell_offsets.len() > 1 {
+            // Remove the last newline offset
+            *cell_offsets.last_mut().unwrap() -= TextSize::new(1);
+        }
+
+        Ok(Self {
+            raw: notebook,
+            index: builder.finish(),
+            content: contents.join("\n"),
+            cell_offsets,
+        })
     }
 
-    /// Concatenates all cells into a single virtual file and builds an index that maps the content
-    /// to notebook cell locations
-    pub fn index(&self) -> (String, JupyterIndex) {
-        let mut jupyter_index = JupyterIndex {
-            // Enter a line number (1-based), get back the cell (1-based)
-            // 0 index is just padding
-            row_to_cell: vec![0],
-            // Enter a line number (1-based), get back the row number in the cell (1-based)
-            // 0 index is just padding
-            row_to_row_in_cell: vec![0],
-        };
+    fn update_cell_offsets(&mut self, edits: BTreeSet<&Edit>) {
+        for edit in edits.into_iter().rev() {
+            let idx = self
+                .cell_offsets
+                .iter()
+                .tuple_windows::<(_, _)>()
+                .find_position(|(&offset1, &offset2)| {
+                    offset1 <= edit.start() && edit.end() <= offset2
+                })
+                .map_or_else(
+                    || panic!("edit outside of any cells: {edit:?}"),
+                    |(idx, _)| idx,
+                );
+
+            if edit.is_deletion() {
+                for offset in &mut self.cell_offsets[idx + 1..] {
+                    *offset -= edit.range().len();
+                }
+            } else if edit.is_insertion() {
+                let new_text_size = TextSize::of(edit.content().unwrap_or_default());
+                for offset in &mut self.cell_offsets[idx + 1..] {
+                    *offset += new_text_size;
+                }
+            } else if edit.is_replacement() {
+                let current_text_size = edit.range().len();
+                let new_text_size = TextSize::of(edit.content().unwrap_or_default());
+                match new_text_size.cmp(&current_text_size) {
+                    Ordering::Less => {
+                        for offset in &mut self.cell_offsets[idx + 1..] {
+                            *offset -= current_text_size - new_text_size;
+                        }
+                    }
+                    Ordering::Greater => {
+                        for offset in &mut self.cell_offsets[idx + 1..] {
+                            *offset += new_text_size - current_text_size;
+                        }
+                    }
+                    Ordering::Equal => (),
+                };
+            } else {
+                panic!("unexpected edit: {edit:?}");
+            }
+        }
+    }
+
+    fn update_cell_content(&mut self, transformed: &str) {
+        for (cell, (start, end)) in self
+            .raw
+            .cells
+            .iter_mut()
+            .filter(|cell| cell.cell_type == CellType::Code)
+            .zip(self.cell_offsets.iter().tuple_windows::<(_, _)>())
+        {
+            let cell_content = transformed
+                .get(start.to_usize()..end.to_usize())
+                .unwrap_or_else(|| panic!("cell content out of bounds: {cell:?}"))
+                .trim_end_matches(|c| c == '\r' || c == '\n')
+                .to_string();
+            cell.source = SourceValue::String(cell_content);
+        }
+    }
+
+    fn refresh_index(&mut self) {
         let size_hint = self
+            .raw
             .cells
             .iter()
             .filter(|cell| cell.cell_type == CellType::Code)
             .count();
 
         let mut contents = Vec::with_capacity(size_hint);
+        let mut builder = JupyterIndexBuilder::default();
 
         for (pos, cell) in self
+            .raw
             .cells
             .iter()
             .enumerate()
             .filter(|(_pos, cell)| cell.cell_type == CellType::Code)
         {
-            let cell_contents = match &cell.source {
-                SourceValue::String(string) => {
-                    // TODO(konstin): is or isn't there a trailing newline per cell?
-                    // i've only seen these as array and never as string
-                    let line_count = u32::try_from(string.lines().count()).unwrap();
-                    jupyter_index.row_to_cell.extend(
-                        iter::repeat(u32::try_from(pos + 1).unwrap()).take(line_count as usize),
-                    );
-                    jupyter_index.row_to_row_in_cell.extend(1..=line_count);
-                    string.clone()
-                }
-                SourceValue::StringArray(string_array) => {
-                    jupyter_index.row_to_cell.extend(
-                        iter::repeat(u32::try_from(pos + 1).unwrap()).take(string_array.len()),
-                    );
-                    jupyter_index
-                        .row_to_row_in_cell
-                        .extend(1..=u32::try_from(string_array.len()).unwrap());
-                    // lines already end in a newline character
-                    string_array.join("")
-                }
-            };
+            let cell_contents = builder.add_cell(pos, cell);
             contents.push(cell_contents);
         }
-        // The last line doesn't end in a newline character
-        (contents.join("\n"), jupyter_index)
+
+        self.index = builder.finish();
+        self.content = contents.join("\n");
+    }
+
+    pub fn update(&mut self, edits: BTreeSet<&Edit>, transformed: &str) {
+        self.update_cell_offsets(edits);
+        self.update_cell_content(transformed);
+        self.refresh_index();
+    }
+
+    /// Return `true` if the notebook is a Python notebook, `false` otherwise.
+    pub fn is_python_notebook(&self) -> bool {
+        self.raw
+            .metadata
+            .language_info
+            .as_ref()
+            .map_or(true, |language| language.name == "python")
     }
 
     /// Write back with an indent of 1, just like black
@@ -192,7 +275,7 @@ impl JupyterNotebook {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
         let mut ser = serde_json::Serializer::with_formatter(&mut writer, formatter);
-        self.serialize(&mut ser)?;
+        self.raw.serialize(&mut ser)?;
         Ok(())
     }
 }
@@ -200,29 +283,31 @@ impl JupyterNotebook {
 #[cfg(test)]
 mod test {
     use std::path::Path;
+    use std::sync::Arc;
 
     #[cfg(feature = "jupyter_notebook")]
+    use crate::jupyter::index::{JupyterIndex, JupyterIndexInner};
     use crate::jupyter::is_jupyter_notebook;
-    use crate::jupyter::{JupyterIndex, JupyterNotebook};
+    use crate::jupyter::Notebook;
 
     #[test]
     fn test_valid() {
         let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        assert!(JupyterNotebook::read(path).is_ok());
+        assert!(Notebook::read(path).is_ok());
     }
 
     #[test]
     fn test_r() {
         // We can load this, it will be filtered out later
         let path = Path::new("resources/test/fixtures/jupyter/R.ipynb");
-        assert!(JupyterNotebook::read(path).is_ok());
+        assert!(Notebook::read(path).is_ok());
     }
 
     #[test]
     fn test_invalid() {
         let path = Path::new("resources/test/fixtures/jupyter/invalid_extension.ipynb");
         assert_eq!(
-            JupyterNotebook::read(path).unwrap_err().kind.body,
+            Notebook::read(path).unwrap_err().kind.body,
             "SyntaxError: Expected a Jupyter Notebook (.ipynb extension), \
             which must be internally stored as JSON, \
             but found a Python source file: \
@@ -230,14 +315,14 @@ mod test {
         );
         let path = Path::new("resources/test/fixtures/jupyter/not_json.ipynb");
         assert_eq!(
-            JupyterNotebook::read(path).unwrap_err().kind.body,
+            Notebook::read(path).unwrap_err().kind.body,
             "SyntaxError: A Jupyter Notebook (.ipynb) must internally be JSON, \
             but this file isn't valid JSON: \
             expected value at line 1 column 1"
         );
         let path = Path::new("resources/test/fixtures/jupyter/wrong_schema.ipynb");
         assert_eq!(
-            JupyterNotebook::read(path).unwrap_err().kind.body,
+            Notebook::read(path).unwrap_err().kind.body,
             "SyntaxError: This file does not match the schema expected of Jupyter Notebooks: \
             missing field `cells` at line 1 column 2"
         );
@@ -256,10 +341,9 @@ mod test {
     #[test]
     fn test_concat_notebook() {
         let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        let notebook = JupyterNotebook::read(path).unwrap();
-        let (contents, index) = notebook.index();
+        let notebook = Notebook::read(path).unwrap();
         assert_eq!(
-            contents,
+            notebook.content,
             r#"def unused_variable():
     x = 1
     y = 2
@@ -273,10 +357,12 @@ mutable_argument()
 "#
         );
         assert_eq!(
-            index,
+            notebook.index,
             JupyterIndex {
-                row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3],
-                row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4],
+                inner: Arc::new(JupyterIndexInner {
+                    row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3],
+                    row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4],
+                }),
             }
         );
     }

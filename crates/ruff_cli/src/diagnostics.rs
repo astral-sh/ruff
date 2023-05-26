@@ -14,12 +14,13 @@ use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
 use ruff::fs;
-use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
+use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, Notebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::pyproject_toml::lint_pyproject_toml;
 use ruff::settings::{flags, AllSettings, Settings};
+use ruff::source_kind::SourceKind;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_python_stdlib::path::is_project_toml;
@@ -67,15 +68,10 @@ impl AddAssign for Diagnostics {
 }
 
 /// Returns either an indexed python jupyter notebook or a diagnostic (which is empty if we skip)
-fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diagnostics>> {
-    let notebook = match JupyterNotebook::read(path) {
+fn load_jupyter_notebook(path: &Path) -> Result<Notebook, Box<Diagnostics>> {
+    let notebook = match Notebook::read(path) {
         Ok(notebook) => {
-            if !notebook
-                .metadata
-                .language_info
-                .as_ref()
-                .map_or(true, |language| language.name == "python")
-            {
+            if !notebook.is_python_notebook() {
                 // Not a python notebook, this could e.g. be an R notebook which we want to just skip
                 debug!(
                     "Skipping {} because it's not a Python notebook",
@@ -98,7 +94,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
         }
     };
 
-    Ok(notebook.index())
+    Ok(notebook)
 }
 
 /// Lint the source code at the given `Path`.
@@ -144,14 +140,16 @@ pub(crate) fn lint_path(
     }
 
     // Read the file from disk
-    let (contents, jupyter_index) = if is_jupyter_notebook(path) {
+    let mut source_kind = if is_jupyter_notebook(path) {
         match load_jupyter_notebook(path) {
-            Ok((contents, jupyter_index)) => (contents, Some(jupyter_index)),
-            Err(diagnostics) => return Ok(*diagnostics),
+            Ok(notebook) => SourceKind::Jupyter(notebook),
+            Err(diagnostic) => return Ok(*diagnostic),
         }
     } else {
-        (std::fs::read_to_string(path)?, None)
+        SourceKind::Python(std::fs::read_to_string(path)?)
     };
+
+    let contents = source_kind.content().to_string();
 
     // Lint the file.
     let (
@@ -165,11 +163,24 @@ pub(crate) fn lint_path(
             result,
             transformed,
             fixed,
-        }) = lint_fix(&contents, path, package, noqa, &settings.lib)
-        {
+        }) = lint_fix(
+            &contents,
+            path,
+            package,
+            noqa,
+            &settings.lib,
+            &mut source_kind,
+        ) {
             if !fixed.is_empty() {
                 if matches!(autofix, flags::FixMode::Apply) {
-                    write(path, transformed.as_bytes())?;
+                    match source_kind {
+                        SourceKind::Python(_) => {
+                            write(path, transformed.as_bytes())?;
+                        }
+                        SourceKind::Jupyter(ref notebook) => {
+                            notebook.write(path)?;
+                        }
+                    }
                 } else if matches!(autofix, flags::FixMode::Diff) {
                     let mut stdout = io::stdout().lock();
                     TextDiff::from_lines(contents.as_str(), &transformed)
@@ -215,15 +226,15 @@ pub(crate) fn lint_path(
         }
     }
 
-    let jupyter_index = match jupyter_index {
-        None => FxHashMap::default(),
-        Some(jupyter_index) => {
+    let jupyter_index = match &source_kind {
+        SourceKind::Python(_) => FxHashMap::default(),
+        SourceKind::Jupyter(notebook) => {
             let mut index = FxHashMap::default();
             index.insert(
                 path.to_str()
                     .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
                     .to_string(),
-                jupyter_index,
+                notebook.index.clone(),
             );
             index
         }
@@ -247,6 +258,7 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
+    let mut source_kind = SourceKind::Python(contents.to_string());
     // Lint the inputs.
     let (
         LinterResult {
@@ -265,6 +277,7 @@ pub(crate) fn lint_stdin(
             package,
             noqa,
             settings,
+            &mut source_kind,
         ) {
             if matches!(autofix, flags::FixMode::Apply) {
                 // Write the contents to stdout, regardless of whether any errors were fixed.

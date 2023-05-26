@@ -95,7 +95,7 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
         let mut diagnostics = diagnostics.clone();
         let mut contents = contents.to_string();
 
-        while let Some((fixed_contents, _)) = fix_file(&diagnostics, &Locator::new(&contents)) {
+        while let Some((fixed_contents, _, _)) = fix_file(&diagnostics, &Locator::new(&contents)) {
             if iterations < max_iterations() {
                 iterations += 1;
             } else {

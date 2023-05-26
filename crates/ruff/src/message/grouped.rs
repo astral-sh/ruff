@@ -114,11 +114,11 @@ impl Display for DisplayGroupedMessage<'_> {
             write!(
                 f,
                 "cell {cell}{sep}",
-                cell = jupyter_index.row_to_cell[start_location.row.get()],
+                cell = jupyter_index.get_cell(start_location.row.get()),
                 sep = ":".cyan()
             )?;
             (
-                jupyter_index.row_to_row_in_cell[start_location.row.get()] as usize,
+                jupyter_index.get_row_in_cell(start_location.row.get()) as usize,
                 start_location.column.get(),
             )
         } else {

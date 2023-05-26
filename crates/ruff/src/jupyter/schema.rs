@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_with::skip_serializing_none;
 
 /// The root of the JSON of a Jupyter Notebook
 ///
@@ -38,6 +39,7 @@ pub struct JupyterNotebook {
 /// Notebook markdown cell.
 ///
 /// Notebook code cell.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Cell {
@@ -58,6 +60,7 @@ pub struct Cell {
 }
 
 /// Cell-level metadata.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CellMetadata {
     /// Raw cell metadata format for nbconvert.
@@ -84,6 +87,7 @@ pub struct CellMetadata {
 
 /// Execution time for the code in the cell. This tracks time at which messages are received
 /// from iopub or shell channels
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Execution {
@@ -113,6 +117,7 @@ pub struct Execution {
 /// Stream output from a code cell.
 ///
 /// Output of an error that occurred during code cell execution.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Output {
@@ -135,6 +140,7 @@ pub struct Output {
 }
 
 /// Notebook root-level metadata.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JupyterNotebookMetadata {
     /// The author(s) of the notebook document
@@ -166,6 +172,7 @@ pub struct Kernelspec {
 }
 
 /// Kernel information.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LanguageInfo {
     /// The codemirror mode to use for code in this language.

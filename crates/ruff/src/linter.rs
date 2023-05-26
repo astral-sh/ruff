@@ -30,6 +30,7 @@ use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
+use crate::source_kind::SourceKind;
 use crate::{directives, fs};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -388,6 +389,7 @@ pub fn lint_fix<'a>(
     package: Option<&Path>,
     noqa: flags::Noqa,
     settings: &Settings,
+    source_kind: &mut SourceKind,
 ) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(contents);
 
@@ -453,11 +455,15 @@ pub fn lint_fix<'a>(
         }
 
         // Apply autofix.
-        if let Some((fixed_contents, applied)) = fix_file(&result.data.0, &locator) {
+        if let Some((fixed_contents, applied, edits)) = fix_file(&result.data.0, &locator) {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, count) in applied {
                     *fixed.entry(rule).or_default() += count;
+                }
+
+                if let SourceKind::Jupyter(notebook) = source_kind {
+                    notebook.update(edits, &fixed_contents);
                 }
 
                 // Store the fixed contents.
