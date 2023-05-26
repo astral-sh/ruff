@@ -1,5 +1,6 @@
 //! Lint rules based on token traversal.
 
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -7,12 +8,14 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, flake8_todos,
-    pycodestyle, pylint, pyupgrade, ruff,
+    eradicate, flake8_commas, flake8_fixme, flake8_implicit_str_concat, flake8_pyi, flake8_quotes,
+    flake8_todos, pycodestyle, pylint, pyupgrade, ruff,
 };
 use crate::settings::Settings;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator};
+
+use super::todo_directives::TodoDirective;
 
 pub(crate) fn check_tokens(
     locator: &Locator,
@@ -60,6 +63,9 @@ pub(crate) fn check_tokens(
     ]);
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
+
+    // Combine flake8_todos and flake8_fixme so that we can reuse detected [`TodoDirective`]s
+    // applicable to both linters.
     let enforce_todos = settings.rules.any_enabled(&[
         Rule::InvalidTodoTag,
         Rule::MissingTodoAuthor,
@@ -68,6 +74,10 @@ pub(crate) fn check_tokens(
         Rule::MissingTodoDescription,
         Rule::InvalidTodoCapitalization,
         Rule::MissingSpaceAfterTodoColon,
+        Rule::LineContainsFixme,
+        Rule::LineContainsXxx,
+        Rule::LineContainsTodo,
+        Rule::LineContainsHack,
     ]);
 
     // RUF001, RUF002, RUF003
@@ -184,9 +194,39 @@ pub(crate) fn check_tokens(
     }
 
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007
+    // T001, T002, T003, T004
     if enforce_todos {
+        // The TextRange of the comment, its position in comment_ranges, and the directive's
+        // TextRange
+        let mut other_directive_ranges: Vec<(TextRange, usize, TextRange)> = vec![];
+        let mut flake8_fixme_directive_ranges: Vec<TextRange> = vec![];
+
+        // Find all TodoDirectives
+        for (i, comment_range) in indexer.comment_ranges().iter().enumerate() {
+            let comment = locator.slice(*comment_range);
+            let Some((directive, relative_offset)) = TodoDirective::from_comment(comment) else {
+                continue;
+            };
+
+            let directive_range =
+                TextRange::at(comment_range.start() + relative_offset, directive.len());
+
+            // TODO, XXX, and FIXME directives are supported by flake8_todos. flake8_fixme supports
+            // all 4 TodoDirective variants.
+            if !matches!(directive, TodoDirective::Hack) {
+                other_directive_ranges.push((*comment_range, i, directive_range));
+            }
+            flake8_fixme_directive_ranges.push(directive_range);
+        }
+
         diagnostics.extend(
-            flake8_todos::rules::todos(indexer, locator, settings)
+            flake8_todos::rules::todos(other_directive_ranges, indexer, locator, settings)
+                .into_iter()
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
+
+        diagnostics.extend(
+            flake8_fixme::rules::todos(flake8_fixme_directive_ranges, locator)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );

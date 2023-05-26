@@ -239,25 +239,28 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn todos(
+    comment_directive_ranges: Vec<(TextRange, usize, TextRange)>,
+    indexer: &Indexer,
+    locator: &Locator,
+    settings: &Settings,
+) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let mut iter = indexer.comment_ranges().iter().peekable();
-    while let Some(comment_range) = iter.next() {
-        let comment = locator.slice(*comment_range);
-
-        // Check that the comment is a TODO (properly formed or not).
-        let Some(tag) = detect_tag(comment, comment_range.start()) else {
-            continue;
+    for (comment_range, comment_index, directive_range) in comment_directive_ranges {
+        let comment = locator.slice(comment_range);
+        let tag = Tag {
+            content: locator.slice(directive_range),
+            range: directive_range,
         };
 
         tag_errors(&tag, &mut diagnostics, settings);
-        static_errors(&mut diagnostics, comment, *comment_range, &tag);
+        static_errors(&mut diagnostics, comment, comment_range, &tag);
 
-        // TD003
         let mut has_issue_link = false;
-        let mut curr_range = comment_range;
-        while let Some(next_range) = iter.peek() {
+        let mut curr_range = &comment_range;
+        let mut future_comments = indexer.comment_ranges().iter().skip(comment_index + 1);
+        while let Some(next_range) = future_comments.next() {
             // Ensure that next_comment_range is in the same multiline comment "block" as
             // comment_range.
             if !locator
@@ -268,8 +271,8 @@ pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -
                 break;
             }
 
-            let next_comment = locator.slice(**next_range);
-            if detect_tag(next_comment, next_range.start()).is_some() {
+            let next_comment = locator.slice(*next_range);
+            if TodoDirective::from_comment(next_comment).is_some() {
                 break;
             }
 
@@ -280,28 +283,16 @@ pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -
             // If the next_comment isn't a tag or an issue, it's worthles in the context of this
             // linter. We can increment here instead of waiting for the next iteration of the outer
             // loop.
-            //
-            // Unwrap is safe because peek() is Some()
-            curr_range = iter.next().unwrap();
+            curr_range = next_range;
         }
 
         if !has_issue_link {
+            // TD-003
             diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
         }
     }
 
     diagnostics
-}
-
-/// Returns the tag pulled out of a given comment, if it exists.
-fn detect_tag(comment: &str, start: TextSize) -> Option<Tag> {
-    let (directive, offset) = TodoDirective::from_comment(comment)?;
-    let comment_range = TextRange::at(offset, directive.len());
-    let tag_range = TextRange::at(start + offset, directive.len());
-    Some(Tag {
-        content: &comment[comment_range],
-        range: tag_range,
-    })
 }
 
 /// Check that the tag itself is valid. This function modifies `diagnostics` in-place.
@@ -367,62 +358,19 @@ fn static_errors(
     let after_author = &post_tag[usize::from(author_end)..];
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
+            // TD-005
             diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
         } else if !after_colon.starts_with(char::is_whitespace) {
+            // TD-007
             diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range));
         }
     } else {
+        // TD-004
         diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
 
         if after_author.is_empty() {
+            // TD-005
             diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_detect_tag() {
-        let test_comment = "# TODO: todo tag";
-        let expected = Tag {
-            content: "TODO",
-            range: TextRange::new(TextSize::new(2), TextSize::new(6)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-
-        let test_comment = "#TODO: todo tag";
-        let expected = Tag {
-            content: "TODO",
-            range: TextRange::new(TextSize::new(1), TextSize::new(5)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-
-        let test_comment = "# todo: todo tag";
-        let expected = Tag {
-            content: "todo",
-            range: TextRange::new(TextSize::new(2), TextSize::new(6)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-        let test_comment = "# fixme: fixme tag";
-        let expected = Tag {
-            content: "fixme",
-            range: TextRange::new(TextSize::new(2), TextSize::new(7)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-        let test_comment = "# noqa # TODO: todo";
-        let expected = Tag {
-            content: "TODO",
-            range: TextRange::new(TextSize::new(9), TextSize::new(13)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-        let test_comment = "# noqa # XXX";
-        let expected = Tag {
-            content: "XXX",
-            range: TextRange::new(TextSize::new(9), TextSize::new(12)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
     }
 }
