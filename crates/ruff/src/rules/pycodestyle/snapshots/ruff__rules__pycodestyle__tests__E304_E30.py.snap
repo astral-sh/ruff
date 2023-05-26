@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+---
+E30.py:81:1: E304 [*] blank lines found after function decorator
+   |
+81 | @decorator
+82 | 
+83 | def function():
+   | ^^^ E304
+84 |     pass
+85 | #: E303:5:1
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+77 77 | 
+78 78 | #: E304:3:1
+79 79 | @decorator
+80    |-
+81 80 | def function():
+82 81 |     pass
+83 82 | #: E303:5:1
+
+
