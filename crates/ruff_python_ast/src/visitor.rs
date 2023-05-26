@@ -1,14 +1,19 @@
 //! AST visitor trait and walk functions.
 
+pub mod preorder;
+
 use rustpython_parser::ast::{
     self, Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler, Expr,
     ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, Unaryop, Withitem,
 };
 
-/// A trait for AST visitors. Visits all nodes in the AST recursively.
+/// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
 ///
 /// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
 /// statements.
+///
+/// Use the [`PreorderVisitor`](self::preorder::PreorderVisitor) if you want to visit the nodes
+/// in pre-order rather than evaluation order.
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);

@@ -1,0 +1,17 @@
+---
+source: crates/ruff_python_ast/src/visitor/preorder.rs
+expression: trace
+---
+- ModModule
+  - StmtFunctionDef
+    - Arguments
+      - Arg
+      - Arg
+      - ExprConstant
+        - Int(34)
+      - Arg
+      - ExprConstant
+        - Int(20)
+      - Arg
+    - StmtPass
+
