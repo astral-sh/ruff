@@ -290,6 +290,10 @@ mod tests {
                 pattern: "examples/*".to_string(),
                 prefix: codes::Pyflakes::_841.into(),
             },
+            PatternPrefixPair {
+                pattern: "*.pyi".to_string(),
+                prefix: codes::Pycodestyle::E302.into(),
+            },
         ];
         assert_eq!(actual, expected);
 
