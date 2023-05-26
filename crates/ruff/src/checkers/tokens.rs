@@ -64,8 +64,7 @@ pub(crate) fn check_tokens(
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
 
-    // Combine flake8_todos and flake8_fixme so that we can reuse detected [`TodoDirective`]s
-    // applicable to both linters.
+    // Combine flake8_todos and flake8_fixme so that we can reuse detected [`TodoDirective`]s.
     let enforce_todos = settings.rules.any_enabled(&[
         Rule::InvalidTodoTag,
         Rule::MissingTodoAuthor,

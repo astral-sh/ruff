@@ -963,7 +963,11 @@ impl Rule {
             | Rule::MissingTodoColon
             | Rule::MissingTodoDescription
             | Rule::InvalidTodoCapitalization
-            | Rule::MissingSpaceAfterTodoColon => LintSource::Tokens,
+            | Rule::MissingSpaceAfterTodoColon
+            | Rule::LineContainsFixme
+            | Rule::LineContainsHack
+            | Rule::LineContainsTodo
+            | Rule::LineContainsXxx => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,

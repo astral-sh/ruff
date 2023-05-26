@@ -259,8 +259,7 @@ pub(crate) fn todos(
 
         let mut has_issue_link = false;
         let mut curr_range = &comment_range;
-        let mut future_comments = indexer.comment_ranges().iter().skip(comment_index + 1);
-        while let Some(next_range) = future_comments.next() {
+        for next_range in indexer.comment_ranges().iter().skip(comment_index + 1) {
             // Ensure that next_comment_range is in the same multiline comment "block" as
             // comment_range.
             if !locator

@@ -1,9 +1,26 @@
+use std::str::FromStr;
+
 use ruff_text_size::{TextLen, TextSize};
 
-pub enum TodoDirective {
+pub(crate) enum TodoDirective {
     Todo,
     Fixme,
     Xxx,
+    Hack,
+}
+
+impl FromStr for TodoDirective {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "fixme" => Ok(TodoDirective::Fixme),
+            "hack" => Ok(TodoDirective::Hack),
+            "todo" => Ok(TodoDirective::Todo),
+            "xxx" => Ok(TodoDirective::Xxx),
+            _ => Err(()),
+        }
+    }
 }
 
 impl TodoDirective {
@@ -21,12 +38,15 @@ impl TodoDirective {
             let offset = subset.text_len() - trimmed.text_len();
             total_offset += offset;
 
+            // TODO: rework this
             let directive = if trimmed.starts_with("fixme") {
                 Some((TodoDirective::Fixme, total_offset))
             } else if trimmed.starts_with("xxx") {
                 Some((TodoDirective::Xxx, total_offset))
             } else if trimmed.starts_with("todo") {
                 Some((TodoDirective::Todo, total_offset))
+            } else if trimmed.starts_with("hack") {
+                Some((TodoDirective::Hack, total_offset))
             } else {
                 None
             };
@@ -51,7 +71,7 @@ impl TodoDirective {
     pub(crate) fn len(&self) -> TextSize {
         match self {
             TodoDirective::Fixme => TextSize::new(5),
-            TodoDirective::Todo => TextSize::new(4),
+            TodoDirective::Todo | TodoDirective::Hack => TextSize::new(4),
             TodoDirective::Xxx => TextSize::new(3),
         }
     }

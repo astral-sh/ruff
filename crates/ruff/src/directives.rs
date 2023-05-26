@@ -1,4 +1,4 @@
-//! Extract `# noqa` and `# isort: skip` directives from tokenized source.
+//! Extract `# noqa`, `# isort: skip`, and `# TODO` directives from tokenized source.
 
 use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextRange, TextSize};
