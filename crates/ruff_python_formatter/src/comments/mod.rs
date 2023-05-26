@@ -1,5 +1,3 @@
-#![allow(unused, unreachable_pub)] // TODO(micha): Remove after using the new comments infrastructure in the formatter.
-
 //! Types for extracting and representing comments of a syntax tree.
 //!
 //! Most programming languages support comments allowing programmers to document their programs.
@@ -91,7 +89,7 @@
 
 use rustpython_parser::ast::Mod;
 use std::cell::Cell;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 mod debug;
@@ -121,6 +119,8 @@ pub(crate) struct SourceComment {
     position: CommentTextPosition,
 }
 
+#[allow(unused)]
+// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl SourceComment {
     /// Returns the location of the comment in the original source code.
     /// Allows retrieving the text of the comment.
@@ -182,6 +182,8 @@ pub(crate) enum CommentTextPosition {
     OwnLine,
 }
 
+#[allow(unused)]
+// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl CommentTextPosition {
     pub(crate) const fn is_own_line(self) -> bool {
         matches!(self, CommentTextPosition::OwnLine)
@@ -224,6 +226,8 @@ pub(crate) struct Comments<'a> {
     data: Rc<CommentsData<'a>>,
 }
 
+#[allow(unused)]
+// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>) -> Self {
         Self {
@@ -496,10 +500,160 @@ def test(x, y):
     else:
         print("Greater")
 
-    # Trailing comment
+        # trailing `else` comment
+
+    # Trailing `if` statement comment
+
+def other(y, z):
+    if y == z:
+        pass
+            # Trailing `if` comment
+      # Trailing `other` function comment
 
 test(10, 20)
 "#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn trailing_comment_after_single_statement_body() {
+        let source = r#"
+if x == y: pass
+
+    # Test
+print("test")
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn if_elif_else_comments() {
+        let source = r#"
+if x == y:
+    pass # trailing `pass` comment
+    # Root `if` trailing comment
+
+# Leading elif comment
+elif x < y:
+    pass
+    # `elif` trailing comment
+# Leading else comment
+else:
+    pass
+    # `else` trailing comment
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn if_elif_if_else_comments() {
+        let source = r#"
+if x == y:
+    pass
+elif x < y:
+    if x < 10:
+        pass
+    # `elif` trailing comment
+# Leading else comment
+else:
+    pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn try_except_finally_else() {
+        let source = r#"
+try:
+    pass
+    # trailing try comment
+# leading handler comment
+except Exception as ex:
+    pass
+    # Trailing except comment
+# leading else comment
+else:
+    pass
+    # trailing else comment
+# leading finally comment
+finally:
+    print("Finally!")
+    # Trailing finally comment
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn try_except() {
+        let source = r#"
+def test():
+    try:
+        pass
+        # trailing try comment
+    # leading handler comment
+    except Exception as ex:
+        pass
+        # Trailing except comment
+
+    # Trailing function comment
+
+print("Next statement");
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    // Issue: Match cases
+    #[test]
+    fn match_cases() {
+        let source = r#"def make_point_3d(pt):
+    match pt:
+        # Leading `case(x, y)` comment
+        case (x, y):
+            return Point3d(x, y, 0)
+            # Trailing `case(x, y) comment
+        # Leading `case (x, y, z)` comment
+        case (x, y, z):
+            if x < y:
+                print("if")
+            else:
+                print("else")
+                # Trailing else comment
+            # trailing case comment
+        case Point2d(x, y):
+            return Point3d(x, y, 0)
+        case _:
+            raise TypeError("not a point we support")
+            # Trailing last case comment
+        # Trailing match comment
+    # After match comment
+
+    print("other")
+        "#;
+
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
