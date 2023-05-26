@@ -4,6 +4,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::{Generator, Locator};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -45,7 +46,7 @@ impl Violation for PytestParametrizeValuesWrongType {
     }
 }
 
-fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
+fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
     let all_literals = elts.iter().all(|e| {
         matches!(
             e,
@@ -77,7 +78,7 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
         kind: None,
         range: TextRange::default(),
     });
-    Some(checker.generator().expr(&node))
+    Some(generator.expr(&node))
 }
 
 /// Returns the range of the `name` argument of `@pytest.mark.parametrize`.
@@ -93,14 +94,14 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) -> TextRange {
+fn get_parametrize_name_range(decorator: &Expr, expr: &Expr, locator: &Locator) -> TextRange {
     let mut locations = Vec::new();
     let mut implicit_concat = None;
 
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
     for (tok, range) in lexer::lex_starts_at(
-        checker.locator.slice(decorator.range()),
+        locator.slice(decorator.range()),
         Mode::Module,
         decorator.start(),
     )
@@ -139,7 +140,8 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
-                        let name_range = get_parametrize_name_range(checker, decorator, expr);
+                        let name_range =
+                            get_parametrize_name_range(decorator, expr, checker.locator);
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -170,7 +172,8 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
-                        let name_range = get_parametrize_name_range(checker, decorator, expr);
+                        let name_range =
+                            get_parametrize_name_range(decorator, expr, checker.locator);
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
@@ -241,7 +244,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(content) = elts_to_csv(elts, checker) {
+                            if let Some(content) = elts_to_csv(elts, checker.generator()) {
                                 #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     content,
@@ -291,7 +294,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(content) = elts_to_csv(elts, checker) {
+                            if let Some(content) = elts_to_csv(elts, checker.generator()) {
                                 #[allow(deprecated)]
                                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                                     content,
@@ -416,22 +419,14 @@ fn handle_value_rows(
 
 pub(crate) fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
     for decorator in decorators {
-        if is_pytest_parametrize(&checker.ctx, decorator) {
+        if is_pytest_parametrize(checker.semantic_model(), decorator) {
             if let Expr::Call(ast::ExprCall { args, .. }) = decorator {
-                if checker
-                    .settings
-                    .rules
-                    .enabled(Rule::PytestParametrizeNamesWrongType)
-                {
+                if checker.enabled(Rule::PytestParametrizeNamesWrongType) {
                     if let Some(names) = args.get(0) {
                         check_names(checker, decorator, names);
                     }
                 }
-                if checker
-                    .settings
-                    .rules
-                    .enabled(Rule::PytestParametrizeValuesWrongType)
-                {
+                if checker.enabled(Rule::PytestParametrizeValuesWrongType) {
                     if let Some(names) = args.get(0) {
                         if let Some(values) = args.get(1) {
                             check_values(checker, names, values);

@@ -8,6 +8,34 @@ use ruff_python_ast::hashable::HashableExpr;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for repeated `isinstance` calls on the same object.
+///
+/// ## Why is this bad?
+/// Repeated `isinstance` calls on the same object can be merged into a
+/// single call.
+///
+/// ## Example
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, int) or isinstance(x, float) or isinstance(x, complex)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, (int, float, complex))
+/// ```
+///
+/// Or, for Python 3.10 and later:
+///
+/// ```python
+/// def is_number(x):
+///     return isinstance(x, int | float | complex)
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct RepeatedIsinstanceCalls {
     obj: String,
@@ -30,7 +58,7 @@ pub(crate) fn repeated_isinstance_calls(
     op: Boolop,
     values: &[Expr],
 ) {
-    if !matches!(op, Boolop::Or) || !checker.ctx.is_builtin("isinstance") {
+    if !matches!(op, Boolop::Or) || !checker.semantic_model().is_builtin("isinstance") {
         return;
     }
 

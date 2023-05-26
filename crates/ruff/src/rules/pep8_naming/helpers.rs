@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use ruff_python_semantic::context::Context;
 use rustpython_parser::ast::{self, Expr, Stmt};
 
+use ruff_python_semantic::model::SemanticModel;
 use ruff_python_stdlib::str::{is_lower, is_upper};
 
 pub(crate) fn is_camelcase(name: &str) -> bool {
@@ -22,14 +22,14 @@ pub(crate) fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
 }
 
-pub(crate) fn is_named_tuple_assignment(context: &Context, stmt: &Stmt) -> bool {
+pub(crate) fn is_named_tuple_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
         return false;
     };
-    context.resolve_call_path(func).map_or(false, |call_path| {
+    model.resolve_call_path(func).map_or(false, |call_path| {
         matches!(
             call_path.as_slice(),
             ["collections", "namedtuple"] | ["typing", "NamedTuple"]
@@ -37,35 +37,35 @@ pub(crate) fn is_named_tuple_assignment(context: &Context, stmt: &Stmt) -> bool 
     })
 }
 
-pub(crate) fn is_typed_dict_assignment(context: &Context, stmt: &Stmt) -> bool {
+pub(crate) fn is_typed_dict_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
         return false;
     };
-    context.resolve_call_path(func).map_or(false, |call_path| {
+    model.resolve_call_path(func).map_or(false, |call_path| {
         call_path.as_slice() == ["typing", "TypedDict"]
     })
 }
 
-pub(crate) fn is_type_var_assignment(context: &Context, stmt: &Stmt) -> bool {
+pub(crate) fn is_type_var_assignment(model: &SemanticModel, stmt: &Stmt) -> bool {
     let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
         return false;
     };
     let Expr::Call(ast::ExprCall {func, ..}) = value.as_ref() else {
         return false;
     };
-    context.resolve_call_path(func).map_or(false, |call_path| {
+    model.resolve_call_path(func).map_or(false, |call_path| {
         call_path.as_slice() == ["typing", "TypeVar"]
             || call_path.as_slice() == ["typing", "NewType"]
     })
 }
 
-pub(crate) fn is_typed_dict_class(context: &Context, bases: &[Expr]) -> bool {
+pub(crate) fn is_typed_dict_class(model: &SemanticModel, bases: &[Expr]) -> bool {
     bases
         .iter()
-        .any(|base| context.match_typing_expr(base, "TypedDict"))
+        .any(|base| model.match_typing_expr(base, "TypedDict"))
 }
 
 #[cfg(test)]

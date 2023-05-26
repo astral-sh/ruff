@@ -1,12 +1,12 @@
-use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable};
 use ruff_python_semantic::{
     analyze::typing::{is_immutable_annotation, is_immutable_func},
-    context::Context,
+    model::SemanticModel,
 };
 
 use crate::checkers::ast::Checker;
@@ -162,8 +162,8 @@ fn is_mutable_expr(expr: &Expr) -> bool {
 
 const ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS: &[&[&str]] = &[&["dataclasses", "field"]];
 
-fn is_allowed_dataclass_function(context: &Context, func: &Expr) -> bool {
-    context.resolve_call_path(func).map_or(false, |call_path| {
+fn is_allowed_dataclass_function(model: &SemanticModel, func: &Expr) -> bool {
+    model.resolve_call_path(func).map_or(false, |call_path| {
         ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS
             .iter()
             .any(|target| call_path.as_slice() == *target)
@@ -171,11 +171,11 @@ fn is_allowed_dataclass_function(context: &Context, func: &Expr) -> bool {
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
-fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
+fn is_class_var_annotation(model: &SemanticModel, annotation: &Expr) -> bool {
     let Expr::Subscript(ast::ExprSubscript { value, .. }) = &annotation else {
         return false;
     };
-    context.match_typing_expr(value, "ClassVar")
+    model.match_typing_expr(value, "ClassVar")
 }
 
 /// RUF009
@@ -195,12 +195,12 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
             ..
         }) = statement
         {
-            if is_class_var_annotation(&checker.ctx, annotation) {
+            if is_class_var_annotation(checker.semantic_model(), annotation) {
                 continue;
             }
             if let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() {
-                if !is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
-                    && !is_allowed_dataclass_function(&checker.ctx, func)
+                if !is_immutable_func(checker.semantic_model(), func, &extend_immutable_calls)
+                    && !is_allowed_dataclass_function(checker.semantic_model(), func)
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {
@@ -223,8 +223,8 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
                 value: Some(value),
                 ..
             }) => {
-                if !is_class_var_annotation(&checker.ctx, annotation)
-                    && !is_immutable_annotation(&checker.ctx, annotation)
+                if !is_class_var_annotation(checker.semantic_model(), annotation)
+                    && !is_immutable_annotation(checker.semantic_model(), annotation)
                     && is_mutable_expr(value)
                 {
                     checker
@@ -244,10 +244,9 @@ pub(crate) fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     }
 }
 
-pub(crate) fn is_dataclass(checker: &Checker, decorator_list: &[Expr]) -> bool {
+pub(crate) fn is_dataclass(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|decorator| {
-        checker
-            .ctx
+        model
             .resolve_call_path(map_callable(decorator))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["dataclasses", "dataclass"]

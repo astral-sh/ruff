@@ -3,7 +3,7 @@ name: "[ruff] Release"
 on:
   workflow_dispatch:
   release:
-    types: [published]
+    types: [ published ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,6 +18,31 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build sdist"
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - name: "Test sdist"
+        run: |
+          pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
+          ruff --help
+          python -m ruff --help
+      - name: "Upload sdist"
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+
   macos-x86_64:
     runs-on: macos-latest
     steps:
@@ -32,7 +57,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
-          args: --release --out dist --sdist
+          args: --release --out dist
       - name: "Test wheel - x86_64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
@@ -69,7 +94,7 @@ jobs:
       - name: "Build wheels - universal2"
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --universal2 --out dist
+          args: --release --target universal2-apple-darwin --out dist
       - name: "Test wheel - universal2"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
@@ -381,9 +406,6 @@ jobs:
         run: |
           pip install --upgrade twine
           twine upload --skip-existing *
-      - name: "Update pre-commit mirror"
-        run: |
-          curl -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.RUFF_PRE_COMMIT_PAT }}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/charliermarsh/ruff-pre-commit/dispatches --data '{"event_type": "pypi_release"}'
       - uses: actions/download-artifact@v3
         with:
           name: binaries
@@ -392,3 +414,22 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: binaries/*
+
+  # After the release has been published, we update downstream repositories
+  # This is separate because if this fails the release is still fine, we just need to do some manual workflow triggers
+  update-dependents:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: "Update pre-commit mirror"
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.RUFF_PRE_COMMIT_PAT }}
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: 'astral-sh',
+              repo: 'ruff-pre-commit',
+              workflow_id: 'main.yml',
+              ref: 'main',
+            })

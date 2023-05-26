@@ -1,6 +1,7 @@
 //! This crate implements internal macros for the `ruff` library.
 
 use crate::cache_key::derive_cache_key;
+use crate::newtype_index::generate_newtype_index;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput, ItemFn, ItemStruct};
 
@@ -9,6 +10,7 @@ mod combine_options;
 mod config;
 mod derive_message_formats;
 mod map_codes;
+mod newtype_index;
 mod register_rules;
 mod rule_code_prefix;
 mod rule_namespace;
@@ -78,4 +80,34 @@ pub fn map_codes(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn derive_message_formats(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
     derive_message_formats::derive_message_formats(&func).into()
+}
+
+/// Derives a newtype wrapper that can be used as an index.
+/// The wrapper can represent indices up to `u32::MAX - 1`.
+///
+/// The `u32::MAX - 1` is an optimization so that `Option<Index>` has the same size as `Index`.
+///
+/// Can store at most `u32::MAX - 1` values
+///
+/// ## Warning
+///
+/// Additional `derive` attributes must come AFTER this attribute:
+///
+/// Good:
+///
+/// ```rust
+/// #[newtype_index]
+/// #[derive(Ord, PartialOrd)]
+/// struct MyIndex;
+/// ```
+#[proc_macro_attribute]
+pub fn newtype_index(_metadata: TokenStream, input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as ItemStruct);
+
+    let output = match generate_newtype_index(item) {
+        Ok(output) => output,
+        Err(err) => err.to_compile_error(),
+    };
+
+    TokenStream::from(output)
 }

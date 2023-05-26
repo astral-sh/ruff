@@ -83,11 +83,7 @@ pub fn extract_directives(
 }
 
 /// Extract a mapping from logical line to noqa line.
-pub fn extract_noqa_line_for(
-    lxr: &[LexResult],
-    locator: &Locator,
-    indexer: &Indexer,
-) -> NoqaMapping {
+fn extract_noqa_line_for(lxr: &[LexResult], locator: &Locator, indexer: &Indexer) -> NoqaMapping {
     let mut string_mappings = Vec::new();
 
     for (tok, range) in lxr.iter().flatten() {
@@ -166,7 +162,7 @@ pub fn extract_noqa_line_for(
 }
 
 /// Extract a set of ranges over which to disable isort.
-pub fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDirectives {
+fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDirectives {
     let mut exclusions: Vec<TextRange> = Vec::default();
     let mut splits: Vec<TextSize> = Vec::default();
     let mut off: Option<TextSize> = None;

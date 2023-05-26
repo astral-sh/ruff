@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 use super::super::helpers::string_literal;
 
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)(select\s.*from\s|delete\s+from\s|insert\s+into\s.*values\s|update\s.*set\s)")
+    Regex::new(r"(?i)\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)")
         .unwrap()
 });
 
@@ -60,7 +60,7 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             op: Operator::Add | Operator::Mod,
             ..
         }) => {
-            let Some(parent) = checker.ctx.expr_parent() else {
+            let Some(parent) = checker.semantic_model().expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
                     return Some(checker.generator().expr(expr));
                 }

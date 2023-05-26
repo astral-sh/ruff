@@ -6,3 +6,4 @@
 # T001 - errors
 # XXX (evanrittenhouse): this is not fine
 # FIXME (evanrittenhouse): this is not fine
+# foo # XXX: this isn't fine either

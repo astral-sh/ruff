@@ -1,7 +1,8 @@
-use memchr::{memchr2, memrchr2};
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::iter::FusedIterator;
 use std::ops::Deref;
+
+use memchr::{memchr2, memrchr2};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 /// Extension trait for [`str`] that provides a [`UniversalNewlineIterator`].
 pub trait StrExt {
@@ -337,9 +338,11 @@ impl Deref for LineEnding {
 
 #[cfg(test)]
 mod tests {
-    use super::UniversalNewlineIterator;
-    use crate::newlines::Line;
     use ruff_text_size::TextSize;
+
+    use crate::newlines::Line;
+
+    use super::UniversalNewlineIterator;
 
     #[test]
     fn universal_newlines_empty_str() {

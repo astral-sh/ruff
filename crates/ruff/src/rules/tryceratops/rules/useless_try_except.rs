@@ -44,7 +44,7 @@ pub(crate) fn useless_try_except(checker: &mut Checker, handlers: &[Excepthandle
         .iter()
         .map(|handler| {
             let ExceptHandler(ExcepthandlerExceptHandler { name, body, .. }) = handler;
-            let Some(Stmt::Raise(ast::StmtRaise {  exc, .. })) = &body.first() else {
+            let Some(Stmt::Raise(ast::StmtRaise {  exc, cause: None, .. })) = &body.first() else {
                 return None;
             };
             if let Some(expr) = exc {

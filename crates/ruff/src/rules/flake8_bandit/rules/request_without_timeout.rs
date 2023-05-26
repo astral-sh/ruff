@@ -34,7 +34,7 @@ pub(crate) fn request_without_timeout(
     keywords: &[Keyword],
 ) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             HTTP_VERBS

@@ -13,6 +13,7 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
+use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -32,6 +33,7 @@ pub struct RuleSelection {
     pub extend_select: Vec<RuleSelector>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub unfixable: Vec<RuleSelector>,
+    pub extend_fixable: Vec<RuleSelector>,
 }
 
 #[derive(Debug, Default)]
@@ -47,6 +49,7 @@ pub struct Configuration {
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
     pub extend_include: Vec<FilePattern>,
+    pub extend_per_file_ignores: Vec<PerFileIgnore>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
@@ -54,7 +57,8 @@ pub struct Configuration {
     pub format: Option<SerializationFormat>,
     pub ignore_init_module_imports: Option<bool>,
     pub include: Option<Vec<FilePattern>>,
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
+    pub tab_size: Option<TabSize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
@@ -101,7 +105,13 @@ impl Configuration {
                     .collect(),
                 extend_select: options.extend_select.unwrap_or_default(),
                 fixable: options.fixable,
-                unfixable: options.unfixable.unwrap_or_default(),
+                unfixable: options
+                    .unfixable
+                    .into_iter()
+                    .flatten()
+                    .chain(options.extend_unfixable.into_iter().flatten())
+                    .collect(),
+                extend_fixable: options.extend_fixable.unwrap_or_default(),
             }],
             allowed_confusables: options.allowed_confusables,
             builtins: options.builtins,
@@ -159,6 +169,17 @@ impl Configuration {
                         .collect()
                 })
                 .unwrap_or_default(),
+            extend_per_file_ignores: options
+                .extend_per_file_ignores
+                .map(|per_file_ignores| {
+                    per_file_ignores
+                        .into_iter()
+                        .map(|(pattern, prefixes)| {
+                            PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
             external: options.external,
             fix: options.fix,
             fix_only: options.fix_only,
@@ -175,6 +196,7 @@ impl Configuration {
                     .collect()
             }),
             line_length: options.line_length,
+            tab_size: options.tab_size,
             namespace_packages: options
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
@@ -247,6 +269,11 @@ impl Configuration {
                 .into_iter()
                 .chain(self.extend_include.into_iter())
                 .collect(),
+            extend_per_file_ignores: config
+                .extend_per_file_ignores
+                .into_iter()
+                .chain(self.extend_per_file_ignores.into_iter())
+                .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
             fix_only: self.fix_only.or(config.fix_only),
@@ -257,6 +284,7 @@ impl Configuration {
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
             line_length: self.line_length.or(config.line_length),
+            tab_size: self.tab_size.or(config.tab_size),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             required_version: self.required_version.or(config.required_version),

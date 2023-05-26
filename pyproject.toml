@@ -1,11 +1,11 @@
 [build-system]
-requires = ["maturin>=0.15.1,<0.16"]
+requires = ["maturin>=1.0,<2.0"]
 
 build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.267"
+version = "0.0.270"
 description = "An extremely fast Python linter, written in Rust."
 authors = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
 maintainers = [{ name = "Charlie Marsh", email = "charlie.r.marsh@gmail.com" }]
@@ -49,6 +49,10 @@ manifest-path = "crates/ruff_cli/Cargo.toml"
 module-name = "ruff"
 python-source = "python"
 strip = true
+exclude = [
+  "crates/ruff/resources/test/fixtures/**/*",
+  "crates/ruff/src/rules/*/snapshots/**/*"
+]
 
 [tool.black]
 force-exclude = '''

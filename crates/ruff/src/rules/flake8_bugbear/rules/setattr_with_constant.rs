@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::source_code::Generator;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
@@ -76,14 +75,12 @@ pub(crate) fn setattr_with_constant(
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
         range: _,
-    }) = &checker.ctx.stmt()
+    }) = checker.semantic_model().stmt()
     {
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
-
             if checker.patch(diagnostic.kind.rule()) {
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                     assignment(obj, name, value, checker.generator()),
                     expr.range(),
                 )));

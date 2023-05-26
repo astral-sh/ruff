@@ -1,6 +1,7 @@
+use ruff_text_size::TextRange;
+
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::checkers::ast::Checker;
@@ -57,7 +56,7 @@ pub(crate) fn native_literals(
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.ctx.is_builtin(id) {
+    if (id == "str" || id == "bytes") && checker.semantic_model().is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str

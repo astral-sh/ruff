@@ -1,5 +1,6 @@
-use crate::{CacheKey, CacheKeyHasher};
 use globset::{Glob, GlobMatcher};
+
+use crate::{CacheKey, CacheKeyHasher};
 
 impl CacheKey for GlobMatcher {
     fn cache_key(&self, state: &mut CacheKeyHasher) {

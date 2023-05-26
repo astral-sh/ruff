@@ -1,4 +1,43 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
 ---
+split.py:15:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+15 |   if True:
+16 | /     import C
+17 | |     import A
+18 | | 
+   | |_^ I001
+19 |       # isort: split
+   |
+   = help: Organize imports
+
+ℹ Suggested fix
+12 12 | import b
+13 13 | 
+14 14 | if True:
+   15 |+    import A
+15 16 |     import C
+16    |-    import A
+17 17 | 
+18 18 |     # isort: split
+19 19 | 
+
+split.py:20:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+20 |       # isort: split
+21 |   
+22 | /     import D
+23 | |     import B
+   |
+   = help: Organize imports
+
+ℹ Suggested fix
+17 17 | 
+18 18 |     # isort: split
+19 19 | 
+   20 |+    import B
+20 21 |     import D
+21    |-    import B
+
 

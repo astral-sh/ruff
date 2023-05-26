@@ -19,7 +19,7 @@ if x > 0:
 else:
     import e
 
-y = x + 1
+__some__magic = 1
 
 import f
 

@@ -76,7 +76,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
 
-    new_pub_use = f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
+    new_pub_use = f"pub(crate) use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
     new_mod = f"mod {rule_name_snake};"
 
     if len(parts) == 2:
@@ -105,6 +105,7 @@ use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct {name};
+
 impl Violation for {name} {{
     #[derive_message_formats]
     fn message(&self) -> String {{
@@ -117,7 +118,7 @@ impl Violation for {name} {{
         fp.write(
             f"""
 /// {prefix}{code}
-pub fn {rule_name_snake}(checker: &mut Checker) {{}}
+pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
 """,
         )
 

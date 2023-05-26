@@ -8,12 +8,11 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use regex::Regex;
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::types::PythonVersion;
@@ -22,7 +21,7 @@ mod tests {
 
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"); "PLE1142")]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"); "PLW0129")]
-    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
+    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE1310")]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"); "PLW0711")]
@@ -48,6 +47,7 @@ mod tests {
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"); "PLE0241")]
+    #[test_case(Rule::DuplicateValue, Path::new("duplicate_value.py"); "PLW0130")]
     #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"); "PLE2510")]
     #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"); "PLE2513")]
     #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"); "PLE2514")]
@@ -58,6 +58,7 @@ mod tests {
     #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"); "PLE1206")]
     #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"); "PLE1205")]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
+    #[test_case(Rule::NamedExprWithoutContext, Path::new("named_expr_without_context.py"); "PLW0131")]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"); "PLE0117")]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"); "PLW2901")]

@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct ZipWithoutExplicitStrict;
@@ -23,7 +24,7 @@ pub(crate) fn zip_without_explicit_strict(
 ) {
     if let Expr::Name(ast::ExprName { id, .. }) = func {
         if id == "zip"
-            && checker.ctx.is_builtin("zip")
+            && checker.semantic_model().is_builtin("zip")
             && !kwargs
                 .iter()
                 .any(|keyword| keyword.arg.as_ref().map_or(false, |name| name == "strict"))

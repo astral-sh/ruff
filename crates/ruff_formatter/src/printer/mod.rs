@@ -23,6 +23,7 @@ use crate::printer::line_suffixes::{LineSuffixEntry, LineSuffixes};
 use crate::printer::queue::{
     AllPredicate, FitsEndPredicate, FitsQueue, PrintQueue, Queue, SingleEntryPredicate,
 };
+use crate::source_code::SourceCode;
 use drop_bomb::DebugDropBomb;
 use ruff_text_size::{TextLen, TextSize};
 use std::num::NonZeroU8;
@@ -32,12 +33,14 @@ use unicode_width::UnicodeWidthChar;
 #[derive(Debug, Default)]
 pub struct Printer<'a> {
     options: PrinterOptions,
+    source_code: SourceCode<'a>,
     state: PrinterState<'a>,
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(options: PrinterOptions) -> Self {
+    pub fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
         Self {
+            source_code,
             options,
             state: PrinterState::default(),
         }
@@ -95,11 +98,11 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::StaticText { text } => self.print_text(text, None),
-            FormatElement::DynamicText {
-                text,
-                source_position,
-            } => self.print_text(text, Some(*source_position)),
-            FormatElement::StaticTextSlice { text, range } => self.print_text(&text[*range], None),
+            FormatElement::DynamicText { text } => self.print_text(text, None),
+            FormatElement::SourceCodeSlice { slice, .. } => {
+                let text = slice.text(self.source_code);
+                self.print_text(text, Some(slice.range()))
+            }
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
@@ -127,6 +130,11 @@ impl<'a> Printer<'a> {
 
             FormatElement::ExpandParent => {
                 // Handled in `Document::propagate_expands()
+            }
+
+            FormatElement::SourcePosition(position) => {
+                self.state.source_position = *position;
+                self.push_marker();
             }
 
             FormatElement::LineSuffixBoundary => {
@@ -273,7 +281,7 @@ impl<'a> Printer<'a> {
         result
     }
 
-    fn print_text(&mut self, text: &str, source_position: Option<TextSize>) {
+    fn print_text(&mut self, text: &str, source_range: Option<TextRange>) {
         if !self.state.pending_indent.is_empty() {
             let (indent_char, repeat_count) = match self.options.indent_style() {
                 IndentStyle::Tab => ('\t', 1),
@@ -311,28 +319,27 @@ impl<'a> Printer<'a> {
         // If the token has no source position (was created by the formatter)
         // both the start and end marker will use the last known position
         // in the input source (from state.source_position)
-        if let Some(source) = source_position {
-            self.state.source_position = source;
+        if let Some(range) = source_range {
+            self.state.source_position = range.start();
         }
 
-        self.push_marker(SourceMarker {
-            source: self.state.source_position,
-            dest: self.state.buffer.text_len(),
-        });
+        self.push_marker();
 
         self.print_str(text);
 
-        if source_position.is_some() {
-            self.state.source_position += text.text_len();
+        if let Some(range) = source_range {
+            self.state.source_position = range.end();
         }
 
-        self.push_marker(SourceMarker {
-            source: self.state.source_position,
-            dest: self.state.buffer.text_len(),
-        });
+        self.push_marker();
     }
 
-    fn push_marker(&mut self, marker: SourceMarker) {
+    fn push_marker(&mut self) {
+        let marker = SourceMarker {
+            source: self.state.source_position,
+            dest: self.state.buffer.text_len(),
+        };
+
         if let Some(last) = self.state.source_markers.last() {
             if last != &marker {
                 self.state.source_markers.push(marker)
@@ -993,8 +1000,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::StaticText { text } => return Ok(self.fits_text(text)),
             FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text)),
-            FormatElement::StaticTextSlice { text, range } => {
-                return Ok(self.fits_text(&text[*range]))
+            FormatElement::SourceCodeSlice { slice, .. } => {
+                let text = slice.text(self.printer.source_code);
+                return Ok(self.fits_text(text));
             }
             FormatElement::LineSuffixBoundary => {
                 if self.state.has_line_suffix {
@@ -1007,6 +1015,8 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     return Ok(Fits::No);
                 }
             }
+
+            FormatElement::SourcePosition(_) => {}
 
             FormatElement::BestFitting(best_fitting) => {
                 let slice = match args.mode() {
@@ -1253,6 +1263,7 @@ struct FitsState {
 mod tests {
     use crate::prelude::*;
     use crate::printer::{LineEnding, PrintWidth, Printer, PrinterOptions};
+    use crate::source_code::SourceCode;
     use crate::{format_args, write, Document, FormatState, IndentStyle, Printed, VecBuffer};
 
     fn format(root: &dyn Format<SimpleFormatContext>) -> Printed {
@@ -1271,7 +1282,7 @@ mod tests {
     ) -> Printed {
         let formatted = crate::format!(SimpleFormatContext::default(), [root]).unwrap();
 
-        Printer::new(options)
+        Printer::new(SourceCode::default(), options)
             .print(formatted.document())
             .expect("Document to be valid")
     }
@@ -1507,9 +1518,12 @@ two lines`,
 
         let document = Document::from(buffer.into_vec());
 
-        let printed = Printer::new(PrinterOptions::default().with_print_width(PrintWidth::new(10)))
-            .print(&document)
-            .unwrap();
+        let printed = Printer::new(
+            SourceCode::default(),
+            PrinterOptions::default().with_print_width(PrintWidth::new(10)),
+        )
+        .print(&document)
+        .unwrap();
 
         assert_eq!(
             printed.as_code(),

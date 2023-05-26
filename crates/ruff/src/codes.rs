@@ -186,6 +186,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R5501") => (RuleGroup::Unspecified, Rule::CollapsibleElseIf),
         (Pylint, "W0120") => (RuleGroup::Unspecified, Rule::UselessElseOnLoop),
         (Pylint, "W0129") => (RuleGroup::Unspecified, Rule::AssertOnStringLiteral),
+        (Pylint, "W0131") => (RuleGroup::Unspecified, Rule::NamedExprWithoutContext),
         (Pylint, "W0406") => (RuleGroup::Unspecified, Rule::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Unspecified, Rule::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Unspecified, Rule::GlobalStatement),
@@ -193,6 +194,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1508") => (RuleGroup::Unspecified, Rule::InvalidEnvvarDefault),
         (Pylint, "W2901") => (RuleGroup::Unspecified, Rule::RedefinedLoopName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, Rule::NestedMinMax),
+        (Pylint, "W0130") => (RuleGroup::Unspecified, Rule::DuplicateValue),
 
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Unspecified, Rule::BlockingHttpCallInAsyncFunction),
@@ -508,6 +510,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "506") => (RuleGroup::Unspecified, Rule::UnsafeYAMLLoad),
         (Flake8Bandit, "508") => (RuleGroup::Unspecified, Rule::SnmpInsecureVersion),
         (Flake8Bandit, "509") => (RuleGroup::Unspecified, Rule::SnmpWeakCryptography),
+        (Flake8Bandit, "601") => (RuleGroup::Unspecified, Rule::ParamikoCall),
         (Flake8Bandit, "602") => (RuleGroup::Unspecified, Rule::SubprocessPopenWithShellEqualsTrue),
         (Flake8Bandit, "603") => (RuleGroup::Unspecified, Rule::SubprocessWithoutShellEqualsTrue),
         (Flake8Bandit, "604") => (RuleGroup::Unspecified, Rule::CallWithShellEqualsTrue),
@@ -581,6 +584,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "010") => (RuleGroup::Unspecified, Rule::NonEmptyStubBody),
         (Flake8Pyi, "011") => (RuleGroup::Unspecified, Rule::TypedArgumentDefaultInStub),
         (Flake8Pyi, "012") => (RuleGroup::Unspecified, Rule::PassInClassBody),
+        (Flake8Pyi, "013") => (RuleGroup::Unspecified, Rule::EllipsisInNonEmptyClassBody),
         (Flake8Pyi, "014") => (RuleGroup::Unspecified, Rule::ArgumentDefaultInStub),
         (Flake8Pyi, "015") => (RuleGroup::Unspecified, Rule::AssignmentDefaultInStub),
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, Rule::DuplicateUnionMember),
@@ -589,6 +593,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, Rule::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, Rule::TSuffixedTypeAlias),
+        (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
 
         // flake8-pytest-style
@@ -719,6 +724,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "009") => (RuleGroup::Unspecified, Rule::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Unspecified, Rule::ExplicitFStringTypeConversion),
         (Ruff, "100") => (RuleGroup::Unspecified, Rule::UnusedNOQA),
+        (Ruff, "200") => (RuleGroup::Unspecified, Rule::InvalidPyprojectToml),
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Unspecified, Rule::DjangoNullableModelStringField),
@@ -734,13 +740,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flynt, "002") => (RuleGroup::Unspecified, Rule::StaticJoinToFString),
 
         // flake8-todos
-        (Flake8Todo, "001") => (RuleGroup::Unspecified, Rule::InvalidTodoTag),
-        (Flake8Todo, "002") => (RuleGroup::Unspecified, Rule::MissingTodoAuthor),
-        (Flake8Todo, "003") => (RuleGroup::Unspecified, Rule::MissingTodoLink),
-        (Flake8Todo, "004") => (RuleGroup::Unspecified, Rule::MissingTodoColon),
-        (Flake8Todo, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
-        (Flake8Todo, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
-        (Flake8Todo, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
+        (Flake8Todos, "001") => (RuleGroup::Unspecified, Rule::InvalidTodoTag),
+        (Flake8Todos, "002") => (RuleGroup::Unspecified, Rule::MissingTodoAuthor),
+        (Flake8Todos, "003") => (RuleGroup::Unspecified, Rule::MissingTodoLink),
+        (Flake8Todos, "004") => (RuleGroup::Unspecified, Rule::MissingTodoColon),
+        (Flake8Todos, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
+        (Flake8Todos, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
+        (Flake8Todos, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
 
         _ => return None,
     })

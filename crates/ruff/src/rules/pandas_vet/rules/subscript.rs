@@ -54,7 +54,7 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, expr: &Expr) {
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.at[0]`), and on irrelevant bindings
     // (like imports).
     if !matches!(
-        test_expression(value, &checker.ctx),
+        test_expression(value, checker.semantic_model()),
         Resolution::RelevantLocal
     ) {
         return;

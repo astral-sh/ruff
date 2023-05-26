@@ -1,0 +1,177 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI013.pyi:5:5: PYI013 [*] Non-empty class body must not contain `...`
+  |
+5 | class OneAttributeClass:
+6 |     value: int
+7 |     ...  # Error
+  |     ^^^ PYI013
+8 | 
+9 | class OneAttributeClass2:
+  |
+  = help: Remove unnecessary `...`
+
+ℹ Fix
+2 2 | 
+3 3 | class OneAttributeClass:
+4 4 |     value: int
+5   |-    ...  # Error
+6 5 | 
+7 6 | class OneAttributeClass2:
+8 7 |     ...  # Error
+
+PYI013.pyi:8:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+ 8 | class OneAttributeClass2:
+ 9 |     ...  # Error
+   |     ^^^ PYI013
+10 |     value: int
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+5 5 |     ...  # Error
+6 6 | 
+7 7 | class OneAttributeClass2:
+8   |-    ...  # Error
+9 8 |     value: int
+10 9 | 
+11 10 | class MyClass:
+
+PYI013.pyi:12:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+12 | class MyClass:
+13 |     ...
+   |     ^^^ PYI013
+14 |     value: int
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+9  9  |     value: int
+10 10 | 
+11 11 | class MyClass:
+12    |-    ...
+13 12 |     value: int
+14 13 | 
+15 14 | class TwoEllipsesClass:
+
+PYI013.pyi:16:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+16 | class TwoEllipsesClass:
+17 |     ...
+   |     ^^^ PYI013
+18 |     ...  # Error
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+13 13 |     value: int
+14 14 | 
+15 15 | class TwoEllipsesClass:
+16    |-    ...
+17 16 |     ...  # Error
+18 17 | 
+19 18 | class DocstringClass:
+
+PYI013.pyi:17:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+17 | class TwoEllipsesClass:
+18 |     ...
+19 |     ...  # Error
+   |     ^^^ PYI013
+20 | 
+21 | class DocstringClass:
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+14 14 | 
+15 15 | class TwoEllipsesClass:
+16 16 |     ...
+17    |-    ...  # Error
+   17 |+    pass  # Error
+18 18 | 
+19 19 | class DocstringClass:
+20 20 |     """
+
+PYI013.pyi:24:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+24 |     """
+25 | 
+26 |     ...  # Error
+   |     ^^^ PYI013
+27 | 
+28 | class NonEmptyChild(Exception):
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+21 21 |     My body only contains an ellipsis.
+22 22 |     """
+23 23 | 
+24    |-    ...  # Error
+25 24 | 
+26 25 | class NonEmptyChild(Exception):
+27 26 |     value: int
+
+PYI013.pyi:28:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+28 | class NonEmptyChild(Exception):
+29 |     value: int
+30 |     ...  # Error
+   |     ^^^ PYI013
+31 | 
+32 | class NonEmptyChild2(Exception):
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+25 25 | 
+26 26 | class NonEmptyChild(Exception):
+27 27 |     value: int
+28    |-    ...  # Error
+29 28 | 
+30 29 | class NonEmptyChild2(Exception):
+31 30 |     ...  # Error
+
+PYI013.pyi:31:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+31 | class NonEmptyChild2(Exception):
+32 |     ...  # Error
+   |     ^^^ PYI013
+33 |     value: int
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+28 28 |     ...  # Error
+29 29 | 
+30 30 | class NonEmptyChild2(Exception):
+31    |-    ...  # Error
+32 31 |     value: int
+33 32 | 
+34 33 | class NonEmptyWithInit:
+
+PYI013.pyi:36:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+36 | class NonEmptyWithInit:
+37 |     value: int
+38 |     ...  # Error
+   |     ^^^ PYI013
+39 | 
+40 |     def __init__():
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Fix
+33 33 | 
+34 34 | class NonEmptyWithInit:
+35 35 |     value: int
+36    |-    ...  # Error
+37 36 | 
+38 37 |     def __init__():
+39 38 |         pass
+
+

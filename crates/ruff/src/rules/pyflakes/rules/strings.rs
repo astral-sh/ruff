@@ -1,6 +1,6 @@
-use ruff_text_size::TextRange;
 use std::string::ToString;
 
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Constant, Expr, Identifier, Keyword};
 

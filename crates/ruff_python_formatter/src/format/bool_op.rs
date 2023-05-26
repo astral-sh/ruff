@@ -1,16 +1,14 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{BoolOp, BoolOpKind};
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
-use crate::shared_traits::AsFormat;
 
-pub struct FormatBoolOp<'a> {
+pub(crate) struct FormatBoolOp<'a> {
     item: &'a BoolOp,
 }
 
-impl AsFormat<ASTFormatContext> for BoolOp {
+impl AsFormat<ASTFormatContext<'_>> for BoolOp {
     type Format<'a> = FormatBoolOp<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -18,7 +16,7 @@ impl AsFormat<ASTFormatContext> for BoolOp {
     }
 }
 
-impl Format<ASTFormatContext> for FormatBoolOp<'_> {
+impl Format<ASTFormatContext<'_>> for FormatBoolOp<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let bool_op = self.item;
         write!(f, [leading_comments(bool_op)])?;

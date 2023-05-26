@@ -2,11 +2,9 @@
 
 use rustpython_parser::ast::{Constant, ConversionFlag};
 
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::{format_args, write};
-use ruff_text_size::TextSize;
 
-use crate::context::ASTFormatContext;
 use crate::cst::{
     Arguments, BoolOp, CmpOp, Comprehension, Expr, ExprKind, Keyword, Operator, OperatorKind,
     SliceIndex, SliceIndexKind, UnaryOp, UnaryOpKind,
@@ -16,10 +14,9 @@ use crate::format::comments::{dangling_comments, end_of_line_comments, leading_c
 use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
 use crate::format::numbers::{complex_literal, float_literal, int_literal};
 use crate::format::strings::string_literal;
-use crate::shared_traits::AsFormat;
 use crate::trivia::{Parenthesize, TriviaKind};
 
-pub struct FormatExpr<'a> {
+pub(crate) struct FormatExpr<'a> {
     item: &'a Expr,
 }
 
@@ -34,7 +31,7 @@ fn format_starred(
 }
 
 fn format_name(f: &mut Formatter<ASTFormatContext>, expr: &Expr, _id: &str) -> FormatResult<()> {
-    write!(f, [literal(expr.range())])?;
+    write!(f, [literal(expr.range(), ContainsNewlines::No)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -58,7 +55,7 @@ fn format_subscript(
                     if let TriviaKind::OwnLineComment(range) = trivia.kind {
                         write!(f, [expand_parent()])?;
                         write!(f, [hard_line_break()])?;
-                        write!(f, [literal(range)])?;
+                        write!(f, [literal(range, ContainsNewlines::No)])?;
                     }
                 }
             }
@@ -574,7 +571,7 @@ fn format_joined_str(
     expr: &Expr,
     _values: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [literal(expr.range())])?;
+    write!(f, [literal(expr.range(), ContainsNewlines::Detect)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -676,7 +673,7 @@ fn format_attribute(
 ) -> FormatResult<()> {
     write!(f, [value.format()])?;
     write!(f, [text(".")])?;
-    write!(f, [dynamic_text(attr, TextSize::default())])?;
+    write!(f, [dynamic_text(attr, None)])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -801,7 +798,7 @@ fn format_if_exp(
     Ok(())
 }
 
-impl Format<ASTFormatContext> for FormatExpr<'_> {
+impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         if self.item.parentheses.is_always() {
             write!(f, [text("(")])?;
@@ -872,7 +869,7 @@ impl Format<ASTFormatContext> for FormatExpr<'_> {
             if trivia.relationship.is_trailing() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
-                    write!(f, [literal(range)])?;
+                    write!(f, [literal(range, ContainsNewlines::No)])?;
                     write!(f, [hard_line_break()])?;
                 }
             }
@@ -886,7 +883,7 @@ impl Format<ASTFormatContext> for FormatExpr<'_> {
     }
 }
 
-impl AsFormat<ASTFormatContext> for Expr {
+impl AsFormat<ASTFormatContext<'_>> for Expr {
     type Format<'a> = FormatExpr<'a>;
 
     fn format(&self) -> Self::Format<'_> {

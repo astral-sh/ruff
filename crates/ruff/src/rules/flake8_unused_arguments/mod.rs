@@ -2,14 +2,12 @@
 mod helpers;
 pub(crate) mod rules;
 pub mod settings;
-mod types;
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
