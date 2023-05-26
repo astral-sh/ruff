@@ -117,6 +117,7 @@ ruff_macros::register_rules!(
     // pylint
     rules::pylint::rules::AssertOnStringLiteral,
     rules::pylint::rules::UselessReturn,
+    rules::pylint::rules::YieldFromInAsyncFunction,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,

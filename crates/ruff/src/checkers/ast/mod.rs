@@ -3084,6 +3084,9 @@ where
                 if self.enabled(Rule::YieldInInit) {
                     pylint::rules::yield_in_init(self, expr);
                 }
+                if self.enabled(Rule::YieldFromInAsyncFunction) {
+                    pylint::rules::yield_from_in_async_function(self, expr);
+                }
             }
             Expr::Await(_) => {
                 if self.enabled(Rule::YieldOutsideFunction) {
