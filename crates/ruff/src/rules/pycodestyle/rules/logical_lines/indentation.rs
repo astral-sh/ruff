@@ -246,6 +246,10 @@ pub(crate) fn indentation(
 ) -> Vec<DiagnosticKind> {
     let mut diagnostics = vec![];
 
+    if logical_line.is_empty() {
+        return diagnostics;
+    }
+
     if indent_level % indent_size != 0 {
         diagnostics.push(if logical_line.is_comment_only() {
             DiagnosticKind::from(IndentationWithInvalidMultipleComment { indent_size })

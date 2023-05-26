@@ -123,7 +123,7 @@ pub(crate) fn check_logical_lines(
         }
 
         prev_line = Some(line.clone());
-        if !line.is_comment_only() {
+        if !line.is_comment_only() && !line.is_empty() {
             prev_no_comment_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
