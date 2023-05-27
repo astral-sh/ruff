@@ -296,11 +296,12 @@ impl AlwaysAutofixableViolation for BlankLinesBeforeNestedDefinition {
 /// E301, E303
 pub(crate) fn blank_lines(
     line: &LogicalLine,
-    prev_line: Option<&LogicalLine>,
     blank_lines: &mut u32,
     blank_characters: &mut u32,
     follows_decorator: &mut bool,
     follows_def: &mut bool,
+    is_in_class: &mut bool,
+    class_indent_level: &mut usize,
     indent_level: usize,
     locator: &Locator,
     stylist: &Stylist,
@@ -334,7 +335,7 @@ pub(crate) fn blank_lines(
         }
         // E303
         else if token_idx == 0 && *blank_lines > BlankLinesConfig::TOP_LEVEL
-            || (indent_level > 0 && *blank_lines > BlankLinesConfig::METHOD)
+            || (*is_in_class && *blank_lines > BlankLinesConfig::METHOD)
         {
             let mut diagnostic = Diagnostic::new(TooManyBlankLines(*blank_lines), token.range());
 
@@ -365,6 +366,17 @@ pub(crate) fn blank_lines(
             context.push_diagnostic(diagnostic);
         }
 
+        if token.kind() == TokenKind::Class {
+            if !*is_in_class {
+                *class_indent_level = indent_level;
+            }
+            *is_in_class = true;
+        }
+
+        if indent_level <= *class_indent_level {
+            *is_in_class = false;
+        }
+
         if token.kind() == TokenKind::At {
             *follows_decorator = true;
 
@@ -383,6 +395,7 @@ pub(crate) fn blank_lines(
     }
     *follows_decorator = false;
     *follows_def = false;
+    *is_in_class = false;
     *blank_lines = 0;
     *blank_characters = 0;
 }

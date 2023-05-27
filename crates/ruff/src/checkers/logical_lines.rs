@@ -47,10 +47,11 @@ pub(crate) fn check_logical_lines(
     let mut prev_line = None;
     let mut nb_blank_lines: u32 = 0;
     let mut blank_characters: u32 = 0;
+    let mut class_indent_level: usize = 0;
     let mut follows_decorator = false;
     let mut follows_def = false;
+    let mut is_in_class = false;
 
-    let mut prev_no_comment_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
     for line in &LogicalLines::from_tokens(tokens, locator) {
@@ -102,7 +103,7 @@ pub(crate) fn check_logical_lines(
 
         for kind in indentation(
             &line,
-            prev_no_comment_line.as_ref(),
+            prev_line.as_ref(),
             indent_char,
             indent_level,
             prev_indent_level,
@@ -115,11 +116,12 @@ pub(crate) fn check_logical_lines(
         if should_fix_blank_lines || true {
             blank_lines(
                 &line,
-                prev_line.as_ref(),
                 &mut nb_blank_lines,
                 &mut blank_characters,
                 &mut follows_decorator,
                 &mut follows_def,
+                &mut is_in_class,
+                &mut class_indent_level,
                 indent_level,
                 locator,
                 stylist,
@@ -127,9 +129,8 @@ pub(crate) fn check_logical_lines(
             );
         }
 
-        prev_line = Some(line.clone());
         if !line.is_comment_only() && !line.is_empty() {
-            prev_no_comment_line = Some(line);
+            prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
     }
