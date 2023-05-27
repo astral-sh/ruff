@@ -3077,12 +3077,15 @@ where
                     pylint::rules::yield_in_init(self, expr);
                 }
             }
-            Expr::YieldFrom(_) => {
+            Expr::YieldFrom(yield_from) => {
                 if self.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
                 if self.enabled(Rule::YieldInInit) {
                     pylint::rules::yield_in_init(self, expr);
+                }
+                if self.enabled(Rule::YieldFromInAsyncFunction) {
+                    pylint::rules::yield_from_in_async_function(self, yield_from);
                 }
             }
             Expr::Await(_) => {

@@ -73,6 +73,7 @@ mod tests {
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"); "PLR1711")]
+    #[test_case(Rule::YieldFromInAsyncFunction, Path::new("yield_from_in_async_function.py"); "PLE1700")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"); "PLW3301")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

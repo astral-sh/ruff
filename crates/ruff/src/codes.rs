@@ -165,6 +165,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E1307") => (RuleGroup::Unspecified, Rule::BadStringFormatType),
         (Pylint, "E1310") => (RuleGroup::Unspecified, Rule::BadStrStripCall),
         (Pylint, "E1507") => (RuleGroup::Unspecified, Rule::InvalidEnvvarValue),
+        (Pylint, "E1700") => (RuleGroup::Unspecified, Rule::YieldFromInAsyncFunction),
         (Pylint, "E2502") => (RuleGroup::Unspecified, Rule::BidirectionalUnicode),
         (Pylint, "E2510") => (RuleGroup::Unspecified, Rule::InvalidCharacterBackspace),
         (Pylint, "E2512") => (RuleGroup::Unspecified, Rule::InvalidCharacterSub),
