@@ -442,6 +442,17 @@
         }
       ]
     },
+    "pyflakes": {
+      "description": "Options for the `pyflakes` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PyflakesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pylint": {
       "description": "Options for the `pylint` plugin.",
       "anyOf": [
@@ -1418,6 +1429,22 @@
         },
         "property-decorators": {
           "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PyflakesOptions": {
+      "type": "object",
+      "properties": {
+        "extend-annotated-subscripts": {
+          "description": "Additional subcripts to consider as a generic, e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.",
           "type": [
             "array",
             "null"

@@ -25,6 +25,10 @@ pub(crate) enum UnusedImportContext {
 /// If an import statement is used to check for the availability or existence
 /// of a module, consider using `importlib.util.find_spec` instead.
 ///
+/// ## Options
+///
+/// - `pyflakes.extend-annotated-subscripts`
+///
 /// ## Example
 /// ```python
 /// import numpy as np  # unused import
