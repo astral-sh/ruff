@@ -23,8 +23,8 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// async def numbers():
-///   async for number in [1, 2, 3, 4, 5]:
-///        yield number
+///     async for number in [1, 2, 3, 4, 5]:
+///         yield number
 /// ```
 #[violation]
 pub struct YieldFromInAsyncFunction;
