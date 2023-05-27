@@ -16,12 +16,14 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// from airflow.operators import PythonOperator
+///
 /// incorrect_name = PythonOperator(task_id="my_task")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from airflow.operators import PythonOperator
+///
 /// my_task = PythonOperator(task_id="my_task")
 /// ```
 #[violation]
