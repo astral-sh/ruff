@@ -4,7 +4,6 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::Locator;
 
-use regex::Regex;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::token_kind::TokenKind;
@@ -55,15 +54,12 @@ impl BlankLinesConfig {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 #[violation]
-pub struct BlankLineBetweenMethods {
-    nb_blank_lines: usize,
-}
+pub struct BlankLineBetweenMethods;
 
 impl AlwaysAutofixableViolation for BlankLineBetweenMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineBetweenMethods { nb_blank_lines } = self;
-        format!("Expected 1 blank line, found {nb_blank_lines}")
+        format!("Expected 1 blank line, found 0")
     }
 
     fn autofix_title(&self) -> String {
@@ -296,6 +292,7 @@ impl AlwaysAutofixableViolation for BlankLinesBeforeNestedDefinition {
 /// E301, E303
 pub(crate) fn blank_lines(
     line: &LogicalLine,
+    prev_line: Option<&LogicalLine>,
     blank_lines: &mut u32,
     blank_characters: &mut u32,
     follows_decorator: &mut bool,
@@ -365,12 +362,29 @@ pub(crate) fn blank_lines(
 
             context.push_diagnostic(diagnostic);
         }
+        // E301
+        if token.kind() == TokenKind::Def
+            && *is_in_class
+            && *blank_lines == 0
+            && prev_line
+                .and_then(|prev_line| prev_line.tokens_trimmed().first())
+                .map_or(false, |token| token.kind() != TokenKind::Class)
+        {
+            let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, token.range());
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                stylist.line_ending().as_str().to_string(),
+                locator.line_start(token.range().start()),
+            )));
+            context.push_diagnostic(diagnostic);
+        }
 
         if token.kind() == TokenKind::Class {
             if !*is_in_class {
                 *class_indent_level = indent_level;
             }
             *is_in_class = true;
+            return;
         }
 
         if indent_level <= *class_indent_level {
@@ -395,7 +409,6 @@ pub(crate) fn blank_lines(
     }
     *follows_decorator = false;
     *follows_def = false;
-    *is_in_class = false;
     *blank_lines = 0;
     *blank_characters = 0;
 }

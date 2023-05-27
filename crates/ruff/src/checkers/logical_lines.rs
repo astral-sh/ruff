@@ -116,6 +116,7 @@ pub(crate) fn check_logical_lines(
         if should_fix_blank_lines || true {
             blank_lines(
                 &line,
+                prev_line.as_ref(),
                 &mut nb_blank_lines,
                 &mut blank_characters,
                 &mut follows_decorator,
