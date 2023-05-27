@@ -13,10 +13,11 @@ use ruff_python_ast::helpers::{
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::whitespace::leading_space;
 
+use crate::line_width::LineWidth;
 use crate::registry::AsRule;
 use crate::settings::Settings;
 
-use super::super::track::Block;
+use super::super::block::Block;
 use super::super::{comments, format_imports};
 
 /// ## What it does
@@ -116,7 +117,8 @@ pub(crate) fn organize_imports(
         block,
         comments,
         locator,
-        settings.line_length - indentation.len(),
+        settings.line_length,
+        LineWidth::new(settings.tab_size).add_str(indentation),
         stylist,
         &settings.src,
         package,

@@ -33,7 +33,7 @@ An extremely fast Python linter, written in Rust.
 - 📏  Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
 - ⚖️  [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
 - 🔌  Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
+- ⌨️  First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
 - 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
@@ -135,15 +135,15 @@ ruff check path/to/code/to/file.py  # Lint `file.py`
 Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 
 ```yaml
-- repo: https://github.com/charliermarsh/ruff-pre-commit
+- repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.269'
+  rev: v0.0.270
   hooks:
     - id: ruff
 ```
 
-Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
-alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
+Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or
+alongside any other editor through the [Ruff LSP](https://github.com/astral-sh/ruff-lsp).
 
 Ruff can also be used as a [GitHub Action](https://github.com/features/actions) via
 [`ruff-action`](https://github.com/chartboost/ruff-action):
@@ -388,7 +388,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [SciPy](https://github.com/scipy/scipy)
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
-- [Starlite](https://github.com/starlite-api/starlite)
+- [Litestar](https://litestar.dev/)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Vega-Altair](https://github.com/altair-viz/altair)
 - WordPress ([Openverse](https://github.com/WordPress/openverse))

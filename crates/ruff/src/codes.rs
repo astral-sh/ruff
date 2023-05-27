@@ -165,6 +165,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E1307") => (RuleGroup::Unspecified, Rule::BadStringFormatType),
         (Pylint, "E1310") => (RuleGroup::Unspecified, Rule::BadStrStripCall),
         (Pylint, "E1507") => (RuleGroup::Unspecified, Rule::InvalidEnvvarValue),
+        (Pylint, "E1700") => (RuleGroup::Unspecified, Rule::YieldFromInAsyncFunction),
         (Pylint, "E2502") => (RuleGroup::Unspecified, Rule::BidirectionalUnicode),
         (Pylint, "E2510") => (RuleGroup::Unspecified, Rule::InvalidCharacterBackspace),
         (Pylint, "E2512") => (RuleGroup::Unspecified, Rule::InvalidCharacterSub),
@@ -592,6 +593,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, Rule::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, Rule::TSuffixedTypeAlias),
+        (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
 
         // flake8-pytest-style
@@ -722,6 +724,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "009") => (RuleGroup::Unspecified, Rule::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Unspecified, Rule::ExplicitFStringTypeConversion),
         (Ruff, "100") => (RuleGroup::Unspecified, Rule::UnusedNOQA),
+        (Ruff, "200") => (RuleGroup::Unspecified, Rule::InvalidPyprojectToml),
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Unspecified, Rule::DjangoNullableModelStringField),
@@ -737,13 +740,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flynt, "002") => (RuleGroup::Unspecified, Rule::StaticJoinToFString),
 
         // flake8-todos
-        (Flake8Todo, "001") => (RuleGroup::Unspecified, Rule::InvalidTodoTag),
-        (Flake8Todo, "002") => (RuleGroup::Unspecified, Rule::MissingTodoAuthor),
-        (Flake8Todo, "003") => (RuleGroup::Unspecified, Rule::MissingTodoLink),
-        (Flake8Todo, "004") => (RuleGroup::Unspecified, Rule::MissingTodoColon),
-        (Flake8Todo, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
-        (Flake8Todo, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
-        (Flake8Todo, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
+        (Flake8Todos, "001") => (RuleGroup::Unspecified, Rule::InvalidTodoTag),
+        (Flake8Todos, "002") => (RuleGroup::Unspecified, Rule::MissingTodoAuthor),
+        (Flake8Todos, "003") => (RuleGroup::Unspecified, Rule::MissingTodoLink),
+        (Flake8Todos, "004") => (RuleGroup::Unspecified, Rule::MissingTodoColon),
+        (Flake8Todos, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
+        (Flake8Todos, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
+        (Flake8Todos, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
 
         // airflow
         (Airflow, "001") => (RuleGroup::Unspecified, Rule::TaskVariableNameNotTaskId),

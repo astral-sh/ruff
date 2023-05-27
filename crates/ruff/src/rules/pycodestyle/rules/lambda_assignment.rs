@@ -7,8 +7,7 @@ use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_ast::whitespace::leading_space;
-use ruff_python_semantic::context::Context;
-use ruff_python_semantic::scope::ScopeKind;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -66,14 +65,6 @@ pub(crate) fn lambda_assignment(
 ) {
     if let Expr::Name(ast::ExprName { id, .. }) = target {
         if let Expr::Lambda(ast::ExprLambda { args, body, .. }) = value {
-            // If the assignment is in a class body, it might not be safe
-            // to replace it because the assignment might be
-            // carrying a type annotation that will be used by some
-            // package like dataclasses, which wouldn't consider the
-            // rewritten function definition to be equivalent.
-            // See https://github.com/charliermarsh/ruff/issues/3046
-            let fixable = !matches!(checker.ctx.scope().kind, ScopeKind::Class(_));
-
             let mut diagnostic = Diagnostic::new(
                 LambdaAssignment {
                     name: id.to_string(),
@@ -81,8 +72,14 @@ pub(crate) fn lambda_assignment(
                 stmt.range(),
             );
 
+            // If the assignment is in a class body, it might not be safe
+            // to replace it because the assignment might be
+            // carrying a type annotation that will be used by some
+            // package like dataclasses, which wouldn't consider the
+            // rewritten function definition to be equivalent.
+            // See https://github.com/charliermarsh/ruff/issues/3046
             if checker.patch(diagnostic.kind.rule())
-                && fixable
+                && !checker.semantic_model().scope().kind.is_class()
                 && !has_leading_content(stmt, checker.locator)
                 && !has_trailing_content(stmt, checker.locator)
             {
@@ -90,7 +87,7 @@ pub(crate) fn lambda_assignment(
                 let indentation = &leading_space(first_line);
                 let mut indented = String::new();
                 for (idx, line) in function(
-                    &checker.ctx,
+                    checker.semantic_model(),
                     id,
                     args,
                     body,
@@ -124,7 +121,7 @@ pub(crate) fn lambda_assignment(
 /// The `Callable` import can be from either `collections.abc` or `typing`.
 /// If an ellipsis is used for the argument types, an empty list is returned.
 /// The returned values are cloned, so they can be used as-is.
-fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
+fn extract_types(model: &SemanticModel, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
         return None;
     };
@@ -135,9 +132,9 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
         return None;
     }
 
-    if !ctx.resolve_call_path(value).map_or(false, |call_path| {
+    if !model.resolve_call_path(value).map_or(false, |call_path| {
         call_path.as_slice() == ["collections", "abc", "Callable"]
-            || ctx.match_typing_call_path(&call_path, "Callable")
+            || model.match_typing_call_path(&call_path, "Callable")
     }) {
         return None;
     }
@@ -160,7 +157,7 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
 }
 
 fn function(
-    ctx: &Context,
+    model: &SemanticModel,
     name: &str,
     args: &Arguments,
     body: &Expr,
@@ -172,7 +169,7 @@ fn function(
         range: TextRange::default(),
     });
     if let Some(annotation) = annotation {
-        if let Some((arg_types, return_type)) = extract_types(ctx, annotation) {
+        if let Some((arg_types, return_type)) = extract_types(model, annotation) {
             // A `lambda` expression can only have positional and positional-only
             // arguments. The order is always positional-only first, then positional.
             let new_posonlyargs = args

@@ -9,9 +9,9 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
+    use crate::line_width::LineLength;
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
@@ -167,13 +167,46 @@ mod tests {
             Path::new("pycodestyle/W505.py"),
             &settings::Settings {
                 pycodestyle: Settings {
-                    max_doc_length: Some(50),
+                    max_doc_length: Some(LineLength::from(50)),
                     ..Settings::default()
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_doc_length_with_utf_8() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle/W505_utf_8.py"),
+            &settings::Settings {
+                pycodestyle: Settings {
+                    max_doc_length: Some(LineLength::from(50)),
+                    ..Settings::default()
+                },
+                ..settings::Settings::for_rule(Rule::DocLineTooLong)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(1)]
+    #[test_case(2)]
+    #[test_case(4)]
+    #[test_case(8)]
+    fn tab_size(tab_size: u8) -> Result<()> {
+        let snapshot = format!("tab_size_{tab_size}");
+        let diagnostics = test_path(
+            Path::new("pycodestyle/E501_2.py"),
+            &settings::Settings {
+                tab_size: tab_size.into(),
+                ..settings::Settings::for_rule(Rule::LineTooLong)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

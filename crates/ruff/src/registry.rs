@@ -1,15 +1,15 @@
 //! Registry of all [`Rule`] implementations.
 
-mod rule_set;
-
 use strum_macros::{AsRefStr, EnumIter};
 
 use ruff_diagnostics::Violation;
 use ruff_macros::RuleNamespace;
+pub use rule_set::{RuleSet, RuleSetIterator};
 
 use crate::codes::{self, RuleCodePrefix};
 use crate::rules;
-pub use rule_set::{RuleSet, RuleSetIterator};
+
+mod rule_set;
 
 ruff_macros::register_rules!(
     // pycodestyle errors
@@ -117,6 +117,7 @@ ruff_macros::register_rules!(
     // pylint
     rules::pylint::rules::AssertOnStringLiteral,
     rules::pylint::rules::UselessReturn,
+    rules::pylint::rules::YieldFromInAsyncFunction,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,
@@ -230,8 +231,8 @@ ruff_macros::register_rules!(
     // mccabe
     rules::mccabe::rules::ComplexStructure,
     // flake8-tidy-imports
-    rules::flake8_tidy_imports::banned_api::BannedApi,
-    rules::flake8_tidy_imports::relative_imports::RelativeImports,
+    rules::flake8_tidy_imports::rules::BannedApi,
+    rules::flake8_tidy_imports::rules::RelativeImports,
     // flake8-return
     rules::flake8_return::rules::UnnecessaryReturnNone,
     rules::flake8_return::rules::ImplicitReturnValue,
@@ -519,6 +520,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::PassStatementStubBody,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
+    rules::flake8_pyi::rules::StubBodyMultipleStatements,
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
     rules::flake8_pyi::rules::TypeCommentInStub,
     rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
@@ -646,6 +648,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::MutableDataclassDefault,
     rules::ruff::rules::FunctionCallInDataclassDefaultArgument,
     rules::ruff::rules::ExplicitFStringTypeConversion,
+    rules::ruff::rules::InvalidPyprojectToml,
     // flake8-django
     rules::flake8_django::rules::DjangoNullableModelStringField,
     rules::flake8_django::rules::DjangoLocalsInRenderFunction,
@@ -814,7 +817,7 @@ pub enum Linter {
     Flake8UsePathlib,
     /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
     #[prefix = "TD"]
-    Flake8Todo,
+    Flake8Todos,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
@@ -1008,6 +1011,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
+
     use strum::IntoEnumIterator;
 
     use super::{Linter, Rule, RuleNamespace};

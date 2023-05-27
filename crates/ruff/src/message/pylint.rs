@@ -1,8 +1,10 @@
+use std::io::Write;
+
+use ruff_python_ast::source_code::OneIndexed;
+
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use ruff_python_ast::source_code::OneIndexed;
-use std::io::Write;
 
 /// Generate violations in Pylint format.
 /// See: [Flake8 documentation](https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter)
@@ -40,9 +42,10 @@ impl Emitter for PylintEmitter {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::PylintEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn output() {

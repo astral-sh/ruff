@@ -22,8 +22,12 @@ once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-literal = { workspace = true }
 rustpython-parser = { workspace = true }
+rustpython-ast = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]

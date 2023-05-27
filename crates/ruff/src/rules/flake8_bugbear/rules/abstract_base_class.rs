@@ -2,8 +2,9 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -35,16 +36,16 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool {
+fn is_abc_class(model: &SemanticModel, bases: &[Expr], keywords: &[Keyword]) -> bool {
     keywords.iter().any(|keyword| {
         keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass")
-            && context
+            && model
                 .resolve_call_path(&keyword.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["abc", "ABCMeta"]
                 })
     }) || bases.iter().any(|base| {
-        context
+        model
             .resolve_call_path(base)
             .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
@@ -79,7 +80,7 @@ pub(crate) fn abstract_base_class(
     if bases.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(&checker.ctx, bases, keywords) {
+    if !is_abc_class(checker.semantic_model(), bases, keywords) {
         return;
     }
 
@@ -108,20 +109,16 @@ pub(crate) fn abstract_base_class(
             continue;
         };
 
-        let has_abstract_decorator = is_abstract(&checker.ctx, decorator_list);
+        let has_abstract_decorator = is_abstract(checker.semantic_model(), decorator_list);
         has_abstract_method |= has_abstract_decorator;
 
-        if !checker
-            .settings
-            .rules
-            .enabled(Rule::EmptyMethodWithoutAbstractDecorator)
-        {
+        if !checker.enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
             continue;
         }
 
         if !has_abstract_decorator
             && is_empty_body(body)
-            && !is_overload(&checker.ctx, decorator_list)
+            && !is_overload(checker.semantic_model(), decorator_list)
         {
             checker.diagnostics.push(Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {
@@ -131,17 +128,13 @@ pub(crate) fn abstract_base_class(
             ));
         }
     }
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::AbstractBaseClassWithoutAbstractMethod)
-    {
+    if checker.enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
         if !has_abstract_method {
             checker.diagnostics.push(Diagnostic::new(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
-                stmt.range(),
+                identifier_range(stmt, checker.locator),
             ));
         }
     }

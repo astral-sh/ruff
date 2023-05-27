@@ -7,12 +7,11 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use regex::Regex;
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::types::PythonVersion;
@@ -21,7 +20,7 @@ mod tests {
 
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"); "PLE1142")]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"); "PLW0129")]
-    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
+    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE1310")]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
     #[test_case(Rule::BinaryOpException, Path::new("binary_op_exception.py"); "PLW0711")]
@@ -40,6 +39,7 @@ mod tests {
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_7.py"); "PLR1722_7")]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_8.py"); "PLR1722_8")]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_9.py"); "PLR1722_9")]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_10.py"); "PLR1722_10")]
     #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"); "PLE0116")]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"); "PLW0603")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
@@ -73,6 +73,7 @@ mod tests {
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"); "PLR1711")]
+    #[test_case(Rule::YieldFromInAsyncFunction, Path::new("yield_from_in_async_function.py"); "PLE1700")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"); "PLW3301")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

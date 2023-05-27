@@ -9,13 +9,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use regex::Regex;
-    use ruff_diagnostics::Diagnostic;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
 
+    use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::linter::{check_path, LinterResult};
@@ -36,6 +35,9 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_9.py"); "F401_9")]
     #[test_case(Rule::UnusedImport, Path::new("F401_10.py"); "F401_10")]
     #[test_case(Rule::UnusedImport, Path::new("F401_11.py"); "F401_11")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_12.py"); "F401_12")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_13.py"); "F401_13")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_14.py"); "F401_14")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
@@ -97,6 +99,8 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_20.py"); "F811_20")]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_21.py"); "F811_21")]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_22.py"); "F811_22")]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_23.py"); "F811_23")]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_24.py"); "F811_24")]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"); "F821_0")]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"); "F821_1")]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"); "F821_2")]
@@ -469,6 +473,16 @@ mod tests {
                 __qualname__
         "#,
             &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        def f():
+            __qualname__ = 1
+
+            class Foo:
+                __qualname__
+        "#,
+            &[Rule::UnusedVariable],
         );
     }
 
@@ -1147,6 +1161,40 @@ mod tests {
         t = Test()
         "#,
             &[],
+        );
+        flakes(
+            r#"
+        class Test(object):
+            print(__class__.__name__)
+
+            def __init__(self):
+                self.x = 1
+
+        t = Test()
+        "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        class Test(object):
+            X = [__class__ for _ in range(10)]
+
+            def __init__(self):
+                self.x = 1
+
+        t = Test()
+        "#,
+            &[Rule::UndefinedName],
+        );
+        flakes(
+            r#"
+        def f(self):
+            print(__class__.__name__)
+            self.x = 1
+
+        f()
+        "#,
+            &[Rule::UndefinedName],
         );
     }
 
@@ -3640,6 +3688,16 @@ mod tests {
             TypeVar("A", bound=A["B"])
             TypeVar("A", A["D"])
             cast(A["E"], [])
+        "#,
+            &[],
+        );
+        flakes(
+            r#"
+            from typing import NewType
+
+            def f():
+                name = "x"
+                NewType(name, int)
         "#,
             &[],
         );

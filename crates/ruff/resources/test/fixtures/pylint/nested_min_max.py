@@ -25,3 +25,14 @@ min(1, min(a))
 min(1, min(i for i in range(10)))
 max(1, max(a))
 max(1, max(i for i in range(10)))
+
+tuples_list = [
+    (1, 2),
+    (2, 3),
+    (3, 4),
+    (4, 5),
+    (5, 6),
+]
+
+min(min(tuples_list))
+max(max(tuples_list))

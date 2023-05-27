@@ -1,17 +1,14 @@
-use ruff_formatter::prelude::*;
+use crate::prelude::*;
 use ruff_formatter::write;
-use ruff_text_size::TextSize;
 
-use crate::context::ASTFormatContext;
 use crate::cst::Arg;
 use crate::format::comments::end_of_line_comments;
-use crate::shared_traits::AsFormat;
 
-pub struct FormatArg<'a> {
+pub(crate) struct FormatArg<'a> {
     item: &'a Arg,
 }
 
-impl AsFormat<ASTFormatContext> for Arg {
+impl AsFormat<ASTFormatContext<'_>> for Arg {
     type Format<'a> = FormatArg<'a>;
 
     fn format(&self) -> Self::Format<'_> {
@@ -19,11 +16,11 @@ impl AsFormat<ASTFormatContext> for Arg {
     }
 }
 
-impl Format<ASTFormatContext> for FormatArg<'_> {
+impl Format<ASTFormatContext<'_>> for FormatArg<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
         let arg = self.item;
 
-        write!(f, [dynamic_text(&arg.arg, TextSize::default())])?;
+        write!(f, [dynamic_text(&arg.arg, None)])?;
         if let Some(annotation) = &arg.annotation {
             write!(f, [text(": ")])?;
             write!(f, [annotation.format()])?;

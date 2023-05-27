@@ -107,7 +107,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let log_level: LogLevel = (&log_level_args).into();
+    let log_level = LogLevel::from(&log_level_args);
     set_up_logging(&log_level)?;
 
     match command {
@@ -155,8 +155,6 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
 }
 
 fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
-    #[cfg(feature = "ecosystem_ci")]
-    let ecosystem_ci = args.ecosystem_ci;
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -214,10 +212,17 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags |= PrinterFlags::SHOW_VIOLATIONS;
     }
     if show_fixes {
-        printer_flags |= PrinterFlags::SHOW_FIXES;
+        printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
     }
     if show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
+    }
+    if cli.ecosystem_ci {
+        warn_user_once!(
+            "The formatting of fixes emitted by this option is a work-in-progress, subject to \
+            change at any time, and intended only for internal use."
+        );
+        printer_flags |= PrinterFlags::SHOW_FIX_DIFF;
     }
 
     #[cfg(debug_assertions)]
@@ -243,14 +248,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(
-        format,
-        log_level,
-        autofix,
-        printer_flags,
-        #[cfg(feature = "ecosystem_ci")]
-        ecosystem_ci,
-    );
+    let printer = Printer::new(format, log_level, autofix, printer_flags);
 
     if cli.watch {
         if format != SerializationFormat::Text {
@@ -388,8 +386,9 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
 #[cfg(test)]
 mod test_file_change_detector {
-    use crate::{change_detected, ChangeKind};
     use std::path::PathBuf;
+
+    use crate::{change_detected, ChangeKind};
 
     #[test]
     fn detect_correct_file_change() {

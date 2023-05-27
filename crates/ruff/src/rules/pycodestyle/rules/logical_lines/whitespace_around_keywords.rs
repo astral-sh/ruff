@@ -1,8 +1,11 @@
-use super::{LogicalLine, Whitespace};
-use crate::checkers::logical_lines::LogicalLinesContext;
+use ruff_text_size::TextRange;
+
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextRange;
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+
+use super::{LogicalLine, Whitespace};
 
 /// ## What it does
 /// Checks for extraneous whitespace after keywords.

@@ -1,12 +1,13 @@
-use anyhow::{bail, Result};
-use globset::{Glob, GlobSet, GlobSetBuilder};
-use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
-use serde::{de, Deserialize, Deserializer, Serialize};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
+
+use anyhow::{bail, Result};
+use globset::{Glob, GlobSet, GlobSetBuilder};
+use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 

@@ -5,7 +5,7 @@ use rustpython_parser as parser;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^(?i)(?:pylint|pyright|noqa|nosec|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:)"
+        r"^(?i)(?:pylint|pyright|noqa|nosec|region|endregion|type:\s*ignore|fmt:\s*(on|off)|isort:\s*(on|off|skip|skip_file|split|dont-add-imports(:\s*\[.*?])?)|mypy:|SPDX-License-Identifier:)"
     ).unwrap()
 });
 static BRACKET_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[()\[\]{}\s]+$").unwrap());
@@ -224,6 +224,11 @@ mod tests {
         assert!(!comment_contains_code("# noqa: A123", &[]));
         assert!(!comment_contains_code("# noqa:A123", &[]));
         assert!(!comment_contains_code("# nosec", &[]));
+        assert!(!comment_contains_code("# region", &[]));
+        assert!(!comment_contains_code("# endregion", &[]));
+        assert!(!comment_contains_code("# region.name", &[]));
+        assert!(!comment_contains_code("# region name", &[]));
+        assert!(!comment_contains_code("# region: name", &[]));
         assert!(!comment_contains_code("# fmt: on", &[]));
         assert!(!comment_contains_code("# fmt: off", &[]));
         assert!(!comment_contains_code("# fmt:on", &[]));

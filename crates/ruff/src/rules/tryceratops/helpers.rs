@@ -3,16 +3,16 @@ use rustpython_parser::ast::{self, Expr};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::analyze::logging;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 /// Collect `logging`-like calls from an AST.
-pub(crate) struct LoggerCandidateVisitor<'a> {
-    context: &'a Context<'a>,
-    pub(crate) calls: Vec<(&'a Expr, &'a Expr)>,
+pub(crate) struct LoggerCandidateVisitor<'a, 'b> {
+    context: &'a SemanticModel<'b>,
+    pub(crate) calls: Vec<(&'b Expr, &'b Expr)>,
 }
 
-impl<'a> LoggerCandidateVisitor<'a> {
-    pub(crate) fn new(context: &'a Context<'a>) -> Self {
+impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
+    pub(crate) fn new(context: &'a SemanticModel<'b>) -> Self {
         LoggerCandidateVisitor {
             context,
             calls: Vec::new(),
@@ -20,13 +20,10 @@ impl<'a> LoggerCandidateVisitor<'a> {
     }
 }
 
-impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a>
-where
-    'b: 'a,
-{
+impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
     fn visit_expr(&mut self, expr: &'b Expr) {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if logging::is_logger_candidate(self.context, func) {
+            if logging::is_logger_candidate(func, self.context) {
                 self.calls.push((expr, func));
             }
         }

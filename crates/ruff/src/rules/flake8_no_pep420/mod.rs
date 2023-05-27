@@ -5,11 +5,10 @@ pub(crate) mod rules;
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};

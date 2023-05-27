@@ -25,12 +25,12 @@ impl Violation for OpenAlias {
 /// UP020
 pub(crate) fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["io", "open"])
     {
         let fixable = checker
-            .ctx
+            .semantic_model()
             .find_binding("open")
             .map_or(true, |binding| binding.kind.is_builtin());
         let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
