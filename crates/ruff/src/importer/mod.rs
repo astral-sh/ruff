@@ -70,11 +70,16 @@ impl<'a> Importer<'a> {
         at: TextSize,
         semantic_model: &SemanticModel,
     ) -> Result<(Edit, String)> {
-        self.get_symbol(module, member, at, semantic_model)?
-            .map_or_else(
-                || self.import_symbol(module, member, at, semantic_model),
-                Ok,
-            )
+        match self.get_symbol(module, member, at, semantic_model) {
+            None => self.import_symbol(module, member, at, semantic_model),
+            Some(Resolution::Success(edit, binding)) => Ok((edit, binding)),
+            Some(Resolution::LateBinding) => {
+                bail!("Unable to use existing symbol due to late binding")
+            }
+            Some(Resolution::IncompatibleContext) => {
+                bail!("Unable to use existing symbol due to incompatible context")
+            }
+        }
     }
 
     /// Return an [`Edit`] to reference an existing symbol, if it's present in the given [`SemanticModel`].
@@ -84,21 +89,25 @@ impl<'a> Importer<'a> {
         member: &str,
         at: TextSize,
         semantic_model: &SemanticModel,
-    ) -> Result<Option<(Edit, String)>> {
+    ) -> Option<Resolution> {
         // If the symbol is already available in the current scope, use it.
-        let Some((source, binding)) = semantic_model.resolve_qualified_import_name(module, member) else {
-            return Ok(None);
-        };
+        let imported_name = semantic_model.resolve_qualified_import_name(module, member)?;
 
-        // The exception: the symbol source (i.e., the import statement) comes after the current
-        // location. For example, we could be generating an edit within a function, and the import
+        // If the symbol source (i.e., the import statement) comes after the current location,
+        // abort. For example, we could be generating an edit within a function, and the import
         // could be defined in the module scope, but after the function definition. In this case,
         // it's unclear whether we can use the symbol (the function could be called between the
         // import and the current location, and thus the symbol would not be available). It's also
         // unclear whether should add an import statement at the top of the file, since it could
         // be shadowed between the import and the current location.
-        if source.start() > at {
-            bail!("Unable to use existing symbol `{binding}` due to late-import");
+        if imported_name.range().start() > at {
+            return Some(Resolution::LateBinding);
+        }
+
+        // If the symbol source (i.e., the import statement) is in a typing-only context, but we're
+        // in a runtime context, abort.
+        if imported_name.context().is_typing() && semantic_model.execution_context().is_runtime() {
+            return Some(Resolution::IncompatibleContext);
         }
 
         // We also add a no-op edit to force conflicts with any other fixes that might try to
@@ -118,10 +127,10 @@ impl<'a> Importer<'a> {
         // By adding this no-op edit, we force the `unused-imports` fix to conflict with the
         // `sys-exit-alias` fix, and thus will avoid applying both fixes in the same pass.
         let import_edit = Edit::range_replacement(
-            self.locator.slice(source.range()).to_string(),
-            source.range(),
+            self.locator.slice(imported_name.range()).to_string(),
+            imported_name.range(),
         );
-        Ok(Some((import_edit, binding)))
+        Some(Resolution::Success(import_edit, imported_name.into_name()))
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make
@@ -219,4 +228,14 @@ impl<'a> Importer<'a> {
         statement.codegen(&mut state);
         Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
+}
+
+enum Resolution {
+    /// The symbol is available for use.
+    Success(Edit, String),
+    /// The symbol is imported, but the import came after the current location.
+    LateBinding,
+    /// The symbol is imported, but in an incompatible context (e.g., in typing-only context, while
+    /// we're in a runtime context).
+    IncompatibleContext,
 }
