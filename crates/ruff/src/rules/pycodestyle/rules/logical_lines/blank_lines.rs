@@ -4,9 +4,10 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::Locator;
 
+use regex::Regex;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -106,7 +107,7 @@ impl AlwaysAutofixableViolation for BlankLinesTopLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BlankLinesTopLevel(nb_blank_lines) = self;
-        format!("Expected 2 blank lines, found ({nb_blank_lines})")
+        format!("Expected 2 blank lines, found {nb_blank_lines}")
     }
 
     fn autofix_title(&self) -> String {
@@ -278,13 +279,13 @@ impl AlwaysAutofixableViolation for BlankLinesAfterFunctionOrClass {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
 #[violation]
-pub struct BlankLinesBeforeNestedDefinition(pub usize);
+pub struct BlankLinesBeforeNestedDefinition(pub u32);
 
 impl AlwaysAutofixableViolation for BlankLinesBeforeNestedDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BlankLinesBeforeNestedDefinition(blank_lines) = self;
-        format!("Expected 1 blank line before a nested definition, found ({blank_lines})")
+        format!("Expected 1 blank line before a nested definition, found {blank_lines}")
     }
 
     fn autofix_title(&self) -> String {
@@ -299,73 +300,89 @@ pub(crate) fn blank_lines(
     blank_lines: &mut u32,
     blank_characters: &mut u32,
     follows_decorator: &mut bool,
+    follows_def: &mut bool,
     indent_level: usize,
     locator: &Locator,
-    // stylist: &Stylist,
+    stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
-    if let Some(previous_logical) = prev_line {
-        if line.is_empty() {
-            *blank_lines += 1;
-            *blank_characters += line.text().len() as u32;
-            return;
+    dbg!("#############################");
+    dbg!(line.text());
+
+    if line.is_empty() {
+        *blank_lines += 1;
+        *blank_characters += line.text().len() as u32;
+        return;
+    }
+
+    for (token_idx, token) in line.tokens().iter().enumerate() {
+        dbg!(token);
+        // E304
+        if *follows_decorator && *blank_lines > 0 {
+            let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
+
+            let range = token.range();
+            diagnostic.set_fix(Fix::suggested(Edit::deletion(
+                locator.line_start(range.start())
+                    - TextSize::new(
+                        u32::try_from(*blank_characters)
+                            .expect("The number of blank characters should be relatively small"),
+                    ),
+                locator.line_start(range.start()),
+            )));
+            context.push_diagnostic(diagnostic);
+        }
+        // E303
+        else if token_idx == 0 && *blank_lines > BlankLinesConfig::TOP_LEVEL
+            || (indent_level > 0 && *blank_lines > BlankLinesConfig::METHOD)
+        {
+            let mut diagnostic = Diagnostic::new(TooManyBlankLines(*blank_lines), token.range());
+
+            let chars_to_remove = if indent_level > 0 {
+                *blank_characters - BlankLinesConfig::METHOD
+            } else {
+                *blank_characters - BlankLinesConfig::TOP_LEVEL
+            };
+            let end = locator.line_start(token.range().start());
+            let start = end - TextSize::new(chars_to_remove);
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::suggested(Edit::deletion(start, end)));
+
+            context.push_diagnostic(diagnostic);
+        }
+        // E306
+        else if token.kind() == TokenKind::Def && *follows_def && *blank_lines == 0 {
+            let mut diagnostic = Diagnostic::new(
+                BlankLinesBeforeNestedDefinition(*blank_lines),
+                token.range(),
+            );
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                stylist.line_ending().as_str().to_string(),
+                locator.line_start(token.range().start()),
+            )));
+
+            context.push_diagnostic(diagnostic);
         }
 
-        for token in line.tokens() {
-            if *follows_decorator && *blank_lines > 0 {
-                let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
+        if token.kind() == TokenKind::At {
+            *follows_decorator = true;
 
-                let range = token.range();
-                diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                    locator.line_start(range.start())
-                        - TextSize::new(
-                            u32::try_from(*blank_characters).expect(
-                                "The number of blank characters should be relatively small",
-                            ),
-                        ),
-                    locator.line_start(range.start()),
-                )));
-                context.push_diagnostic(diagnostic);
-            } else if token.kind() != TokenKind::NonLogicalNewline
-                && (*blank_lines > BlankLinesConfig::TOP_LEVEL
-                    || (indent_level > 0 && *blank_lines > BlankLinesConfig::METHOD))
-            {
-                let mut diagnostic =
-                    Diagnostic::new(TooManyBlankLines(*blank_lines), token.range());
-
-                let chars_to_remove = if indent_level > 0 {
-                    *blank_characters - BlankLinesConfig::METHOD
-                } else {
-                    *blank_characters - BlankLinesConfig::TOP_LEVEL
-                };
-                let end = locator.line_start(token.range().start());
-                let start = end - TextSize::new(chars_to_remove);
-
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::suggested(Edit::deletion(start, end)));
-                context.push_diagnostic(diagnostic);
-            }
-
-            // diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            //     annotation.to_string(),
-            //     TextRange::new(start, end),
-            // )));
-            // stylist.line_ending().as_str()
-
-            // pub struct Stylist<'a> {
-            //     locator: &'a Locator<'a>,
-            //     indentation: Indentation,
-            //     quote: Quote,
-            //     line_ending: OnceCell<LineEnding>,
-            // }
-
+            *follows_def = false;
             *blank_lines = 0;
             *blank_characters = 0;
-            if token.kind() == TokenKind::At {
-                *follows_decorator = true;
-                return;
-            }
+            return;
+        } else if token.kind() == TokenKind::Def {
+            *follows_def = true;
+
             *follows_decorator = false;
+            *blank_lines = 0;
+            *blank_characters = 0;
+            return;
         }
     }
+    *follows_decorator = false;
+    *follows_def = false;
+    *blank_lines = 0;
+    *blank_characters = 0;
 }

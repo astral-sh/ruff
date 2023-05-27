@@ -48,6 +48,7 @@ pub(crate) fn check_logical_lines(
     let mut nb_blank_lines: u32 = 0;
     let mut blank_characters: u32 = 0;
     let mut follows_decorator = false;
+    let mut follows_def = false;
 
     let mut prev_no_comment_line = None;
     let mut prev_indent_level = None;
@@ -118,8 +119,10 @@ pub(crate) fn check_logical_lines(
                 &mut nb_blank_lines,
                 &mut blank_characters,
                 &mut follows_decorator,
+                &mut follows_def,
                 indent_level,
                 locator,
+                stylist,
                 &mut context,
             );
         }
