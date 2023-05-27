@@ -77,15 +77,12 @@ where
             // Continue until the end of the `if` body, thus ensuring that we don't
             // accidentally pick up an `else` or `elif` in the nested block.
             continue;
-        } else {
-            if matches!(tok, Tok::Elif) && elif.is_none() {
-                elif = Some(range.start());
-            }
-            if matches!(tok, Tok::Else) && else_.is_none() {
-                else_ = Some(range.start());
-            }
-        }
-        if starter.is_some() && elif.is_some() && else_.is_some() {
+        // We only care about the first `elif` or `else` following the `if`.
+        } else if matches!(tok, Tok::Elif) {
+            elif = Some(range.start());
+            break;
+        } else if matches!(tok, Tok::Else) {
+            else_ = Some(range.start());
             break;
         }
     }
