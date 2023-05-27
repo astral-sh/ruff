@@ -58,21 +58,24 @@ where
 {
     indentation(locator, located)?;
 
-    let located_start = located.start();
-    let text = locator.slice(TextRange::new(located_start, located.end()));
-    let body_end = body.last().map(Ranged::end).unwrap();
-
     let mut starter = None;
     let mut elif = None;
     let mut else_ = None;
 
-    for (tok, range) in lexer::lex_starts_at(text, Mode::Module, located_start)
-        .flatten()
-        .filter(|(tok, _)| matches!(tok, Tok::If | Tok::Elif | Tok::Else))
+    let body_end = body.last().map(Ranged::end).unwrap();
+    for (tok, range) in lexer::lex_starts_at(
+        locator.slice(located.range()),
+        Mode::Module,
+        located.start(),
+    )
+    .flatten()
+    .filter(|(tok, _)| matches!(tok, Tok::If | Tok::Elif | Tok::Else))
     {
         if starter.is_none() {
             starter = Some(tok.clone());
         } else if range.start() < body_end {
+            // Continue until the end of the `if` body, thus ensuring that we don't
+            // accidentally pick up an `else` or `elif` in the nested block.
             continue;
         } else {
             if matches!(tok, Tok::Elif) && elif.is_none() {
