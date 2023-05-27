@@ -29,6 +29,7 @@ use ruff_python_semantic::binding::{
 };
 use ruff_python_semantic::context::ExecutionContext;
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
+use ruff_python_semantic::globals::Globals;
 use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
@@ -1905,32 +1906,9 @@ where
 
                 self.deferred.functions.push(self.semantic_model.snapshot());
 
-                // If any global bindings don't already exist in the global scope, add them.
-                let globals = helpers::extract_globals(body);
-                for (name, range) in globals {
-                    if self
-                        .semantic_model
-                        .global_scope()
-                        .get(name)
-                        .map_or(true, |binding_id| {
-                            self.semantic_model.bindings[binding_id]
-                                .kind
-                                .is_annotation()
-                        })
-                    {
-                        let id = self.semantic_model.bindings.push(Binding {
-                            kind: BindingKind::Assignment,
-                            range,
-                            references: Vec::new(),
-                            source: self.semantic_model.stmt_id,
-                            context: self.semantic_model.execution_context(),
-                            exceptions: self.semantic_model.exceptions(),
-                            flags: BindingFlags::empty(),
-                        });
-                        self.semantic_model.global_scope_mut().add(name, id);
-                    }
-
-                    self.semantic_model.scope_mut().add_global(name, range);
+                // Extract any global bindings from the function body.
+                if let Some(globals) = Globals::from_body(body) {
+                    self.semantic_model.set_globals(globals);
                 }
             }
             Stmt::ClassDef(
@@ -1962,30 +1940,9 @@ where
 
                 self.semantic_model.push_scope(ScopeKind::Class(class_def));
 
-                // If any global bindings don't already exist in the global scope, add them.
-                for (name, range) in helpers::extract_globals(body) {
-                    if self
-                        .semantic_model
-                        .global_scope()
-                        .get(name)
-                        .map_or(true, |binding_id| {
-                            self.semantic_model.bindings[binding_id]
-                                .kind
-                                .is_annotation()
-                        })
-                    {
-                        let id = self.semantic_model.bindings.push(Binding {
-                            kind: BindingKind::Assignment,
-                            range,
-                            references: Vec::new(),
-                            source: self.semantic_model.stmt_id,
-                            context: self.semantic_model.execution_context(),
-                            exceptions: self.semantic_model.exceptions(),
-                            flags: BindingFlags::empty(),
-                        });
-                        self.semantic_model.global_scope_mut().add(name, id);
-                    }
-                    self.semantic_model.scope_mut().add_global(name, range);
+                // Extract any global bindings from the class body.
+                if let Some(globals) = Globals::from_body(body) {
+                    self.semantic_model.set_globals(globals);
                 }
 
                 self.visit_body(body);
@@ -4256,7 +4213,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
-    pub(crate) fn visit_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
         self.semantic_model.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -4264,7 +4221,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
-    pub(crate) fn visit_non_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_non_type_definition(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
         self.semantic_model.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -4274,7 +4231,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
-    pub(crate) fn visit_boolean_test(&mut self, expr: &'a Expr) {
+    fn visit_boolean_test(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic_model.flags;
         self.semantic_model.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
