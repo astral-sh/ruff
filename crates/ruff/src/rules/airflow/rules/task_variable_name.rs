@@ -57,7 +57,7 @@ pub(crate) fn task_variable_name(
         Some(name) => name.id.as_str(),
         None => return None,
     };
-    let fully_qualified_func_name = match checker.ctx.find_binding(func_name) {
+    let fully_qualified_func_name = match checker.semantic_model().find_binding(func_name) {
         Some(call_path) => match call_path.kind.as_from_importation() {
             Some(from_importation) => &from_importation.full_name,
             None => return None,
