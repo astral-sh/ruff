@@ -14,6 +14,26 @@ impl Violation for ExpressionsInStarAssignment {
     }
 }
 
+/// ## What it does
+/// Checks for more than one starred expression in an assignment.
+///
+/// ## Why is this bad?
+/// Starred expressions in assignments are used to unpack iterables. If there
+/// are more than one starred expressions, it is unclear how the iterable is
+/// unpacked and will raise a `SyntaxError` at runtime.
+///
+/// ## Example
+/// ```python
+/// *foo, *bar, baz = (1, 2, 3)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// *foo, bar, baz = (1, 2, 3)
+/// ```
+///
+/// ## References
+/// - [PEP 3132](https://peps.python.org/pep-3132/)
 #[violation]
 pub struct MultipleStarredExpressions;
 

@@ -5,6 +5,26 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for assert tests that are non-empty tuples.
+///
+/// ## Why is this bad?
+/// Assert tests are boolean expressions. Non-empty tuples are always `True`.
+/// This means that the assert statement will always pass, which is likely a
+/// mistake.
+///
+/// ## Example
+/// ```python
+/// assert (False,)  # always passes
+/// ```
+///
+/// Use instead:
+/// ```python
+/// assert False  # always fails
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]
 pub struct AssertTuple;
 

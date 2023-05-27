@@ -10,6 +10,35 @@ use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for dictionary key literals that are repeated with different values.
+///
+/// ## Why is this bad?
+/// Dictionary keys should be unique. If a key is repeated with a different
+/// value, the first values will be overwritten and the key will correspond to
+/// the last value. This is likely a mistake.
+///
+/// ## Example
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2,
+///     "baz": 3,
+/// }
+/// foo["baz"]  # 3
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2,
+/// }
+/// foo["baz"]  # 2
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {
     name: String,
@@ -37,6 +66,36 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         }
     }
 }
+
+/// ## What it does
+/// Checks for dictionary keys that are repeated with different values.
+///
+/// ## Why is this bad?
+/// Dictionary keys should be unique. If a key is repeated with a different
+/// value, the first values will be overwritten and the key will correspond to
+/// the last value. This is likely a mistake.
+///
+/// ## Example
+/// ```python
+/// foo = {
+///     bar: 1,
+///     baz: 2,
+///     baz: 3,
+/// }
+/// foo[baz]  # 3
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = {
+///     bar: 1,
+///     baz: 2,
+/// }
+/// foo[baz]  # 2
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[violation]
 pub struct MultiValueRepeatedKeyVariable {
     name: String,

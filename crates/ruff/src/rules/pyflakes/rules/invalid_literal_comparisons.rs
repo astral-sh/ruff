@@ -27,6 +27,36 @@ impl From<&Cmpop> for IsCmpop {
     }
 }
 
+/// ## What it does
+/// Checks for `is` and `is not` comparisons with constant literals.
+///
+/// ## Why is this bad?
+/// `is` and `is not` are identity comparisons. They check if two objects are
+/// the same object. If the objects are not the same object, the comparison
+/// will always be false. This is likely a mistake.
+///
+/// Instead, use `==` and `!=` to compare constant literals. These comparisons
+/// check for equality, not identity. This means that `"foo" == "foo"` will be
+/// true, even if the two strings are not the same object.
+///
+/// ## Example
+/// ```python
+/// name = input("What is your name? ")
+/// if name is "Maria":
+///     print("Hello, Maria!")  # This will never print
+/// ```
+///
+/// Use instead:
+/// ```python
+/// name = input("What is your name? ")
+/// if name == "Maria":
+///     print("Hello, Maria!")  # This will print if the user inputs "Maria"
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#is-not)
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#value-comparisons)
+/// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
 #[violation]
 pub struct IsLiteral {
     cmpop: IsCmpop,

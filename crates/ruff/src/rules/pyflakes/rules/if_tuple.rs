@@ -5,6 +5,27 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for if tests that are non-empty tuples.
+///
+/// ## Why is this bad?
+/// If tests are boolean expressions. Non-empty tuples are always `True`. This
+/// means that the if statement will always run, which is likely a mistake.
+///
+/// ## Example
+/// ```python
+/// if (False,):
+///     print("This will always run")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if False:
+///     print("This will never run")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 #[violation]
 pub struct IfTuple;
 
