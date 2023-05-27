@@ -51,7 +51,7 @@ impl Violation for PercentFormatInvalidFormat {
 
 /// ## What it does
 /// Checks for named placeholders in `printf`-style format strings without
-/// mapping type values.
+/// mapping-type values.
 ///
 /// ## Why is this bad?
 /// When using named placeholders in `printf`-style format strings, the values
@@ -86,11 +86,11 @@ impl Violation for PercentFormatExpectedMapping {
 }
 
 /// ## What it does
-/// Checks for mapping type values in `printf`-style format strings without
-/// named placeholders.
+/// Checks for uses of mapping-type values in `printf`-style format strings
+/// without named placeholders.
 ///
 /// ## Why is this bad?
-/// When using mapping type values (such as `dict`) in `printf`-style format
+/// When using mapping-type values (such as `dict`) in `printf`-style format
 /// strings, the keys must be named. Otherwise, the expression will raise a
 /// `TypeError`.
 ///
@@ -125,8 +125,8 @@ impl Violation for PercentFormatExpectedSequence {
 /// Checks for unused mapping keys in `printf`-style format strings.
 ///
 /// ## Why is this bad?
-/// Unused named placeholders in `printf`-style format strings are unnecessary
-/// and are indicative of a mistake. They should be removed.
+/// Unused named placeholders in `printf`-style format strings are unnecessary,
+/// and likely indicative of a mistake. They should be removed.
 ///
 /// ## Example
 /// ```python
@@ -161,11 +161,12 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
 }
 
 /// ## What it does
-/// Checks for mapping keys in `printf`-style format strings that are not
-/// present in the string.
+/// Checks for named placeholders in `printf`-style format strings that are not
+/// present in the provided mapping.
 ///
 /// ## Why is this bad?
-/// Mapping keys that are not present in the string will raise a `KeyError`.
+/// Named placeholders that lack a corresponding value in the provided mapping
+/// will raise a `KeyError`.
 ///
 /// ## Example
 /// ```python
@@ -199,7 +200,8 @@ impl Violation for PercentFormatMissingArgument {
 ///
 /// ## Why is this bad?
 /// Python does not support mixing positional and named placeholders in
-/// `printf`-style format strings.
+/// `printf`-style format strings. The use of mixed placeholders will raise a
+/// `TypeError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -229,12 +231,12 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
 }
 
 /// ## What it does
-/// Checks for `printf`-style format strings that have a different number of
-/// positional placeholders than substitutions.
+/// Checks for `printf`-style format strings that have a mismatch between the
+/// number of positional placeholders and the number of substitution values.
 ///
 /// ## Why is this bad?
-/// Python does not support `printf`-style format strings that have a different
-/// number of placeholders than substitutions. This will raise a `TypeError`.
+/// When a `printf`-style format string is provided with too many or too few
+/// substitution values, it will raise a `TypeError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -267,7 +269,8 @@ impl Violation for PercentFormatPositionalCountMismatch {
 /// non-tuple values.
 ///
 /// ## Why is this bad?
-/// Python does not support using the `*` specifier with non-tuple values.
+/// The use of the `*` specifier with non-tuple values will raise a
+/// `TypeError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -299,7 +302,9 @@ impl Violation for PercentFormatStarRequiresSequence {
 /// Checks for `printf`-style format strings with invalid format characters.
 ///
 /// ## Why is this bad?
-/// Invalid format characters will raise a `ValueError`.
+/// In `printf`-style format strings, the `%` character is used to indicate
+/// placeholders. If a `%` character is not followed by a valid format
+/// character, it will raise a `ValueError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -361,7 +366,7 @@ impl Violation for StringDotFormatInvalidFormat {
 /// Checks for `str.format` calls with unused keyword arguments.
 ///
 /// ## Why is this bad?
-/// Unused keyword arguments are redundant and are indicative of a mistake.
+/// Unused keyword arguments are redundant, and often indicative of a mistake.
 /// They should be removed.
 ///
 /// ## Example
@@ -400,8 +405,8 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
 /// Checks for `str.format` calls with unused positional arguments.
 ///
 /// ## Why is this bad?
-/// Unused positional arguments are redundant and indicative of a mistake. They
-/// should be removed.
+/// Unused positional arguments are redundant, and often indicative of a mistake.
+/// They should be removed.
 ///
 /// ## Example
 /// ```python
@@ -439,7 +444,8 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
 /// Checks for `str.format` calls with placeholders that are missing arguments.
 ///
 /// ## Why is this bad?
-/// Missing arguments will raise a `KeyError`.
+/// In `str.format` calls, omitting arguments for placeholders will raise a
+/// `KeyError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -471,7 +477,8 @@ impl Violation for StringDotFormatMissingArguments {
 /// Checks for `str.format` calls that mix automatic and manual numbering.
 ///
 /// ## Why is this bad?
-/// Mixing automatic and manual numbering will raise a `ValueError`.
+/// In `str.format` calls, mixing automatic and manual numbering will raise a
+/// `ValueError` at runtime.
 ///
 /// ## Example
 /// ```python
