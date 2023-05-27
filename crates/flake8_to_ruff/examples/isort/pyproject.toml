@@ -1,0 +1,3 @@
+[tool.isort]
+src_paths = ["src", "tests"]
+force_single_line = true

@@ -14,7 +14,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 use crate::rules::pydocstyle::settings::Convention;
 use crate::rules::{
     flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
-    flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
+    flake8_quotes, flake8_tidy_imports, isort, mccabe, pep8_naming, pydocstyle,
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
@@ -416,8 +416,8 @@ pub fn convert(
         }
     }
 
-    if let Some(isort) = &external_config.isort {
-        if let Some(src_paths) = &isort.src_paths {
+    if let Some(isort_config) = &external_config.isort {
+        if let Some(src_paths) = &isort_config.src_paths {
             match options.src.as_mut() {
                 Some(src) => {
                     src.extend_from_slice(src_paths);
@@ -427,6 +427,18 @@ pub fn convert(
                 }
             }
         }
+
+        let mut isort = isort::settings::Options::default();
+
+        if let Some(force_single_line) = &isort_config.force_single_line {
+            isort.force_single_line = Some(*force_single_line);
+        }
+
+        options.isort = if isort == isort::settings::Options::default() {
+            None
+        } else {
+            Some(isort)
+        };
     }
 
     if let Some(project) = &external_config.project {
