@@ -1,3 +1,3 @@
-mod tasks;
+mod task_variable_name;
 
-pub(crate) use tasks::{task_variable_name, TaskVariableNameNotTaskId};
+pub(crate) use task_variable_name::{task_variable_name, TaskVariableNameNotTaskId};
