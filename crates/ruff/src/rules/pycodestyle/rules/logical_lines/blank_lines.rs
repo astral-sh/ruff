@@ -6,6 +6,7 @@ use ruff_python_ast::source_code::Locator;
 
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
+use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
@@ -296,7 +297,7 @@ pub(crate) fn blank_lines(
     line: &LogicalLine,
     prev_line: Option<&LogicalLine>,
     blank_lines: &mut u32,
-    blank_characters: &mut usize,
+    blank_characters: &mut u32,
     follows_decorator: &mut bool,
     indent_level: usize,
     locator: &Locator,
@@ -306,7 +307,7 @@ pub(crate) fn blank_lines(
     if let Some(previous_logical) = prev_line {
         if line.is_empty() {
             *blank_lines += 1;
-            *blank_characters += line.text().len();
+            *blank_characters += line.text().len() as u32;
             return;
         }
 
@@ -327,13 +328,36 @@ pub(crate) fn blank_lines(
                 context.push_diagnostic(diagnostic);
             } else if token.kind() != TokenKind::NonLogicalNewline
                 && (*blank_lines > BlankLinesConfig::TOP_LEVEL
-                    || (indent_level > 0 && *blank_lines == BlankLinesConfig::METHOD + 1))
+                    || (indent_level > 0 && *blank_lines > BlankLinesConfig::METHOD))
             {
                 let mut diagnostic =
                     Diagnostic::new(TooManyBlankLines(*blank_lines), token.range());
-                // TODO: diagnostic.set_fix // FIXME: Use stylist to use the user's preferred newline character
+
+                let chars_to_remove = if indent_level > 0 {
+                    *blank_characters - BlankLinesConfig::METHOD
+                } else {
+                    *blank_characters - BlankLinesConfig::TOP_LEVEL
+                };
+                let end = locator.line_start(token.range().start());
+                let start = end - TextSize::new(chars_to_remove);
+
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::suggested(Edit::deletion(start, end)));
                 context.push_diagnostic(diagnostic);
             }
+
+            // diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            //     annotation.to_string(),
+            //     TextRange::new(start, end),
+            // )));
+            // stylist.line_ending().as_str()
+
+            // pub struct Stylist<'a> {
+            //     locator: &'a Locator<'a>,
+            //     indentation: Indentation,
+            //     quote: Quote,
+            //     line_ending: OnceCell<LineEnding>,
+            // }
 
             *blank_lines = 0;
             *blank_characters = 0;
