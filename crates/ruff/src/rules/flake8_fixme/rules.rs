@@ -1,5 +1,8 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_text_size::TextRange;
+
+use crate::directives::TodoDirective;
 
 #[violation]
 pub struct LineContainsTodo;

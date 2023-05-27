@@ -4,6 +4,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use crate::directives::TodoDirective;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
@@ -14,8 +15,6 @@ use crate::rules::{
 use crate::settings::Settings;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator};
-
-use super::todo_directives::TodoDirective;
 
 pub(crate) fn check_tokens(
     locator: &Locator,
@@ -198,7 +197,7 @@ pub(crate) fn check_tokens(
         // The TextRange of the comment, its position in comment_ranges, and the directive's
         // TextRange
         let mut other_directive_ranges: Vec<(TextRange, usize, TextRange)> = vec![];
-        let mut flake8_fixme_directive_ranges: Vec<TextRange> = vec![];
+        let mut flake8_fixme_directive_ranges: Vec<(TodoDirective, TextRange)> = vec![];
 
         // Find all TodoDirectives
         for (i, comment_range) in indexer.comment_ranges().iter().enumerate() {
@@ -215,7 +214,7 @@ pub(crate) fn check_tokens(
             if !matches!(directive, TodoDirective::Hack) {
                 other_directive_ranges.push((*comment_range, i, directive_range));
             }
-            flake8_fixme_directive_ranges.push(directive_range);
+            flake8_fixme_directive_ranges.push((directive, directive_range));
         }
 
         diagnostics.extend(
@@ -225,7 +224,7 @@ pub(crate) fn check_tokens(
         );
 
         diagnostics.extend(
-            flake8_fixme::rules::todos(flake8_fixme_directive_ranges, locator)
+            flake8_fixme::rules::todos(flake8_fixme_directive_ranges)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );

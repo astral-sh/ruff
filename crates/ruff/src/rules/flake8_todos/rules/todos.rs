@@ -6,7 +6,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::{checkers::todo_directives::TodoDirective, registry::Rule, settings::Settings};
+use crate::{directives::TodoDirective, registry::Rule, settings::Settings};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
