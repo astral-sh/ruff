@@ -15,13 +15,14 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// incorrect_name = SomeOperator(task_id="my_task")
-/// async def fetch():
+/// from airflow.operators import PythonOperator
+/// incorrect_name = PythonOperator(task_id="my_task")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// my_task = SomeOperator(task_id="my_task")
+/// from airflow.operators import PythonOperator
+/// my_task = PythonOperator(task_id="my_task")
 /// ```
 #[violation]
 pub struct TaskVariableNameNotTaskId;
