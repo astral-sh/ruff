@@ -83,8 +83,8 @@ pub(crate) fn runtime_evaluated(
 }
 
 fn runtime_evaluated_base_class(semantic_model: &SemanticModel, base_classes: &[String]) -> bool {
-    if let ScopeKind::Class(class_def) = &semantic_model.scope().kind {
-        for base in class_def.bases.iter() {
+    if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) = &semantic_model.scope().kind {
+        for base in bases.iter() {
             if let Some(call_path) = semantic_model.resolve_call_path(base) {
                 if base_classes
                     .iter()
@@ -99,8 +99,9 @@ fn runtime_evaluated_base_class(semantic_model: &SemanticModel, base_classes: &[
 }
 
 fn runtime_evaluated_decorators(semantic_model: &SemanticModel, decorators: &[String]) -> bool {
-    if let ScopeKind::Class(class_def) = &semantic_model.scope().kind {
-        for decorator in class_def.decorator_list.iter() {
+    if let ScopeKind::Class(ast::StmtClassDef { decorator_list, .. }) = &semantic_model.scope().kind
+    {
+        for decorator in decorator_list.iter() {
             if let Some(call_path) = semantic_model.resolve_call_path(map_callable(decorator)) {
                 if decorators
                     .iter()

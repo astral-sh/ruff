@@ -4,7 +4,7 @@ use std::path::Path;
 use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Stmt};
+use rustpython_parser::ast::{Expr, Ranged, Stmt};
 use smallvec::smallvec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
@@ -212,7 +212,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_function();
+            seen_function |= scope.kind.is_any_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -350,7 +350,7 @@ impl<'a> SemanticModel<'a> {
         &self,
         module: &str,
         member: &str,
-    ) -> Option<(&Stmt, String)> {
+    ) -> Option<ImportedName> {
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
             scope.binding_ids().find_map(|binding_id| {
                 let binding = &self.bindings[binding_id];
@@ -360,14 +360,18 @@ impl<'a> SemanticModel<'a> {
                     // `import sys as sys2` -> `sys2.exit`
                     BindingKind::Importation(Importation { name, full_name }) => {
                         if full_name == &module {
-                            // Verify that `sys` isn't bound in an inner scope.
-                            if self
-                                .scopes()
-                                .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
-                            {
-                                if let Some(source) = binding.source {
-                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                            if let Some(source) = binding.source {
+                                // Verify that `sys` isn't bound in an inner scope.
+                                if self
+                                    .scopes()
+                                    .take(scope_index)
+                                    .all(|scope| scope.get(name).is_none())
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{name}.{member}"),
+                                        range: self.stmts[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -378,14 +382,18 @@ impl<'a> SemanticModel<'a> {
                     BindingKind::FromImportation(FromImportation { name, full_name }) => {
                         if let Some((target_module, target_member)) = full_name.split_once('.') {
                             if target_module == module && target_member == member {
-                                // Verify that `join` isn't bound in an inner scope.
-                                if self
-                                    .scopes()
-                                    .take(scope_index)
-                                    .all(|scope| scope.get(name).is_none())
-                                {
-                                    if let Some(source) = binding.source {
-                                        return Some((self.stmts[source], (*name).to_string()));
+                                if let Some(source) = binding.source {
+                                    // Verify that `join` isn't bound in an inner scope.
+                                    if self
+                                        .scopes()
+                                        .take(scope_index)
+                                        .all(|scope| scope.get(name).is_none())
+                                    {
+                                        return Some(ImportedName {
+                                            name: (*name).to_string(),
+                                            range: self.stmts[source].range(),
+                                            context: binding.context,
+                                        });
                                     }
                                 }
                             }
@@ -395,14 +403,18 @@ impl<'a> SemanticModel<'a> {
                     // `import os.path ` -> `os.name`
                     BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
                         if name == &module {
-                            // Verify that `os` isn't bound in an inner scope.
-                            if self
-                                .scopes()
-                                .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
-                            {
-                                if let Some(source) = binding.source {
-                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                            if let Some(source) = binding.source {
+                                // Verify that `os` isn't bound in an inner scope.
+                                if self
+                                    .scopes()
+                                    .take(scope_index)
+                                    .all(|scope| scope.get(name).is_none())
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{name}.{member}"),
+                                        range: self.stmts[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -539,13 +551,26 @@ impl<'a> SemanticModel<'a> {
         self.scope_id == scope_id
     }
 
-    /// Return `true` if the context is at the top level of the module (i.e., in the module scope,
+    /// Return `true` if the model is at the top level of the module (i.e., in the module scope,
     /// and not nested within any statements).
     pub fn at_top_level(&self) -> bool {
         self.scope_id.is_global()
             && self
                 .stmt_id
                 .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
+    }
+
+    /// Return `true` if the model is in an async context.
+    pub fn in_async_context(&self) -> bool {
+        for scope in self.scopes() {
+            if scope.kind.is_async_function() {
+                return true;
+            }
+            if scope.kind.is_function() {
+                return false;
+            }
+        }
+        false
     }
 
     /// Returns `true` if the given [`BindingId`] is used.
@@ -897,4 +922,30 @@ pub enum ResolvedReference {
     StarImport,
     /// The reference is definitively unresolved.
     NotFound,
+}
+
+#[derive(Debug)]
+pub struct ImportedName {
+    /// The name to which the imported symbol is bound.
+    name: String,
+    /// The range at which the symbol is imported.
+    range: TextRange,
+    /// The context in which the symbol is imported.
+    context: ExecutionContext,
+}
+
+impl ImportedName {
+    pub fn into_name(self) -> String {
+        self.name
+    }
+
+    pub const fn context(&self) -> ExecutionContext {
+        self.context
+    }
+}
+
+impl Ranged for ImportedName {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }

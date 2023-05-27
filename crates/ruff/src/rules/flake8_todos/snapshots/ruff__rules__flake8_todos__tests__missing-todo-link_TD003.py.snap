@@ -29,11 +29,21 @@ TD003.py:25:3: TD003 Missing issue link on the line following this TODO
 29 | # TDO-3870
    |
 
-TD003.py:29:3: TD003 Missing issue link on the line following this TODO
+TD003.py:29:9: TD003 Missing issue link on the line following this TODO
    |
 29 | # TDO-3870
 30 | 
-31 | # TODO: here's a TODO on the last line with no link
+31 | # foo # TODO: no link!
+   |         ^^^^ TD003
+32 | 
+33 | # TODO: here's a TODO on the last line with no link
+   |
+
+TD003.py:31:3: TD003 Missing issue link on the line following this TODO
+   |
+31 | # foo # TODO: no link!
+32 | 
+33 | # TODO: here's a TODO on the last line with no link
    |   ^^^^ TD003
    |
 

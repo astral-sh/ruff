@@ -31,7 +31,7 @@ use ruff_python_semantic::context::ExecutionContext;
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::node::NodeId;
-use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
+use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -424,6 +424,9 @@ where
                     }
                     if self.enabled(Rule::NonEmptyStubBody) {
                         flake8_pyi::rules::non_empty_stub_body(self, body);
+                    }
+                    if self.enabled(Rule::StubBodyMultipleStatements) {
+                        flake8_pyi::rules::stub_body_multiple_statements(self, stmt, body);
                     }
                 }
 
@@ -1683,7 +1686,7 @@ where
                         if !self
                             .semantic_model
                             .scopes()
-                            .any(|scope| scope.kind.is_function())
+                            .any(|scope| scope.kind.is_any_function())
                         {
                             if self.enabled(Rule::UnprefixedTypeParam) {
                                 flake8_pyi::rules::prefix_type_params(self, value, targets);
@@ -1732,7 +1735,7 @@ where
                             if !self
                                 .semantic_model
                                 .scopes()
-                                .any(|scope| scope.kind.is_function())
+                                .any(|scope| scope.kind.is_any_function())
                             {
                                 flake8_pyi::rules::annotated_assignment_default_in_stub(
                                     self, target, value, annotation,
@@ -1886,9 +1889,25 @@ where
                     },
                 );
 
-                // If any global bindings don't already exist in the global scope, add it.
+                let definition = docstrings::extraction::extract_definition(
+                    ExtractionTarget::Function,
+                    stmt,
+                    self.semantic_model.definition_id,
+                    &self.semantic_model.definitions,
+                );
+                self.semantic_model.push_definition(definition);
+
+                self.semantic_model.push_scope(match &stmt {
+                    Stmt::FunctionDef(stmt) => ScopeKind::Function(stmt),
+                    Stmt::AsyncFunctionDef(stmt) => ScopeKind::AsyncFunction(stmt),
+                    _ => unreachable!("Expected Stmt::FunctionDef | Stmt::AsyncFunctionDef"),
+                });
+
+                self.deferred.functions.push(self.semantic_model.snapshot());
+
+                // If any global bindings don't already exist in the global scope, add them.
                 let globals = helpers::extract_globals(body);
-                for (name, stmt) in helpers::extract_globals(body) {
+                for (name, range) in globals {
                     if self
                         .semantic_model
                         .global_scope()
@@ -1901,7 +1920,7 @@ where
                     {
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
-                            range: stmt.range(),
+                            range,
                             references: Vec::new(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
@@ -1910,36 +1929,19 @@ where
                         });
                         self.semantic_model.global_scope_mut().add(name, id);
                     }
+
+                    self.semantic_model.scope_mut().add_global(name, range);
                 }
-
-                let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Function,
-                    stmt,
-                    self.semantic_model.definition_id,
-                    &self.semantic_model.definitions,
-                );
-                self.semantic_model.push_definition(definition);
-
-                self.semantic_model
-                    .push_scope(ScopeKind::Function(FunctionDef {
-                        name,
-                        body,
-                        args,
-                        decorator_list,
-                        async_: matches!(stmt, Stmt::AsyncFunctionDef(_)),
-                        globals,
-                    }));
-
-                self.deferred.functions.push(self.semantic_model.snapshot());
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                body,
-                name,
-                bases,
-                keywords,
-                decorator_list,
-                range: _,
-            }) => {
+            Stmt::ClassDef(
+                class_def @ ast::StmtClassDef {
+                    body,
+                    bases,
+                    keywords,
+                    decorator_list,
+                    ..
+                },
+            ) => {
                 for expr in bases {
                     self.visit_expr(expr);
                 }
@@ -1950,9 +1952,18 @@ where
                     self.visit_expr(expr);
                 }
 
-                // If any global bindings don't already exist in the global scope, add it.
-                let globals = helpers::extract_globals(body);
-                for (name, stmt) in &globals {
+                let definition = docstrings::extraction::extract_definition(
+                    ExtractionTarget::Class,
+                    stmt,
+                    self.semantic_model.definition_id,
+                    &self.semantic_model.definitions,
+                );
+                self.semantic_model.push_definition(definition);
+
+                self.semantic_model.push_scope(ScopeKind::Class(class_def));
+
+                // If any global bindings don't already exist in the global scope, add them.
+                for (name, range) in helpers::extract_globals(body) {
                     if self
                         .semantic_model
                         .global_scope()
@@ -1965,7 +1976,7 @@ where
                     {
                         let id = self.semantic_model.bindings.push(Binding {
                             kind: BindingKind::Assignment,
-                            range: stmt.range(),
+                            range,
                             references: Vec::new(),
                             source: self.semantic_model.stmt_id,
                             context: self.semantic_model.execution_context(),
@@ -1974,23 +1985,8 @@ where
                         });
                         self.semantic_model.global_scope_mut().add(name, id);
                     }
+                    self.semantic_model.scope_mut().add_global(name, range);
                 }
-
-                let definition = docstrings::extraction::extract_definition(
-                    ExtractionTarget::Class,
-                    stmt,
-                    self.semantic_model.definition_id,
-                    &self.semantic_model.definitions,
-                );
-                self.semantic_model.push_definition(definition);
-
-                self.semantic_model.push_scope(ScopeKind::Class(ClassDef {
-                    name,
-                    bases,
-                    keywords,
-                    decorator_list,
-                    globals,
-                }));
 
                 self.visit_body(body);
             }
@@ -2054,7 +2050,7 @@ where
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = if self.semantic_model.future_annotations() {
-                    if matches!(self.semantic_model.scope().kind, ScopeKind::Class(..)) {
+                    if self.semantic_model.scope().kind.is_class() {
                         let baseclasses = &self
                             .settings
                             .flake8_type_checking
@@ -2074,7 +2070,7 @@ where
                 } else {
                     matches!(
                         self.semantic_model.scope().kind,
-                        ScopeKind::Class(..) | ScopeKind::Module
+                        ScopeKind::Class(_) | ScopeKind::Module
                     )
                 };
 
@@ -3419,7 +3415,7 @@ where
             Expr::Lambda(
                 lambda @ ast::ExprLambda {
                     args,
-                    body,
+                    body: _,
                     range: _,
                 },
             ) => {
@@ -3434,8 +3430,7 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
-                self.semantic_model
-                    .push_scope(ScopeKind::Lambda(Lambda { args, body }));
+                self.semantic_model.push_scope(ScopeKind::Lambda(lambda));
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -4514,7 +4509,7 @@ impl<'a> Checker<'a> {
         }
 
         if self.enabled(Rule::NonLowercaseVariableInFunction) {
-            if matches!(self.semantic_model.scope().kind, ScopeKind::Function(..)) {
+            if self.semantic_model.scope().kind.is_any_function() {
                 // Ignore globals.
                 if !self
                     .semantic_model
@@ -4530,13 +4525,11 @@ impl<'a> Checker<'a> {
         }
 
         if self.enabled(Rule::MixedCaseVariableInClassScope) {
-            if let ScopeKind::Class(class) = &self.semantic_model.scope().kind {
+            if let ScopeKind::Class(ast::StmtClassDef { bases, .. }) =
+                &self.semantic_model.scope().kind
+            {
                 pep8_naming::rules::mixed_case_variable_in_class_scope(
-                    self,
-                    expr,
-                    parent,
-                    id,
-                    class.bases,
+                    self, expr, parent, id, bases,
                 );
             }
         }
@@ -5058,7 +5051,7 @@ impl<'a> Checker<'a> {
             }
 
             // Imports in classes are public members.
-            if matches!(scope.kind, ScopeKind::Class(..)) {
+            if scope.kind.is_class() {
                 continue;
             }
 

@@ -27,6 +27,7 @@ pub mod logging;
 pub mod message;
 mod noqa;
 pub mod packaging;
+pub mod pyproject_toml;
 pub mod registry;
 pub mod resolver;
 mod rule_redirects;

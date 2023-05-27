@@ -39,6 +39,7 @@ mod tests {
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_7.py"); "PLR1722_7")]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_8.py"); "PLR1722_8")]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_9.py"); "PLR1722_9")]
+    #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_10.py"); "PLR1722_10")]
     #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"); "PLE0116")]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"); "PLW0603")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
