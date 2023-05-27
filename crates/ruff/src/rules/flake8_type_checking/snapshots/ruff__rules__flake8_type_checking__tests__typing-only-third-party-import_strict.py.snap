@@ -11,4 +11,13 @@ strict.py:54:25: TCH002 Move third-party import `pkg.bar.A` into a type-checking
 58 |     def test(value: A):
    |
 
+strict.py:91:12: TCH002 Move third-party import `pkg` into a type-checking block
+   |
+91 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
+92 |     # testing the implementation.
+93 |     import pkg
+   |            ^^^ TCH002
+94 |     import pkgfoo.bar as B
+   |
+
 

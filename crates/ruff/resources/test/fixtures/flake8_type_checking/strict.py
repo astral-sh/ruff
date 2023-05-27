@@ -55,3 +55,41 @@ def f():
 
     def test(value: A):
         return pkg.B()
+
+
+def f():
+    # In un-strict mode, this shouldn't rase an error, since `pkg.bar` is used at runtime.
+    import pkg
+    import pkg.bar as B
+
+    def test(value: pkg.A):
+        return B()
+
+
+def f():
+    # In un-strict mode, this shouldn't rase an error, since `pkg.foo.bar` is used at runtime.
+    import pkg.foo as F
+    import pkg.foo.bar as B
+
+    def test(value: F.Foo):
+        return B()
+
+
+def f():
+    # In un-strict mode, this shouldn't rase an error, since `pkg.foo.bar` is used at runtime.
+    import pkg
+    import pkg.foo.bar as B
+
+    def test(value: pkg.A):
+        return B()
+
+
+def f():
+    # In un-strict mode, this _should_ rase an error, since `pkgfoo.bar` is used at runtime.
+    # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
+    # testing the implementation.
+    import pkg
+    import pkgfoo.bar as B
+
+    def test(value: pkg.A):
+        return B()
