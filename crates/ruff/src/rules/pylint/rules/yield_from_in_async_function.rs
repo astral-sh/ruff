@@ -1,41 +1,45 @@
-use rustpython_parser::ast::{ExprYieldFrom, Ranged, StmtAsyncFunctionDef};
+use rustpython_parser::ast::{ExprYieldFrom, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use ruff_python_semantic::scope::ScopeKind;
-
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks if `yield from` is used inside of an async function
+/// Checks for uses of `yield from` in async functions.
 ///
 /// ## Why is this bad?
-/// This will result in a `SyntaxError`
+/// Python doesn't support the use of `yield from` in async functions, and will
+/// raise a `SyntaxError` in such cases.
+///
+/// Instead, considering refactoring the code to use an `async for` loop instead.
 ///
 /// ## Example
 /// ```python
-/// def foo():
-///     l = (1, 2, 3)
-///     yield from l
+/// async def numbers():
+///     yield from [1, 2, 3, 4, 5]
 /// ```
 ///
-/// ## References
-/// [pylint E1700: `yield-inside-async-function`] https://pylint.pycqa.org/en/latest/user_guide/messages/error/yield-inside-async-function.html
+/// Use instead:
+/// ```python
+/// async def numbers():
+///   async for number in [1, 2, 3, 4, 5]:
+///        yield number
+/// ```
 #[violation]
 pub struct YieldFromInAsyncFunction;
 
 impl Violation for YieldFromInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`yield from` inside async function consider refactoring with `async for`")
+        format!("`yield from` statement in async function; use `async for` instead")
     }
 }
 
 /// PLE1700
 pub(crate) fn yield_from_in_async_function(checker: &mut Checker, expr: &ExprYieldFrom) {
     let scope = checker.semantic_model().scope();
-    if let ScopeKind::AsyncFunction(StmtAsyncFunctionDef { .. }) = scope.kind {
+    if scope.kind.is_async_function() {
         checker
             .diagnostics
             .push(Diagnostic::new(YieldFromInAsyncFunction, expr.range()));
