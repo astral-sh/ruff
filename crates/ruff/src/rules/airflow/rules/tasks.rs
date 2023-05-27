@@ -50,10 +50,7 @@ pub(crate) fn task_variable_name(
     };
 
     // if the value is not a call, we can't do anything
-    let call = match value {
-        Expr::Call(call) => call,
-        _ => return None,
-    };
+    let Expr::Call(call) = value else { return None };
 
     // if the function doesn't come from airflow, we can't do anything
     let func_name = match call.func.as_name_expr() {
@@ -73,13 +70,10 @@ pub(crate) fn task_variable_name(
     }
 
     // if the call doesn't have a task_id, don't do anything
-    let task_id_arg = match call.keywords.iter().find(|keyword| match &keyword.arg {
-        Some(arg_name) => arg_name == "task_id",
-        _ => false,
-    }) {
-        Some(keyword) => keyword,
-        None => return None,
-    };
+    let Some(task_id_arg) = call.keywords.iter().find(|keyword| match &keyword.arg {
+            Some(arg_name) => arg_name == "task_id",
+            _ => false,
+        }) else { return None };
 
     // get the task_id value
     let task_id_arg_value = match &task_id_arg.value {
