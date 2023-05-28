@@ -15,6 +15,7 @@ use super::LogicalLine;
 
 /// Contains variables used for the linting of blank lines.
 #[derive(Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub(crate) struct BlankLinesTrackingVars {
     blank_lines: u32,
     blank_characters: u32,
