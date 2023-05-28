@@ -1,0 +1,92 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+---
+E30.py:55:1: E303 [*] Too many blank lines (3)
+   |
+55 | print
+   | ^^^^^ E303
+56 | #: E303:5:1
+57 | print
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+51 51 | print
+52 52 | 
+53 53 | 
+54    |-
+55 54 | print
+56 55 | #: E303:5:1
+57 56 | print
+
+E30.py:61:1: E303 [*] Too many blank lines (3)
+   |
+61 | # comment
+   | ^^^^^^^^^ E303
+62 | 
+63 | print
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+57 57 | print
+58 58 | 
+59 59 | 
+60    |-
+61 60 | # comment
+62 61 | 
+63 62 | print
+
+E30.py:69:5: E303 [*] Too many blank lines (2)
+   |
+69 |     # comment
+   |     ^^^^^^^^^ E303
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+65 65 | def a():
+66 66 |     print
+67 67 | 
+68    |-
+69 68 |     # comment
+70 69 | 
+71 70 | 
+
+E30.py:72:5: E303 [*] Too many blank lines (2)
+   |
+72 |     # another comment
+   |     ^^^^^^^^^^^^^^^^^ E303
+73 | 
+74 |     print
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+68 68 | 
+69 69 |     # comment
+70 70 | 
+71    |-
+72 71 |     # another comment
+73 72 | 
+74 73 |     print
+
+E30.py:88:1: E303 [*] Too many blank lines (3)
+   |
+88 | """This class docstring comes on line 5.
+   |  E303
+89 | It gives error E303: too many blank lines (3)
+90 | """
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+84 84 | #!python
+85 85 | 
+86 86 | 
+87    |-
+88 87 | """This class docstring comes on line 5.
+89 88 | It gives error E303: too many blank lines (3)
+90 89 | """
+
+
