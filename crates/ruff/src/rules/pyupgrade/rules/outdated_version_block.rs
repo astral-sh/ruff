@@ -32,24 +32,62 @@ impl AlwaysAutofixableViolation for OutdatedVersionBlock {
     }
 }
 
+/// The metadata for a version-comparison block.
 #[derive(Debug)]
 struct BlockMetadata {
-    /// The first non-whitespace token in the block.
-    starter: Tok,
-    /// The location of the first `elif` token, if any.
-    elif: Option<TextSize>,
-    /// The location of the `else` token, if any.
-    else_: Option<TextSize>,
+    /// The first `if` or `elif` token in the block, used to signal the start of the
+    /// version-comparison block.
+    leading_token: StartToken,
+    /// The first `elif` or `else` token following the start token, if any, used to signal the end
+    /// of the version-comparison block.
+    trailing_token: Option<EndToken>,
 }
 
-impl BlockMetadata {
-    const fn new(starter: Tok, elif: Option<TextSize>, else_: Option<TextSize>) -> Self {
-        Self {
-            starter,
-            elif,
-            else_,
+/// The set of tokens that can start a block, i.e., the first token in an `if` statement.
+#[derive(Debug)]
+enum StartTok {
+    If,
+    Elif,
+}
+
+impl StartTok {
+    fn from_tok(tok: &Tok) -> Option<Self> {
+        match tok {
+            Tok::If => Some(Self::If),
+            Tok::Elif => Some(Self::Elif),
+            _ => None,
         }
     }
+}
+
+#[derive(Debug)]
+struct StartToken {
+    tok: StartTok,
+    range: TextRange,
+}
+
+/// The set of tokens that can end a block, i.e., the first token in the subsequent `elif` or `else`
+/// branch that follows an `if` or `elif` statement.
+#[derive(Debug)]
+enum EndTok {
+    Elif,
+    Else,
+}
+
+impl EndTok {
+    fn from_tok(tok: &Tok) -> Option<Self> {
+        match tok {
+            Tok::Elif => Some(Self::Elif),
+            Tok::Else => Some(Self::Else),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct EndToken {
+    tok: EndTok,
+    range: TextRange,
 }
 
 fn metadata<T>(locator: &Locator, located: &T, body: &[Stmt]) -> Option<BlockMetadata>
@@ -58,38 +96,35 @@ where
 {
     indentation(locator, located)?;
 
-    let mut starter = None;
-    let mut elif = None;
-    let mut else_ = None;
-
-    let body_end = body.last().map(Ranged::end).unwrap();
-    for (tok, range) in lexer::lex_starts_at(
+    let mut iter = lexer::lex_starts_at(
         locator.slice(located.range()),
         Mode::Module,
         located.start(),
     )
-    .flatten()
-    .filter(|(tok, _)| matches!(tok, Tok::If | Tok::Elif | Tok::Else))
-    {
-        if starter.is_none() {
-            starter = Some(tok.clone());
-        } else if range.start() < body_end {
-            // Continue until the end of the `if` body, thus ensuring that we don't
-            // accidentally pick up an `else` or `elif` in the nested block.
-            continue;
-        // We only care about the first `elif` or `else` following the `if`.
-        } else if matches!(tok, Tok::Elif) {
-            elif = Some(range.start());
-            break;
-        } else if matches!(tok, Tok::Else) {
-            else_ = Some(range.start());
-            break;
-        }
-    }
-    Some(BlockMetadata::new(starter.unwrap(), elif, else_))
+    .flatten();
+
+    // First the leading `if` or `elif` token.
+    let (tok, range) = iter.next()?;
+    let leading_token = StartToken {
+        tok: StartTok::from_tok(&tok)?,
+        range,
+    };
+
+    // Skip any tokens until we reach the end of the `if` body.
+    let body_end = body.last()?.range().end();
+
+    // Find the trailing `elif` or `else` token, if any.
+    let trailing_token = iter
+        .skip_while(|(_, range)| range.start() < body_end)
+        .find_map(|(tok, range)| EndTok::from_tok(&tok).map(|tok| EndToken { tok, range }));
+
+    Some(BlockMetadata {
+        leading_token,
+        trailing_token,
+    })
 }
 
-/// Converts a `BigInt` to a `u32`, if the number is negative, it will return 0
+/// Converts a `BigInt` to a `u32`. If the number is negative, it will return 0.
 fn bigint_to_u32(number: &BigInt) -> u32 {
     let the_number = number.to_u32_digits();
     match the_number.0 {
@@ -147,11 +182,11 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
 fn fix_py2_block(
     checker: &mut Checker,
     stmt: &Stmt,
-    body: &[Stmt],
     orelse: &[Stmt],
     block: &BlockMetadata,
 ) -> Option<Fix> {
-    if orelse.is_empty() {
+    let leading_token = &block.leading_token;
+    let Some(trailing_token) = &block.trailing_token else {
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
@@ -160,7 +195,7 @@ fn fix_py2_block(
         let defined_in = checker.semantic_model().stmt_parent();
         return match delete_stmt(
             defined_by,
-            if block.starter == Tok::If {
+            if matches!(block.leading_token.tok, StartTok::If) {
                 defined_in
             } else {
                 None
@@ -180,59 +215,64 @@ fn fix_py2_block(
                 None
             }
         };
-    }
+    };
 
-    // If we only have an `if` and an `else`, dedent the `else` block.
-    if block.starter == Tok::If && block.elif.is_none() {
-        let start = orelse.first().unwrap();
-        let end = orelse.last().unwrap();
-
-        if indentation(checker.locator, start).is_none() {
-            // Inline `else` block (e.g., `else: x = 1`).
-            #[allow(deprecated)]
-            Some(Fix::unspecified(Edit::range_replacement(
-                checker
-                    .locator
-                    .slice(TextRange::new(start.start(), end.end()))
-                    .to_string(),
-                stmt.range(),
-            )))
-        } else {
-            indentation(checker.locator, stmt)
-                .and_then(|indentation| {
-                    adjust_indentation(
-                        TextRange::new(checker.locator.line_start(start.start()), end.end()),
-                        indentation,
-                        checker.locator,
-                        checker.stylist,
-                    )
-                    .ok()
-                })
-                .map(|contents| {
-                    #[allow(deprecated)]
-                    Fix::unspecified(Edit::replacement(
-                        contents,
-                        checker.locator.line_start(stmt.start()),
-                        stmt.end(),
-                    ))
-                })
-        }
-    } else {
-        let mut end_location = orelse.last().unwrap().start();
-        if block.starter == Tok::If && block.elif.is_some() {
-            // Turn the `elif` into an `if`.
-            end_location = block.elif.unwrap() + TextSize::from(2);
-        } else if block.starter == Tok::Elif {
-            if let Some(elif) = block.elif {
-                end_location = elif;
-            } else if let Some(else_) = block.else_ {
-                end_location = else_;
+    match (&leading_token.tok, &trailing_token.tok) {
+        // If we only have an `if` and an `else`, dedent the `else` block.
+        (StartTok::If, EndTok::Else) => {
+            let start = orelse.first()?;
+            let end = orelse.last()?;
+            if indentation(checker.locator, start).is_none() {
+                // Inline `else` block (e.g., `else: x = 1`).
+                #[allow(deprecated)]
+                Some(Fix::unspecified(Edit::range_replacement(
+                    checker
+                        .locator
+                        .slice(TextRange::new(start.start(), end.end()))
+                        .to_string(),
+                    stmt.range(),
+                )))
             } else {
-                end_location = body.last().unwrap().end();
+                indentation(checker.locator, stmt)
+                    .and_then(|indentation| {
+                        adjust_indentation(
+                            TextRange::new(checker.locator.line_start(start.start()), end.end()),
+                            indentation,
+                            checker.locator,
+                            checker.stylist,
+                        )
+                        .ok()
+                    })
+                    .map(|contents| {
+                        #[allow(deprecated)]
+                        Fix::unspecified(Edit::replacement(
+                            contents,
+                            checker.locator.line_start(stmt.start()),
+                            stmt.end(),
+                        ))
+                    })
             }
         }
-        #[allow(deprecated)]
-        Some(Fix::unspecified(Edit::deletion(stmt.start(), end_location)))
+        (StartTok::If, EndTok::Elif) => {
+            // If we have an `if` and an `elif`, turn the `elif` into an `if`.
+            let start_location = leading_token.range.start();
+            let end_location = trailing_token.range.start() + TextSize::from(2);
+            #[allow(deprecated)]
+            Some(Fix::unspecified(Edit::deletion(
+                start_location,
+                end_location,
+            )))
+        }
+        (StartTok::Elif, _) => {
+            // If we have an `elif`, delete up to the `else` or the end of the statement.
+            let start_location = leading_token.range.start();
+            let end_location = trailing_token.range.start();
+            #[allow(deprecated)]
+            Some(Fix::unspecified(Edit::deletion(
+                start_location,
+                end_location,
+            )))
+        }
     }
 }
 
@@ -244,13 +284,12 @@ fn fix_py3_block(
     body: &[Stmt],
     block: &BlockMetadata,
 ) -> Option<Fix> {
-    match block.starter {
-        Tok::If => {
+    match block.leading_token.tok {
+        StartTok::If => {
             // If the first statement is an if, use the body of this statement, and ignore
             // the rest.
-            let start = body.first().unwrap();
-            let end = body.last().unwrap();
-
+            let start = body.first()?;
+            let end = body.last()?;
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 #[allow(deprecated)]
@@ -282,10 +321,10 @@ fn fix_py3_block(
                     })
             }
         }
-        Tok::Elif => {
+        StartTok::Elif => {
             // Replace the `elif` with an `else, preserve the body of the elif, and remove
             // the rest.
-            let end = body.last().unwrap();
+            let end = body.last()?;
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
             #[allow(deprecated)]
             Some(Fix::unspecified(Edit::range_replacement(
@@ -293,7 +332,6 @@ fn fix_py3_block(
                 stmt.range(),
             )))
         }
-        _ => None,
     }
 }
 
@@ -336,9 +374,7 @@ pub(crate) fn outdated_version_block(
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt, body) {
-                                if let Some(fix) =
-                                    fix_py2_block(checker, stmt, body, orelse, &block)
-                                {
+                                if let Some(fix) = fix_py2_block(checker, stmt, orelse, &block) {
                                     diagnostic.set_fix(fix);
                                 }
                             }
@@ -369,7 +405,7 @@ pub(crate) fn outdated_version_block(
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt, body) {
-                            if let Some(fix) = fix_py2_block(checker, stmt, body, orelse, &block) {
+                            if let Some(fix) = fix_py2_block(checker, stmt, orelse, &block) {
                                 diagnostic.set_fix(fix);
                             }
                         }
