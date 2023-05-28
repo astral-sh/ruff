@@ -270,7 +270,7 @@ impl AlwaysAutofixableViolation for BlankLinesAfterFunctionOrClass {
 /// - Two blank lines are expected between functions and classes
 /// - One blank line is expected between methods of a class.
 ///
-/// ## Example  FIXME: The pycodestyle example does not trigger an error...
+/// ## Example
 /// ```python
 /// def outer():
 ///     def inner():
@@ -308,7 +308,7 @@ impl AlwaysAutofixableViolation for BlankLinesBeforeNestedDefinition {
     }
 }
 
-/// E301, E303
+/// E301, E302, E303, E304, E305, E306
 pub(crate) fn blank_lines(
     line: &LogicalLine,
     prev_line: Option<&LogicalLine>,
@@ -325,15 +325,15 @@ pub(crate) fn blank_lines(
         return;
     }
 
+    if indent_level <= tracked_vars.class_indent_level {
+        tracked_vars.is_in_class = false;
+    }
+
+    if indent_level <= tracked_vars.fn_indent_level {
+        tracked_vars.is_in_fn = false;
+    }
+
     for (token_idx, token) in line.tokens().iter().enumerate() {
-        if indent_level <= tracked_vars.class_indent_level {
-            tracked_vars.is_in_class = false;
-        }
-
-        if indent_level <= tracked_vars.fn_indent_level {
-            tracked_vars.is_in_fn = false;
-        }
-
         // E301
         if token.kind() == TokenKind::Def
             && tracked_vars.is_in_class
@@ -453,15 +453,14 @@ pub(crate) fn blank_lines(
                     tracked_vars.class_indent_level = indent_level;
                 }
                 tracked_vars.is_in_class = true;
-                return;
+                tracked_vars.follows_decorator = false;
+                tracked_vars.follows_def = false;
+                break;
             }
             TokenKind::At => {
                 tracked_vars.follows_decorator = true;
-
                 tracked_vars.follows_def = false;
-                tracked_vars.blank_lines = 0;
-                tracked_vars.blank_characters = 0;
-                return;
+                break;
             }
             TokenKind::Def => {
                 if !tracked_vars.is_in_fn {
@@ -469,17 +468,16 @@ pub(crate) fn blank_lines(
                 }
                 tracked_vars.is_in_fn = true;
                 tracked_vars.follows_def = true;
-
                 tracked_vars.follows_decorator = false;
-                tracked_vars.blank_lines = 0;
-                tracked_vars.blank_characters = 0;
-                return;
+                break;
             }
-            _ => {}
+            _ => {
+                tracked_vars.follows_decorator = false;
+                tracked_vars.follows_def = false;
+            }
         }
     }
-    tracked_vars.follows_decorator = false;
-    tracked_vars.follows_def = false;
+
     tracked_vars.blank_lines = 0;
     tracked_vars.blank_characters = 0;
 }
