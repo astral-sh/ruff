@@ -13,6 +13,19 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 
 use super::LogicalLine;
 
+/// Contains variables used for the linting of blank lines.
+#[derive(Default)]
+pub(crate) struct BlankLinesTrackingVars {
+    blank_lines: u32,
+    blank_characters: u32,
+    follows_decorator: bool,
+    follows_def: bool,
+    is_in_class: bool,
+    class_indent_level: usize,
+    is_in_fn: bool,
+    fn_indent_level: usize,
+}
+
 /// Number of blank lines between various code parts.
 struct BlankLinesConfig;
 
@@ -293,48 +306,50 @@ impl AlwaysAutofixableViolation for BlankLinesBeforeNestedDefinition {
 pub(crate) fn blank_lines(
     line: &LogicalLine,
     prev_line: Option<&LogicalLine>,
-    blank_lines: &mut u32,
-    blank_characters: &mut u32,
-    follows_decorator: &mut bool,
-    follows_def: &mut bool,
-    is_in_class: &mut bool,
-    class_indent_level: &mut usize,
-    is_in_fn: &mut bool,
-    fn_indent_level: &mut usize,
+    tracked_vars: &mut BlankLinesTrackingVars,
+    // blank_lines: &mut u32,
+    // blank_characters: &mut u32,
+    // follows_decorator: &mut bool,
+    // follows_def: &mut bool,
+    // is_in_class: &mut bool,
+    // class_indent_level: &mut usize,
+    // is_in_fn: &mut bool,
+    // fn_indent_level: &mut usize,
     indent_level: usize,
     locator: &Locator,
     stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
     if line.is_empty() {
-        *blank_lines += 1;
-        *blank_characters += u32::try_from(line.text().len())
+        tracked_vars.blank_lines += 1;
+        tracked_vars.blank_characters += u32::try_from(line.text().len())
             .expect("The number of blank characters should be relatively small");
         return;
     }
 
     for (token_idx, token) in line.tokens().iter().enumerate() {
         // E304
-        if *follows_decorator && *blank_lines > 0 {
+        if tracked_vars.follows_decorator && tracked_vars.blank_lines > 0 {
             let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
 
             let range = token.range();
             diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                locator.line_start(range.start()) - TextSize::new(*blank_characters),
+                locator.line_start(range.start()) - TextSize::new(tracked_vars.blank_characters),
                 locator.line_start(range.start()),
             )));
             context.push_diagnostic(diagnostic);
         }
         // E303
-        else if token_idx == 0 && *blank_lines > BlankLinesConfig::TOP_LEVEL
-            || (*is_in_class && *blank_lines > BlankLinesConfig::METHOD)
+        else if token_idx == 0 && tracked_vars.blank_lines > BlankLinesConfig::TOP_LEVEL
+            || (tracked_vars.is_in_class && tracked_vars.blank_lines > BlankLinesConfig::METHOD)
         {
-            let mut diagnostic = Diagnostic::new(TooManyBlankLines(*blank_lines), token.range());
+            let mut diagnostic =
+                Diagnostic::new(TooManyBlankLines(tracked_vars.blank_lines), token.range());
 
             let chars_to_remove = if indent_level > 0 {
-                *blank_characters - BlankLinesConfig::METHOD
+                tracked_vars.blank_characters - BlankLinesConfig::METHOD
             } else {
-                *blank_characters - BlankLinesConfig::TOP_LEVEL
+                tracked_vars.blank_characters - BlankLinesConfig::TOP_LEVEL
             };
             let end = locator.line_start(token.range().start());
             let start = end - TextSize::new(chars_to_remove);
@@ -344,9 +359,12 @@ pub(crate) fn blank_lines(
             context.push_diagnostic(diagnostic);
         }
         // E306
-        else if token.kind() == TokenKind::Def && *follows_def && *blank_lines == 0 {
+        else if token.kind() == TokenKind::Def
+            && tracked_vars.follows_def
+            && tracked_vars.blank_lines == 0
+        {
             let mut diagnostic = Diagnostic::new(
-                BlankLinesBeforeNestedDefinition(*blank_lines),
+                BlankLinesBeforeNestedDefinition(tracked_vars.blank_lines),
                 token.range(),
             );
             #[allow(deprecated)]
@@ -359,8 +377,8 @@ pub(crate) fn blank_lines(
         }
         // E301
         if token.kind() == TokenKind::Def
-            && *is_in_class
-            && *blank_lines == 0
+            && tracked_vars.is_in_class
+            && tracked_vars.blank_lines == 0
             && prev_line
                 .and_then(|prev_line| prev_line.tokens_trimmed().first())
                 .map_or(false, |token| token.kind() != TokenKind::Class)
@@ -375,27 +393,12 @@ pub(crate) fn blank_lines(
         }
         // E302
         if token.kind() == TokenKind::Def
-            && !*is_in_class
-            && *blank_lines < 2
+            && !tracked_vars.is_in_class
+            && tracked_vars.blank_lines < 2
             && prev_line.is_some()
         {
-            let mut diagnostic =
-                Diagnostic::new(BlankLinesTopLevel(*blank_lines as usize), token.range());
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
-                stylist
-                    .line_ending()
-                    .as_str()
-                    .to_string()
-                    .repeat(2 - *blank_lines as usize),
-                locator.line_start(token.range().start()),
-            )));
-            context.push_diagnostic(diagnostic);
-        }
-        // E305
-        if *blank_lines < 2 && (*is_in_fn || *is_in_class) && indent_level == 0 {
             let mut diagnostic = Diagnostic::new(
-                BlankLinesAfterFunctionOrClass(*blank_lines as usize),
+                BlankLinesTopLevel(tracked_vars.blank_lines as usize),
                 token.range(),
             );
             #[allow(deprecated)]
@@ -404,7 +407,27 @@ pub(crate) fn blank_lines(
                     .line_ending()
                     .as_str()
                     .to_string()
-                    .repeat(2 - *blank_lines as usize),
+                    .repeat(2 - tracked_vars.blank_lines as usize),
+                locator.line_start(token.range().start()),
+            )));
+            context.push_diagnostic(diagnostic);
+        }
+        // E305
+        if tracked_vars.blank_lines < 2
+            && (tracked_vars.is_in_fn || tracked_vars.is_in_class)
+            && indent_level == 0
+        {
+            let mut diagnostic = Diagnostic::new(
+                BlankLinesAfterFunctionOrClass(tracked_vars.blank_lines as usize),
+                token.range(),
+            );
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                stylist
+                    .line_ending()
+                    .as_str()
+                    .to_string()
+                    .repeat(2 - tracked_vars.blank_lines as usize),
                 locator.line_start(token.range().start()),
             )));
             context.push_diagnostic(diagnostic);
@@ -412,45 +435,45 @@ pub(crate) fn blank_lines(
 
         match token.kind() {
             TokenKind::Class => {
-                if !*is_in_class {
-                    *class_indent_level = indent_level;
+                if !tracked_vars.is_in_class {
+                    tracked_vars.class_indent_level = indent_level;
                 }
-                *is_in_class = true;
+                tracked_vars.is_in_class = true;
                 return;
             }
             TokenKind::At => {
-                *follows_decorator = true;
+                tracked_vars.follows_decorator = true;
 
-                *follows_def = false;
-                *blank_lines = 0;
-                *blank_characters = 0;
+                tracked_vars.follows_def = false;
+                tracked_vars.blank_lines = 0;
+                tracked_vars.blank_characters = 0;
                 return;
             }
             TokenKind::Def => {
-                if !*is_in_fn {
-                    *fn_indent_level = indent_level;
+                if !tracked_vars.is_in_fn {
+                    tracked_vars.fn_indent_level = indent_level;
                 }
-                *is_in_fn = true;
-                *follows_def = true;
+                tracked_vars.is_in_fn = true;
+                tracked_vars.follows_def = true;
 
-                *follows_decorator = false;
-                *blank_lines = 0;
-                *blank_characters = 0;
+                tracked_vars.follows_decorator = false;
+                tracked_vars.blank_lines = 0;
+                tracked_vars.blank_characters = 0;
                 return;
             }
             _ => {}
         }
 
-        if indent_level <= *class_indent_level {
-            *is_in_class = false;
+        if indent_level <= tracked_vars.class_indent_level {
+            tracked_vars.is_in_class = false;
         }
 
-        if indent_level <= *fn_indent_level {
-            *is_in_fn = false;
+        if indent_level <= tracked_vars.fn_indent_level {
+            tracked_vars.is_in_fn = false;
         }
     }
-    *follows_decorator = false;
-    *follows_def = false;
-    *blank_lines = 0;
-    *blank_characters = 0;
+    tracked_vars.follows_decorator = false;
+    tracked_vars.follows_def = false;
+    tracked_vars.blank_lines = 0;
+    tracked_vars.blank_characters = 0;
 }

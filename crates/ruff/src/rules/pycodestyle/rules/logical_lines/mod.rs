@@ -9,7 +9,8 @@ use ruff_python_ast::token_kind::TokenKind;
 
 pub(crate) use blank_lines::{
     blank_lines, BlankLineAfterDecorator, BlankLineBetweenMethods, BlankLinesAfterFunctionOrClass,
-    BlankLinesBeforeNestedDefinition, BlankLinesTopLevel, TooManyBlankLines,
+    BlankLinesBeforeNestedDefinition, BlankLinesTopLevel, BlankLinesTrackingVars,
+    TooManyBlankLines,
 };
 pub(crate) use extraneous_whitespace::{
     extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,

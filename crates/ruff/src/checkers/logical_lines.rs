@@ -10,7 +10,8 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     blank_lines, extraneous_whitespace, indentation, missing_whitespace,
     missing_whitespace_after_keyword, missing_whitespace_around_operator, space_around_operator,
     whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
+    whitespace_before_comment, whitespace_before_parameters, BlankLinesTrackingVars, LogicalLines,
+    TokenFlags,
 };
 use crate::settings::Settings;
 
@@ -42,16 +43,8 @@ pub(crate) fn check_logical_lines(
     let should_fix_whitespace_before_parameters =
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
+    let mut blank_lines_tracking_vars = BlankLinesTrackingVars::default();
     let mut prev_line = None;
-    let mut nb_blank_lines: u32 = 0;
-    let mut blank_characters: u32 = 0;
-    let mut follows_decorator = false;
-    let mut follows_def = false;
-    let mut is_in_class = false;
-    let mut class_indent_level: usize = 0;
-    let mut is_in_fn = false;
-    let mut fn_indent_level: usize = 0;
-
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
     for line in &LogicalLines::from_tokens(tokens, locator) {
@@ -116,14 +109,7 @@ pub(crate) fn check_logical_lines(
         blank_lines(
             &line,
             prev_line.as_ref(),
-            &mut nb_blank_lines,
-            &mut blank_characters,
-            &mut follows_decorator,
-            &mut follows_def,
-            &mut is_in_class,
-            &mut class_indent_level,
-            &mut is_in_fn,
-            &mut fn_indent_level,
+            &mut blank_lines_tracking_vars,
             indent_level,
             locator,
             stylist,
