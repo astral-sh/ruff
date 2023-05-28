@@ -94,13 +94,13 @@
 //! mode or tokenizing the source beforehand:
 //!
 //! ```
-//! use rustpython_parser::parse_program;
+//! use rustpython_parser::{Parse, ast};
 //!
 //! let python_source = r#"
 //! def is_odd(i):
 //!   return bool(i & 1)
 //! "#;
-//! let ast = parse_program(python_source, "<embedded>");
+//! let ast = ast::Suite::parse(python_source, "<embedded>");
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -126,12 +126,12 @@ mod soft_keywords;
 mod string;
 mod token;
 
-pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
-    parse_tokens, ParseError, ParseErrorType,
-};
+pub use parser::{parse, parse_starts_at, parse_tokens, Parse, ParseError, ParseErrorType};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok};
+
+#[allow(deprecated)]
+pub use parser::{parse_expression, parse_expression_starts_at, parse_program};
 
 #[rustfmt::skip]
 mod python {

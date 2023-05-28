@@ -155,7 +155,7 @@ const fn is_starred(exp: &ast::Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::{parse_program, ParseErrorType};
+    use crate::{ast, parser::ParseErrorType, Parse};
 
     #[cfg(not(feature = "all-nodes-with-ranges"))]
     macro_rules! function_and_lambda {
@@ -163,7 +163,7 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let parse_ast = parse_program($code, "<test>");
+                    let parse_ast = ast::Suite::parse($code, "<test>");
                     insta::assert_debug_snapshot!(parse_ast);
                 }
             )*
@@ -190,7 +190,7 @@ mod tests {
     }
 
     fn function_parse_error(src: &str) -> LexicalErrorType {
-        let parse_ast = parse_program(src, "<test>");
+        let parse_ast = ast::Suite::parse(src, "<test>");
         parse_ast
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(e) => e,

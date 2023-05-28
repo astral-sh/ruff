@@ -212,7 +212,7 @@ pub fn lex_starts_at(
     source: &str,
     mode: Mode,
     start_offset: TextSize,
-) -> impl Iterator<Item = LexResult> + '_ {
+) -> SoftKeywordTransformer<Lexer<std::str::Chars<'_>>> {
     SoftKeywordTransformer::new(Lexer::new(source.chars(), start_offset), mode)
 }
 

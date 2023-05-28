@@ -60,7 +60,8 @@ Execution mode check. Allowed modes are `exec`, `eval` or `single`.
 
 For example, one could do this:
 ```
-  use rustpython_parser::{parser, ast};
+  use rustpython_parser::{Parse, ast};
   let python_source = "print('Hello world')";
-  let python_ast = parser::parse_expression(python_source).unwrap();
+  let python_statements = ast::Suite::parse(python_source).unwrap();  // statements
+  let python_expr = ast::Expr::parse(python_source).unwrap();  // or expr
 ```
