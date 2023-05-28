@@ -38,9 +38,7 @@ pub(crate) fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
-    let should_fix_blank_lines = settings.rules.should_fix(Rule::BlankLineBetweenMethods); // FIXME: Rule::BlankLines
     let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
-
     let should_fix_whitespace_before_parameters =
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
@@ -115,24 +113,22 @@ pub(crate) fn check_logical_lines(
                 context.push(kind, range);
             }
         }
-        if should_fix_blank_lines || true {
-            blank_lines(
-                &line,
-                prev_line.as_ref(),
-                &mut nb_blank_lines,
-                &mut blank_characters,
-                &mut follows_decorator,
-                &mut follows_def,
-                &mut is_in_class,
-                &mut class_indent_level,
-                &mut is_in_fn,
-                &mut fn_indent_level,
-                indent_level,
-                locator,
-                stylist,
-                &mut context,
-            );
-        }
+        blank_lines(
+            &line,
+            prev_line.as_ref(),
+            &mut nb_blank_lines,
+            &mut blank_characters,
+            &mut follows_decorator,
+            &mut follows_def,
+            &mut is_in_class,
+            &mut class_indent_level,
+            &mut is_in_fn,
+            &mut fn_indent_level,
+            indent_level,
+            locator,
+            stylist,
+            &mut context,
+        );
 
         if !line.is_comment_only() && !line.is_empty() {
             prev_line = Some(line);

@@ -308,7 +308,8 @@ pub(crate) fn blank_lines(
 ) {
     if line.is_empty() {
         *blank_lines += 1;
-        *blank_characters += line.text().len() as u32;
+        *blank_characters += u32::try_from(line.text().len())
+            .expect("The number of blank characters should be relatively small");
         return;
     }
 
@@ -319,11 +320,7 @@ pub(crate) fn blank_lines(
 
             let range = token.range();
             diagnostic.set_fix(Fix::suggested(Edit::deletion(
-                locator.line_start(range.start())
-                    - TextSize::new(
-                        u32::try_from(*blank_characters)
-                            .expect("The number of blank characters should be relatively small"),
-                    ),
+                locator.line_start(range.start()) - TextSize::new(*blank_characters),
                 locator.line_start(range.start()),
             )));
             context.push_diagnostic(diagnostic);
@@ -396,9 +393,7 @@ pub(crate) fn blank_lines(
             context.push_diagnostic(diagnostic);
         }
         // E305
-        if *blank_lines < 2
-            && ((*is_in_class && indent_level == 0) || (*is_in_fn && indent_level == 0))
-        {
+        if *blank_lines < 2 && (*is_in_fn || *is_in_class) && indent_level == 0 {
             let mut diagnostic = Diagnostic::new(
                 BlankLinesAfterFunctionOrClass(*blank_lines as usize),
                 token.range(),
