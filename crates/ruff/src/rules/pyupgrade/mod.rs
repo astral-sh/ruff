@@ -71,6 +71,7 @@ mod tests {
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_2.py"); "UP036_2")]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_3.py"); "UP036_3")]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_4.py"); "UP036_4")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_5.py"); "UP036_5")]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037.py"); "UP037")]
     #[test_case(Rule::NonPEP604Isinstance, Path::new("UP038.py"); "UP038")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -186,8 +186,18 @@ fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
             | BindingKind::SubmoduleImportation(SubmoduleImportation {
                 name: that_name, ..
             }) => {
-                // Ex) `pkg.A` vs. `pkg.B`
-                this_name == that_name
+                // Submodule importation with an alias (`import pkg.A as B`)
+                // are represented as `Importation`.
+                match (this_name.find('.'), that_name.find('.')) {
+                    // Ex) `pkg.A` vs. `pkg.B`
+                    (Some(i), Some(j)) => this_name[..i] == that_name[..j],
+                    // Ex) `pkg.A` vs. `pkg`
+                    (Some(i), None) => this_name[..i] == **that_name,
+                    // Ex) `pkg` vs. `pkg.B`
+                    (None, Some(j)) => **this_name == that_name[..j],
+                    // Ex) `pkg` vs. `pkg`
+                    (None, None) => this_name == that_name,
+                }
             }
             _ => false,
         },

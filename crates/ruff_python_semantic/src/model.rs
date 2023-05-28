@@ -13,11 +13,12 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::binding::{
-    Binding, BindingId, BindingKind, Bindings, Exceptions, FromImportation, Importation,
-    SubmoduleImportation,
+    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImportation,
+    Importation, SubmoduleImportation,
 };
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
+use crate::globals::{Globals, GlobalsArena};
 use crate::node::{NodeId, Nodes};
 use crate::reference::References;
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
@@ -43,6 +44,8 @@ pub struct SemanticModel<'a> {
     pub bindings: Bindings<'a>,
     // Stack of all references created in any scope, at any point in execution.
     pub references: References,
+    // Arena of global bindings.
+    globals: GlobalsArena<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
     pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
@@ -68,6 +71,7 @@ impl<'a> SemanticModel<'a> {
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
             references: References::default(),
+            globals: GlobalsArena::default(),
             shadowed_bindings: IntMap::default(),
             body: &[],
             body_index: 0,
@@ -544,6 +548,35 @@ impl<'a> SemanticModel<'a> {
     pub fn parents(&self) -> impl Iterator<Item = &Stmt> + '_ {
         let node_id = self.stmt_id.expect("No current statement");
         self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
+    }
+
+    /// Set the [`Globals`] for the current [`Scope`].
+    pub fn set_globals(&mut self, globals: Globals<'a>) {
+        // If any global bindings don't already exist in the global scope, add them.
+        for (name, range) in globals.iter() {
+            if self.global_scope().get(name).map_or(true, |binding_id| {
+                self.bindings[binding_id].kind.is_annotation()
+            }) {
+                let id = self.bindings.push(Binding {
+                    kind: BindingKind::Assignment,
+                    range: *range,
+                    references: Vec::new(),
+                    source: self.stmt_id,
+                    context: self.execution_context(),
+                    exceptions: self.exceptions(),
+                    flags: BindingFlags::empty(),
+                });
+                self.global_scope_mut().add(name, id);
+            }
+        }
+
+        self.scopes[self.scope_id].set_globals_id(self.globals.push(globals));
+    }
+
+    /// Return the [`TextRange`] at which a name is declared as global in the current [`Scope`].
+    pub fn global(&self, name: &str) -> Option<TextRange> {
+        let global_id = self.scopes[self.scope_id].globals_id()?;
+        self.globals[global_id].get(name).copied()
     }
 
     /// Return `true` if the given [`ScopeId`] matches that of the current scope.
