@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Arguments, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 
@@ -35,16 +35,16 @@ pub struct AnyEqNeAnnotation {
     method_name: String,
 }
 
-impl AlwaysAutofixableViolation for AnyEqNeAnnotation {
+impl Violation for AnyEqNeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AnyEqNeAnnotation { method_name } = self;
         format!("Prefer `object` to `Any` for the second parameter in {method_name}")
     }
 
-    fn autofix_title(&self) -> String {
-        format!("Replace `object` with `Any`")
-    }
+    // fn autofix_title(&self) -> String {
+    //     format!("Replace `object` with `Any`")
+    // }
 }
 
 /// PYI032
@@ -74,7 +74,7 @@ pub(crate) fn any_eq_ne_annotation(
                     AnyEqNeAnnotation {
                         method_name: name.to_string(),
                     },
-                    identifier_range(stmt, checker.locator),
+                    args.args[1].range,
                 ));
             }
         }
