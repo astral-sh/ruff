@@ -20,23 +20,23 @@ RUF011.py:10:26: RUF011 Do not use mutable default values for class attributes
 14 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
    |
 
-RUF011.py:16:34: RUF011 Do not use mutable default values for class attributes
+RUF011.py:17:34: RUF011 Do not use mutable default values for class attributes
    |
-16 | class B:
-17 |     mutable_default: list[int] = []
-   |                                  ^^ RUF011
-18 |     immutable_annotation: Sequence[int] = []
-19 |     without_annotation = []
-   |
-
-RUF011.py:18:26: RUF011 Do not use mutable default values for class attributes
-   |
+17 | class B:
 18 |     mutable_default: list[int] = []
+   |                                  ^^ RUF011
 19 |     immutable_annotation: Sequence[int] = []
 20 |     without_annotation = []
+   |
+
+RUF011.py:19:26: RUF011 Do not use mutable default values for class attributes
+   |
+19 |     mutable_default: list[int] = []
+20 |     immutable_annotation: Sequence[int] = []
+21 |     without_annotation = []
    |                          ^^ RUF011
-21 |     ignored_via_comment: list[int] = []  # noqa: RUF011
-22 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+22 |     ignored_via_comment: list[int] = []  # noqa: RUF011
+23 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
    |
 
 
