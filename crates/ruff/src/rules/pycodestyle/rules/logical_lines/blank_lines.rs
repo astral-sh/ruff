@@ -263,7 +263,7 @@ impl AlwaysAutofixableViolation for BlankLinesAfterFunctionOrClass {
 }
 
 /// ## What it does
-/// Checks for blank lines after end of function or class.
+/// Checks for for 1 blank line between nested functions/classes definitions.
 ///
 /// ## Why is this bad?
 /// PEP 8 recommends the using blank lines as following:
@@ -282,6 +282,7 @@ impl AlwaysAutofixableViolation for BlankLinesAfterFunctionOrClass {
 /// Use instead:
 /// ```python
 /// def outer():
+///
 ///     def inner():
 ///         pass
 ///
@@ -419,9 +420,17 @@ pub(crate) fn blank_lines(
             context.push_diagnostic(diagnostic);
         }
 
+        if indent_level <= tracked_vars.class_indent_level {
+            tracked_vars.is_in_class = false;
+        }
+
+        if indent_level <= tracked_vars.fn_indent_level {
+            tracked_vars.is_in_fn = false;
+        }
+
         // E306
-        if token.kind() == TokenKind::Def
-            && tracked_vars.follows_def
+        if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
+            && (tracked_vars.is_in_class || tracked_vars.is_in_fn)
             && tracked_vars.blank_lines == 0
         {
             let mut diagnostic = Diagnostic::new(
@@ -466,14 +475,6 @@ pub(crate) fn blank_lines(
                 return;
             }
             _ => {}
-        }
-
-        if indent_level <= tracked_vars.class_indent_level {
-            tracked_vars.is_in_class = false;
-        }
-
-        if indent_level <= tracked_vars.fn_indent_level {
-            tracked_vars.is_in_fn = false;
         }
     }
     tracked_vars.follows_decorator = false;
