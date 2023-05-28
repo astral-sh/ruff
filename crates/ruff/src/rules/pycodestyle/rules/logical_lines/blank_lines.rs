@@ -365,8 +365,10 @@ pub(crate) fn blank_lines(
         }
 
         // E303
-        if token_idx == 0 && tracked_vars.blank_lines > BlankLinesConfig::TOP_LEVEL
-            || (tracked_vars.is_in_class && tracked_vars.blank_lines > BlankLinesConfig::METHOD)
+        if token_idx == 0
+            && (tracked_vars.blank_lines > BlankLinesConfig::TOP_LEVEL
+                || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
+                    && tracked_vars.blank_lines > BlankLinesConfig::METHOD))
         {
             let mut diagnostic =
                 Diagnostic::new(TooManyBlankLines(tracked_vars.blank_lines), token.range());
