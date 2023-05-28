@@ -299,14 +299,13 @@ pub(crate) fn blank_lines(
     follows_def: &mut bool,
     is_in_class: &mut bool,
     class_indent_level: &mut usize,
+    is_in_fn: &mut bool,
+    fn_indent_level: &mut usize,
     indent_level: usize,
     locator: &Locator,
     stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
-    dbg!("#############################");
-    dbg!(line.text());
-
     if line.is_empty() {
         *blank_lines += 1;
         *blank_characters += line.text().len() as u32;
@@ -314,7 +313,6 @@ pub(crate) fn blank_lines(
     }
 
     for (token_idx, token) in line.tokens().iter().enumerate() {
-        dbg!(token);
         // E304
         if *follows_decorator && *blank_lines > 0 {
             let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
@@ -397,33 +395,63 @@ pub(crate) fn blank_lines(
             )));
             context.push_diagnostic(diagnostic);
         }
+        // E305
+        if *blank_lines < 2
+            && ((*is_in_class && indent_level == 0) || (*is_in_fn && indent_level == 0))
+        {
+            let mut diagnostic = Diagnostic::new(
+                BlankLinesAfterFunctionOrClass(*blank_lines as usize),
+                token.range(),
+            );
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                stylist
+                    .line_ending()
+                    .as_str()
+                    .to_string()
+                    .repeat(2 - *blank_lines as usize),
+                locator.line_start(token.range().start()),
+            )));
+            context.push_diagnostic(diagnostic);
+        }
 
-        if token.kind() == TokenKind::Class {
-            if !*is_in_class {
-                *class_indent_level = indent_level;
+        match token.kind() {
+            TokenKind::Class => {
+                if !*is_in_class {
+                    *class_indent_level = indent_level;
+                }
+                *is_in_class = true;
+                return;
             }
-            *is_in_class = true;
-            return;
+            TokenKind::At => {
+                *follows_decorator = true;
+
+                *follows_def = false;
+                *blank_lines = 0;
+                *blank_characters = 0;
+                return;
+            }
+            TokenKind::Def => {
+                if !*is_in_fn {
+                    *fn_indent_level = indent_level;
+                }
+                *is_in_fn = true;
+                *follows_def = true;
+
+                *follows_decorator = false;
+                *blank_lines = 0;
+                *blank_characters = 0;
+                return;
+            }
+            _ => {}
         }
 
         if indent_level <= *class_indent_level {
             *is_in_class = false;
         }
 
-        if token.kind() == TokenKind::At {
-            *follows_decorator = true;
-
-            *follows_def = false;
-            *blank_lines = 0;
-            *blank_characters = 0;
-            return;
-        } else if token.kind() == TokenKind::Def {
-            *follows_def = true;
-
-            *follows_decorator = false;
-            *blank_lines = 0;
-            *blank_characters = 0;
-            return;
+        if indent_level <= *fn_indent_level {
+            *is_in_fn = false;
         }
     }
     *follows_decorator = false;

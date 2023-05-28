@@ -47,10 +47,12 @@ pub(crate) fn check_logical_lines(
     let mut prev_line = None;
     let mut nb_blank_lines: u32 = 0;
     let mut blank_characters: u32 = 0;
-    let mut class_indent_level: usize = 0;
     let mut follows_decorator = false;
     let mut follows_def = false;
     let mut is_in_class = false;
+    let mut class_indent_level: usize = 0;
+    let mut is_in_fn = false;
+    let mut fn_indent_level: usize = 0;
 
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
@@ -123,6 +125,8 @@ pub(crate) fn check_logical_lines(
                 &mut follows_def,
                 &mut is_in_class,
                 &mut class_indent_level,
+                &mut is_in_fn,
+                &mut fn_indent_level,
                 indent_level,
                 locator,
                 stylist,
