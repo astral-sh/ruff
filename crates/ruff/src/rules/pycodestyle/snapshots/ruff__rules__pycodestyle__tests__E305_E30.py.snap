@@ -1,0 +1,611 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+---
+E30.py:8:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+ 8 |     def b():
+ 9 |         pass
+10 | #: E301:6:5
+   | ^^^^^^^^^^^ E305
+11 | class X:
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+5  5  |         pass
+6  6  |     def b():
+7  7  |         pass
+   8  |+
+   9  |+
+8  10 | #: E301:6:5
+9  11 | class X:
+10 12 | 
+
+E30.py:16:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+16 |     def b():
+17 |         pass
+18 | #:
+   | ^^ E305
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+13 13 |     # comment
+14 14 |     def b():
+15 15 |         pass
+   16 |+
+   17 |+
+16 18 | #:
+17 19 | 
+18 20 | 
+
+E30.py:23:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+23 | def _main():
+24 |     pass
+25 | #: E302:2:1
+   | ^^^^^^^^^^^ E305
+26 | import sys
+27 | def get_sys_path():
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+20 20 | """Main module."""
+21 21 | def _main():
+22 22 |     pass
+   23 |+
+   24 |+
+23 25 | #: E302:2:1
+24 26 | import sys
+25 27 | def get_sys_path():
+
+E30.py:27:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+27 | def get_sys_path():
+28 |     return sys.path
+29 | #: E302:4:1
+   | ^^^^^^^^^^^ E305
+30 | def a():
+31 |     pass
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+24 24 | import sys
+25 25 | def get_sys_path():
+26 26 |     return sys.path
+   27 |+
+   28 |+
+27 29 | #: E302:4:1
+28 30 | def a():
+29 31 |     pass
+
+E30.py:31:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+   |
+31 |     pass
+32 | 
+33 | def b():
+   |  E305
+34 |     pass
+35 | #: E302:6:1
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+28 28 | def a():
+29 29 |     pass
+30 30 | 
+   31 |+
+31 32 | def b():
+32 33 |     pass
+33 34 | #: E302:6:1
+
+E30.py:33:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+33 | def b():
+34 |     pass
+35 | #: E302:6:1
+   | ^^^^^^^^^^^ E305
+36 | def a():
+37 |     pass
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+30 30 | 
+31 31 | def b():
+32 32 |     pass
+   33 |+
+   34 |+
+33 35 | #: E302:6:1
+34 36 | def a():
+35 37 |     pass
+
+E30.py:37:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+   |
+37 |     pass
+38 | 
+39 | # comment
+   | ^^^^^^^^^ E305
+40 | 
+41 | def b():
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+34 34 | def a():
+35 35 |     pass
+36 36 | 
+   37 |+
+37 38 | # comment
+38 39 | 
+39 40 | def b():
+
+E30.py:41:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+41 | def b():
+42 |     pass
+43 | #:
+   | ^^ E305
+44 | #: E302:4:1
+45 | def a():
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+38 38 | 
+39 39 | def b():
+40 40 |     pass
+   41 |+
+   42 |+
+41 43 | #:
+42 44 | #: E302:4:1
+43 45 | def a():
+
+E30.py:46:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+   |
+46 |     pass
+47 | 
+48 | async def b():
+   |  E305
+49 |     pass
+50 | #:
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+43 43 | def a():
+44 44 |     pass
+45 45 | 
+   46 |+
+46 47 | async def b():
+47 48 |     pass
+48 49 | #:
+
+E30.py:48:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+48 | async def b():
+49 |     pass
+50 | #:
+   | ^^ E305
+51 | 
+52 | #: E303:5:1
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+45 45 | 
+46 46 | async def b():
+47 47 |     pass
+   48 |+
+   49 |+
+48 50 | #:
+49 51 | 
+50 52 | #: E303:5:1
+
+E30.py:75:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+75 |     print
+76 | #:
+   | ^^ E305
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+72 72 |     # another comment
+73 73 | 
+74 74 |     print
+   75 |+
+   76 |+
+75 77 | #:
+76 78 | 
+77 79 | 
+
+E30.py:83:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+   |
+83 | def function():
+84 |     pass
+85 | #: E303:5:1
+   | ^^^^^^^^^^^ E305
+86 | #!python
+   |
+   = help: Add missing blank line(s)
+
+ℹ Suggested fix
+80 80 | 
+81 81 | def function():
+82 82 |     pass
+   83 |+
+   84 |+
+83 85 | #: E303:5:1
+84 86 | #!python
+85 87 | 
+
+E30.py:100:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+100 |     # another comment
+101 | a()
+    |  E305
+102 | #: E305:8:1
+103 | def a():
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+97  97  |     # comment
+98  98  | 
+99  99  |     # another comment
+    100 |+
+    101 |+
+100 102 | a()
+101 103 | #: E305:8:1
+102 104 | def a():
+
+E30.py:109:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+    |
+109 |     # another comment
+110 | 
+111 | try:
+    |  E305
+112 |     a()
+113 | except Exception:
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+106 106 | 
+107 107 |     # another comment
+108 108 | 
+    109 |+
+109 110 | try:
+110 111 |     a()
+111 112 | except Exception:
+
+E30.py:117:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+    |
+117 |     print
+118 | 
+119 | # Two spaces before comments, too.
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E305
+120 | if a():
+121 |     a()
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+114 114 | def a():
+115 115 |     print
+116 116 | 
+    117 |+
+117 118 | # Two spaces before comments, too.
+118 119 | if a():
+119 120 |     a()
+
+E30.py:127:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+127 |     def b():
+128 |         pass
+129 | #: E306:3:5
+    | ^^^^^^^^^^^ E305
+130 | async def a():
+131 |     x = 1
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+124 124 |     x = 1
+125 125 |     def b():
+126 126 |         pass
+    127 |+
+    128 |+
+127 129 | #: E306:3:5
+128 130 | async def a():
+129 131 |     x = 1
+
+E30.py:132:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+132 |     def b():
+133 |         pass
+134 | #: E306:3:5 E306:5:9
+    | ^^^^^^^^^^^^^^^^^^^^ E305
+135 | def a():
+136 |     x = 2
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+129 129 |     x = 1
+130 130 |     def b():
+131 131 |         pass
+    132 |+
+    133 |+
+132 134 | #: E306:3:5 E306:5:9
+133 135 | def a():
+134 136 |     x = 2
+
+E30.py:139:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+139 |         def c():
+140 |             pass
+141 | #: E306:3:5 E306:6:5
+    | ^^^^^^^^^^^^^^^^^^^^ E305
+142 | def a():
+143 |     x = 1
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+136 136 |         x = 1
+137 137 |         def c():
+138 138 |             pass
+    139 |+
+    140 |+
+139 141 | #: E306:3:5 E306:6:5
+140 142 | def a():
+141 143 |     x = 1
+
+E30.py:147:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+147 |     def b():
+148 |         pass
+149 | #:
+    | ^^ E305
+150 | 
+151 | #: E305:8:1
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+144 144 |     x = 2
+145 145 |     def b():
+146 146 |         pass
+    147 |+
+    148 |+
+147 149 | #:
+148 150 | 
+149 151 | #: E305:8:1
+
+E30.py:157:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+    |
+157 |     blah, blah
+158 | 
+159 | if __name__ == '__main__':
+    |  E305
+160 |     main()
+161 | # Previously just E272:1:6 E272:4:6
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+154 154 | def main():
+155 155 |     blah, blah
+156 156 | 
+    157 |+
+157 158 | if __name__ == '__main__':
+158 159 |     main()
+159 160 | # Previously just E272:1:6 E272:4:6
+
+E30.py:164:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+    |
+164 |     pass
+165 | 
+166 | async  def x(y: int = 1):
+    |  E305
+167 |     pass
+168 | #: E704:3:1 E302:3:1
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+161 161 | async  def x():
+162 162 |     pass
+163 163 | 
+    164 |+
+164 165 | async  def x(y: int = 1):
+165 166 |     pass
+166 167 | #: E704:3:1 E302:3:1
+
+E30.py:166:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+166 | async  def x(y: int = 1):
+167 |     pass
+168 | #: E704:3:1 E302:3:1
+    | ^^^^^^^^^^^^^^^^^^^^ E305
+169 | def bar():
+170 |     pass
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+163 163 | 
+164 164 | async  def x(y: int = 1):
+165 165 |     pass
+    166 |+
+    167 |+
+166 168 | #: E704:3:1 E302:3:1
+167 169 | def bar():
+168 170 |     pass
+
+E30.py:169:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+169 | def bar():
+170 |     pass
+171 | def baz(): pass
+    |  E305
+172 | #: E704:1:1 E302:2:1
+173 | def bar(): pass
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+166 166 | #: E704:3:1 E302:3:1
+167 167 | def bar():
+168 168 |     pass
+    169 |+
+    170 |+
+169 171 | def baz(): pass
+170 172 | #: E704:1:1 E302:2:1
+171 173 | def bar(): pass
+
+E30.py:170:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+170 |     pass
+171 | def baz(): pass
+172 | #: E704:1:1 E302:2:1
+    | ^^^^^^^^^^^^^^^^^^^^ E305
+173 | def bar(): pass
+174 | def baz():
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+167 167 | def bar():
+168 168 |     pass
+169 169 | def baz(): pass
+    170 |+
+    171 |+
+170 172 | #: E704:1:1 E302:2:1
+171 173 | def bar(): pass
+172 174 | def baz():
+
+E30.py:172:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+172 | #: E704:1:1 E302:2:1
+173 | def bar(): pass
+174 | def baz():
+    | ^^^ E305
+175 |     pass
+176 | #: E704:4:5 E306:4:5
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+169 169 | def baz(): pass
+170 170 | #: E704:1:1 E302:2:1
+171 171 | def bar(): pass
+    172 |+
+    173 |+
+172 174 | def baz():
+173 175 |     pass
+174 176 | #: E704:4:5 E306:4:5
+
+E30.py:174:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+174 | def baz():
+175 |     pass
+176 | #: E704:4:5 E306:4:5
+    | ^^^^^^^^^^^^^^^^^^^^ E305
+177 | def foo():
+178 |     def bar():
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+171 171 | def bar(): pass
+172 172 | def baz():
+173 173 |     pass
+    174 |+
+    175 |+
+174 176 | #: E704:4:5 E306:4:5
+175 177 | def foo():
+176 178 |     def bar():
+
+E30.py:179:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+179 |         pass
+180 |     def baz(): pass
+181 | #: E704:2:5 E306:3:5
+    | ^^^^^^^^^^^^^^^^^^^^ E305
+182 | def foo():
+183 |     def bar(): pass
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+176 176 |     def bar():
+177 177 |         pass
+178 178 |     def baz(): pass
+    179 |+
+    180 |+
+179 181 | #: E704:2:5 E306:3:5
+180 182 | def foo():
+181 183 |     def bar(): pass
+
+E30.py:184:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+184 |     def baz():
+185 |         pass
+186 | #: E302:5:1
+    | ^^^^^^^^^^^ E305
+187 | def f():
+188 |     pass
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+181 181 |     def bar(): pass
+182 182 |     def baz():
+183 183 |         pass
+    184 |+
+    185 |+
+184 186 | #: E302:5:1
+185 187 | def f():
+186 188 |     pass
+
+E30.py:188:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+    |
+188 |     pass
+189 | 
+190 | # wat
+    | ^^^^^ E305
+191 | @hi
+192 | def g():
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+185 185 | def f():
+186 186 |     pass
+187 187 | 
+    188 |+
+188 189 | # wat
+189 190 | @hi
+190 191 | def g():
+
+E30.py:192:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+    |
+192 | def g():
+193 |     pass
+    |
+    = help: Add missing blank line(s)
+
+ℹ Suggested fix
+189 189 | @hi
+190 190 | def g():
+191 191 |     pass
+    192 |+
+    193 |+
+
+
