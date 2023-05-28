@@ -277,16 +277,12 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, body: &[Stmt], is_dat
                     && !is_immutable_annotation(checker.semantic_model(), annotation)
                     && is_mutable_expr(value)
                 {
-                    checker
-                        .diagnostics
-                        .push(diagnostic(is_dataclass,value));
+                    checker.diagnostics.push(diagnostic(is_dataclass, value));
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, .. }) => {
                 if is_mutable_expr(value) {
-                    checker
-                        .diagnostics
-                        .push(diagnostic(is_dataclass, value));
+                    checker.diagnostics.push(diagnostic(is_dataclass, value));
                 }
             }
             _ => (),
