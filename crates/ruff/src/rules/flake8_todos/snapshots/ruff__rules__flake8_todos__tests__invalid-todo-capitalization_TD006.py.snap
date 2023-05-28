@@ -8,6 +8,7 @@ TD006.py:4:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
 6 | # ToDo (evanrittenhouse): invalid capitalization
   |   ^^^^ TD006
 7 | # todo (evanrittenhouse): another invalid capitalization
+8 | # foo # todo: invalid capitalization
   |
   = help: Replace `ToDo` with `TODO`
 
@@ -18,6 +19,7 @@ TD006.py:4:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
 4   |-# ToDo (evanrittenhouse): invalid capitalization
   4 |+# TODO (evanrittenhouse): invalid capitalization
 5 5 | # todo (evanrittenhouse): another invalid capitalization
+6 6 | # foo # todo: invalid capitalization
 
 TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
   |
@@ -25,6 +27,7 @@ TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
 6 | # ToDo (evanrittenhouse): invalid capitalization
 7 | # todo (evanrittenhouse): another invalid capitalization
   |   ^^^^ TD006
+8 | # foo # todo: invalid capitalization
   |
   = help: Replace `todo` with `TODO`
 
@@ -34,5 +37,22 @@ TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
 4 4 | # ToDo (evanrittenhouse): invalid capitalization
 5   |-# todo (evanrittenhouse): another invalid capitalization
   5 |+# TODO (evanrittenhouse): another invalid capitalization
+6 6 | # foo # todo: invalid capitalization
+
+TD006.py:6:9: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+  |
+6 | # ToDo (evanrittenhouse): invalid capitalization
+7 | # todo (evanrittenhouse): another invalid capitalization
+8 | # foo # todo: invalid capitalization
+  |         ^^^^ TD006
+  |
+  = help: Replace `todo` with `TODO`
+
+ℹ Fix
+3 3 | # TDO006 - error
+4 4 | # ToDo (evanrittenhouse): invalid capitalization
+5 5 | # todo (evanrittenhouse): another invalid capitalization
+6   |-# foo # todo: invalid capitalization
+  6 |+# foo # TODO: invalid capitalization
 
 

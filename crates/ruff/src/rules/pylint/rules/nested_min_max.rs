@@ -132,6 +132,12 @@ pub(crate) fn nested_min_max(
         return;
     };
 
+    if args.len() == 1
+        && matches!(&args[0], Expr::Call(ast::ExprCall { args, .. }) if args.len() == 1)
+    {
+        return;
+    }
+
     if args.iter().any(|arg| {
         let Expr::Call(ast::ExprCall { func, keywords, ..} )= arg else {
             return false;

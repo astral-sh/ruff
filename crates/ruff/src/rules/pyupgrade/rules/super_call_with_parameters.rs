@@ -2,7 +2,6 @@ use rustpython_parser::ast::{self, Arg, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -46,7 +45,7 @@ pub(crate) fn super_call_with_parameters(
     let scope = checker.semantic_model().scope();
 
     // Check: are we in a Function scope?
-    if !matches!(scope.kind, ScopeKind::Function(_)) {
+    if !scope.kind.is_any_function() {
         return;
     }
 

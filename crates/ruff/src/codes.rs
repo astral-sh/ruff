@@ -171,6 +171,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E1307") => (RuleGroup::Unspecified, Rule::BadStringFormatType),
         (Pylint, "E1310") => (RuleGroup::Unspecified, Rule::BadStrStripCall),
         (Pylint, "E1507") => (RuleGroup::Unspecified, Rule::InvalidEnvvarValue),
+        (Pylint, "E1700") => (RuleGroup::Unspecified, Rule::YieldFromInAsyncFunction),
         (Pylint, "E2502") => (RuleGroup::Unspecified, Rule::BidirectionalUnicode),
         (Pylint, "E2510") => (RuleGroup::Unspecified, Rule::InvalidCharacterBackspace),
         (Pylint, "E2512") => (RuleGroup::Unspecified, Rule::InvalidCharacterSub),
@@ -598,6 +599,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, Rule::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, Rule::TSuffixedTypeAlias),
+        (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
 
         // flake8-pytest-style
@@ -728,6 +730,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "009") => (RuleGroup::Unspecified, Rule::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Unspecified, Rule::ExplicitFStringTypeConversion),
         (Ruff, "100") => (RuleGroup::Unspecified, Rule::UnusedNOQA),
+        (Ruff, "200") => (RuleGroup::Unspecified, Rule::InvalidPyprojectToml),
 
         // flake8-django
         (Flake8Django, "001") => (RuleGroup::Unspecified, Rule::DjangoNullableModelStringField),

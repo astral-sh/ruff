@@ -959,39 +959,6 @@ where
     }
 }
 
-#[derive(Default)]
-struct GlobalStatementVisitor<'a> {
-    globals: FxHashMap<&'a str, &'a Stmt>,
-}
-
-impl<'a> StatementVisitor<'a> for GlobalStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _range,
-            }) => {
-                for name in names {
-                    self.globals.insert(name.as_str(), stmt);
-                }
-            }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
-                // Don't recurse.
-            }
-            _ => walk_stmt(self, stmt),
-        }
-    }
-}
-
-/// Extract a map from global name to its last-defining [`Stmt`].
-pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
-    let mut visitor = GlobalStatementVisitor::default();
-    for stmt in body {
-        visitor.visit_stmt(stmt);
-    }
-    visitor.globals
-}
-
 /// Return `true` if a [`Ranged`] has leading content.
 pub fn has_leading_content<T>(located: &T, locator: &Locator) -> bool
 where

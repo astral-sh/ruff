@@ -913,6 +913,7 @@ checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
  "hashbrown",
+ "serde",
 ]
 
 [[package]]
@@ -1402,6 +1403,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pep508_rs"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "969679a29dfdc8278a449f75b3dd45edf57e649bd59f7502429c2840751c46d8"
+dependencies = [
+ "once_cell",
+ "pep440_rs",
+ "regex",
+ "serde",
+ "thiserror",
+ "tracing",
+ "unicode-width",
+ "url",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1561,6 +1578,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b63bdb0cd06f1f4dedf69b254734f9b45af66e4a031e42a7480257d9898b435"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pyproject-toml"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f04dbbb336bd88583943c7cd973a32fed323578243a7569f40cb0c7da673321b"
+dependencies = [
+ "indexmap",
+ "pep440_rs",
+ "pep508_rs",
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -1751,6 +1781,7 @@ dependencies = [
  "pathdiff",
  "pep440_rs",
  "pretty_assertions",
+ "pyproject-toml",
  "quick-junit",
  "regex",
  "result-like",
@@ -1930,6 +1961,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.3.1",
+ "insta",
  "is-macro",
  "itertools",
  "log",
@@ -2601,6 +2633,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
 dependencies = [
  "cfg-if",
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
@@ -2772,6 +2805,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

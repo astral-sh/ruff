@@ -1,0 +1,57 @@
+# This is a valid pyproject.toml
+# https://github.com/PyO3/maturin/blob/87ac3d9f74dd79ef2df9a20880b9f1fa23f9a437/pyproject.toml
+[build-system]
+requires = ["setuptools", "wheel>=0.36.2", "tomli>=1.1.0 ; python_version<'3.11'", "setuptools-rust>=1.4.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maturin"
+requires-python = ">=3.7"
+classifiers = [
+    "Topic :: Software Development :: Build Tools",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = ["tomli>=1.1.0 ; python_version<'3.11'"]
+dynamic = [
+    "authors",
+    "description",
+    "license",
+    "readme",
+    "version"
+]
+
+[project.optional-dependencies]
+zig = [
+    "ziglang~=0.10.0",
+]
+patchelf = [
+    "patchelf",
+]
+
+[project.urls]
+"Source Code" = "https://github.com/PyO3/maturin"
+Issues = "https://github.com/PyO3/maturin/issues"
+Documentation = "https://maturin.rs"
+Changelog = "https://maturin.rs/changelog.html"
+
+[tool.maturin]
+bindings = "bin"
+
+[tool.black]
+target_version = ['py37']
+extend-exclude = '''
+# Ignore cargo-generate templates
+^/src/templates
+'''
+
+[tool.ruff]
+line-length = 120
+target-version = "py37"
+
+[tool.mypy]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_no_return = true
+ignore_missing_imports = true
