@@ -93,3 +93,13 @@ def f():
 
     def test(value: pkg.A):
         return B()
+
+
+def f():
+    # Even in strict mode, this shouldn't rase an error, since `pkg.baz` is used at
+    # runtime, and implicitly imports `pkg.bar`.
+    import pkg.bar as B
+    import pkg.foo as F
+
+    def test(value: F.Foo):
+        return B.Bar()
