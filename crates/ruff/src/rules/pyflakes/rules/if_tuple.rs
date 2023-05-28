@@ -5,6 +5,27 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `if statements that use non-empty tuples as test conditions.
+///
+/// ## Why is this bad?
+/// Non-empty tuples are always `True`, so an `if` statement with a non-empty
+/// tuple as its test condition will always pass. This is likely a mistake.
+///
+/// ## Example
+/// ```python
+/// if (False,):
+///     print("This will always run")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if False:
+///     print("This will never run")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 #[violation]
 pub struct IfTuple;
 

@@ -4,6 +4,15 @@ use rustpython_parser::ast::Expr;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for the use of too many expressions in starred assignment statements.
+///
+/// ## Why is this bad?
+/// In assignment statements, starred expressions can be used to unpack iterables.
+///
+/// In Python 3, no more than 1 << 8 assignments are allowed before a starred
+/// expression, and no more than 1 << 24 expressions are allowed after a starred
+/// expression.
 #[violation]
 pub struct ExpressionsInStarAssignment;
 
@@ -14,6 +23,22 @@ impl Violation for ExpressionsInStarAssignment {
     }
 }
 
+/// ## What it does
+/// Checks for the use of multiple starred expressions in assignment statements.
+///
+/// ## Why is this bad?
+/// In assignment statements, starred expressions can be used to unpack iterables.
+/// Including more than one starred expression on the left-hand-side of an
+/// assignment will cause a `SyntaxError`, as it is unclear which expression
+/// should receive the remaining values.
+///
+/// ## Example
+/// ```python
+/// *foo, *bar, baz = (1, 2, 3)
+/// ```
+///
+/// ## References
+/// - [PEP 3132](https://peps.python.org/pep-3132/)
 #[violation]
 pub struct MultipleStarredExpressions;
 
