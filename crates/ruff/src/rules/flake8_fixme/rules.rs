@@ -44,9 +44,13 @@ pub fn todos(directive_ranges: Vec<(TodoDirective, TextRange)>) -> Vec<Diagnosti
     directive_ranges
         .into_iter()
         .map(|(directive, range)| match directive {
+            // T-001
             TodoDirective::Fixme => Diagnostic::new(LineContainsFixme, range),
+            // T-002
             TodoDirective::Hack => Diagnostic::new(LineContainsHack, range),
+            // T-003
             TodoDirective::Todo => Diagnostic::new(LineContainsTodo, range),
+            // T-004
             TodoDirective::Xxx => Diagnostic::new(LineContainsXxx, range),
         })
         .collect::<Vec<Diagnostic>>()

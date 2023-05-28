@@ -230,13 +230,30 @@ impl FromStr for TodoDirective {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "fixme" => Ok(TodoDirective::Fixme),
-            "hack" => Ok(TodoDirective::Hack),
-            "todo" => Ok(TodoDirective::Todo),
-            "xxx" => Ok(TodoDirective::Xxx),
-            _ => Err(()),
+        // The lengths of the respective variant strings: TODO, FIXME, HACK, XXX
+        for length in [3, 4, 5] {
+            let Some(substr) = s.get(..length) else {
+                break;
+            };
+
+            match substr.to_lowercase().as_str() {
+                "fixme" => {
+                    return Ok(TodoDirective::Fixme);
+                }
+                "hack" => {
+                    return Ok(TodoDirective::Hack);
+                }
+                "todo" => {
+                    return Ok(TodoDirective::Todo);
+                }
+                "xxx" => {
+                    return Ok(TodoDirective::Xxx);
+                }
+                _ => continue,
+            }
         }
+
+        Err(())
     }
 }
 
@@ -250,26 +267,13 @@ impl TodoDirective {
 
         // Loop over the comment to catch cases like `# foo # TODO`.
         while let Some(subset) = subset_opt {
-            let trimmed = subset.trim_start_matches('#').trim_start().to_lowercase();
+            let trimmed = subset.trim_start_matches('#').trim_start();
 
             let offset = subset.text_len() - trimmed.text_len();
             total_offset += offset;
 
-            // TODO: rework this
-            let directive = if trimmed.starts_with("fixme") {
-                Some((TodoDirective::Fixme, total_offset))
-            } else if trimmed.starts_with("xxx") {
-                Some((TodoDirective::Xxx, total_offset))
-            } else if trimmed.starts_with("todo") {
-                Some((TodoDirective::Todo, total_offset))
-            } else if trimmed.starts_with("hack") {
-                Some((TodoDirective::Hack, total_offset))
-            } else {
-                None
-            };
-
-            if directive.is_some() {
-                return directive;
+            if let Ok(directive) = trimmed.parse::<TodoDirective>() {
+                return Some((directive, total_offset));
             }
 
             // Shrink the subset to check for the next phrase starting with "#".
