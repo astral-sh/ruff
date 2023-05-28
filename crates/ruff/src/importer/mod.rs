@@ -1,10 +1,11 @@
 //! Add and modify import statements to make module members available during fix execution.
 
+use std::error::Error;
+
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
-use std::error::Error;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import};
@@ -72,10 +73,8 @@ impl<'a> Importer<'a> {
         semantic_model: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
         match self.get_symbol(module, member, at, semantic_model) {
-            Some(result) => result.into(),
-            None => self
-                .import_symbol(module, member, at, semantic_model)
-                .into(),
+            Some(result) => result,
+            None => self.import_symbol(module, member, at, semantic_model),
         }
     }
 
@@ -86,7 +85,7 @@ impl<'a> Importer<'a> {
         member: &str,
         at: TextSize,
         semantic_model: &SemanticModel,
-    ) -> Option<GetResolution> {
+    ) -> Option<Result<(Edit, String), ResolutionError>> {
         // If the symbol is already available in the current scope, use it.
         let imported_name = semantic_model.resolve_qualified_import_name(module, member)?;
 
@@ -98,13 +97,13 @@ impl<'a> Importer<'a> {
         // unclear whether should add an import statement at the top of the file, since it could
         // be shadowed between the import and the current location.
         if imported_name.range().start() > at {
-            return Some(GetResolution::LateBinding);
+            return Some(Err(ResolutionError::ImportAfterUsage));
         }
 
         // If the symbol source (i.e., the import statement) is in a typing-only context, but we're
         // in a runtime context, abort.
         if imported_name.context().is_typing() && semantic_model.execution_context().is_runtime() {
-            return Some(GetResolution::IncompatibleContext);
+            return Some(Err(ResolutionError::IncompatibleContext));
         }
 
         // We also add a no-op edit to force conflicts with any other fixes that might try to
@@ -127,7 +126,7 @@ impl<'a> Importer<'a> {
             self.locator.slice(imported_name.range()).to_string(),
             imported_name.range(),
         );
-        Some(GetResolution::Ok(import_edit, imported_name.into_name()))
+        Some(Ok((import_edit, imported_name.into_name())))
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make
@@ -142,27 +141,27 @@ impl<'a> Importer<'a> {
         member: &str,
         at: TextSize,
         semantic_model: &SemanticModel,
-    ) -> ImportResolution {
+    ) -> Result<(Edit, String), ResolutionError> {
         if let Some(stmt) = self.find_import_from(module, at) {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
             if semantic_model.is_unbound(member) {
                 let Ok(import_edit) = self.add_member(stmt, member) else {
-                    return ImportResolution::ParseError;
+                    return Err(ResolutionError::InvalidEdit);
                 };
-                ImportResolution::Ok(import_edit, member.to_string())
+                Ok((import_edit, member.to_string()))
             } else {
-                ImportResolution::ExistingBinding(member.to_string())
+                Err(ResolutionError::ConflictingName(member.to_string()))
             }
         } else {
             // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
             // return `"functools.cache"` as the bound name.
             if semantic_model.is_unbound(module) {
                 let import_edit = self.add_import(&AnyImport::Import(Import::module(module)), at);
-                ImportResolution::Ok(import_edit, format!("{module}.{member}"))
+                Ok((import_edit, format!("{module}.{member}")))
             } else {
-                ImportResolution::ExistingBinding(module.to_string())
+                Err(ResolutionError::ConflictingName(module.to_string()))
             }
         }
     }
@@ -223,77 +222,35 @@ impl<'a> Importer<'a> {
     }
 }
 
-/// The result of an [`Importer::get_symbol`] call.
-enum GetResolution {
-    /// The symbol is available for use.
-    Ok(Edit, String),
-    /// The symbol is imported, but the import came after the current location.
-    LateBinding,
-    /// The symbol is imported, but in an incompatible context (e.g., in typing-only context, while
-    /// we're in a runtime context).
-    IncompatibleContext,
-}
-
-impl From<GetResolution> for Result<(Edit, String), ResolutionError> {
-    fn from(result: GetResolution) -> Self {
-        match result {
-            GetResolution::Ok(edit, name) => Ok((edit, name)),
-            GetResolution::LateBinding => Err(ResolutionError::LateBinding),
-            GetResolution::IncompatibleContext => Err(ResolutionError::IncompatibleContext),
-        }
-    }
-}
-
-/// The result of an [`Importer::import_symbol`] call.
-enum ImportResolution {
-    /// The symbol was imported, and is available for use.
-    Ok(Edit, String),
-    /// The symbol can't be imported, because another symbol is bound to the same name.
-    ExistingBinding(String),
-    /// The symbol can't be imported, because an existing import can't be parsed.
-    ParseError,
-}
-
-impl From<ImportResolution> for Result<(Edit, String), ResolutionError> {
-    fn from(result: ImportResolution) -> Self {
-        match result {
-            ImportResolution::Ok(edit, name) => Ok((edit, name)),
-            ImportResolution::ExistingBinding(binding) => {
-                Err(ResolutionError::ExistingBinding(binding))
-            }
-            ImportResolution::ParseError => Err(ResolutionError::ParseError),
-        }
-    }
-}
-
+/// The result of an [`Importer::get_or_import_symbol`] call.
 #[derive(Debug)]
-pub enum ResolutionError {
+pub(crate) enum ResolutionError {
     /// The symbol is imported, but the import came after the current location.
-    LateBinding,
+    ImportAfterUsage,
     /// The symbol is imported, but in an incompatible context (e.g., in typing-only context, while
     /// we're in a runtime context).
     IncompatibleContext,
     /// The symbol can't be imported, because another symbol is bound to the same name.
-    ExistingBinding(String),
-    /// The symbol can't be imported, because an existing import can't be parsed.
-    ParseError,
+    ConflictingName(String),
+    /// The symbol can't be imported due to an error in editing an existing import statement.
+    InvalidEdit,
 }
 
 impl std::fmt::Display for ResolutionError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResolutionError::LateBinding => {
+            ResolutionError::ImportAfterUsage => {
                 fmt.write_str("Unable to use existing symbol due to late binding")
             }
             ResolutionError::IncompatibleContext => {
                 fmt.write_str("Unable to use existing symbol due to incompatible context")
             }
-            ResolutionError::ExistingBinding(binding) => std::write!(
+            ResolutionError::ConflictingName(binding) => std::write!(
                 fmt,
                 "Unable to insert `{binding}` into scope due to name conflict"
             ),
-            ResolutionError::ParseError => {
-                fmt.write_str("Unable to parse existing import statement")
+            ResolutionError::InvalidEdit => {
+                fmt.write_str("Unable to modify existing import statement")
             }
         }
     }
