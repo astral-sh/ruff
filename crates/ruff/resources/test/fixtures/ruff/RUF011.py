@@ -1,5 +1,5 @@
 import typing
-from typing import Sequence
+from typing import ClassVar, Sequence
 
 KNOWINGLY_MUTABLE_DEFAULT = []
 
@@ -10,6 +10,7 @@ class A:
     without_annotation = []
     ignored_via_comment: list[int] = []  # noqa: RUF011
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+    class_variable: typing.ClassVar[list[int]] = []
 
 
 class B:
@@ -18,3 +19,4 @@ class B:
     without_annotation = []
     ignored_via_comment: list[int] = []  # noqa: RUF011
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+    class_variable: ClassVar[list[int]] = []
