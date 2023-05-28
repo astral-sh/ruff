@@ -326,6 +326,14 @@ pub(crate) fn blank_lines(
     }
 
     for (token_idx, token) in line.tokens().iter().enumerate() {
+        if indent_level <= tracked_vars.class_indent_level {
+            tracked_vars.is_in_class = false;
+        }
+
+        if indent_level <= tracked_vars.fn_indent_level {
+            tracked_vars.is_in_fn = false;
+        }
+
         // E301
         if token.kind() == TokenKind::Def
             && tracked_vars.is_in_class
@@ -345,6 +353,7 @@ pub(crate) fn blank_lines(
 
         // E302
         if token.kind() == TokenKind::Def
+            && !tracked_vars.follows_decorator
             && !tracked_vars.is_in_class
             && tracked_vars.blank_lines < 2
             && prev_line.is_some()
@@ -418,14 +427,6 @@ pub(crate) fn blank_lines(
                 locator.line_start(token.range().start()),
             )));
             context.push_diagnostic(diagnostic);
-        }
-
-        if indent_level <= tracked_vars.class_indent_level {
-            tracked_vars.is_in_class = false;
-        }
-
-        if indent_level <= tracked_vars.fn_indent_level {
-            tracked_vars.is_in_fn = false;
         }
 
         // E306
