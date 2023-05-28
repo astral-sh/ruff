@@ -748,17 +748,21 @@ where
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
-                if self.settings.rules.enabled(Rule::MutableClassDefault) {
-                    ruff::rules::mutable_class_default(self, body);
-                }
+                if self.any_enabled(&[
+                    Rule::MutableDataclassDefault,
+                    Rule::FunctionCallInDataclassDefaultArgument,
+                    Rule::MutableClassDefault,
+                ]) {
+                    let is_dataclass =
+                        ruff::rules::is_dataclass(&self.semantic_model, decorator_list);
+                    if self.any_enabled(&[Rule::MutableDataclassDefault, Rule::MutableClassDefault])
+                    {
+                        ruff::rules::mutable_class_default(self, body, is_dataclass);
+                    }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::FunctionCallInDataclassDefaultArgument)
-                    && ruff::rules::is_dataclass(&self.semantic_model, decorator_list)
-                {
-                    ruff::rules::function_call_in_dataclass_defaults(self, body);
+                    if is_dataclass && self.enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+                        ruff::rules::function_call_in_dataclass_defaults(self, body);
+                    }
                 }
 
                 if self.enabled(Rule::FStringDocstring) {

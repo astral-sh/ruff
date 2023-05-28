@@ -167,8 +167,19 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MutableClassDefault, Path::new("RUF008.py"); "RUF008")]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"); "RUF008")]
     #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"); "RUF009")]
+    fn mutable_dataclass_defaults(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::MutableClassDefault, Path::new("RUF011.py"); "RUF010")]
     fn mutable_class_defaults(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

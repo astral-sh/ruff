@@ -12,10 +12,11 @@ use ruff_python_semantic::{
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for mutable default values in class attribute defaults.
+/// Checks for mutable default values in dataclasses without the use of
+/// `dataclasses.field`.
 ///
 /// ## Why is this bad?
-/// Mutable default values share state across all instances of the class,
+/// Mutable default values share state across all instances of the dataclass,
 /// while not being obvious. This can lead to bugs when the attributes are
 /// changed in one instance, as those changes will unexpectedly affect all
 /// other instances.
@@ -52,6 +53,49 @@ use crate::checkers::ast::Checker;
 /// class A:
 ///     mutable_default: list[int] = I_KNOW_THIS_IS_SHARED_STATE
 /// ```
+#[violation]
+pub struct MutableDataclassDefault;
+
+impl Violation for MutableDataclassDefault {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Do not use mutable default values for dataclass attributes")
+    }
+}
+
+/// ## What it does
+/// Checks for mutable default values in class attributes not annotated with `ClassVar`.
+///
+/// ## Why is this bad?
+/// Mutable default values share state across all instances of the class,
+/// while not being obvious. This can lead to bugs when the attributes are
+/// changed in one instance, as those changes will unexpectedly affect all
+/// other instances.
+///
+/// ## Examples:
+/// ```python
+/// class A:
+///     mutable_default: list[int] = []
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from dataclasses import dataclass, field
+///
+///
+/// @dataclass
+/// class A:
+///     mutable_default: list[int] = field(default_factory=list)
+/// ```
+///
+/// Alternatively, if you _want_ shared behaviour, make it more obvious
+/// by assigning to a module-level variable:
+/// ```python
+/// I_KNOW_THIS_IS_SHARED_STATE = [1, 2, 3, 4]
+///
+///
+/// class A:
+///     mutable_default: list[int] = I_KNOW_THIS_IS_SHARED_STATE
 #[violation]
 pub struct MutableClassDefault;
 
@@ -213,8 +257,15 @@ pub(crate) fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &
     }
 }
 
-/// RUF008
-pub(crate) fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
+/// RUF008/RUF011
+pub(crate) fn mutable_class_default(checker: &mut Checker, body: &[Stmt], is_dataclass: bool) {
+    fn diagnostic(is_dataclass: bool, value: &Expr) -> Diagnostic {
+        if is_dataclass {
+            Diagnostic::new(MutableDataclassDefault, value.range())
+        } else {
+            Diagnostic::new(MutableClassDefault, value.range())
+        }
+    }
     for statement in body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -228,14 +279,14 @@ pub(crate) fn mutable_class_default(checker: &mut Checker, body: &[Stmt]) {
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                        .push(diagnostic(is_dataclass,value));
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, .. }) => {
                 if is_mutable_expr(value) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(MutableClassDefault, value.range()));
+                        .push(diagnostic(is_dataclass, value));
                 }
             }
             _ => (),

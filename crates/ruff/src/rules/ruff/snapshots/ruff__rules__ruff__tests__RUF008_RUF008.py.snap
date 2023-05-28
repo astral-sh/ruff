@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-RUF008.py:10:34: RUF008 Do not use mutable default values for class attributes
+RUF008.py:10:34: RUF008 Do not use mutable default values for dataclass attributes
    |
 10 | @dataclass()
 11 | class A:
@@ -11,7 +11,7 @@ RUF008.py:10:34: RUF008 Do not use mutable default values for class attributes
 14 |     without_annotation = []
    |
 
-RUF008.py:12:26: RUF008 Do not use mutable default values for class attributes
+RUF008.py:12:26: RUF008 Do not use mutable default values for dataclass attributes
    |
 12 |     mutable_default: list[int] = []
 13 |     immutable_annotation: typing.Sequence[int] = []
@@ -21,7 +21,7 @@ RUF008.py:12:26: RUF008 Do not use mutable default values for class attributes
 16 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
    |
 
-RUF008.py:21:34: RUF008 Do not use mutable default values for class attributes
+RUF008.py:21:34: RUF008 Do not use mutable default values for dataclass attributes
    |
 21 | @dataclass
 22 | class B:
@@ -31,7 +31,7 @@ RUF008.py:21:34: RUF008 Do not use mutable default values for class attributes
 25 |     without_annotation = []
    |
 
-RUF008.py:23:26: RUF008 Do not use mutable default values for class attributes
+RUF008.py:23:26: RUF008 Do not use mutable default values for dataclass attributes
    |
 23 |     mutable_default: list[int] = []
 24 |     immutable_annotation: Sequence[int] = []
@@ -39,44 +39,6 @@ RUF008.py:23:26: RUF008 Do not use mutable default values for class attributes
    |                          ^^ RUF008
 26 |     ignored_via_comment: list[int] = []  # noqa: RUF008
 27 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-   |
-
-RUF008.py:31:34: RUF008 Do not use mutable default values for class attributes
-   |
-31 | class A:
-32 |     mutable_default: list[int] = []
-   |                                  ^^ RUF008
-33 |     immutable_annotation: typing.Sequence[int] = []
-34 |     without_annotation = []
-   |
-
-RUF008.py:33:26: RUF008 Do not use mutable default values for class attributes
-   |
-33 |     mutable_default: list[int] = []
-34 |     immutable_annotation: typing.Sequence[int] = []
-35 |     without_annotation = []
-   |                          ^^ RUF008
-36 |     ignored_via_comment: list[int] = []  # noqa: RUF008
-37 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
-   |
-
-RUF008.py:39:34: RUF008 Do not use mutable default values for class attributes
-   |
-39 | class B:
-40 |     mutable_default: list[int] = []
-   |                                  ^^ RUF008
-41 |     immutable_annotation: Sequence[int] = []
-42 |     without_annotation = []
-   |
-
-RUF008.py:41:26: RUF008 Do not use mutable default values for class attributes
-   |
-41 |     mutable_default: list[int] = []
-42 |     immutable_annotation: Sequence[int] = []
-43 |     without_annotation = []
-   |                          ^^ RUF008
-44 |     ignored_via_comment: list[int] = []  # noqa: RUF008
-45 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
    |
 
 

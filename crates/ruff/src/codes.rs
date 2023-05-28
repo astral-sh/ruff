@@ -718,9 +718,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "005") => (RuleGroup::Unspecified, Rule::CollectionLiteralConcatenation),
         (Ruff, "006") => (RuleGroup::Unspecified, Rule::AsyncioDanglingTask),
         (Ruff, "007") => (RuleGroup::Unspecified, Rule::PairwiseOverZipped),
-        (Ruff, "008") => (RuleGroup::Unspecified, Rule::MutableClassDefault),
+        (Ruff, "008") => (RuleGroup::Unspecified, Rule::MutableDataclassDefault),
         (Ruff, "009") => (RuleGroup::Unspecified, Rule::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Unspecified, Rule::ExplicitFStringTypeConversion),
+        (Ruff, "011") => (RuleGroup::Unspecified, Rule::MutableClassDefault),
         (Ruff, "100") => (RuleGroup::Unspecified, Rule::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, Rule::InvalidPyprojectToml),
 

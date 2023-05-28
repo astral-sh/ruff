@@ -12,7 +12,7 @@ pub(crate) use explicit_f_string_type_conversion::{
 pub(crate) use invalid_pyproject_toml::InvalidPyprojectToml;
 pub(crate) use mutable_defaults_in_class_fields::{
     function_call_in_dataclass_defaults, is_dataclass, mutable_class_default,
-    FunctionCallInDataclassDefaultArgument, MutableClassDefault,
+    FunctionCallInDataclassDefaultArgument, MutableClassDefault, MutableDataclassDefault,
 };
 pub(crate) use pairwise_over_zipped::{pairwise_over_zipped, PairwiseOverZipped};
 pub(crate) use unused_noqa::{UnusedCodes, UnusedNOQA};
