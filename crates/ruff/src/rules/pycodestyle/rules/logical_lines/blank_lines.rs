@@ -378,6 +378,25 @@ pub(crate) fn blank_lines(
             )));
             context.push_diagnostic(diagnostic);
         }
+        // E302
+        if token.kind() == TokenKind::Def
+            && !*is_in_class
+            && *blank_lines < 2
+            && prev_line.is_some()
+        {
+            let mut diagnostic =
+                Diagnostic::new(BlankLinesTopLevel(*blank_lines as usize), token.range());
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+                stylist
+                    .line_ending()
+                    .as_str()
+                    .to_string()
+                    .repeat(2 - *blank_lines as usize),
+                locator.line_start(token.range().start()),
+            )));
+            context.push_diagnostic(diagnostic);
+        }
 
         if token.kind() == TokenKind::Class {
             if !*is_in_class {
