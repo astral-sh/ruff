@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI032.pyi:6:22: PYI032 [*] Prefer `object` to `Any` for the second parameter in __eq__
+PYI032.pyi:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
   |
 6 | class Bad:
 7 |     def __eq__(self, other: Any) -> bool: ...  # Y032
-  |                      ^^^^^^^^^^ PYI032
+  |                             ^^^ PYI032
 8 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
   |
-  = help: Replace `object` with `Any`
+  = help: Replace with `object`
 
 ℹ Fix
 3 3 | 
@@ -20,14 +20,14 @@ PYI032.pyi:6:22: PYI032 [*] Prefer `object` to `Any` for the second parameter in
 8 8 | 
 9 9 | 
 
-PYI032.pyi:7:22: PYI032 [*] Prefer `object` to `Any` for the second parameter in __ne__
+PYI032.pyi:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
   |
 7 | class Bad:
 8 |     def __eq__(self, other: Any) -> bool: ...  # Y032
 9 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
-  |                      ^^^^^^^^^^^^^^^^^ PYI032
+  |                             ^^^^^^^^^^ PYI032
   |
-  = help: Replace `object` with `Any`
+  = help: Replace with `object`
 
 ℹ Fix
 4 4 | 
