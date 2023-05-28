@@ -32,6 +32,13 @@
         "null"
       ]
     },
+    "dummy-import-rgx": {
+      "description": "A regular expression used to identify \"dummy\" imports, or those which should be ignored when enforcing (e.g.) unused-imports rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "dummy-variable-rgx": {
       "description": "A regular expression used to identify \"dummy\" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.",
       "type": [
