@@ -45,4 +45,21 @@ impl<R> Default for EmptyRange<R> {
     }
 }
 
+impl Cmpop {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Cmpop::Eq => "==",
+            Cmpop::NotEq => "!=",
+            Cmpop::Lt => "<",
+            Cmpop::LtE => "<=",
+            Cmpop::Gt => ">",
+            Cmpop::GtE => ">=",
+            Cmpop::Is => "is",
+            Cmpop::IsNot => "is not",
+            Cmpop::In => "in",
+            Cmpop::NotIn => "not in",
+        }
+    }
+}
+
 include!("gen/generic.rs");

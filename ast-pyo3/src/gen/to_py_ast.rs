@@ -1653,8 +1653,8 @@ impl ToPyAst for ast::StmtPass<TextRange> {
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
 
         Ok(instance)
     }
@@ -1665,8 +1665,8 @@ impl ToPyAst for ast::StmtBreak<TextRange> {
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
 
         Ok(instance)
     }
@@ -1677,8 +1677,8 @@ impl ToPyAst for ast::StmtContinue<TextRange> {
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
 
         Ok(instance)
     }
@@ -3429,8 +3429,8 @@ impl ToPyAst for ast::StmtPass<SourceRange> {
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
 
         let cache = ast_cache();
         instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
@@ -3449,8 +3449,8 @@ impl ToPyAst for ast::StmtBreak<SourceRange> {
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
 
         let cache = ast_cache();
         instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;
@@ -3469,8 +3469,8 @@ impl ToPyAst for ast::StmtContinue<SourceRange> {
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
 
-        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
         let Self { range: _range } = self;
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;
 
         let cache = ast_cache();
         instance.setattr(cache.lineno.as_ref(py), _range.start.row.get())?;

@@ -93,7 +93,7 @@ impl<T: ToPyWrapper> ToPyWrapper for Vec<T> {
     }
 }
 
-#[pyclass(module = "rustpython_ast", subclass)]
+#[pyclass(module = "rustpython_ast", name = "AST", subclass)]
 pub struct Ast;
 
 #[pymethods]

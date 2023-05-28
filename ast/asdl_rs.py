@@ -1078,11 +1078,6 @@ class ToPyo3AstVisitor(EmitVisitor):
         else:
             assert False, self.namespace
 
-    @property
-    def location(self):
-        # lineno, col_offset
-        pass
-
     def visitModule(self, mod):
         for dfn in mod.dfns:
             self.visit(dfn)
@@ -1133,12 +1128,13 @@ class ToPyo3AstVisitor(EmitVisitor):
 
     def emit_to_pyo3_with_fields(self, cons, type, name):
         type_info = self.type_info[type.name]
+
         self.emit(
             f"""
             impl ToPyAst for ast::{name}{self.generics} {{
                 #[inline]
-                    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {{
-                        let cache = Self::py_type_cache().get().unwrap();
+                fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {{
+                    let cache = Self::py_type_cache().get().unwrap();
             """,
             0,
         )
@@ -1171,12 +1167,7 @@ class ToPyo3AstVisitor(EmitVisitor):
                             3,
                         )
                         continue
-                    if field.name in (
-                        "lineno",
-                        "col_offset",
-                        "end_lineno",
-                        "end_col_offset",
-                    ):
+                    if field.name == "lineno":
                         self.emit(
                             f"{rust_field(field.name)}.to_u32().to_object(py),",
                             3,
@@ -1192,11 +1183,11 @@ class ToPyo3AstVisitor(EmitVisitor):
             )
         else:
             self.emit(
-                "let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;",
+                "let Self { range: _range } = self;",
                 1,
             )
             self.emit(
-                "let Self { range: _range } = self;",
+                """let instance = Py::<PyAny>::as_ref(&cache.0, py).call0()?;""",
                 1,
             )
         if type.value.attributes and self.namespace == "located":
@@ -1210,7 +1201,7 @@ class ToPyo3AstVisitor(EmitVisitor):
                     instance.setattr(cache.end_col_offset.as_ref(py), end.column.get())?;
                 }
                 """,
-                1,
+                0,
             )
         self.emit(
             """

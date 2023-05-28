@@ -1,5 +1,5 @@
 use crate::ConversionFlag;
-use crate::{Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, Identifier, Operator};
+use crate::{Arg, Arguments, Boolop, Comprehension, Constant, Expr, Identifier, Operator};
 use std::fmt;
 
 mod precedence {
@@ -285,19 +285,9 @@ impl<'a> Unparser<'a> {
                     let new_lvl = precedence::CMP + 1;
                     self.unparse_expr(left, new_lvl)?;
                     for (op, cmp) in ops.iter().zip(comparators) {
-                        let op = match op {
-                            Cmpop::Eq => " == ",
-                            Cmpop::NotEq => " != ",
-                            Cmpop::Lt => " < ",
-                            Cmpop::LtE => " <= ",
-                            Cmpop::Gt => " > ",
-                            Cmpop::GtE => " >= ",
-                            Cmpop::Is => " is ",
-                            Cmpop::IsNot => " is not ",
-                            Cmpop::In => " in ",
-                            Cmpop::NotIn => " not in ",
-                        };
-                        self.p(op)?;
+                        self.p(" ")?;
+                        self.p(op.as_str())?;
+                        self.p(" ")?;
                         self.unparse_expr(cmp, new_lvl)?;
                     }
                 })

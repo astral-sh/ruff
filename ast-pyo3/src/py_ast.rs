@@ -131,6 +131,19 @@ struct AstCache {
 }
 
 impl AstCache {
+    // fn location_vec<'py>(&'static self, py: Python<'py>, range: &SourceRange) -> &'py PyDict {
+    //     let attributes = PyDict::new(py);
+    //     attributes.set_item(self.lineno.as_ref(py), range.start.row.get()).unwrap();
+    //     attributes.set_item(self.col_offset.as_ref(py), range.start.column.to_zero_indexed()).unwrap();
+    //     if let Some(end) = range.end {
+    //         attributes.set_item(self.end_lineno.as_ref(py), end.row.get()).unwrap();
+    //         attributes.set_item(
+    //             self.end_col_offset.as_ref(py),
+    //             end.column.to_zero_indexed(),
+    //         ).unwrap();
+    //     }
+    //     attributes
+    // }
     #[inline]
     fn none_ref<'py>(&'static self, py: Python<'py>) -> &'py PyAny {
         Py::<PyAny>::as_ref(&self.none, py)
