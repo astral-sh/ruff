@@ -19,6 +19,7 @@ use crate::registry::AsRule;
 /// class Foo:
 ///     def __eq__(self, obj: Any):
 ///         ...
+///
 ///     def __ne__(self, obj: typing.Any):
 ///         ...
 /// ```
@@ -28,6 +29,7 @@ use crate::registry::AsRule;
 /// class Foo:
 ///     def __eq__(self, obj: object):
 ///         ...
+///
 ///     def __ne__(self, obj: object):
 ///         ...
 /// ```
