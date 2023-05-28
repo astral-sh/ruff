@@ -96,8 +96,7 @@ def f():
 
 
 def f():
-    # Even in strict mode, this shouldn't rase an error, since `pkg.baz` is used at
-    # runtime, and implicitly imports `pkg.bar`.
+    # In un-strict mode, this shouldn't raise an error, since `pkg.bar` is used at runtime.
     import pkg.bar as B
     import pkg.foo as F
 
