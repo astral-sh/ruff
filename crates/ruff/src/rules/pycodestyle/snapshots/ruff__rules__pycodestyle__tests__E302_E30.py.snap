@@ -183,26 +183,6 @@ E30.py:65:1: E302 [*] Expected 2 blank lines, found 0
 66 68 |     print
 67 69 | 
 
-E30.py:81:1: E302 [*] Expected 2 blank lines, found 1
-   |
-81 | @decorator
-82 | 
-83 | def function():
-   | ^^^ E302
-84 |     pass
-85 | #: E303:5:1
-   |
-   = help: Add missing blank line(s)
-
-ℹ Suggested fix
-78 78 | #: E304:3:1
-79 79 | @decorator
-80 80 | 
-   81 |+
-81 82 | def function():
-82 83 |     pass
-83 84 | #: E303:5:1
-
 E30.py:94:1: E302 [*] Expected 2 blank lines, found 0
    |
 94 | #: E305:7:1
@@ -719,24 +699,5 @@ E30.py:185:1: E302 [*] Expected 2 blank lines, found 0
 185 187 | def f():
 186 188 |     pass
 187 189 | 
-
-E30.py:190:1: E302 [*] Expected 2 blank lines, found 0
-    |
-190 | # wat
-191 | @hi
-192 | def g():
-    | ^^^ E302
-193 |     pass
-    |
-    = help: Add missing blank line(s)
-
-ℹ Suggested fix
-187 187 | 
-188 188 | # wat
-189 189 | @hi
-    190 |+
-    191 |+
-190 192 | def g():
-191 193 |     pass
 
 
