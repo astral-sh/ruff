@@ -17,15 +17,15 @@ use crate::registry::AsRule;
 /// ## Example
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: Any):
-///     def __ne__(self, obj: typing.Any):
+///     def __eq__(self, obj: Any): ...
+///     def __ne__(self, obj: typing.Any): ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Foo:
-///     def __eq__(self, obj: object):
-///     def __ne__(self, obj: object):
+///     def __eq__(self, obj: object): ...
+///     def __ne__(self, obj: object): ...
 /// ```
 /// ## References
 /// - [Python Docs](https://docs.python.org/3/library/typing.html#the-any-type)
