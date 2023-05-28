@@ -40,6 +40,7 @@ pub(crate) fn check_logical_lines(
     let mut context = LogicalLinesContext::new(settings);
 
     let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
+
     let should_fix_whitespace_before_parameters =
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
@@ -47,6 +48,7 @@ pub(crate) fn check_logical_lines(
     let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
+
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             space_around_operator(&line, &mut context);
@@ -94,18 +96,21 @@ pub(crate) fn check_logical_lines(
 
         let indent_size = 4;
 
-        for kind in indentation(
-            &line,
-            prev_line.as_ref(),
-            indent_char,
-            indent_level,
-            prev_indent_level,
-            indent_size,
-        ) {
-            if settings.rules.enabled(kind.rule()) {
-                context.push(kind, range);
+        if !line.is_empty() {
+            for kind in indentation(
+                &line,
+                prev_line.as_ref(),
+                indent_char,
+                indent_level,
+                prev_indent_level,
+                indent_size,
+            ) {
+                if settings.rules.enabled(kind.rule()) {
+                    context.push(kind, range);
+                }
             }
         }
+
         blank_lines(
             &line,
             prev_line.as_ref(),
