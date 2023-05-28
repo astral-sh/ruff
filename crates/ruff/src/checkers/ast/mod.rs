@@ -430,7 +430,7 @@ where
                         flake8_pyi::rules::stub_body_multiple_statements(self, stmt, body);
                     }
                     if self.enabled(Rule::AnyEqNeAnnotation) {
-                        flake8_pyi::rules::any_eq_ne_annotation(self, stmt, name, args);
+                        flake8_pyi::rules::any_eq_ne_annotation(self, name, args);
                     }
                 }
 
