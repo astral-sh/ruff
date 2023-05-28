@@ -2176,19 +2176,19 @@ where
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.any_enabled(&[
-                    Rule::MissingFutureAnnotationsImport,
+                    Rule::MissingFutureAnnotationsImportOldStyle,
                     Rule::NonPEP604Annotation,
                 ]) {
                     if let Some(operator) =
                         analyze::typing::to_pep604_operator(value, slice, &self.semantic_model)
                     {
-                        if self.enabled(Rule::MissingFutureAnnotationsImport) {
+                        if self.enabled(Rule::MissingFutureAnnotationsImportOldStyle) {
                             if self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic_model.future_annotations()
                                 && self.semantic_model.in_annotation()
                             {
-                                flake8_future_annotations::rules::missing_future_annotations(
+                                flake8_future_annotations::rules::missing_future_annotations_old_style(
                                     self, value,
                                 );
                             }
@@ -2263,19 +2263,19 @@ where
 
                         // Ex) List[...]
                         if self.any_enabled(&[
-                            Rule::MissingFutureAnnotationsImport,
+                            Rule::MissingFutureAnnotationsImportOldStyle,
                             Rule::NonPEP585Annotation,
                         ]) {
                             if let Some(replacement) =
                                 analyze::typing::to_pep585_generic(expr, &self.semantic_model)
                             {
-                                if self.enabled(Rule::MissingFutureAnnotationsImport) {
+                                if self.enabled(Rule::MissingFutureAnnotationsImportOldStyle) {
                                     if self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic_model.future_annotations()
                                         && self.semantic_model.in_annotation()
                                     {
-                                        flake8_future_annotations::rules::missing_future_annotations(
+                                        flake8_future_annotations::rules::missing_future_annotations_old_style(
                                             self, expr,
                                         );
                                     }
@@ -2341,19 +2341,19 @@ where
             Expr::Attribute(ast::ExprAttribute { attr, value, .. }) => {
                 // Ex) typing.List[...]
                 if self.any_enabled(&[
-                    Rule::MissingFutureAnnotationsImport,
+                    Rule::MissingFutureAnnotationsImportOldStyle,
                     Rule::NonPEP585Annotation,
                 ]) {
                     if let Some(replacement) =
                         analyze::typing::to_pep585_generic(expr, &self.semantic_model)
                     {
-                        if self.enabled(Rule::MissingFutureAnnotationsImport) {
+                        if self.enabled(Rule::MissingFutureAnnotationsImportOldStyle) {
                             if self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic_model.future_annotations()
                                 && self.semantic_model.in_annotation()
                             {
-                                flake8_future_annotations::rules::missing_future_annotations(
+                                flake8_future_annotations::rules::missing_future_annotations_old_style(
                                     self, expr,
                                 );
                             }

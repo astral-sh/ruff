@@ -53,20 +53,20 @@ use crate::checkers::ast::Checker;
 ///     a_list.append("hello")
 /// ```
 #[violation]
-pub struct MissingFutureAnnotationsImport {
+pub struct MissingFutureAnnotationsImportOldStyle {
     name: String,
 }
 
-impl Violation for MissingFutureAnnotationsImport {
+impl Violation for MissingFutureAnnotationsImportOldStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingFutureAnnotationsImport { name } = self;
+        let MissingFutureAnnotationsImportOldStyle { name } = self;
         format!("Missing `from __future__ import annotations`, but uses `{name}`")
     }
 }
 
 /// FA100
-pub(crate) fn missing_future_annotations(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn missing_future_annotations_old_style(checker: &mut Checker, expr: &Expr) {
     let name = checker
         .semantic_model()
         .resolve_call_path(expr)
@@ -74,7 +74,7 @@ pub(crate) fn missing_future_annotations(checker: &mut Checker, expr: &Expr) {
 
     if let Some(name) = name {
         checker.diagnostics.push(Diagnostic::new(
-            MissingFutureAnnotationsImport { name },
+            MissingFutureAnnotationsImportOldStyle { name },
             expr.range(),
         ));
     }

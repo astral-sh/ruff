@@ -25,13 +25,13 @@ mod tests {
     #[test_case(Path::new("ok_non_simplifiable_types.py"); "ok_non_simplifiable_types")]
     #[test_case(Path::new("ok_uses_future.py"); "ok_uses_future")]
     #[test_case(Path::new("ok_variable_name.py"); "ok_variable_name")]
-    fn rules(path: &Path) -> Result<()> {
+    fn fa100(path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImport)
+                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImportOldStyle)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
