@@ -166,11 +166,13 @@ Once you've completed the code for the rule itself, you can define tests with th
    want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
    examples of both violations and non-violations.
 
-1. Run Ruff locally against your file and verify the output is as expected. For example, if you
-   added a new rule named `E402`, you could
-   run `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
-   Once you're satisfied with the output (you see the violations you expect, and no others), proceed
-   to the next step.
+1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
+   with the output (you see the violations you expect, and no others), proceed to the next step.
+   For example, if you're adding a new rule named `E402`, you would run:
+
+   ```shell
+   cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
+   ```
 
 1. Add the test to the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. If you're contributing
    a rule to a pre-existing set, you should be able to find a similar example to pattern-match
