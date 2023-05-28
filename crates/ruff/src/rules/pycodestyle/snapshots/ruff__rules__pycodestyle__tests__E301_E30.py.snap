@@ -1,0 +1,44 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+---
+E30.py:6:5: E301 [*] Expected 1 blank line, found 0
+   |
+ 6 |     def a():
+ 7 |         pass
+ 8 |     def b():
+   |     ^^^ E301
+ 9 |         pass
+10 | #: E301:6:5
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+3 3 | 
+4 4 |     def a():
+5 5 |         pass
+  6 |+
+6 7 |     def b():
+7 8 |         pass
+8 9 | #: E301:6:5
+
+E30.py:14:5: E301 [*] Expected 1 blank line, found 0
+   |
+14 |         pass
+15 |     # comment
+16 |     def b():
+   |     ^^^ E301
+17 |         pass
+18 | #:
+   |
+   = help: Remove extraneous blank line(s)
+
+ℹ Suggested fix
+11 11 |     def a():
+12 12 |         pass
+13 13 |     # comment
+   14 |+
+14 15 |     def b():
+15 16 |         pass
+16 17 | #:
+
+
