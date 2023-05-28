@@ -1,12 +1,12 @@
 use std::ops::{Deref, DerefMut};
 
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast;
 
 use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
 use crate::binding::{BindingId, StarImportation};
+use crate::globals::GlobalsId;
 
 #[derive(Debug)]
 pub struct Scope<'a> {
@@ -21,8 +21,8 @@ pub struct Scope<'a> {
     bindings: FxHashMap<&'a str, BindingId>,
     /// A map from bound name to binding index, for bindings that were shadowed later in the scope.
     shadowed_bindings: FxHashMap<&'a str, Vec<BindingId>>,
-    /// A map from global name to the range that declares it.
-    globals: FxHashMap<&'a str, TextRange>,
+    /// Index into the globals arena, if the scope contains any globally-declared symbols.
+    globals_id: Option<GlobalsId>,
 }
 
 impl<'a> Scope<'a> {
@@ -34,7 +34,7 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: FxHashMap::default(),
-            globals: FxHashMap::default(),
+            globals_id: None,
         }
     }
 
@@ -46,7 +46,7 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: FxHashMap::default(),
-            globals: FxHashMap::default(),
+            globals_id: None,
         }
     }
 
@@ -110,14 +110,14 @@ impl<'a> Scope<'a> {
         self.star_imports.iter()
     }
 
-    /// Add a global name to this scope.
-    pub fn add_global(&mut self, name: &'a str, range: TextRange) {
-        self.globals.insert(name, range);
+    /// Set the globals pointer for this scope.
+    pub fn set_globals_id(&mut self, globals: GlobalsId) {
+        self.globals_id = Some(globals);
     }
 
-    /// Returns the range of the global name with the given name.
-    pub fn get_global(&self, name: &str) -> Option<TextRange> {
-        self.globals.get(name).copied()
+    /// Returns the globals pointer for this scope.
+    pub fn globals_id(&self) -> Option<GlobalsId> {
+        self.globals_id
     }
 }
 
