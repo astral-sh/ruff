@@ -9,10 +9,12 @@ use crate::checkers::ast::Checker;
 /// Checks for `print` statements that use the `>>` syntax.
 ///
 /// ## Why is this bad?
-/// The `print >> sys.stderr` syntax is deprecated in Python 3.
+/// In Python 2, the `print` statement can be used with the `>>` syntax to
+/// print to a file-like object. This `print >> sys.stderr` syntax is
+/// deprecated in Python 3.
 ///
-/// Instead, use the `file` keyword argument to the `print` function, use the
-/// `sys.stderr.write` function, or use the `logging` module.
+/// Instead, use the `file` keyword argument to the `print` function, the
+/// `sys.stderr.write` function, or the `logging` module.
 ///
 /// ## Example
 /// ```python
@@ -31,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import sys
 ///
-/// sys.stderr.write("Hello, world!\n")  # does not add a newline by default
+/// sys.stderr.write("Hello, world!\n")
 /// ```
 ///
 /// Or:

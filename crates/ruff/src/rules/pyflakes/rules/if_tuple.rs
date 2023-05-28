@@ -6,11 +6,11 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for if tests that are non-empty tuples.
+/// Checks for `if statements that use non-empty tuples as test conditions.
 ///
 /// ## Why is this bad?
-/// If tests are boolean expressions. Non-empty tuples are always `True`. This
-/// means that the if statement will always run, which is likely a mistake.
+/// Non-empty tuples are always `True`, so an `if` statement with a non-empty
+/// tuple as its test condition will always pass. This is likely a mistake.
 ///
 /// ## Example
 /// ```python

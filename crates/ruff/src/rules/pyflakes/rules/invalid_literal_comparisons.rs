@@ -28,29 +28,34 @@ impl From<&Cmpop> for IsCmpop {
 }
 
 /// ## What it does
-/// Checks for `is` and `is not` comparisons with constant literals.
+/// Checks for `is` and `is not` comparisons against constant literals, like
+/// integers and strings.
 ///
 /// ## Why is this bad?
-/// `is` and `is not` are identity comparisons. They check if two objects are
-/// the same object. If the objects are not the same object, the comparison
-/// will always be false. This is likely a mistake.
+/// The `is` and `is not` comparators operate on identity, in that they check
+/// whether two objects are the same object. If the objects are not the same
+/// object, the comparison will always be `False`. Using `is` and `is not` with
+/// constant literals often works "by accident", but are not guaranteed to produce
+/// the expected result.
 ///
-/// Instead, use `==` and `!=` to compare constant literals. These comparisons
-/// check for equality, not identity. This means that `"foo" == "foo"` will be
-/// true, even if the two strings are not the same object.
+/// As of Python 3.8, using `is` and `is not` with constant literals will produce
+/// a `SyntaxWarning`.
+///
+/// Instead, use `==` and `!=` to compare constant literals, which will compare
+/// the values of the objects instead of their identities.
 ///
 /// ## Example
 /// ```python
-/// name = input("What is your name? ")
-/// if name is "Maria":
-///     print("Hello, Maria!")  # This will never print
+/// x = 200
+/// if x is 200:
+///     print("It's 200!")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// name = input("What is your name? ")
-/// if name == "Maria":
-///     print("Hello, Maria!")  # This will print if the user inputs "Maria"
+/// x = 200
+/// if x == 200:
+///     print("It's 200!")
 /// ```
 ///
 /// ## References

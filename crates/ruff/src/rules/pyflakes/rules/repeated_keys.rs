@@ -11,12 +11,13 @@ use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
 /// ## What it does
-/// Checks for dictionary key literals that are repeated with different values.
+/// Checks for dictionary literals that associate multiple values with the
+/// same key.
 ///
 /// ## Why is this bad?
-/// Dictionary keys should be unique. If a key is repeated with a different
-/// value, the first values will be overwritten and the key will correspond to
-/// the last value. This is likely a mistake.
+/// Dictionary keys should be unique. If a key is associated with multiple values,
+/// the earlier values will be overwritten. Including multiple values for the
+/// same key in a dictionary literal is likely a mistake.
 ///
 /// ## Example
 /// ```python
