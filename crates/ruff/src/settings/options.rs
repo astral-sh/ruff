@@ -70,6 +70,18 @@ pub struct Options {
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     pub dummy_variable_rgx: Option<String>,
     #[option(
+        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
+        value_type = "re.Pattern",
+        example = r#"
+            # Only ignore imports named "_".
+            dummy-import-rgx = "^_$"
+        "#
+    )]
+    /// A regular expression used to identify "dummy" imports, or those which
+    /// should be ignored when enforcing (e.g.) unused-imports rules. The
+    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
+    pub dummy_import_rgx: Option<String>,
+    #[option(
         default = r#"[".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
         value_type = "list[str]",
         example = r#"

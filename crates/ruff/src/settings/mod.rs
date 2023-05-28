@@ -97,6 +97,7 @@ pub struct Settings {
     pub allowed_confusables: FxHashSet<char>,
     pub builtins: Vec<String>,
     pub dummy_variable_rgx: Regex,
+    pub dummy_import_rgx: Regex,
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
     pub line_length: LineLength,
@@ -151,6 +152,9 @@ impl Settings {
             dummy_variable_rgx: config
                 .dummy_variable_rgx
                 .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone()),
+            dummy_import_rgx: config
+                .dummy_import_rgx
+                .unwrap_or_else(|| defaults::DUMMY_IMPORT_RGX.clone()),
             exclude: FilePatternSet::try_from_vec(
                 config.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
             )?,

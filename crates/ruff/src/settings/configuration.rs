@@ -45,6 +45,7 @@ pub struct Configuration {
     pub builtins: Option<Vec<String>>,
     pub cache_dir: Option<PathBuf>,
     pub dummy_variable_rgx: Option<Regex>,
+    pub dummy_import_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
@@ -128,6 +129,11 @@ impl Configuration {
                 .map(|pattern| Regex::new(&pattern))
                 .transpose()
                 .map_err(|e| anyhow!("Invalid `dummy-variable-rgx` value: {e}"))?,
+            dummy_import_rgx: options
+                .dummy_import_rgx
+                .map(|pattern| Regex::new(&pattern))
+                .transpose()
+                .map_err(|e| anyhow!("Invalid `dummy-import-rgx` value: {e}"))?,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -257,6 +263,7 @@ impl Configuration {
             builtins: self.builtins.or(config.builtins),
             cache_dir: self.cache_dir.or(config.cache_dir),
             dummy_variable_rgx: self.dummy_variable_rgx.or(config.dummy_variable_rgx),
+            dummy_import_rgx: self.dummy_import_rgx.or(config.dummy_import_rgx),
             exclude: self.exclude.or(config.exclude),
             extend: self.extend.or(config.extend),
             extend_exclude: config

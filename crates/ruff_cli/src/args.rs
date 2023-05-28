@@ -250,6 +250,9 @@ pub struct CheckArgs {
     /// Regular expression matching the name of dummy variables.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
+    /// Regular expression matching the name of dummy imports.
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
+    pub dummy_import_rgx: Option<Regex>,
     /// Disable cache reads.
     #[arg(short, long, help_heading = "Miscellaneous")]
     pub no_cache: bool,
@@ -407,6 +410,7 @@ impl CheckArgs {
             },
             Overrides {
                 dummy_variable_rgx: self.dummy_variable_rgx,
+                dummy_import_rgx: self.dummy_import_rgx,
                 exclude: self.exclude,
                 extend_exclude: self.extend_exclude,
                 extend_fixable: self.extend_fixable,
@@ -477,6 +481,7 @@ pub struct Arguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct Overrides {
     pub dummy_variable_rgx: Option<Regex>,
+    pub dummy_import_rgx: Option<Regex>,
     pub exclude: Option<Vec<FilePattern>>,
     pub extend_exclude: Option<Vec<FilePattern>>,
     pub extend_fixable: Option<Vec<RuleSelector>>,
@@ -508,6 +513,9 @@ impl ConfigProcessor for &Overrides {
         }
         if let Some(dummy_variable_rgx) = &self.dummy_variable_rgx {
             config.dummy_variable_rgx = Some(dummy_variable_rgx.clone());
+        }
+        if let Some(dummy_import_rgx) = &self.dummy_import_rgx {
+            config.dummy_import_rgx = Some(dummy_import_rgx.clone());
         }
         if let Some(exclude) = &self.exclude {
             config.exclude = Some(exclude.clone());

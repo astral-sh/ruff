@@ -5135,6 +5135,10 @@ impl<'a> Checker<'a> {
                         _ => continue,
                     };
 
+                    if self.settings.dummy_import_rgx.is_match(full_name) {
+                        continue;
+                    }
+
                     let child_id = binding.source.unwrap();
                     let parent_id = self.semantic_model.stmts.parent_id(child_id);
 
