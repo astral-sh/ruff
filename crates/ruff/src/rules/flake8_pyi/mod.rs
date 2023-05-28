@@ -12,8 +12,8 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::AnyEqNeNotation, Path::new("PYI032.py"))]
-    #[test_case(Rule::AnyEqNeNotation, Path::new("PYI032.py"))]
+    #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
+    #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.py"))]
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.pyi"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.py"))]

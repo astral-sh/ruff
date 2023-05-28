@@ -1,4 +1,4 @@
-pub(crate) use any_eq_ne_annotation::{any_eq_ne_annotation, AnyEqNeNotation};
+pub(crate) use any_eq_ne_annotation::{any_eq_ne_annotation, AnyEqNeAnnotation};
 pub(crate) use bad_version_info_comparison::{
     bad_version_info_comparison, BadVersionInfoComparison,
 };
