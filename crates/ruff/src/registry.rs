@@ -509,6 +509,7 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::FStringInException,
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
+    rules::flake8_pyi::rules::AnyEqNeAnnotation,
     rules::flake8_pyi::rules::ArgumentDefaultInStub,
     rules::flake8_pyi::rules::AssignmentDefaultInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
