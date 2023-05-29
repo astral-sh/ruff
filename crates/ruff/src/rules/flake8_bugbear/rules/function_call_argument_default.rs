@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, Ranged};
+use rustpython_parser::ast::{self, Arguments, Expr, Ranged};
 
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
@@ -94,10 +94,9 @@ where
 {
     fn visit_expr(&mut self, expr: &'b Expr) {
         match expr {
-            Expr::Call(ast::ExprCall { func, args, .. }) => {
+            Expr::Call(ast::ExprCall { func, .. }) => {
                 if !is_mutable_func(self.model, func)
                     && !is_immutable_func(self.model, func, &self.extend_immutable_calls)
-                    && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
                         FunctionCallInDefaultArgument {
@@ -113,29 +112,6 @@ where
             _ => visitor::walk_expr(self, expr),
         }
     }
-}
-
-fn is_nan_or_infinity(expr: &Expr, args: &[Expr]) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = expr else {
-        return false;
-    };
-    if id != "float" {
-        return false;
-    }
-    let Some(arg) = args.first() else {
-        return false;
-    };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(value),
-        ..
-    } )= arg else {
-        return false;
-    };
-    let lowercased = value.to_lowercase();
-    matches!(
-        lowercased.as_str(),
-        "nan" | "+nan" | "-nan" | "inf" | "+inf" | "-inf" | "infinity" | "+infinity" | "-infinity"
-    )
 }
 
 /// B008

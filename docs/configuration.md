@@ -442,7 +442,8 @@ By default, Ruff exits with the following status codes:
 
 - `0` if no violations were found, or if all present violations were fixed automatically.
 - `1` if violations were found.
-- `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error.
+- `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
+  internal error.
 
 This convention mirrors that of tools like ESLint, Prettier, and RuboCop.
 
