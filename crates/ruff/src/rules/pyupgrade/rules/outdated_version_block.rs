@@ -52,45 +52,37 @@ impl BlockMetadata {
     }
 }
 
-fn metadata<T>(locator: &Locator, located: &T) -> Option<BlockMetadata>
+fn metadata<T>(locator: &Locator, located: &T, body: &[Stmt]) -> Option<BlockMetadata>
 where
     T: Ranged,
 {
     indentation(locator, located)?;
 
-    let line_start = locator.line_start(located.start());
-    // Start the selection at the start-of-line. This ensures consistent indentation
-    // in the token stream, in the event that the entire block is indented.
-    let text = locator.slice(TextRange::new(line_start, located.end()));
-
-    let mut starter: Option<Tok> = None;
+    let mut starter = None;
     let mut elif = None;
     let mut else_ = None;
 
-    for (tok, range) in lexer::lex_starts_at(text, Mode::Module, line_start)
-        .flatten()
-        .filter(|(tok, _)| {
-            !matches!(
-                tok,
-                Tok::Indent
-                    | Tok::Dedent
-                    | Tok::NonLogicalNewline
-                    | Tok::Newline
-                    | Tok::Comment(..)
-            )
-        })
+    let body_end = body.last().map(Ranged::end).unwrap();
+    for (tok, range) in lexer::lex_starts_at(
+        locator.slice(located.range()),
+        Mode::Module,
+        located.start(),
+    )
+    .flatten()
+    .filter(|(tok, _)| matches!(tok, Tok::If | Tok::Elif | Tok::Else))
     {
         if starter.is_none() {
             starter = Some(tok.clone());
-        } else {
-            if matches!(tok, Tok::Elif) && elif.is_none() {
-                elif = Some(range.start());
-            }
-            if matches!(tok, Tok::Else) && else_.is_none() {
-                else_ = Some(range.start());
-            }
-        }
-        if starter.is_some() && elif.is_some() && else_.is_some() {
+        } else if range.start() < body_end {
+            // Continue until the end of the `if` body, thus ensuring that we don't
+            // accidentally pick up an `else` or `elif` in the nested block.
+            continue;
+        // We only care about the first `elif` or `else` following the `if`.
+        } else if matches!(tok, Tok::Elif) {
+            elif = Some(range.start());
+            break;
+        } else if matches!(tok, Tok::Else) {
+            else_ = Some(range.start());
             break;
         }
     }
@@ -343,7 +335,7 @@ pub(crate) fn outdated_version_block(
                     if compare_version(&version, target, op == &Cmpop::LtE) {
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(block) = metadata(checker.locator, stmt) {
+                            if let Some(block) = metadata(checker.locator, stmt, body) {
                                 if let Some(fix) =
                                     fix_py2_block(checker, stmt, body, orelse, &block)
                                 {
@@ -357,7 +349,7 @@ pub(crate) fn outdated_version_block(
                     if compare_version(&version, target, op == &Cmpop::GtE) {
                         let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(block) = metadata(checker.locator, stmt) {
+                            if let Some(block) = metadata(checker.locator, stmt, body) {
                                 if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block)
                                 {
                                     diagnostic.set_fix(fix);
@@ -376,7 +368,7 @@ pub(crate) fn outdated_version_block(
                 if version_number == 2 && op == &Cmpop::Eq {
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(block) = metadata(checker.locator, stmt) {
+                        if let Some(block) = metadata(checker.locator, stmt, body) {
                             if let Some(fix) = fix_py2_block(checker, stmt, body, orelse, &block) {
                                 diagnostic.set_fix(fix);
                             }
@@ -386,7 +378,7 @@ pub(crate) fn outdated_version_block(
                 } else if version_number == 3 && op == &Cmpop::Eq {
                     let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
-                        if let Some(block) = metadata(checker.locator, stmt) {
+                        if let Some(block) = metadata(checker.locator, stmt, body) {
                             if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block) {
                                 diagnostic.set_fix(fix);
                             }

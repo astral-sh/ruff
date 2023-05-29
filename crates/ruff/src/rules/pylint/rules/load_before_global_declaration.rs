@@ -54,8 +54,7 @@ impl Violation for LoadBeforeGlobalDeclaration {
 }
 /// PLE0118
 pub(crate) fn load_before_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
-    let scope = checker.semantic_model().scope();
-    if let Some(stmt) = scope.get_global(name) {
+    if let Some(stmt) = checker.semantic_model().global(name) {
         if expr.start() < stmt.start() {
             #[allow(deprecated)]
             let location = checker.locator.compute_source_location(stmt.start());
