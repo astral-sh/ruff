@@ -15,3 +15,6 @@ indent_size = 4
 
 [*.snap]
 trim_trailing_whitespace = false
+
+[*.md]
+max_line_length = 100
