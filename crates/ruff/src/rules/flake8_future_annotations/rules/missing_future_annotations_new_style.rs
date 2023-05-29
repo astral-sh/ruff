@@ -1,4 +1,5 @@
 use rustpython_parser::ast::{Expr, Ranged};
+use std::fmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -6,48 +7,71 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for missing `from __future__ import annotations` imports upon
-/// detecting type annotations that are written in PEP 585 or PEP 604 style but
-/// the target Python version doesn't support them without the import.
+/// Checks for uses of PEP 585- and PEP 604-style type annotations in Python
+/// modules that lack the required `from __future__ import annotations` import
+/// for compatibility with older Python versions.
 ///
 /// ## Why is this bad?
-///
-/// Using PEP 585 and PEP 604 style annotations without the import will cause
-/// runtime errors on Python versions older than 3.9 and 3.10, respectively.
+/// Using PEP 585 and PEP 604 style annotations without a `from __future__ import
+/// annotations` import will cause runtime errors on Python versions prior to
+/// 3.9 and 3.10, respectively.
 ///
 /// By adding the `__future__` import, the interpreter will no longer interpret
-/// annotations at evaluation time, making the code compatible with both older
-/// and newer Python versions.
+/// annotations at evaluation time, making the code compatible with both past
+/// and future Python versions.
 ///
 /// ## Example
-///
 /// ```python
-/// def function(a_dict: dict[str, int | None]) -> None:
-///     a_list: list[str] = []
-///     a_list.append("hello")
+/// def func(obj: dict[str, int | None]) -> None:
+///     ...
 /// ```
-/// would raise an exception at runtime before Python 3.9 and Python 3.10.
+///
+/// Use instead:
+/// ```python
+/// from __future__ import annotations
+///
+///
+/// def func(obj: dict[str, int | None]) -> None:
+///    ...
+/// ```
 #[violation]
 pub struct MissingFutureAnnotationsImportNewStyle {
-    kind: String,
-    expr: String,
+    reason: Reason,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum Reason {
+    /// The type annotation is written in PEP 585 style (e.g., `list[int]`).
+    PEP585,
+    /// The type annotation is written in PEP 604 style (e.g., `int | None`).
+    PEP604,
+}
+
+impl fmt::Display for Reason {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Reason::PEP585 => fmt.write_str("PEP 585 collection"),
+            Reason::PEP604 => fmt.write_str("PEP 604 union"),
+        }
+    }
 }
 
 impl Violation for MissingFutureAnnotationsImportNewStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingFutureAnnotationsImportNewStyle { kind, expr } = self;
-        format!("Missing `from __future__ import annotations`, but uses {kind} `{expr}`")
+        let MissingFutureAnnotationsImportNewStyle { reason } = self;
+        format!("Missing `from __future__ import annotations`, but uses {reason}")
     }
 }
 
 /// FA102
-pub(crate) fn missing_future_annotations_new_style(checker: &mut Checker, kind: &str, expr: &Expr) {
+pub(crate) fn missing_future_annotations_new_style(
+    checker: &mut Checker,
+    expr: &Expr,
+    reason: Reason,
+) {
     checker.diagnostics.push(Diagnostic::new(
-        MissingFutureAnnotationsImportNewStyle {
-            kind: kind.to_string(),
-            expr: checker.locator.slice(expr.range()).to_string(),
-        },
+        MissingFutureAnnotationsImportNewStyle { reason },
         expr.range(),
     ));
 }
