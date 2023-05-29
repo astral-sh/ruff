@@ -220,11 +220,10 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@v1
         with:
-          manylinux: auto
           args: --out dist
       - name: "Test wheel"
         run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
+          pip install --force-reinstall --find-links dist ${{ env.PACKAGE_NAME }}
           ruff --help
           python -m ruff --help
       - name: "Remove wheels from cache"
