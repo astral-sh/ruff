@@ -1,0 +1,11 @@
+---
+source: crates/ruff/src/rules/pandas_vet/mod.rs
+---
+<filename>:3:1: PD901 `df` is a bad variable name. Be kinder to your future self.
+  |
+3 | import pandas as pd
+4 | df = pd.DataFrame()
+  | ^^ PD901
+  |
+
+
