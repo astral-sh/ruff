@@ -42,6 +42,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import collections.abc
 ///
+///
 /// class Class:
 ///     def __iter__(self) -> collections.abc.Iterator[str]:
 ///         ...

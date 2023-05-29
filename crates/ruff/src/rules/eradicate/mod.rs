@@ -13,7 +13,7 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::CommentedOutCode, Path::new("ERA001.py"); "ERA001")]
+    #[test_case(Rule::CommentedOutCode, Path::new("ERA001.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
