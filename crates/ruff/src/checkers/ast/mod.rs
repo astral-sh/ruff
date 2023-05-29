@@ -1550,6 +1550,9 @@ where
                 if self.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
+                if self.enabled(Rule::IterateOverSet) {
+                    pylint::rules::iterate_over_set(self, stmt, iter);
+                }
                 if matches!(stmt, Stmt::For(_)) {
                     if self.enabled(Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(

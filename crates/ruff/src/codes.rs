@@ -150,6 +150,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0414") => (RuleGroup::Unspecified, Rule::UselessImportAlias),
         (Pylint, "C1901") => (RuleGroup::Unspecified, Rule::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Unspecified, Rule::UnnecessaryDirectLambdaCall),
+        (Pylint, "C0208") => (RuleGroup::Unspecified, Rule::IterateOverSet),
         (Pylint, "E0100") => (RuleGroup::Unspecified, Rule::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Unspecified, Rule::ReturnInInit),
         (Pylint, "E0116") => (RuleGroup::Unspecified, Rule::ContinueInFinally),
