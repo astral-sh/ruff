@@ -50,20 +50,20 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 #[violation]
-pub struct MissingFutureAnnotationsImportOldStyle {
+pub struct FutureRewritableTypeAnnotation {
     name: String,
 }
 
-impl Violation for MissingFutureAnnotationsImportOldStyle {
+impl Violation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingFutureAnnotationsImportOldStyle { name } = self;
+        let FutureRewritableTypeAnnotation { name } = self;
         format!("Missing `from __future__ import annotations`, but uses `{name}`")
     }
 }
 
 /// FA100
-pub(crate) fn missing_future_annotations_old_style(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn future_rewritable_type_annotation(checker: &mut Checker, expr: &Expr) {
     let name = checker
         .semantic_model()
         .resolve_call_path(expr)
@@ -71,7 +71,7 @@ pub(crate) fn missing_future_annotations_old_style(checker: &mut Checker, expr: 
 
     if let Some(name) = name {
         checker.diagnostics.push(Diagnostic::new(
-            MissingFutureAnnotationsImportOldStyle { name },
+            FutureRewritableTypeAnnotation { name },
             expr.range(),
         ));
     }

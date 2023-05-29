@@ -267,8 +267,8 @@ ruff_macros::register_rules!(
     rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
     rules::flake8_annotations::rules::AnyType,
     // flake8-future-annotations
-    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImportOldStyle,
-    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImportNewStyle,
+    rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation,
+    rules::flake8_future_annotations::rules::FutureRequiredTypeAnnotation,
     // flake8-2020
     rules::flake8_2020::rules::SysVersionSlice3,
     rules::flake8_2020::rules::SysVersion2,
