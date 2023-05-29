@@ -323,11 +323,17 @@ pub(crate) fn trailing_commas(
             }
         };
         if comma_prohibited {
+            // SAFETY: The following token spans are always `Some` as they come from `tokens` which has
+            // been mapped with `Token::from_spanned`.
             let comma = prev.spanned.unwrap();
+            let closing_bracket = token.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
             if settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
                 #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(diagnostic.range())));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(TextRange::new(
+                    comma.1.start(),
+                    closing_bracket.1.start(),
+                ))));
             }
             diagnostics.push(diagnostic);
         }

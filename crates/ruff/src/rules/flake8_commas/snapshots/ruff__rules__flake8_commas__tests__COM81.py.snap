@@ -527,7 +527,7 @@ COM81.py:496:21: COM819 [*] Trailing comma prohibited
 494 494 | (0, 1,)
 495 495 | 
 496     |-foo = ['a', 'b', 'c', ]
-    496 |+foo = ['a', 'b', 'c' ]
+    496 |+foo = ['a', 'b', 'c']
 497 497 | 
 498 498 | bar = { a: b, }
 499 499 | 
@@ -548,7 +548,7 @@ COM81.py:498:13: COM819 [*] Trailing comma prohibited
 496 496 | foo = ['a', 'b', 'c', ]
 497 497 | 
 498     |-bar = { a: b, }
-    498 |+bar = { a: b }
+    498 |+bar = { a: b}
 499 499 | 
 500 500 | def bah(ham, spam, ):
 501 501 |     pass
@@ -568,7 +568,7 @@ COM81.py:500:18: COM819 [*] Trailing comma prohibited
 498 498 | bar = { a: b, }
 499 499 | 
 500     |-def bah(ham, spam, ):
-    500 |+def bah(ham, spam ):
+    500 |+def bah(ham, spam):
 501 501 |     pass
 502 502 | 
 503 503 | (0, )
@@ -589,7 +589,7 @@ COM81.py:505:6: COM819 [*] Trailing comma prohibited
 503 503 | (0, )
 504 504 | 
 505     |-(0, 1, )
-    505 |+(0, 1 )
+    505 |+(0, 1)
 506 506 | 
 507 507 | image[:, :, 0]
 508 508 | 
@@ -631,7 +631,7 @@ COM81.py:513:9: COM819 [*] Trailing comma prohibited
 511 511 | image[:,:,]
 512 512 | 
 513     |-lambda x, :
-    513 |+lambda x :
+    513 |+lambda x:
 514 514 | 
 515 515 | # ==> unpack.py <==
 516 516 | def function(
