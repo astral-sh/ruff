@@ -591,9 +591,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, Rule::DuplicateUnionMember),
         (Flake8Pyi, "020") => (RuleGroup::Unspecified, Rule::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Unspecified, Rule::DocstringInStub),
+        (Flake8Pyi, "032") => (RuleGroup::Unspecified, Rule::AnyEqNeAnnotation),
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, Rule::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, Rule::TSuffixedTypeAlias),
+        (Flake8Pyi, "045") => (RuleGroup::Unspecified, Rule::IterMethodReturnIterable),
         (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
 
@@ -748,6 +750,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Todos, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
         (Flake8Todos, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
         (Flake8Todos, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
+
+        // airflow
+        (Airflow, "001") => (RuleGroup::Unspecified, Rule::AirflowVariableNameTaskIdMismatch),
 
         _ => return None,
     })

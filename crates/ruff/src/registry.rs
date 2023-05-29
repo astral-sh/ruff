@@ -510,10 +510,12 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::FStringInException,
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
+    rules::flake8_pyi::rules::AnyEqNeAnnotation,
     rules::flake8_pyi::rules::ArgumentDefaultInStub,
     rules::flake8_pyi::rules::AssignmentDefaultInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::IterMethodReturnIterable,
     rules::flake8_pyi::rules::DuplicateUnionMember,
     rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
     rules::flake8_pyi::rules::NonEmptyStubBody,
@@ -668,6 +670,8 @@ ruff_macros::register_rules!(
     rules::flake8_todos::rules::MissingTodoDescription,
     rules::flake8_todos::rules::InvalidTodoCapitalization,
     rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
+    // airflow
+    rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
 );
 
 pub trait AsRule {
@@ -838,6 +842,9 @@ pub enum Linter {
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,
+    /// [Airflow](https://pypi.org/project/apache-airflow/)
+    #[prefix = "AIR"]
+    Airflow,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

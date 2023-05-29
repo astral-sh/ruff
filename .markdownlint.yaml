@@ -1,0 +1,14 @@
+# default to true for all rules
+default: true
+
+# MD033/no-inline-html
+MD033: false
+
+# MD041/first-line-h1
+MD041: false
+
+# MD013/line-length
+MD013:
+  line_length: 100
+  code_blocks: false
+  ignore_code_blocks: true

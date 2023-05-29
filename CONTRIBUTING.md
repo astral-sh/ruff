@@ -8,6 +8,7 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
   - [Project Structure](#project-structure)
   - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
     - [Rule naming convention](#rule-naming-convention)
+    - [Rule testing: fixtures and snapshots](#rule-testing-fixtures-and-snapshots)
   - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
 - [MkDocs](#mkdocs)
 - [Release Process](#release-process)
@@ -93,9 +94,11 @@ At time of writing, the repository includes the following crates:
 
 - `crates/ruff`: library crate containing all lint rules and the core logic for running them.
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
-- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
+- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g.,
+  `cargo dev generate-all`).
 - `crates/ruff_macros`: library crate containing macros used by Ruff.
-- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
+- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of
+  standard library modules by version).
 - `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
 
 ### Example: Adding a new lint rule
@@ -103,14 +106,20 @@ At time of writing, the repository includes the following crates:
 At a high level, the steps involved in adding a new lint rule are as follows:
 
 1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
+
 1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+
 1. In that file, define a violation struct. You can grep for `#[violation]` to see examples.
+
 1. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
-1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for AST-based
-   checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
-   (for text-based checks), or `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based
-   checks).
-1. Add a test fixture.
+
+1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast/mod.rs` (for
+   AST-based checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks),
+   `crates/ruff/src/checkers/lines.rs` (for text-based checks), or
+   `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
+
+1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
+
 1. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
@@ -125,18 +134,8 @@ collecting diagnostics as it goes.
 If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
 for the `Check::new` invocations to understand how other, similar rules are implemented.
 
-To add a test fixture, create a file under `crates/ruff/resources/test/fixtures/[linter]`, named to match
-the code you defined earlier (e.g., `crates/ruff/resources/test/fixtures/pycodestyle/E402.py`). This file should
-contain a variety of violations and non-violations designed to evaluate and demonstrate the behavior
-of your lint rule.
-
-Run `cargo dev generate-all` to generate the code for your new fixture. Then run Ruff
-locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
-
-Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. Then, run `cargo test`.
-Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
-generated snapshot, then commit the snapshot file alongside the rest of your changes.
+Once you're satisfied with your code, add tests for your rule. See [rule testing](#rule-testing-fixtures-and-snapshots)
+for more details.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
@@ -153,6 +152,38 @@ This implies that rule names:
 
 When re-implementing rules from other linters, this convention is given more importance than
 preserving the original rule name.
+
+#### Rule testing: fixtures and snapshots
+
+To test rules, Ruff uses snapshots of Ruff's output for a given file (fixture). Generally, there
+will be one file per rule (e.g., `E402.py`), and each file will contain all necessary examples of
+both violations and non-violations. `cargo insta review` will generate a snapshot file containing
+Ruff's output for each fixture, which you can then commit alongside your changes.
+
+Once you've completed the code for the rule itself, you can define tests with the following steps:
+
+1. Add a Python file to `crates/ruff/resources/test/fixtures/[linter]` that contains the code you
+   want to test. The file name should match the rule name (e.g., `E402.py`), and it should include
+   examples of both violations and non-violations.
+
+1. Run Ruff locally against your file and verify the output is as expected. Once you're satisfied
+   with the output (you see the violations you expect, and no others), proceed to the next step.
+   For example, if you're adding a new rule named `E402`, you would run:
+
+   ```shell
+   cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache
+   ```
+
+1. Add the test to the relevant `crates/ruff/src/rules/[linter]/mod.rs` file. If you're contributing
+   a rule to a pre-existing set, you should be able to find a similar example to pattern-match
+   against. If you're adding a new linter, you'll need to create a new `mod.rs` file (see,
+   e.g., `crates/ruff/src/rules/flake8_bugbear/mod.rs`)
+
+1. Run `cargo test`. Your test will fail, but you'll be prompted to follow-up
+   with `cargo insta review`. Run `cargo insta review`, review and accept the generated snapshot,
+   then commit the snapshot file alongside the rest of your changes.
+
+1. Run `cargo test` again to ensure that your test passes.
 
 ### Example: Adding a new configuration option
 
