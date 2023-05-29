@@ -749,6 +749,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Todos, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
         (Flake8Todos, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
 
+        // airflow
+        (Airflow, "001") => (RuleGroup::Unspecified, Rule::AirflowVariableNameTaskIdMismatch),
+
         _ => return None,
     })
 }

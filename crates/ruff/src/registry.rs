@@ -668,6 +668,8 @@ ruff_macros::register_rules!(
     rules::flake8_todos::rules::MissingTodoDescription,
     rules::flake8_todos::rules::InvalidTodoCapitalization,
     rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
+    // airflow
+    rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
 );
 
 pub trait AsRule {
@@ -838,6 +840,9 @@ pub enum Linter {
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,
+    /// [Airflow](https://pypi.org/project/apache-airflow/)
+    #[prefix = "AIR"]
+    Airflow,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
