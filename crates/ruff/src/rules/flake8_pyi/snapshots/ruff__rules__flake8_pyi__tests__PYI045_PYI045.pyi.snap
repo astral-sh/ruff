@@ -4,7 +4,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 PYI045.pyi:9:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as they should always return some kind of `Iterator`.
    |
  9 | class TypingIterableTReturn:
-10 |     def __iter__(self) -> typing.Iterable[int]: ... # Error: PYI045
+10 |     def __iter__(self) -> typing.Iterable[int]: ...  # Error: PYI045
    |                           ^^^^^^^^^^^^^^^^^^^^ PYI045
 11 |     def not_iter(self) -> typing.Iterable[int]: ...
    |
@@ -12,7 +12,7 @@ PYI045.pyi:9:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as 
 PYI045.pyi:13:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as they should always return some kind of `Iterator`.
    |
 13 | class TypingIterableReturn:
-14 |     def __iter__(self) -> typing.Iterable: ... # Error: PYI045
+14 |     def __iter__(self) -> typing.Iterable: ...  # Error: PYI045
    |                           ^^^^^^^^^^^^^^^ PYI045
 15 |     def not_iter(self) -> typing.Iterable: ...
    |
@@ -20,7 +20,7 @@ PYI045.pyi:13:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as
 PYI045.pyi:17:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as they should always return some kind of `Iterator`.
    |
 17 | class CollectionsIterableTReturn:
-18 |     def __iter__(self) -> collections.abc.Iterable[int]: ... # Error: PYI045
+18 |     def __iter__(self) -> collections.abc.Iterable[int]: ...  # Error: PYI045
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI045
 19 |     def not_iter(self) -> collections.abc.Iterable[int]: ...
    |
@@ -28,7 +28,7 @@ PYI045.pyi:17:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as
 PYI045.pyi:21:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as they should always return some kind of `Iterator`.
    |
 21 | class CollectionsIterableReturn:
-22 |     def __iter__(self) -> collections.abc.Iterable: ... # Error: PYI045
+22 |     def __iter__(self) -> collections.abc.Iterable: ...  # Error: PYI045
    |                           ^^^^^^^^^^^^^^^^^^^^^^^^ PYI045
 23 |     def not_iter(self) -> collections.abc.Iterable: ...
    |
@@ -36,7 +36,7 @@ PYI045.pyi:21:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as
 PYI045.pyi:25:27: PYI045 __iter__ methods should never return ` Iterable[T]`, as they should always return some kind of `Iterator`.
    |
 25 | class IterableReturn:
-26 |     def __iter__(self) -> Iterable: ... # Error: PYI045
+26 |     def __iter__(self) -> Iterable: ...  # Error: PYI045
    |                           ^^^^^^^^ PYI045
 27 | 
 28 | class IteratorReturn:
