@@ -1,4 +1,9 @@
-use crate::context::ASTFormatContext;
+pub mod mod_expression;
+pub mod mod_function_type;
+pub mod mod_interactive;
+pub mod mod_module;
+
+use crate::context::PyFormatContext;
 use ruff_formatter::format_element::tag::VerbatimKind;
 use ruff_formatter::prelude::*;
 use ruff_formatter::write;
@@ -14,8 +19,8 @@ impl<'a> FormatModule<'a> {
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatModule<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+impl Format<PyFormatContext<'_>> for FormatModule<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let range = self.module.range();
 
         write!(f, [source_position(range.start())])?;

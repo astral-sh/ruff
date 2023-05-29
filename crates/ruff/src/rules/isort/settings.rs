@@ -269,7 +269,7 @@ pub struct Options {
             forced-separate = ["tests"]
         "#
     )]
-    /// A list of modules to separate into auxiliary block(s) of imports,
+    /// A list of modules to separate into src block(s) of imports,
     /// in the order specified.
     pub forced_separate: Option<Vec<String>>,
     #[option(
