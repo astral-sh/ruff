@@ -6,8 +6,10 @@ use std::path::Path;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_text_size::TextRange;
 
 use crate::registry::Rule;
+use crate::rules::flake8_copyright::rules::{copyright_header_absent, HeaderLacksCopyright};
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
@@ -49,6 +51,10 @@ pub(crate) fn check_physical_lines(
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
+    let enforce_copyright_header = settings.rules.enabled(Rule::HeaderLacksCopyright);
+
+    let mut checked_copyright_header_absent = false;
+    let mut chars_before_copyright_header: i64 = 0;
 
     let fix_unnecessary_coding_comment = settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace = settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
@@ -153,6 +159,24 @@ pub(crate) fn check_physical_lines(
             if let Some(diagnostic) = tab_indentation(&line, indexer) {
                 diagnostics.push(diagnostic);
             }
+        }
+        if enforce_copyright_header && !checked_copyright_header_absent {
+            let missing_copyright_header =
+                copyright_header_absent(&line, settings, chars_before_copyright_header);
+
+            match missing_copyright_header {
+                Some(false) => checked_copyright_header_absent = true,
+                Some(true) => {
+                    let diagnostic = Diagnostic::new(
+                        HeaderLacksCopyright,
+                        TextRange::new(line.start(), line.end()),
+                    );
+                    diagnostics.push(diagnostic);
+                    checked_copyright_header_absent = true;
+                }
+                None => (),
+            }
+            chars_before_copyright_header += line.len() as i64;
         }
     }
 

@@ -360,6 +360,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "401") => (RuleGroup::Unspecified, Rule::IfElseBlockInsteadOfDictGet),
         (Flake8Simplify, "910") => (RuleGroup::Unspecified, Rule::DictGetWithNoneDefault),
 
+        // flake8-copyright
+        (Flake8Copyright, "1") => (RuleGroup::Unspecified, Rule::HeaderLacksCopyright),
+
         // pyupgrade
         (Pyupgrade, "001") => (RuleGroup::Unspecified, Rule::UselessMetaclassType),
         (Pyupgrade, "003") => (RuleGroup::Unspecified, Rule::TypeOfPrimitive),

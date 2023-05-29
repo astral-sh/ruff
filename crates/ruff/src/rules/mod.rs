@@ -10,6 +10,7 @@ pub mod flake8_bugbear;
 pub mod flake8_builtins;
 pub mod flake8_commas;
 pub mod flake8_comprehensions;
+pub mod flake8_copyright;
 pub mod flake8_datetimez;
 pub mod flake8_debugger;
 pub mod flake8_django;

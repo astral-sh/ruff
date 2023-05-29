@@ -306,6 +306,8 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::YodaConditions,
     rules::flake8_simplify::rules::IfElseBlockInsteadOfDictGet,
     rules::flake8_simplify::rules::DictGetWithNoneDefault,
+    // flake8-copyright
+    rules::flake8_copyright::rules::HeaderLacksCopyright,
     // pyupgrade
     rules::pyupgrade::rules::UselessMetaclassType,
     rules::pyupgrade::rules::TypeOfPrimitive,
@@ -736,6 +738,9 @@ pub enum Linter {
     #[prefix = "COM"]
     Flake8Commas,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+    #[prefix = "C80"]
+    Flake8Copyright,
+    /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
     #[prefix = "C4"]
     Flake8Comprehensions,
     /// [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
@@ -913,6 +918,7 @@ impl Rule {
             | Rule::ShebangLeadingWhitespace
             | Rule::TrailingWhitespace
             | Rule::TabIndentation
+            | Rule::HeaderLacksCopyright
             | Rule::BlankLineWithWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring

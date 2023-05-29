@@ -1,0 +1,12 @@
+---
+source: crates/ruff/src/rules/flake8_copyright/mod.rs
+---
+C801_custom_author_fail.py:2:1: C801 Copyright notice not present
+  |
+2 | # Copyright 2023 (c) rufffff
+3 | 
+  |  C801
+4 | import os
+  |
+
+

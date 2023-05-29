@@ -37,6 +37,7 @@ ignore = { workspace = true }
 imperative = { version = "1.0.4" }
 is-macro = { workspace = true }
 itertools = { workspace = true }
+lazy-regex = { version = "2.5.0" }
 libcst = { workspace = true }
 log = { workspace = true }
 natord = { version = "1.0.9" }

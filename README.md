@@ -257,6 +257,7 @@ quality tools, including:
 - [flake8-builtins](https://pypi.org/project/flake8-builtins/)
 - [flake8-commas](https://pypi.org/project/flake8-commas/)
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-copyright](https://pypi.org/project/flake8-copyright/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
 - [flake8-django](https://pypi.org/project/flake8-django/)

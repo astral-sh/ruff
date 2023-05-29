@@ -198,6 +198,17 @@
         }
       ]
     },
+    "flake8-copyright": {
+      "description": "Options for the `flake8-copyright` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8CopyrightOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
@@ -709,6 +720,34 @@
           "description": "Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).",
           "type": [
             "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8CopyrightOptions": {
+      "type": "object",
+      "properties": {
+        "copyright-author": {
+          "description": "Author to check for specifically within the header\n\nDefault is \"\" E.g # Copyright (c) <Year> <Author>",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "copyright-min-file-size": {
+          "description": "Minimum number of characters in a file before requiring a copyright notice",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int"
+        },
+        "copyright-regexp": {
+          "description": "Regexp to check for copyright headers.\n\nDefault is \"Copyright\\s+(\\(C\\)\\s+)?\\d{4}([-,]\\d{4})*\\s+%(author)s\" E.g # Copyright (c) 2023 ruff",
+          "type": [
+            "string",
             "null"
           ]
         }
@@ -1617,6 +1656,8 @@
         "C417",
         "C418",
         "C419",
+        "C80",
+        "C801",
         "C9",
         "C90",
         "C901",
