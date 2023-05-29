@@ -2206,6 +2206,19 @@ where
                         }
                     }
                 }
+                // PEP585 list[...], dict[...] without future when required by Python version
+                if self.enabled(Rule::MissingFutureAnnotationsImportNewStyle)
+                    && self.settings.target_version < PythonVersion::Py39
+                    && !self.semantic_model.future_annotations()
+                    && self.semantic_model.in_annotation()
+                    && analyze::typing::is_pep585_generic(value, &self.semantic_model)
+                {
+                    flake8_future_annotations::rules::missing_future_annotations_new_style(
+                        self,
+                        "PEP585 collection",
+                        expr,
+                    );
+                }
 
                 if self.semantic_model.match_typing_expr(value, "Literal") {
                     self.semantic_model.flags |= SemanticModelFlags::LITERAL;
@@ -3190,6 +3203,19 @@ where
                 op: Operator::BitOr,
                 ..
             }) => {
+                // Target version < 3.10, but using a PEP604 `|` operator.
+                if self.enabled(Rule::MissingFutureAnnotationsImportNewStyle)
+                    && self.settings.target_version < PythonVersion::Py310
+                    && !self.semantic_model.future_annotations()
+                    && self.semantic_model.in_annotation()
+                {
+                    flake8_future_annotations::rules::missing_future_annotations_new_style(
+                        self,
+                        "PEP604 union",
+                        expr,
+                    );
+                }
+
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic_model.in_type_definition()

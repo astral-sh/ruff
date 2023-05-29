@@ -37,4 +37,22 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Path::new("no_future_import_uses_lowercase.py"); "no_future_import_uses_lowercase")]
+    #[test_case(Path::new("no_future_import_uses_union.py"); "no_future_import_uses_union")]
+    #[test_case(Path::new("no_future_import_uses_union_inner.py"); "no_future_import_uses_union_inner")]
+    #[test_case(Path::new("ok_no_types.py"); "ok_no_types")]
+    #[test_case(Path::new("ok_uses_future.py"); "ok_uses_future")]
+    fn fa102(path: &Path) -> Result<()> {
+        let snapshot = format!("fa102_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_future_annotations").join(path).as_path(),
+            &settings::Settings {
+                target_version: PythonVersion::Py37,
+                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImportNewStyle)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
 }
