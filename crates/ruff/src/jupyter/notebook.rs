@@ -29,8 +29,8 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
 
 #[derive(Debug)]
 pub struct Notebook {
-    pub index: JupyterIndex,
-    pub content: String,
+    content: String,
+    index: JupyterIndex,
     raw: JupyterNotebook,
     cell_offsets: Vec<TextSize>,
 }
@@ -147,7 +147,7 @@ impl Notebook {
             .enumerate()
             .filter(|(_, cell)| cell.cell_type == CellType::Code)
         {
-            let cell_contents = builder.add_cell(pos, cell);
+            let cell_contents = builder.add_code_cell(pos, cell);
             current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
             cell_offsets.push(current_offset);
             contents.push(cell_contents);
@@ -166,6 +166,7 @@ impl Notebook {
         })
     }
 
+    /// Update the cell offsets as per the given edits.
     fn update_cell_offsets(&mut self, edits: BTreeSet<&Edit>) {
         for edit in edits.into_iter().rev() {
             let idx = self
@@ -246,7 +247,7 @@ impl Notebook {
             .enumerate()
             .filter(|(_pos, cell)| cell.cell_type == CellType::Code)
         {
-            let cell_contents = builder.add_cell(pos, cell);
+            let cell_contents = builder.add_code_cell(pos, cell);
             contents.push(cell_contents);
         }
 
@@ -254,6 +255,19 @@ impl Notebook {
         self.content = contents.join("\n");
     }
 
+    /// Return the notebook content.
+    ///
+    /// This is the concatenation of all Python code cells.
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    /// Return the notebook index.
+    pub fn index(&self) -> JupyterIndex {
+        self.index.clone()
+    }
+
+    /// Update the notebook with the given edits and transformed content.
     pub fn update(&mut self, edits: BTreeSet<&Edit>, transformed: &str) {
         self.update_cell_offsets(edits);
         self.update_cell_content(transformed);
@@ -357,7 +371,7 @@ mutable_argument()
 "#
         );
         assert_eq!(
-            notebook.index,
+            notebook.index(),
             JupyterIndex {
                 inner: Arc::new(JupyterIndexInner {
                     row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3],

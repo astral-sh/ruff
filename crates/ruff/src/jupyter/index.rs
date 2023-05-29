@@ -9,14 +9,17 @@ use crate::jupyter::{Cell, SourceValue};
 /// [`ruff_text_size::TextSize`] to jupyter notebook cell/row/column.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JupyterIndex {
-    inner: Arc<JupyterIndexInner>,
+    pub(super) inner: Arc<JupyterIndexInner>,
 }
 
 impl JupyterIndex {
+    /// Returns the cell number (1-based) for the given row (1-based).
     pub fn get_cell(&self, row: usize) -> u32 {
         self.inner.row_to_cell[row]
     }
 
+    /// Returns the row number (1-based) in the cell (1-based) for the
+    /// given row (1-based).
     pub fn get_row_in_cell(&self, row: usize) -> u32 {
         self.inner.row_to_row_in_cell[row]
     }
@@ -25,13 +28,13 @@ impl JupyterIndex {
 #[derive(Debug, Eq, PartialEq)]
 pub struct JupyterIndexInner {
     /// Enter a row (1-based), get back the cell (1-based)
-    row_to_cell: Vec<u32>,
-    /// Enter a row (1-based), get back the cell (1-based)
-    row_to_row_in_cell: Vec<u32>,
+    pub(super) row_to_cell: Vec<u32>,
+    /// Enter a row (1-based), get back the row in cell (1-based)
+    pub(super) row_to_row_in_cell: Vec<u32>,
 }
 
 /// Builder for [`JupyterIndex`].
-pub struct JupyterIndexBuilder {
+pub(super) struct JupyterIndexBuilder {
     row_to_cell: Vec<u32>,
     row_to_row_in_cell: Vec<u32>,
 }
@@ -43,14 +46,17 @@ impl Default for JupyterIndexBuilder {
 }
 
 impl JupyterIndexBuilder {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             row_to_cell: vec![0],
             row_to_row_in_cell: vec![0],
         }
     }
 
-    pub fn add_cell(&mut self, pos: usize, cell: &Cell) -> String {
+    /// Add the given code cell to the index, returning the contents of the cell.
+    /// The position of the cell is given by `pos` which is the absolute position
+    /// of the cell in the notebook.
+    pub(super) fn add_code_cell(&mut self, pos: usize, cell: &Cell) -> String {
         let cell_contents = match &cell.source {
             SourceValue::String(string) => {
                 let line_count = u32::try_from(string.lines().count()).unwrap();
@@ -72,7 +78,7 @@ impl JupyterIndexBuilder {
         cell_contents
     }
 
-    pub fn finish(&self) -> JupyterIndex {
+    pub(super) fn finish(&self) -> JupyterIndex {
         JupyterIndex {
             inner: Arc::new(JupyterIndexInner {
                 row_to_cell: self.row_to_cell.clone(),

@@ -173,11 +173,11 @@ pub(crate) fn lint_path(
         ) {
             if !fixed.is_empty() {
                 if matches!(autofix, flags::FixMode::Apply) {
-                    match source_kind {
+                    match &source_kind {
                         SourceKind::Python(_) => {
                             write(path, transformed.as_bytes())?;
                         }
-                        SourceKind::Jupyter(ref notebook) => {
+                        SourceKind::Jupyter(notebook) => {
                             notebook.write(path)?;
                         }
                     }
@@ -234,7 +234,7 @@ pub(crate) fn lint_path(
                 path.to_str()
                     .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
                     .to_string(),
-                notebook.index.clone(),
+                notebook.index(),
             );
             index
         }

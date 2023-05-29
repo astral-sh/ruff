@@ -9,7 +9,7 @@ impl SourceKind {
     pub fn content(&self) -> &str {
         match self {
             SourceKind::Python(content) => content,
-            SourceKind::Jupyter(notebook) => &notebook.content,
+            SourceKind::Jupyter(notebook) => notebook.content(),
         }
     }
 }
