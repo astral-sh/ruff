@@ -279,7 +279,7 @@ mod tests {
         rule_code(code, expected);
     }
 
-    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
+    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
