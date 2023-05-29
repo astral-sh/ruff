@@ -2184,19 +2184,19 @@ where
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.any_enabled(&[
-                    Rule::MissingFutureAnnotationsImportOldStyle,
+                    Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP604Annotation,
                 ]) {
                     if let Some(operator) =
                         analyze::typing::to_pep604_operator(value, slice, &self.semantic_model)
                     {
-                        if self.enabled(Rule::MissingFutureAnnotationsImportOldStyle) {
+                        if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic_model.future_annotations()
                                 && self.semantic_model.in_annotation()
                             {
-                                flake8_future_annotations::rules::missing_future_annotations_old_style(
+                                flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, value,
                                 );
                             }
@@ -2216,13 +2216,13 @@ where
                 }
 
                 // Ex) list[...]
-                if self.enabled(Rule::MissingFutureAnnotationsImportNewStyle) {
+                if self.enabled(Rule::FutureRequiredTypeAnnotation) {
                     if self.settings.target_version < PythonVersion::Py39
                         && !self.semantic_model.future_annotations()
                         && self.semantic_model.in_annotation()
                         && analyze::typing::is_pep585_generic(value, &self.semantic_model)
                     {
-                        flake8_future_annotations::rules::missing_future_annotations_new_style(
+                        flake8_future_annotations::rules::future_required_type_annotation(
                             self,
                             expr,
                             flake8_future_annotations::rules::Reason::PEP585,
@@ -2286,19 +2286,19 @@ where
 
                         // Ex) List[...]
                         if self.any_enabled(&[
-                            Rule::MissingFutureAnnotationsImportOldStyle,
+                            Rule::FutureRewritableTypeAnnotation,
                             Rule::NonPEP585Annotation,
                         ]) {
                             if let Some(replacement) =
                                 analyze::typing::to_pep585_generic(expr, &self.semantic_model)
                             {
-                                if self.enabled(Rule::MissingFutureAnnotationsImportOldStyle) {
+                                if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                                     if self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic_model.future_annotations()
                                         && self.semantic_model.in_annotation()
                                     {
-                                        flake8_future_annotations::rules::missing_future_annotations_old_style(
+                                        flake8_future_annotations::rules::future_rewritable_type_annotation(
                                             self, expr,
                                         );
                                     }
@@ -2364,19 +2364,19 @@ where
             Expr::Attribute(ast::ExprAttribute { attr, value, .. }) => {
                 // Ex) typing.List[...]
                 if self.any_enabled(&[
-                    Rule::MissingFutureAnnotationsImportOldStyle,
+                    Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP585Annotation,
                 ]) {
                     if let Some(replacement) =
                         analyze::typing::to_pep585_generic(expr, &self.semantic_model)
                     {
-                        if self.enabled(Rule::MissingFutureAnnotationsImportOldStyle) {
+                        if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic_model.future_annotations()
                                 && self.semantic_model.in_annotation()
                             {
-                                flake8_future_annotations::rules::missing_future_annotations_old_style(
+                                flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, expr,
                                 );
                             }
@@ -3214,12 +3214,12 @@ where
                 ..
             }) => {
                 // Ex) `str | None`
-                if self.enabled(Rule::MissingFutureAnnotationsImportNewStyle) {
+                if self.enabled(Rule::FutureRequiredTypeAnnotation) {
                     if self.settings.target_version < PythonVersion::Py310
                         && !self.semantic_model.future_annotations()
                         && self.semantic_model.in_annotation()
                     {
-                        flake8_future_annotations::rules::missing_future_annotations_new_style(
+                        flake8_future_annotations::rules::future_required_type_annotation(
                             self,
                             expr,
                             flake8_future_annotations::rules::Reason::PEP604,

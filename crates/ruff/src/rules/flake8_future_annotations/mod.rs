@@ -31,7 +31,7 @@ mod tests {
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImportOldStyle)
+                ..settings::Settings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
         )?;
         assert_messages!(snapshot, diagnostics);
@@ -49,7 +49,7 @@ mod tests {
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImportNewStyle)
+                ..settings::Settings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

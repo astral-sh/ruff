@@ -35,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///     ...
 /// ```
 #[violation]
-pub struct MissingFutureAnnotationsImportNewStyle {
+pub struct FutureRequiredTypeAnnotation {
     reason: Reason,
 }
 
@@ -56,22 +56,18 @@ impl fmt::Display for Reason {
     }
 }
 
-impl Violation for MissingFutureAnnotationsImportNewStyle {
+impl Violation for FutureRequiredTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingFutureAnnotationsImportNewStyle { reason } = self;
+        let FutureRequiredTypeAnnotation { reason } = self;
         format!("Missing `from __future__ import annotations`, but uses {reason}")
     }
 }
 
 /// FA102
-pub(crate) fn missing_future_annotations_new_style(
-    checker: &mut Checker,
-    expr: &Expr,
-    reason: Reason,
-) {
+pub(crate) fn future_required_type_annotation(checker: &mut Checker, expr: &Expr, reason: Reason) {
     checker.diagnostics.push(Diagnostic::new(
-        MissingFutureAnnotationsImportNewStyle { reason },
+        FutureRequiredTypeAnnotation { reason },
         expr.range(),
     ));
 }

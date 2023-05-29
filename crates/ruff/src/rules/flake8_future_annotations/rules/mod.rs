@@ -1,9 +1,9 @@
-pub(crate) use missing_future_annotations_new_style::{
-    missing_future_annotations_new_style, MissingFutureAnnotationsImportNewStyle, Reason,
+pub(crate) use future_required_type_annotation::{
+    future_required_type_annotation, FutureRequiredTypeAnnotation, Reason,
 };
-pub(crate) use missing_future_annotations_old_style::{
-    missing_future_annotations_old_style, MissingFutureAnnotationsImportOldStyle,
+pub(crate) use future_rewritable_type_annotation::{
+    future_rewritable_type_annotation, FutureRewritableTypeAnnotation,
 };
 
-mod missing_future_annotations_new_style;
-mod missing_future_annotations_old_style;
+mod future_required_type_annotation;
+mod future_rewritable_type_annotation;
