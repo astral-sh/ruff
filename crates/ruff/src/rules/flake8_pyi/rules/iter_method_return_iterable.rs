@@ -17,13 +17,15 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// class Foo:
-///     def __iter__(self) -> collections.abc.Iterable: ...
+///     def __iter__(self) -> collections.abc.Iterable:
+///         ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Foo:
-///     def __iter__(self) -> collections.abc.Iterator: ...
+///     def __iter__(self) -> collections.abc.Iterator:
+///         ...
 /// ```
 #[violation]
 pub struct IterMethodReturnIterable;
