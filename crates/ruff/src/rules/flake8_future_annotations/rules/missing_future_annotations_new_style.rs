@@ -32,7 +32,7 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// def func(obj: dict[str, int | None]) -> None:
-///    ...
+///     ...
 /// ```
 #[violation]
 pub struct MissingFutureAnnotationsImportNewStyle {

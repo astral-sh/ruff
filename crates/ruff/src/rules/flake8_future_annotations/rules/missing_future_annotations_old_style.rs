@@ -26,9 +26,8 @@ use crate::checkers::ast::Checker;
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def function(a_dict: Dict[str, Optional[int]]) -> None:
-///     a_list: List[str] = []
-///     a_list.append("hello")
+/// def func(obj: Dict[str, Optional[int]]) -> None:
+///     ...
 /// ```
 ///
 /// Use instead:
@@ -38,9 +37,8 @@ use crate::checkers::ast::Checker;
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def function(a_dict: Dict[str, Optional[int]]) -> None:
-///     a_list: List[str] = []
-///     a_list.append("hello")
+/// def func(obj: Dict[str, Optional[int]]) -> None:
+///     ...
 /// ```
 ///
 /// After running the additional pyupgrade rules:
@@ -48,9 +46,8 @@ use crate::checkers::ast::Checker;
 /// from __future__ import annotations
 ///
 ///
-/// def function(a_dict: dict[str, int | None]) -> None:
-///     a_list: list[str] = []
-///     a_list.append("hello")
+/// def func(obj: dict[str, int | None]) -> None:
+///     ...
 /// ```
 #[violation]
 pub struct MissingFutureAnnotationsImportOldStyle {
