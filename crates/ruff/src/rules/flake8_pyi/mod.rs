@@ -24,6 +24,8 @@ mod tests {
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.py"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.pyi"))]
+    #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.py"))]
+    #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.pyi"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.py"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.pyi"))]
     #[test_case(Rule::PassInClassBody, Path::new("PYI012.py"))]
