@@ -25,13 +25,31 @@ mod tests {
     #[test_case(Path::new("ok_non_simplifiable_types.py"))]
     #[test_case(Path::new("ok_uses_future.py"))]
     #[test_case(Path::new("ok_variable_name.py"))]
-    fn rules(path: &Path) -> Result<()> {
+    fn fa100(path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImport)
+                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImportOldStyle)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_future_import_uses_lowercase.py"))]
+    #[test_case(Path::new("no_future_import_uses_union.py"))]
+    #[test_case(Path::new("no_future_import_uses_union_inner.py"))]
+    #[test_case(Path::new("ok_no_types.py"))]
+    #[test_case(Path::new("ok_uses_future.py"))]
+    fn fa102(path: &Path) -> Result<()> {
+        let snapshot = format!("fa102_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_future_annotations").join(path).as_path(),
+            &settings::Settings {
+                target_version: PythonVersion::Py37,
+                ..settings::Settings::for_rule(Rule::MissingFutureAnnotationsImportNewStyle)
             },
         )?;
         assert_messages!(snapshot, diagnostics);

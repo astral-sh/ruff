@@ -26,9 +26,8 @@ use crate::checkers::ast::Checker;
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def function(a_dict: Dict[str, Optional[int]]) -> None:
-///     a_list: List[str] = []
-///     a_list.append("hello")
+/// def func(obj: Dict[str, Optional[int]]) -> None:
+///     ...
 /// ```
 ///
 /// Use instead:
@@ -38,9 +37,8 @@ use crate::checkers::ast::Checker;
 /// from typing import List, Dict, Optional
 ///
 ///
-/// def function(a_dict: Dict[str, Optional[int]]) -> None:
-///     a_list: List[str] = []
-///     a_list.append("hello")
+/// def func(obj: Dict[str, Optional[int]]) -> None:
+///     ...
 /// ```
 ///
 /// After running the additional pyupgrade rules:
@@ -48,25 +46,24 @@ use crate::checkers::ast::Checker;
 /// from __future__ import annotations
 ///
 ///
-/// def function(a_dict: dict[str, int | None]) -> None:
-///     a_list: list[str] = []
-///     a_list.append("hello")
+/// def func(obj: dict[str, int | None]) -> None:
+///     ...
 /// ```
 #[violation]
-pub struct MissingFutureAnnotationsImport {
+pub struct MissingFutureAnnotationsImportOldStyle {
     name: String,
 }
 
-impl Violation for MissingFutureAnnotationsImport {
+impl Violation for MissingFutureAnnotationsImportOldStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingFutureAnnotationsImport { name } = self;
+        let MissingFutureAnnotationsImportOldStyle { name } = self;
         format!("Missing `from __future__ import annotations`, but uses `{name}`")
     }
 }
 
 /// FA100
-pub(crate) fn missing_future_annotations(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn missing_future_annotations_old_style(checker: &mut Checker, expr: &Expr) {
     let name = checker
         .semantic_model()
         .resolve_call_path(expr)
@@ -74,7 +71,7 @@ pub(crate) fn missing_future_annotations(checker: &mut Checker, expr: &Expr) {
 
     if let Some(name) = name {
         checker.diagnostics.push(Diagnostic::new(
-            MissingFutureAnnotationsImport { name },
+            MissingFutureAnnotationsImportOldStyle { name },
             expr.range(),
         ));
     }
