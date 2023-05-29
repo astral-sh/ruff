@@ -12,8 +12,8 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::Print, Path::new("T201.py"); "T201")]
-    #[test_case(Rule::PPrint, Path::new("T203.py"); "T203")]
+    #[test_case(Rule::Print, Path::new("T201.py"))]
+    #[test_case(Rule::PPrint, Path::new("T203.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

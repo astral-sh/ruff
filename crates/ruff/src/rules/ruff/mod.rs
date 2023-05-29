@@ -20,9 +20,9 @@ mod tests {
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"); "RUF010")]
-    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"); "RUF005")]
-    #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
+    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
+    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
+    #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -167,8 +167,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"); "RUF008")]
-    #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"); "RUF009")]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
     fn mutable_defaults(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
