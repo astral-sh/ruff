@@ -668,7 +668,7 @@ ruff_macros::register_rules!(
     rules::flake8_todos::rules::InvalidTodoCapitalization,
     rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
     // airflow
-    rules::airflow::rules::TaskVariableNameNotTaskId,
+    rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
 );
 
 pub trait AsRule {

@@ -245,7 +245,6 @@ catches a wide variety of common errors (like unused imports) with zero configur
 Beyond the defaults, Ruff re-implements some of the most popular Flake8 plugins and related code
 quality tools, including:
 
-- [airflow](https://pypi.org/project/apache-airflow/)
 - [autoflake](https://pypi.org/project/autoflake/)
 - [eradicate](https://pypi.org/project/eradicate/)
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
@@ -292,6 +291,7 @@ quality tools, including:
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
+- [pylint-airflow](https://pypi.org/project/pylint-airflow/)
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)

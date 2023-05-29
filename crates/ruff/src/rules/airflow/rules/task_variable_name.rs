@@ -3,19 +3,23 @@ use rustpython_parser::ast::{Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::prelude::Constant;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks that the task variable name is the same as the task_id.
+/// Checks that the task variable name matches the `task_id` value for
+/// Airflow Operators.
 ///
 /// ## Why is this bad?
-/// For consistency, the task variable name should be the same as the task_id.
-/// This makes it easier for you and others to understand the code.
+/// When initializing an Airflow Operator, for consistency, the variable
+/// name should match the `task_id` value. This makes it easier to
+/// follow the flow of the DAG.
 ///
 /// ## Example
 /// ```python
 /// from airflow.operators import PythonOperator
+///
 ///
 /// incorrect_name = PythonOperator(task_id="my_task")
 /// ```
@@ -24,25 +28,29 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from airflow.operators import PythonOperator
 ///
+///
 /// my_task = PythonOperator(task_id="my_task")
 /// ```
 #[violation]
-pub struct TaskVariableNameNotTaskId;
+pub struct AirflowVariableNameTaskIdMismatch {
+    task_id: String,
+}
 
-impl Violation for TaskVariableNameNotTaskId {
+impl Violation for AirflowVariableNameTaskIdMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Task variable name should be the same as the task_id")
+        let AirflowVariableNameTaskIdMismatch { task_id } = self;
+        format!("Task variable name should match the `task_id`: \"{task_id}\"")
     }
 }
 
 /// AIR001
-pub(crate) fn task_variable_name(
+pub(crate) fn variable_name_task_id(
     checker: &mut Checker,
     targets: &[Expr],
     value: &Expr,
 ) -> Option<Diagnostic> {
-    // if we have more than one target, we can't do anything
+    // If we have more than one target, we can't do anything.
     if targets.len() != 1 {
         return None;
     }
@@ -52,46 +60,43 @@ pub(crate) fn task_variable_name(
         return None;
     };
 
-    // if the value is not a call, we can't do anything
-    let Expr::Call(call) = value else { return None };
-
-    // if the function doesn't come from airflow, we can't do anything
-    let func_name = match call.func.as_name_expr() {
-        Some(name) => name.id.as_str(),
-        None => return None,
-    };
-    let fully_qualified_func_name = match checker.semantic_model().find_binding(func_name) {
-        Some(call_path) => match call_path.kind.as_from_importation() {
-            Some(from_importation) => &from_importation.full_name,
-            None => return None,
-        },
-        None => return None,
+    // If the value is not a call, we can't do anything.
+    let Expr::Call(ast::ExprCall { func, keywords, .. }) = value else {
+        return None;
     };
 
-    if !fully_qualified_func_name.starts_with("airflow.") {
+    // If the function doesn't come from Airflow, we can't do anything.
+    if !checker
+        .semantic_model()
+        .resolve_call_path(func)
+        .map_or(false, |call_path| matches!(call_path[0], "airflow"))
+    {
         return None;
     }
 
-    // if the call doesn't have a task_id, don't do anything
-    let Some(task_id_arg) = call.keywords.iter().find(|keyword| match &keyword.arg {
-            Some(arg_name) => arg_name == "task_id",
-            _ => false,
-        }) else { return None };
+    // If the call doesn't have a `task_id` keyword argument, we can't do anything.
+    let keyword = keywords
+        .iter()
+        .find(|keyword| keyword.arg.as_ref().map_or(false, |arg| arg == "task_id"))?;
 
-    // get the task_id value
-    let task_id_arg_value = match &task_id_arg.value {
-        Expr::Constant(constant) => match constant.value.as_str() {
-            Some(string) => string,
-            None => return None,
+    // If the keyword argument is not a string, we can't do anything.
+    let task_id = match &keyword.value {
+        Expr::Constant(constant) => match &constant.value {
+            Constant::Str(value) => value,
+            _ => return None,
         },
         _ => return None,
     };
 
-    // if the target name is the same as the task_id, no violation
-    if &id.to_string() == task_id_arg_value {
+    // If the target name is the same as the task_id, no violation.
+    if id == task_id {
         return None;
     }
 
-    // if the target name is not the same as the task_id, violation
-    Some(Diagnostic::new(TaskVariableNameNotTaskId, target.range()))
+    Some(Diagnostic::new(
+        AirflowVariableNameTaskIdMismatch {
+            task_id: task_id.to_string(),
+        },
+        target.range(),
+    ))
 }

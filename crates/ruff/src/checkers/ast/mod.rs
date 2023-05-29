@@ -1633,11 +1633,9 @@ where
                         pycodestyle::rules::lambda_assignment(self, target, value, None, stmt);
                     }
                 }
-
                 if self.enabled(Rule::AssignmentToOsEnviron) {
                     flake8_bugbear::rules::assignment_to_os_environ(self, targets);
                 }
-
                 if self.enabled(Rule::HardcodedPasswordString) {
                     if let Some(diagnostic) =
                         flake8_bandit::rules::assign_hardcoded_password_string(value, targets)
@@ -1645,7 +1643,6 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-
                 if self.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
                         if let Expr::Name(ast::ExprName { id, .. }) = target {
@@ -1653,7 +1650,6 @@ where
                         }
                     }
                 }
-
                 if self.enabled(Rule::UselessMetaclassType) {
                     pyupgrade::rules::useless_metaclass_type(self, stmt, value, targets);
                 }
@@ -1670,21 +1666,22 @@ where
                 if self.enabled(Rule::UnpackedListComprehension) {
                     pyupgrade::rules::unpacked_list_comprehension(self, targets, value);
                 }
-
                 if self.enabled(Rule::PandasDfVariableName) {
                     if let Some(diagnostic) = pandas_vet::rules::assignment_to_df(targets) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-
-                if self.settings.rules.enabled(Rule::TaskVariableNameNotTaskId) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::AirflowVariableNameTaskIdMismatch)
+                {
                     if let Some(diagnostic) =
-                        airflow::rules::task_variable_name(self, targets, value)
+                        airflow::rules::variable_name_task_id(self, targets, value)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-
                 if self.is_stub {
                     if self.any_enabled(&[
                         Rule::UnprefixedTypeParam,
