@@ -9,80 +9,116 @@ use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `__iter__` methods in stubs with the wrong return type annotation.
+/// Checks for `__iter__` methods in stubs that return `Iterable[T]` instead
+/// of an `Iterator[T]`.
 ///
 /// ## Why is this bad?
-/// `__iter__` should return an `Iterator`, not an `Iterable`.
+/// `__iter__` methods should always should return an `Iterator` of some kind,
+/// not an `Iterable`.
+///
+/// In Python, an `Iterator` is an object that has a `__next__` method, which
+/// provides a consistent interface for sequentially processing elements from
+/// a sequence or other iterable object. Meanwhile, an `Iterable` is an object
+/// with an `__iter__` method, which itself returns an `Iterator`.
+///
+/// Every `Iterator` is an `Iterable`, but not every `Iterable` is an `Iterator`.
+/// By returning an `Iterable` from `__iter__`, you may end up returning an
+/// object that doesn't implement `__next__`, which will cause a `TypeError`
+/// at runtime. For example, returning a `list` from `__iter__` will cause
+/// a `TypeError` when you call `__next__` on it, as a `list` is an `Iterable`,
+/// but not an `Iterator`.
 ///
 /// ## Example
 /// ```python
-/// class Foo:
-///     def __iter__(self) -> collections.abc.Iterable:
+/// import collections.abc
+///
+///
+/// class Class:
+///     def __iter__(self) -> collections.abc.Iterable[str]:
 ///         ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class Foo:
-///     def __iter__(self) -> collections.abc.Iterator:
+/// import collections.abc
+///
+/// class Class:
+///     def __iter__(self) -> collections.abc.Iterator[str]:
 ///         ...
 /// ```
 #[violation]
-pub struct IterMethodReturnIterable;
+pub struct IterMethodReturnIterable {
+    async_: bool,
+}
 
 impl Violation for IterMethodReturnIterable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("__iter__ methods should never return ` Iterable[T]`, as they should always return some kind of `Iterator`.")
+        let IterMethodReturnIterable { async_ } = self;
+        if *async_ {
+            format!("`__aiter__` methods should return an `AsyncIterator`, not an `AsyncIterable`")
+        } else {
+            format!("`__iter__` methods should return an `Iterator`, not an `Iterable`")
+        }
     }
 }
 
 /// PYI045
 pub(crate) fn iter_method_return_iterable(checker: &mut Checker, definition: &Definition) {
     let Definition::Member(Member {
-                               kind: MemberKind::Method,
-                               stmt,
-                               ..
-                           }) = definition else {
+        kind: MemberKind::Method,
+        stmt,
+        ..
+    }) = definition else {
         return;
     };
 
     let Stmt::FunctionDef(ast::StmtFunctionDef {
-                              name,
-                              returns,
-                              ..
-                          }) = stmt else {
+        name,
+        returns,
+        ..
+    }) = stmt else {
         return;
     };
-
-    if name != "__iter__" {
-        return;
-    }
 
     let Some(returns) = returns else {
         return;
     };
 
-    let annotation = match returns.as_ref() {
-        // e.g., Iterable[T]
-        Expr::Subscript(ast::ExprSubscript { value, .. }) => value.as_ref(),
-        // e.g., typing.Iterable, Iterable
-        ann_expr @ (Expr::Name(_) | Expr::Attribute(_)) => ann_expr,
+    let annotation = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = returns.as_ref() {
+        // Ex) `Iterable[T]`
+        value
+    } else {
+        // Ex) `Iterable`, `typing.Iterable`
+        returns
+    };
+
+    let async_ = match name.as_str() {
+        "__iter__" => false,
+        "__aiter__" => true,
         _ => return,
     };
 
     if checker
         .semantic_model()
         .resolve_call_path(annotation)
-        .map_or(false, |cp| {
-            matches!(
-                cp.as_slice(),
-                &["typing", "Iterable"] | &["collections", "abc", "Iterable"]
-            )
+        .map_or(false, |call_path| {
+            if async_ {
+                matches!(
+                    call_path.as_slice(),
+                    ["typing", "AsyncIterable"] | ["collections", "abc", "AsyncIterable"]
+                )
+            } else {
+                matches!(
+                    call_path.as_slice(),
+                    ["typing", "Iterable"] | ["collections", "abc", "Iterable"]
+                )
+            }
         })
     {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(IterMethodReturnIterable, returns.range()));
+        checker.diagnostics.push(Diagnostic::new(
+            IterMethodReturnIterable { async_ },
+            returns.range(),
+        ));
     }
 }

@@ -2,8 +2,6 @@ import collections.abc
 import typing
 from collections.abc import Iterator, Iterable
 
-# All OK for PYI045 because this isn't a stub.
-
 
 class NoReturn:
     def __iter__(self):
@@ -74,4 +72,14 @@ class CollectionsIteratorReturn:
 
 class CollectionsIteratorTReturn:
     def __iter__(self) -> collections.abc.Iterator[int]:
+        ...
+
+
+class TypingAsyncIterableTReturn:
+    def __aiter__(self) -> typing.AsyncIterable[int]:
+        ...
+
+
+class TypingAsyncIterableReturn:
+    def __aiter__(self) -> typing.AsyncIterable:
         ...

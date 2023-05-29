@@ -41,3 +41,9 @@ class CollectionsIteratorReturn:
 
 class CollectionsIteratorTReturn:
     def __iter__(self) -> collections.abc.Iterator[int]: ...
+
+class TypingAsyncIterableTReturn:
+    def __aiter__(self) -> typing.AsyncIterable[int]: ...  # Error: PYI045
+
+class TypingAsyncIterableReturn:
+    def __aiter__(self) -> typing.AsyncIterable: ...  # Error: PYI045
