@@ -263,7 +263,7 @@ first-party.
 
 For example, if you have a project with the following structure:
 
-```
+```tree
 .
 ├── pyproject.toml
 ├── src
