@@ -152,7 +152,7 @@ Something [`else`][other].
 
 [other]: http://example.com.
 
-[mccabe.max-complexity]: ../../settings#max-complexity\n"
+[mccabe.max-complexity]: ../../settings#mccabe-max-complexity\n"
         );
     }
 }
