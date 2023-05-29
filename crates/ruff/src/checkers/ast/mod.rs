@@ -5289,7 +5289,8 @@ impl<'a> Checker<'a> {
             Rule::MissingReturnTypeClassMethod,
             Rule::AnyType,
         ]);
-        let enforce_stubs = self.is_stub && self.any_enabled(&[Rule::DocstringInStub]);
+        let enforce_stubs = self.is_stub
+            && self.any_enabled(&[Rule::DocstringInStub, Rule::IterMethodReturnIterable]);
         let enforce_docstrings = self.any_enabled(&[
             Rule::UndocumentedPublicModule,
             Rule::UndocumentedPublicClass,
@@ -5392,6 +5393,9 @@ impl<'a> Checker<'a> {
                 if self.is_stub {
                     if self.enabled(Rule::DocstringInStub) {
                         flake8_pyi::rules::docstring_in_stubs(self, docstring);
+                    }
+                    if self.enabled(Rule::IterMethodReturnIterable) {
+                        flake8_pyi::rules::iter_method_return_iterable(self, definition);
                     }
                 }
             }
