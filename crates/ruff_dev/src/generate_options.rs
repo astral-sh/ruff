@@ -5,7 +5,14 @@ use ruff::settings::options::Options;
 use ruff::settings::options_base::{OptionEntry, OptionField};
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
-    output.push_str(&format!("#### [`{name}`](#{name})\n"));
+    // if there's a group name, we need to add it to the anchor
+    if let Some(group_name) = group_name {
+        output.push_str(&format!(
+            "#### [`{name}`](#{group_name}-{name}) {{: #{group_name}-{name} }}\n"
+        ));
+    } else {
+        output.push_str(&format!("#### [`{name}`](#{name})\n"));
+    }
     output.push('\n');
     output.push_str(field.doc);
     output.push_str("\n\n");
