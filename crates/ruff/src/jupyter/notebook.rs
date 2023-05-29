@@ -12,11 +12,13 @@ use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::jupyter::index::{JupyterIndex, JupyterIndexBuilder};
-use crate::jupyter::{CellType, JupyterNotebook, SourceValue};
+use crate::jupyter::{Cell, CellType, JupyterNotebook, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
 use crate::IOError;
 
 pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
+
+const MAGIC_PREFIX: [&str; 3] = ["%", "!", "?"];
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
 pub fn is_jupyter_notebook(path: &Path) -> bool {
@@ -27,12 +29,35 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
         && cfg!(feature = "jupyter_notebook")
 }
 
+/// Return `true` if the given [`Cell`] is a valid code cell.
+///
+/// A valid code cell is a cell where the type is [`CellType::Code`] and the
+/// source is not a magic, shell or help command.
+fn is_valid_code_cell(cell: &Cell) -> bool {
+    if cell.cell_type != CellType::Code {
+        return false;
+    }
+    let lines = match &cell.source {
+        SourceValue::String(string) => string.lines().collect::<Vec<_>>(),
+        SourceValue::StringArray(string_array) => string_array
+            .iter()
+            .map(std::string::String::as_str)
+            .collect(),
+    };
+    !lines.iter().all(|line| {
+        MAGIC_PREFIX
+            .iter()
+            .any(|prefix| line.trim_start().starts_with(prefix))
+    })
+}
+
 #[derive(Debug)]
 pub struct Notebook {
     content: String,
     index: JupyterIndex,
     raw: JupyterNotebook,
     cell_offsets: Vec<TextSize>,
+    valid_code_cells: Vec<usize>,
 }
 
 impl Notebook {
@@ -128,26 +153,23 @@ impl Notebook {
             )));
         }
 
-        let size_hint = notebook
+        let valid_code_cells = notebook
             .cells
             .iter()
-            .filter(|cell| cell.cell_type == CellType::Code)
-            .count();
+            .enumerate()
+            .filter(|(_, cell)| is_valid_code_cell(cell))
+            .map(|(pos, _)| pos)
+            .collect::<Vec<_>>();
 
         let mut current_offset = TextSize::from(0);
         let mut cell_offsets = Vec::with_capacity(notebook.cells.len());
         cell_offsets.push(TextSize::from(0));
 
-        let mut contents = Vec::with_capacity(size_hint);
+        let mut contents = Vec::with_capacity(valid_code_cells.len());
         let mut builder = JupyterIndexBuilder::default();
 
-        for (pos, cell) in notebook
-            .cells
-            .iter()
-            .enumerate()
-            .filter(|(_, cell)| cell.cell_type == CellType::Code)
-        {
-            let cell_contents = builder.add_code_cell(pos, cell);
+        for &pos in &valid_code_cells {
+            let cell_contents = builder.add_code_cell(pos, &notebook.cells[pos]);
             current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
             cell_offsets.push(current_offset);
             contents.push(cell_contents);
@@ -163,6 +185,7 @@ impl Notebook {
             index: builder.finish(),
             content: contents.join("\n"),
             cell_offsets,
+            valid_code_cells,
         })
     }
 
@@ -213,41 +236,26 @@ impl Notebook {
     }
 
     fn update_cell_content(&mut self, transformed: &str) {
-        for (cell, (start, end)) in self
-            .raw
-            .cells
-            .iter_mut()
-            .filter(|cell| cell.cell_type == CellType::Code)
+        for (&pos, (start, end)) in self
+            .valid_code_cells
+            .iter()
             .zip(self.cell_offsets.iter().tuple_windows::<(_, _)>())
         {
             let cell_content = transformed
                 .get(start.to_usize()..end.to_usize())
-                .unwrap_or_else(|| panic!("cell content out of bounds: {cell:?}"))
+                .unwrap_or_else(|| panic!("cell content out of bounds: {:?}", &self.raw.cells[pos]))
                 .trim_end_matches(|c| c == '\r' || c == '\n')
                 .to_string();
-            cell.source = SourceValue::String(cell_content);
+            self.raw.cells[pos].source = SourceValue::String(cell_content);
         }
     }
 
     fn refresh_index(&mut self) {
-        let size_hint = self
-            .raw
-            .cells
-            .iter()
-            .filter(|cell| cell.cell_type == CellType::Code)
-            .count();
-
-        let mut contents = Vec::with_capacity(size_hint);
+        let mut contents = Vec::with_capacity(self.valid_code_cells.len());
         let mut builder = JupyterIndexBuilder::default();
 
-        for (pos, cell) in self
-            .raw
-            .cells
-            .iter()
-            .enumerate()
-            .filter(|(_pos, cell)| cell.cell_type == CellType::Code)
-        {
-            let cell_contents = builder.add_code_cell(pos, cell);
+        for &pos in &self.valid_code_cells {
+            let cell_contents = builder.add_code_cell(pos, &self.raw.cells[pos]);
             contents.push(cell_contents);
         }
 
