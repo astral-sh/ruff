@@ -8,8 +8,13 @@ edition = "2021"
 # It reimplements AST types, but currently both slower than python AST types and limited to use in other API
 wrapper = []
 
+[lib]
+name = "rustpython_ast"
+crate-type = ["cdylib"]
+
 [dependencies]
 rustpython-ast = { workspace = true, features = ["location"] }
+rustpython-parser = { workspace = true }
 num-complex = { workspace = true }
 once_cell = { workspace = true }
 
