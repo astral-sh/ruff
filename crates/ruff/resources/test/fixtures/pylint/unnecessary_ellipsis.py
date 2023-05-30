@@ -10,6 +10,14 @@ except ValueError:
     ...  # [unnecessary-ellipsis]
 
 
+# Ellipsis in else statement
+if True:
+    A = 2
+else:
+    A = 24
+    ...  # [unnecessary-ellipsis]
+
+
 def ellipsis_and_subsequent_statement():
     ...  # [unnecessary-ellipsis]
     return 0
