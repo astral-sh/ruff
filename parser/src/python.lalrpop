@@ -387,7 +387,8 @@ MatchStatement: ast::Stmt = {
 }
 
 MatchCase: ast::MatchCase = {
-    <start:@L> "case" <pattern:Patterns> <guard:(Guard)?> ":" <body:Suite> <end:@R> => {
+    <start:@L> "case" <pattern:Patterns> <guard:(Guard)?> ":" <body:Suite> => {
+        let end = body.last().unwrap().end();
         ast::MatchCase {
             pattern,
             guard: guard.map(Box::new),
