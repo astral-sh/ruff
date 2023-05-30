@@ -19,9 +19,11 @@
 		"vscode": {
 			"extensions": [
 				"ms-python.python",
-				"1YiB.rust-bundle",
+				"rust-lang.rust-analyzer",
+				"serayuzgur.crates",
 				"tamasfe.even-better-toml",
-				"Swellaby.vscode-rust-test-adapter"
+				"Swellaby.vscode-rust-test-adapter",
+				"charliermarsh.ruff"
 			],
 			"settings": {
 				"rust-analyzer.updates.askBeforeDownload": false
