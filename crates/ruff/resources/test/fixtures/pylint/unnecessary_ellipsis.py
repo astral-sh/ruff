@@ -8,6 +8,9 @@ try:
 except ValueError:
     A = 24
     ...  # [unnecessary-ellipsis]
+finally:
+    A = 3
+    ...  # [unnecessary-ellipsis]
 
 
 # Ellipsis in else statement

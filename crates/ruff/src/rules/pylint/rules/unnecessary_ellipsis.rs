@@ -141,12 +141,26 @@ pub(crate) fn unnecessary_ellipsis(checker: &mut Checker, expr: &Expr) {
                 process_body(checker, stmt, body, expr);
             }
         }
-        if let Stmt::Try(ast::StmtTry { handlers, .. }) = stmt {
+        if let Stmt::Try(ast::StmtTry {
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        })
+        | Stmt::TryStar(ast::StmtTryStar {
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) = stmt
+        {
             for handler in handlers {
                 let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
                     handler;
                 process_body(checker, stmt, body, expr);
             }
+            process_body(checker, stmt, orelse, expr);
+            process_body(checker, stmt, finalbody, expr);
         }
     }
 }
