@@ -67,10 +67,14 @@ impl JupyterIndexBuilder {
                 string.clone()
             }
             SourceValue::StringArray(string_array) => {
-                self.row_to_cell
-                    .extend(iter::repeat(u32::try_from(pos + 1).unwrap()).take(string_array.len()));
+                let trailing_newline =
+                    usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
+                self.row_to_cell.extend(
+                    iter::repeat(u32::try_from(pos + 1).unwrap())
+                        .take(string_array.len() + trailing_newline),
+                );
                 self.row_to_row_in_cell
-                    .extend(1..=u32::try_from(string_array.len()).unwrap());
+                    .extend(1..=u32::try_from(string_array.len() + trailing_newline).unwrap());
                 // lines already end in a newline character
                 string_array.join("")
             }
