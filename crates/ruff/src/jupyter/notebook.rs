@@ -385,8 +385,8 @@ mutable_argument()
             notebook.index(),
             JupyterIndex {
                 inner: Arc::new(JupyterIndexInner {
-                    row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3],
-                    row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4],
+                    row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
+                    row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5],
                 }),
             }
         );
