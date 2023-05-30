@@ -3379,7 +3379,7 @@ where
                 ..
             }) => {
                 if self.enabled(Rule::UnnecessaryEllipsis) {
-                    pylint::rules::unnecessary_ellipsis(self);
+                    pylint::rules::unnecessary_ellipsis(self, expr);
                 }
             }
             Expr::Constant(ast::ExprConstant {

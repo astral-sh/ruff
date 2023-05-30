@@ -77,11 +77,11 @@ fn is_ellipsis(element: &Stmt) -> bool {
 }
 
 /// Checks the statement body for unnecessary ellipses.
-fn process_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
+fn process_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt], expr: &Expr) {
     let has_docstring = starts_with_docstring(body);
     for (element_idx, element) in body.iter().enumerate() {
         if (has_docstring && element_idx == 1 && is_ellipsis(element))
-            || (is_ellipsis(element) && body.len() > 1)
+            || (is_ellipsis(element) && body.len() > 1 && element.range() == expr.range())
         {
             let mut diagnostic = Diagnostic::new(UnnecessaryEllipsis, element.range());
             diagnostic.try_set_fix(|| {
@@ -116,23 +116,23 @@ fn process_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
 ///    - A statement exists in the same scope as the ellipsis.
 ///      For example: A function consisting of an ellipsis followed by a
 ///      return statement on the next line.
-pub(crate) fn unnecessary_ellipsis(checker: &mut Checker) {
+pub(crate) fn unnecessary_ellipsis(checker: &mut Checker, expr: &Expr) {
     if let Some(stmt) = checker.semantic_model().stmt_parent() {
         if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
         | Stmt::If(ast::StmtIf { body, .. })
         | Stmt::Try(ast::StmtTry { body, .. })
         | Stmt::ClassDef(ast::StmtClassDef { body, .. }) = stmt
         {
-            process_body(checker, stmt, body);
+            process_body(checker, stmt, body, expr);
         }
         if let Stmt::If(ast::StmtIf { orelse, .. }) = stmt {
-            process_body(checker, stmt, orelse);
+            process_body(checker, stmt, orelse, expr);
         }
         if let Stmt::Try(ast::StmtTry { handlers, .. }) = stmt {
             for handler in handlers {
                 let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
                     handler;
-                process_body(checker, stmt, body);
+                process_body(checker, stmt, body, expr);
             }
         }
     }

@@ -1,0 +1,189 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+unnecessary_ellipsis.py:10:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+10 | except ValueError:
+11 |     A = 24
+12 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+7  7  |     A = 2
+8  8  | except ValueError:
+9  9  |     A = 24
+10    |-    ...  # [unnecessary-ellipsis]
+11 10 | 
+12 11 | 
+13 12 | # Ellipsis in else statement
+
+unnecessary_ellipsis.py:18:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+18 | else:
+19 |     A = 24
+20 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+15 15 |     A = 2
+16 16 | else:
+17 17 |     A = 24
+18    |-    ...  # [unnecessary-ellipsis]
+19 18 | 
+20 19 | 
+21 20 | # Ellipsis in if and else statement
+
+unnecessary_ellipsis.py:24:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+24 | if True:
+25 |     A = 2
+26 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+27 | else:
+28 |     A = 24
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+21 21 | # Ellipsis in if and else statement
+22 22 | if True:
+23 23 |     A = 2
+24    |-    ...  # [unnecessary-ellipsis]
+25 24 | else:
+26 25 |     A = 24
+27 26 |     ...  # [unnecessary-ellipsis]
+
+unnecessary_ellipsis.py:27:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+27 | else:
+28 |     A = 24
+29 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+24 24 |     ...  # [unnecessary-ellipsis]
+25 25 | else:
+26 26 |     A = 24
+27    |-    ...  # [unnecessary-ellipsis]
+28 27 | 
+29 28 | 
+30 29 | def ellipsis_and_subsequent_statement():
+
+unnecessary_ellipsis.py:31:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+31 | def ellipsis_and_subsequent_statement():
+32 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+33 |     return 0
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+28 28 | 
+29 29 | 
+30 30 | def ellipsis_and_subsequent_statement():
+31    |-    ...  # [unnecessary-ellipsis]
+32 31 |     return 0
+33 32 | 
+34 33 | 
+
+unnecessary_ellipsis.py:68:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+68 |     constants
+69 |     """
+70 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+65 65 |     constants, suggesting the removal of the useless `...`
+66 66 |     constants
+67 67 |     """
+68    |-    ...  # [unnecessary-ellipsis]
+69 68 | 
+70 69 | 
+71 70 | class DocstringOnly:
+
+unnecessary_ellipsis.py:81:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+81 | class MultipleEllipses:
+82 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+83 |     ...
+84 |     ...  # [unnecessary-ellipsis]
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+78 78 | 
+79 79 | 
+80 80 | class MultipleEllipses:
+81    |-    ...  # [unnecessary-ellipsis]
+82 81 |     ...
+83 82 |     ...  # [unnecessary-ellipsis]
+84 83 | 
+
+unnecessary_ellipsis.py:82:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+82 | class MultipleEllipses:
+83 |     ...  # [unnecessary-ellipsis]
+84 |     ...
+   |     ^^^ PLW2301
+85 |     ...  # [unnecessary-ellipsis]
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+79 79 | 
+80 80 | class MultipleEllipses:
+81 81 |     ...  # [unnecessary-ellipsis]
+82    |-    ...
+83 82 |     ...  # [unnecessary-ellipsis]
+84 83 | 
+85 84 | 
+
+unnecessary_ellipsis.py:83:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+83 |     ...  # [unnecessary-ellipsis]
+84 |     ...
+85 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+80 80 | class MultipleEllipses:
+81 81 |     ...  # [unnecessary-ellipsis]
+82 82 |     ...
+83    |-    ...  # [unnecessary-ellipsis]
+   83 |+    pass  # [unnecessary-ellipsis]
+84 84 | 
+85 85 | 
+86 86 | class DocstringAndEllipsis:
+
+unnecessary_ellipsis.py:89:5: PLW2301 [*] Unnecessary ellipsis constant.
+   |
+89 |     """Whoops! Mark this one as bad too."""
+90 | 
+91 |     ...  # [unnecessary-ellipsis]
+   |     ^^^ PLW2301
+   |
+   = help: Remove unnecessary ellipsis
+
+ℹ Fix
+86 86 | class DocstringAndEllipsis:
+87 87 |     """Whoops! Mark this one as bad too."""
+88 88 | 
+89    |-    ...  # [unnecessary-ellipsis]
+90 89 | 
+91 90 | 
+92 91 | # Function overloading
+
+
