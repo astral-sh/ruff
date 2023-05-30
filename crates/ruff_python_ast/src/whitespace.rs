@@ -38,3 +38,14 @@ pub fn clean(indentation: &str) -> String {
         .map(|char| if char.is_whitespace() { char } else { ' ' })
         .collect()
 }
+
+/// Returns `true` for [whitespace](https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens)
+/// or new-line characters.
+pub const fn is_python_whitespace(c: char) -> bool {
+    matches!(
+        c,
+        ' ' | '\n' | '\t' | '\r' |
+        // Form-feed
+        '\x0C'
+    )
+}

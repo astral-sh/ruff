@@ -1,6 +1,7 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
+use crate::source_code::comment_ranges::{CommentRanges, CommentRangesBuilder};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{StringKind, Tok};
@@ -8,8 +9,7 @@ use rustpython_parser::{StringKind, Tok};
 use crate::source_code::Locator;
 
 pub struct Indexer {
-    /// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
-    comment_ranges: Vec<TextRange>,
+    comment_ranges: CommentRanges,
 
     /// Stores the start offset of continuation lines.
     continuation_lines: Vec<TextSize>,
@@ -27,7 +27,7 @@ impl Indexer {
     pub fn from_tokens(tokens: &[LexResult], locator: &Locator) -> Self {
         assert!(TextSize::try_from(locator.contents().len()).is_ok());
 
-        let mut comment_ranges = Vec::new();
+        let mut comment_ranges_builder = CommentRangesBuilder::default();
         let mut continuation_lines = Vec::new();
         let mut triple_quoted_string_ranges = Vec::new();
         let mut f_string_ranges = Vec::new();
@@ -63,10 +63,9 @@ impl Indexer {
                 }
             }
 
+            comment_ranges_builder.visit_token(tok, *range);
+
             match tok {
-                Tok::Comment(..) => {
-                    comment_ranges.push(*range);
-                }
                 Tok::Newline | Tok::NonLogicalNewline => {
                     line_start = range.end();
                 }
@@ -89,7 +88,7 @@ impl Indexer {
             prev_end = range.end();
         }
         Self {
-            comment_ranges,
+            comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
             triple_quoted_string_ranges,
             f_string_ranges,
@@ -97,7 +96,7 @@ impl Indexer {
     }
 
     /// Returns the byte offset ranges of comments
-    pub fn comment_ranges(&self) -> &[TextRange] {
+    pub fn comment_ranges(&self) -> &CommentRanges {
         &self.comment_ranges
     }
 

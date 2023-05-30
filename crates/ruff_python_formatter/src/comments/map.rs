@@ -42,6 +42,7 @@ use std::ops::Range;
 /// * 1 byte for the end sequence, e.g. `\n`
 ///
 /// Meaning, the upper bound for comments is `u32::MAX / 2`.
+#[derive(Clone)]
 pub(super) struct MultiMap<K, V> {
     /// Lookup table to retrieve the entry for a key.
     index: FxHashMap<K, Entry>,
@@ -519,7 +520,7 @@ impl<V> ExactSizeIterator for PartsIterator<'_, V> {}
 
 impl<V> FusedIterator for PartsIterator<'_, V> {}
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Entry {
     InOrder(InOrderEntry),
     OutOfOrder(OutOfOrderEntry),
@@ -586,7 +587,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct InOrderEntry {
     /// Index into the [MultiMap::parts] vector where the leading parts of this entry start
     leading_start: PartIndex,
@@ -709,7 +710,7 @@ impl InOrderEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct OutOfOrderEntry {
     /// Index into the [MultiMap::out_of_order] vector at which offset the leaading vec is stored.
     leading_index: usize,
