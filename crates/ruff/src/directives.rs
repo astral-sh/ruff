@@ -241,6 +241,12 @@ impl<'a> TodoComment<'a> {
             range_index,
         })
     }
+
+    /// Determine the starting location for the [`TodoDirective`], relative to the comment's
+    /// starting offset
+    pub fn directive_offset(&self) -> TextSize {
+        self.directive.range.start() - self.range.start()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -251,22 +257,14 @@ pub struct TodoDirective {
     pub range: TextRange,
     /// The directive's kind: HACK, XXX, FIXME, or TODO.
     pub kind: TodoDirectiveKind,
-    /// The directive's offset against the range of the comment that contains it.
-    pub relative_offset: TextSize,
 }
 
 impl TodoDirective {
-    pub fn new(
-        content: String,
-        directive_range: TextRange,
-        kind: TodoDirectiveKind,
-        relative_offset: TextSize,
-    ) -> Self {
+    pub fn new(content: String, directive_range: TextRange, kind: TodoDirectiveKind) -> Self {
         Self {
             content,
             range: directive_range,
             kind,
-            relative_offset,
         }
     }
 
@@ -299,7 +297,6 @@ impl TodoDirective {
                     content,
                     range: TextRange::at(string_range.start() + relative_offset, directive_length),
                     kind: directive_kind,
-                    relative_offset,
                 });
             }
 
@@ -592,7 +589,6 @@ z = x + 1";
             content: String::from("TODO"),
             range: TextRange::new(TextSize::new(2), TextSize::new(6)),
             kind: TodoDirectiveKind::Todo,
-            relative_offset: TextSize::new(2),
         };
         assert_eq!(
             expected,
@@ -605,7 +601,6 @@ z = x + 1";
             content: String::from("TODO"),
             range: TextRange::new(TextSize::new(1), TextSize::new(5)),
             kind: TodoDirectiveKind::Todo,
-            relative_offset: TextSize::new(1),
         };
         assert_eq!(
             expected,
@@ -618,7 +613,6 @@ z = x + 1";
             content: String::from("fixme"),
             range: TextRange::new(TextSize::new(2), TextSize::new(7)),
             kind: TodoDirectiveKind::Fixme,
-            relative_offset: TextSize::new(2),
         };
         assert_eq!(
             expected,
@@ -631,7 +625,6 @@ z = x + 1";
             content: String::from("TODO"),
             range: TextRange::new(TextSize::new(9), TextSize::new(13)),
             kind: TodoDirectiveKind::Todo,
-            relative_offset: TextSize::new(9),
         };
         assert_eq!(
             expected,
