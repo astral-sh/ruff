@@ -6,5 +6,3 @@ cargo install cargo-insta
 cargo fetch
 
 pip install maturin pre-commit
-
-pre-commit install
