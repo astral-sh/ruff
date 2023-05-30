@@ -1,5 +1,4 @@
 use crate::autofix::actions::delete_stmt;
-use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
 use ruff_python_ast::types::RefEquality;
 use rustpython_parser::ast::Excepthandler;
@@ -48,17 +47,15 @@ impl AlwaysAutofixableViolation for UnnecessaryEllipsis {
 }
 
 fn starts_with_docstring(body: &[Stmt]) -> bool {
-    if let Some(first_stmt) = body.first() {
-        if let Stmt::Expr(ast::StmtExpr { value, .. }) = first_stmt {
-            if matches!(
-                value.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(_),
-                    ..
-                })
-            ) {
-                return true;
-            }
+    if let Some(Stmt::Expr(ast::StmtExpr { value, .. })) = body.first() {
+        if matches!(
+            value.as_ref(),
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(_),
+                ..
+            })
+        ) {
+            return true;
         }
     };
     false
@@ -79,6 +76,7 @@ fn is_ellipsis(element: &Stmt) -> bool {
     false
 }
 
+/// Checks the statement body for unnecessary ellipses.
 fn process_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
     let has_docstring = starts_with_docstring(body);
     for (element_idx, element) in body.iter().enumerate() {
