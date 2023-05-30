@@ -39,7 +39,7 @@ impl Violation for LineContainsHack {
     }
 }
 
-pub fn todos(directive_ranges: &Vec<TodoComment>) -> Vec<Diagnostic> {
+pub fn todos(directive_ranges: &[TodoComment]) -> Vec<Diagnostic> {
     directive_ranges
         .iter()
         .map(|TodoComment { directive, .. }| match directive.kind {

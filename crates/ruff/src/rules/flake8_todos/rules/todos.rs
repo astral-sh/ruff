@@ -244,7 +244,7 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 });
 
 pub(crate) fn todos(
-    todo_comments: &Vec<TodoComment>,
+    todo_comments: &[TodoComment],
     indexer: &Indexer,
     locator: &Locator,
     settings: &Settings,

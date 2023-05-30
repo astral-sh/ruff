@@ -199,7 +199,7 @@ pub(crate) fn check_tokens(
             .enumerate()
             .filter_map(|(i, comment_range)| {
                 let comment = locator.slice(*comment_range);
-                TodoComment::from_comment(comment, comment_range, i).map(|comment| comment)
+                TodoComment::from_comment(comment, comment_range, i)
             })
             .collect::<Vec<TodoComment>>();
 
