@@ -23,6 +23,7 @@ ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
 ruff_text_size = { workspace = true }
+ruff_textwrap = { path = "../ruff_textwrap" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
@@ -67,7 +68,6 @@ shellexpand = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-textwrap = { workspace = true }
 thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
