@@ -211,7 +211,8 @@ pub(crate) fn lint_path(
             "{}",
             DisplayParseError::new(
                 err,
-                SourceCode::new(&contents, &LineIndex::from_source_text(&contents))
+                SourceCode::new(&contents, &LineIndex::from_source_text(&contents)),
+                Some(&source_kind),
             )
         );
 

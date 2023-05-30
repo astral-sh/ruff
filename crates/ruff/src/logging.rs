@@ -9,9 +9,10 @@ use log::Level;
 use once_cell::sync::Lazy;
 use rustpython_parser::{ParseError, ParseErrorType};
 
-use ruff_python_ast::source_code::SourceCode;
+use ruff_python_ast::source_code::{OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
+use crate::source_kind::SourceKind;
 
 pub(crate) static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 
@@ -137,25 +138,61 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
 pub struct DisplayParseError<'a> {
     error: ParseError,
     source_code: SourceCode<'a, 'a>,
+    source_kind: Option<&'a SourceKind>,
 }
 
 impl<'a> DisplayParseError<'a> {
-    pub fn new(error: ParseError, source_code: SourceCode<'a, 'a>) -> Self {
-        Self { error, source_code }
+    pub fn new(
+        error: ParseError,
+        source_code: SourceCode<'a, 'a>,
+        source_kind: Option<&'a SourceKind>,
+    ) -> Self {
+        Self {
+            error,
+            source_code,
+            source_kind,
+        }
     }
 }
 
 impl Display for DisplayParseError<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{header} {path}{colon}",
+            header = "Failed to parse".bold(),
+            path = fs::relativize_path(Path::new(&self.error.source_path)).bold(),
+            colon = ":".cyan(),
+        )?;
+
         let source_location = self.source_code.source_location(self.error.offset);
+
+        // If we're working on a Jupyter notebook, translate the positions
+        // with respect to the cell and row in the cell. This is the same
+        // format as the `TextEmitter`.
+        let error_location = if let Some(SourceKind::Jupyter(notebook)) = self.source_kind {
+            let index = notebook.index();
+            write!(
+                f,
+                "cell {cell}{colon}",
+                cell = index.get_cell(source_location.row.get()),
+                colon = ":".cyan(),
+            )?;
+
+            SourceLocation {
+                row: OneIndexed::new(index.get_row_in_cell(source_location.row.get()) as usize)
+                    .unwrap(),
+                column: source_location.column,
+            }
+        } else {
+            source_location
+        };
 
         write!(
             f,
-            "{header} {path}{colon}{row}{colon}{column}{colon} {inner}",
-            header = "Failed to parse".bold(),
-            path = fs::relativize_path(Path::new(&self.error.source_path)).bold(),
-            row = source_location.row,
-            column = source_location.column,
+            "{row}{colon}{column}{colon} {inner}",
+            row = error_location.row,
+            column = error_location.column,
             colon = ":".cyan(),
             inner = &DisplayParseErrorType(&self.error.error)
         )
