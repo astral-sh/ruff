@@ -150,10 +150,7 @@ impl<'a> Importer<'a> {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
-            if semantic_model
-                .find_binding(member)
-                .map_or(true, |binding| binding.kind.is_builtin())
-            {
+            if semantic_model.is_unbound(member) {
                 let import_edit = self.add_member(stmt, member)?;
                 Ok((import_edit, member.to_string()))
             } else {
@@ -162,10 +159,7 @@ impl<'a> Importer<'a> {
         } else {
             // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
             // return `"functools.cache"` as the bound name.
-            if semantic_model
-                .find_binding(module)
-                .map_or(true, |binding| binding.kind.is_builtin())
-            {
+            if semantic_model.is_unbound(module) {
                 let import_edit = self.add_import(&AnyImport::Import(Import::module(module)), at);
                 Ok((import_edit, format!("{module}.{member}")))
             } else {

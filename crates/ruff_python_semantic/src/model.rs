@@ -123,6 +123,12 @@ impl<'a> SemanticModel<'a> {
             .map_or(false, |binding| binding.kind.is_builtin())
     }
 
+    /// Return `true` if `member` is unbound.
+    pub fn is_unbound(&self, member: &str) -> bool {
+        self.find_binding(member)
+            .map_or(true, |binding| binding.kind.is_builtin())
+    }
+
     /// Resolve a reference to the given symbol.
     pub fn resolve_reference(&mut self, symbol: &str, range: TextRange) -> ResolvedReference {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
