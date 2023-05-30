@@ -8,13 +8,13 @@ use rustpython_parser::{lexer, Mode, ParseError};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+pub use comment_ranges::{CommentRanges, CommentRangesBuilder};
 pub use generator::Generator;
 pub use indexer::Indexer;
 pub use locator::Locator;
 pub use stylist::{Quote, Stylist};
 
 pub use crate::source_code::line_index::{LineIndex, OneIndexed};
-pub use comment_ranges::{CommentRanges, CommentRangesBuilder};
 
 mod comment_ranges;
 mod generator;

@@ -8,7 +8,8 @@ use rustpython_parser::ast::{
     Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
 };
 
-use crate::newlines::LineEnding;
+use ruff_newlines::LineEnding;
+
 use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
@@ -1458,7 +1459,8 @@ impl<'a> Generator<'a> {
 mod tests {
     use rustpython_parser as parser;
 
-    use crate::newlines::LineEnding;
+    use ruff_newlines::LineEnding;
+
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;
 

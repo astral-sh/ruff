@@ -1792,6 +1792,7 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_macros",
+ "ruff_newlines",
  "ruff_python_ast",
  "ruff_python_semantic",
  "ruff_python_stdlib",
@@ -1960,6 +1961,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_newlines"
+version = "0.0.0"
+dependencies = [
+ "memchr",
+ "ruff_text_size",
+]
+
+[[package]]
 name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
@@ -1973,6 +1982,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "once_cell",
+ "ruff_newlines",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-ast",
@@ -1994,6 +2004,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "ruff_formatter",
+ "ruff_newlines",
  "ruff_python_ast",
  "ruff_testing_macros",
  "ruff_text_size",

@@ -9,8 +9,8 @@ use rustpython_parser::ast::{self, Excepthandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
+use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::helpers;
-use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 use crate::cst::helpers::compose_module_path;
