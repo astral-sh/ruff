@@ -13,7 +13,7 @@ use rustpython_parser::lexer::LexResult;
 use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 
-use crate::autofix::fix_file;
+use crate::autofix::{fix_file, FixResult};
 use crate::directives;
 use crate::linter::{check_path, LinterResult};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
@@ -95,7 +95,11 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
         let mut diagnostics = diagnostics.clone();
         let mut contents = contents.to_string();
 
-        while let Some((fixed_contents, _, _)) = fix_file(&diagnostics, &Locator::new(&contents)) {
+        while let Some(FixResult {
+            code: fixed_contents,
+            ..
+        }) = fix_file(&diagnostics, &Locator::new(&contents))
+        {
             if iterations < max_iterations() {
                 iterations += 1;
             } else {
