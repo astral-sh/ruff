@@ -8,7 +8,7 @@ use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::imports::{AnyImport, Import};
+use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_semantic::model::SemanticModel;
 
@@ -79,27 +79,26 @@ impl<'a> Importer<'a> {
     /// Attempts to reuse existing imports when possible.
     pub(crate) fn get_or_import_symbol(
         &self,
-        module: &str,
-        member: &str,
+        symbol: &ImportRequest,
         at: TextSize,
         semantic_model: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
-        match self.get_symbol(module, member, at, semantic_model) {
+        match self.get_symbol(symbol, at, semantic_model) {
             Some(result) => result,
-            None => self.import_symbol(module, member, at, semantic_model),
+            None => self.import_symbol(symbol, at, semantic_model),
         }
     }
 
     /// Return an [`Edit`] to reference an existing symbol, if it's present in the given [`SemanticModel`].
     fn get_symbol(
         &self,
-        module: &str,
-        member: &str,
+        symbol: &ImportRequest,
         at: TextSize,
         semantic_model: &SemanticModel,
     ) -> Option<Result<(Edit, String), ResolutionError>> {
         // If the symbol is already available in the current scope, use it.
-        let imported_name = semantic_model.resolve_qualified_import_name(module, member)?;
+        let imported_name =
+            semantic_model.resolve_qualified_import_name(symbol.module, symbol.member)?;
 
         // If the symbol source (i.e., the import statement) comes after the current location,
         // abort. For example, we could be generating an edit within a function, and the import
@@ -149,31 +148,58 @@ impl<'a> Importer<'a> {
     /// the name on which the `lru_cache` symbol would be made available (`"functools.lru_cache"`).
     fn import_symbol(
         &self,
-        module: &str,
-        member: &str,
+        symbol: &ImportRequest,
         at: TextSize,
         semantic_model: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
-        if let Some(stmt) = self.find_import_from(module, at) {
+        if let Some(stmt) = self.find_import_from(symbol.module, at) {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
-            if semantic_model.is_unbound(member) {
-                let Ok(import_edit) = self.add_member(stmt, member) else {
+            if semantic_model.is_unbound(symbol.member) {
+                let Ok(import_edit) = self.add_member(stmt, symbol.member) else {
                     return Err(ResolutionError::InvalidEdit);
                 };
-                Ok((import_edit, member.to_string()))
+                Ok((import_edit, symbol.member.to_string()))
             } else {
-                Err(ResolutionError::ConflictingName(member.to_string()))
+                Err(ResolutionError::ConflictingName(symbol.member.to_string()))
             }
         } else {
-            // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
-            // return `"functools.cache"` as the bound name.
-            if semantic_model.is_unbound(module) {
-                let import_edit = self.add_import(&AnyImport::Import(Import::module(module)), at);
-                Ok((import_edit, format!("{module}.{member}")))
-            } else {
-                Err(ResolutionError::ConflictingName(module.to_string()))
+            match symbol.style {
+                ImportStyle::Import => {
+                    // Case 2a: No `functools` import is in scope; thus, we add `import functools`,
+                    // and return `"functools.cache"` as the bound name.
+                    if semantic_model.is_unbound(symbol.module) {
+                        let import_edit =
+                            self.add_import(&AnyImport::Import(Import::module(symbol.module)), at);
+                        Ok((
+                            import_edit,
+                            format!(
+                                "{module}.{member}",
+                                module = symbol.module,
+                                member = symbol.member
+                            ),
+                        ))
+                    } else {
+                        Err(ResolutionError::ConflictingName(symbol.module.to_string()))
+                    }
+                }
+                ImportStyle::ImportFrom => {
+                    // Case 2b: No `functools` import is in scope; thus, we add
+                    // `from functools import cache`, and return `"cache"` as the bound name.
+                    if semantic_model.is_unbound(symbol.member) {
+                        let import_edit = self.add_import(
+                            &AnyImport::ImportFrom(ImportFrom::member(
+                                symbol.module,
+                                symbol.member,
+                            )),
+                            at,
+                        );
+                        Ok((import_edit, symbol.member.to_string()))
+                    } else {
+                        Err(ResolutionError::ConflictingName(symbol.member.to_string()))
+                    }
+                }
             }
         }
     }
@@ -231,6 +257,47 @@ impl<'a> Importer<'a> {
         };
         statement.codegen(&mut state);
         Ok(Edit::range_replacement(state.to_string(), stmt.range()))
+    }
+}
+
+#[derive(Debug)]
+enum ImportStyle {
+    /// Import the symbol using the `import` statement (e.g. `import foo; foo.bar`).
+    Import,
+    /// Import the symbol using the `from` statement (e.g. `from foo import bar; bar`).
+    ImportFrom,
+}
+
+#[derive(Debug)]
+pub(crate) struct ImportRequest<'a> {
+    /// The module from which the symbol can be imported (e.g., `foo`, in `from foo import bar`).
+    module: &'a str,
+    /// The member to import (e.g., `bar`, in `from foo import bar`).
+    member: &'a str,
+    /// The preferred style to use when importing the symbol (e.g., `import foo` or
+    /// `from foo import bar`), if it's not already in scope.
+    style: ImportStyle,
+}
+
+impl<'a> ImportRequest<'a> {
+    /// Create a new `ImportRequest` from a module and member. If not present in the scope,
+    /// the symbol should be imported using the "import" statement.
+    pub(crate) fn import(module: &'a str, member: &'a str) -> Self {
+        Self {
+            module,
+            member,
+            style: ImportStyle::Import,
+        }
+    }
+
+    /// Create a new `ImportRequest` from a module and member. If not present in the scope,
+    /// the symbol should be imported using the "import from" statement.
+    pub(crate) fn import_from(module: &'a str, member: &'a str) -> Self {
+        Self {
+            module,
+            member,
+            style: ImportStyle::ImportFrom,
+        }
     }
 }
 

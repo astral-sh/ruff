@@ -8,6 +8,7 @@ use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::has_comments;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 #[violation]
@@ -87,8 +88,7 @@ pub(crate) fn suppressible_exception(
                 if !has_comments(stmt, checker.locator) {
                     diagnostic.try_set_fix(|| {
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
-                            "contextlib",
-                            "suppress",
+                            &ImportRequest::import("contextlib", "suppress"),
                             stmt.start(),
                             checker.semantic_model(),
                         )?;

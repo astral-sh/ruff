@@ -4,6 +4,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -76,8 +77,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer.get_or_import_symbol(
-                    "sys",
-                    "exit",
+                    &ImportRequest::import("sys", "exit"),
                     func.start(),
                     checker.semantic_model(),
                 )?;
