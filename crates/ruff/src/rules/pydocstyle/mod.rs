@@ -59,9 +59,18 @@ mod tests {
     #[test_case(Rule::UndocumentedPublicMethod, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicMethod, Path::new("setter.py"))]
     #[test_case(Rule::UndocumentedPublicModule, Path::new("D.py"))]
-    #[test_case(Rule::UndocumentedPublicModule, Path::new("_unrelated/pkg/D100_pub.py"))]
-    #[test_case(Rule::UndocumentedPublicModule, Path::new("_unrelated/pkg/_priv/no_D100_priv.py"))]
-    #[test_case(Rule::UndocumentedPublicModule, Path::new("_unrelated/_no_pkg_priv.py"))]
+    #[test_case(
+        Rule::UndocumentedPublicModule,
+        Path::new("_unrelated/pkg/D100_pub.py")
+    )]
+    #[test_case(
+        Rule::UndocumentedPublicModule,
+        Path::new("_unrelated/pkg/_priv/no_D100_priv.py")
+    )]
+    #[test_case(
+        Rule::UndocumentedPublicModule,
+        Path::new("_unrelated/_no_pkg_priv.py")
+    )]
     #[test_case(Rule::UndocumentedPublicNestedClass, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicPackage, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicPackage, Path::new("D104/__init__.py"))]
