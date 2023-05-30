@@ -38,6 +38,7 @@ def sort_test_cases(
     with mod_rs.open("w") as fp:
         has_added_testcase = False
         lines = []
+        has_reached_testcases = False
         for line in content.splitlines():
             if not has_added_testcase and (
                 line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
@@ -51,19 +52,26 @@ def sort_test_cases(
                 lines.clear()
                 has_added_testcase = True
 
-            if has_added_testcase:
+            if (
+                has_added_testcase
+                or not has_reached_testcases
+                and (line.strip() != "" and not line.strip().startswith("#[test_case"))
+            ):
                 fp.write(line)
                 fp.write("\n")
-            elif line.strip() == "":
-                fp.write("\n".join(lines))
-                fp.write("\n\n")
-                lines.clear()
-            else:
+            elif line.strip().startswith("#[test_case"):
                 lines.append(line)
+                has_reached_testcases = True
+            elif has_reached_testcases:
+                lines[-1] += "\n" + line
+            else:
+                fp.write(line)
+                fp.write("\n")
 
         if not has_added_testcase:
             fp.write("\n".join(lines))
-            fp.write("\n")
+            if has_reached_testcases:
+                fp.write("\n")
 
 
 def sort_exports(
