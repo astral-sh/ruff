@@ -7,7 +7,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violat
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::{
-    directives::{TodoComment, TodoDirective},
+    directives::{TodoComment, TodoDirective, TodoDirectiveKind},
     registry::Rule,
     settings::Settings,
 };
@@ -258,6 +258,11 @@ pub(crate) fn todos(
             range,
             range_index,
         } = todo_comment;
+
+        // flake8-todos doesn't support HACK directives.
+        if matches!(directive.kind, TodoDirectiveKind::Hack) {
+            continue;
+        }
 
         tag_errors(directive, &mut diagnostics, settings);
         static_errors(&mut diagnostics, content, *range, directive);
