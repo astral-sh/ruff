@@ -30,50 +30,20 @@ mod tests {
     #[test_case(Rule::MixedCaseVariableInGlobalScope, Path::new("N816.py"))]
     #[test_case(Rule::CamelcaseImportedAsAcronym, Path::new("N817.py"))]
     #[test_case(Rule::ErrorSuffixOnExceptionName, Path::new("N818.py"))]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/mod with spaces/__init__.py")
-    )]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/mod with spaces/file.py")
-    )]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod with spaces/__init__.py"))]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod with spaces/file.py"))]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/flake9/__init__.py"))]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/MODULE/__init__.py"))]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/MODULE/file.py"))]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/mod-with-dashes/__init__.py")
-    )]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/valid_name/__init__.py")
-    )]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod-with-dashes/__init__.py"))]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__init__.py"))]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/no_module/test.txt"))]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/valid_name/file-with-dashes.py")
-    )]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/valid_name/__main__.py")
-    )]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/invalid_name/0001_initial.py")
-    )]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/valid_name/__setup__.py")
-    )]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/valid_name/file-with-dashes")
-    )]
-    #[test_case(
-        Rule::InvalidModuleName,
-        Path::new("N999/module/invalid_name/import.py")
-    )]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes.py"))]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__main__.py"))]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/invalid_name/0001_initial.py"))]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__setup__.py"))]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes"))]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/invalid_name/import.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
