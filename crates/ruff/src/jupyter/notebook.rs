@@ -44,7 +44,10 @@ fn is_valid_code_cell(cell: &Cell) -> bool {
             .map(std::string::String::as_str)
             .collect(),
     };
-    !lines.iter().all(|line| {
+    // Ignore a cell if it contains a magic command. There could be valid
+    // Python code as well, but we'll ignore that for now.
+    // TODO(dhruvmanila): https://github.com/psf/black/blob/main/src/black/handle_ipynb_magics.py
+    !lines.iter().any(|line| {
         MAGIC_PREFIX
             .iter()
             .any(|prefix| line.trim_start().starts_with(prefix))
