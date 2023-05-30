@@ -1,5 +1,8 @@
+use crate::autofix::actions::delete_stmt;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
+use ruff_python_ast::types::RefEquality;
+use rustpython_parser::ast::Excepthandler;
 use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
@@ -76,6 +79,38 @@ fn is_ellipsis(element: &Stmt) -> bool {
     false
 }
 
+fn process_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt]) {
+    let has_docstring = starts_with_docstring(body);
+    for (element_idx, element) in body.iter().enumerate() {
+        if (has_docstring && element_idx == 1 && is_ellipsis(element))
+            || (is_ellipsis(element) && body.len() > 1)
+        {
+            let mut diagnostic = Diagnostic::new(UnnecessaryEllipsis, element.range());
+            diagnostic.try_set_fix(|| {
+                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+                let edit = delete_stmt(
+                    element,
+                    Some(parent),
+                    &deleted,
+                    checker.locator,
+                    checker.indexer,
+                    checker.stylist,
+                )?;
+
+                // In the unlikely event the body consists solely of several
+                // ellipses, `delete_stmt` can actually result in a `pass`.
+                if edit.is_deletion() || edit.content() == Some("pass") {
+                    checker.deletions.insert(RefEquality(element));
+                }
+
+                Ok(Fix::automatic(edit))
+            });
+
+            checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
 /// PLW2301
 /// Check if the ellipsis constant is used unnecessarily.
 /// Emit a warning when:
@@ -83,19 +118,24 @@ fn is_ellipsis(element: &Stmt) -> bool {
 ///    - A statement exists in the same scope as the ellipsis.
 ///      For example: A function consisting of an ellipsis followed by a
 ///      return statement on the next line.
-pub(crate) fn unnecessary_ellipsis(checker: &mut Checker, body: &[Stmt]) {
-    let has_docstring = starts_with_docstring(body);
-    for (element_idx, element) in body.iter().enumerate() {
-        if (has_docstring && element_idx == 1 && is_ellipsis(element))
-            || (is_ellipsis(element) && body.len() > 1)
+pub(crate) fn unnecessary_ellipsis(checker: &mut Checker) {
+    if let Some(stmt) = checker.semantic_model().stmt_parent() {
+        if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
+        | Stmt::If(ast::StmtIf { body, .. })
+        | Stmt::Try(ast::StmtTry { body, .. })
+        | Stmt::ClassDef(ast::StmtClassDef { body, .. }) = stmt
         {
-            let mut diagnostic = Diagnostic::new(UnnecessaryEllipsis, element.range());
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::deletion(
-                element.start(),
-                element.end(),
-            )));
-            checker.diagnostics.push(diagnostic);
+            process_body(checker, stmt, body);
+        }
+        if let Stmt::If(ast::StmtIf { orelse, .. }) = stmt {
+            process_body(checker, stmt, orelse);
+        }
+        if let Stmt::Try(ast::StmtTry { handlers, .. }) = stmt {
+            for handler in handlers {
+                let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) =
+                    handler;
+                process_body(checker, stmt, body);
+            }
         }
     }
 }

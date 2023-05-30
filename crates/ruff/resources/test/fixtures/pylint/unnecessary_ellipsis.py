@@ -18,6 +18,15 @@ else:
     ...  # [unnecessary-ellipsis]
 
 
+# Ellipsis in if and else statement
+if True:
+    A = 2
+    ...  # [unnecessary-ellipsis]
+else:
+    A = 24
+    ...  # [unnecessary-ellipsis]
+
+
 def ellipsis_and_subsequent_statement():
     ...  # [unnecessary-ellipsis]
     return 0
@@ -66,6 +75,12 @@ class DocstringOnly:
 # No problem
 class EllipsisOnly:
     ...
+
+
+class MultipleEllipses:
+    ...  # [unnecessary-ellipsis]
+    ...
+    ...  # [unnecessary-ellipsis]
 
 
 class DocstringAndEllipsis:
