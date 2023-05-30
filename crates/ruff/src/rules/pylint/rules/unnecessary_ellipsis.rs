@@ -119,14 +119,27 @@ fn process_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt], expr: &Expr
 pub(crate) fn unnecessary_ellipsis(checker: &mut Checker, expr: &Expr) {
     if let Some(stmt) = checker.semantic_model().stmt_parent() {
         if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
+        | Stmt::ClassDef(ast::StmtClassDef { body, .. })
+        | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. })
+        | Stmt::While(ast::StmtWhile { body, .. })
+        | Stmt::With(ast::StmtWith { body, .. })
+        | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. })
         | Stmt::If(ast::StmtIf { body, .. })
         | Stmt::Try(ast::StmtTry { body, .. })
-        | Stmt::ClassDef(ast::StmtClassDef { body, .. }) = stmt
+        | Stmt::TryStar(ast::StmtTryStar { body, .. }) = stmt
         {
             process_body(checker, stmt, body, expr);
         }
         if let Stmt::If(ast::StmtIf { orelse, .. }) = stmt {
             process_body(checker, stmt, orelse, expr);
+        }
+
+        if let Stmt::Match(ast::StmtMatch { cases, .. }) = stmt {
+            for case in cases {
+                let ast::MatchCase { body, .. } = case;
+                process_body(checker, stmt, body, expr);
+            }
         }
         if let Stmt::Try(ast::StmtTry { handlers, .. }) = stmt {
             for handler in handlers {
