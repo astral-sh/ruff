@@ -51,9 +51,7 @@ def add_test_case(
 ) -> None:
     """Add the relevant `#testcase` macro."""
     filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
-    test_case_to_add = (
-        f'#[test_case(Rule::{name}, Path::new("{filestem}.py"))]'
-    )
+    test_case_to_add = f'#[test_case(Rule::{name}, Path::new("{filestem}.py"))]'
     m = re.search(r"\d", code)
     nb_digit = len(code) - (m.start() if m else 0)
     sort_test_cases(plugin_module, nb_digit, test_case_to_add=test_case_to_add)
