@@ -15,7 +15,7 @@ use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 use ruff_python_stdlib::path::is_python_stub_file;
 
-use crate::autofix::fix_file;
+use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
@@ -460,7 +460,12 @@ pub fn lint_fix<'a>(
         }
 
         // Apply autofix.
-        if let Some((fixed_contents, applied, edits)) = fix_file(&result.data.0, &locator) {
+        if let Some(FixResult {
+            code: fixed_contents,
+            fixes: applied,
+            edits,
+        }) = fix_file(&result.data.0, &locator)
+        {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, count) in applied {
