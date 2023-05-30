@@ -320,7 +320,7 @@ pub(crate) fn blank_lines(
 ) {
     if line.is_empty() {
         tracked_vars.blank_lines += 1;
-        tracked_vars.blank_characters += u32::try_from(line.text().len())
+        tracked_vars.blank_characters += u32::try_from(line.text().chars().count())
             .expect("The number of blank characters should be relatively small");
         return;
     }
