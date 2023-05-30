@@ -150,10 +150,8 @@ pub(crate) fn extraneous_whitespace(
                             TextRange::at(token.end(), trailing_len),
                         );
                         if autofix_whitespace_after_open_bracket {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
-                                diagnostic.range(),
-                            )));
+                            diagnostic
+                                .set_fix(Fix::automatic(Edit::range_deletion(diagnostic.range())));
                         }
                         context.push_diagnostic(diagnostic);
                     }
@@ -168,8 +166,7 @@ pub(crate) fn extraneous_whitespace(
                                 TextRange::at(token.start() - offset, offset),
                             );
                             if autofix_whitespace_before_close_bracket {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
                                     diagnostic.range(),
                                 )));
                             }
@@ -187,8 +184,7 @@ pub(crate) fn extraneous_whitespace(
                                 TextRange::at(token.start() - offset, offset),
                             );
                             if autofix_whitespace_before_punctuation {
-                                #[allow(deprecated)]
-                                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
                                     diagnostic.range(),
                                 )));
                             }
