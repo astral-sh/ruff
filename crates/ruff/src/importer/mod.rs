@@ -18,10 +18,16 @@ use crate::importer::insertion::Insertion;
 mod insertion;
 
 pub(crate) struct Importer<'a> {
+    /// The Python AST to which we are adding imports.
     python_ast: &'a Suite,
+    /// The [`Locator`] for the Python AST.
     locator: &'a Locator<'a>,
+    /// The [`Stylist`] for the Python AST.
     stylist: &'a Stylist<'a>,
-    ordered_imports: Vec<&'a Stmt>,
+    /// The list of visited, top-level runtime imports in the Python AST.
+    runtime_imports: Vec<&'a Stmt>,
+    /// The list of visited, top-level `if TYPE_CHECKING:` blocks in the Python AST.
+    type_checking_blocks: Vec<&'a Stmt>,
 }
 
 impl<'a> Importer<'a> {
@@ -34,13 +40,19 @@ impl<'a> Importer<'a> {
             python_ast,
             locator,
             stylist,
-            ordered_imports: Vec::default(),
+            runtime_imports: Vec::default(),
+            type_checking_blocks: Vec::default(),
         }
     }
 
     /// Visit a top-level import statement.
     pub(crate) fn visit_import(&mut self, import: &'a Stmt) {
-        self.ordered_imports.push(import);
+        self.runtime_imports.push(import);
+    }
+
+    /// Visit a top-level type-checking block.
+    pub(crate) fn visit_type_checking_block(&mut self, type_checking_block: &'a Stmt) {
+        self.type_checking_blocks.push(type_checking_block);
     }
 
     /// Add an import statement to import the given module.
@@ -168,17 +180,17 @@ impl<'a> Importer<'a> {
 
     /// Return the import statement that precedes the given position, if any.
     fn preceding_import(&self, at: TextSize) -> Option<&Stmt> {
-        self.ordered_imports
+        self.runtime_imports
             .partition_point(|stmt| stmt.start() < at)
             .checked_sub(1)
-            .map(|idx| self.ordered_imports[idx])
+            .map(|idx| self.runtime_imports[idx])
     }
 
     /// Return the top-level [`Stmt`] that imports the given module using `Stmt::ImportFrom`
     /// preceding the given position, if any.
     fn find_import_from(&self, module: &str, at: TextSize) -> Option<&Stmt> {
         let mut import_from = None;
-        for stmt in &self.ordered_imports {
+        for stmt in &self.runtime_imports {
             if stmt.start() >= at {
                 break;
             }

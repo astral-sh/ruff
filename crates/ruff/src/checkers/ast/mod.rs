@@ -2076,16 +2076,21 @@ where
                 self.visit_body(body);
                 self.visit_body(orelse);
             }
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                orelse,
-                range: _,
-            }) => {
+            Stmt::If(
+                stmt_if @ ast::StmtIf {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                },
+            ) => {
                 self.visit_boolean_test(test);
 
-                if flake8_type_checking::helpers::is_type_checking_block(&self.semantic_model, test)
-                {
+                if analyze::typing::is_type_checking_block(stmt_if, &self.semantic_model) {
+                    if self.semantic_model.at_top_level() {
+                        self.importer.visit_type_checking_block(stmt);
+                    }
+
                     if self.enabled(Rule::EmptyTypeCheckingBlock) {
                         flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
                     }
