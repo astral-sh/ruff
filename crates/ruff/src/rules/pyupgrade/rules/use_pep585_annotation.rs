@@ -6,6 +6,7 @@ use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 #[violation]
@@ -61,8 +62,7 @@ pub(crate) fn use_pep585_annotation(
                     // Imported type, like `collections.deque`.
                     diagnostic.try_set_fix(|| {
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
-                            module,
-                            member,
+                            &ImportRequest::import_from(module, member),
                             expr.start(),
                             checker.semantic_model(),
                         )?;
