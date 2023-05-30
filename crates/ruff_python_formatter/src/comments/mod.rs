@@ -112,13 +112,13 @@ use ruff_python_ast::source_code::CommentRanges;
 #[derive(Debug, Clone)]
 pub(crate) struct SourceComment {
     /// The location of the comment in the source document.
-    pub(super) slice: SourceCodeSlice,
+    slice: SourceCodeSlice,
 
     /// Whether the comment has been formatted or not.
     #[cfg(debug_assertions)]
-    pub(super) formatted: Cell<bool>,
+    formatted: Cell<bool>,
 
-    pub(super) position: CommentTextPosition,
+    position: CommentTextPosition,
 }
 
 impl SourceComment {
@@ -126,6 +126,10 @@ impl SourceComment {
     /// Allows retrieving the text of the comment.
     pub(crate) fn slice(&self) -> &SourceCodeSlice {
         &self.slice
+    }
+
+    pub(crate) fn position(&self) -> CommentTextPosition {
+        self.position
     }
 
     #[cfg(not(debug_assertions))]
@@ -161,16 +165,7 @@ pub(crate) enum CommentTextPosition {
     /// ```
     ///
     /// `# comment` is an end of line comments because it is separated by at least one line break from the following token `b`.
-    ///
-    /// ## Own line
-    ///
-    /// ```python
-    /// a;
-    /// # comment
-    /// b;
-    /// ```
-    ///
-    /// `# comment` isn't an end of line comment because it isn't on the same line as the preceding token `a`.
+    /// Comments that not only end, but also start on a new line are [`OwnLine`](CommentTextPosition::OwnLine) comments.
     EndOfLine,
 
     /// A Comment that is separated by at least one line break from the preceding token.
@@ -183,8 +178,7 @@ pub(crate) enum CommentTextPosition {
     /// b;
     /// ```
     ///
-    /// `# comment` line comments because they are separated by one line break from the preceding
-    /// token `a`.
+    /// `# comment` line comments because they are separated by one line break from the preceding token `a`.
     OwnLine,
 }
 
