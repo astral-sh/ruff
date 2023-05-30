@@ -15,7 +15,7 @@ mod tests {
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"))]
-    fn paths(rule_code: Rule, path: &Path) -> Result<()> {
+    fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pandas_vet").join(path).as_path(),
