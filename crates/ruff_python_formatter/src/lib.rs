@@ -12,6 +12,7 @@ use crate::parentheses::normalize_parentheses;
 
 mod attachment;
 pub mod cli;
+mod comments;
 pub mod context;
 mod cst;
 mod format;

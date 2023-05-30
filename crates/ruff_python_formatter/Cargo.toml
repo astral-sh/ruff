@@ -13,6 +13,7 @@ ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
+countme = "3.0.1"
 is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
