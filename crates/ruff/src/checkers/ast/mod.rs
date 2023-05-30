@@ -42,7 +42,7 @@ use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::flake8_builtins::helpers::AnyShadowing;
 use crate::rules::{
     airflow, flake8_2020, flake8_annotations, flake8_async, flake8_bandit, flake8_blind_except,
@@ -171,8 +171,12 @@ impl<'a> Checker<'a> {
         )
     }
 
-    pub(crate) fn semantic_model(&self) -> &SemanticModel<'a> {
+    pub(crate) const fn semantic_model(&self) -> &SemanticModel<'a> {
         &self.semantic_model
+    }
+
+    pub(crate) const fn package(&self) -> Option<&'a Path> {
+        self.package
     }
 
     /// Returns whether the given rule should be checked.
@@ -5122,29 +5126,18 @@ impl<'a> Checker<'a> {
                 for binding_id in scope.binding_ids() {
                     let binding = &self.semantic_model.bindings[binding_id];
 
-                    if let Some(diagnostic) =
-                        flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                            binding,
-                            &self.semantic_model,
-                        )
-                    {
-                        if self.enabled(diagnostic.kind.rule()) {
-                            diagnostics.push(diagnostic);
-                        }
-                    }
-                    if let Some(diagnostic) =
-                        flake8_type_checking::rules::typing_only_runtime_import(
-                            binding,
-                            &runtime_imports,
-                            &self.semantic_model,
-                            self.package,
-                            self.settings,
-                        )
-                    {
-                        if self.enabled(diagnostic.kind.rule()) {
-                            diagnostics.push(diagnostic);
-                        }
-                    }
+                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                        self,
+                        binding,
+                        &mut diagnostics,
+                    );
+
+                    flake8_type_checking::rules::typing_only_runtime_import(
+                        self,
+                        binding,
+                        &runtime_imports,
+                        &mut diagnostics,
+                    );
                 }
             }
 
