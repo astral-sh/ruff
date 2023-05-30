@@ -151,10 +151,10 @@ impl Settings {
             builtins: config.builtins.unwrap_or_default(),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
-                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone()),
+                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_OR_IMPORT_RGX.clone()),
             dummy_import_rgx: config
                 .dummy_import_rgx
-                .unwrap_or_else(|| defaults::DUMMY_IMPORT_RGX.clone()),
+                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_OR_IMPORT_RGX.clone()),
             exclude: FilePatternSet::try_from_vec(
                 config.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
             )?,

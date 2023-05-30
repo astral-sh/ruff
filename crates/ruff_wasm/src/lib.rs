@@ -96,8 +96,8 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         // Propagate defaults.
         allowed_confusables: Some(Vec::default()),
         builtins: Some(Vec::default()),
-        dummy_variable_rgx: Some(defaults::DUMMY_VARIABLE_RGX.as_str().to_string()),
-        dummy_import_rgx: Some(defaults::DUMMY_IMPORT_RGX.as_str().to_string()),
+        dummy_variable_rgx: Some(defaults::DUMMY_VARIABLE_OR_IMPORT_RGX.as_str().to_string()),
+        dummy_import_rgx: Some(defaults::DUMMY_VARIABLE_OR_IMPORT_RGX.as_str().to_string()),
         extend_fixable: Some(Vec::default()),
         extend_ignore: Some(Vec::default()),
         extend_select: Some(Vec::default()),

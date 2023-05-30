@@ -29,10 +29,7 @@ pub const TARGET_VERSION: PythonVersion = PythonVersion::Py310;
 
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
-pub static DUMMY_VARIABLE_RGX: Lazy<Regex> =
-    Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
-
-pub static DUMMY_IMPORT_RGX: Lazy<Regex> =
+pub static DUMMY_VARIABLE_OR_IMPORT_RGX: Lazy<Regex> =
     Lazy::new(|| Regex::new("^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$").unwrap());
 
 pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
@@ -75,8 +72,8 @@ impl Default for Settings {
             rules: PREFIXES.iter().flat_map(IntoIterator::into_iter).collect(),
             allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
-            dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
-            dummy_import_rgx: DUMMY_IMPORT_RGX.clone(),
+            dummy_variable_rgx: DUMMY_VARIABLE_OR_IMPORT_RGX.clone(),
+            dummy_import_rgx: DUMMY_VARIABLE_OR_IMPORT_RGX.clone(),
             exclude: FilePatternSet::try_from_vec(EXCLUDE.clone()).unwrap(),
             extend_exclude: FilePatternSet::default(),
             extend_include: FilePatternSet::default(),
