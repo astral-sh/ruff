@@ -92,7 +92,7 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
             .iter()
             .map(|alias| format!("__future__.{}", alias.name))
             .collect();
-        match autofix::actions::remove_unused_imports(
+        match autofix::edits::remove_unused_imports(
             unused_imports.iter().map(String::as_str),
             defined_by,
             defined_in,
