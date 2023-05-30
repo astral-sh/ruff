@@ -266,14 +266,6 @@ pub(crate) fn nested_if_statements(
         checker.locator,
     );
 
-    // The fixer preserves comments in the nested body, but removes comments between
-    // the outer and inner if statements.
-    let nested_if = &body[0];
-    let fixable = !has_comments_in(
-        TextRange::new(stmt.start(), nested_if.start()),
-        checker.locator,
-    );
-
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
         colon.map_or_else(
@@ -281,23 +273,31 @@ pub(crate) fn nested_if_statements(
             |colon| TextRange::new(stmt.start(), colon.end()),
         ),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
-            Ok(edit) => {
-                if edit
-                    .content()
-                    .unwrap_or_default()
-                    .universal_newlines()
-                    .all(|line| {
-                        LineWidth::new(checker.settings.tab_size).add_str(&line)
-                            <= checker.settings.line_length
-                    })
-                {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(edit));
+    if checker.patch(diagnostic.kind.rule()) {
+        // The fixer preserves comments in the nested body, but removes comments between
+        // the outer and inner if statements.
+        let nested_if = &body[0];
+        if !has_comments_in(
+            TextRange::new(stmt.start(), nested_if.start()),
+            checker.locator,
+        ) {
+            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
+                Ok(edit) => {
+                    if edit
+                        .content()
+                        .unwrap_or_default()
+                        .universal_newlines()
+                        .all(|line| {
+                            LineWidth::new(checker.settings.tab_size).add_str(&line)
+                                <= checker.settings.line_length
+                        })
+                    {
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(edit));
+                    }
                 }
+                Err(err) => error!("Failed to fix nested if: {err}"),
             }
-            Err(err) => error!("Failed to fix nested if: {err}"),
         }
     }
     checker.diagnostics.push(diagnostic);
@@ -351,48 +351,49 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     }
 
     let condition = checker.generator().expr(test);
-    let fixable = matches!(if_return, Bool::True)
-        && matches!(else_return, Bool::False)
-        && !has_comments(stmt, checker.locator)
-        && (test.is_compare_expr() || checker.semantic_model().is_builtin("bool"));
-
     let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        if test.is_compare_expr() {
-            // If the condition is a comparison, we can replace it with the condition.
-            let node = ast::StmtReturn {
-                value: Some(test.clone()),
-                range: TextRange::default(),
+    if checker.patch(diagnostic.kind.rule()) {
+        if matches!(if_return, Bool::True)
+            && matches!(else_return, Bool::False)
+            && !has_comments(stmt, checker.locator)
+            && (test.is_compare_expr() || checker.semantic_model().is_builtin("bool"))
+        {
+            if test.is_compare_expr() {
+                // If the condition is a comparison, we can replace it with the condition.
+                let node = ast::StmtReturn {
+                    value: Some(test.clone()),
+                    range: TextRange::default(),
+                };
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    checker.generator().stmt(&node.into()),
+                    stmt.range(),
+                )));
+            } else {
+                // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
+                // verified, above, that `bool` is a builtin.)
+                let node = ast::ExprName {
+                    id: "bool".into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                let node1 = ast::ExprCall {
+                    func: Box::new(node.into()),
+                    args: vec![(**test).clone()],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                };
+                let node2 = ast::StmtReturn {
+                    value: Some(Box::new(node1.into())),
+                    range: TextRange::default(),
+                };
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    checker.generator().stmt(&node2.into()),
+                    stmt.range(),
+                )));
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                checker.generator().stmt(&node.into()),
-                stmt.range(),
-            )));
-        } else {
-            // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
-            // verified, above, that `bool` is a builtin.)
-            let node = ast::ExprName {
-                id: "bool".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            };
-            let node1 = ast::ExprCall {
-                func: Box::new(node.into()),
-                args: vec![(**test).clone()],
-                keywords: vec![],
-                range: TextRange::default(),
-            };
-            let node2 = ast::StmtReturn {
-                value: Some(Box::new(node1.into())),
-                range: TextRange::default(),
-            };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                checker.generator().stmt(&node2.into()),
-                stmt.range(),
-            )));
-        };
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -519,19 +520,20 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
         return;
     }
 
-    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            contents,
-            stmt.range(),
-        )));
+    if checker.patch(diagnostic.kind.rule()) {
+        if !has_comments(stmt, checker.locator) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                contents,
+                stmt.range(),
+            )));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -875,19 +877,20 @@ pub(crate) fn use_dict_get_with_default(
         return;
     }
 
-    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            contents,
-            stmt.range(),
-        )));
+    if checker.patch(diagnostic.kind.rule()) {
+        if !has_comments(stmt, checker.locator) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                contents,
+                stmt.range(),
+            )));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
