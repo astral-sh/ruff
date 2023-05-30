@@ -18,8 +18,8 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"))]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"))]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"))]
@@ -27,11 +27,48 @@ mod tests {
     #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"))]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
+    #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"))]
+    #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
+    #[test_case(Rule::DuplicateValue, Path::new("duplicate_value.py"))]
+    #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"))]
+    #[test_case(
+        Rule::GlobalVariableNotAssigned,
+        Path::new("global_variable_not_assigned.py")
+    )]
+    #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
+    #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
+    #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
+    #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::InvalidCharacterSub, Path::new("invalid_characters.py"))]
+    #[test_case(
+        Rule::InvalidCharacterZeroWidthSpace,
+        Path::new("invalid_characters.py")
+    )]
+    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
+    #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
+    #[test_case(
+        Rule::LoadBeforeGlobalDeclaration,
+        Path::new("load_before_global_declaration.py")
+    )]
+    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"))]
+    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"))]
+    #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
+    #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
+    #[test_case(
+        Rule::NamedExprWithoutContext,
+        Path::new("named_expr_without_context.py")
+    )]
+    #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"))]
+    #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
+    #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
+    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(
         Rule::RepeatedIsinstanceCalls,
         Path::new("repeated_isinstance_calls.py")
     )]
-    #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
+    #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_2.py"))]
@@ -43,38 +80,6 @@ mod tests {
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_8.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_9.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_10.py"))]
-    #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"))]
-    #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"))]
-    #[test_case(
-        Rule::GlobalVariableNotAssigned,
-        Path::new("global_variable_not_assigned.py")
-    )]
-    #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
-    #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
-    #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
-    #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
-    #[test_case(Rule::DuplicateValue, Path::new("duplicate_value.py"))]
-    #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterSub, Path::new("invalid_characters.py"))]
-    #[test_case(
-        Rule::InvalidCharacterZeroWidthSpace,
-        Path::new("invalid_characters.py")
-    )]
-    #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
-    #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
-    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"))]
-    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"))]
-    #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
-    #[test_case(
-        Rule::NamedExprWithoutContext,
-        Path::new("named_expr_without_context.py")
-    )]
-    #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
-    #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
-    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
-    #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
@@ -90,10 +95,6 @@ mod tests {
         Rule::UnnecessaryDirectLambdaCall,
         Path::new("unnecessary_direct_lambda_call.py")
     )]
-    #[test_case(
-        Rule::LoadBeforeGlobalDeclaration,
-        Path::new("load_before_global_declaration.py")
-    )]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"))]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"))]
@@ -102,7 +103,6 @@ mod tests {
         Path::new("yield_from_in_async_function.py")
     )]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"))]
-    #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

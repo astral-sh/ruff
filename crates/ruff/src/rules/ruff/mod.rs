@@ -20,9 +20,9 @@ mod tests {
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
+    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

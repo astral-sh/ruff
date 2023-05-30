@@ -186,6 +186,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R5501") => (RuleGroup::Unspecified, Rule::CollapsibleElseIf),
         (Pylint, "W0120") => (RuleGroup::Unspecified, Rule::UselessElseOnLoop),
         (Pylint, "W0129") => (RuleGroup::Unspecified, Rule::AssertOnStringLiteral),
+        (Pylint, "W0130") => (RuleGroup::Unspecified, Rule::DuplicateValue),
         (Pylint, "W0131") => (RuleGroup::Unspecified, Rule::NamedExprWithoutContext),
         (Pylint, "W0406") => (RuleGroup::Unspecified, Rule::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Unspecified, Rule::GlobalVariableNotAssigned),
@@ -194,7 +195,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1508") => (RuleGroup::Unspecified, Rule::InvalidEnvvarDefault),
         (Pylint, "W2901") => (RuleGroup::Unspecified, Rule::RedefinedLoopName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, Rule::NestedMinMax),
-        (Pylint, "W0130") => (RuleGroup::Unspecified, Rule::DuplicateValue),
 
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Unspecified, Rule::BlockingHttpCallInAsyncFunction),
