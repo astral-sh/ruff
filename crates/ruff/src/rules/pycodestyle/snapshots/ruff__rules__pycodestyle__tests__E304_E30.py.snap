@@ -12,7 +12,7 @@ E30.py:81:1: E304 [*] blank lines found after function decorator
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 77 77 | 
 78 78 | #: E304:3:1
 79 79 | @decorator

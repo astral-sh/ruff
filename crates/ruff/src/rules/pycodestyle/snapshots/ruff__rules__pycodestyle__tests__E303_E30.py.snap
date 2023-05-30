@@ -10,7 +10,7 @@ E30.py:55:1: E303 [*] Too many blank lines (3)
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 51 51 | print
 52 52 | 
 53 53 | 
@@ -28,7 +28,7 @@ E30.py:61:1: E303 [*] Too many blank lines (3)
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 57 57 | print
 58 58 | 
 59 59 | 
@@ -44,7 +44,7 @@ E30.py:69:5: E303 [*] Too many blank lines (2)
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 65 65 | def a():
 66 66 |     print
 67 67 | 
@@ -62,7 +62,7 @@ E30.py:72:5: E303 [*] Too many blank lines (2)
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 68 68 | 
 69 69 |     # comment
 70 70 | 
@@ -80,7 +80,7 @@ E30.py:88:1: E303 [*] Too many blank lines (3)
    |
    = help: Remove extraneous blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 84 84 | #!python
 85 85 | 
 86 86 | 

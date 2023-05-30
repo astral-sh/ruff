@@ -10,9 +10,9 @@ E30.py:6:5: E301 [*] Expected 1 blank line, found 0
  9 |         pass
 10 | #: E301:6:5
    |
-   = help: Remove extraneous blank line(s)
+   = help: Add missing blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | 
 4 4 |     def a():
 5 5 |         pass
@@ -30,9 +30,9 @@ E30.py:14:5: E301 [*] Expected 1 blank line, found 0
 17 |         pass
 18 | #:
    |
-   = help: Remove extraneous blank line(s)
+   = help: Add missing blank line(s)
 
-ℹ Suggested fix
+ℹ Fix
 11 11 |     def a():
 12 12 |         pass
 13 13 |     # comment
