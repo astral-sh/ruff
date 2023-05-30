@@ -8,24 +8,15 @@ use ruff_formatter::{
 };
 use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 
-use crate::attachment::attach;
 use crate::comments::Comments;
 use crate::context::ASTFormatContext;
-use crate::cst::Stmt;
-use crate::newlines::normalize_newlines;
-use crate::parentheses::normalize_parentheses;
-use crate::trivia::TriviaToken;
+use crate::module::FormatModule;
 
-mod attachment;
 pub mod cli;
 mod comments;
 pub mod context;
-mod cst;
-mod format;
-mod newlines;
-mod parentheses;
+mod module;
 mod prelude;
-mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
@@ -46,12 +37,10 @@ pub fn fmt(contents: &str) -> Result<Printed> {
 
     let comment_ranges = comment_ranges.finish();
 
-    let trivia = trivia::extract_trivia_tokens(&tokens);
-
     // Parse the AST.
     let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
 
-    let formatted = format_node(&python_ast, &comment_ranges, contents, trivia)?;
+    let formatted = format_node(&python_ast, &comment_ranges, contents)?;
 
     formatted
         .print()
@@ -62,26 +51,10 @@ pub(crate) fn format_node<'a>(
     root: &'a Mod,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
-    trivia: Vec<TriviaToken>,
 ) -> FormatResult<Formatted<ASTFormatContext<'a>>> {
     let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
 
-    let module = root.as_module().unwrap();
-
     let locator = Locator::new(source);
-
-    // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = module
-        .body
-        .iter()
-        .cloned()
-        .map(|stmt| (stmt, &locator).into())
-        .collect();
-
-    // Attach trivia.
-    attach(&mut python_cst, trivia);
-    normalize_newlines(&mut python_cst);
-    normalize_parentheses(&mut python_cst, &locator);
 
     format!(
         ASTFormatContext::new(
@@ -92,7 +65,7 @@ pub(crate) fn format_node<'a>(
             locator.contents(),
             comments
         ),
-        [format::builders::statements(&python_cst)]
+        [FormatModule::new(root)]
     )
 }
 
@@ -111,15 +84,9 @@ mod tests {
     use ruff_testing_macros::fixture;
     use similar::TextDiff;
 
-    use crate::{fmt, format_node, trivia};
+    use crate::{fmt, format_node};
 
-    #[fixture(
-        pattern = "resources/test/fixtures/black/**/*.py",
-        // Excluded tests because they reach unreachable when attaching tokens
-        exclude = [
-            "*comments8.py",
-        ])
-    ]
+    #[fixture(pattern = "resources/test/fixtures/black/**/*.py")]
     #[test]
     fn black_test(input_path: &Path) -> Result<()> {
         let content = fs::read_to_string(input_path)?;
@@ -212,12 +179,10 @@ mod tests {
 
         let comment_ranges = comment_ranges.finish();
 
-        let trivia = trivia::extract_trivia_tokens(&tokens);
-
         // Parse the AST.
         let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
 
-        let formatted = format_node(&python_ast, &comment_ranges, src, trivia).unwrap();
+        let formatted = format_node(&python_ast, &comment_ranges, src).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
