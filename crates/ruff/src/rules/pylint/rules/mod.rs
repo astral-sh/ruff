@@ -45,6 +45,7 @@ pub(crate) use unexpected_special_method_signature::{
 pub(crate) use unnecessary_direct_lambda_call::{
     unnecessary_direct_lambda_call, UnnecessaryDirectLambdaCall,
 };
+pub(crate) use unnecessary_ellipsis::{unnecessary_ellipsis, UnnecessaryEllipsis};
 pub(crate) use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub(crate) use useless_import_alias::{useless_import_alias, UselessImportAlias};
 pub(crate) use useless_return::{useless_return, UselessReturn};
@@ -91,6 +92,7 @@ mod too_many_return_statements;
 mod too_many_statements;
 mod unexpected_special_method_signature;
 mod unnecessary_direct_lambda_call;
+mod unnecessary_ellipsis;
 mod useless_else_on_loop;
 mod useless_import_alias;
 mod useless_return;

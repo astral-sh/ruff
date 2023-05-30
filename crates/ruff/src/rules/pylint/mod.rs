@@ -76,6 +76,7 @@ mod tests {
     #[test_case(Rule::YieldFromInAsyncFunction, Path::new("yield_from_in_async_function.py"); "PLE1700")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
     #[test_case(Rule::NestedMinMax, Path::new("nested_min_max.py"); "PLW3301")]
+    #[test_case(Rule::UnnecessaryEllipsis, Path::new("unnecessary_ellipsis.py"); "PLW2301")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

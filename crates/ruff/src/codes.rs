@@ -195,6 +195,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W2901") => (RuleGroup::Unspecified, Rule::RedefinedLoopName),
         (Pylint, "W3301") => (RuleGroup::Unspecified, Rule::NestedMinMax),
         (Pylint, "W0130") => (RuleGroup::Unspecified, Rule::DuplicateValue),
+        (Pylint, "W2301") => (RuleGroup::Unspecified, Rule::UnnecessaryEllipsis),
 
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Unspecified, Rule::BlockingHttpCallInAsyncFunction),

@@ -515,6 +515,10 @@ where
                     pylint::rules::too_many_arguments(self, args, stmt);
                 }
 
+                if self.enabled(Rule::UnnecessaryEllipsis) || true {
+                    pylint::rules::unnecessary_ellipsis(self, body);
+                }
+
                 if self.enabled(Rule::TooManyReturnStatements) {
                     if let Some(diagnostic) = pylint::rules::too_many_return_statements(
                         stmt,
@@ -656,6 +660,9 @@ where
                 body,
                 range: _,
             }) => {
+                if self.enabled(Rule::UnnecessaryEllipsis) || true {
+                    pylint::rules::unnecessary_ellipsis(self, body);
+                }
                 if self.enabled(Rule::DjangoNullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
