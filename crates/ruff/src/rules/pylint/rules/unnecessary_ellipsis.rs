@@ -97,7 +97,7 @@ fn process_body(checker: &mut Checker, parent: &Stmt, body: &[Stmt], expr: &Expr
 
                 // In the unlikely event the body consists solely of several
                 // ellipses, `delete_stmt` can actually result in a `pass`.
-                if edit.is_deletion() || edit.content() == Some("pass") {
+                if edit.is_deletion() && edit.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(element));
                 }
 

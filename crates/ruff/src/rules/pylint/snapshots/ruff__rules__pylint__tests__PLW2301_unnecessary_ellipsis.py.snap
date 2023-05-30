@@ -163,10 +163,9 @@ unnecessary_ellipsis.py:83:5: PLW2301 [*] Unnecessary ellipsis constant.
 81 81 |     ...  # [unnecessary-ellipsis]
 82 82 |     ...
 83    |-    ...  # [unnecessary-ellipsis]
-   83 |+    pass  # [unnecessary-ellipsis]
-84 84 | 
-85 85 | 
-86 86 | class DocstringAndEllipsis:
+84 83 | 
+85 84 | 
+86 85 | class DocstringAndEllipsis:
 
 unnecessary_ellipsis.py:89:5: PLW2301 [*] Unnecessary ellipsis constant.
    |
