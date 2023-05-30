@@ -39,18 +39,20 @@ def get_indent(line: str) -> str:
 
 def key_test_case(nb_digit: int) -> Callable[[str], tuple[str, int, str, int]]:
     def key(line: str) -> tuple[str, int, str, int]:
-        (rule, prefix, code, subcode) = next(
-            re.finditer(
-                (
-                    r"(?s)Rule::(.*?),.*?Path::new\("
-                    r'(?:"(?:.*?)?([A-Z]+)([0-9]+)?|.+?)(?:.*?)?(_[0-9]+)?(?:.(?:pyi?|txt))?"'
-                ),
-                line,
+        m = re.search(
+            (
+                r"(?s)Rule::(.*?),.*?Path::new\("
+                r'(?:"(?:.*?)?([A-Z]+)([0-9]+)?|.+?)(?:.*?)?(_[0-9]+)?(?:.(?:pyi?|txt))?"'
             ),
+            line,
         )
-        subcode = int(subcode[1:]) if subcode else -1
-        prefix = prefix or ""
+        assert m is not None
+        rule = m.group(1)
+        prefix = m.group(2) or ""
+        code = m.group(3)
         code = int(code + "0" * (nb_digit - len(code))) if code is not None else -1
+        subcode = m.group(4)
+        subcode = int(subcode[1:]) if subcode else -1
         return prefix, code, rule, subcode
 
     return key
