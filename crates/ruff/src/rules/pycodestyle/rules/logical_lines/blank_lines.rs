@@ -343,8 +343,7 @@ pub(crate) fn blank_lines(
                 .map_or(false, |token| token.kind() != TokenKind::Class)
         {
             let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, token.range());
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+            diagnostic.set_fix(Fix::automatic(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
                 locator.line_start(token.range().start()),
             )));
@@ -362,8 +361,7 @@ pub(crate) fn blank_lines(
                 BlankLinesTopLevel(tracked_vars.blank_lines as usize),
                 token.range(),
             );
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+            diagnostic.set_fix(Fix::automatic(Edit::insertion(
                 stylist
                     .line_ending()
                     .as_str()
@@ -390,8 +388,7 @@ pub(crate) fn blank_lines(
             };
             let end = locator.line_start(token.range().start());
             let start = end - TextSize::new(chars_to_remove);
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::suggested(Edit::deletion(start, end)));
+            diagnostic.set_fix(Fix::automatic(Edit::deletion(start, end)));
 
             context.push_diagnostic(diagnostic);
         }
@@ -401,7 +398,7 @@ pub(crate) fn blank_lines(
             let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range());
 
             let range = token.range();
-            diagnostic.set_fix(Fix::suggested(Edit::deletion(
+            diagnostic.set_fix(Fix::automatic(Edit::deletion(
                 locator.line_start(range.start()) - TextSize::new(tracked_vars.blank_characters),
                 locator.line_start(range.start()),
             )));
@@ -417,8 +414,7 @@ pub(crate) fn blank_lines(
                 BlankLinesAfterFunctionOrClass(tracked_vars.blank_lines as usize),
                 token.range(),
             );
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+            diagnostic.set_fix(Fix::automatic(Edit::insertion(
                 stylist
                     .line_ending()
                     .as_str()
@@ -438,8 +434,7 @@ pub(crate) fn blank_lines(
                 BlankLinesBeforeNestedDefinition(tracked_vars.blank_lines),
                 token.range(),
             );
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::insertion(
+            diagnostic.set_fix(Fix::automatic(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
                 locator.line_start(token.range().start()),
             )));
