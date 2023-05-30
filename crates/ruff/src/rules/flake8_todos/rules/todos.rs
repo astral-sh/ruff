@@ -6,7 +6,11 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::{directives::TodoDirective, registry::Rule, settings::Settings};
+use crate::{
+    directives::{TodoComment, TodoDirective},
+    registry::Rule,
+    settings::Settings,
+};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -240,26 +244,27 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 });
 
 pub(crate) fn todos(
-    comment_directive_ranges: Vec<(TextRange, usize, TextRange)>,
+    todo_comments: &Vec<TodoComment>,
     indexer: &Indexer,
     locator: &Locator,
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    for (comment_range, comment_index, directive_range) in comment_directive_ranges {
-        let comment = locator.slice(comment_range);
-        let tag = Tag {
-            content: locator.slice(directive_range),
-            range: directive_range,
-        };
+    for todo_comment in todo_comments {
+        let TodoComment {
+            directive,
+            content,
+            range,
+            range_index,
+        } = todo_comment;
 
-        tag_errors(&tag, &mut diagnostics, settings);
-        static_errors(&mut diagnostics, comment, comment_range, &tag);
+        tag_errors(directive, &mut diagnostics, settings);
+        static_errors(&mut diagnostics, content, *range, directive);
 
         let mut has_issue_link = false;
-        let mut curr_range = &comment_range;
-        for next_range in indexer.comment_ranges().iter().skip(comment_index + 1) {
+        let mut curr_range = range;
+        for next_range in indexer.comment_ranges().iter().skip(range_index + 1) {
             // Ensure that next_comment_range is in the same multiline comment "block" as
             // comment_range.
             if !locator
@@ -271,7 +276,7 @@ pub(crate) fn todos(
             }
 
             let next_comment = locator.slice(*next_range);
-            if TodoDirective::from_comment(next_comment).is_some() {
+            if TodoDirective::extract_directive(next_comment, next_range).is_some() {
                 break;
             }
 
@@ -287,7 +292,7 @@ pub(crate) fn todos(
 
         if !has_issue_link {
             // TD-003
-            diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
         }
     }
 
@@ -295,24 +300,24 @@ pub(crate) fn todos(
 }
 
 /// Check that the tag itself is valid. This function modifies `diagnostics` in-place.
-fn tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: &Settings) {
-    if tag.content == "TODO" {
+fn tag_errors(directive: &TodoDirective, diagnostics: &mut Vec<Diagnostic>, settings: &Settings) {
+    if directive.content == "TODO" {
         return;
     }
 
-    if tag.content.to_uppercase() == "TODO" {
+    if directive.content.to_uppercase() == "TODO" {
         // TD006
         let mut diagnostic = Diagnostic::new(
             InvalidTodoCapitalization {
-                tag: tag.content.to_string(),
+                tag: directive.content.to_string(),
             },
-            tag.range,
+            directive.range,
         );
 
         if settings.rules.should_fix(Rule::InvalidTodoCapitalization) {
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 "TODO".to_string(),
-                tag.range,
+                directive.range,
             )));
         }
 
@@ -321,9 +326,9 @@ fn tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: &Settings)
         // TD001
         diagnostics.push(Diagnostic::new(
             InvalidTodoTag {
-                tag: tag.content.to_string(),
+                tag: directive.content.to_string(),
             },
-            tag.range,
+            directive.range,
         ));
     }
 }
@@ -334,11 +339,11 @@ fn static_errors(
     diagnostics: &mut Vec<Diagnostic>,
     comment: &str,
     comment_range: TextRange,
-    tag: &Tag,
+    directive: &TodoDirective,
 ) {
-    let post_tag = &comment[usize::from(tag.range.end() - comment_range.start())..];
-    let trimmed = post_tag.trim_start();
-    let content_offset = post_tag.text_len() - trimmed.text_len();
+    let post_directive = &comment[usize::from(directive.range.end() - comment_range.start())..];
+    let trimmed = post_directive.trim_start();
+    let content_offset = post_directive.text_len() - trimmed.text_len();
 
     let author_end = content_offset
         + if trimmed.starts_with('(') {
@@ -349,27 +354,27 @@ fn static_errors(
             }
         } else {
             // TD-002
-            diagnostics.push(Diagnostic::new(MissingTodoAuthor, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
 
             TextSize::new(0)
         };
 
-    let after_author = &post_tag[usize::from(author_end)..];
+    let after_author = &post_directive[usize::from(author_end)..];
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
             // TD-005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
         } else if !after_colon.starts_with(char::is_whitespace) {
             // TD-007
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range));
+            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, directive.range));
         }
     } else {
         // TD-004
-        diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
+        diagnostics.push(Diagnostic::new(MissingTodoColon, directive.range));
 
         if after_author.is_empty() {
             // TD-005
-            diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
         }
     }
 }
