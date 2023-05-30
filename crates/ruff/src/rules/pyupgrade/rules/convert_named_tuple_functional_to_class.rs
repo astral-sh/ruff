@@ -198,22 +198,24 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             return;
         }
     };
-    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-    let fixable = checker.locator.is_at_start_of_line(stmt.start());
+
     let mut diagnostic = Diagnostic::new(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(convert_to_class(
-            stmt,
-            typename,
-            properties,
-            base_class,
-            checker.generator(),
-        ));
+    if checker.patch(diagnostic.kind.rule()) {
+        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+        if checker.locator.is_at_start_of_line(stmt.start()) {
+            diagnostic.set_fix(convert_to_class(
+                stmt,
+                typename,
+                properties,
+                base_class,
+                checker.generator(),
+            ));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

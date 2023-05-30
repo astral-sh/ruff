@@ -6,7 +6,8 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 pip install ruff
 ```
 
-For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff`](https://formulae.brew.sh/formula/ruff) on Homebrew:
+For **macOS Homebrew** and **Linuxbrew** users, Ruff is also available as [`ruff`](https://formulae.brew.sh/formula/ruff)
+on Homebrew:
 
 ```shell
 brew install ruff

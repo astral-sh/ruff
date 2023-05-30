@@ -165,6 +165,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E1307") => (RuleGroup::Unspecified, Rule::BadStringFormatType),
         (Pylint, "E1310") => (RuleGroup::Unspecified, Rule::BadStrStripCall),
         (Pylint, "E1507") => (RuleGroup::Unspecified, Rule::InvalidEnvvarValue),
+        (Pylint, "E1700") => (RuleGroup::Unspecified, Rule::YieldFromInAsyncFunction),
         (Pylint, "E2502") => (RuleGroup::Unspecified, Rule::BidirectionalUnicode),
         (Pylint, "E2510") => (RuleGroup::Unspecified, Rule::InvalidCharacterBackspace),
         (Pylint, "E2512") => (RuleGroup::Unspecified, Rule::InvalidCharacterSub),
@@ -317,7 +318,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Annotations, "401") => (RuleGroup::Unspecified, Rule::AnyType),
 
         // flake8-future-annotations
-        (Flake8FutureAnnotations, "100") => (RuleGroup::Unspecified, Rule::MissingFutureAnnotationsImport),
+        (Flake8FutureAnnotations, "100") => (RuleGroup::Unspecified, Rule::FutureRewritableTypeAnnotation),
+        (Flake8FutureAnnotations, "102") => (RuleGroup::Unspecified, Rule::FutureRequiredTypeAnnotation),
 
         // flake8-2020
         (Flake82020, "101") => (RuleGroup::Unspecified, Rule::SysVersionSlice3),
@@ -589,9 +591,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, Rule::DuplicateUnionMember),
         (Flake8Pyi, "020") => (RuleGroup::Unspecified, Rule::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Unspecified, Rule::DocstringInStub),
+        (Flake8Pyi, "032") => (RuleGroup::Unspecified, Rule::AnyEqNeAnnotation),
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, Rule::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, Rule::TSuffixedTypeAlias),
+        (Flake8Pyi, "045") => (RuleGroup::Unspecified, Rule::IterMethodReturnIterable),
+        (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
 
         // flake8-pytest-style
@@ -746,6 +751,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Todos, "005") => (RuleGroup::Unspecified, Rule::MissingTodoDescription),
         (Flake8Todos, "006") => (RuleGroup::Unspecified, Rule::InvalidTodoCapitalization),
         (Flake8Todos, "007") => (RuleGroup::Unspecified, Rule::MissingSpaceAfterTodoColon),
+
+        // airflow
+        (Airflow, "001") => (RuleGroup::Unspecified, Rule::AirflowVariableNameTaskIdMismatch),
 
         _ => return None,
     })

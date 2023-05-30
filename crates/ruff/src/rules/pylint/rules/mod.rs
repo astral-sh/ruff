@@ -48,6 +48,9 @@ pub(crate) use unnecessary_direct_lambda_call::{
 pub(crate) use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub(crate) use useless_import_alias::{useless_import_alias, UselessImportAlias};
 pub(crate) use useless_return::{useless_return, UselessReturn};
+pub(crate) use yield_from_in_async_function::{
+    yield_from_in_async_function, YieldFromInAsyncFunction,
+};
 pub(crate) use yield_in_init::{yield_in_init, YieldInInit};
 
 mod assert_on_string_literal;
@@ -91,4 +94,5 @@ mod unnecessary_direct_lambda_call;
 mod useless_else_on_loop;
 mod useless_import_alias;
 mod useless_return;
+mod yield_from_in_async_function;
 mod yield_in_init;

@@ -12,6 +12,8 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
+    #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
+    #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.py"))]
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.pyi"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.py"))]
@@ -24,6 +26,8 @@ mod tests {
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.py"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.pyi"))]
+    #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.py"))]
+    #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.pyi"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.py"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.pyi"))]
     #[test_case(Rule::PassInClassBody, Path::new("PYI012.py"))]
@@ -34,6 +38,8 @@ mod tests {
     #[test_case(Rule::QuotedAnnotationInStub, Path::new("PYI020.pyi"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
+    #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.py"))]
+    #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.pyi"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.pyi"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]

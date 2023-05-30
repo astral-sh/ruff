@@ -132,6 +132,12 @@ pub(crate) fn nested_min_max(
         return;
     };
 
+    if args.len() == 1
+        && matches!(&args[0], Expr::Call(ast::ExprCall { args, .. }) if args.len() == 1)
+    {
+        return;
+    }
+
     if args.iter().any(|arg| {
         let Expr::Call(ast::ExprCall { func, keywords, ..} )= arg else {
             return false;
@@ -139,20 +145,21 @@ pub(crate) fn nested_min_max(
         MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic_model())
             == Some(min_max)
     }) {
-        let fixable = !has_comments(expr, checker.locator);
         let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
-        if fixable && checker.patch(diagnostic.kind.rule()) {
-            let flattened_expr = Expr::Call(ast::ExprCall {
-                func: Box::new(func.clone()),
-                args: collect_nested_args(checker.semantic_model(), min_max, args),
-                keywords: keywords.to_owned(),
-                range: TextRange::default(),
-            });
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                checker.generator().expr(&flattened_expr),
-                expr.range(),
-            )));
+        if checker.patch(diagnostic.kind.rule()) {
+            if !has_comments(expr, checker.locator) {
+                let flattened_expr = Expr::Call(ast::ExprCall {
+                    func: Box::new(func.clone()),
+                    args: collect_nested_args(checker.semantic_model(), min_max, args),
+                    keywords: keywords.to_owned(),
+                    range: TextRange::default(),
+                });
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    checker.generator().expr(&flattened_expr),
+                    expr.range(),
+                )));
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

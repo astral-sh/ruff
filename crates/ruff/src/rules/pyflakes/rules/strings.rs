@@ -17,6 +17,25 @@ use super::super::fixes::{
 };
 use super::super::format::FormatSummary;
 
+/// ## What it does
+/// Checks for invalid `printf`-style format strings.
+///
+/// ## Why is this bad?
+/// Conversion specifiers are required for `printf`-style format strings. These
+/// specifiers must contain a `%` character followed by a conversion type.
+///
+/// ## Example
+/// ```python
+/// "Hello, %" % "world"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "Hello, %s" % "world"
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatInvalidFormat {
     pub(crate) message: String,
@@ -30,6 +49,32 @@ impl Violation for PercentFormatInvalidFormat {
     }
 }
 
+/// ## What it does
+/// Checks for named placeholders in `printf`-style format strings without
+/// mapping-type values.
+///
+/// ## Why is this bad?
+/// When using named placeholders in `printf`-style format strings, the values
+/// must be a map type (such as a dictionary). Otherwise, the expression will
+/// raise a `TypeError`.
+///
+/// ## Example
+/// ```python
+/// "%(greeting)s, %(name)s" % ("Hello", "World")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "%(greeting)s, %(name)s" % {"greeting": "Hello", "name": "World"}
+/// ```
+///
+/// Or:
+/// ```python
+/// "%s, %s" % ("Hello", "World")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatExpectedMapping;
 
@@ -40,6 +85,32 @@ impl Violation for PercentFormatExpectedMapping {
     }
 }
 
+/// ## What it does
+/// Checks for uses of mapping-type values in `printf`-style format strings
+/// without named placeholders.
+///
+/// ## Why is this bad?
+/// When using mapping-type values (such as `dict`) in `printf`-style format
+/// strings, the keys must be named. Otherwise, the expression will raise a
+/// `TypeError`.
+///
+/// ## Example
+/// ```python
+/// "%s, %s" % {"greeting": "Hello", "name": "World"}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "%(greeting)s, %(name)s" % {"greeting": "Hello", "name": "World"}
+/// ```
+///
+/// Or:
+/// ```python
+/// "%s, %s" % ("Hello", "World")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatExpectedSequence;
 
@@ -50,6 +121,25 @@ impl Violation for PercentFormatExpectedSequence {
     }
 }
 
+/// ## What it does
+/// Checks for unused mapping keys in `printf`-style format strings.
+///
+/// ## Why is this bad?
+/// Unused named placeholders in `printf`-style format strings are unnecessary,
+/// and likely indicative of a mistake. They should be removed.
+///
+/// ## Example
+/// ```python
+/// "Hello, %(name)s" % {"greeting": "Hello", "name": "World"}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "Hello, %(name)s" % {"name": "World"}
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatExtraNamedArguments {
     missing: Vec<String>,
@@ -70,6 +160,26 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
     }
 }
 
+/// ## What it does
+/// Checks for named placeholders in `printf`-style format strings that are not
+/// present in the provided mapping.
+///
+/// ## Why is this bad?
+/// Named placeholders that lack a corresponding value in the provided mapping
+/// will raise a `KeyError`.
+///
+/// ## Example
+/// ```python
+/// "%(greeting)s, %(name)s" % {"name": "world"}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "Hello, %(name)s" % {"name": "world"}
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatMissingArgument {
     missing: Vec<String>,
@@ -84,6 +194,32 @@ impl Violation for PercentFormatMissingArgument {
     }
 }
 
+/// ## What it does
+/// Checks for `printf`-style format strings that have mixed positional and
+/// named placeholders.
+///
+/// ## Why is this bad?
+/// Python does not support mixing positional and named placeholders in
+/// `printf`-style format strings. The use of mixed placeholders will raise a
+/// `TypeError` at runtime.
+///
+/// ## Example
+/// ```python
+/// "%s, %(name)s" % ("Hello", {"name": "World"})
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "%s, %s" % ("Hello", "World")
+/// ```
+///
+/// Or:
+/// ```python
+/// "%(greeting)s, %(name)s" % {"greeting": "Hello", "name": "World"}
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatMixedPositionalAndNamed;
 
@@ -94,6 +230,26 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
     }
 }
 
+/// ## What it does
+/// Checks for `printf`-style format strings that have a mismatch between the
+/// number of positional placeholders and the number of substitution values.
+///
+/// ## Why is this bad?
+/// When a `printf`-style format string is provided with too many or too few
+/// substitution values, it will raise a `TypeError` at runtime.
+///
+/// ## Example
+/// ```python
+/// "%s, %s" % ("Hello", "world", "!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "%s, %s" % ("Hello", "world")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatPositionalCountMismatch {
     wanted: usize,
@@ -108,6 +264,30 @@ impl Violation for PercentFormatPositionalCountMismatch {
     }
 }
 
+/// ## What it does
+/// Checks for `printf`-style format strings that use the `*` specifier with
+/// non-tuple values.
+///
+/// ## Why is this bad?
+/// The use of the `*` specifier with non-tuple values will raise a
+/// `TypeError` at runtime.
+///
+/// ## Example
+/// ```python
+/// from math import pi
+///
+/// "%(n).*f" % {"n": (2, pi)}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from math import pi
+///
+/// "%.*f" % (2, pi)  # 3.14
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatStarRequiresSequence;
 
@@ -118,6 +298,26 @@ impl Violation for PercentFormatStarRequiresSequence {
     }
 }
 
+/// ## What it does
+/// Checks for `printf`-style format strings with invalid format characters.
+///
+/// ## Why is this bad?
+/// In `printf`-style format strings, the `%` character is used to indicate
+/// placeholders. If a `%` character is not followed by a valid format
+/// character, it will raise a `ValueError` at runtime.
+///
+/// ## Example
+/// ```python
+/// "Hello, %S" % "world"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "Hello, %s" % "world"
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[violation]
 pub struct PercentFormatUnsupportedFormatCharacter {
     pub(crate) char: char,
@@ -131,6 +331,24 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
     }
 }
 
+/// ## What it does
+/// Checks for `str.format` calls with invalid format strings.
+///
+/// ## Why is this bad?
+/// Invalid format strings will raise a `ValueError`.
+///
+/// ## Example
+/// ```python
+/// "{".format(foo)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "{}".format(foo)
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatInvalidFormat {
     pub(crate) message: String,
@@ -144,6 +362,25 @@ impl Violation for StringDotFormatInvalidFormat {
     }
 }
 
+/// ## What it does
+/// Checks for `str.format` calls with unused keyword arguments.
+///
+/// ## Why is this bad?
+/// Unused keyword arguments are redundant, and often indicative of a mistake.
+/// They should be removed.
+///
+/// ## Example
+/// ```python
+/// "Hello, {name}".format(greeting="Hello", name="World")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "Hello, {name}".format(name="World")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatExtraNamedArguments {
     missing: Vec<String>,
@@ -164,6 +401,25 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
     }
 }
 
+/// ## What it does
+/// Checks for `str.format` calls with unused positional arguments.
+///
+/// ## Why is this bad?
+/// Unused positional arguments are redundant, and often indicative of a mistake.
+/// They should be removed.
+///
+/// ## Example
+/// ```python
+/// "Hello, {0}".format("world", "!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "Hello, {0}".format("world")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
@@ -184,6 +440,25 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
     }
 }
 
+/// ## What it does
+/// Checks for `str.format` calls with placeholders that are missing arguments.
+///
+/// ## Why is this bad?
+/// In `str.format` calls, omitting arguments for placeholders will raise a
+/// `KeyError` at runtime.
+///
+/// ## Example
+/// ```python
+/// "{greeting}, {name}".format(name="World")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "{greeting}, {name}".format(greeting="Hello", name="World")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatMissingArguments {
     missing: Vec<String>,
@@ -198,6 +473,30 @@ impl Violation for StringDotFormatMissingArguments {
     }
 }
 
+/// ## What it does
+/// Checks for `str.format` calls that mix automatic and manual numbering.
+///
+/// ## Why is this bad?
+/// In `str.format` calls, mixing automatic and manual numbering will raise a
+/// `ValueError` at runtime.
+///
+/// ## Example
+/// ```python
+/// "{0}, {}".format("Hello", "World")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// "{0}, {1}".format("Hello", "World")
+/// ```
+///
+/// Or:
+/// ```python
+/// "{}, {}".format("Hello", "World")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[violation]
 pub struct StringDotFormatMixingAutomatic;
 

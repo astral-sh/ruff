@@ -194,7 +194,16 @@ let g:ale_fixers = {
 </details>
 
 <details>
-<summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
+<summary>
+Ruff can also be integrated via
+<a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm">
+  <code>efm</code>
+</a>
+in just a
+<a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">
+  few lines.
+</a>
+</summary>
 <br>
 
 ```yaml
@@ -211,7 +220,12 @@ tools:
 </details>
 
 <details>
-<summary>For neovim users using <a href="https://github.com/jose-elias-alvarez/null-ls.nvim"><code>null-ls</code></a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.</summary>
+<summary>
+For neovim users using
+<a href="https://github.com/jose-elias-alvarez/null-ls.nvim">
+  <code>null-ls</code>
+</a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.
+</summary>
 <br>
 
 ```lua

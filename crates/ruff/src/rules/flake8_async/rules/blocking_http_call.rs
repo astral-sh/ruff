@@ -6,8 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
-use super::super::helpers::in_async_function;
-
 /// ## What it does
 /// Checks that async functions do not contain blocking HTTP calls.
 ///
@@ -66,7 +64,7 @@ const BLOCKING_HTTP_CALLS: &[&[&str]] = &[
 
 /// ASYNC100
 pub(crate) fn blocking_http_call(checker: &mut Checker, expr: &Expr) {
-    if in_async_function(checker.semantic_model()) {
+    if checker.semantic_model().in_async_context() {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
             let call_path = checker.semantic_model().resolve_call_path(func);
             let is_blocking =

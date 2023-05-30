@@ -31,12 +31,27 @@ pub struct Alias<'a> {
 }
 
 impl<'a> Import<'a> {
+    /// Creates a new `Import` to import the specified module.
     pub fn module(name: &'a str) -> Self {
         Self {
             name: Alias {
                 name,
                 as_name: None,
             },
+        }
+    }
+}
+
+impl<'a> ImportFrom<'a> {
+    /// Creates a new `ImportFrom` to import a member from the specified module.
+    pub fn member(module: &'a str, name: &'a str) -> Self {
+        Self {
+            module: Some(module),
+            name: Alias {
+                name,
+                as_name: None,
+            },
+            level: None,
         }
     }
 }
