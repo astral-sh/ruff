@@ -12,14 +12,14 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::Eval, Path::new("PGH001_0.py"); "PGH001_0")]
-    #[test_case(Rule::Eval, Path::new("PGH001_1.py"); "PGH001_1")]
-    #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_0.py"); "PGH002_0")]
-    #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_1.py"); "PGH002_1")]
-    #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"); "PGH003_0")]
-    #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_1.py"); "PGH003_1")]
-    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_0.py"); "PGH004_0")]
-    #[test_case(Rule::InvalidMockAccess, Path::new("PGH005_0.py"); "PGH005_0")]
+    #[test_case(Rule::Eval, Path::new("PGH001_0.py"))]
+    #[test_case(Rule::Eval, Path::new("PGH001_1.py"))]
+    #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_0.py"))]
+    #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_1.py"))]
+    #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"))]
+    #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_1.py"))]
+    #[test_case(Rule::BlanketNOQA, Path::new("PGH004_0.py"))]
+    #[test_case(Rule::InvalidMockAccess, Path::new("PGH005_0.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

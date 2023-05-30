@@ -14,7 +14,9 @@ pub use locator::Locator;
 pub use stylist::{Quote, Stylist};
 
 pub use crate::source_code::line_index::{LineIndex, OneIndexed};
+pub use comment_ranges::{CommentRanges, CommentRangesBuilder};
 
+mod comment_ranges;
 mod generator;
 mod indexer;
 mod line_index;

@@ -2184,19 +2184,19 @@ where
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 // Ex) Optional[...], Union[...]
                 if self.any_enabled(&[
-                    Rule::MissingFutureAnnotationsImport,
+                    Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP604Annotation,
                 ]) {
                     if let Some(operator) =
                         analyze::typing::to_pep604_operator(value, slice, &self.semantic_model)
                     {
-                        if self.enabled(Rule::MissingFutureAnnotationsImport) {
+                        if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py310
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic_model.future_annotations()
                                 && self.semantic_model.in_annotation()
                             {
-                                flake8_future_annotations::rules::missing_future_annotations(
+                                flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, value,
                                 );
                             }
@@ -2212,6 +2212,21 @@ where
                                 );
                             }
                         }
+                    }
+                }
+
+                // Ex) list[...]
+                if self.enabled(Rule::FutureRequiredTypeAnnotation) {
+                    if self.settings.target_version < PythonVersion::Py39
+                        && !self.semantic_model.future_annotations()
+                        && self.semantic_model.in_annotation()
+                        && analyze::typing::is_pep585_generic(value, &self.semantic_model)
+                    {
+                        flake8_future_annotations::rules::future_required_type_annotation(
+                            self,
+                            expr,
+                            flake8_future_annotations::rules::Reason::PEP585,
+                        );
                     }
                 }
 
@@ -2271,19 +2286,19 @@ where
 
                         // Ex) List[...]
                         if self.any_enabled(&[
-                            Rule::MissingFutureAnnotationsImport,
+                            Rule::FutureRewritableTypeAnnotation,
                             Rule::NonPEP585Annotation,
                         ]) {
                             if let Some(replacement) =
                                 analyze::typing::to_pep585_generic(expr, &self.semantic_model)
                             {
-                                if self.enabled(Rule::MissingFutureAnnotationsImport) {
+                                if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                                     if self.settings.target_version < PythonVersion::Py39
                                         && self.settings.target_version >= PythonVersion::Py37
                                         && !self.semantic_model.future_annotations()
                                         && self.semantic_model.in_annotation()
                                     {
-                                        flake8_future_annotations::rules::missing_future_annotations(
+                                        flake8_future_annotations::rules::future_rewritable_type_annotation(
                                             self, expr,
                                         );
                                     }
@@ -2349,19 +2364,19 @@ where
             Expr::Attribute(ast::ExprAttribute { attr, value, .. }) => {
                 // Ex) typing.List[...]
                 if self.any_enabled(&[
-                    Rule::MissingFutureAnnotationsImport,
+                    Rule::FutureRewritableTypeAnnotation,
                     Rule::NonPEP585Annotation,
                 ]) {
                     if let Some(replacement) =
                         analyze::typing::to_pep585_generic(expr, &self.semantic_model)
                     {
-                        if self.enabled(Rule::MissingFutureAnnotationsImport) {
+                        if self.enabled(Rule::FutureRewritableTypeAnnotation) {
                             if self.settings.target_version < PythonVersion::Py39
                                 && self.settings.target_version >= PythonVersion::Py37
                                 && !self.semantic_model.future_annotations()
                                 && self.semantic_model.in_annotation()
                             {
-                                flake8_future_annotations::rules::missing_future_annotations(
+                                flake8_future_annotations::rules::future_rewritable_type_annotation(
                                     self, expr,
                                 );
                             }
@@ -3198,6 +3213,20 @@ where
                 op: Operator::BitOr,
                 ..
             }) => {
+                // Ex) `str | None`
+                if self.enabled(Rule::FutureRequiredTypeAnnotation) {
+                    if self.settings.target_version < PythonVersion::Py310
+                        && !self.semantic_model.future_annotations()
+                        && self.semantic_model.in_annotation()
+                    {
+                        flake8_future_annotations::rules::future_required_type_annotation(
+                            self,
+                            expr,
+                            flake8_future_annotations::rules::Reason::PEP604,
+                        );
+                    }
+                }
+
                 if self.is_stub {
                     if self.enabled(Rule::DuplicateUnionMember)
                         && self.semantic_model.in_type_definition()
@@ -5297,7 +5326,8 @@ impl<'a> Checker<'a> {
             Rule::MissingReturnTypeClassMethod,
             Rule::AnyType,
         ]);
-        let enforce_stubs = self.is_stub && self.any_enabled(&[Rule::DocstringInStub]);
+        let enforce_stubs = self.is_stub
+            && self.any_enabled(&[Rule::DocstringInStub, Rule::IterMethodReturnIterable]);
         let enforce_docstrings = self.any_enabled(&[
             Rule::UndocumentedPublicModule,
             Rule::UndocumentedPublicClass,
@@ -5400,6 +5430,9 @@ impl<'a> Checker<'a> {
                 if self.is_stub {
                     if self.enabled(Rule::DocstringInStub) {
                         flake8_pyi::rules::docstring_in_stubs(self, docstring);
+                    }
+                    if self.enabled(Rule::IterMethodReturnIterable) {
+                        flake8_pyi::rules::iter_method_return_iterable(self, definition);
                     }
                 }
             }

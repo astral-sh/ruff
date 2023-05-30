@@ -244,6 +244,8 @@ stylistic rules made obsolete by the use of an autoformatter, like
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
 catches a wide variety of common errors (like unused imports) with zero configuration.
 
+<!-- End section: Rules -->
+
 Beyond the defaults, Ruff re-implements some of the most popular Flake8 plugins and related code
 quality tools, including:
 
@@ -297,8 +299,6 @@ quality tools, including:
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
-
-<!-- End section: Rules -->
 
 For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
 

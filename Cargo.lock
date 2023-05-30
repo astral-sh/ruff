@@ -472,6 +472,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
+name = "countme"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
+
+[[package]]
 name = "crc32fast"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1984,13 +1990,13 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap 4.2.7",
+ "countme",
  "insta",
  "is-macro",
  "itertools",
  "once_cell",
  "ruff_formatter",
  "ruff_python_ast",
- "ruff_rustpython",
  "ruff_testing_macros",
  "ruff_text_size",
  "rustc-hash",

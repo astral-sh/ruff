@@ -101,6 +101,21 @@ pub fn to_pep585_generic(expr: &Expr, model: &SemanticModel) -> Option<ModuleMem
     })
 }
 
+/// Return whether a given expression uses a PEP 585 standard library generic.
+pub fn is_pep585_generic(expr: &Expr, model: &SemanticModel) -> bool {
+    if let Some(call_path) = model.resolve_call_path(expr) {
+        let [module, name] = call_path.as_slice() else {
+            return false;
+        };
+        for (_, (to_module, to_member)) in PEP_585_GENERICS {
+            if module == to_module && name == to_member {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum Pep604Operator {
     /// The union operator, e.g., `Union[str, int]`, expressible as `str | int` after PEP 604.

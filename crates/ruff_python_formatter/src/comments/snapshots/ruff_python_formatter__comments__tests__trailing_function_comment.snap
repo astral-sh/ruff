@@ -1,0 +1,21 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtExpr,
+        range: 143..155,
+        source: `test(10, 20)`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# Trailing comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+}
