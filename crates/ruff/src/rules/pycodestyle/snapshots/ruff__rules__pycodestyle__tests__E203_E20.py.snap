@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-E20.py:51:10: E203 Whitespace before ':'
+E20.py:51:10: E203 [*] Whitespace before ':'
    |
 51 | #: E203:1:10
 52 | if x == 4 :
@@ -9,8 +9,19 @@ E20.py:51:10: E203 Whitespace before ':'
 53 |     print x, y
 54 |     x, y = y, x
    |
+   = help: Removed whitespace before ':'
 
-E20.py:55:10: E203 Whitespace before ':'
+ℹ Suggested fix
+48 48 | 
+49 49 | 
+50 50 | #: E203:1:10
+51    |-if x == 4 :
+   51 |+if x == 4:
+52 52 |     print x, y
+53 53 |     x, y = y, x
+54 54 | #: E203:1:10
+
+E20.py:55:10: E203 [*] Whitespace before ':'
    |
 55 |     x, y = y, x
 56 | #: E203:1:10
@@ -19,8 +30,19 @@ E20.py:55:10: E203 Whitespace before ':'
 58 |     print x, y
 59 |     x, y = y, x
    |
+   = help: Removed whitespace before ':'
 
-E20.py:60:15: E203 Whitespace before ';'
+ℹ Suggested fix
+52 52 |     print x, y
+53 53 |     x, y = y, x
+54 54 | #: E203:1:10
+55    |-if x == 4	:
+   55 |+if x == 4:
+56 56 |     print x, y
+57 57 |     x, y = y, x
+58 58 | #: E203:2:15 E702:2:16
+
+E20.py:60:15: E203 [*] Whitespace before ';'
    |
 60 | #: E203:2:15 E702:2:16
 61 | if x == 4:
@@ -29,8 +51,19 @@ E20.py:60:15: E203 Whitespace before ';'
 63 | #: E203:2:15 E702:2:16
 64 | if x == 4:
    |
+   = help: Removed whitespace before ';'
 
-E20.py:63:15: E203 Whitespace before ';'
+ℹ Suggested fix
+57 57 |     x, y = y, x
+58 58 | #: E203:2:15 E702:2:16
+59 59 | if x == 4:
+60    |-    print x, y ; x, y = y, x
+   60 |+    print x, y; x, y = y, x
+61 61 | #: E203:2:15 E702:2:16
+62 62 | if x == 4:
+63 63 |     print x, y	; x, y = y, x
+
+E20.py:63:15: E203 [*] Whitespace before ';'
    |
 63 | #: E203:2:15 E702:2:16
 64 | if x == 4:
@@ -39,8 +72,19 @@ E20.py:63:15: E203 Whitespace before ';'
 66 | #: E203:3:13
 67 | if x == 4:
    |
+   = help: Removed whitespace before ';'
 
-E20.py:67:13: E203 Whitespace before ','
+ℹ Suggested fix
+60 60 |     print x, y ; x, y = y, x
+61 61 | #: E203:2:15 E702:2:16
+62 62 | if x == 4:
+63    |-    print x, y	; x, y = y, x
+   63 |+    print x, y; x, y = y, x
+64 64 | #: E203:3:13
+65 65 | if x == 4:
+66 66 |     print x, y
+
+E20.py:67:13: E203 [*] Whitespace before ','
    |
 67 | if x == 4:
 68 |     print x, y
@@ -49,8 +93,19 @@ E20.py:67:13: E203 Whitespace before ','
 70 | #: E203:3:13
 71 | if x == 4:
    |
+   = help: Removed whitespace before ','
 
-E20.py:71:13: E203 Whitespace before ','
+ℹ Suggested fix
+64 64 | #: E203:3:13
+65 65 | if x == 4:
+66 66 |     print x, y
+67    |-    x, y = y , x
+   67 |+    x, y = y, x
+68 68 | #: E203:3:13
+69 69 | if x == 4:
+70 70 |     print x, y
+
+E20.py:71:13: E203 [*] Whitespace before ','
    |
 71 | if x == 4:
 72 |     print x, y
@@ -59,5 +114,16 @@ E20.py:71:13: E203 Whitespace before ','
 74 | #: Okay
 75 | if x == 4:
    |
+   = help: Removed whitespace before ','
+
+ℹ Suggested fix
+68 68 | #: E203:3:13
+69 69 | if x == 4:
+70 70 |     print x, y
+71    |-    x, y = y	, x
+   71 |+    x, y = y, x
+72 72 | #: Okay
+73 73 | if x == 4:
+74 74 |     print x, y
 
 
