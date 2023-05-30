@@ -72,21 +72,25 @@ impl BlankLinesConfig {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 #[violation]
-pub struct BlankLineBetweenMethods;
+pub struct BlankLineBetweenMethods(pub u32);
 
 impl AlwaysAutofixableViolation for BlankLineBetweenMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Expected 1 blank line, found 0")
+        let BlankLineBetweenMethods(nb_blank_lines) = self;
+        format!(
+            "Expected {:?} blank line, found {nb_blank_lines}",
+            BlankLinesConfig::METHOD
+        )
     }
 
     fn autofix_title(&self) -> String {
-        "Remove extraneous blank line(s)".to_string()
+        "Add missing blank line(s)".to_string()
     }
 }
 
 /// ## What it does
-/// Checks for extraneous blank lines between top level functions and classes.
+/// Checks for missing blank lines between top level functions and classes.
 ///
 /// ## Why is this bad?
 /// PEP 8 recommends the use of blank lines as follows:
@@ -115,13 +119,16 @@ impl AlwaysAutofixableViolation for BlankLineBetweenMethods {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
 #[violation]
-pub struct BlankLinesTopLevel(pub usize);
+pub struct BlankLinesTopLevel(pub u32);
 
 impl AlwaysAutofixableViolation for BlankLinesTopLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BlankLinesTopLevel(nb_blank_lines) = self;
-        format!("Expected 2 blank lines, found {nb_blank_lines}")
+        format!(
+            "Expected {:?} blank lines, found {nb_blank_lines}",
+            BlankLinesConfig::TOP_LEVEL
+        )
     }
 
     fn autofix_title(&self) -> String {
@@ -221,7 +228,7 @@ impl AlwaysAutofixableViolation for BlankLineAfterDecorator {
 }
 
 /// ## What it does
-/// Checks for blank lines after end of function or class.
+/// Checks for missing blank lines after end of function or class.
 ///
 /// ## Why is this bad?
 /// PEP 8 recommends the using blank lines as following:
@@ -248,7 +255,7 @@ impl AlwaysAutofixableViolation for BlankLineAfterDecorator {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
 #[violation]
-pub struct BlankLinesAfterFunctionOrClass(pub usize);
+pub struct BlankLinesAfterFunctionOrClass(pub u32);
 
 impl AlwaysAutofixableViolation for BlankLinesAfterFunctionOrClass {
     #[derive_message_formats]
@@ -342,7 +349,10 @@ pub(crate) fn blank_lines(
                 .and_then(|prev_line| prev_line.tokens_trimmed().first())
                 .map_or(false, |token| token.kind() != TokenKind::Class)
         {
-            let mut diagnostic = Diagnostic::new(BlankLineBetweenMethods, token.range());
+            let mut diagnostic = Diagnostic::new(
+                BlankLineBetweenMethods(tracked_vars.blank_lines),
+                token.range(),
+            );
             diagnostic.set_fix(Fix::automatic(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
                 locator.line_start(token.range().start()),
@@ -357,10 +367,8 @@ pub(crate) fn blank_lines(
             && tracked_vars.blank_lines < 2
             && prev_line.is_some()
         {
-            let mut diagnostic = Diagnostic::new(
-                BlankLinesTopLevel(tracked_vars.blank_lines as usize),
-                token.range(),
-            );
+            let mut diagnostic =
+                Diagnostic::new(BlankLinesTopLevel(tracked_vars.blank_lines), token.range());
             diagnostic.set_fix(Fix::automatic(Edit::insertion(
                 stylist
                     .line_ending()
@@ -411,7 +419,7 @@ pub(crate) fn blank_lines(
             && indent_level == 0
         {
             let mut diagnostic = Diagnostic::new(
-                BlankLinesAfterFunctionOrClass(tracked_vars.blank_lines as usize),
+                BlankLinesAfterFunctionOrClass(tracked_vars.blank_lines),
                 token.range(),
             );
             diagnostic.set_fix(Fix::automatic(Edit::insertion(
