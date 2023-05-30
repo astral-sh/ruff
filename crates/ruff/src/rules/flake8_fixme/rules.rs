@@ -1,8 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextRange;
 
-use crate::directives::TodoDirective;
+use crate::directives::{TodoComment, TodoDirectiveKind};
 
 #[violation]
 pub struct LineContainsTodo;
@@ -40,18 +39,18 @@ impl Violation for LineContainsHack {
     }
 }
 
-pub fn todos(directive_ranges: Vec<(TodoDirective, TextRange)>) -> Vec<Diagnostic> {
+pub fn todos(directive_ranges: &Vec<TodoComment>) -> Vec<Diagnostic> {
     directive_ranges
-        .into_iter()
-        .map(|(directive, range)| match directive {
+        .iter()
+        .map(|TodoComment { directive, .. }| match directive.kind {
             // T-001
-            TodoDirective::Fixme => Diagnostic::new(LineContainsFixme, range),
+            TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
             // T-002
-            TodoDirective::Hack => Diagnostic::new(LineContainsHack, range),
+            TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
             // T-003
-            TodoDirective::Todo => Diagnostic::new(LineContainsTodo, range),
+            TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
             // T-004
-            TodoDirective::Xxx => Diagnostic::new(LineContainsXxx, range),
+            TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
         })
         .collect::<Vec<Diagnostic>>()
 }

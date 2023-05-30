@@ -1,10 +1,9 @@
 //! Lint rules based on token traversal.
 
-use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::directives::TodoDirective;
+use crate::directives::TodoComment;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
@@ -194,37 +193,24 @@ pub(crate) fn check_tokens(
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007
     // T001, T002, T003, T004
     if enforce_todos {
-        // The TextRange of the comment, its position in comment_ranges, and the directive's
-        // TextRange
-        let mut other_directive_ranges: Vec<(TextRange, usize, TextRange)> = vec![];
-        let mut flake8_fixme_directive_ranges: Vec<(TodoDirective, TextRange)> = vec![];
-
-        // Find all TodoDirectives
-        for (i, comment_range) in indexer.comment_ranges().iter().enumerate() {
-            let comment = locator.slice(*comment_range);
-            let Some((directive, relative_offset)) = TodoDirective::from_comment(comment) else {
-                continue;
-            };
-
-            let directive_range =
-                TextRange::at(comment_range.start() + relative_offset, directive.len());
-
-            // TODO, XXX, and FIXME directives are supported by flake8_todos. flake8_fixme supports
-            // all 4 TodoDirective variants.
-            if !matches!(directive, TodoDirective::Hack) {
-                other_directive_ranges.push((*comment_range, i, directive_range));
-            }
-            flake8_fixme_directive_ranges.push((directive, directive_range));
-        }
+        let todo_comments: Vec<TodoComment> = indexer
+            .comment_ranges()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, comment_range)| {
+                let comment = locator.slice(*comment_range);
+                TodoComment::from_comment(comment, comment_range, i).map(|comment| comment)
+            })
+            .collect::<Vec<TodoComment>>();
 
         diagnostics.extend(
-            flake8_todos::rules::todos(other_directive_ranges, indexer, locator, settings)
+            flake8_todos::rules::todos(&todo_comments, indexer, locator, settings)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
 
         diagnostics.extend(
-            flake8_fixme::rules::todos(flake8_fixme_directive_ranges)
+            flake8_fixme::rules::todos(&todo_comments)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );
