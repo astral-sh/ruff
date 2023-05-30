@@ -119,7 +119,8 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 ## Using `ruff.toml`
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` (or `.ruff.toml`) file,
-which implements an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted).
+which implements an equivalent schema (though in the `ruff.toml` and `.ruff.toml` versions, the
+`[tool.ruff]` header is omitted).
 
 For example, the `pyproject.toml` described above would be represented via the following
 `ruff.toml` (or `.ruff.toml`):
