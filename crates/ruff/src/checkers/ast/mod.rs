@@ -3450,6 +3450,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterateOverSet) {
+                    for generator in generators {
+                        pylint::rules::iterate_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -3474,6 +3479,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterateOverSet) {
+                    for generator in generators {
+                        pylint::rules::iterate_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {
                 generators,
@@ -3490,6 +3500,11 @@ where
                             &generator.target,
                             &generator.iter,
                         );
+                    }
+                }
+                if self.enabled(Rule::IterateOverSet) {
+                    for generator in generators {
+                        pylint::rules::iterate_over_set(self, &generator.iter);
                     }
                 }
             }

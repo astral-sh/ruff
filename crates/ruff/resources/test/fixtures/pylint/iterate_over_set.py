@@ -1,6 +1,6 @@
 """Test iterate-over-set rule.
 
-Should trigger three times.
+Should trigger seven times.
 """
 
 # True positives.
@@ -14,9 +14,13 @@ for item in set("apples", "lemons", "water"):  # flags set() calls
 for number in {i for i in range(10)}:  # flags set comprehensions
     print(number)
 
-# False negatives.
+numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
 
-numbers = [i for i in {1, 2, 3}]  # rule not checked for comprehensions (yet)
+numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
+
+numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+
+numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
 
 # True negatives.
 
@@ -29,3 +33,11 @@ for item in ["apples", "lemons", "water"]:  # lists are fine
 
 for item in ("apples", "lemons", "water"):  # tuples are fine
     print(f"I like {item}.")
+
+numbers_list = [i for i in [1, 2, 3]]  # lists in comprehensions are fine
+
+numbers_set = {i for i in (1, 2, 3)}  # tuples in comprehensions are fine
+
+numbers_dict = {str(i): i for i in [1, 2, 3]}  # lists in dict comprehensions are fine
+
+numbers_gen = (i for i in (1, 2, 3))  # tuples in generator expressions are fine

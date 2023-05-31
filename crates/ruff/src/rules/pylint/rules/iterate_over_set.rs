@@ -10,7 +10,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Iterating over a `set` is slower than iterating over a sequence type (such
-/// as `list` or `tuple`) because `set` access is performed using a hash table.
+/// as `list` or `tuple`) because `set` access is performed using a hash
+/// function, whereas sequenced items are accessed using an index directly.
 ///
 /// ## Example
 /// ```python
@@ -25,7 +26,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## References
-/// - TODO: add references
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#set)
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html?highlight=list#sequence-types-list-tuple-range)
 #[violation]
 pub struct IterateOverSet;
 
