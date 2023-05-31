@@ -22,7 +22,7 @@ use crate::checkers::ast::Checker;
 /// from collections import namedtuple
 ///
 ///
-/// person = namedtuple("Person", ["name", "age"]
+/// person = namedtuple("Person", ["name", "age"])
 /// ```
 ///
 /// Use instead:
