@@ -1551,7 +1551,7 @@ where
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
                 if self.enabled(Rule::IterateOverSet) {
-                    pylint::rules::iterate_over_set(self, stmt, iter);
+                    pylint::rules::iterate_over_set(self, iter);
                 }
                 if matches!(stmt, Stmt::For(_)) {
                     if self.enabled(Rule::ReimplementedBuiltin) {
