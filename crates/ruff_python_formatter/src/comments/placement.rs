@@ -195,38 +195,39 @@ fn handle_in_between_bodies_comment<'a>(
     if let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
     {
         // ...and the following statement must be the first statement in an alternate body of the parent...
-        let is_following_first_in_body = match comment.enclosing_node() {
-            AnyNodeRef::StmtIf(StmtIf { orelse, .. })
-            | AnyNodeRef::StmtFor(StmtFor { orelse, .. })
-            | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { orelse, .. })
-            | AnyNodeRef::StmtWhile(StmtWhile { orelse, .. }) => {
-                are_same_optional(following, orelse.first())
-            }
+        let is_following_the_first_statement_in_a_parents_alternate_body =
+            match comment.enclosing_node() {
+                AnyNodeRef::StmtIf(StmtIf { orelse, .. })
+                | AnyNodeRef::StmtFor(StmtFor { orelse, .. })
+                | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { orelse, .. })
+                | AnyNodeRef::StmtWhile(StmtWhile { orelse, .. }) => {
+                    are_same_optional(following, orelse.first())
+                }
 
-            AnyNodeRef::StmtTry(StmtTry {
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            })
-            | AnyNodeRef::StmtTryStar(StmtTryStar {
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                are_same_optional(following, handlers.first())
+                AnyNodeRef::StmtTry(StmtTry {
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                })
+                | AnyNodeRef::StmtTryStar(StmtTryStar {
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                }) => {
+                    are_same_optional(following, handlers.first())
                     // Comments between the handlers and the `else`, or comments between the `handlers` and the `finally`
                     // are already handled by `handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_comment`
                     || handlers.is_empty() && are_same_optional(following, orelse.first())
                     || (handlers.is_empty() || !orelse.is_empty())
                         && are_same_optional(following, finalbody.first())
-            }
+                }
 
-            _ => false,
-        };
+                _ => false,
+            };
 
-        if !is_following_first_in_body {
+        if !is_following_the_first_statement_in_a_parents_alternate_body {
             // ```python
             // if test:
             //     a
