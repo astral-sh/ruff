@@ -39,9 +39,15 @@ pub(crate) fn check_logical_lines(
     let mut context = LogicalLinesContext::new(settings);
 
     let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
-
     let should_fix_whitespace_before_parameters =
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
+    let should_fix_whitespace_after_open_bracket =
+        settings.rules.should_fix(Rule::WhitespaceAfterOpenBracket);
+    let should_fix_whitespace_before_close_bracket = settings
+        .rules
+        .should_fix(Rule::WhitespaceBeforeCloseBracket);
+    let should_fix_whitespace_before_punctuation =
+        settings.rules.should_fix(Rule::WhitespaceBeforePunctuation);
 
     let mut prev_line = None;
     let mut prev_indent_level = None;
@@ -59,7 +65,13 @@ pub(crate) fn check_logical_lines(
             .flags()
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
         {
-            extraneous_whitespace(&line, &mut context);
+            extraneous_whitespace(
+                &line,
+                &mut context,
+                should_fix_whitespace_after_open_bracket,
+                should_fix_whitespace_before_close_bracket,
+                should_fix_whitespace_before_punctuation,
+            );
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
