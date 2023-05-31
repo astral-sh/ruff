@@ -20,7 +20,7 @@ mod prelude;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
-pub fn fmt(contents: &str) -> Result<Printed> {
+pub fn format_module(contents: &str) -> Result<Printed> {
     // Tokenize once
     let mut tokens = Vec::new();
     let mut comment_ranges = CommentRangesBuilder::default();
@@ -38,7 +38,8 @@ pub fn fmt(contents: &str) -> Result<Printed> {
     let comment_ranges = comment_ranges.finish();
 
     // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
+    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
+        .with_context(|| "Syntax error in input")?;
 
     let formatted = format_node(&python_ast, &comment_ranges, contents)?;
 
@@ -47,7 +48,7 @@ pub fn fmt(contents: &str) -> Result<Printed> {
         .with_context(|| "Failed to print the formatter IR")
 }
 
-pub(crate) fn format_node<'a>(
+pub fn format_node<'a>(
     root: &'a Mod,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
@@ -84,20 +85,41 @@ mod tests {
     use ruff_testing_macros::fixture;
     use similar::TextDiff;
 
-    use crate::{fmt, format_node};
+    use crate::{format_module, format_node};
 
     #[fixture(pattern = "resources/test/fixtures/black/**/*.py")]
     #[test]
     fn black_test(input_path: &Path) -> Result<()> {
         let content = fs::read_to_string(input_path)?;
 
-        let printed = fmt(&content)?;
+        let printed = format_module(&content)?;
 
         let expected_path = input_path.with_extension("py.expect");
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
         let formatted_code = printed.as_code();
+
+        let reformatted =
+            format_module(formatted_code).expect("Expected formatted code to be valid syntax");
+
+        if reformatted.as_code() != formatted_code {
+            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
+                .unified_diff()
+                .header("Formatted once", "Formatted twice")
+                .to_string();
+            panic!(
+                r#"Reformatting the formatted code a second time resulted in formatting changes.
+{diff}
+
+Formatted once:
+{formatted_code}
+
+Formatted twice:
+{}"#,
+                reformatted.as_code()
+            );
+        }
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
