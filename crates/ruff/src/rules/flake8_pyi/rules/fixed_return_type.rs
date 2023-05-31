@@ -10,8 +10,8 @@ use ruff_python_ast::prelude::Ranged;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 
 /// ## What it does
-///  Checks for common errors where certain methods are annotated as having a fixed return type,
-/// despite returning self at runtime. Such methods should be annotated with _typeshed.Self.
+/// Checks for common errors where certain methods are annotated as having a fixed return type,
+/// despite returning self at runtime. Such methods should be annotated with typing_extensions.Self
 ///
 /// This check looks for:
 ///
@@ -30,10 +30,13 @@ use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Bad:
 ///         ...
+///
 ///     def __enter__(self) -> Bad:
 ///         ...
+///
 ///     async def __aenter__(self) -> Bad:
 ///         ...
+///
 ///     def __iadd__(self, other: Bad) -> Bad:
 ///         ...
 /// ```
@@ -44,11 +47,14 @@ use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 ///
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
-///         ...  # Ok
+///         ...
+///
 ///     def __enter__(self) -> Self:
 ///         ...
+///
 ///     async def __aenter__(self) -> Self:
 ///         ...
+///
 ///     def __iadd__(self, other: Bad) -> Self:
 ///         ...
 /// ```
