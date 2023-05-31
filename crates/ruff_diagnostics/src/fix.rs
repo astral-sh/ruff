@@ -32,7 +32,7 @@ pub enum Applicability {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum IsolationLevel {
     /// The fix should be applied in isolation.
-    Isolated,
+    Isolated(u32),
     /// The fix should be applied as long as it does not overlap with any other fixes.
     #[default]
     NonOverlapping,
