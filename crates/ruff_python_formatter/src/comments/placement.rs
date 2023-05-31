@@ -1,6 +1,7 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 
 use crate::comments::CommentTextPosition;
+use crate::trivia::find_first_non_trivia_character_in_range;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
@@ -18,6 +19,9 @@ pub(super) fn place_comment<'a>(
         .or_else(|comment| handle_in_between_bodies_comment(comment, locator))
         .or_else(|comment| handle_trailing_body_comment(comment, locator))
         .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
+        .or_else(|comment| {
+            handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
+        })
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -465,29 +469,135 @@ fn handle_positional_only_arguments_separator_comment<'a>(
     }
 }
 
-fn find_pos_only_slash_offset(trivia_range: TextRange, locator: &Locator) -> Option<TextSize> {
-    let mut in_comment = false;
+/// Handles comments between the left side and the operator of a binary expression (trailing comments of the left),
+/// and trailing end-of-line comments that are on the same line as the operator.
+///
+///```python
+/// a = (
+///     5 # trailing left comment
+///     + # trailing operator comment
+///     # leading right comment
+///     3
+/// )
+/// ```
+fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let Some(binary_expression) = comment.enclosing_node().expr_bin_op() else {
+        return CommentPlacement::Default(comment);
+    };
 
-    for (offset, c) in locator.slice(trivia_range).char_indices() {
-        match c {
-            '\n' | '\r' => {
-                in_comment = false;
-            }
-            '/' if !in_comment => {
-                return Some(trivia_range.start() + TextSize::try_from(offset).unwrap());
-            }
-            '#' => {
-                // SAFE because we know there's only trivia. So all content is either whitespace,
-                // or comments but never strings.
-                in_comment = true;
-            }
-            _ => {}
-        }
+    // Only if there's a preceding node (in which case, the preceding node is `left`).
+    if comment.preceding_node().is_none() || comment.following_node().is_none() {
+        return CommentPlacement::Default(comment);
     }
 
-    None
+    let mut between_operands_range = TextRange::new(
+        binary_expression.left.end(),
+        binary_expression.right.start(),
+    );
+
+    let operator_offset = loop {
+        match find_first_non_trivia_character_in_range(locator.contents(), between_operands_range) {
+            // Skip over closing parens
+            Some((offset, ')')) => {
+                between_operands_range =
+                    TextRange::new(offset + TextSize::new(1), between_operands_range.end());
+            }
+            Some((offset, _)) => break offset,
+            None => return CommentPlacement::Default(comment),
+        }
+    };
+
+    let comment_range = comment.slice().range();
+
+    if comment_range.end() < operator_offset {
+        // ```python
+        // a = (
+        //      5
+        //      # comment
+        //      +
+        //      3
+        // )
+        // ```
+        CommentPlacement::trailing(AnyNodeRef::from(binary_expression.left.as_ref()), comment)
+    } else if comment.text_position().is_end_of_line() {
+        // Is the operator on its own line.
+        if locator.contains_line_break(TextRange::new(
+            binary_expression.left.end(),
+            operator_offset,
+        )) && locator.contains_line_break(TextRange::new(
+            operator_offset,
+            binary_expression.right.start(),
+        )) {
+            // ```python
+            // a = (
+            //      5
+            //      + # comment
+            //      3
+            // )
+            // ```
+            CommentPlacement::dangling(binary_expression.into(), comment)
+        } else {
+            // ```python
+            // a = (
+            //      5
+            //      +
+            //      3 # comment
+            // )
+            // ```
+            // OR
+            // ```python
+            // a = (
+            //      5 # comment
+            //      +
+            //      3
+            // )
+            // ```
+            CommentPlacement::Default(comment)
+        }
+    } else {
+        // ```python
+        // a = (
+        //      5
+        //      +
+        //      # comment
+        //      3
+        // )
+        // ```
+        CommentPlacement::Default(comment)
+    }
 }
 
+/// Finds the offset of the `/` that separates the positional only and arguments from the other arguments.
+/// Returns `None` if the positional only separator `/` isn't present in the specified range.
+fn find_pos_only_slash_offset(
+    between_arguments_range: TextRange,
+    locator: &Locator,
+) -> Option<TextSize> {
+    // First find the comma separating the two arguments
+    find_first_non_trivia_character_in_range(locator.contents(), between_arguments_range).and_then(
+        |(comma_offset, comma)| {
+            debug_assert_eq!(comma, ',');
+
+            // Then find the position of the `/` operator
+            find_first_non_trivia_character_in_range(
+                locator.contents(),
+                TextRange::new(
+                    comma_offset + TextSize::new(1),
+                    between_arguments_range.end(),
+                ),
+            )
+            .map(|(offset, c)| {
+                debug_assert_eq!(c, '/');
+                offset
+            })
+        },
+    )
+}
+
+/// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.
 fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
 where
     T: Into<AnyNodeRef<'a>>,
