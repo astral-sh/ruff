@@ -72,26 +72,25 @@ for node in nodes:
 for group, group_nodes in nodes_grouped.items():
     # These conflict with the manually content of the mod.rs files
     # src.joinpath(groups[group]).mkdir(exist_ok=True)
-    # src.joinpath(groups[group]).joinpath("mod.rs").write_text(
-    #    rustfmt(
-    #        "\n".join(f"pub(crate) mod {to_camel_case(node)};" for node in sorted(group_nodes))
-    #    )
+    # mod_section = "\n".join(
+    #     f"pub(crate) mod {to_camel_case(node)};" for node in group_nodes
     # )
+    # src.joinpath(groups[group]).joinpath("mod.rs").write_text(rustfmt(mod_section))
     for node in group_nodes:
         code = f"""
-    use crate::{{FormatNodeRule, PyFormatter}};
-    use ruff_formatter::FormatResult;
-    use rustpython_parser::ast::{node};
+            use crate::{{FormatNodeRule, PyFormatter}};
+            use ruff_formatter::FormatResult;
+            use rustpython_parser::ast::{node};
 
-    #[derive(Default)]
-    pub(crate) struct Format{node};
+            #[derive(Default)]
+            pub(crate) struct Format{node};
 
-    impl FormatNodeRule<{node}> for Format{node} {{
-        fn fmt_fields(&self, _item: &{node}, _f: &mut PyFormatter) -> FormatResult<()> {{
-            Ok(())
-        }}
-    }}
-    """.strip()
+            impl FormatNodeRule<{node}> for Format{node} {{
+                fn fmt_fields(&self, _item: &{node}, _f: &mut PyFormatter) -> FormatResult<()> {{
+                    Ok(())
+                }}
+            }}
+        """.strip()  # noqa: E501
         src.joinpath(groups[group]).joinpath(f"{to_camel_case(node)}.rs").write_text(
             rustfmt(code)
         )
@@ -105,49 +104,49 @@ use crate::{AsFormat, FormatNodeRule, IntoFormat};
 use ruff_formatter::formatter::Formatter;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
 use rustpython_parser::ast;
-"""
+"""  # noqa: E501
 for node in nodes:
     text = f"""
-impl FormatRule<ast::{node}, PyFormatContext<'_>>
-    for crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}
-{{
-    #[inline]
-    fn fmt(
-        &self,
-        node: &ast::{node},
-        f: &mut Formatter<PyFormatContext<'_>>,
-    ) -> FormatResult<()> {{
-        FormatNodeRule::<ast::{node}>::fmt(self, node, f)
-    }}
-}}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::{node} {{
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::{node},
-        crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {{
-        FormatRefWithRule::new(
-            self,
-            crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
-        )
-    }}
-}}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::{node} {{
-    type Format = FormatOwnedWithRule<
-        ast::{node},
-        crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {{
-        FormatOwnedWithRule::new(
-            self,
-            crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
-        )
-    }}
-}}
-"""
+        impl FormatRule<ast::{node}, PyFormatContext<'_>>
+            for crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}
+        {{
+            #[inline]
+            fn fmt(
+                &self,
+                node: &ast::{node},
+                f: &mut Formatter<PyFormatContext<'_>>,
+            ) -> FormatResult<()> {{
+                FormatNodeRule::<ast::{node}>::fmt(self, node, f)
+            }}
+        }}
+        impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::{node} {{
+            type Format<'a> = FormatRefWithRule<
+                'a,
+                ast::{node},
+                crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
+                PyFormatContext<'ast>,
+            >;
+            fn format(&self) -> Self::Format<'_> {{
+                FormatRefWithRule::new(
+                    self,
+                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
+                )
+            }}
+        }}
+        impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::{node} {{
+            type Format = FormatOwnedWithRule<
+                ast::{node},
+                crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
+                PyFormatContext<'ast>,
+            >;
+            fn into_format(self) -> Self::Format {{
+                FormatOwnedWithRule::new(
+                    self,
+                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
+                )
+            }}
+        }}
+    """  # noqa: E501
     generated += text
 
 out.write_text(rustfmt(generated))
