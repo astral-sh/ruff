@@ -3,8 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser as parser;
-use rustpython_parser::{lexer, Mode, ParseError};
+use rustpython_parser::{ast, lexer, Mode, Parse, ParseError};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +25,7 @@ mod stylist;
 /// Run round-trip source code generation on a given Python code.
 pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {
     let locator = Locator::new(code);
-    let python_ast = parser::parse_program(code, source_path)?;
+    let python_ast = ast::Suite::parse(code, source_path)?;
     let tokens: Vec<_> = lexer::lex(code, Mode::Module).collect();
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let mut generator: Generator = (&stylist).into();

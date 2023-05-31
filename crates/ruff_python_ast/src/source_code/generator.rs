@@ -1456,7 +1456,8 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser as parser;
+    use rustpython_ast::Suite;
+    use rustpython_parser::Parse;
 
     use crate::newlines::LineEnding;
     use crate::source_code::stylist::{Indentation, Quote};
@@ -1466,7 +1467,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let program = parser::parse_program(contents, "<filename>").unwrap();
+        let program = Suite::parse(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
@@ -1479,7 +1480,7 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let program = parser::parse_program(contents, "<filename>").unwrap();
+        let program = Suite::parse(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
