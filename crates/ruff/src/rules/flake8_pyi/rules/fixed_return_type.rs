@@ -78,6 +78,20 @@ const SELF_RETURNING_METHODS: &[&str] = &[
     "__aenter__",
 ];
 
+const ASYNC_ITER_RETURN_TYPES: &[&[&str]] = &[
+    &["typing", "AsyncIterable"],
+    &["typing", "AsyncIterator"],
+    &["collections", "abc", "AsyncIterable"],
+    &["collections", "abc", "AsyncIterator"],
+];
+
+const SYNC_ITER_RETURN_TYPES: &[&[&str]] = &[
+    &["typing", "Iterable"],
+    &["typing", "Iterator"],
+    &["collections", "abc", "Iterable"],
+    &["collections", "abc", "Iterator"],
+];
+
 /// PYI034
 pub(crate) fn fixed_return_type(
     checker: &mut Checker,
@@ -192,21 +206,9 @@ pub(crate) fn fixed_return_type(
             .resolve_call_path(annotation)
             .map_or(false, |call_path| {
                 if async_ {
-                    matches!(
-                        call_path.as_slice(),
-                        ["typing", "AsyncIterable"]
-                            | ["collections", "abc", "AsyncIterable"]
-                            | ["typing", "AsyncIterator"]
-                            | ["collections", "abc", "AsyncIterator"]
-                    )
+                    ASYNC_ITER_RETURN_TYPES.contains(&call_path.as_slice())
                 } else {
-                    matches!(
-                        call_path.as_slice(),
-                        ["typing", "Iterable"]
-                            | ["collections", "abc", "Iterable"]
-                            | ["typing", "Iterator"]
-                            | ["collections", "abc", "Iterator"]
-                    )
+                    SYNC_ITER_RETURN_TYPES.contains(&call_path.as_slice())
                 }
             })
         {
