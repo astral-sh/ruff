@@ -147,16 +147,15 @@ pub(crate) fn organize_imports(
     let range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
     let actual = locator.slice(range);
     if matches_ignoring_indentation(actual, &expected) {
-        None
-    } else {
-        let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-        if settings.rules.should_fix(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                indent(&expected, indentation),
-                range,
-            )));
-        }
-        Some(diagnostic)
+        return None;
     }
+
+    let mut diagnostic = Diagnostic::new(UnsortedImports, range);
+    if settings.rules.should_fix(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            indent(&expected, indentation),
+            range,
+        )));
+    }
+    Some(diagnostic)
 }
