@@ -10,6 +10,7 @@ pub(crate) use ellipsis_in_non_empty_class_body::{
 pub(crate) use iter_method_return_iterable::{
     iter_method_return_iterable, IterMethodReturnIterable,
 };
+pub(crate) use incorrect_named_tuple::{incorrect_named_tuple, IncorrectNamedTuple};
 pub(crate) use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub(crate) use pass_in_class_body::{pass_in_class_body, PassInClassBody};
 pub(crate) use pass_statement_stub_body::{pass_statement_stub_body, PassStatementStubBody};
@@ -37,6 +38,7 @@ mod docstring_in_stubs;
 mod duplicate_union_member;
 mod ellipsis_in_non_empty_class_body;
 mod iter_method_return_iterable;
+mod incorrect_named_tuple;
 mod non_empty_stub_body;
 mod pass_in_class_body;
 mod pass_statement_stub_body;

@@ -1064,6 +1064,11 @@ where
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
+                if self.is_stub {
+                    if self.enabled(Rule::IncorrectNamedTuple) {
+                        flake8_pyi::rules::incorrect_named_tuple(self, stmt);
+                    }
+                }
                 if self.enabled(Rule::BannedApi) {
                     if let Some(module) =
                         helpers::resolve_imported_module_path(level, module, self.module_path)
