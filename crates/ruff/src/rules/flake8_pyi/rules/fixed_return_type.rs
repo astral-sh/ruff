@@ -23,7 +23,23 @@ use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 /// NOTE: This check excludes methods decorated with @overload or @AbstractMethod.
 ///
 /// ## Why is this bad?
-/// # TODO: Add
+/// If the return type of these methods is fixed, and the class is subclassed, the type checker can
+/// get confused in scenarios such as:
+/// ```python
+/// class Shape:
+///     def set_scale(self, scale: float) -> Shape:
+///         self.scale = scale
+///         return self
+///
+/// class Circle(Shape):
+///     def set_radius(self, r: float) -> Circle:
+///         self.radius = r
+///         return self
+///
+/// Circle().set_scale(0.5)  # *Shape*, not Circle
+/// Circle().set_scale(0.5).set_radius(2.7)
+/// # => Error: Shape has no attribute set_radius
+/// ```
 ///
 /// ## Example
 /// ```python
@@ -58,6 +74,8 @@ use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 ///     def __iadd__(self, other: Bad) -> Self:
 ///         ...
 /// ```
+/// ## References
+/// - [PEP 673](https://peps.python.org/pep-0673/)
 #[violation]
 pub struct FixedReturnType {
     method_name: String,
