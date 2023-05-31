@@ -1,6 +1,5 @@
 use crate::comments::Comments;
 use ruff_formatter::{FormatContext, SimpleFormatOptions, SourceCode};
-//use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::source_code::Locator;
 use std::fmt::{Debug, Formatter};
 
