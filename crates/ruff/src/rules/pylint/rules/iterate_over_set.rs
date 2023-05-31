@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for iterating over a `set`.
+/// Checks for code that iterates over an in-place `set`.
 ///
 /// ## Why is this bad?
 /// Iterating over a `set` is slower than iterating over a sequence type (such
@@ -34,7 +34,7 @@ pub struct IterateOverSet;
 impl Violation for IterateOverSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use a sequence type when iterating over values")
+        format!("Use a sequence type instead of a set when iterating over values")
     }
 }
 

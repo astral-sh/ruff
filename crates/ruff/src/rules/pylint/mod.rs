@@ -55,6 +55,7 @@ mod tests {
     #[test_case(Rule::InvalidCharacterZeroWidthSpace, Path::new("invalid_characters.py"); "PLE2515")]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"); "PLW1508")]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"); "PLE1507")]
+    #[test_case(Rule::IterateOverSet, Path::new("iterate_over_set.py"); "PLC0208")]
     #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"); "PLE1206")]
     #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"); "PLE1205")]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
