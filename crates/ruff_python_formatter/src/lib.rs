@@ -54,7 +54,7 @@ where
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
 
-    /// Formats the [leading comments](rome_formatter::comments#leading-comments) of the node.
+    /// Formats the [leading comments](crate::comments#leading-comments) of the node.
     ///
     /// You may want to override this method if you want to manually handle the formatting of comments
     /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
