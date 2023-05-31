@@ -75,6 +75,37 @@ impl<'a> Importer<'a> {
         }
     }
 
+    /// Move an existing import to the top-level, thereby making it available at runtime.
+    ///
+    /// If there are no existing imports, the new import will be added at the top
+    /// of the file. Otherwise, it will be added after the most recent top-level
+    /// import statement.
+    pub(crate) fn runtime_import_edit(
+        &self,
+        import: &StmtImport,
+        at: TextSize,
+    ) -> Result<RuntimeImportEdit> {
+        // Generate the modified import statement.
+        let content = autofix::codemods::retain_imports(
+            &[import.full_name],
+            import.stmt,
+            self.locator,
+            self.stylist,
+        )?;
+
+        // Add the import to the top-level.
+        let insertion = if let Some(stmt) = self.preceding_import(at) {
+            // Insert after the last top-level import.
+            Insertion::end_of_statement(stmt, self.locator, self.stylist)
+        } else {
+            // Insert at the start of the file.
+            Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
+        };
+        let add_import_edit = insertion.into_edit(&content);
+
+        Ok(RuntimeImportEdit { add_import_edit })
+    }
+
     /// Move an existing import into a `TYPE_CHECKING` block.
     ///
     /// If there are no existing `TYPE_CHECKING` blocks, a new one will be added at the top
@@ -341,6 +372,19 @@ impl<'a> Importer<'a> {
         } else {
             None
         }
+    }
+}
+
+/// An edit to the top-level of a module, making it available at runtime.
+#[derive(Debug)]
+pub(crate) struct RuntimeImportEdit {
+    /// The edit to add the import to the top-level of the module.
+    add_import_edit: Edit,
+}
+
+impl RuntimeImportEdit {
+    pub(crate) fn into_edits(self) -> Vec<Edit> {
+        vec![self.add_import_edit]
     }
 }
 
