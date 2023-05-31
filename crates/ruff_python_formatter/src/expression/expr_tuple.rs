@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::ExprTuple;
 
 #[derive(Default)]
-pub struct FormatExprTuple;
+pub(crate) struct FormatExprTuple;
 
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {

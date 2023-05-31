@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::StmtDelete;
 
 #[derive(Default)]
-pub struct FormatStmtDelete;
+pub(crate) struct FormatStmtDelete;
 
 impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
     fn fmt_fields(&self, item: &StmtDelete, f: &mut PyFormatter) -> FormatResult<()> {

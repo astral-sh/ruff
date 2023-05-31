@@ -1,8 +1,8 @@
-pub mod pattern_match_as;
-pub mod pattern_match_class;
-pub mod pattern_match_mapping;
-pub mod pattern_match_or;
-pub mod pattern_match_sequence;
-pub mod pattern_match_singleton;
-pub mod pattern_match_star;
-pub mod pattern_match_value;
+pub(crate) mod pattern_match_as;
+pub(crate) mod pattern_match_class;
+pub(crate) mod pattern_match_mapping;
+pub(crate) mod pattern_match_or;
+pub(crate) mod pattern_match_sequence;
+pub(crate) mod pattern_match_singleton;
+pub(crate) mod pattern_match_star;
+pub(crate) mod pattern_match_value;

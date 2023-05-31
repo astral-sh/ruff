@@ -1,10 +1,10 @@
 use crate::comments::Comments;
 use ruff_formatter::{FormatContext, SimpleFormatOptions, SourceCode};
-use ruff_python_ast::source_code::Locator;
+//use ruff_python_ast::source_code::Locator;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
-pub struct PyFormatContext<'a> {
+pub(crate) struct PyFormatContext<'a> {
     options: SimpleFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
@@ -23,13 +23,13 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    pub fn contents(&self) -> &'a str {
-        self.contents
-    }
-
-    pub fn locator(&self) -> Locator<'a> {
-        Locator::new(self.contents)
-    }
+    //pub(crate) fn contents(&self) -> &'a str {
+    //    self.contents
+    //}
+    //
+    //pub(crate) fn locator(&self) -> Locator<'a> {
+    //    Locator::new(self.contents)
+    //}
 
     #[allow(unused)]
     pub(crate) fn comments(&self) -> &Comments<'a> {

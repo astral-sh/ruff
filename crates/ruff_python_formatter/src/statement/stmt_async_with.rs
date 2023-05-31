@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::StmtAsyncWith;
 
 #[derive(Default)]
-pub struct FormatStmtAsyncWith;
+pub(crate) struct FormatStmtAsyncWith;
 
 impl FormatNodeRule<StmtAsyncWith> for FormatStmtAsyncWith {
     fn fmt_fields(&self, item: &StmtAsyncWith, f: &mut PyFormatter) -> FormatResult<()> {

@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::ExcepthandlerExceptHandler;
 
 #[derive(Default)]
-pub struct FormatExcepthandlerExceptHandler;
+pub(crate) struct FormatExcepthandlerExceptHandler;
 
 impl FormatNodeRule<ExcepthandlerExceptHandler> for FormatExcepthandlerExceptHandler {
     fn fmt_fields(

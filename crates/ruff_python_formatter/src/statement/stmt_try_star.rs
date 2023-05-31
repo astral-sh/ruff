@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::StmtTryStar;
 
 #[derive(Default)]
-pub struct FormatStmtTryStar;
+pub(crate) struct FormatStmtTryStar;
 
 impl FormatNodeRule<StmtTryStar> for FormatStmtTryStar {
     fn fmt_fields(&self, item: &StmtTryStar, f: &mut PyFormatter) -> FormatResult<()> {

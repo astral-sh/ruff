@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::ExprCompare;
 
 #[derive(Default)]
-pub struct FormatExprCompare;
+pub(crate) struct FormatExprCompare;
 
 impl FormatNodeRule<ExprCompare> for FormatExprCompare {
     fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {

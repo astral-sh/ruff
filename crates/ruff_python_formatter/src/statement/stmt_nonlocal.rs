@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::StmtNonlocal;
 
 #[derive(Default)]
-pub struct FormatStmtNonlocal;
+pub(crate) struct FormatStmtNonlocal;
 
 impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
     fn fmt_fields(&self, item: &StmtNonlocal, f: &mut PyFormatter) -> FormatResult<()> {

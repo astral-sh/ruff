@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::ModExpression;
 
 #[derive(Default)]
-pub struct FormatModExpression;
+pub(crate) struct FormatModExpression;
 
 impl FormatNodeRule<ModExpression> for FormatModExpression {
     fn fmt_fields(&self, item: &ModExpression, f: &mut PyFormatter) -> FormatResult<()> {

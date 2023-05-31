@@ -1,7 +1,7 @@
-pub mod mod_expression;
-pub mod mod_function_type;
-pub mod mod_interactive;
-pub mod mod_module;
+pub(crate) mod mod_expression;
+pub(crate) mod mod_function_type;
+pub(crate) mod mod_interactive;
+pub(crate) mod mod_module;
 
 use crate::context::PyFormatContext;
 use ruff_formatter::format_element::tag::VerbatimKind;

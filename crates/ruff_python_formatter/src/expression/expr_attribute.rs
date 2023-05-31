@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::ExprAttribute;
 
 #[derive(Default)]
-pub struct FormatExprAttribute;
+pub(crate) struct FormatExprAttribute;
 
 impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     fn fmt_fields(&self, item: &ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {

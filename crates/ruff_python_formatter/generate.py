@@ -70,13 +70,13 @@ for node in nodes:
     nodes_grouped[group_for_node(node)].append(node)
 
 src.joinpath("mod.rs").write_text(
-    rustfmt("\n".join(f"pub mod {group};" for group in sorted(groups.values())))
+    rustfmt("\n".join(f"pub(crate) mod {group};" for group in sorted(groups.values())))
 )
 for group, group_nodes in nodes_grouped.items():
     #src.joinpath(groups[group]).mkdir(exist_ok=True)
     #src.joinpath(groups[group]).joinpath("mod.rs").write_text(
     #    rustfmt(
-    #        "\n".join(f"pub mod {to_camel_case(node)};" for node in sorted(group_nodes))
+    #        "\n".join(f"pub(crate) mod {to_camel_case(node)};" for node in sorted(group_nodes))
     #    )
     #)
     for node in group_nodes:
@@ -88,7 +88,7 @@ for group, group_nodes in nodes_grouped.items():
     use rustpython_parser::ast::{node};
 
     #[derive(Default)]
-    pub struct Format{node};
+    pub(crate) struct Format{node};
 
     impl FormatNodeRule<{node}> for Format{node} {{
         fn fmt_fields(&self, item: &{node}, f: &mut PyFormatter) -> FormatResult<()> {{

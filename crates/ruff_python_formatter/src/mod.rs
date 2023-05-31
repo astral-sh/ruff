@@ -1,5 +1,5 @@
-pub mod expression;
-pub mod module;
-pub mod other;
-pub mod pattern;
-pub mod statement;
+pub(crate) mod expression;
+pub(crate) mod module;
+pub(crate) mod other;
+pub(crate) mod pattern;
+pub(crate) mod statement;

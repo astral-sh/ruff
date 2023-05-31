@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::StmtAugAssign;
 
 #[derive(Default)]
-pub struct FormatStmtAugAssign;
+pub(crate) struct FormatStmtAugAssign;
 
 impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
     fn fmt_fields(&self, item: &StmtAugAssign, f: &mut PyFormatter) -> FormatResult<()> {

@@ -5,7 +5,7 @@ use ruff_formatter::{write, Buffer, FormatElement, FormatResult};
 use rustpython_parser::ast::ExprJoinedStr;
 
 #[derive(Default)]
-pub struct FormatExprJoinedStr;
+pub(crate) struct FormatExprJoinedStr;
 
 impl FormatNodeRule<ExprJoinedStr> for FormatExprJoinedStr {
     fn fmt_fields(&self, item: &ExprJoinedStr, f: &mut PyFormatter) -> FormatResult<()> {

@@ -18,13 +18,13 @@ use crate::module::FormatModule;
 
 pub mod cli;
 mod comments;
-pub mod context;
-pub mod expression;
-pub mod module;
-pub mod other;
-pub mod pattern;
+pub(crate) mod context;
+pub(crate) mod expression;
+pub(crate) mod module;
+pub(crate) mod other;
+pub(crate) mod pattern;
 mod prelude;
-pub mod statement;
+pub(crate) mod statement;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
