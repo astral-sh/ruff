@@ -10,7 +10,8 @@ use ruff_python_ast::source_code::Locator;
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
-pub(crate) mod actions;
+pub(crate) mod codemods;
+pub(crate) mod edits;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(

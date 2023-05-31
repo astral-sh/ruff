@@ -7,7 +7,7 @@ use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::types::RefEquality;
 
-use crate::autofix::actions::delete_stmt;
+use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
