@@ -7,6 +7,17 @@ PYI024.pyi:3:4: PYI024 Use `typing.NamedTuple` instead of `collections.namedtupl
 4 | 
 5 | j: collections.namedtuple  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
   |    ^^^^^^^^^^^^^^^^^^^^^^ PYI024
+6 | 
+7 | from collections import namedtuple
+  |
+  = help: Replace with `typing.NamedTuple`
+
+PYI024.pyi:7:4: PYI024 Use `typing.NamedTuple` instead of `collections.namedtuple`
+  |
+7 | from collections import namedtuple
+8 | 
+9 | j: namedtuple  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
+  |    ^^^^^^^^^^ PYI024
   |
   = help: Replace with `typing.NamedTuple`
 

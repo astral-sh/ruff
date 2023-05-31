@@ -1,3 +1,7 @@
 import collections
 
 j: collections.namedtuple  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
+
+from collections import namedtuple
+
+j: namedtuple  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
