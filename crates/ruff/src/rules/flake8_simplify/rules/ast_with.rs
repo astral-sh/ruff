@@ -5,8 +5,8 @@ use rustpython_parser::ast::{self, Ranged, Stmt, Withitem};
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::StrExt;
 use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
-use ruff_python_ast::newlines::StrExt;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;

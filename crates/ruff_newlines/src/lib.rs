@@ -22,7 +22,7 @@ impl StrExt for str {
 ///
 /// ```rust
 /// # use ruff_text_size::TextSize;
-/// # use ruff_python_ast::newlines::{Line, UniversalNewlineIterator};
+/// # use ruff_newlines::{Line, UniversalNewlineIterator};
 /// let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
 ///
 /// assert_eq!(lines.next_back(), Some(Line::new("bop", TextSize::from(14))));
@@ -340,9 +340,7 @@ impl Deref for LineEnding {
 mod tests {
     use ruff_text_size::TextSize;
 
-    use crate::newlines::Line;
-
-    use super::UniversalNewlineIterator;
+    use super::{Line, UniversalNewlineIterator};
 
     #[test]
     fn universal_newlines_empty_str() {

@@ -143,7 +143,7 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::Parse;
 
-    use ruff_python_ast::newlines::LineEnding;
+    use ruff_newlines::LineEnding;
     use ruff_python_ast::source_code::{Locator, Stylist};
 
     use super::Insertion;

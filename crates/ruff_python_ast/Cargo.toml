@@ -8,6 +8,7 @@ rust-version = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_newlines = { path = "../ruff_newlines" }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
