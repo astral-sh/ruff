@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: b3bdb285a98bcb23bbdc0a0a1ae5119cb92ca88075154f68cff8b71aed1085b5
+// sha3: 08868c96b5c75553bed53bea23881b24fb0c1029f6d75290c63ac78f748a2ae0
 use crate::{
     ast::{self as ast, Ranged},
     lexer::{LexicalError, LexicalErrorType},
@@ -29666,6 +29666,7 @@ fn __action82<
 ) -> ast::MatchCase
 {
     {
+        // SAFETY: `body` is never empty because it is non-optional and `Suite` matches one or more statements.
         let end = body.last().unwrap().end();
         ast::MatchCase {
             pattern,

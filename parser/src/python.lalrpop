@@ -388,6 +388,7 @@ MatchStatement: ast::Stmt = {
 
 MatchCase: ast::MatchCase = {
     <start:@L> "case" <pattern:Patterns> <guard:(Guard)?> ":" <body:Suite> => {
+        // SAFETY: `body` is never empty because it is non-optional and `Suite` matches one or more statements.
         let end = body.last().unwrap().end();
         ast::MatchCase {
             pattern,
