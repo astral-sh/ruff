@@ -56,10 +56,22 @@ fn is_valid_code_cell(cell: &Cell) -> bool {
 
 #[derive(Debug)]
 pub struct Notebook {
+    /// Python source code of the notebook.
+    ///
+    /// This is the concatenation of all valid code cells in the notebook
+    /// separated by a newline and a trailing newline. The trailing newline
+    /// is added to make sure that each cell ends with a newline which will
+    /// be removed when updating the cell content.
     content: String,
+    /// The index of the notebook. This is used to map between the concatenated
+    /// source code and the original notebook.
     index: JupyterIndex,
+    /// The raw notebook.
     raw: JupyterNotebook,
+    /// The offsets of each cell in the concatenated source code. This includes
+    /// the first and last character offsets as well.
     cell_offsets: Vec<TextSize>,
+    /// The cell numbers of all valid code cells in the notebook.
     valid_code_cells: Vec<usize>,
 }
 
@@ -178,15 +190,10 @@ impl Notebook {
             contents.push(cell_contents);
         }
 
-        if cell_offsets.len() > 1 {
-            // Remove the last newline offset
-            *cell_offsets.last_mut().unwrap() -= TextSize::new(1);
-        }
-
         Ok(Self {
             raw: notebook,
             index: builder.finish(),
-            content: contents.join("\n"),
+            content: contents.join("\n") + "\n",
             cell_offsets,
             valid_code_cells,
         })
@@ -263,7 +270,7 @@ impl Notebook {
         }
 
         self.index = builder.finish();
-        self.content = contents.join("\n");
+        self.content = contents.join("\n") + "\n";
     }
 
     /// Return the notebook content.
@@ -310,8 +317,8 @@ mod test {
     use std::path::Path;
     use std::sync::Arc;
 
-    #[cfg(feature = "jupyter_notebook")]
     use crate::jupyter::index::{JupyterIndex, JupyterIndexInner};
+    #[cfg(feature = "jupyter_notebook")]
     use crate::jupyter::is_jupyter_notebook;
     use crate::jupyter::Notebook;
 
