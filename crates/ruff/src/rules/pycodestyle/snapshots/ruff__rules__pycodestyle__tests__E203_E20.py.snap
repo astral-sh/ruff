@@ -9,7 +9,7 @@ E20.py:51:10: E203 [*] Whitespace before ':'
 53 |     print x, y
 54 |     x, y = y, x
    |
-   = help: Removed whitespace before ':'
+   = help: Remove whitespace before ':'
 
 ℹ Fix
 48 48 | 
@@ -30,7 +30,7 @@ E20.py:55:10: E203 [*] Whitespace before ':'
 58 |     print x, y
 59 |     x, y = y, x
    |
-   = help: Removed whitespace before ':'
+   = help: Remove whitespace before ':'
 
 ℹ Fix
 52 52 |     print x, y
@@ -51,7 +51,7 @@ E20.py:60:15: E203 [*] Whitespace before ';'
 63 | #: E203:2:15 E702:2:16
 64 | if x == 4:
    |
-   = help: Removed whitespace before ';'
+   = help: Remove whitespace before ';'
 
 ℹ Fix
 57 57 |     x, y = y, x
@@ -72,7 +72,7 @@ E20.py:63:15: E203 [*] Whitespace before ';'
 66 | #: E203:3:13
 67 | if x == 4:
    |
-   = help: Removed whitespace before ';'
+   = help: Remove whitespace before ';'
 
 ℹ Fix
 60 60 |     print x, y ; x, y = y, x
@@ -93,7 +93,7 @@ E20.py:67:13: E203 [*] Whitespace before ','
 70 | #: E203:3:13
 71 | if x == 4:
    |
-   = help: Removed whitespace before ','
+   = help: Remove whitespace before ','
 
 ℹ Fix
 64 64 | #: E203:3:13
@@ -114,7 +114,7 @@ E20.py:71:13: E203 [*] Whitespace before ','
 74 | #: Okay
 75 | if x == 4:
    |
-   = help: Removed whitespace before ','
+   = help: Remove whitespace before ','
 
 ℹ Fix
 68 68 | #: E203:3:13

@@ -46,7 +46,7 @@ impl AlwaysAutofixableViolation for WhitespaceAfterOpenBracket {
 
     fn autofix_title(&self) -> String {
         let WhitespaceAfterOpenBracket { symbol } = self;
-        format!("Removed whitespace before '{symbol}'")
+        format!("Remove whitespace before '{symbol}'")
     }
 }
 
@@ -86,7 +86,7 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeCloseBracket {
 
     fn autofix_title(&self) -> String {
         let WhitespaceBeforeCloseBracket { symbol } = self;
-        format!("Removed whitespace before '{symbol}'")
+        format!("Remove whitespace before '{symbol}'")
     }
 }
 
@@ -124,7 +124,7 @@ impl AlwaysAutofixableViolation for WhitespaceBeforePunctuation {
 
     fn autofix_title(&self) -> String {
         let WhitespaceBeforePunctuation { symbol } = self;
-        format!("Removed whitespace before '{symbol}'")
+        format!("Remove whitespace before '{symbol}'")
     }
 }
 

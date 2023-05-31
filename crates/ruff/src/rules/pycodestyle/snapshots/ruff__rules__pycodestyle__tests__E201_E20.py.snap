@@ -9,7 +9,7 @@ E20.py:2:6: E201 [*] Whitespace after '('
 4 | #: E201:1:10
 5 | spam(ham[ 1], {eggs: 2})
   |
-  = help: Removed whitespace before '('
+  = help: Remove whitespace before '('
 
 ℹ Fix
 1 1 | #: E201:1:6
@@ -28,7 +28,7 @@ E20.py:4:10: E201 [*] Whitespace after '['
 7 | #: E201:1:15
 8 | spam(ham[1], { eggs: 2})
   |
-  = help: Removed whitespace before '['
+  = help: Remove whitespace before '['
 
 ℹ Fix
 1 1 | #: E201:1:6
@@ -49,7 +49,7 @@ E20.py:6:15: E201 [*] Whitespace after '{'
  9 | #: E201:1:6
 10 | spam(   ham[1], {eggs: 2})
    |
-   = help: Removed whitespace before '{'
+   = help: Remove whitespace before '{'
 
 ℹ Fix
 3 3 | #: E201:1:10
@@ -70,7 +70,7 @@ E20.py:8:6: E201 [*] Whitespace after '('
 11 | #: E201:1:10
 12 | spam(ham[   1], {eggs: 2})
    |
-   = help: Removed whitespace before '('
+   = help: Remove whitespace before '('
 
 ℹ Fix
 5 5 | #: E201:1:15
@@ -91,7 +91,7 @@ E20.py:10:10: E201 [*] Whitespace after '['
 13 | #: E201:1:15
 14 | spam(ham[1], {  eggs: 2})
    |
-   = help: Removed whitespace before '['
+   = help: Remove whitespace before '['
 
 ℹ Fix
 7  7  | #: E201:1:6
@@ -112,7 +112,7 @@ E20.py:12:15: E201 [*] Whitespace after '{'
 15 | #: Okay
 16 | spam(ham[1], {eggs: 2})
    |
-   = help: Removed whitespace before '{'
+   = help: Remove whitespace before '{'
 
 ℹ Fix
 9  9  | #: E201:1:10
@@ -132,7 +132,7 @@ E20.py:81:6: E201 [*] Whitespace after '['
 83 | 
 84 | #: Okay
    |
-   = help: Removed whitespace before '['
+   = help: Remove whitespace before '['
 
 ℹ Fix
 78 78 | #:

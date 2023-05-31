@@ -9,7 +9,7 @@ E20.py:19:23: E202 [*] Whitespace before ')'
 21 | #: E202:1:22
 22 | spam(ham[1], {eggs: 2 })
    |
-   = help: Removed whitespace before ')'
+   = help: Remove whitespace before ')'
 
 ℹ Fix
 16 16 | 
@@ -30,7 +30,7 @@ E20.py:21:22: E202 [*] Whitespace before '}'
 24 | #: E202:1:11
 25 | spam(ham[1 ], {eggs: 2})
    |
-   = help: Removed whitespace before '}'
+   = help: Remove whitespace before '}'
 
 ℹ Fix
 18 18 | #: E202:1:23
@@ -51,7 +51,7 @@ E20.py:23:11: E202 [*] Whitespace before ']'
 26 | #: E202:1:23
 27 | spam(ham[1], {eggs: 2}  )
    |
-   = help: Removed whitespace before ']'
+   = help: Remove whitespace before ']'
 
 ℹ Fix
 20 20 | #: E202:1:22
@@ -72,7 +72,7 @@ E20.py:25:23: E202 [*] Whitespace before ')'
 28 | #: E202:1:22
 29 | spam(ham[1], {eggs: 2   })
    |
-   = help: Removed whitespace before ')'
+   = help: Remove whitespace before ')'
 
 ℹ Fix
 22 22 | #: E202:1:11
@@ -93,7 +93,7 @@ E20.py:27:22: E202 [*] Whitespace before '}'
 30 | #: E202:1:11
 31 | spam(ham[1  ], {eggs: 2})
    |
-   = help: Removed whitespace before '}'
+   = help: Remove whitespace before '}'
 
 ℹ Fix
 24 24 | #: E202:1:23
@@ -114,7 +114,7 @@ E20.py:29:11: E202 [*] Whitespace before ']'
 32 | #: Okay
 33 | spam(ham[1], {eggs: 2})
    |
-   = help: Removed whitespace before ']'
+   = help: Remove whitespace before ']'
 
 ℹ Fix
 26 26 | #: E202:1:22
