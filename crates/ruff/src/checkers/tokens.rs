@@ -201,7 +201,7 @@ pub(crate) fn check_tokens(
                 let comment = locator.slice(*comment_range);
                 TodoComment::from_comment(comment, comment_range, i)
             })
-            .collect::<Vec<TodoComment>>();
+            .collect();
 
         diagnostics.extend(
             flake8_todos::rules::todos(&todo_comments, indexer, locator, settings)

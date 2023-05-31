@@ -264,7 +264,7 @@ pub(crate) fn todos(
             continue;
         }
 
-        tag_errors(directive, &mut diagnostics, settings);
+        directive_errors(directive, &mut diagnostics, settings);
         static_errors(&mut diagnostics, content, *range, directive);
 
         let mut has_issue_link = false;
@@ -281,7 +281,7 @@ pub(crate) fn todos(
             }
 
             let next_comment = locator.slice(*next_range);
-            if TodoDirective::extract_directive(next_comment, next_range).is_some() {
+            if TodoDirective::from_comment(next_comment, next_range).is_some() {
                 break;
             }
 
@@ -304,8 +304,12 @@ pub(crate) fn todos(
     diagnostics
 }
 
-/// Check that the tag itself is valid. This function modifies `diagnostics` in-place.
-fn tag_errors(directive: &TodoDirective, diagnostics: &mut Vec<Diagnostic>, settings: &Settings) {
+/// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
+fn directive_errors(
+    directive: &TodoDirective,
+    diagnostics: &mut Vec<Diagnostic>,
+    settings: &Settings,
+) {
     if directive.content == "TODO" {
         return;
     }
