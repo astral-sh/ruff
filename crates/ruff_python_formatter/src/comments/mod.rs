@@ -716,4 +716,90 @@ def test(
 
         assert_debug_snapshot!(comments.debug(test_case.source_code));
     }
+
+    #[test]
+    fn positional_argument_only_comment() {
+        let source = r#"
+def test(
+    a, # trailing positional comment
+    # Positional arguments only after here
+    /, # trailing positional argument comment.
+    # leading b comment
+    b,
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn positional_argument_only_leading_comma_comment() {
+        let source = r#"
+def test(
+    a # trailing positional comment
+    # Positional arguments only after here
+    ,/, # trailing positional argument comment.
+    # leading b comment
+    b,
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn positional_argument_only_comment_without_following_node() {
+        let source = r#"
+def test(
+    a, # trailing positional comment
+    # Positional arguments only after here
+    /, # trailing positional argument comment.
+    # Trailing on new line
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn non_positional_arguments_with_defaults() {
+        let source = r#"
+def test(
+    a=10 # trailing positional comment
+    # Positional arguments only after here
+    ,/, # trailing positional argument comment.
+    # leading comment for b
+    b=20
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn non_positional_arguments_slash_on_same_line() {
+        let source = r#"
+def test(a=10,/, # trailing positional argument comment.
+    # leading comment for b
+    b=20
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
 }
