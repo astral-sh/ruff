@@ -39,10 +39,8 @@ pub(crate) fn check_logical_lines(
     let mut context = LogicalLinesContext::new(settings);
 
     let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
-
     let should_fix_whitespace_before_parameters =
         settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
-
     let should_fix_whitespace_after_open_bracket =
         settings.rules.should_fix(Rule::WhitespaceAfterOpenBracket);
     let should_fix_whitespace_before_close_bracket = settings

@@ -132,9 +132,9 @@ impl AlwaysAutofixableViolation for WhitespaceBeforePunctuation {
 pub(crate) fn extraneous_whitespace(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
-    autofix_whitespace_after_open_bracket: bool,
-    autofix_whitespace_before_close_bracket: bool,
-    autofix_whitespace_before_punctuation: bool,
+    autofix_after_open_bracket: bool,
+    autofix_before_close_bracket: bool,
+    autofix_before_punctuation: bool,
 ) {
     let mut prev_token = None;
 
@@ -149,7 +149,7 @@ pub(crate) fn extraneous_whitespace(
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
                         );
-                        if autofix_whitespace_after_open_bracket {
+                        if autofix_after_open_bracket {
                             diagnostic
                                 .set_fix(Fix::automatic(Edit::range_deletion(diagnostic.range())));
                         }
@@ -165,7 +165,7 @@ pub(crate) fn extraneous_whitespace(
                                 WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             );
-                            if autofix_whitespace_before_close_bracket {
+                            if autofix_before_close_bracket {
                                 diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
                                     diagnostic.range(),
                                 )));
@@ -183,7 +183,7 @@ pub(crate) fn extraneous_whitespace(
                                 WhitespaceBeforePunctuation { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             );
-                            if autofix_whitespace_before_punctuation {
+                            if autofix_before_punctuation {
                                 diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
                                     diagnostic.range(),
                                 )));
