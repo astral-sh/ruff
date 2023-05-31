@@ -1,6 +1,7 @@
 //! Lint rules based on checking physical lines.
 
 use ruff_text_size::TextSize;
+use std::convert::TryFrom;
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
@@ -9,7 +10,9 @@ use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_text_size::TextRange;
 
 use crate::registry::Rule;
-use crate::rules::flake8_copyright::rules::{copyright_header_absent, HeaderLacksCopyright};
+use crate::rules::flake8_copyright::rules::{
+    copyright_header_absent, CopyrightHeaderKind, HeaderLacksCopyright,
+};
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
@@ -54,7 +57,7 @@ pub(crate) fn check_physical_lines(
     let enforce_copyright_header = settings.rules.enabled(Rule::HeaderLacksCopyright);
 
     let mut checked_copyright_header_absent = false;
-    let mut chars_before_copyright_header: i64 = 0;
+    let mut chars_before_copyright_header: u32 = 0;
 
     let fix_unnecessary_coding_comment = settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace = settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
@@ -165,8 +168,8 @@ pub(crate) fn check_physical_lines(
                 copyright_header_absent(&line, settings, chars_before_copyright_header);
 
             match missing_copyright_header {
-                Some(false) => checked_copyright_header_absent = true,
-                Some(true) => {
+                CopyrightHeaderKind::Present => checked_copyright_header_absent = true,
+                CopyrightHeaderKind::Missing => {
                     let diagnostic = Diagnostic::new(
                         HeaderLacksCopyright,
                         TextRange::new(line.start(), line.end()),
@@ -174,9 +177,12 @@ pub(crate) fn check_physical_lines(
                     diagnostics.push(diagnostic);
                     checked_copyright_header_absent = true;
                 }
-                None => (),
+                CopyrightHeaderKind::NotFoundInRange => (),
             }
-            chars_before_copyright_header += line.len() as i64;
+
+            // this will only panic if chars count exceeds i32 max.
+            // Based on flake8-copyright max allowed chars before header is 1024
+            chars_before_copyright_header += u32::try_from(line.chars().count()).unwrap_or(1024);
         }
     }
 

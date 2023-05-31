@@ -730,7 +730,7 @@
       "type": "object",
       "properties": {
         "copyright-author": {
-          "description": "Author to check for specifically within the header\n\nDefault is \"\" E.g # Copyright (c) <Year> <Author>",
+          "description": "Author to check for specifically within the header\n\nDefault is \"\" E.g # Copyright (c) 2023 ruff",
           "type": [
             "string",
             "null"
@@ -742,7 +742,8 @@
             "integer",
             "null"
           ],
-          "format": "int"
+          "format": "uint32",
+          "minimum": 0.0
         },
         "copyright-regexp": {
           "description": "Regexp to check for copyright headers.\n\nDefault is \"Copyright\\s+(\\(C\\)\\s+)?\\d{4}([-,]\\d{4})*\\s+%(author)s\" E.g # Copyright (c) 2023 ruff",

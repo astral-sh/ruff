@@ -5,6 +5,18 @@ use ruff_python_ast::newlines::Line;
 use crate::settings::Settings;
 
 use lazy_regex::Regex;
+
+// Three states are possible:
+// 1. Found copyright header
+// 2. Missing copyright header
+// 3. file length < chars_before_copyright_header
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum CopyrightHeaderKind {
+    Missing,
+    Present,
+    NotFoundInRange,
+}
+
 #[violation]
 pub struct HeaderLacksCopyright;
 
@@ -22,26 +34,36 @@ impl Violation for HeaderLacksCopyright {
 pub(crate) fn copyright_header_absent(
     line: &Line,
     settings: &Settings,
-    current_char_index: i64,
-) -> Option<bool> {
+    current_char_index: u32,
+) -> CopyrightHeaderKind {
     let copyright_regexp = format!(
         "{} {}",
         settings.flake8_copyright.copyright_regexp, settings.flake8_copyright.copyright_author
     );
-    let regex = Regex::new(copyright_regexp.trim()).unwrap();
 
-    let out_of_range =
-        current_char_index > (settings.flake8_copyright.copyright_min_file_size as i64);
+    // use default string if we panic
+    let regex = match Regex::new(copyright_regexp.trim()) {
+        Ok(regex) => regex,
+        Err(_) => Regex::new("(?i)Copyright \\(C\\) \\d{4}").unwrap(),
+    };
+
+    // flake8 copyright uses maximum allowed chars to be 1024 before copyright
+    let copyright_file_size: u32 = match settings.flake8_copyright.copyright_min_file_size {
+        x if x <= 1024 => settings.flake8_copyright.copyright_min_file_size,
+        _ => 1024, // max is 1024 in flake8 rule
+    };
+
+    let out_of_range = current_char_index > copyright_file_size;
     let copyright_missing = regex.find(line.as_str()).is_none();
 
     if copyright_missing && out_of_range {
         // Missing copyright header
-        return Some(true);
+        return CopyrightHeaderKind::Missing;
     }
     if !copyright_missing {
         // Found copyright header, should stop checking
-        return Some(false);
+        return CopyrightHeaderKind::Present;
     }
     // Missing copyright header, but need to keep checking
-    None
+    CopyrightHeaderKind::NotFoundInRange
 }

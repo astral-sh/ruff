@@ -42,14 +42,14 @@ pub struct Options {
         "#
     )]
     /// Minimum number of characters in a file before requiring a copyright notice
-    pub copyright_min_file_size: Option<isize>,
+    pub copyright_min_file_size: Option<u32>,
 }
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub copyright_regexp: String,
     pub copyright_author: String,
-    pub copyright_min_file_size: isize,
+    pub copyright_min_file_size: u32,
 }
 
 impl Default for Settings {
