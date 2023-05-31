@@ -73,12 +73,12 @@ src.joinpath("mod.rs").write_text(
     rustfmt("\n".join(f"pub(crate) mod {group};" for group in sorted(groups.values())))
 )
 for group, group_nodes in nodes_grouped.items():
-    #src.joinpath(groups[group]).mkdir(exist_ok=True)
-    #src.joinpath(groups[group]).joinpath("mod.rs").write_text(
+    # src.joinpath(groups[group]).mkdir(exist_ok=True)
+    # src.joinpath(groups[group]).joinpath("mod.rs").write_text(
     #    rustfmt(
     #        "\n".join(f"pub(crate) mod {to_camel_case(node)};" for node in sorted(group_nodes))
     #    )
-    #)
+    # )
     for node in group_nodes:
         code = f"""
     use crate::{{FormatNodeRule, PyFormatter}};
