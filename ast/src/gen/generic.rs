@@ -2679,7 +2679,7 @@ impl<R> Node for Excepthandler<R> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Arguments<R = TextRange> {
+pub struct PythonArguments<R = TextRange> {
     pub range: OptionalRange<R>,
     pub posonlyargs: Vec<Arg<R>>,
     pub args: Vec<Arg<R>>,
@@ -2690,7 +2690,7 @@ pub struct Arguments<R = TextRange> {
     pub defaults: Vec<Expr<R>>,
 }
 
-impl<R> Node for Arguments<R> {
+impl<R> Node for PythonArguments<R> {
     const NAME: &'static str = "arguments";
     const FIELD_NAMES: &'static [&'static str] = &[
         "posonlyargs",
@@ -2986,4 +2986,47 @@ pub enum TypeIgnore<R = TextRange> {
 impl<R> Node for TypeIgnore<R> {
     const NAME: &'static str = "type_ignore";
     const FIELD_NAMES: &'static [&'static str] = &[];
+}
+
+/// An alternative type of AST `arguments`. This is parser-friendly and human-friendly definition of function arguments.
+/// This form also has advantage to implement pre-order traverse.
+/// `defaults` and `kw_defaults` fields are removed and the default values are placed under each `arg_with_default` typed argument.
+/// `vararg` and `kwarg` are still typed as `arg` because they never can have a default value.
+///
+/// The matching Python style AST type is [PythonArguments]. While [PythonArguments] has ordered `kwonlyargs` fields by
+/// default existence, [Arguments] has location-ordered kwonlyargs fields.
+///
+/// NOTE: This type is different from original Python AST.
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Arguments<R = TextRange> {
+    pub range: OptionalRange<R>,
+    pub posonlyargs: Vec<ArgWithDefault<R>>,
+    pub args: Vec<ArgWithDefault<R>>,
+    pub vararg: Option<Box<Arg<R>>>,
+    pub kwonlyargs: Vec<ArgWithDefault<R>>,
+    pub kwarg: Option<Box<Arg<R>>>,
+}
+
+impl<R> Node for Arguments<R> {
+    const NAME: &'static str = "alt:arguments";
+    const FIELD_NAMES: &'static [&'static str] =
+        &["posonlyargs", "args", "vararg", "kwonlyargs", "kwarg"];
+}
+
+/// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
+/// Used by `Arguments` original type.
+///
+/// NOTE: This type is different from original Python AST.
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArgWithDefault<R = TextRange> {
+    pub range: OptionalRange<R>,
+    pub def: Arg<R>,
+    pub default: Option<Box<Expr<R>>>,
+}
+
+impl<R> Node for ArgWithDefault<R> {
+    const NAME: &'static str = "arg_with_default";
+    const FIELD_NAMES: &'static [&'static str] = &["def", "default"];
 }

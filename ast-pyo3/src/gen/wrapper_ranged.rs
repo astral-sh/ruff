@@ -3289,10 +3289,10 @@ impl ExcepthandlerExceptHandler {
 
 #[pyclass(module="rustpython_ast.ranged", name="_arguments", extends=super::Ast, frozen)]
 #[derive(Clone, Debug)]
-pub struct Arguments(pub &'static ast::Arguments<TextRange>);
+pub struct Arguments(pub &'static ast::PythonArguments<TextRange>);
 
-impl From<&'static ast::Arguments<TextRange>> for Arguments {
-    fn from(node: &'static ast::Arguments<TextRange>) -> Self {
+impl From<&'static ast::PythonArguments<TextRange>> for Arguments {
+    fn from(node: &'static ast::PythonArguments<TextRange>) -> Self {
         Arguments(node)
     }
 }
@@ -3304,7 +3304,7 @@ impl ToPyObject for Arguments {
     }
 }
 
-impl ToPyWrapper for ast::Arguments<TextRange> {
+impl ToPyWrapper for ast::PythonArguments<TextRange> {
     #[inline]
     fn to_py_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {
         Ok(Arguments(self).to_object(py))
@@ -4096,7 +4096,7 @@ pub fn add_to_module(py: Python, m: &PyModule) -> PyResult<()> {
     super::init_type::<Comprehension, ast::Comprehension>(py, m)?;
     super::init_type::<Excepthandler, ast::Excepthandler>(py, m)?;
     super::init_type::<ExcepthandlerExceptHandler, ast::ExcepthandlerExceptHandler>(py, m)?;
-    super::init_type::<Arguments, ast::Arguments>(py, m)?;
+    super::init_type::<Arguments, ast::PythonArguments>(py, m)?;
     super::init_type::<Arg, ast::Arg>(py, m)?;
     super::init_type::<Keyword, ast::Keyword>(py, m)?;
     super::init_type::<Alias, ast::Alias>(py, m)?;

@@ -11,58 +11,69 @@ Ok(
                     "f",
                 ),
                 args: Arguments {
-                    range: (),
+                    range: 6..19,
                     posonlyargs: [],
                     args: [
-                        Arg {
+                        ArgWithDefault {
                             range: 6..7,
-                            arg: Identifier(
-                                "a",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 6..7,
+                                arg: Identifier(
+                                    "a",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 9..10,
-                            arg: Identifier(
-                                "b",
+                            def: Arg {
+                                range: 9..10,
+                                arg: Identifier(
+                                    "b",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 11..13,
+                                        value: Int(
+                                            20,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
                             ),
-                            annotation: None,
-                            type_comment: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 15..16,
-                            arg: Identifier(
-                                "c",
+                            def: Arg {
+                                range: 15..16,
+                                arg: Identifier(
+                                    "c",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 17..19,
+                                        value: Int(
+                                            30,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
                             ),
-                            annotation: None,
-                            type_comment: None,
                         },
                     ],
                     vararg: None,
                     kwonlyargs: [],
-                    kw_defaults: [],
                     kwarg: None,
-                    defaults: [
-                        Constant(
-                            ExprConstant {
-                                range: 11..13,
-                                value: Int(
-                                    20,
-                                ),
-                                kind: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 17..19,
-                                value: Int(
-                                    30,
-                                ),
-                                kind: None,
-                            },
-                        ),
-                    ],
                 },
                 body: [
                     Pass(

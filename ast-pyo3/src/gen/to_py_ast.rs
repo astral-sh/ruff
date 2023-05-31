@@ -808,7 +808,7 @@ impl<R> PyNode for ast::ExcepthandlerExceptHandler<R> {
     }
 }
 
-impl<R> PyNode for ast::Arguments<R> {
+impl<R> PyNode for ast::PythonArguments<R> {
     #[inline]
     fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
         static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
@@ -2288,7 +2288,7 @@ impl ToPyAst for ast::ExcepthandlerExceptHandler<TextRange> {
     }
 }
 
-impl ToPyAst for ast::Arguments<TextRange> {
+impl ToPyAst for ast::PythonArguments<TextRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
@@ -4312,7 +4312,7 @@ impl ToPyAst for ast::ExcepthandlerExceptHandler<SourceRange> {
     }
 }
 
-impl ToPyAst for ast::Arguments<SourceRange> {
+impl ToPyAst for ast::PythonArguments<SourceRange> {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let cache = Self::py_type_cache().get().unwrap();
@@ -4820,7 +4820,7 @@ fn init_types(py: Python) -> PyResult<()> {
     cache_py_type::<ast::Comprehension>(ast_module)?;
     cache_py_type::<ast::Excepthandler>(ast_module)?;
     cache_py_type::<ast::ExcepthandlerExceptHandler>(ast_module)?;
-    cache_py_type::<ast::Arguments>(ast_module)?;
+    cache_py_type::<ast::PythonArguments>(ast_module)?;
     cache_py_type::<ast::Arg>(ast_module)?;
     cache_py_type::<ast::Keyword>(ast_module)?;
     cache_py_type::<ast::Alias>(ast_module)?;

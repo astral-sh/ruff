@@ -11,14 +11,12 @@ Ok(
                     "f",
                 ),
                 args: Arguments {
-                    range: (),
+                    range: 5..7,
                     posonlyargs: [],
                     args: [],
                     vararg: None,
                     kwonlyargs: [],
-                    kw_defaults: [],
                     kwarg: None,
-                    defaults: [],
                 },
                 body: [
                     Pass(

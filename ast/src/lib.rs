@@ -1,3 +1,12 @@
+//! Python AST node definitions and utilities.
+//!
+//! AST nodes are very similary defined like [Python AST](https://docs.python.org/3/library/ast.html).
+//! But a few exceptions exist due to parser optimization.
+//! They can be transformed to matching Python-styled AST in reasonable cost.
+//!
+//! [PythonArguments] is replaced by [Arguments]. The new [Arguments] type representation uses a new type
+//! [ArgWithDefault] to represent arguments with default values. See each type documentation for more details.
+
 mod builtin;
 mod generic;
 mod impls;

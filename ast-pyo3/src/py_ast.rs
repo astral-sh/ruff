@@ -78,6 +78,18 @@ impl ToPyAst for ConversionFlag {
     }
 }
 
+impl<R> ToPyAst for ast::Arguments<R>
+where
+    R: Clone,
+    ast::PythonArguments<R>: ToPyAst,
+{
+    #[inline]
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let arguments = self.to_python_arguments();
+        arguments.to_py_ast(py)
+    }
+}
+
 fn constant_to_object(constant: &ast::Constant, py: Python) -> PyObject {
     let cache = ast_cache();
     match constant {

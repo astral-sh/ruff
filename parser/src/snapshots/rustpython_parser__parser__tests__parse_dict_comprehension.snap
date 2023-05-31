@@ -25,7 +25,7 @@ DictComp(
         ),
         generators: [
             Comprehension {
-                range: (),
+                range: 8..18,
                 target: Name(
                     ExprName {
                         range: 12..13,

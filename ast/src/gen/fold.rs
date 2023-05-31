@@ -507,6 +507,12 @@ pub trait Fold<U> {
     ) -> Result<TypeIgnoreTypeIgnore<Self::TargetU>, Self::Error> {
         fold_type_ignore_type_ignore(self, node)
     }
+    fn fold_arg_with_default(
+        &mut self,
+        node: ArgWithDefault<U>,
+    ) -> Result<ArgWithDefault<Self::TargetU>, Self::Error> {
+        fold_arg_with_default(self, node)
+    }
 }
 impl<T, U> Foldable<T, U> for Mod<T> {
     type Mapped = Mod<U>;
@@ -2368,9 +2374,7 @@ pub fn fold_arguments<U, F: Fold<U> + ?Sized>(
         args,
         vararg,
         kwonlyargs,
-        kw_defaults,
         kwarg,
-        defaults,
         range,
     } = node;
     let context = folder.will_map_user_cfg(&range);
@@ -2378,18 +2382,14 @@ pub fn fold_arguments<U, F: Fold<U> + ?Sized>(
     let args = Foldable::fold(args, folder)?;
     let vararg = Foldable::fold(vararg, folder)?;
     let kwonlyargs = Foldable::fold(kwonlyargs, folder)?;
-    let kw_defaults = Foldable::fold(kw_defaults, folder)?;
     let kwarg = Foldable::fold(kwarg, folder)?;
-    let defaults = Foldable::fold(defaults, folder)?;
     let range = folder.map_user_cfg(range, context)?;
     Ok(Arguments {
         posonlyargs,
         args,
         vararg,
         kwonlyargs,
-        kw_defaults,
         kwarg,
-        defaults,
         range,
     })
 }
@@ -2790,4 +2790,32 @@ pub fn fold_type_ignore_type_ignore<U, F: Fold<U> + ?Sized>(
     let tag = Foldable::fold(tag, folder)?;
     let range = folder.map_user_cfg(range, context)?;
     Ok(TypeIgnoreTypeIgnore { lineno, tag, range })
+}
+impl<T, U> Foldable<T, U> for ArgWithDefault<T> {
+    type Mapped = ArgWithDefault<U>;
+    fn fold<F: Fold<T, TargetU = U> + ?Sized>(
+        self,
+        folder: &mut F,
+    ) -> Result<Self::Mapped, F::Error> {
+        folder.fold_arg_with_default(self)
+    }
+}
+pub fn fold_arg_with_default<U, F: Fold<U> + ?Sized>(
+    #[allow(unused)] folder: &mut F,
+    node: ArgWithDefault<U>,
+) -> Result<ArgWithDefault<F::TargetU>, F::Error> {
+    let ArgWithDefault {
+        def,
+        default,
+        range,
+    } = node;
+    let context = folder.will_map_user_cfg(&range);
+    let def = Foldable::fold(def, folder)?;
+    let default = Foldable::fold(default, folder)?;
+    let range = folder.map_user_cfg(range, context)?;
+    Ok(ArgWithDefault {
+        def,
+        default,
+        range,
+    })
 }

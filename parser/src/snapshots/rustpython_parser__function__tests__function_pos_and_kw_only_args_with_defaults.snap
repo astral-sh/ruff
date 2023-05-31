@@ -11,83 +11,106 @@ Ok(
                     "f",
                 ),
                 args: Arguments {
-                    range: (),
+                    range: 6..31,
                     posonlyargs: [],
                     args: [
-                        Arg {
+                        ArgWithDefault {
                             range: 6..7,
-                            arg: Identifier(
-                                "a",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 6..7,
+                                arg: Identifier(
+                                    "a",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 9..10,
-                            arg: Identifier(
-                                "b",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 9..10,
+                                arg: Identifier(
+                                    "b",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 12..13,
-                            arg: Identifier(
-                                "c",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 12..13,
+                                arg: Identifier(
+                                    "c",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
                     ],
                     vararg: None,
                     kwonlyargs: [
-                        Arg {
+                        ArgWithDefault {
                             range: 18..19,
-                            arg: Identifier(
-                                "d",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 18..19,
+                                arg: Identifier(
+                                    "d",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 21..22,
-                            arg: Identifier(
-                                "e",
+                            def: Arg {
+                                range: 21..22,
+                                arg: Identifier(
+                                    "e",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 23..25,
+                                        value: Int(
+                                            20,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
                             ),
-                            annotation: None,
-                            type_comment: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 27..28,
-                            arg: Identifier(
-                                "f",
+                            def: Arg {
+                                range: 27..28,
+                                arg: Identifier(
+                                    "f",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 29..31,
+                                        value: Int(
+                                            30,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
                             ),
-                            annotation: None,
-                            type_comment: None,
                         },
-                    ],
-                    kw_defaults: [
-                        Constant(
-                            ExprConstant {
-                                range: 23..25,
-                                value: Int(
-                                    20,
-                                ),
-                                kind: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 29..31,
-                                value: Int(
-                                    30,
-                                ),
-                                kind: None,
-                            },
-                        ),
                     ],
                     kwarg: None,
-                    defaults: [],
                 },
                 body: [
                     Pass(

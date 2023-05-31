@@ -610,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_lambda() {
         let source = "lambda x, y: x * y"; // lambda(x, y): x * y";
         let parse_ast = ast::Suite::parse(source, "<test>").unwrap();
@@ -625,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_class() {
         let source = "\
 class Foo(A, B):
@@ -638,7 +638,7 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_dict_comprehension() {
         let source = "{x1: x2 for y in z}";
         let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
@@ -646,7 +646,7 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_list_comprehension() {
         let source = "[x for y in z]";
         let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
@@ -654,7 +654,7 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_double_list_comprehension() {
         let source = "[x for y, y2 in z for a in b if a < 5 if a > 10]";
         let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
@@ -662,7 +662,7 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_generator_comprehension() {
         let source = "(x for y in z)";
         let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
@@ -670,7 +670,7 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_named_expression_generator_comprehension() {
         let source = "(x := y + 1 for y in z)";
         let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
@@ -678,7 +678,7 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_parse_if_else_generator_comprehension() {
         let source = "(x if y else y for y in z)";
         let parse_ast = ast::Expr::parse(source, "<test>").unwrap();
@@ -707,7 +707,7 @@ class Foo(A, B):
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_with_statement() {
         let source = "\
 with 0: pass
@@ -777,7 +777,7 @@ array[3:5, *indexes_to_select]
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_generator_expression_argument() {
         let source = r#"' '.join(
     sql
@@ -837,7 +837,7 @@ except* OSError as e:
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_match_as_identifier() {
         let parse_ast = ast::Suite::parse(
             r#"
@@ -870,7 +870,7 @@ print(match(12))
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_patma() {
         let source = r#"# Cases sampled from Lib/test/test_patma.py
 
@@ -1042,7 +1042,7 @@ match w := x,:
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_match() {
         let parse_ast = ast::Suite::parse(
             r#"
@@ -1073,7 +1073,7 @@ match x:
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn test_variadic_generics() {
         let parse_ast = ast::Suite::parse(
             r#"

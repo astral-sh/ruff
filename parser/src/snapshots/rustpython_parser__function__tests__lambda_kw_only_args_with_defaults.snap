@@ -11,58 +11,69 @@ Ok(
                     ExprLambda {
                         range: 0..26,
                         args: Arguments {
-                            range: (),
+                            range: 7..23,
                             posonlyargs: [],
                             args: [],
                             vararg: None,
                             kwonlyargs: [
-                                Arg {
+                                ArgWithDefault {
                                     range: 10..11,
-                                    arg: Identifier(
-                                        "a",
-                                    ),
-                                    annotation: None,
-                                    type_comment: None,
+                                    def: Arg {
+                                        range: 10..11,
+                                        arg: Identifier(
+                                            "a",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: None,
                                 },
-                                Arg {
+                                ArgWithDefault {
                                     range: 13..14,
-                                    arg: Identifier(
-                                        "b",
+                                    def: Arg {
+                                        range: 13..14,
+                                        arg: Identifier(
+                                            "b",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: Some(
+                                        Constant(
+                                            ExprConstant {
+                                                range: 15..17,
+                                                value: Int(
+                                                    20,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
                                     ),
-                                    annotation: None,
-                                    type_comment: None,
                                 },
-                                Arg {
+                                ArgWithDefault {
                                     range: 19..20,
-                                    arg: Identifier(
-                                        "c",
+                                    def: Arg {
+                                        range: 19..20,
+                                        arg: Identifier(
+                                            "c",
+                                        ),
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                    default: Some(
+                                        Constant(
+                                            ExprConstant {
+                                                range: 21..23,
+                                                value: Int(
+                                                    30,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
                                     ),
-                                    annotation: None,
-                                    type_comment: None,
                                 },
-                            ],
-                            kw_defaults: [
-                                Constant(
-                                    ExprConstant {
-                                        range: 15..17,
-                                        value: Int(
-                                            20,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
-                                Constant(
-                                    ExprConstant {
-                                        range: 21..23,
-                                        value: Int(
-                                            30,
-                                        ),
-                                        kind: None,
-                                    },
-                                ),
                             ],
                             kwarg: None,
-                            defaults: [],
                         },
                         body: Constant(
                             ExprConstant {

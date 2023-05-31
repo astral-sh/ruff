@@ -11,58 +11,69 @@ Ok(
                     "f",
                 ),
                 args: Arguments {
-                    range: (),
+                    range: 6..22,
                     posonlyargs: [],
                     args: [],
                     vararg: None,
                     kwonlyargs: [
-                        Arg {
+                        ArgWithDefault {
                             range: 9..10,
-                            arg: Identifier(
-                                "a",
-                            ),
-                            annotation: None,
-                            type_comment: None,
+                            def: Arg {
+                                range: 9..10,
+                                arg: Identifier(
+                                    "a",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 12..13,
-                            arg: Identifier(
-                                "b",
+                            def: Arg {
+                                range: 12..13,
+                                arg: Identifier(
+                                    "b",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 14..16,
+                                        value: Int(
+                                            20,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
                             ),
-                            annotation: None,
-                            type_comment: None,
                         },
-                        Arg {
+                        ArgWithDefault {
                             range: 18..19,
-                            arg: Identifier(
-                                "c",
+                            def: Arg {
+                                range: 18..19,
+                                arg: Identifier(
+                                    "c",
+                                ),
+                                annotation: None,
+                                type_comment: None,
+                            },
+                            default: Some(
+                                Constant(
+                                    ExprConstant {
+                                        range: 20..22,
+                                        value: Int(
+                                            30,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
                             ),
-                            annotation: None,
-                            type_comment: None,
                         },
-                    ],
-                    kw_defaults: [
-                        Constant(
-                            ExprConstant {
-                                range: 14..16,
-                                value: Int(
-                                    20,
-                                ),
-                                kind: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 20..22,
-                                value: Int(
-                                    30,
-                                ),
-                                kind: None,
-                            },
-                        ),
                     ],
                     kwarg: None,
-                    defaults: [],
                 },
                 body: [
                     Pass(

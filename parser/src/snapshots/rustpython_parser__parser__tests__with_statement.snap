@@ -8,7 +8,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 0..12,
             items: [
                 Withitem {
-                    range: (),
+                    range: 5..6,
                     context_expr: Constant(
                         ExprConstant {
                             range: 5..6,
@@ -36,7 +36,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 13..30,
             items: [
                 Withitem {
-                    range: (),
+                    range: 18..24,
                     context_expr: Constant(
                         ExprConstant {
                             range: 18..19,
@@ -74,7 +74,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 31..46,
             items: [
                 Withitem {
-                    range: (),
+                    range: 36..37,
                     context_expr: Constant(
                         ExprConstant {
                             range: 36..37,
@@ -87,7 +87,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     optional_vars: None,
                 },
                 Withitem {
-                    range: (),
+                    range: 39..40,
                     context_expr: Constant(
                         ExprConstant {
                             range: 39..40,
@@ -115,7 +115,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 47..72,
             items: [
                 Withitem {
-                    range: (),
+                    range: 52..58,
                     context_expr: Constant(
                         ExprConstant {
                             range: 52..53,
@@ -138,7 +138,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     ),
                 },
                 Withitem {
-                    range: (),
+                    range: 60..66,
                     context_expr: Constant(
                         ExprConstant {
                             range: 60..61,
@@ -176,7 +176,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 73..97,
             items: [
                 Withitem {
-                    range: (),
+                    range: 78..91,
                     context_expr: IfExp(
                         ExprIfExp {
                             range: 78..91,
@@ -227,7 +227,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 98..127,
             items: [
                 Withitem {
-                    range: (),
+                    range: 103..121,
                     context_expr: IfExp(
                         ExprIfExp {
                             range: 103..116,
@@ -288,7 +288,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 128..141,
             items: [
                 Withitem {
-                    range: (),
+                    range: 133..135,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 133..135,
@@ -314,7 +314,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 142..160,
             items: [
                 Withitem {
-                    range: (),
+                    range: 147..154,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 147..149,
@@ -350,7 +350,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 161..175,
             items: [
                 Withitem {
-                    range: (),
+                    range: 167..168,
                     context_expr: Constant(
                         ExprConstant {
                             range: 167..168,
@@ -378,7 +378,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 176..195,
             items: [
                 Withitem {
-                    range: (),
+                    range: 181..189,
                     context_expr: Constant(
                         ExprConstant {
                             range: 182..183,
@@ -416,7 +416,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 196..211,
             items: [
                 Withitem {
-                    range: (),
+                    range: 202..203,
                     context_expr: Constant(
                         ExprConstant {
                             range: 202..203,
@@ -444,7 +444,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 212..232,
             items: [
                 Withitem {
-                    range: (),
+                    range: 217..226,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 217..221,
@@ -490,7 +490,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 233..250,
             items: [
                 Withitem {
-                    range: (),
+                    range: 239..243,
                     context_expr: Constant(
                         ExprConstant {
                             range: 239..240,
@@ -503,7 +503,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     optional_vars: None,
                 },
                 Withitem {
-                    range: (),
+                    range: 239..243,
                     context_expr: Constant(
                         ExprConstant {
                             range: 242..243,
@@ -531,7 +531,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 251..273,
             items: [
                 Withitem {
-                    range: (),
+                    range: 256..267,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 256..262,
@@ -586,7 +586,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 274..290,
             items: [
                 Withitem {
-                    range: (),
+                    range: 279..284,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 279..284,
@@ -628,7 +628,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 291..312,
             items: [
                 Withitem {
-                    range: (),
+                    range: 296..306,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 296..301,
@@ -680,7 +680,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 313..331,
             items: [
                 Withitem {
-                    range: (),
+                    range: 318..325,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 318..325,
@@ -731,7 +731,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 332..355,
             items: [
                 Withitem {
-                    range: (),
+                    range: 337..349,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 337..344,
@@ -792,7 +792,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 356..375,
             items: [
                 Withitem {
-                    range: (),
+                    range: 361..369,
                     context_expr: NamedExpr(
                         ExprNamedExpr {
                             range: 362..368,
@@ -834,7 +834,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 376..400,
             items: [
                 Withitem {
-                    range: (),
+                    range: 381..394,
                     context_expr: NamedExpr(
                         ExprNamedExpr {
                             range: 382..388,
@@ -886,7 +886,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 401..428,
             items: [
                 Withitem {
-                    range: (),
+                    range: 406..422,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 406..422,
@@ -959,7 +959,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 429..461,
             items: [
                 Withitem {
-                    range: (),
+                    range: 434..455,
                     context_expr: Tuple(
                         ExprTuple {
                             range: 434..450,
@@ -1042,7 +1042,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 462..481,
             items: [
                 Withitem {
-                    range: (),
+                    range: 468..474,
                     context_expr: Constant(
                         ExprConstant {
                             range: 468..469,
@@ -1080,7 +1080,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 482..502,
             items: [
                 Withitem {
-                    range: (),
+                    range: 488..494,
                     context_expr: Constant(
                         ExprConstant {
                             range: 488..489,
@@ -1118,7 +1118,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 503..530,
             items: [
                 Withitem {
-                    range: (),
+                    range: 509..515,
                     context_expr: Constant(
                         ExprConstant {
                             range: 509..510,
@@ -1141,7 +1141,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     ),
                 },
                 Withitem {
-                    range: (),
+                    range: 517..523,
                     context_expr: Constant(
                         ExprConstant {
                             range: 517..518,
@@ -1179,7 +1179,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             range: 531..559,
             items: [
                 Withitem {
-                    range: (),
+                    range: 537..543,
                     context_expr: Constant(
                         ExprConstant {
                             range: 537..538,
@@ -1202,7 +1202,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                     ),
                 },
                 Withitem {
-                    range: (),
+                    range: 545..551,
                     context_expr: Constant(
                         ExprConstant {
                             range: 545..546,
