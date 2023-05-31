@@ -139,8 +139,9 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 mod tests {
     use anyhow::Result;
     use ruff_text_size::TextSize;
-    use rustpython_parser as parser;
+    use rustpython_parser::ast::Suite;
     use rustpython_parser::lexer::LexResult;
+    use rustpython_parser::Parse;
 
     use ruff_python_ast::newlines::LineEnding;
     use ruff_python_ast::source_code::{Locator, Stylist};
@@ -148,7 +149,7 @@ mod tests {
     use super::Insertion;
 
     fn insert(contents: &str) -> Result<Insertion> {
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
         let locator = Locator::new(contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);

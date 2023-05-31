@@ -424,7 +424,8 @@ pub(crate) fn remove_argument(
 mod tests {
     use anyhow::Result;
     use ruff_text_size::TextSize;
-    use rustpython_parser as parser;
+    use rustpython_parser::ast::Suite;
+    use rustpython_parser::Parse;
 
     use ruff_python_ast::source_code::Locator;
 
@@ -433,19 +434,19 @@ mod tests {
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt, &locator), None);
 
         let contents = "x = 1; y = 1";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt, &locator), Some(TextSize::from(5)));
 
         let contents = "x = 1 ; y = 1";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt, &locator), Some(TextSize::from(6)));
@@ -455,7 +456,7 @@ x = 1 \
   ; y = 1
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt, &locator), Some(TextSize::from(10)));
