@@ -33,21 +33,25 @@ def docstring_multiline():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,12 +1,12 @@
+@@ -1,13 +1,13 @@
  #!/usr/bin/env python3
  
  name = "Łukasz"
 -(f"hello {name}", f"hello {name}")
+-(b"", b"")
+-("", "")
 +(f"hello {name}", F"hello {name}")
- (b"", b"")
- ("", "")
++(b"", B"")
++(u"", U"")
  (r"", R"")
  
 -(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
+-(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
 +(rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
- (rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
++(rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
  
  
+ def docstring_singleline():
 ```
 
 ## Ruff Output
@@ -57,12 +61,12 @@ def docstring_multiline():
 
 name = "Łukasz"
 (f"hello {name}", F"hello {name}")
-(b"", b"")
-("", "")
+(b"", B"")
+(u"", U"")
 (r"", R"")
 
 (rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
-(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
+(rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
 
 
 def docstring_singleline():

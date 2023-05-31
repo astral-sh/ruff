@@ -86,7 +86,8 @@ the intention of adding a stable public API in the future.
 ### `select`, `extend-select`, `ignore`, and `extend-ignore` have new semantics ([#2312](https://github.com/charliermarsh/ruff/pull/2312))
 
 Previously, the interplay between `select` and its related options could lead to unexpected
-behavior. For example, `ruff --select E501 --ignore ALL` and `ruff --select E501 --extend-ignore ALL` behaved differently. (See [#2312](https://github.com/charliermarsh/ruff/pull/2312) for more
+behavior. For example, `ruff --select E501 --ignore ALL` and `ruff --select E501 --extend-ignore ALL`
+behaved differently. (See [#2312](https://github.com/charliermarsh/ruff/pull/2312) for more
 examples.)
 
 When Ruff determines the enabled rule set, it has to reconcile `select` and `ignore` from a variety

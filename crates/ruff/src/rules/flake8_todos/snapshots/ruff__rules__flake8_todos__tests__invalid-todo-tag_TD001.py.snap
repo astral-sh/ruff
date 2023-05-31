@@ -2,12 +2,13 @@
 source: crates/ruff/src/rules/flake8_todos/mod.rs
 ---
 TD001.py:7:3: TD001 Invalid TODO tag: `XXX`
-  |
-7 | # T001 - errors
-8 | # XXX (evanrittenhouse): this is not fine
-  |   ^^^ TD001
-9 | # FIXME (evanrittenhouse): this is not fine
-  |
+   |
+ 7 | # T001 - errors
+ 8 | # XXX (evanrittenhouse): this is not fine
+   |   ^^^ TD001
+ 9 | # FIXME (evanrittenhouse): this is not fine
+10 | # foo # XXX: this isn't fine either
+   |
 
 TD001.py:8:3: TD001 Invalid TODO tag: `FIXME`
    |
@@ -15,6 +16,15 @@ TD001.py:8:3: TD001 Invalid TODO tag: `FIXME`
  9 | # XXX (evanrittenhouse): this is not fine
 10 | # FIXME (evanrittenhouse): this is not fine
    |   ^^^^^ TD001
+11 | # foo # XXX: this isn't fine either
+   |
+
+TD001.py:9:9: TD001 Invalid TODO tag: `XXX`
+   |
+ 9 | # XXX (evanrittenhouse): this is not fine
+10 | # FIXME (evanrittenhouse): this is not fine
+11 | # foo # XXX: this isn't fine either
+   |         ^^^ TD001
    |
 
 

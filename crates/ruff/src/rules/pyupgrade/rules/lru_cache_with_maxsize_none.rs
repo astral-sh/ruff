@@ -5,6 +5,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 #[violation]
@@ -65,8 +66,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
                         let (import_edit, binding) = checker.importer.get_or_import_symbol(
-                            "functools",
-                            "cache",
+                            &ImportRequest::import("functools", "cache"),
                             expr.start(),
                             checker.semantic_model(),
                         )?;

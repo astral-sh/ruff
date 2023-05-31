@@ -4,7 +4,7 @@ use std::iter::FusedIterator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
 
-use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
+use ruff_newlines::{StrExt, UniversalNewlineIterator};
 use ruff_python_ast::whitespace;
 
 use crate::docstrings::styles::SectionStyle;

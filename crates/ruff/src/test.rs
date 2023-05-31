@@ -1,10 +1,11 @@
 #![cfg(test)]
+//! Helper functions for the tests of rule implementations.
 
-/// Helper functions for the tests of rule implementations.
 use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
+use ruff_textwrap::dedent;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 
@@ -24,15 +25,27 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
 }
 
-/// A convenient wrapper around [`check_path`], that additionally
-/// asserts that autofixes converge after 10 iterations.
+/// Run [`check_path`] on a file in the `resources/test/fixtures` directory.
 pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
-    static MAX_ITERATIONS: usize = 10;
-
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
-    let locator = Locator::new(&contents);
+    Ok(test_contents(&contents, &path, settings))
+}
+
+/// Run [`check_path`] on a snippet of Python code.
+pub(crate) fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> {
+    let path = Path::new("<filename>");
+    let contents = dedent(contents);
+    test_contents(&contents, path, settings)
+}
+
+/// A convenient wrapper around [`check_path`], that additionally
+/// asserts that autofixes converge after 10 iterations.
+fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Message> {
+    static MAX_ITERATIONS: usize = 10;
+
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+    let locator = Locator::new(contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer = Indexer::from_tokens(&tokens, &locator);
     let directives = directives::extract_directives(
@@ -45,7 +58,7 @@ pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<V
         data: (diagnostics, _imports),
         error,
     } = check_path(
-        &path,
+        path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
         tokens,
@@ -67,18 +80,18 @@ pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<V
         .any(|diagnostic| diagnostic.fix.is_some())
     {
         let mut diagnostics = diagnostics.clone();
-        let mut contents = contents.clone();
+        let mut contents = contents.to_string();
 
         while let Some((fixed_contents, _)) = fix_file(&diagnostics, &Locator::new(&contents)) {
             if iterations < MAX_ITERATIONS {
                 iterations += 1;
             } else {
-                let output = print_diagnostics(diagnostics, &path, &contents);
+                let output = print_diagnostics(diagnostics, path, &contents);
 
                 panic!(
-                        "Failed to converge after {MAX_ITERATIONS} iterations. This likely \
-                         indicates a bug in the implementation of the fix. Last diagnostics:\n{output}"
-                    );
+                    "Failed to converge after {MAX_ITERATIONS} iterations. This likely \
+                     indicates a bug in the implementation of the fix. Last diagnostics:\n{output}"
+                );
             }
 
             let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&fixed_contents);
@@ -96,7 +109,7 @@ pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<V
                 data: (fixed_diagnostics, _),
                 error: fixed_error,
             } = check_path(
-                &path,
+                path,
                 None,
                 tokens,
                 &locator,
@@ -110,12 +123,12 @@ pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<V
             if let Some(fixed_error) = fixed_error {
                 if !source_has_errors {
                     // Previous fix introduced a syntax error, abort
-                    let fixes = print_diagnostics(diagnostics, &path, &contents);
+                    let fixes = print_diagnostics(diagnostics, path, &contents);
 
                     let mut syntax_diagnostics = Vec::new();
                     syntax_error(&mut syntax_diagnostics, &fixed_error, &locator);
                     let syntax_errors =
-                        print_diagnostics(syntax_diagnostics, &path, &fixed_contents);
+                        print_diagnostics(syntax_diagnostics, path, &fixed_contents);
 
                     panic!(
                         r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
@@ -139,7 +152,7 @@ Source with applied fixes:
     )
     .finish();
 
-    Ok(diagnostics
+    diagnostics
         .into_iter()
         .map(|diagnostic| {
             let rule = diagnostic.kind.rule();
@@ -166,7 +179,7 @@ Source with applied fixes:
             Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
         })
         .sorted()
-        .collect())
+        .collect()
 }
 
 fn print_diagnostics(diagnostics: Vec<Diagnostic>, file_path: &Path, source: &str) -> String {

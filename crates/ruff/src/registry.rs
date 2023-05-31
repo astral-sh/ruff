@@ -117,6 +117,7 @@ ruff_macros::register_rules!(
     // pylint
     rules::pylint::rules::AssertOnStringLiteral,
     rules::pylint::rules::UselessReturn,
+    rules::pylint::rules::YieldFromInAsyncFunction,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,
@@ -266,7 +267,8 @@ ruff_macros::register_rules!(
     rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
     rules::flake8_annotations::rules::AnyType,
     // flake8-future-annotations
-    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImport,
+    rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation,
+    rules::flake8_future_annotations::rules::FutureRequiredTypeAnnotation,
     // flake8-2020
     rules::flake8_2020::rules::SysVersionSlice3,
     rules::flake8_2020::rules::SysVersion2,
@@ -508,17 +510,21 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::FStringInException,
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
+    rules::flake8_pyi::rules::AnyEqNeAnnotation,
     rules::flake8_pyi::rules::ArgumentDefaultInStub,
     rules::flake8_pyi::rules::AssignmentDefaultInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::IterMethodReturnIterable,
     rules::flake8_pyi::rules::DuplicateUnionMember,
     rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
+    rules::flake8_pyi::rules::CollectionsNamedTuple,
     rules::flake8_pyi::rules::NonEmptyStubBody,
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::PassStatementStubBody,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
+    rules::flake8_pyi::rules::StubBodyMultipleStatements,
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
     rules::flake8_pyi::rules::TypeCommentInStub,
     rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
@@ -646,6 +652,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::MutableDataclassDefault,
     rules::ruff::rules::FunctionCallInDataclassDefaultArgument,
     rules::ruff::rules::ExplicitFStringTypeConversion,
+    rules::ruff::rules::InvalidPyprojectToml,
     // flake8-django
     rules::flake8_django::rules::DjangoNullableModelStringField,
     rules::flake8_django::rules::DjangoLocalsInRenderFunction,
@@ -664,6 +671,8 @@ ruff_macros::register_rules!(
     rules::flake8_todos::rules::MissingTodoDescription,
     rules::flake8_todos::rules::InvalidTodoCapitalization,
     rules::flake8_todos::rules::MissingSpaceAfterTodoColon,
+    // airflow
+    rules::airflow::rules::AirflowVariableNameTaskIdMismatch,
 );
 
 pub trait AsRule {
@@ -834,6 +843,9 @@ pub enum Linter {
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,
+    /// [Airflow](https://pypi.org/project/apache-airflow/)
+    #[prefix = "AIR"]
+    Airflow,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

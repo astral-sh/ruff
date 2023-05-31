@@ -1,6 +1,7 @@
 import collections
 import datetime as dt
 from decimal import Decimal
+from fractions import Fraction
 import logging
 import operator
 from pathlib import Path
@@ -158,12 +159,37 @@ def float_infinity_literal(value=float("1e999")):
     pass
 
 
-# But don't allow standard floats
-def float_int_is_wrong(value=float(3)):
+# Allow standard floats
+def float_int_okay(value=float(3)):
     pass
 
 
-def float_str_not_inf_or_nan_is_wrong(value=float("3.14")):
+def float_str_not_inf_or_nan_okay(value=float("3.14")):
+    pass
+
+
+# Allow immutable str() value
+def str_okay(value=str("foo")):
+    pass
+
+
+# Allow immutable bool() value
+def bool_okay(value=bool("bar")):
+    pass
+
+
+# Allow immutable int() value
+def int_okay(value=int("12")):
+    pass
+
+
+# Allow immutable complex() value
+def complex_okay(value=complex(1,2)):
+    pass
+
+
+# Allow immutable Fraction() value
+def fraction_okay(value=Fraction(1,2)):
     pass
 
 

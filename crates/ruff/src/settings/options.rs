@@ -407,11 +407,15 @@ pub struct Options {
     /// (e.g., `src = ["src"]`), such that when resolving imports,
     /// `my_package.foo` is considered a first-party import.
     ///
+    /// When omitted, the `src` directory will typically default to the
+    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
+    /// `.ruff.toml` file (the "project root"), unless a configuration file
+    /// is explicitly provided (e.g., via the `--config` command-line flag).
+    ///
     /// This field supports globs. For example, if you have a series of Python
     /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
-    /// would expand to incorporate all of the
-    /// packages in that directory. User home directory and environment
-    /// variables will also be expanded.
+    /// would expand to incorporate all of the packages in that directory. User
+    /// home directory and environment variables will also be expanded.
     pub src: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,

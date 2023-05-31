@@ -63,7 +63,7 @@ def single_quote_docstring_over_line_limit2():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,13 @@
+@@ -1,9 +1,11 @@
  def docstring_almost_at_line_limit():
 -    """long docstring................................................................."""
 +    """long docstring.................................................................
@@ -72,40 +72,17 @@ def single_quote_docstring_over_line_limit2():
  
  def docstring_almost_at_line_limit_with_prefix():
 -    f"""long docstring................................................................"""
-+    (
-+        f"""long docstring................................................................
++    f"""long docstring................................................................
 +    """
-+    )
  
  
  def mulitline_docstring_almost_at_line_limit():
-@@ -14,10 +18,12 @@
+@@ -45,4 +47,4 @@
  
  
- def mulitline_docstring_almost_at_line_limit_with_prefix():
--    f"""long docstring................................................................
-+    (
-+        f"""long docstring................................................................
- 
-     ..................................................................................
-     """
-+    )
- 
- 
- def docstring_at_line_limit():
-@@ -35,9 +41,11 @@
- 
- 
- def multiline_docstring_at_line_limit_with_prefix():
--    f"""first line----------------------------------------------------------------------
-+    (
-+        f"""first line----------------------------------------------------------------------
- 
-     second line----------------------------------------------------------------------"""
-+    )
- 
- 
- def single_quote_docstring_over_line_limit():
+ def single_quote_docstring_over_line_limit2():
+-    "We do not want to put the closing quote on a new line as that is invalid (see GH-3141)."
++    'We do not want to put the closing quote on a new line as that is invalid (see GH-3141).'
 ```
 
 ## Ruff Output
@@ -117,10 +94,8 @@ def docstring_almost_at_line_limit():
 
 
 def docstring_almost_at_line_limit_with_prefix():
-    (
-        f"""long docstring................................................................
+    f"""long docstring................................................................
     """
-    )
 
 
 def mulitline_docstring_almost_at_line_limit():
@@ -131,12 +106,10 @@ def mulitline_docstring_almost_at_line_limit():
 
 
 def mulitline_docstring_almost_at_line_limit_with_prefix():
-    (
-        f"""long docstring................................................................
+    f"""long docstring................................................................
 
     ..................................................................................
     """
-    )
 
 
 def docstring_at_line_limit():
@@ -154,11 +127,9 @@ def multiline_docstring_at_line_limit():
 
 
 def multiline_docstring_at_line_limit_with_prefix():
-    (
-        f"""first line----------------------------------------------------------------------
+    f"""first line----------------------------------------------------------------------
 
     second line----------------------------------------------------------------------"""
-    )
 
 
 def single_quote_docstring_over_line_limit():
@@ -166,7 +137,7 @@ def single_quote_docstring_over_line_limit():
 
 
 def single_quote_docstring_over_line_limit2():
-    "We do not want to put the closing quote on a new line as that is invalid (see GH-3141)."
+    'We do not want to put the closing quote on a new line as that is invalid (see GH-3141).'
 ```
 
 ## Black Output

@@ -46,13 +46,7 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
                 indent = get_indent(line)
                 filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
                 lines.append(
-                    f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py");'
-                    f' "{prefix}{code}")]',
-                )
-                lines.sort(
-                    key=lambda line: line.split('Path::new("')[1]
-                    if linter != "pylint"
-                    else line.split(");")[1],
+                    f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py"))]',
                 )
                 fp.write("\n".join(lines))
                 fp.write("\n")

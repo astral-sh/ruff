@@ -24,17 +24,18 @@ An extremely fast Python linter, written in Rust.
   <i>Linting the CPython codebase from scratch.</i>
 </p>
 
-- ⚡️  10-100x faster than existing linters
-- 🐍  Installable via `pip`
-- 🛠️  `pyproject.toml` support
-- 🤝  Python 3.11 compatibility
-- 📦  Built-in caching, to avoid re-analyzing unchanged files
-- 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏  Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
-- ⚖️  [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-- 🔌  Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-- ⌨️  First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
-- 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
+- ⚡️ 10-100x faster than existing linters
+- 🐍 Installable via `pip`
+- 🛠️ `pyproject.toml` support
+- 🤝 Python 3.11 compatibility
+- 📦 Built-in caching, to avoid re-analyzing unchanged files
+- 🔧 Autofix support, for automatic error correction (e.g., automatically remove unused imports)
+- 📏 Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
+- ⚖️ [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the
+  built-in Flake8 rule set
+- 🔌 Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
+- ⌨️ First-party editor integrations for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
+- 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
@@ -84,7 +85,8 @@ of [Conda](https://docs.conda.io/en/latest/):
 [**Timothy Crosley**](https://twitter.com/timothycrosley/status/1606420868514877440),
 creator of [isort](https://github.com/PyCQA/isort):
 
-> Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe it was working till I intentionally introduced some errors.
+> Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe
+> it was working till I intentionally introduced some errors.
 
 [**Tim Abbott**](https://github.com/charliermarsh/ruff/issues/465#issuecomment-1317400028), lead
 developer of [Zulip](https://github.com/zulip/zulip):
@@ -242,6 +244,8 @@ stylistic rules made obsolete by the use of an autoformatter, like
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
 catches a wide variety of common errors (like unused imports) with zero configuration.
 
+<!-- End section: Rules -->
+
 Beyond the defaults, Ruff re-implements some of the most popular Flake8 plugins and related code
 quality tools, including:
 
@@ -291,11 +295,10 @@ quality tools, including:
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks)
+- [pylint-airflow](https://pypi.org/project/pylint-airflow/)
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
-
-<!-- End section: Rules -->
 
 For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
 
@@ -352,7 +355,9 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
-- Hugging Face ([Transformers](https://github.com/huggingface/transformers), [Datasets](https://github.com/huggingface/datasets), [Diffusers](https://github.com/huggingface/diffusers))
+- Hugging Face ([Transformers](https://github.com/huggingface/transformers),
+  [Datasets](https://github.com/huggingface/datasets),
+  [Diffusers](https://github.com/huggingface/diffusers))
 - [Hatch](https://github.com/pypa/hatch)
 - [Home Assistant](https://github.com/home-assistant/core)
 - [Ibis](https://github.com/ibis-project/ibis)
@@ -364,7 +369,9 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
-- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel), [ONNX Runtime](https://github.com/microsoft/onnxruntime), [LightGBM](https://github.com/microsoft/LightGBM))
+- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
+  [ONNX Runtime](https://github.com/microsoft/onnxruntime),
+  [LightGBM](https://github.com/microsoft/LightGBM))
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [ONNX](https://github.com/onnx/onnx)

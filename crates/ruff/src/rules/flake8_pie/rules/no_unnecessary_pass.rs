@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 
 use ruff_python_ast::helpers::trailing_comment_start_offset;
 
-use crate::autofix::actions::delete_stmt;
+use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 

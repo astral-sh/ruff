@@ -15,7 +15,6 @@ use crate::registry::AsRule;
 #[violation]
 pub struct ConvertTypedDictFunctionalToClass {
     name: String,
-    fixable: bool,
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {
@@ -23,12 +22,12 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name, .. } = self;
+        let ConvertTypedDictFunctionalToClass { name } = self;
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let ConvertTypedDictFunctionalToClass { name, .. } = self;
+        let ConvertTypedDictFunctionalToClass { name } = self;
         Some(format!("Convert `{name}` to class syntax"))
     }
 }
@@ -252,24 +251,25 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             return;
         }
     };
-    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-    let fixable = checker.locator.is_at_start_of_line(stmt.start());
+
     let mut diagnostic = Diagnostic::new(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
-            fixable,
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(convert_to_class(
-            stmt,
-            class_name,
-            body,
-            total_keyword,
-            base_class,
-            checker.generator(),
-        ));
+    if checker.patch(diagnostic.kind.rule()) {
+        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+        if checker.locator.is_at_start_of_line(stmt.start()) {
+            diagnostic.set_fix(convert_to_class(
+                stmt,
+                class_name,
+                body,
+                total_keyword,
+                base_class,
+                checker.generator(),
+            ));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
