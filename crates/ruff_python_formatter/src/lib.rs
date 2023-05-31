@@ -4,7 +4,7 @@ use rustpython_parser::lexer::lex;
 use rustpython_parser::{parse_tokens, Mode};
 
 use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::text;
+use ruff_formatter::prelude::source_position;
 use ruff_formatter::{
     format, write, Buffer, FormatResult, Formatted, IndentStyle, Printed, SimpleFormatOptions,
     SourceCode,
@@ -36,7 +36,7 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-		write!(f, [source_position(node.start())])?;
+        write!(f, [source_position(node.start())])?;
         self.fmt_leading_comments(node, f)?;
         self.fmt_node(node, f)?;
         self.fmt_dangling_comments(node, f)?;

@@ -69,10 +69,8 @@ def to_camel_case(node: str) -> str:
 for node in nodes:
     nodes_grouped[group_for_node(node)].append(node)
 
-src.joinpath("mod.rs").write_text(
-    rustfmt("\n".join(f"pub(crate) mod {group};" for group in sorted(groups.values())))
-)
 for group, group_nodes in nodes_grouped.items():
+    # These conflict with the manually content of the mod.rs files
     # src.joinpath(groups[group]).mkdir(exist_ok=True)
     # src.joinpath(groups[group]).joinpath("mod.rs").write_text(
     #    rustfmt(
@@ -82,27 +80,15 @@ for group, group_nodes in nodes_grouped.items():
     for node in group_nodes:
         code = f"""
     use crate::{{FormatNodeRule, PyFormatter}};
-    use ruff_formatter::format_element::tag::VerbatimKind;
-    use ruff_formatter::prelude::{{source_position, source_text_slice, ContainsNewlines, Tag}};
-    use ruff_formatter::{{write, Buffer, FormatElement, FormatResult}};
+    use ruff_formatter::FormatResult;
     use rustpython_parser::ast::{node};
 
     #[derive(Default)]
     pub(crate) struct Format{node};
 
     impl FormatNodeRule<{node}> for Format{node} {{
-        fn fmt_fields(&self, item: &{node}, f: &mut PyFormatter) -> FormatResult<()> {{
-            write!(f, [source_position(item.range.start())])?;
-
-            f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-                VerbatimKind::Verbatim {{
-                    length: item.range.len(),
-                }},
-            )))?;
-            write!(f, [source_text_slice(item.range, ContainsNewlines::Detect)])?;
-            f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-
-            write!(f, [source_position(item.range.end())])
+        fn fmt_fields(&self, _item: &{node}, _f: &mut PyFormatter) -> FormatResult<()> {{
+            Ok(())
         }}
     }}
     """.strip()
