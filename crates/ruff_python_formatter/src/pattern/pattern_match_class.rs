@@ -3,7 +3,7 @@ use ruff_formatter::FormatResult;
 use rustpython_parser::ast::PatternMatchClass;
 
 #[derive(Default)]
-pub(crate) struct FormatPatternMatchClass;
+pub struct FormatPatternMatchClass;
 
 impl FormatNodeRule<PatternMatchClass> for FormatPatternMatchClass {
     fn fmt_fields(&self, _item: &PatternMatchClass, _f: &mut PyFormatter) -> FormatResult<()> {

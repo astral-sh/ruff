@@ -3,7 +3,7 @@ use ruff_formatter::FormatResult;
 use rustpython_parser::ast::ExprLambda;
 
 #[derive(Default)]
-pub(crate) struct FormatExprLambda;
+pub struct FormatExprLambda;
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, _item: &ExprLambda, _f: &mut PyFormatter) -> FormatResult<()> {

@@ -3,7 +3,7 @@ use ruff_formatter::FormatResult;
 use rustpython_parser::ast::ExcepthandlerExceptHandler;
 
 #[derive(Default)]
-pub(crate) struct FormatExcepthandlerExceptHandler;
+pub struct FormatExcepthandlerExceptHandler;
 
 impl FormatNodeRule<ExcepthandlerExceptHandler> for FormatExcepthandlerExceptHandler {
     fn fmt_fields(

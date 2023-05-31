@@ -20,6 +20,7 @@ pub mod cli;
 mod comments;
 pub(crate) mod context;
 pub(crate) mod expression;
+mod generated;
 pub(crate) mod module;
 pub(crate) mod other;
 pub(crate) mod pattern;

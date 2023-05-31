@@ -1,8 +1,8 @@
 """See Docs.md"""
-import re
 
 # %%
 
+import re
 from collections import defaultdict
 from pathlib import Path
 from subprocess import check_output
@@ -83,7 +83,7 @@ for group, group_nodes in nodes_grouped.items():
             use rustpython_parser::ast::{node};
 
             #[derive(Default)]
-            pub(crate) struct Format{node};
+            pub struct Format{node};
 
             impl FormatNodeRule<{node}> for Format{node} {{
                 fn fmt_fields(&self, _item: &{node}, _f: &mut PyFormatter) -> FormatResult<()> {{

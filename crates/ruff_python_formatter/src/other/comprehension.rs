@@ -3,7 +3,7 @@ use ruff_formatter::FormatResult;
 use rustpython_parser::ast::Comprehension;
 
 #[derive(Default)]
-pub(crate) struct FormatComprehension;
+pub struct FormatComprehension;
 
 impl FormatNodeRule<Comprehension> for FormatComprehension {
     fn fmt_fields(&self, _item: &Comprehension, _f: &mut PyFormatter) -> FormatResult<()> {
