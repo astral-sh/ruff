@@ -13,6 +13,7 @@ use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::{cast, whitespace};
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_semantic::definition::{Definition, Member, MemberKind};
+use ruff_textwrap::dedent;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
@@ -780,7 +781,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
         .map(|l| l.as_str())
         .filter(|line| line.starts_with(leading_space) || line.is_empty())
         .join("\n");
-    let args_content = textwrap::dedent(&relevant_lines);
+    let args_content = dedent(&relevant_lines);
 
     // Reformat each section.
     let mut args_sections: Vec<String> = vec![];
