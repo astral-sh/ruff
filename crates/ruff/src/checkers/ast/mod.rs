@@ -436,6 +436,9 @@ where
                     if self.enabled(Rule::AnyEqNeAnnotation) {
                         flake8_pyi::rules::any_eq_ne_annotation(self, name, args);
                     }
+                    if self.enabled(Rule::FixedReturnType) {
+                        flake8_pyi::rules::fixed_return_type(self, stmt);
+                    }
                 }
 
                 if self.enabled(Rule::DunderFunctionName) {
