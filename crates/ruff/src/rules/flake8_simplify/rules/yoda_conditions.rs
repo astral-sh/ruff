@@ -1,7 +1,8 @@
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState, CompOp};
+use libcst_native::CompOp;
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -117,13 +118,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
         _ => panic!("Expected comparison operator"),
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    expression.codegen(&mut state);
-    Ok(state.to_string())
+    Ok(expression.codegen_stylist(stylist))
 }
 
 /// SIM300

@@ -1,7 +1,8 @@
 use anyhow::{bail, Result};
-use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
+use libcst_native::{CompoundStatement, Statement, Suite, With};
 use rustpython_parser::ast::Ranged;
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace;
@@ -70,15 +71,8 @@ pub(crate) fn fix_multiple_with_statements(
     }
     outer_with.body = inner_with.body.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
     // Reconstruct and reformat the code.
-    let module_text = state.to_string();
+    let module_text = tree.codegen_stylist(stylist);
     let contents = if outer_indent.is_empty() {
         module_text
     } else {

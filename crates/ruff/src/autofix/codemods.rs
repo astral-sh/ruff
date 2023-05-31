@@ -11,6 +11,23 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_statement;
 
+/// Glue code to make libcst codegen work with ruff's Stylist
+pub(crate) trait CodegenStylist<'a>: Codegen<'a> {
+    fn codegen_stylist(&self, stylist: &'a Stylist<'a>) -> String;
+}
+
+impl<'a, T: Codegen<'a>> CodegenStylist<'a> for T {
+    fn codegen_stylist(&self, stylist: &'a Stylist<'a>) -> String {
+        let mut state = CodegenState {
+            default_newline: stylist.line_ending().as_str(),
+            default_indent: stylist.indentation(),
+            ..Default::default()
+        };
+        self.codegen(&mut state);
+        state.to_string()
+    }
+}
+
 /// Given an import statement, remove any imports that are specified in the `imports` iterator.
 ///
 /// Returns `Ok(None)` if the statement is empty after removing the imports.
@@ -110,18 +127,7 @@ pub(crate) fn remove_imports<'a>(
         }
     }
 
-    if aliases.is_empty() {
-        return Ok(None);
-    }
-
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Some(state.to_string()))
+    Ok(Some(tree.codegen_stylist(&stylist)))
 }
 
 /// Given an import statement, remove any imports that are not specified in the `imports` slice.
@@ -200,11 +206,5 @@ pub(crate) fn retain_imports(
         }
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-    Ok(state.to_string())
+    Ok(tree.codegen_stylist(stylist))
 }

@@ -4,12 +4,11 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{self, Excepthandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::autofix::codemods;
 use ruff_diagnostics::Edit;
 use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-
-use crate::autofix::codemods;
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
