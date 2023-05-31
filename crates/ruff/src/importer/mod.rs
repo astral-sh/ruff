@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
+use libcst_native::{Codegen, ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
@@ -324,11 +324,7 @@ impl<'a> Importer<'a> {
             asname: None,
             comma: aliases.last().and_then(|alias| alias.comma.clone()),
         });
-        let mut state = CodegenState {
-            default_newline: &self.stylist.line_ending(),
-            default_indent: self.stylist.indentation(),
-            ..CodegenState::default()
-        };
+        let mut state = self.stylist.codegen_state();
         statement.codegen(&mut state);
         Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }

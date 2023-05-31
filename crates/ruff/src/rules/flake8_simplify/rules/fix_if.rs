@@ -2,9 +2,8 @@ use std::borrow::Cow;
 
 use anyhow::{bail, Result};
 use libcst_native::{
-    BooleanOp, BooleanOperation, Codegen, CodegenState, CompoundStatement, Expression, If,
-    LeftParen, ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace,
-    Statement, Suite,
+    BooleanOp, BooleanOperation, Codegen, CompoundStatement, Expression, If, LeftParen,
+    ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace, Statement, Suite,
 };
 use rustpython_parser::ast::Ranged;
 
@@ -111,11 +110,7 @@ pub(crate) fn fix_nested_if_statements(
     }));
     outer_if.body = inner_if.body.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..Default::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.

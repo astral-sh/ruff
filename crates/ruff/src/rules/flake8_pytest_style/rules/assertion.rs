@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
-    Assert, BooleanOp, Codegen, CodegenState, CompoundStatement, Expression,
-    ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
-    SmallStatement, Statement, TrailingWhitespace, UnaryOp, UnaryOperation,
+    Assert, BooleanOp, Codegen, CompoundStatement, Expression, ParenthesizableWhitespace,
+    ParenthesizedNode, SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement,
+    TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
 
@@ -410,11 +410,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }));
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.

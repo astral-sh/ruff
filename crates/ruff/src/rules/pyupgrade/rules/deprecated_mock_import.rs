@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::{
-    AsName, AssignTargetExpression, Attribute, Codegen, CodegenState, Dot, Expression, Import,
-    ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
+    AsName, AssignTargetExpression, Attribute, Codegen, Dot, Expression, Import, ImportAlias,
+    ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
@@ -137,11 +137,7 @@ fn format_import(
     } else {
         import.names = clean_aliases;
 
-        let mut state = CodegenState {
-            default_newline: &stylist.line_ending(),
-            default_indent: stylist.indentation(),
-            ..CodegenState::default()
-        };
+        let mut state = stylist.codegen_state();
         tree.codegen(&mut state);
 
         let mut content = state.to_string();
@@ -187,11 +183,7 @@ fn format_import_from(
             lpar: vec![],
             rpar: vec![],
         })));
-        let mut state = CodegenState {
-            default_newline: &stylist.line_ending(),
-            default_indent: stylist.indentation(),
-            ..CodegenState::default()
-        };
+        let mut state = stylist.codegen_state();
         tree.codegen(&mut state);
         Ok(state.to_string())
     } else if let ImportFrom {
@@ -224,11 +216,7 @@ fn format_import_from(
                 rpar: vec![],
             })));
 
-            let mut state = CodegenState {
-                default_newline: &stylist.line_ending(),
-                default_indent: stylist.indentation(),
-                ..CodegenState::default()
-            };
+            let mut state = stylist.codegen_state();
             tree.codegen(&mut state);
 
             let mut content = state.to_string();

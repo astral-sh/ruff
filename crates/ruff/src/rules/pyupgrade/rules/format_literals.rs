@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use libcst_native::{Arg, Codegen, CodegenState};
+use libcst_native::{Arg, Codegen};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{Expr, Ranged};
@@ -99,21 +99,13 @@ fn generate_call(
     // Fix the string itself.
     let item = match_attribute(&mut call.func)?;
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     item.codegen(&mut state);
     let cleaned = remove_specifiers(&state.to_string());
 
     call.func = Box::new(match_expression(&cleaned)?);
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     expression.codegen(&mut state);
     if module_text == state.to_string() {
         // Ex) `'{' '0}'.format(1)`

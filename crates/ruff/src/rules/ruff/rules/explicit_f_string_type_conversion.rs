@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use libcst_native::{Codegen, CodegenState};
+use libcst_native::Codegen;
 use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
@@ -77,11 +77,7 @@ fn fix_explicit_f_string_type_conversion(
     }
     formatted_string_expression.expression = call.args[0].value.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     expression.codegen(&mut state);
 
     Ok(Fix::automatic(Edit::range_replacement(

@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
+use libcst_native::{Codegen, CompoundStatement, Statement, Suite, With};
 use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::Edit;
@@ -70,11 +70,7 @@ pub(crate) fn fix_multiple_with_statements(
     }
     outer_with.body = inner_with.body.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.

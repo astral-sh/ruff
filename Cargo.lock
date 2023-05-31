@@ -1963,6 +1963,7 @@ dependencies = [
  "insta",
  "is-macro",
  "itertools",
+ "libcst",
  "log",
  "memchr",
  "num-bigint",

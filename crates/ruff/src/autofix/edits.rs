@@ -1,6 +1,7 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
 use itertools::Itertools;
+use libcst_native::{Codegen, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{self, Excepthandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
@@ -10,7 +11,8 @@ use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
-use crate::autofix::codemods;
+use crate::cst::helpers::compose_module_path;
+use crate::cst::matchers::match_statement;
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
@@ -71,9 +73,106 @@ pub(crate) fn remove_unused_imports<'a>(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    match codemods::remove_imports(unused_imports, stmt, locator, stylist)? {
-        None => delete_stmt(stmt, parent, deleted, locator, indexer, stylist),
-        Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
+    let module_text = locator.slice(stmt.range());
+    let mut tree = match_statement(module_text)?;
+
+    let Statement::Simple(body) = &mut tree else {
+        bail!("Expected Statement::Simple");
+    };
+
+    let (aliases, import_module) = match body.body.first_mut() {
+        Some(SmallStatement::Import(import_body)) => (&mut import_body.names, None),
+        Some(SmallStatement::ImportFrom(import_body)) => {
+            if let ImportNames::Aliases(names) = &mut import_body.names {
+                (
+                    names,
+                    Some((&import_body.relative, import_body.module.as_ref())),
+                )
+            } else if let ImportNames::Star(..) = &import_body.names {
+                // Special-case: if the import is a `from ... import *`, then we delete the
+                // entire statement.
+                let mut found_star = false;
+                for unused_import in unused_imports {
+                    let full_name = match import_body.module.as_ref() {
+                        Some(module_name) => format!("{}.*", compose_module_path(module_name)),
+                        None => "*".to_string(),
+                    };
+                    if unused_import == full_name {
+                        found_star = true;
+                    } else {
+                        bail!(
+                            "Expected \"*\" for unused import (got: \"{}\")",
+                            unused_import
+                        );
+                    }
+                }
+                if !found_star {
+                    bail!("Expected \'*\' for unused import");
+                }
+                return delete_stmt(stmt, parent, deleted, locator, indexer, stylist);
+            } else {
+                bail!("Expected: ImportNames::Aliases | ImportNames::Star");
+            }
+        }
+        _ => bail!("Expected: SmallStatement::ImportFrom | SmallStatement::Import"),
+    };
+
+    // Preserve the trailing comma (or not) from the last entry.
+    let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
+
+    for unused_import in unused_imports {
+        let alias_index = aliases.iter().position(|alias| {
+            let full_name = match import_module {
+                Some((relative, module)) => {
+                    let module = module.map(compose_module_path);
+                    let member = compose_module_path(&alias.name);
+                    let mut full_name = String::with_capacity(
+                        relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
+                    );
+                    for _ in 0..relative.len() {
+                        full_name.push('.');
+                    }
+                    if let Some(module) = module {
+                        full_name.push_str(&module);
+                        full_name.push('.');
+                    }
+                    full_name.push_str(&member);
+                    full_name
+                }
+                None => compose_module_path(&alias.name),
+            };
+            full_name == unused_import
+        });
+
+        if let Some(index) = alias_index {
+            aliases.remove(index);
+        }
+    }
+
+    // But avoid destroying any trailing comments.
+    if let Some(alias) = aliases.last_mut() {
+        let has_comment = if let Some(comma) = &alias.comma {
+            match &comma.whitespace_after {
+                ParenthesizableWhitespace::SimpleWhitespace(_) => false,
+                ParenthesizableWhitespace::ParenthesizedWhitespace(whitespace) => {
+                    whitespace.first_line.comment.is_some()
+                }
+            }
+        } else {
+            false
+        };
+        if !has_comment {
+            alias.comma = trailing_comma;
+        }
+    }
+
+    if aliases.is_empty() {
+        delete_stmt(stmt, parent, deleted, locator, indexer, stylist)
+    } else {
+        let mut state = stylist.codegen_state();
+        tree.codegen(&mut state);
+
+        Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
 }
 

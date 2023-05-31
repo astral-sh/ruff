@@ -1,5 +1,5 @@
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState, ParenthesizableWhitespace};
+use libcst_native::{Codegen, ParenthesizableWhitespace};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
@@ -29,11 +29,7 @@ pub(crate) fn adjust_indentation(
     let indented_block = match_indented_block(&mut embedding.body)?;
     indented_block.indent = Some(indentation);
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..Default::default()
-    };
+    let mut state = stylist.codegen_state();
     indented_block.codegen(&mut state);
 
     let module_text = state.to_string();
@@ -61,11 +57,7 @@ pub(crate) fn remove_super_arguments(
     body.whitespace_before_args = ParenthesizableWhitespace::default();
     body.whitespace_after_func = ParenthesizableWhitespace::default();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Some(Edit::range_replacement(state.to_string(), range))

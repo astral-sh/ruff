@@ -1,5 +1,5 @@
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState};
+use libcst_native::Codegen;
 use log::error;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
@@ -42,11 +42,7 @@ fn get_value_content_for_key_in_dict(
     let call = match_call_mut(&mut expression)?;
     let attribute = match_attribute(&mut call.func)?;
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     attribute.value.codegen(&mut state);
 
     Ok(state.to_string())

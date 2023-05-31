@@ -1,8 +1,8 @@
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
-    Arg, AssignEqual, AssignTargetExpression, Call, Codegen, CodegenState, Comment, CompFor, Dict,
-    DictComp, DictElement, Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
+    Arg, AssignEqual, AssignTargetExpression, Call, Codegen, Comment, CompFor, Dict, DictComp,
+    DictElement, Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
     LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedWhitespace,
     RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
@@ -44,11 +44,7 @@ pub(crate) fn fix_unnecessary_generator_list(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -82,11 +78,7 @@ pub(crate) fn fix_unnecessary_generator_set(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     let mut content = state.to_string();
@@ -136,11 +128,7 @@ pub(crate) fn fix_unnecessary_generator_dict(
         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     let mut content = state.to_string();
@@ -182,11 +170,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -229,11 +213,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -318,11 +298,7 @@ pub(crate) fn fix_unnecessary_literal_set(
         }));
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -386,11 +362,7 @@ pub(crate) fn fix_unnecessary_literal_dict(
         rpar: vec![],
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -495,11 +467,7 @@ pub(crate) fn fix_unnecessary_collection_call(
         }
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -549,11 +517,7 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
         }],
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -605,11 +569,7 @@ pub(crate) fn fix_unnecessary_literal_within_list_call(
         rpar: vec![],
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -629,11 +589,7 @@ pub(crate) fn fix_unnecessary_list_call(
 
     tree = arg.value.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -747,11 +703,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
         }
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -781,11 +733,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
         None => bail!("Expected at least one argument in outer function call"),
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -872,11 +820,7 @@ pub(crate) fn fix_unnecessary_comprehension(
         }
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -1018,11 +962,7 @@ pub(crate) fn fix_unnecessary_map(
             }
         }
 
-        let mut state = CodegenState {
-            default_newline: &stylist.line_ending(),
-            default_indent: stylist.indentation(),
-            ..CodegenState::default()
-        };
+        let mut state = stylist.codegen_state();
         tree.codegen(&mut state);
 
         let mut content = state.to_string();
@@ -1054,11 +994,7 @@ pub(crate) fn fix_unnecessary_literal_within_dict_call(
 
     tree = arg.value.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -1231,11 +1167,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
         _ => whitespace_after_arg,
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Fix::suggested(Edit::range_replacement(

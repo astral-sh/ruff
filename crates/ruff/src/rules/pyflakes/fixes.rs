@@ -1,5 +1,5 @@
 use anyhow::{bail, Ok, Result};
-use libcst_native::{Codegen, CodegenState, DictElement, Expression};
+use libcst_native::{Codegen, DictElement, Expression};
 use ruff_text_size::TextRange;
 use rustpython_format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
@@ -33,11 +33,7 @@ pub(crate) fn remove_unused_format_arguments_from_dict(
         } if raw_contents(name.value).map_or(false, |name| unused_arguments.contains(&name)))
     });
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), stmt.range()))
@@ -57,11 +53,7 @@ pub(crate) fn remove_unused_keyword_arguments_from_format_call(
     call.args
         .retain(|e| !matches!(&e.keyword, Some(kw) if unused_arguments.contains(&kw.value)));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), location))
@@ -161,11 +153,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
         simple_string.value = new_format_string.as_str();
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
+    let mut state = stylist.codegen_state();
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), location))
