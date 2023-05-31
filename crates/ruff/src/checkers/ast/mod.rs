@@ -1064,11 +1064,6 @@ where
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
-                if self.is_stub {
-                    if self.enabled(Rule::IncorrectNamedTuple) {
-                        flake8_pyi::rules::incorrect_named_tuple(self, stmt);
-                    }
-                }
                 if self.enabled(Rule::BannedApi) {
                     if let Some(module) =
                         helpers::resolve_imported_module_path(level, module, self.module_path)
@@ -2428,6 +2423,11 @@ where
                 }
                 if self.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
+                }
+                if self.is_stub {
+                    if self.enabled(Rule::CollectionsNamedTuple) {
+                        flake8_pyi::rules::collections_named_tuple(self, expr);
+                    }
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }

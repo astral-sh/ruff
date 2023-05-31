@@ -2,12 +2,12 @@ pub(crate) use any_eq_ne_annotation::{any_eq_ne_annotation, AnyEqNeAnnotation};
 pub(crate) use bad_version_info_comparison::{
     bad_version_info_comparison, BadVersionInfoComparison,
 };
+pub(crate) use collections_named_tuple::{collections_named_tuple, CollectionsNamedTuple};
 pub(crate) use docstring_in_stubs::{docstring_in_stubs, DocstringInStub};
 pub(crate) use duplicate_union_member::{duplicate_union_member, DuplicateUnionMember};
 pub(crate) use ellipsis_in_non_empty_class_body::{
     ellipsis_in_non_empty_class_body, EllipsisInNonEmptyClassBody,
 };
-pub(crate) use incorrect_named_tuple::{incorrect_named_tuple, IncorrectNamedTuple};
 pub(crate) use iter_method_return_iterable::{
     iter_method_return_iterable, IterMethodReturnIterable,
 };
@@ -34,10 +34,10 @@ pub(crate) use unrecognized_platform::{
 
 mod any_eq_ne_annotation;
 mod bad_version_info_comparison;
+mod collections_named_tuple;
 mod docstring_in_stubs;
 mod duplicate_union_member;
 mod ellipsis_in_non_empty_class_body;
-mod incorrect_named_tuple;
 mod iter_method_return_iterable;
 mod non_empty_stub_body;
 mod pass_in_class_body;
