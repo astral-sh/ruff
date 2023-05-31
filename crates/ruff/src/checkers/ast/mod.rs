@@ -436,9 +436,6 @@ where
                     if self.enabled(Rule::AnyEqNeAnnotation) {
                         flake8_pyi::rules::any_eq_ne_annotation(self, name, args);
                     }
-                    if self.enabled(Rule::FixedReturnType) {
-                        flake8_pyi::rules::fixed_return_type(self, stmt);
-                    }
                 }
 
                 if self.enabled(Rule::DunderFunctionName) {
@@ -747,6 +744,9 @@ where
                     }
                     if self.enabled(Rule::EllipsisInNonEmptyClassBody) {
                         flake8_pyi::rules::ellipsis_in_non_empty_class_body(self, stmt, body);
+                    }
+                    if self.enabled(Rule::FixedReturnType) {
+                        flake8_pyi::rules::fixed_return_type(self, bases, body, decorator_list);
                     }
                 }
 

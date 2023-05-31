@@ -1,0 +1,65 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+assertion_line: 67
+---
+PYI034.pyi:8:50: PYI034 __new__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+   |
+ 8 | class Bad:
+ 9 |   def __new__(cls, *args: Any, **kwargs: Any) -> Bad: ...  # Y034
+   |                                                  ^^^ PYI034
+10 |   def __enter__(self) -> Bad: ...  # Y034
+11 |   async def __aenter__(self) -> Bad: ...  # Y034
+   |
+
+PYI034.pyi:9:26: PYI034 __enter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+   |
+ 9 | class Bad:
+10 |   def __new__(cls, *args: Any, **kwargs: Any) -> Bad: ...  # Y034
+11 |   def __enter__(self) -> Bad: ...  # Y034
+   |                          ^^^ PYI034
+12 |   async def __aenter__(self) -> Bad: ...  # Y034
+13 |   def __iadd__(self, other: Bad) -> Bad: ...  # Y034
+   |
+
+PYI034.pyi:10:33: PYI034 __aenter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+   |
+10 |   def __new__(cls, *args: Any, **kwargs: Any) -> Bad: ...  # Y034
+11 |   def __enter__(self) -> Bad: ...  # Y034
+12 |   async def __aenter__(self) -> Bad: ...  # Y034
+   |                                 ^^^ PYI034
+13 |   def __iadd__(self, other: Bad) -> Bad: ...  # Y034
+   |
+
+PYI034.pyi:11:37: PYI034 __iadd__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+   |
+11 |   def __enter__(self) -> Bad: ...  # Y034
+12 |   async def __aenter__(self) -> Bad: ...  # Y034
+13 |   def __iadd__(self, other: Bad) -> Bad: ...  # Y034
+   |                                     ^^^ PYI034
+14 | 
+15 |   class Good:
+   |
+
+PYI034.pyi:40:25: PYI034 __iter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+   |
+40 | class BadIterator1(Iterator[int]):
+41 |   def __iter__(self) -> Iterator[int]: ...  # Y034
+   |                         ^^^^^^^^^^^^^ PYI034
+   |
+
+PYI034.pyi:45:27: PYI034 __iter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+   |
+45 | class BadIterator2(Iterator[int]):
+46 |     # Note: *Iterable*, not *Iterator*, returned!
+47 |     def __iter__(self) -> Iterable[int]: ...  # Y034
+   |                           ^^^^^^^^^^^^^ PYI034
+   |
+
+PYI034.pyi:49:28: PYI034 __aiter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+   |
+49 | class BadAsyncIterator(AsyncIterator[str]):
+50 |     def __aiter__(self) -> AsyncIterator[str]: ...  # Y034
+   |                            ^^^^^^^^^^^^^^^^^^ PYI034
+   |
+
+
