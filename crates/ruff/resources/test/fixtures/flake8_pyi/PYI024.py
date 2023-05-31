@@ -1,7 +1,9 @@
 import collections
 
-j: collections.namedtuple  # OK
+person: collections.namedtuple  # OK
 
 from collections import namedtuple
 
-j: namedtuple  # OK
+person: namedtuple  # OK
+
+person = namedtuple("Person", ["name", "age"])  # OK
