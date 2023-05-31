@@ -78,19 +78,19 @@ for group, group_nodes in nodes_grouped.items():
     # src.joinpath(groups[group]).joinpath("mod.rs").write_text(rustfmt(mod_section))
     for node in group_nodes:
         code = f"""
-            use crate::{{FormatNodeRule, PyFormatter}};
-            use ruff_formatter::FormatResult;
+            use crate::{{verbatim_text, FormatNodeRule, PyFormatter}};
+            use ruff_formatter::{{write, Buffer, FormatResult}};
             use rustpython_parser::ast::{node};
 
             #[derive(Default)]
             pub struct Format{node};
 
             impl FormatNodeRule<{node}> for Format{node} {{
-                fn fmt_fields(&self, _item: &{node}, _f: &mut PyFormatter) -> FormatResult<()> {{
-                    Ok(())
+                fn fmt_fields(&self, item: &{node}, f: &mut PyFormatter) -> FormatResult<()> {{
+                    write!(f, [verbatim_text(item.range)])
                 }}
             }}
-        """.strip()  # noqa: E501
+            """.strip()  # noqa: E501
         src.joinpath(groups[group]).joinpath(f"{to_camel_case(node)}.rs").write_text(
             rustfmt(code)
         )

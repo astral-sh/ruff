@@ -1,12 +1,12 @@
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::FormatResult;
+use crate::{verbatim_text, FormatNodeRule, PyFormatter};
+use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::StmtImport;
 
 #[derive(Default)]
 pub struct FormatStmtImport;
 
 impl FormatNodeRule<StmtImport> for FormatStmtImport {
-    fn fmt_fields(&self, _item: &StmtImport, _f: &mut PyFormatter) -> FormatResult<()> {
-        Ok(())
+    fn fmt_fields(&self, item: &StmtImport, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [verbatim_text(item.range)])
     }
 }

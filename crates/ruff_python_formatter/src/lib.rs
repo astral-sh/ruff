@@ -1,13 +1,15 @@
 use anyhow::{anyhow, Context, Result};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::Mod;
 use rustpython_parser::lexer::lex;
 use rustpython_parser::{parse_tokens, Mode};
 
+use ruff_formatter::format_element::tag::VerbatimKind;
 use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::source_position;
+use ruff_formatter::prelude::{source_position, source_text_slice, ContainsNewlines, Tag};
 use ruff_formatter::{
-    format, write, Buffer, FormatResult, Formatted, IndentStyle, Printed, SimpleFormatOptions,
-    SourceCode,
+    format, write, Buffer, Format, FormatContext, FormatElement, FormatResult, Formatted,
+    IndentStyle, Printed, SimpleFormatOptions, SourceCode,
 };
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
@@ -132,6 +134,25 @@ pub fn format_node<'a>(
         ),
         [FormatModule::new(root)]
     )
+}
+
+pub(crate) struct VerbatimText(TextRange);
+
+pub(crate) const fn verbatim_text(range: TextRange) -> VerbatimText {
+    VerbatimText(range)
+}
+
+impl<C: FormatContext> Format<C> for VerbatimText {
+    fn fmt(&self, f: &mut Formatter<C>) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            VerbatimKind::Verbatim {
+                length: self.0.len(),
+            },
+        )))?;
+        write!(f, [source_text_slice(self.0, ContainsNewlines::Detect)])?;
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

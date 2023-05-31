@@ -1,5 +1,5 @@
-use crate::{FormatNodeRule, PyFormatter};
-use ruff_formatter::FormatResult;
+use crate::{verbatim_text, FormatNodeRule, PyFormatter};
+use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExcepthandlerExceptHandler;
 
 #[derive(Default)]
@@ -8,9 +8,9 @@ pub struct FormatExcepthandlerExceptHandler;
 impl FormatNodeRule<ExcepthandlerExceptHandler> for FormatExcepthandlerExceptHandler {
     fn fmt_fields(
         &self,
-        _item: &ExcepthandlerExceptHandler,
-        _f: &mut PyFormatter,
+        item: &ExcepthandlerExceptHandler,
+        f: &mut PyFormatter,
     ) -> FormatResult<()> {
-        Ok(())
+        write!(f, [verbatim_text(item.range)])
     }
 }
