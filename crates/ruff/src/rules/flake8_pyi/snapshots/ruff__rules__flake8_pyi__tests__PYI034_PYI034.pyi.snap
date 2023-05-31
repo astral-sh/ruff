@@ -1,6 +1,5 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-assertion_line: 67
 ---
 PYI034.pyi:8:50: PYI034 __new__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
    |

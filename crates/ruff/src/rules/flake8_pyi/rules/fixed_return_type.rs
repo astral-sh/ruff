@@ -78,6 +78,13 @@ const SELF_RETURNING_METHODS: &[&str] = &[
     "__aenter__",
 ];
 
+const ITERATOR_BASES: &[&[&str]] = &[
+    &["typing", "Iterator"],
+    &["typing", "AsyncIterator"],
+    &["collections", "abc", "Iterator"],
+    &["collections", "abc", "AsyncIterator"],
+];
+
 const ASYNC_ITER_RETURN_TYPES: &[&[&str]] = &[
     &["typing", "AsyncIterable"],
     &["typing", "AsyncIterator"],
@@ -108,25 +115,22 @@ pub(crate) fn fixed_return_type(
         return;
     }
 
-    // TODO: Fix
-    // let base = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = bases.as_ref() {
-    //     // Ex) class Foo(Iterator[T]):
-    //     value
-    // } else {
-    //     // Ex) class Foo(Iterator):
-    //     bases
-    // };
-    //
-    // let is_iter_subclass: bool =
-    //     checker
-    //         .semantic_model()
-    //         .resolve_call_path(base)
-    //         .map_or(false, |call_path| {
-    //             matches!(
-    //                 call_path.as_slice(),
-    //                 ["typing", "Iterator"] | ["typing", "AsyncIterator"]
-    //             )
-    //         });
+    let mut is_iter_subclass: bool = false;
+    if bases.len() == 1 {
+        let base = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = &bases[0] {
+            // Ex) class Foo(Iterator[T]):
+            value
+        } else {
+            // Ex) class Foo(Iterator):
+            &bases[0]
+        };
+        is_iter_subclass = checker
+            .semantic_model()
+            .resolve_call_path(base)
+            .map_or(false, |call_path| {
+                ITERATOR_BASES.contains(&call_path.as_slice())
+            });
+    }
 
     for stmt in body {
         let (
@@ -180,11 +184,9 @@ pub(crate) fn fixed_return_type(
 
         // __iter__/__aiter__ methods that return Iterator/AsyncIterator even if class directly
         // inherits from these
-
-        // TODO: Fix
-        // if !is_iter_subclass {
-        //     continue;
-        // }
+        if !is_iter_subclass {
+            continue;
+        }
 
         let async_ = match method_name.as_str() {
             "__iter__" => false,
