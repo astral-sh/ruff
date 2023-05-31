@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Stmt};
+use rustpython_parser::ast::{Expr, ExprName, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -39,12 +39,32 @@ impl Violation for IterateOverSet {
 
 /// PLC0208
 pub(crate) fn iterate_over_set(checker: &mut Checker, stmt: &Stmt, iter: &Expr) {
-    if let Expr::Set(_) = iter {
-        checker.diagnostics.push(Diagnostic::new(
-            IterateOverSet,
-            helpers::identifier_range(stmt, checker.locator),
-        ));
+    match iter {
+        // Check if set literal; e.g., `{1, 2, 3}`
+        Expr::Set(_) => {
+            checker.diagnostics.push(Diagnostic::new(
+                IterateOverSet,
+                helpers::identifier_range(stmt, checker.locator),
+            ));
+        }
+        // Check if call to set constructor; e.g., `set(1, 2, 3)`
+        Expr::Call(call) => {
+            if let Expr::Name(ExprName { id, .. }) = &*call.func {
+                if id.as_str() == "set" {
+                    checker.diagnostics.push(Diagnostic::new(
+                        IterateOverSet,
+                        helpers::identifier_range(stmt, checker.locator),
+                    ));
+                }
+            }
+        }
+        // Check if set comprehension; e.g., `{n for n in range(1, 4)}`
+        Expr::SetComp(_) => {
+            checker.diagnostics.push(Diagnostic::new(
+                IterateOverSet,
+                helpers::identifier_range(stmt, checker.locator),
+            ));
+        }
+        _ => {}
     }
-    // TODO: check if iterating over a name that corresponds to a set (questionable).
-    // TODO: check if iterating over a set in a comprehension.
 }
