@@ -16,7 +16,6 @@ use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator}
 
 use crate::comments::Comments;
 use crate::context::PyFormatContext;
-use crate::module::FormatModule;
 
 pub mod cli;
 mod comments;
@@ -130,9 +129,9 @@ pub fn format_node<'a>(
                 line_width: 88.try_into().unwrap(),
             },
             locator.contents(),
-            comments
+            comments,
         ),
-        [FormatModule::new(root)]
+        [root.format()]
     )
 }
 
@@ -165,12 +164,32 @@ mod tests {
     use insta::assert_snapshot;
     use rustpython_parser::lexer::lex;
     use rustpython_parser::{parse_tokens, Mode};
+    use similar::TextDiff;
 
     use ruff_python_ast::source_code::CommentRangesBuilder;
     use ruff_testing_macros::fixture;
-    use similar::TextDiff;
 
     use crate::{format_module, format_node};
+
+    /// Very basic test intentionally kept very similar to the CLI
+    #[test]
+    fn basic() -> Result<()> {
+        let input = r#"
+# preceding
+if    True:
+    print( "hi" )
+# trailing
+"#;
+        let expected = r#"
+# preceding
+if    True:
+    print( "hi" )
+# trailing
+"#;
+        let actual = format_module(input)?.as_code().to_string();
+        assert_eq!(expected, actual);
+        Ok(())
+    }
 
     #[fixture(pattern = "resources/test/fixtures/black/**/*.py")]
     #[test]
