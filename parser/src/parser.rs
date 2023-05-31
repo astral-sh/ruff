@@ -59,6 +59,9 @@ where
     fn parse(source: &str, source_path: &str) -> Result<Self, ParseError> {
         Self::parse_starts_at(source, source_path, TextSize::default())
     }
+    fn parse_without_path(source: &str) -> Result<Self, ParseError> {
+        Self::parse(source, "<unknown>")
+    }
     fn parse_starts_at(
         source: &str,
         source_path: &str,
@@ -194,6 +197,52 @@ impl Parse for ast::Expr {
         source_path: &str,
     ) -> Result<Self, ParseError> {
         Ok(*ast::ModExpression::parse_tokens(lxr, source_path)?.body)
+    }
+}
+
+impl Parse for ast::Identifier {
+    fn lex_starts_at(
+        source: &str,
+        offset: TextSize,
+    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
+        ast::Expr::lex_starts_at(source, offset)
+    }
+    fn parse_tokens(
+        lxr: impl IntoIterator<Item = LexResult>,
+        source_path: &str,
+    ) -> Result<Self, ParseError> {
+        let expr = ast::Expr::parse_tokens(lxr, source_path)?;
+        match expr {
+            ast::Expr::Name(name) => Ok(name.id),
+            expr => Err(ParseError {
+                error: ParseErrorType::InvalidToken,
+                offset: expr.range().start(),
+                source_path: source_path.to_owned(),
+            }),
+        }
+    }
+}
+
+impl Parse for ast::Constant {
+    fn lex_starts_at(
+        source: &str,
+        offset: TextSize,
+    ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {
+        ast::Expr::lex_starts_at(source, offset)
+    }
+    fn parse_tokens(
+        lxr: impl IntoIterator<Item = LexResult>,
+        source_path: &str,
+    ) -> Result<Self, ParseError> {
+        let expr = ast::Expr::parse_tokens(lxr, source_path)?;
+        match expr {
+            ast::Expr::Constant(c) => Ok(c.value),
+            expr => Err(ParseError {
+                error: ParseErrorType::InvalidToken,
+                offset: expr.range().start(),
+                source_path: source_path.to_owned(),
+            }),
+        }
     }
 }
 
@@ -504,6 +553,8 @@ impl ParseErrorType {
 pub(super) fn optional_range(start: TextSize, end: TextSize) -> OptionalRange<TextRange> {
     OptionalRange::<TextRange>::new(start, end)
 }
+
+include!("gen/parse.rs");
 
 #[cfg(test)]
 mod tests {
@@ -1032,5 +1083,22 @@ def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_parse_constant() {
+        use num_traits::ToPrimitive;
+
+        let c = ast::Constant::parse_without_path("'string'").unwrap();
+        assert_eq!(c.str().unwrap(), "string");
+
+        let c = ast::Constant::parse_without_path("10").unwrap();
+        assert_eq!(c.int().unwrap().to_i32().unwrap(), 10);
+    }
+
+    #[test]
+    fn test_parse_identifier() {
+        let i = ast::Identifier::parse_without_path("test").unwrap();
+        assert_eq!(i.as_str(), "test");
     }
 }

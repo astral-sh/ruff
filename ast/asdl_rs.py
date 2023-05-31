@@ -1951,6 +1951,40 @@ def write_pyo3_wrapper(mod, type_info, namespace, f):
     f.write("Ok(())\n}")
 
 
+def write_parse_def(mod, type_info, f):
+    for info in type_info.values():
+        if info.enum_name not in ["expr", "stmt"]:
+            continue
+
+        type_name = rust_type_name(info.enum_name)
+        cons_name = rust_type_name(info.name)
+
+        f.write(f"""
+        impl Parse for ast::{info.rust_sum_name} {{
+            fn lex_starts_at(
+                source: &str,
+                offset: TextSize,
+            ) -> SoftKeywordTransformer<Lexer<std::str::Chars>> {{
+                ast::{type_name}::lex_starts_at(source, offset)
+            }}
+            fn parse_tokens(
+                lxr: impl IntoIterator<Item = LexResult>,
+                source_path: &str,
+            ) -> Result<Self, ParseError> {{
+                let node = ast::{type_name}::parse_tokens(lxr, source_path)?;
+                match node {{
+                    ast::{type_name}::{cons_name}(node) => Ok(node),
+                    node => Err(ParseError {{
+                        error: ParseErrorType::InvalidToken,
+                        offset: node.range().start(),
+                        source_path: source_path.to_owned(),
+                    }}),
+                }}
+            }}
+        }}
+        """)
+
+
 def write_ast_mod(mod, type_info, f):
     f.write(
         """
@@ -1972,6 +2006,7 @@ def write_ast_mod(mod, type_info, f):
 def main(
     input_filename,
     ast_dir,
+    parser_dir,
     ast_pyo3_dir,
     module_filename,
     dump_module=False,
@@ -2001,6 +2036,14 @@ def main(
             write(f)
 
     for filename, write in [
+        ("parse", p(write_parse_def, mod, type_info)),
+    ]:
+        with (parser_dir / f"{filename}.rs").open("w") as f:
+            f.write(auto_gen_msg)
+            write(f)
+
+
+    for filename, write in [
         ("to_py_ast", p(write_to_pyo3, mod, type_info)),
         ("wrapper_located", p(write_pyo3_wrapper, mod, type_info, "located")),
         ("wrapper_ranged", p(write_pyo3_wrapper, mod, type_info, "ranged")),
@@ -2020,6 +2063,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("input_file", type=Path)
     parser.add_argument("-A", "--ast-dir", type=Path, required=True)
+    parser.add_argument("-P", "--parser-dir", type=Path, required=True)
     parser.add_argument("-O", "--ast-pyo3-dir", type=Path, required=True)
     parser.add_argument("-M", "--module-file", type=Path, required=True)
     parser.add_argument("-d", "--dump-module", action="store_true")
@@ -2028,6 +2072,7 @@ if __name__ == "__main__":
     main(
         args.input_file,
         args.ast_dir,
+        args.parser_dir,
         args.ast_pyo3_dir,
         args.module_file,
         args.dump_module,
