@@ -44,17 +44,7 @@ where
 
     /// Formats the node without comments. Ignores any suppression comments.
     fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        let needs_parentheses = false;
-
-        if needs_parentheses {
-            write!(f, [text("(")])?;
-        }
-
         self.fmt_fields(node, f)?;
-
-        if needs_parentheses {
-            write!(f, [text(")")])?;
-        }
 
         Ok(())
     }
