@@ -59,7 +59,8 @@ use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 ///
 /// Use instead:
 /// ```python
-/// from _typeshed import Self
+/// from typing_extensions import Self
+///
 ///
 /// class Foo:
 ///     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
