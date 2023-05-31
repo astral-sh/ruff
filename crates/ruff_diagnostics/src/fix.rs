@@ -27,12 +27,24 @@ pub enum Applicability {
     Unspecified,
 }
 
+/// Indicates the level of isolation required to apply a fix.
+#[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, is_macro::Is)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum IsolationLevel {
+    /// The fix should be applied in isolation.
+    Isolated,
+    /// The fix should be applied as long as it does not overlap with any other fixes.
+    #[default]
+    NonOverlapping,
+}
+
 /// A collection of [`Edit`] elements to be applied to a source file.
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
     edits: Vec<Edit>,
     applicability: Applicability,
+    isolation_level: IsolationLevel,
 }
 
 impl Fix {
@@ -44,6 +56,7 @@ impl Fix {
         Self {
             edits: vec![edit],
             applicability: Applicability::Unspecified,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -55,6 +68,7 @@ impl Fix {
         Self {
             edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
             applicability: Applicability::Unspecified,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -63,6 +77,7 @@ impl Fix {
         Self {
             edits: vec![edit],
             applicability: Applicability::Automatic,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -71,6 +86,7 @@ impl Fix {
         Self {
             edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
             applicability: Applicability::Automatic,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -79,6 +95,7 @@ impl Fix {
         Self {
             edits: vec![edit],
             applicability: Applicability::Suggested,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -87,6 +104,7 @@ impl Fix {
         Self {
             edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
             applicability: Applicability::Suggested,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -95,6 +113,7 @@ impl Fix {
         Self {
             edits: vec![edit],
             applicability: Applicability::Manual,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -103,6 +122,7 @@ impl Fix {
         Self {
             edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
             applicability: Applicability::Manual,
+            isolation_level: IsolationLevel::default(),
         }
     }
 
@@ -120,7 +140,20 @@ impl Fix {
         self.edits
     }
 
+    /// Return the [`Applicability`] of the [`Fix`].
     pub fn applicability(&self) -> Applicability {
         self.applicability
+    }
+
+    /// Return the [`IsolationLevel`] of the [`Fix`].
+    pub fn isolation(&self) -> IsolationLevel {
+        self.isolation_level
+    }
+
+    /// Create a new [`Fix`] with the given [`IsolationLevel`].
+    #[must_use]
+    pub fn isolate(mut self, isolation: IsolationLevel) -> Self {
+        self.isolation_level = isolation;
+        self
     }
 }

@@ -1,12 +1,9 @@
-use log::error;
-use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, IsolationLevel};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 
-use crate::autofix::edits;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -24,25 +21,6 @@ impl AlwaysAutofixableViolation for UselessMetaclassType {
     }
 }
 
-fn rule(targets: &[Expr], value: &Expr, location: TextRange) -> Option<Diagnostic> {
-    if targets.len() != 1 {
-        return None;
-    }
-    let Expr::Name(ast::ExprName { id, .. }) = targets.first().unwrap() else {
-        return None;
-    };
-    if id != "__metaclass__" {
-        return None;
-    }
-    let Expr::Name(ast::ExprName { id, .. }) = value else {
-        return None;
-    };
-    if id != "type" {
-        return None;
-    }
-    Some(Diagnostic::new(UselessMetaclassType, location))
-}
-
 /// UP001
 pub(crate) fn useless_metaclass_type(
     checker: &mut Checker,
@@ -50,31 +28,34 @@ pub(crate) fn useless_metaclass_type(
     value: &Expr,
     targets: &[Expr],
 ) {
-    let Some(mut diagnostic) =
-        rule(targets, value, stmt.range()) else {
-            return;
-        };
+    if targets.len() != 1 {
+        return;
+    }
+    let Expr::Name(ast::ExprName { id, .. }) = targets.first().unwrap() else {
+        return ;
+    };
+    if id != "__metaclass__" {
+        return;
+    }
+    let Expr::Name(ast::ExprName { id, .. }) = value else {
+        return ;
+    };
+    if id != "type" {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(UselessMetaclassType, stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.semantic_model().stmt();
-        let defined_in = checker.semantic_model().stmt_parent();
-        match edits::delete_stmt(
-            defined_by,
-            defined_in,
-            &deleted,
+        let stmt = checker.semantic_model().stmt();
+        let parent = checker.semantic_model().stmt_parent();
+        let edit = autofix::edits::delete_stmt(
+            stmt,
+            parent,
             checker.locator,
             checker.indexer,
             checker.stylist,
-        ) {
-            Ok(edit) => {
-                if edit.is_deletion() || edit.content() == Some("pass") {
-                    checker.deletions.insert(RefEquality(defined_by));
-                }
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(edit));
-            }
-            Err(e) => error!("Failed to fix remove metaclass type: {e}"),
-        }
+        );
+        diagnostic.set_fix(Fix::automatic(edit).isolate(IsolationLevel::Isolated));
     }
     checker.diagnostics.push(diagnostic);
 }

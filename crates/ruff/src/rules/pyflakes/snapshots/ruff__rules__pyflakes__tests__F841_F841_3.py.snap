@@ -315,10 +315,9 @@ F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
 63    |-        if a is not None
 64    |-        else b
 65    |-    )
-   61 |+    pass
-66 62 | 
-67 63 |     y = \
-68 64 |         a if a is not None else b
+66 61 | 
+67 62 |     y = \
+68 63 |         a if a is not None else b
 
 F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
    |

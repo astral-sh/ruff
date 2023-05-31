@@ -37,6 +37,7 @@ fn apply_fixes<'a>(
 ) -> (String, FixTable) {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
+    let mut isolation = false;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
     let mut fixed = FxHashMap::default();
 
@@ -63,6 +64,15 @@ fn apply_fixes<'a>(
                 .map_or(false, |fix_location| last_pos >= fix_location)
         }) {
             continue;
+        }
+
+        // If this fix requires isolation, and we've already applied another fix that
+        // requires isolation, skip it. We apply at most one isolated fix per run.
+        if fix.isolation().is_isolated() {
+            if isolation {
+                continue;
+            }
+            isolation = true;
         }
 
         for edit in fix

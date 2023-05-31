@@ -3,19 +3,19 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     self, Arg, Arguments, Comprehension, Constant, Excepthandler, Expr, ExprContext, Keyword,
     Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
 };
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
 use ruff_python_ast::str::trailing_quote;
-use ruff_python_ast::types::{Node, RefEquality};
+use ruff_python_ast::types::Node;
 use ruff_python_ast::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{cast, helpers, str, visitor};
@@ -75,9 +75,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) importer: Importer<'a>,
     // Stateful fields.
     semantic_model: SemanticModel<'a>,
-    pub(crate) diagnostics: Vec<Diagnostic>,
-    pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
     deferred: Deferred<'a>,
+    pub(crate) diagnostics: Vec<Diagnostic>,
     // Check-specific state.
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
@@ -111,7 +110,6 @@ impl<'a> Checker<'a> {
             semantic_model: SemanticModel::new(&settings.typing_modules, path, module),
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
-            deletions: FxHashSet::default(),
             flake8_bugbear_seen: Vec::default(),
         }
     }
@@ -2113,7 +2111,7 @@ where
                     }
 
                     if self.enabled(Rule::EmptyTypeCheckingBlock) {
-                        flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
+                        flake8_type_checking::rules::empty_type_checking_block(self, stmt_if);
                     }
 
                     self.visit_type_checking_block(body);
@@ -5234,14 +5232,14 @@ impl<'a> Checker<'a> {
                         _ => continue,
                     };
 
-                    let child_id = binding.source.unwrap();
-                    let parent_id = self.semantic_model.stmts.parent_id(child_id);
+                    let stmt_id = binding.source.unwrap();
+                    let parent_id = self.semantic_model.stmts.parent_id(stmt_id);
 
                     let exceptions = binding.exceptions;
                     let diagnostic_offset = binding.range.start();
-                    let child = &self.semantic_model.stmts[child_id];
-                    let parent_offset = if matches!(child, Stmt::ImportFrom(_)) {
-                        Some(child.start())
+                    let stmt = &self.semantic_model.stmts[stmt_id];
+                    let parent_offset = if matches!(stmt, Stmt::ImportFrom(_)) {
+                        Some(stmt.start())
                     } else {
                         None
                     };
@@ -5252,12 +5250,12 @@ impl<'a> Checker<'a> {
                         })
                     {
                         ignored
-                            .entry((child_id, parent_id, exceptions))
+                            .entry((stmt_id, parent_id, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     } else {
                         unused
-                            .entry((child_id, parent_id, exceptions))
+                            .entry((stmt_id, parent_id, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     }
@@ -5265,38 +5263,26 @@ impl<'a> Checker<'a> {
 
                 let in_init =
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
-                for ((defined_by, defined_in, exceptions), unused_imports) in unused
+                for ((stmt_id, parent_id, exceptions), unused_imports) in unused
                     .into_iter()
                     .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
                 {
-                    let child = self.semantic_model.stmts[defined_by];
-                    let parent = defined_in.map(|defined_in| self.semantic_model.stmts[defined_in]);
+                    let stmt = self.semantic_model.stmts[stmt_id];
+                    let parent = parent_id.map(|parent_id| self.semantic_model.stmts[parent_id]);
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
 
                     let fix = if !in_init && !in_except_handler && self.patch(Rule::UnusedImport) {
-                        let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
-                        match autofix::edits::remove_unused_imports(
+                        autofix::edits::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
-                            child,
+                            stmt,
                             parent,
-                            &deleted,
                             self.locator,
                             self.indexer,
                             self.stylist,
-                        ) {
-                            Ok(fix) => {
-                                if fix.is_deletion() || fix.content() == Some("pass") {
-                                    self.deletions.insert(RefEquality(child));
-                                }
-                                Some(fix)
-                            }
-                            Err(e) => {
-                                error!("Failed to remove unused imports: {e}");
-                                None
-                            }
-                        }
+                        )
+                        .ok()
                     } else {
                         None
                     };
@@ -5316,22 +5302,26 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child, Stmt::ImportFrom(_)) {
-                            diagnostic.set_parent(child.start());
+                        if matches!(stmt, Stmt::ImportFrom(_)) {
+                            diagnostic.set_parent(stmt.start());
                         }
-
-                        if let Some(edit) = &fix {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(edit.clone()));
+                        if let Some(edit) = fix.as_ref() {
+                            diagnostic.set_fix(Fix::automatic(edit.clone()).isolate(
+                                if parent.is_some() {
+                                    IsolationLevel::Isolated
+                                } else {
+                                    IsolationLevel::NonOverlapping
+                                },
+                            ));
                         }
                         diagnostics.push(diagnostic);
                     }
                 }
-                for ((child, .., exceptions), unused_imports) in ignored
+                for ((stmt_id, .., exceptions), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
+                    .sorted_by_key(|((stmt_id, ..), ..)| *stmt_id)
                 {
-                    let child = self.semantic_model.stmts[child];
+                    let stmt = self.semantic_model.stmts[stmt_id];
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
@@ -5350,8 +5340,8 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child, Stmt::ImportFrom(_)) {
-                            diagnostic.set_parent(child.start());
+                        if matches!(stmt, Stmt::ImportFrom(_)) {
+                            diagnostic.set_parent(stmt.start());
                         }
                         diagnostics.push(diagnostic);
                     }

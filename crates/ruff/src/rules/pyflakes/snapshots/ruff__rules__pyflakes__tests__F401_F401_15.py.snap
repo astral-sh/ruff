@@ -9,7 +9,7 @@ F401_15.py:5:25: F401 [*] `pathlib.Path` imported but unused
   |
   = help: Remove unused import: `pathlib.Path`
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | from django.db.models import ForeignKey
 3 3 | 
 4 4 | if TYPE_CHECKING:
