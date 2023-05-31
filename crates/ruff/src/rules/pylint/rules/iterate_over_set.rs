@@ -41,13 +41,13 @@ impl Violation for IterateOverSet {
 /// PLC0208
 pub(crate) fn iterate_over_set(checker: &mut Checker, iter: &Expr) {
     match iter {
-        // Check if set literal; e.g., `{1, 2, 3}`
+        // Check if set literal; e.g., `{1, 2, 3}`.
         Expr::Set(_) => {
             checker
                 .diagnostics
                 .push(Diagnostic::new(IterateOverSet, iter.range()));
         }
-        // Check if call to set constructor; e.g., `set(1, 2, 3)`
+        // Check if call to set constructor; e.g., `set(1, 2, 3)`.
         Expr::Call(call) => {
             if let Expr::Name(ExprName { id, .. }) = &*call.func {
                 if id.as_str() == "set" {
@@ -57,7 +57,7 @@ pub(crate) fn iterate_over_set(checker: &mut Checker, iter: &Expr) {
                 }
             }
         }
-        // Check if set comprehension; e.g., `{n for n in range(1, 4)}`
+        // Check if set comprehension; e.g., `{n for n in range(1, 4)}`.
         Expr::SetComp(_) => {
             checker
                 .diagnostics
