@@ -12,6 +12,7 @@ use ruff::logging::{set_up_logging, LogLevel};
 use ruff::settings::types::SerializationFormat;
 use ruff::settings::{flags, CliSettings};
 use ruff::{fs, warn_user_once};
+use ruff_python_formatter::format_module;
 
 use crate::args::{Args, CheckArgs, Command};
 use crate::commands::run_stdin::read_from_stdin;
@@ -131,22 +132,26 @@ fn format(files: &[PathBuf]) -> Result<ExitStatus> {
         internal use only."
     );
 
-    // dummy
-    let format_code = |code: &str| code.replace("# DEL", "");
+    let format_code = |code: &str| {
+        // dummy, to check that the function was actually called
+        let contents = code.replace("# DEL", "");
+        // real formatting that is currently a passthrough
+        format_module(&contents)
+    };
 
     match &files {
         // Check if we should read from stdin
         [path] if path == Path::new("-") => {
             let unformatted = read_from_stdin()?;
-            let formatted = format_code(&unformatted);
-            stdout().lock().write_all(formatted.as_bytes())?;
+            let formatted = format_code(&unformatted)?;
+            stdout().lock().write_all(formatted.as_code().as_bytes())?;
         }
         _ => {
             for file in files {
                 let unformatted = std::fs::read_to_string(file)
                     .with_context(|| format!("Could not read {}: ", file.display()))?;
-                let formatted = format_code(&unformatted);
-                std::fs::write(file, formatted)
+                let formatted = format_code(&unformatted)?;
+                std::fs::write(file, formatted.as_code().as_bytes())
                     .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
             }
         }
