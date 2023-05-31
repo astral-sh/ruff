@@ -1,14 +1,12 @@
-use std::path::Path;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
     Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
 };
-use ruff_python_semantic::model::SemanticModel;
 
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
-use crate::settings::Settings;
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but
@@ -250,47 +248,48 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
     }
 }
 
-/// TCH001
+/// TCH001, TCH002, TCH003
 pub(crate) fn typing_only_runtime_import(
+    checker: &Checker,
     binding: &Binding,
     runtime_imports: &[&Binding],
-    semantic_model: &SemanticModel,
-    package: Option<&Path>,
-    settings: &Settings,
-) -> Option<Diagnostic> {
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     // If we're in un-strict mode, don't flag typing-only imports that are
     // implicitly loaded by way of a valid runtime import.
-    if !settings.flake8_type_checking.strict
+    if !checker.settings.flake8_type_checking.strict
         && runtime_imports
             .iter()
             .any(|import| is_implicit_import(binding, import))
     {
-        return None;
+        return;
     }
 
     let full_name = match &binding.kind {
         BindingKind::Importation(Importation { full_name, .. }) => full_name,
         BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
         BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
-        _ => return None,
+        _ => return,
     };
 
     if is_exempt(
         full_name,
-        &settings
+        &checker
+            .settings
             .flake8_type_checking
             .exempt_modules
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>(),
     ) {
-        return None;
+        return;
     }
 
     if binding.context.is_runtime()
         && binding.is_used()
         && binding.references().all(|reference_id| {
-            semantic_model
+            checker
+                .semantic_model()
                 .references
                 .resolve(reference_id)
                 .context()
@@ -308,41 +307,43 @@ pub(crate) fn typing_only_runtime_import(
             .unwrap();
 
         // Categorize the import.
-        match categorize(
+        let diagnostic = match categorize(
             full_name,
             Some(level),
-            &settings.src,
-            package,
-            &settings.isort.known_modules,
-            settings.target_version,
+            &checker.settings.src,
+            checker.package(),
+            &checker.settings.isort.known_modules,
+            checker.settings.target_version,
         ) {
             ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
-                Some(Diagnostic::new(
+                Diagnostic::new(
                     TypingOnlyFirstPartyImport {
                         full_name: full_name.to_string(),
                     },
                     binding.range,
-                ))
+                )
             }
             ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
-                Some(Diagnostic::new(
+                Diagnostic::new(
                     TypingOnlyThirdPartyImport {
                         full_name: full_name.to_string(),
                     },
                     binding.range,
-                ))
+                )
             }
-            ImportSection::Known(ImportType::StandardLibrary) => Some(Diagnostic::new(
+            ImportSection::Known(ImportType::StandardLibrary) => Diagnostic::new(
                 TypingOnlyStandardLibraryImport {
                     full_name: full_name.to_string(),
                 },
                 binding.range,
-            )),
+            ),
             ImportSection::Known(ImportType::Future) => {
                 unreachable!("`__future__` imports should be marked as used")
             }
+        };
+
+        if checker.enabled(diagnostic.kind.rule()) {
+            diagnostics.push(diagnostic);
         }
-    } else {
-        None
     }
 }

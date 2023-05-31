@@ -3,7 +3,7 @@ use ruff_text_size::{TextLen, TextRange};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::NewlineWithTrailingNewline;
+use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::whitespace;
 
 use crate::checkers::ast::Checker;

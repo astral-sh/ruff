@@ -8,28 +8,19 @@ use ruff_formatter::{
 };
 use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 
-use crate::attachment::attach;
 use crate::comments::Comments;
 use crate::context::ASTFormatContext;
-use crate::cst::Stmt;
-use crate::newlines::normalize_newlines;
-use crate::parentheses::normalize_parentheses;
-use crate::trivia::TriviaToken;
+use crate::module::FormatModule;
 
-mod attachment;
 pub mod cli;
 mod comments;
 pub mod context;
-mod cst;
-mod format;
-mod newlines;
-mod parentheses;
+mod module;
 mod prelude;
-mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
-pub fn fmt(contents: &str) -> Result<Printed> {
+pub fn format_module(contents: &str) -> Result<Printed> {
     // Tokenize once
     let mut tokens = Vec::new();
     let mut comment_ranges = CommentRangesBuilder::default();
@@ -46,42 +37,25 @@ pub fn fmt(contents: &str) -> Result<Printed> {
 
     let comment_ranges = comment_ranges.finish();
 
-    let trivia = trivia::extract_trivia_tokens(&tokens);
-
     // Parse the AST.
-    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
+    let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
+        .with_context(|| "Syntax error in input")?;
 
-    let formatted = format_node(&python_ast, &comment_ranges, contents, trivia)?;
+    let formatted = format_node(&python_ast, &comment_ranges, contents)?;
 
     formatted
         .print()
         .with_context(|| "Failed to print the formatter IR")
 }
 
-pub(crate) fn format_node<'a>(
+pub fn format_node<'a>(
     root: &'a Mod,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
-    trivia: Vec<TriviaToken>,
 ) -> FormatResult<Formatted<ASTFormatContext<'a>>> {
     let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
 
-    let module = root.as_module().unwrap();
-
     let locator = Locator::new(source);
-
-    // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = module
-        .body
-        .iter()
-        .cloned()
-        .map(|stmt| (stmt, &locator).into())
-        .collect();
-
-    // Attach trivia.
-    attach(&mut python_cst, trivia);
-    normalize_newlines(&mut python_cst);
-    normalize_parentheses(&mut python_cst, &locator);
 
     format!(
         ASTFormatContext::new(
@@ -92,7 +66,7 @@ pub(crate) fn format_node<'a>(
             locator.contents(),
             comments
         ),
-        [format::builders::statements(&python_cst)]
+        [FormatModule::new(root)]
     )
 }
 
@@ -111,26 +85,41 @@ mod tests {
     use ruff_testing_macros::fixture;
     use similar::TextDiff;
 
-    use crate::{fmt, format_node, trivia};
+    use crate::{format_module, format_node};
 
-    #[fixture(
-        pattern = "resources/test/fixtures/black/**/*.py",
-        // Excluded tests because they reach unreachable when attaching tokens
-        exclude = [
-            "*comments8.py",
-        ])
-    ]
+    #[fixture(pattern = "resources/test/fixtures/black/**/*.py")]
     #[test]
     fn black_test(input_path: &Path) -> Result<()> {
         let content = fs::read_to_string(input_path)?;
 
-        let printed = fmt(&content)?;
+        let printed = format_module(&content)?;
 
         let expected_path = input_path.with_extension("py.expect");
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
         let formatted_code = printed.as_code();
+
+        let reformatted =
+            format_module(formatted_code).expect("Expected formatted code to be valid syntax");
+
+        if reformatted.as_code() != formatted_code {
+            let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
+                .unified_diff()
+                .header("Formatted once", "Formatted twice")
+                .to_string();
+            panic!(
+                r#"Reformatting the formatted code a second time resulted in formatting changes.
+{diff}
+
+Formatted once:
+{formatted_code}
+
+Formatted twice:
+{}"#,
+                reformatted.as_code()
+            );
+        }
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -212,12 +201,10 @@ mod tests {
 
         let comment_ranges = comment_ranges.finish();
 
-        let trivia = trivia::extract_trivia_tokens(&tokens);
-
         // Parse the AST.
         let python_ast = parse_tokens(tokens, Mode::Module, "<filename>").unwrap();
 
-        let formatted = format_node(&python_ast, &comment_ranges, src, trivia).unwrap();
+        let formatted = format_node(&python_ast, &comment_ranges, src).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

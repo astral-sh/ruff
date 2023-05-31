@@ -214,6 +214,7 @@ break;
             continue_statement.as_ref().into(),
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
+                #[cfg(debug_assertions)]
                 formatted: Cell::new(false),
                 position: CommentTextPosition::OwnLine,
             },
@@ -223,6 +224,7 @@ break;
             continue_statement.as_ref().into(),
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
+                #[cfg(debug_assertions)]
                 formatted: Cell::new(false),
                 position: CommentTextPosition::EndOfLine,
             },
@@ -232,6 +234,7 @@ break;
             break_statement.as_ref().into(),
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
+                #[cfg(debug_assertions)]
                 formatted: Cell::new(false),
                 position: CommentTextPosition::OwnLine,
             },

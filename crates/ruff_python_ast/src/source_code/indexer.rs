@@ -1,11 +1,11 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
-use crate::source_code::comment_ranges::{CommentRanges, CommentRangesBuilder};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::{StringKind, Tok};
 
+use crate::source_code::comment_ranges::{CommentRanges, CommentRangesBuilder};
 use crate::source_code::Locator;
 
 pub struct Indexer {

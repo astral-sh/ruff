@@ -80,3 +80,6 @@ class Registry:
     # FBT001: Boolean positional arg in function definition
     def foo(self, value: bool) -> None:
         pass
+
+    def foo(self) -> None:
+        object.__setattr__(self, "flag", True)

@@ -67,8 +67,8 @@ impl<'a> Importer<'a> {
             Insertion::end_of_statement(stmt, self.locator, self.stylist)
                 .into_edit(&required_import)
         } else {
-            // Insert at the top of the file.
-            Insertion::top_of_file(self.python_ast, self.locator, self.stylist)
+            // Insert at the start of the file.
+            Insertion::start_of_file(self.python_ast, self.locator, self.stylist)
                 .into_edit(&required_import)
         }
     }
@@ -105,7 +105,7 @@ impl<'a> Importer<'a> {
         // could be defined in the module scope, but after the function definition. In this case,
         // it's unclear whether we can use the symbol (the function could be called between the
         // import and the current location, and thus the symbol would not be available). It's also
-        // unclear whether should add an import statement at the top of the file, since it could
+        // unclear whether should add an import statement at the start of the file, since it could
         // be shadowed between the import and the current location.
         if imported_name.range().start() > at {
             return Some(Err(ResolutionError::ImportAfterUsage));
@@ -144,7 +144,7 @@ impl<'a> Importer<'a> {
     /// the symbol available in the current scope along with the bound name of the symbol.
     ///
     /// For example, assuming `module` is `"functools"` and `member` is `"lru_cache"`, this function
-    /// could return an [`Edit`] to add `import functools` to the top of the file, alongside with
+    /// could return an [`Edit`] to add `import functools` to the start of the file, alongside with
     /// the name on which the `lru_cache` symbol would be made available (`"functools.lru_cache"`).
     fn import_symbol(
         &self,
