@@ -5,7 +5,7 @@ use ruff_python_ast::source_code::Locator;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
-pub(crate) struct PyFormatContext<'a> {
+pub struct PyFormatContext<'a> {
     options: SimpleFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
