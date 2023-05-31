@@ -13,7 +13,7 @@ add_newline_before_comments.py:1:1: I001 [*] Import block is un-sorted or un-for
   |
   = help: Organize imports
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | import os
   2 |+
 2 3 | # This is a comment in the same section, so we need to add one newline.

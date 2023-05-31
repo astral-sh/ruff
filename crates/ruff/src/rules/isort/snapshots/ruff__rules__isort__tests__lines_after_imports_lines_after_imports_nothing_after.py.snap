@@ -15,7 +15,7 @@ lines_after_imports_nothing_after.py:1:1: I001 [*] Import block is un-sorted or 
   |
   = help: Organize imports
 
-ℹ Suggested fix
+ℹ Fix
 2 2 | 
 3 3 | from typing import Any
 4 4 | 
