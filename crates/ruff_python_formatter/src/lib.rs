@@ -36,10 +36,12 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+		write!(f, [source_position(node.start())])?;
         self.fmt_leading_comments(node, f)?;
         self.fmt_node(node, f)?;
         self.fmt_dangling_comments(node, f)?;
-        self.fmt_trailing_comments(node, f)
+        self.fmt_trailing_comments(node, f)?;
+        write!(f, [source_position(node.start())])
     }
 
     /// Formats the node without comments. Ignores any suppression comments.
