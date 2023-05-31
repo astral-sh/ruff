@@ -243,7 +243,7 @@ UP006_0.py:61:10: UP006 [*] Use `collections.deque` instead of `typing.Deque` fo
 20 20 | 
 21 21 | 
 22 22 | from typing import List as IList
-   23 |+import collections
+   23 |+from collections import deque
 23 24 | 
 24 25 | 
 25 26 | def f(x: IList[str]) -> None:
@@ -252,7 +252,7 @@ UP006_0.py:61:10: UP006 [*] Use `collections.deque` instead of `typing.Deque` fo
 59 60 | 
 60 61 | 
 61    |-def f(x: typing.Deque[str]) -> None:
-   62 |+def f(x: collections.deque[str]) -> None:
+   62 |+def f(x: deque[str]) -> None:
 62 63 |     ...
 63 64 | 
 64 65 | 
@@ -269,7 +269,7 @@ UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Def
 20 20 | 
 21 21 | 
 22 22 | from typing import List as IList
-   23 |+import collections
+   23 |+from collections import defaultdict
 23 24 | 
 24 25 | 
 25 26 | def f(x: IList[str]) -> None:
@@ -278,7 +278,7 @@ UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.Def
 63 64 | 
 64 65 | 
 65    |-def f(x: typing.DefaultDict[str, str]) -> None:
-   66 |+def f(x: collections.defaultdict[str, str]) -> None:
+   66 |+def f(x: defaultdict[str, str]) -> None:
 66 67 |     ...
 
 

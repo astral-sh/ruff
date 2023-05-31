@@ -215,6 +215,8 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 
 To preview any changes to the documentation locally:
 
+1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
+
 1. Install MkDocs and Material for MkDocs with:
 
    ```shell

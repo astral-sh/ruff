@@ -11,7 +11,7 @@ fn main() -> Result<()> {
     let contents = fs::read_to_string(cli.file)?;
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", fmt(&contents)?.print()?.as_code());
+        println!("{}", fmt(&contents)?.as_code());
     }
     Ok(())
 }

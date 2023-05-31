@@ -66,7 +66,7 @@ impl Insertion {
     ///
     /// The insertion returned will begin at the start of the `import os` statement, and will
     /// include a trailing newline suffix.
-    pub(super) fn top_of_file(body: &[Stmt], locator: &Locator, stylist: &Stylist) -> Insertion {
+    pub(super) fn start_of_file(body: &[Stmt], locator: &Locator, stylist: &Stylist) -> Insertion {
         // Skip over any docstrings.
         let mut location = if let Some(location) = match_docstring_end(body) {
             // If the first token after the docstring is a semicolon, insert after the semicolon as an
@@ -139,8 +139,9 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 mod tests {
     use anyhow::Result;
     use ruff_text_size::TextSize;
-    use rustpython_parser as parser;
+    use rustpython_parser::ast::Suite;
     use rustpython_parser::lexer::LexResult;
+    use rustpython_parser::Parse;
 
     use ruff_python_ast::newlines::LineEnding;
     use ruff_python_ast::source_code::{Locator, Stylist};
@@ -148,15 +149,15 @@ mod tests {
     use super::Insertion;
 
     fn insert(contents: &str) -> Result<Insertion> {
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
         let locator = Locator::new(contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
-        Ok(Insertion::top_of_file(&program, &locator, &stylist))
+        Ok(Insertion::start_of_file(&program, &locator, &stylist))
     }
 
     #[test]
-    fn top_of_file() -> Result<()> {
+    fn start_of_file() -> Result<()> {
         let contents = "";
         assert_eq!(
             insert(contents)?,

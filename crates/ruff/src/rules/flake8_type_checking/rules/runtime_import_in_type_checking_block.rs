@@ -3,7 +3,9 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
     Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
 };
-use ruff_python_semantic::model::SemanticModel;
+
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for runtime imports defined in a type-checking block.
@@ -43,42 +45,44 @@ pub struct RuntimeImportInTypeCheckingBlock {
 impl Violation for RuntimeImportInTypeCheckingBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
+        let RuntimeImportInTypeCheckingBlock { full_name } = self;
         format!(
-            "Move import `{}` out of type-checking block. Import is used for more than type \
-             hinting.",
-            self.full_name
+            "Move import `{full_name}` out of type-checking block. Import is used for more than type hinting."
         )
     }
 }
 
 /// TCH004
 pub(crate) fn runtime_import_in_type_checking_block(
+    checker: &Checker,
     binding: &Binding,
-    semantic_model: &SemanticModel,
-) -> Option<Diagnostic> {
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let full_name = match &binding.kind {
         BindingKind::Importation(Importation { full_name, .. }) => full_name,
         BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
         BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
-        _ => return None,
+        _ => return,
     };
 
     if binding.context.is_typing()
         && binding.references().any(|reference_id| {
-            semantic_model
+            checker
+                .semantic_model()
                 .references
                 .resolve(reference_id)
                 .context()
                 .is_runtime()
         })
     {
-        Some(Diagnostic::new(
+        let diagnostic = Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
                 full_name: full_name.to_string(),
             },
             binding.range,
-        ))
-    } else {
-        None
+        );
+        if checker.enabled(diagnostic.kind.rule()) {
+            diagnostics.push(diagnostic);
+        }
     }
 }

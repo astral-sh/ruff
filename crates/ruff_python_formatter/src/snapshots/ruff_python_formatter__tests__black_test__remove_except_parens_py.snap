@@ -57,7 +57,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
      raise err
  
  # This is tuple of exceptions.
-@@ -21,9 +21,7 @@
+@@ -21,22 +21,15 @@
  # Test long variants.
  try:
      a.something
@@ -68,6 +68,21 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
      raise err
  
  try:
+     a.something
+-except (
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+-) as err:
++except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,) as err:
+     raise err
+ 
+ try:
+     a.something
+-except (
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+-) as err:
++except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error, some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
+     raise err
 ```
 
 ## Ruff Output
@@ -101,17 +116,12 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 
 try:
     a.something
-except (
-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-) as err:
+except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,) as err:
     raise err
 
 try:
     a.something
-except (
-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-) as err:
+except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error, some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
     raise err
 ```
 

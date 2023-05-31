@@ -104,7 +104,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
                     "unknown option {option}"
                 );
 
-                let anchor = option.rsplit('.').next().unwrap();
+                let anchor = option.replace('.', "-");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
                 after.push_str(&format!("[{option}]: ../../settings#{anchor}"));
 
@@ -152,7 +152,7 @@ Something [`else`][other].
 
 [other]: http://example.com.
 
-[mccabe.max-complexity]: ../../settings#max-complexity\n"
+[mccabe.max-complexity]: ../../settings#mccabe-max-complexity\n"
         );
     }
 }

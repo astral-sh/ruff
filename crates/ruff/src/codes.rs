@@ -319,7 +319,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Annotations, "401") => (RuleGroup::Unspecified, Rule::AnyType),
 
         // flake8-future-annotations
-        (Flake8FutureAnnotations, "100") => (RuleGroup::Unspecified, Rule::MissingFutureAnnotationsImport),
+        (Flake8FutureAnnotations, "100") => (RuleGroup::Unspecified, Rule::FutureRewritableTypeAnnotation),
+        (Flake8FutureAnnotations, "102") => (RuleGroup::Unspecified, Rule::FutureRequiredTypeAnnotation),
 
         // flake8-2020
         (Flake82020, "101") => (RuleGroup::Unspecified, Rule::SysVersionSlice3),
@@ -595,6 +596,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, Rule::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, Rule::TSuffixedTypeAlias),
+        (Flake8Pyi, "045") => (RuleGroup::Unspecified, Rule::IterMethodReturnIterable),
         (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
 

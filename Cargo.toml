@@ -24,18 +24,21 @@ is-macro = { version = "0.2.2" }
 itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e5beb532fdd1e209ad2dbb470438" }
 log = { version = "0.4.17" }
+memchr = "2.5.0"
 nohash-hasher = { version = "0.2.0" }
+num-bigint = { version = "0.4.3" }
+num-traits = { version = "0.2.15" }
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.0.14" }
 proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "335780aeeac1e6fcd85994ba001d7b8ce99fcf65" }
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "335780aeeac1e6fcd85994ba001d7b8ce99fcf65", default-features = false, features = ["all-nodes-with-ranges"]}
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "335780aeeac1e6fcd85994ba001d7b8ce99fcf65" }
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "335780aeeac1e6fcd85994ba001d7b8ce99fcf65" }
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "335780aeeac1e6fcd85994ba001d7b8ce99fcf65", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
+ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["all-nodes-with-ranges"]}
+rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd" }
+rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd" }
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }

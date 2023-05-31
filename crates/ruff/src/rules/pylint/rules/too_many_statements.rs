@@ -168,7 +168,8 @@ pub(crate) fn too_many_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser as parser;
+    use rustpython_parser::ast::Suite;
+    use rustpython_parser::Parse;
 
     use super::num_statements;
 
@@ -178,7 +179,7 @@ mod tests {
 def f():  # 2
     pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -192,7 +193,7 @@ def f():
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -207,7 +208,7 @@ def f():
         if a:
             print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -221,7 +222,7 @@ def f():  # 5
     elif a:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -239,7 +240,7 @@ def f():  # 9
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 9);
         Ok(())
     }
@@ -268,7 +269,7 @@ async def f():  # 19
             import time
             pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 19);
         Ok(())
     }
@@ -280,7 +281,7 @@ def f():  # 2
     for i in range(10):
         pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -294,7 +295,7 @@ def f():  # 3
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -309,7 +310,7 @@ def f():  # 5
 
     print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -327,7 +328,7 @@ def f():  # 3
 
     print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -338,7 +339,7 @@ def f():  # 3
 def f():
     return
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 1);
         Ok(())
     }
@@ -354,7 +355,7 @@ def f():  # 6
             print()
 
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
@@ -368,7 +369,7 @@ def f():  # 5
     except Exception:
         raise
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -384,7 +385,7 @@ def f():  # 7
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 7);
         Ok(())
     }
@@ -402,7 +403,7 @@ def f():  # 10
     finally:
         pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 10);
         Ok(())
     }
@@ -418,7 +419,7 @@ def f():  # 8
     except Exception:
         raise
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 8);
         Ok(())
     }
@@ -436,7 +437,7 @@ def f():  # 11
     finally:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 11);
         Ok(())
     }
@@ -448,7 +449,7 @@ def f():  # 2
     for i in range(10):
         yield i
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }

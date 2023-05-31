@@ -293,7 +293,6 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let fixable = !contains_effect(target, |id| checker.semantic_model().is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
                     name: if let Expr::Name(ast::ExprName { id, .. }) = target {
@@ -304,73 +303,75 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 },
                 expr.range(),
             );
-            if fixable && checker.patch(diagnostic.kind.rule()) {
-                // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
-                // in `isinstance(obj, int) or isinstance(obj, str)`).
-                let types: Vec<&Expr> = indices
-                    .iter()
-                    .map(|index| &values[*index])
-                    .map(|expr| {
-                        let Expr::Call(ast::ExprCall { args, ..}) = expr else {
-                            unreachable!("Indices should only contain `isinstance` calls")
-                        };
-                        args.get(1).expect("`isinstance` should have two arguments")
-                    })
-                    .collect();
-
-                // Generate a single `isinstance` call.
-                let node = ast::ExprTuple {
-                    // Flatten all the types used across the `isinstance` calls.
-                    elts: types
+            if checker.patch(diagnostic.kind.rule()) {
+                if !contains_effect(target, |id| checker.semantic_model().is_builtin(id)) {
+                    // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
+                    // in `isinstance(obj, int) or isinstance(obj, str)`).
+                    let types: Vec<&Expr> = indices
                         .iter()
-                        .flat_map(|value| {
-                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                                Left(elts.iter())
-                            } else {
-                                Right(iter::once(*value))
-                            }
+                        .map(|index| &values[*index])
+                        .map(|expr| {
+                            let Expr::Call(ast::ExprCall { args, .. }) = expr else {
+                                unreachable!("Indices should only contain `isinstance` calls")
+                            };
+                            args.get(1).expect("`isinstance` should have two arguments")
                         })
-                        .map(Clone::clone)
-                        .collect(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                let node1 = ast::ExprName {
-                    id: "isinstance".into(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                let node2 = ast::ExprCall {
-                    func: Box::new(node1.into()),
-                    args: vec![target.clone(), node.into()],
-                    keywords: vec![],
-                    range: TextRange::default(),
-                };
-                let call = node2.into();
+                        .collect();
 
-                // Generate the combined `BoolOp`.
-                let node = ast::ExprBoolOp {
-                    op: Boolop::Or,
-                    values: iter::once(call)
-                        .chain(
-                            values
-                                .iter()
-                                .enumerate()
-                                .filter(|(index, _)| !indices.contains(index))
-                                .map(|(_, elt)| elt.clone()),
-                        )
-                        .collect(),
-                    range: TextRange::default(),
-                };
-                let bool_op = node.into();
+                    // Generate a single `isinstance` call.
+                    let node = ast::ExprTuple {
+                        // Flatten all the types used across the `isinstance` calls.
+                        elts: types
+                            .iter()
+                            .flat_map(|value| {
+                                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
+                                    Left(elts.iter())
+                                } else {
+                                    Right(iter::once(*value))
+                                }
+                            })
+                            .map(Clone::clone)
+                            .collect(),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    };
+                    let node1 = ast::ExprName {
+                        id: "isinstance".into(),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    };
+                    let node2 = ast::ExprCall {
+                        func: Box::new(node1.into()),
+                        args: vec![target.clone(), node.into()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    };
+                    let call = node2.into();
 
-                // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
-                // multiple duplicates, the fixes will conflict.
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    checker.generator().expr(&bool_op),
-                    expr.range(),
-                )));
+                    // Generate the combined `BoolOp`.
+                    let node = ast::ExprBoolOp {
+                        op: Boolop::Or,
+                        values: iter::once(call)
+                            .chain(
+                                values
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(index, _)| !indices.contains(index))
+                                    .map(|(_, elt)| elt.clone()),
+                            )
+                            .collect(),
+                        range: TextRange::default(),
+                    };
+                    let bool_op = node.into();
+
+                    // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
+                    // multiple duplicates, the fixes will conflict.
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        checker.generator().expr(&bool_op),
+                        expr.range(),
+                    )));
+                }
             }
             checker.diagnostics.push(diagnostic);
         }

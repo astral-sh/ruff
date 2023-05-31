@@ -268,7 +268,8 @@ ruff_macros::register_rules!(
     rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
     rules::flake8_annotations::rules::AnyType,
     // flake8-future-annotations
-    rules::flake8_future_annotations::rules::MissingFutureAnnotationsImport,
+    rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation,
+    rules::flake8_future_annotations::rules::FutureRequiredTypeAnnotation,
     // flake8-2020
     rules::flake8_2020::rules::SysVersionSlice3,
     rules::flake8_2020::rules::SysVersion2,
@@ -515,6 +516,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::AssignmentDefaultInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::IterMethodReturnIterable,
     rules::flake8_pyi::rules::DuplicateUnionMember,
     rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
     rules::flake8_pyi::rules::NonEmptyStubBody,

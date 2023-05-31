@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-iterate_over_set.py:8:13: PLC0208 Use a sequence type when iterating over values
+iterate_over_set.py:8:13: PLC0208 Use a sequence type instead of a set when iterating over values
    |
  8 | # True positives.
  9 | 
@@ -10,7 +10,7 @@ iterate_over_set.py:8:13: PLC0208 Use a sequence type when iterating over values
 11 |     print(f"I like {item}.")
    |
 
-iterate_over_set.py:11:13: PLC0208 Use a sequence type when iterating over values
+iterate_over_set.py:11:13: PLC0208 Use a sequence type instead of a set when iterating over values
    |
 11 |     print(f"I like {item}.")
 12 | 
@@ -19,7 +19,7 @@ iterate_over_set.py:11:13: PLC0208 Use a sequence type when iterating over value
 14 |     print(f"I like {item}.")
    |
 
-iterate_over_set.py:14:15: PLC0208 Use a sequence type when iterating over values
+iterate_over_set.py:14:15: PLC0208 Use a sequence type instead of a set when iterating over values
    |
 14 |     print(f"I like {item}.")
 15 | 
@@ -28,7 +28,7 @@ iterate_over_set.py:14:15: PLC0208 Use a sequence type when iterating over value
 17 |     print(number)
    |
 
-iterate_over_set.py:17:28: PLC0208 Use a sequence type when iterating over values
+iterate_over_set.py:17:28: PLC0208 Use a sequence type instead of a set when iterating over values
    |
 17 |     print(number)
 18 | 
@@ -38,7 +38,7 @@ iterate_over_set.py:17:28: PLC0208 Use a sequence type when iterating over value
 21 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
    |
 
-iterate_over_set.py:19:27: PLC0208 Use a sequence type when iterating over values
+iterate_over_set.py:19:27: PLC0208 Use a sequence type instead of a set when iterating over values
    |
 19 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
 20 | 
@@ -48,7 +48,7 @@ iterate_over_set.py:19:27: PLC0208 Use a sequence type when iterating over value
 23 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
    |
 
-iterate_over_set.py:21:36: PLC0208 Use a sequence type when iterating over values
+iterate_over_set.py:21:36: PLC0208 Use a sequence type instead of a set when iterating over values
    |
 21 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
 22 | 
@@ -58,7 +58,7 @@ iterate_over_set.py:21:36: PLC0208 Use a sequence type when iterating over value
 25 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
    |
 
-iterate_over_set.py:23:27: PLC0208 Use a sequence type when iterating over values
+iterate_over_set.py:23:27: PLC0208 Use a sequence type instead of a set when iterating over values
    |
 23 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
 24 | 
