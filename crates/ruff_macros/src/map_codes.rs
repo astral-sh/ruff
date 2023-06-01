@@ -12,13 +12,18 @@ use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_nursery};
 
 #[derive(Clone)]
 struct LinterToRuleData {
-    /// The rule identifier, e.g., `rules::pyflakes::rules::UnusedImport`.
-    rule_id: Path,
     /// The actual name of the rule, e.g., `UnusedImport`.
     rule_name: Ident,
-    /// The rule group identifiers, e.g., `RuleGroup::Unspecified`.
-    rule_group_id: Path,
-    /// The rule attributes.
+    /// The linter associated with the rule, e.g., `Flake8Bugbear`.
+    linter: Ident,
+    /// The code associated with the rule, e.g., `"002"`.
+    code: LitStr,
+    /// The rule group identifier, e.g., `RuleGroup::Unspecified`.
+    group: Path,
+    /// The path to the struct implementing the rule, e.g.
+    /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
+    rule: Path,
+    /// The rule attributes, e.g. for feature gates
     attrs: Vec<Attribute>,
 }
 
@@ -28,7 +33,7 @@ struct RuleToLinterData<'a> {
     /// The code associated with the rule, e.g., `"002"`.
     code: &'a str,
     /// The rule group identifier, e.g., `RuleGroup::Unspecified`.
-    rule_group_id: &'a Path,
+    rule_group: &'a Path,
     /// The rule attributes.
     attrs: &'a [Attribute],
 }
@@ -54,17 +59,11 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             break;
         }
 
-        let entry = syn::parse::<Entry>(arm.into_token_stream().into())?;
-        let rule_name = entry.rule.segments.last().unwrap().ident.clone();
-        linter_to_rules.entry(entry.linter).or_default().insert(
-            entry.code.value(),
-            LinterToRuleData {
-                rule_id: entry.rule,
-                rule_name,
-                rule_group_id: entry.group,
-                attrs: entry.attrs,
-            },
-        );
+        let entry = syn::parse::<LinterToRuleData>(arm.into_token_stream().into())?;
+        linter_to_rules
+            .entry(entry.linter.clone())
+            .or_default()
+            .insert(entry.code.value(), entry);
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
@@ -96,16 +95,9 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     for (linter, rules) in &linter_to_rules {
         output.extend(super::rule_code_prefix::expand(
             linter,
-            rules.iter().map(
-                |(
-                    code,
-                    LinterToRuleData {
-                        rule_group_id,
-                        attrs,
-                        ..
-                    },
-                )| (code.as_str(), rule_group_id, attrs),
-            ),
+            rules
+                .iter()
+                .map(|(code, LinterToRuleData { group, attrs, .. })| (code.as_str(), group, attrs)),
         ));
 
         output.extend(quote! {
@@ -211,17 +203,14 @@ fn rules_by_prefix(
     for (
         code,
         LinterToRuleData {
-            rule_id,
-            rule_group_id,
-            attrs,
-            ..
+            group, rule, attrs, ..
         },
     ) in rules
     {
         // Nursery rules have to be explicitly selected, so we ignore them when looking at
         // prefixes.
-        if is_nursery(rule_group_id) {
-            rules_by_prefix.insert(code.clone(), vec![(rule_id.clone(), attrs.clone())]);
+        if is_nursery(group) {
+            rules_by_prefix.insert(code.clone(), vec![(rule.clone(), attrs.clone())]);
             continue;
         }
 
@@ -233,20 +222,17 @@ fn rules_by_prefix(
                     |(
                         code,
                         LinterToRuleData {
-                            rule_id,
-                            rule_group_id,
-                            attrs,
-                            ..
+                            attrs, rule, group, ..
                         },
                     )| {
                         // Nursery rules have to be explicitly selected, so we ignore them when
                         // looking at prefixes.
-                        if is_nursery(rule_group_id) {
+                        if is_nursery(group) {
                             return None;
                         }
 
                         if code.starts_with(&prefix) {
-                            Some((rule_id.clone(), attrs.clone()))
+                            Some((rule.clone(), attrs.clone()))
                         } else {
                             None
                         }
@@ -274,23 +260,20 @@ fn generate_rule_to_code(
         for (
             code,
             LinterToRuleData {
-                rule_id,
-                rule_group_id,
-                attrs,
-                ..
+                attrs, rule, group, ..
             },
         ) in map
         {
             rule_to_codes
-                .entry(rule_id)
+                .entry(rule)
                 .or_default()
                 .push(RuleToLinterData {
                     linter,
                     code,
-                    rule_group_id,
+                    rule_group: group,
                     attrs,
                 });
-            let rule_name = rule_id.segments.last().unwrap();
+            let rule_name = rule.segments.last().unwrap();
             linter_code_for_rule_match_arms.extend(quote! {
                 #(#attrs)* (Self::#linter, Rule::#rule_name) => Some(#code),
             });
@@ -323,7 +306,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
         let RuleToLinterData {
             linter,
             code,
-            rule_group_id,
+            rule_group,
             attrs,
         } = codes
             .iter()
@@ -336,7 +319,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
         });
 
         rule_group_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => #rule_group_id,
+            #(#attrs)* Rule::#rule_name => #rule_group,
         });
     }
 
@@ -382,8 +365,8 @@ fn generate_iter_impl(
 ) -> TokenStream {
     let mut linter_into_iter_match_arms = quote!();
     for (linter, map) in linter_to_rules {
-        let rule_paths = map.values().map(|LinterToRuleData { rule_id, attrs, .. }| {
-            let rule_name = rule_id.segments.last().unwrap();
+        let rule_paths = map.values().map(|LinterToRuleData { attrs, rule, .. }| {
+            let rule_name = rule.segments.last().unwrap();
             quote!(#(#attrs)* Rule::#rule_name)
         });
         linter_into_iter_match_arms.extend(quote! {
@@ -421,10 +404,10 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a LinterToRuleData>) -> Toke
     let mut from_impls_for_diagnostic_kind = quote!();
 
     for LinterToRuleData {
-        rule_id: path,
         rule_name: name,
-        rule_group_id: _,
         attrs,
+        rule: path,
+        ..
     } in input
     {
         rule_variants.extend(quote! {
@@ -492,16 +475,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a LinterToRuleData>) -> Toke
     }
 }
 
-struct Entry {
-    linter: Ident,
-    code: LitStr,
-    group: Path,
-    rule: Path,
-    attrs: Vec<Attribute>,
-}
-
-impl Parse for Entry {
-    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Nursery, Rule::NoIndentedBlock),`
+impl Parse for LinterToRuleData {
+    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;
@@ -514,13 +489,15 @@ impl Parse for Entry {
         parenthesized!(pat_tuple in input);
         let group: Path = pat_tuple.parse()?;
         let _: Token!(,) = pat_tuple.parse()?;
-        let rule: Path = pat_tuple.parse()?;
+        let rule_path: Path = pat_tuple.parse()?;
         let _: Token!(,) = input.parse()?;
-        Ok(Entry {
+        let rule_name = rule_path.segments.last().unwrap().ident.clone();
+        Ok(LinterToRuleData {
+            rule_name,
             linter,
             code,
             group,
-            rule,
+            rule: rule_path,
             attrs,
         })
     }
