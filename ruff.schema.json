@@ -442,6 +442,17 @@
         }
       ]
     },
+    "pyflakes": {
+      "description": "Options for the `pyflakes` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PyflakesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pylint": {
       "description": "Options for the `pylint` plugin.",
       "anyOf": [
@@ -1429,6 +1440,22 @@
       },
       "additionalProperties": false
     },
+    "PyflakesOptions": {
+      "type": "object",
+      "properties": {
+        "extend-generics": {
+          "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "PylintOptions": {
       "type": "object",
       "properties": {
@@ -2006,6 +2033,9 @@
         "PL",
         "PLC",
         "PLC0",
+        "PLC02",
+        "PLC020",
+        "PLC0208",
         "PLC04",
         "PLC041",
         "PLC0414",

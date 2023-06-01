@@ -62,10 +62,11 @@ __all__ = (
 ```diff
 --- Black
 +++ Ruff
-@@ -2,8 +2,10 @@
- 
- # flake8: noqa
- 
+@@ -1,55 +1,30 @@
+ """The asyncio package, tracking PEP 3156."""
+-
+-# flake8: noqa
+-
 -from logging import WARNING
  from logging import (
 +    WARNING
@@ -74,9 +75,23 @@ __all__ = (
      ERROR,
  )
  import sys
-@@ -22,33 +24,16 @@
+-
+-# This relies on each of the submodules having an __all__ variable.
+ from .base_events import *
+ from .coroutines import *
+-from .events import *  # comment here
+-
++from .events import *
+ from .futures import *
+-from .locks import *  # comment here
++from .locks import *
+ from .protocols import *
+-
+-from ..runners import *  # comment here
++from ..runners import *
+ from ..queues import *
  from ..streams import *
- 
+-
  from some_library import (
 -    Just,
 -    Enough,
@@ -99,7 +114,7 @@ __all__ = (
 -)
 +from name_of_a_company.extremely_long_project_name.component.ttypes import CuteLittleServiceHandlerFactoryyy
  from name_of_a_company.extremely_long_project_name.extremely_long_component_name.ttypes import *
- 
+-
  from .a.b.c.subprocess import *
 -from . import tasks
 -from . import A, B, C
@@ -107,22 +122,20 @@ __all__ = (
 -    SomeVeryLongNameAndAllOfItsAdditionalLetters1,
 -    SomeVeryLongNameAndAllOfItsAdditionalLetters2,
 -)
+-
 +from . import (tasks)
 +from . import (A, B, C)
 +from . import SomeVeryLongNameAndAllOfItsAdditionalLetters1, \
 +              SomeVeryLongNameAndAllOfItsAdditionalLetters2
- 
  __all__ = (
      base_events.__all__
+     + coroutines.__all__
 ```
 
 ## Ruff Output
 
 ```py
 """The asyncio package, tracking PEP 3156."""
-
-# flake8: noqa
-
 from logging import (
     WARNING
 )
@@ -130,32 +143,25 @@ from logging import (
     ERROR,
 )
 import sys
-
-# This relies on each of the submodules having an __all__ variable.
 from .base_events import *
 from .coroutines import *
-from .events import *  # comment here
-
+from .events import *
 from .futures import *
-from .locks import *  # comment here
+from .locks import *
 from .protocols import *
-
-from ..runners import *  # comment here
+from ..runners import *
 from ..queues import *
 from ..streams import *
-
 from some_library import (
     Just, Enough, Libraries, To, Fit, In, This, Nice, Split, Which, We, No, Longer, Use
 )
 from name_of_a_company.extremely_long_project_name.component.ttypes import CuteLittleServiceHandlerFactoryyy
 from name_of_a_company.extremely_long_project_name.extremely_long_component_name.ttypes import *
-
 from .a.b.c.subprocess import *
 from . import (tasks)
 from . import (A, B, C)
 from . import SomeVeryLongNameAndAllOfItsAdditionalLetters1, \
               SomeVeryLongNameAndAllOfItsAdditionalLetters2
-
 __all__ = (
     base_events.__all__
     + coroutines.__all__

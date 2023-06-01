@@ -87,7 +87,7 @@ impl<'a> LogicalLines<'a> {
         assert!(u32::try_from(tokens.len()).is_ok());
 
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
-        let mut parens: u32 = 0;
+        let mut parens = 0u32;
 
         for (token, range) in tokens.iter().flatten() {
             let token_kind = TokenKind::from_token(token);
@@ -95,10 +95,10 @@ impl<'a> LogicalLines<'a> {
 
             match token_kind {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                    parens += 1;
+                    parens = parens.saturating_add(1);
                 }
                 TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
-                    parens -= 1;
+                    parens = parens.saturating_sub(1);
                 }
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     builder.finish_line();

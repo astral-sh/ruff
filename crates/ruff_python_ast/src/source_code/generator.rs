@@ -132,11 +132,11 @@ impl<'a> Generator<'a> {
     }
 
     fn body<U>(&mut self, stmts: &[Stmt<U>]) {
-        self.indent_depth += 1;
+        self.indent_depth = self.indent_depth.saturating_add(1);
         for stmt in stmts {
             self.unparse_stmt(stmt);
         }
-        self.indent_depth -= 1;
+        self.indent_depth = self.indent_depth.saturating_sub(1);
     }
 
     fn p(&mut self, s: &str) {
@@ -531,11 +531,11 @@ impl<'a> Generator<'a> {
                     self.p(":");
                 });
                 for case in cases {
-                    self.indent_depth += 1;
+                    self.indent_depth = self.indent_depth.saturating_add(1);
                     statement!({
                         self.unparse_match_case(case);
                     });
-                    self.indent_depth -= 1;
+                    self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
             }
             Stmt::Raise(ast::StmtRaise {

@@ -1,0 +1,56 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: Arguments,
+        range: 15..177,
+        source: `a=10 # trailing positional comment⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# Positional arguments only after here",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# trailing positional argument comment.",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: ExprConstant,
+        range: 17..19,
+        source: `10`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing positional comment",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: Arg,
+        range: 173..174,
+        source: `b`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# leading comment for b",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+}

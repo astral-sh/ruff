@@ -1554,6 +1554,9 @@ where
                 if self.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    pylint::rules::iteration_over_set(self, iter);
+                }
                 if matches!(stmt, Stmt::For(_)) {
                     if self.enabled(Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
@@ -1976,10 +1979,17 @@ where
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
                     if let Some(call_path) = self.semantic_model.resolve_call_path(type_) {
-                        if call_path.as_slice() == ["", "NameError"] {
-                            handled_exceptions |= Exceptions::NAME_ERROR;
-                        } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
-                            handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                        match call_path.as_slice() {
+                            ["", "NameError"] => {
+                                handled_exceptions |= Exceptions::NAME_ERROR;
+                            }
+                            ["", "ModuleNotFoundError"] => {
+                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                            }
+                            ["", "ImportError"] => {
+                                handled_exceptions |= Exceptions::IMPORT_ERROR;
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -3506,6 +3516,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -3530,6 +3545,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {
                 generators,
@@ -3546,6 +3566,11 @@ where
                             &generator.target,
                             &generator.iter,
                         );
+                    }
+                }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
                     }
                 }
             }
@@ -3870,6 +3895,7 @@ where
                         value,
                         &self.semantic_model,
                         self.settings.typing_modules.iter().map(String::as_str),
+                        &self.settings.pyflakes.extend_generics,
                     ) {
                         Some(subscript) => {
                             match subscript {
