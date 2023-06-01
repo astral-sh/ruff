@@ -1,9 +1,11 @@
+use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{lines_after, lines_before};
-use ruff_formatter::{format_args, write};
+use ruff_formatter::{format_args, write, SourceCode};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::AstNode;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 /// Formats the leading comments of a node.
 pub(crate) fn leading_comments<T>(node: &T) -> FormatLeadingComments
@@ -30,10 +32,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
             let lines_after_comment = lines_after(f.context().contents(), slice.end());
             write!(
                 f,
-                [
-                    source_text_slice(slice.range(), ContainsNewlines::No),
-                    empty_lines(lines_after_comment)
-                ]
+                [format_comment(comment), empty_lines(lines_after_comment)]
             )?;
 
             comment.mark_formatted();
@@ -64,7 +63,6 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
 
         for trailing in comments.trailing_comments(self.node) {
             let slice = trailing.slice();
-            let content = source_text_slice(slice.range(), ContainsNewlines::No);
 
             let lines_before_comment = lines_before(f.context().contents(), slice.start());
             has_empty_lines_before |= lines_before_comment > 0;
@@ -81,7 +79,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                     f,
                     [
                         line_suffix(&format_with(|f| {
-                            write!(f, [empty_lines(lines_before_comment), content])
+                            write!(
+                                f,
+                                [empty_lines(lines_before_comment), format_comment(trailing)]
+                            )
                         })),
                         expand_parent()
                     ]
@@ -90,7 +91,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
                 write!(
                     f,
                     [
-                        line_suffix(&format_args![space(), space(), content]),
+                        line_suffix(&format_args![space(), space(), format_comment(trailing)]),
                         expand_parent()
                     ]
                 )?;
@@ -132,7 +133,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
             write!(
                 f,
                 [
-                    source_text_slice(comment.slice().range(), ContainsNewlines::No),
+                    format_comment(comment),
                     empty_lines(lines_after(f.context().contents(), comment.slice().end()))
                 ]
             )?;
@@ -143,6 +144,56 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
         }
 
         Ok(())
+    }
+}
+
+/// Formats the content of the passed comment.
+///
+/// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, or `!`
+/// * Replaces non breaking whitespaces with regular whitespaces except if in front of a `types:` comment
+const fn format_comment(comment: &SourceComment) -> FormatComment {
+    FormatComment { comment }
+}
+
+struct FormatComment<'a> {
+    comment: &'a SourceComment,
+}
+
+impl Format<PyFormatContext<'_>> for FormatComment<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        let slice = self.comment.slice();
+        let comment_text = slice.text(SourceCode::new(f.context().contents()));
+
+        let (content, mut start_offset) = comment_text
+            .strip_prefix('#')
+            .map_or((comment_text, TextSize::new(0)), |rest| {
+                (rest, '#'.text_len())
+            });
+
+        write!(f, [source_position(slice.start()), text("#")])?;
+
+        // Starts with a non breaking space
+        if content.starts_with('\u{A0}') && !content.trim_start().starts_with("type:") {
+            // Replace non-breaking space with a space (if not followed by a normal space)
+            start_offset += '\u{A0}'.text_len();
+        }
+
+        // Add a space between the `#` and the text if the source contains none.
+        if !content.is_empty() && !content.starts_with([' ', '!', ':', '#', '\'']) {
+            write!(f, [space()])?;
+        }
+
+        let start = slice.start() + start_offset;
+        let trimmed = content.trim_end();
+        let end = slice.range().end() - (content.text_len() - trimmed.text_len());
+
+        write!(
+            f,
+            [
+                source_text_slice(TextRange::new(start, end), ContainsNewlines::No),
+                source_position(slice.end())
+            ]
+        )
     }
 }
 

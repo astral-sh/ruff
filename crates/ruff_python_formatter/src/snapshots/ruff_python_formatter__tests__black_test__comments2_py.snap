@@ -349,7 +349,7 @@ instruction()#comment with bad spacing
          # yup
          for element in collection.select_elements()
          # right
-@@ -140,34 +132,26 @@
+@@ -140,28 +132,20 @@
              # and round and round we go
          # and round and round we go
  
@@ -386,13 +386,6 @@ instruction()#comment with bad spacing
  #######################
  ### SECTION COMMENT ###
  #######################
- 
- 
--instruction()  # comment with bad spacing
-+instruction()  #comment with bad spacing
- 
- # END COMMENTS
- # MORE END COMMENTS
 ```
 
 ## Ruff Output
@@ -551,7 +544,7 @@ class Test:
 #######################
 
 
-instruction()  #comment with bad spacing
+instruction()  # comment with bad spacing
 
 # END COMMENTS
 # MORE END COMMENTS
