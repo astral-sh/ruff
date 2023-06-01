@@ -17,7 +17,7 @@ pub struct LongStringOrBytesInStub;
 impl Violation for LongStringOrBytesInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`str` and `bytes` literals longer than 50 characters should not be used in stubs.")
+        format!("`str` and `bytes` literals longer than 50 characters should not be used in stubs")
     }
 }
 
