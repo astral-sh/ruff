@@ -523,7 +523,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::NonEmptyStubBody,
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::PassStatementStubBody,
-    rules::flake8_pyi::rules::LongNumericLiteralsInStub,
+    rules::flake8_pyi::rules::NumericLiteralTooLong,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
     rules::flake8_pyi::rules::StubBodyMultipleStatements,

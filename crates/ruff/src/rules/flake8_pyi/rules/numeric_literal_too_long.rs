@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct LongNumericLiteralsInStub;
+pub struct NumericLiteralTooLong;
 
 /// ## What it does
 /// Checks for numeric literals longer than 10 characters
@@ -25,7 +25,7 @@ pub struct LongNumericLiteralsInStub;
 /// ```python
 /// def foo(arg: int = ...) -> None: ...
 /// ```
-impl Violation for LongNumericLiteralsInStub {
+impl Violation for NumericLiteralTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Numeric literals with a string representation longer than ten characters are not permitted")
@@ -33,10 +33,10 @@ impl Violation for LongNumericLiteralsInStub {
 }
 
 /// PYI054
-pub(crate) fn long_numeric_literals_in_stub(checker: &mut Checker, range: TextRange) {
+pub(crate) fn numeric_literal_too_long(checker: &mut Checker, range: TextRange) {
     if range.len() > TextSize::new(10) {
         checker
             .diagnostics
-            .push(Diagnostic::new(LongNumericLiteralsInStub, range));
+            .push(Diagnostic::new(NumericLiteralTooLong, range));
     }
 }
