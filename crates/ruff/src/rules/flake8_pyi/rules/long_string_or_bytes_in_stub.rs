@@ -14,7 +14,17 @@ pub struct LongStringOrBytesInStub;
 /// ## Why is this bad?
 /// If a function has a default value where the string or bytes representation is greater than 50
 /// characters, it is likely to be an implementation detail or a constant that varies depending on
-/// the system you're running on.
+/// the system you're running on. Consider replacing them with ellipses.
+///
+/// ## Example
+/// ```python
+/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(arg: str = ...) -> None: ...
+/// ```
 impl Violation for LongStringOrBytesInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
