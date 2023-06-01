@@ -3,6 +3,21 @@ use rustpython_parser::ast::{self, Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for `break` statements outside of loops.
+///
+/// ## Why is this bad?
+/// `break` statements outside of a `while` or `for` loop will raise a
+/// `SyntaxError`.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     break  # SyntaxError
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-break-statement)
 #[violation]
 pub struct BreakOutsideLoop;
 

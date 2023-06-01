@@ -25,6 +25,20 @@ impl fmt::Display for DeferralKeyword {
     }
 }
 
+/// ## What it does
+/// Checks for `yield` and `yield from` statements outside of a function.
+///
+/// ## Why is this bad?
+/// `yield` and `yield from` statements outside a function will raise a `SyntaxError`.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     yield 1  # SyntaxError
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
 #[violation]
 pub struct YieldOutsideFunction {
     keyword: DeferralKeyword,

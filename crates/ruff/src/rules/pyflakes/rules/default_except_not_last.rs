@@ -5,6 +5,42 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::except_range;
 use ruff_python_ast::source_code::Locator;
 
+/// ## What it does
+/// Checks for bare `except` blocks that are not the last exception handler.
+///
+/// ## Why is this bad?
+/// `except` blocks are executed in order, so if a `except` block that handles
+/// all exceptions is not the last one, it will prevent the following `except`
+/// blocks from being executed. This will result in a `SyntaxError`.
+///
+/// ## Example
+/// ```python
+/// def reciprocal(n):
+///     try:
+///         reciprocal = 1 / n
+///     except:  # SyntaxError
+///         print("An exception occurred.")
+///     except ZeroDivisionError:
+///         print("Cannot divide by zero!")
+///     else:
+///         return reciprocal
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def reciprocal(n):
+///     try:
+///         reciprocal = 1 / n
+///     except ZeroDivisionError:
+///         print("Cannot divide by zero!")
+///     except:
+///         print("An exception occurred.")
+///     else:
+///         return reciprocal
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[violation]
 pub struct DefaultExceptNotLast;
 

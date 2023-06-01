@@ -6,6 +6,20 @@ use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `return` statements outside of a function.
+///
+/// ## Why is this bad?
+/// `return` statements outside a function will raise a `SyntaxError`.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     return 1  # SyntaxError
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-return-statement)
 #[violation]
 pub struct ReturnOutsideFunction;
 
