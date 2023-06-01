@@ -104,7 +104,7 @@ pub(crate) fn remove_argument(
 
     if n_arguments == 1 {
         // Case 1: there is only one argument.
-        let mut count: usize = 0;
+        let mut count = 0u32;
         for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, call_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
@@ -114,11 +114,11 @@ pub(crate) fn remove_argument(
                         range.start() + TextSize::from(1)
                     });
                 }
-                count += 1;
+                count = count.saturating_add(1);
             }
 
             if matches!(tok, Tok::Rpar) {
-                count -= 1;
+                count = count.saturating_sub(1);
                 if count == 0 {
                     fix_end = Some(if remove_parentheses {
                         range.end()

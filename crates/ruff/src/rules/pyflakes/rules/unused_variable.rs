@@ -73,9 +73,9 @@ where
     let contents = locator.after(located.start());
 
     // Track the bracket depth.
-    let mut par_count = 0;
-    let mut sqb_count = 0;
-    let mut brace_count = 0;
+    let mut par_count = 0u32;
+    let mut sqb_count = 0u32;
+    let mut brace_count = 0u32;
 
     for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, Mode::Module, located.start())
         .flatten()
@@ -83,30 +83,30 @@ where
     {
         match tok {
             Tok::Lpar => {
-                par_count += 1;
+                par_count = par_count.saturating_add(1);
             }
             Tok::Lsqb => {
-                sqb_count += 1;
+                sqb_count = sqb_count.saturating_add(1);
             }
             Tok::Lbrace => {
-                brace_count += 1;
+                brace_count = brace_count.saturating_add(1);
             }
             Tok::Rpar => {
-                par_count -= 1;
+                par_count = par_count.saturating_sub(1);
                 // If this is a closing bracket, continue.
                 if par_count == 0 {
                     continue;
                 }
             }
             Tok::Rsqb => {
-                sqb_count -= 1;
+                sqb_count = sqb_count.saturating_sub(1);
                 // If this is a closing bracket, continue.
                 if sqb_count == 0 {
                     continue;
                 }
             }
             Tok::Rbrace => {
-                brace_count -= 1;
+                brace_count = brace_count.saturating_sub(1);
                 // If this is a closing bracket, continue.
                 if brace_count == 0 {
                     continue;

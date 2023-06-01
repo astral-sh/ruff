@@ -16,7 +16,7 @@ pub(crate) fn add_return_annotation(
     // Find the colon (following the `def` keyword).
     let mut seen_lpar = false;
     let mut seen_rpar = false;
-    let mut count: usize = 0;
+    let mut count = 0u32;
     for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
@@ -28,10 +28,10 @@ pub(crate) fn add_return_annotation(
             if count == 0 {
                 seen_lpar = true;
             }
-            count += 1;
+            count = count.saturating_add(1);
         }
         if matches!(tok, Tok::Rpar) {
-            count -= 1;
+            count = count.saturating_sub(1);
             if count == 0 {
                 seen_rpar = true;
             }
