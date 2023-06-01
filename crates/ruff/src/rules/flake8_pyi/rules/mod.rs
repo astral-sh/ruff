@@ -29,6 +29,9 @@ pub(crate) use type_alias_naming::{
     snake_case_type_alias, t_suffixed_type_alias, SnakeCaseTypeAlias, TSuffixedTypeAlias,
 };
 pub(crate) use type_comment_in_stub::{type_comment_in_stub, TypeCommentInStub};
+pub(crate) use unaliased_collections_abc_set_import::{
+    unaliased_collections_abc_set_import, UnaliasedCollectionsAbcSetImport,
+};
 pub(crate) use unrecognized_platform::{
     unrecognized_platform, UnrecognizedPlatformCheck, UnrecognizedPlatformName,
 };
@@ -50,4 +53,5 @@ mod string_or_bytes_too_long;
 mod stub_body_multiple_statements;
 mod type_alias_naming;
 mod type_comment_in_stub;
+mod unaliased_collections_abc_set_import;
 mod unrecognized_platform;
