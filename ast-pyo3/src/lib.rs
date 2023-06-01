@@ -4,7 +4,7 @@ pub mod wrapper;
 
 pub use py_ast::{init, PyNode, ToPyAst};
 use pyo3::prelude::*;
-use rustpython_parser::ast::{source_code::SourceLocator, Fold};
+use rustpython_parser::ast::{source_code::LinearLocator, Fold};
 
 #[pyfunction]
 #[pyo3(signature = (source, filename="<unknown>", *, type_comments=false, locate=true))]
@@ -21,7 +21,7 @@ pub fn parse<'py>(
     let parsed = rustpython_parser::parse(source, rustpython_parser::Mode::Module, filename)
         .map_err(|e| PyErr::new::<pyo3::exceptions::PySyntaxError, _>(e.to_string()))?;
     if locate {
-        let parsed = SourceLocator::new(source).fold(parsed).unwrap();
+        let parsed = LinearLocator::new(source).fold(parsed).unwrap();
         parsed.module().unwrap().to_py_ast(py)
     } else {
         parsed.module().unwrap().to_py_ast(py)

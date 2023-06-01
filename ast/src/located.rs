@@ -13,6 +13,10 @@ pub trait Located {
     }
 }
 
+pub trait LocatedMut: Located {
+    fn range_mut(&mut self) -> &mut SourceRange;
+}
+
 pub type Suite = Vec<Stmt>;
 
 pub use crate::builtin::*;

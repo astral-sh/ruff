@@ -1125,14 +1125,25 @@ class LocatedDefVisitor(EmitVisitor):
             self.emit_located_impl(variant_info)
 
         if not info.no_cfg(self.type_info):
-            self.emit('#[cfg(feature = "all-nodes-with-ranges")]', 0)
+            cfg = '#[cfg(feature = "all-nodes-with-ranges")]'
+        else:
+            cfg = ''
 
         self.emit(
             f"""
+            {cfg}
             impl Located for {info.full_type_name} {{
                 fn range(&self) -> SourceRange {{
                     match self {{
                         {sum_match_arms}
+                    }}
+                }}
+            }}
+            {cfg}
+            impl LocatedMut for {info.full_type_name} {{
+                fn range_mut(&mut self) -> &mut SourceRange {{
+                    match self {{
+                        {sum_match_arms.replace('range()', 'range_mut()')}
                     }}
                 }}
             }}
@@ -1157,13 +1168,22 @@ class LocatedDefVisitor(EmitVisitor):
 
     def emit_located_impl(self, info):
         if not info.no_cfg(self.type_info):
-            self.emit('#[cfg(feature = "all-nodes-with-ranges")]', 0)
+            cfg = '#[cfg(feature = "all-nodes-with-ranges")]'
+        else:
+            cfg = ''
 
         self.emit(
             f"""
+            {cfg}
             impl Located for {info.full_type_name} {{
                 fn range(&self) -> SourceRange {{
                     self.range
+                }}
+            }}
+            {cfg}
+            impl LocatedMut for {info.full_type_name} {{
+                fn range_mut(&mut self) -> &mut SourceRange {{
+                    &mut self.range
                 }}
             }}
             """,
