@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for `continue` statements outside of loops.
 ///
 /// ## Why is this bad?
-/// `continue` statements outside of a `while` or `for` loop will raise a
+/// `continue` statements outside of a `while` or `for` loop will raise
 /// `SyntaxError`.
 ///
 /// ## Example

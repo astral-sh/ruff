@@ -11,7 +11,7 @@ use ruff_python_ast::source_code::Locator;
 /// ## Why is this bad?
 /// `except` blocks are executed in order, so if a `except` block that handles
 /// all exceptions is not the last one, it will prevent the following `except`
-/// blocks from being executed. This will result in a `SyntaxError`.
+/// blocks from being executed. This will result in `SyntaxError` being raised.
 ///
 /// ## Example
 /// ```python

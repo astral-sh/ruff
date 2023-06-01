@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 /// Checks for undefined local variables.
 ///
 /// ## Why is this bad?
-/// Referencing a local variable before it has been assigned will raise an
+/// Referencing a local variable before it has been assigned will raise
 /// `UnboundLocalError`.
 ///
 /// ## Example

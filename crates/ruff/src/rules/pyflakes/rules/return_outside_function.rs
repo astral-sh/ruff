@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for `return` statements outside of a function.
 ///
 /// ## Why is this bad?
-/// `return` statements outside a function will raise a `SyntaxError`.
+/// `return` statements outside a function will raise `SyntaxError`.
 ///
 /// ## Example
 /// ```python

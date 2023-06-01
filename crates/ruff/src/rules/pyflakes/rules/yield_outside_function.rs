@@ -29,7 +29,7 @@ impl fmt::Display for DeferralKeyword {
 /// Checks for `yield` and `yield from` statements outside of a function.
 ///
 /// ## Why is this bad?
-/// `yield` and `yield from` statements outside a function will raise a `SyntaxError`.
+/// `yield` and `yield from` statements outside a function will raise `SyntaxError`.
 ///
 /// ## Example
 /// ```python
