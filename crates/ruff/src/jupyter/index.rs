@@ -1,6 +1,8 @@
 use std::iter;
 use std::sync::Arc;
 
+use ruff_newlines::NewlineWithTrailingNewline;
+
 use crate::jupyter::{Cell, SourceValue};
 
 /// Jupyter Notebook indexing table
@@ -59,7 +61,8 @@ impl JupyterIndexBuilder {
     pub(super) fn add_code_cell(&mut self, pos: usize, cell: &Cell) -> String {
         let cell_contents = match &cell.source {
             SourceValue::String(string) => {
-                let line_count = u32::try_from(string.lines().count()).unwrap();
+                let line_count =
+                    u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap();
                 self.row_to_cell.extend(
                     iter::repeat(u32::try_from(pos + 1).unwrap()).take(line_count as usize),
                 );
