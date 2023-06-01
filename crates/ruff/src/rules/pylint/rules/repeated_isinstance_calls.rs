@@ -56,18 +56,6 @@ impl AlwaysAutofixableViolation for RepeatedIsinstanceCalls {
     }
 }
 
-fn merged_isinstance_call(
-    obj: &str,
-    types: impl IntoIterator<Item = String>,
-    target_version: PythonVersion,
-) -> String {
-    if target_version >= PythonVersion::Py310 {
-        format!("isinstance({}, {})", obj, types.into_iter().join(" | "))
-    } else {
-        format!("isinstance({}, ({}))", obj, types.into_iter().join(", "))
-    }
-}
-
 /// PLR1701
 pub(crate) fn repeated_isinstance_calls(
     checker: &mut Checker,
@@ -75,7 +63,7 @@ pub(crate) fn repeated_isinstance_calls(
     op: Boolop,
     values: &[Expr],
 ) {
-    if !(op.is_or() && checker.semantic_model().is_builtin("isinstance")) {
+    if !op.is_or() {
         return;
     }
 
@@ -86,6 +74,9 @@ pub(crate) fn repeated_isinstance_calls(
             continue;
         };
         if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if id == "isinstance") {
+            continue;
+        }
+        if !checker.semantic_model().is_builtin("isinstance") {
             continue;
         }
         let [obj, types] = &args[..] else {
@@ -124,5 +115,17 @@ pub(crate) fn repeated_isinstance_calls(
             }
             checker.diagnostics.push(diagnostic);
         }
+    }
+}
+
+fn merged_isinstance_call(
+    obj: &str,
+    types: impl IntoIterator<Item = String>,
+    target_version: PythonVersion,
+) -> String {
+    if target_version >= PythonVersion::Py310 {
+        format!("isinstance({}, {})", obj, types.into_iter().join(" | "))
+    } else {
+        format!("isinstance({}, ({}))", obj, types.into_iter().join(", "))
     }
 }
