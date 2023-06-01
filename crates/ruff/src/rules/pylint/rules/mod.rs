@@ -21,7 +21,6 @@ pub(crate) use invalid_string_characters::{
     invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
     InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
 };
-pub(crate) use iterate_over_set::{iterate_over_set, IterateOverSet};
 pub(crate) use load_before_global_declaration::{
     load_before_global_declaration, LoadBeforeGlobalDeclaration,
 };
@@ -35,6 +34,7 @@ pub(crate) use property_with_parameters::{property_with_parameters, PropertyWith
 pub(crate) use redefined_loop_name::{redefined_loop_name, RedefinedLoopName};
 pub(crate) use repeated_isinstance_calls::{repeated_isinstance_calls, RepeatedIsinstanceCalls};
 pub(crate) use return_in_init::{return_in_init, ReturnInInit};
+pub(crate) use set_iteration::{set_iteration, SetIteration};
 pub(crate) use sys_exit_alias::{sys_exit_alias, SysExitAlias};
 pub(crate) use too_many_arguments::{too_many_arguments, TooManyArguments};
 pub(crate) use too_many_branches::{too_many_branches, TooManyBranches};
@@ -74,7 +74,6 @@ mod invalid_all_object;
 mod invalid_envvar_default;
 mod invalid_envvar_value;
 mod invalid_string_characters;
-mod iterate_over_set;
 mod load_before_global_declaration;
 mod logging;
 mod magic_value_comparison;
@@ -86,6 +85,7 @@ mod property_with_parameters;
 mod redefined_loop_name;
 mod repeated_isinstance_calls;
 mod return_in_init;
+mod set_iteration;
 mod sys_exit_alias;
 mod too_many_arguments;
 mod too_many_branches;
