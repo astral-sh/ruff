@@ -1,6 +1,5 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-assertion_line: 67
 ---
 PYI025.pyi:4:29: PYI025 [*] Always alias collections.abc.Set when importing it, so as to avoid confusion with builtins.set
   |
