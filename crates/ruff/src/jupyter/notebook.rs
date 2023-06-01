@@ -253,10 +253,15 @@ impl Notebook {
         {
             let cell_content = transformed
                 .get(start.to_usize()..end.to_usize())
-                .unwrap_or_else(|| panic!("cell content out of bounds: {:?}", &self.raw.cells[pos]))
-                .trim_end_matches(|c| c == '\r' || c == '\n')
-                .to_string();
-            self.raw.cells[pos].source = SourceValue::String(cell_content);
+                .unwrap_or_else(|| {
+                    panic!("cell content out of bounds ({start:?}..{end:?}): {transformed}")
+                });
+            self.raw.cells[pos].source = SourceValue::String(
+                cell_content
+                    .strip_suffix('\n')
+                    .unwrap_or(cell_content)
+                    .to_string(),
+            );
         }
     }
 
