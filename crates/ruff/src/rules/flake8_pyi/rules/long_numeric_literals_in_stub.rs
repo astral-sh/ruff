@@ -1,6 +1,6 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_text_size::{TextRange, TextSize};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -12,7 +12,19 @@ pub struct LongNumericLiteralsInStub;
 /// Checks for numeric literals longer than 10 characters
 ///
 /// ## Why is this bad?
-/// Long hardcoded numeric values are unlikely to be useful for users. Consider replacing them with ellipses.
+/// If a function has a default value where the string representation is greater than 10
+/// characters, it is likely to be an implementation detail or a constant that varies depending on
+/// the system you're running on, such as `sys.maxsize`. Consider replacing them with ellipses.
+///
+/// ## Example
+/// ```python
+/// def foo(arg: int = 12345678901) -> None: ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(arg: int = ...) -> None: ...
+/// ```
 impl Violation for LongNumericLiteralsInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
