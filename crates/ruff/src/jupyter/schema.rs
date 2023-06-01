@@ -4,10 +4,16 @@
 //! <https://github.com/jupyter/nbformat/blob/16b53251aabf472ad9406ddb1f78b0421c014eeb/nbformat/v4/nbformat.v4.schema.json>
 //! Jupyter Notebook v4.5 JSON schema.
 //!
-//! The following changes were made to the generated version: `Cell::id` is optional because it
-//! wasn't required <v4.5, `#[serde(deny_unknown_fields)]` was added where the schema had
-//! `"additionalProperties": false` and `#[serde(flatten)] pub other: BTreeMap<String, Value>`
-//! for `"additionalProperties": true` as preparation for round-trip support.
+//! The following changes were made to the generated version:
+//! * `Cell::id` is optional because it wasn't required <v4.5
+//! * `#[serde(deny_unknown_fields)]` was added where the schema had
+//!   `"additionalProperties": false`
+//! * `#[serde(flatten)] pub other: BTreeMap<String, Value>` for
+//!   `"additionalProperties": true` as preparation for round-trip support.
+//! * `#[serde(skip_serializing_none)]` was added to all structs where one or
+//!   more fields were optional to avoid serializing `null` values.
+//! * `Output::data` & `Cell::attachements` were changed to `Value` because
+//!    the scheme had `patternProperties`.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -43,7 +49,7 @@ pub struct JupyterNotebook {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Cell {
-    pub attachments: Option<HashMap<String, HashMap<String, SourceValue>>>,
+    pub attachments: Option<HashMap<String, HashMap<String, Value>>>,
     /// String identifying the type of cell.
     pub cell_type: CellType,
     /// Technically, id isn't required (it's not even present) in schema v4.0 through v4.4, but
@@ -121,7 +127,7 @@ pub struct Execution {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Output {
-    pub data: Option<HashMap<String, SourceValue>>,
+    pub data: Option<HashMap<String, Value>>,
     /// A result's prompt number.
     pub execution_count: Option<i64>,
     pub metadata: Option<HashMap<String, Option<Value>>>,
