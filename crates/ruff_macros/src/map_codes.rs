@@ -248,6 +248,7 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
     let mut rule_group_match_arms = quote!();
 
     for (rule, codes) in rule_to_codes {
+        let rule_name = rule.segments.last().unwrap();
         assert_eq!(
             codes.len(),
             1,
@@ -263,9 +264,8 @@ and before we can do that we have to rename all our rules to match our naming co
 
 See also https://github.com/charliermarsh/ruff/issues/2186.
 ",
-            rule.segments.last().unwrap().ident
+            rule_name.ident
         );
-        let rule_name = rule.segments.last().unwrap();
 
         let Rule {
             linter,
