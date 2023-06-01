@@ -37,7 +37,7 @@ use crate::settings::types::PythonVersion;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/functions.html#isinstance)
+/// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct RepeatedIsinstanceCalls {
     expr: String,
@@ -47,7 +47,7 @@ impl AlwaysAutofixableViolation for RepeatedIsinstanceCalls {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RepeatedIsinstanceCalls { expr } = self;
-        format!("Consider merging these isinstance calls to `{expr}`")
+        format!("Merge `isinstance` calls: `{expr}`")
     }
 
     fn autofix_title(&self) -> String {
@@ -75,7 +75,7 @@ pub(crate) fn repeated_isinstance_calls(
     op: Boolop,
     values: &[Expr],
 ) {
-    if !matches!(op, Boolop::Or) || !checker.semantic_model().is_builtin("isinstance") {
+    if !(op.is_or() && checker.semantic_model().is_builtin("isinstance")) {
         return;
     }
 
