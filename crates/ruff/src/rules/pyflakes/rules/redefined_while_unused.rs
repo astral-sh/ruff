@@ -3,16 +3,18 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::OneIndexed;
 
 /// ## What it does
-/// Checks for redefinitions of unused names.
+/// Checks for variable definitions that redefine (or "shadow") unused
+/// variables.
 ///
 /// ## Why is this bad?
-/// Redefinitions of unused names are unnecessary and indicative of a mistake.
+/// Redefinitions of unused names are unnecessary and often indicative of a
+/// mistake.
 ///
 /// ## Example
 /// ```python
 /// import foo
 /// import bar
-/// import foo  # redefinition of unused `foo`
+/// import foo  # Redefinition of unused `foo` from line 1
 /// ```
 ///
 /// Use instead:
@@ -20,9 +22,6 @@ use ruff_python_ast::source_code::OneIndexed;
 /// import foo
 /// import bar
 /// ```
-///
-/// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)
 #[violation]
 pub struct RedefinedWhileUnused {
     pub name: String,

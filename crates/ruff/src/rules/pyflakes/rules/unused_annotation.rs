@@ -5,11 +5,11 @@ use ruff_python_semantic::scope::ScopeId;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for unused type annotations.
+/// Checks for local variables that are annotated but never used.
 ///
 /// ## Why is this bad?
-/// Type annotations are used to provide type hints to static analysis tools. If
-/// they are not used, they are redundant.
+/// Annotations are used to provide type hints to static type checkers. If a
+/// variable is annotated but never used, the annotation is unnecessary.
 ///
 /// ## Example
 /// ```python

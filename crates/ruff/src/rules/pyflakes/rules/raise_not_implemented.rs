@@ -7,15 +7,15 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `NotImplemented` being raised.
+/// Checks for `raise` statements that raise `NotImplemented`.
 ///
 /// ## Why is this bad?
 /// `NotImplemented` is an exception used by binary special methods to indicate
-/// that the operation is not implemented with the supplied type combination.
+/// that an operation is not implemented with respect to a particular type.
 ///
 /// `NotImplemented` should not be raised directly. Instead, raise
 /// `NotImplementedError`, which is used to indicate that the method is
-/// abstract or is not yet developed.
+/// abstract or not implemented in the derived class.
 ///
 /// ## Example
 /// ```python
@@ -32,8 +32,8 @@ use crate::registry::AsRule;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/constants.html#NotImplemented)
-/// - [Python documentation](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
+/// - [Python documentation: `NotImplemented`](https://docs.python.org/3/library/constants.html#NotImplemented)
+/// - [Python documentation: `NotImplementedError`](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
 #[violation]
 pub struct RaiseNotImplemented;
 

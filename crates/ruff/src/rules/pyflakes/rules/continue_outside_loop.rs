@@ -7,8 +7,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for `continue` statements outside of loops.
 ///
 /// ## Why is this bad?
-/// `continue` statements outside of a `while` or `for` loop will raise
-/// `SyntaxError`.
+/// The use of a `continue` statement outside of a `for` or `while` loop will
+/// raise a `SyntaxError`.
 ///
 /// ## Example
 /// ```python
@@ -17,7 +17,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-continue-statement)
+/// - [Python documentation: `continue`](https://docs.python.org/3/reference/simple_stmts.html#the-continue-statement)
 #[violation]
 pub struct ContinueOutsideLoop;
 

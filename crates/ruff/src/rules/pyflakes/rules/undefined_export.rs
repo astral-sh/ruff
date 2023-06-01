@@ -8,13 +8,18 @@ use ruff_python_semantic::scope::Scope;
 /// Checks for undefined names in `__all__`.
 ///
 /// ## Why is this bad?
-/// `__all__` is used to define the names exported by a module. An undefined
-/// name in `__all__` is likely to raise `NameError` at runtime when the module
-/// is imported.
+/// In Python, the `__all__` variable is used to define the names that are
+/// exported when a module is imported as a wildcard (e.g.,
+/// `from foo import *`). The names in `__all__` must be defined in the module,
+/// but are included as strings.
+///
+/// Including an undefined name in `__all__` is likely to raise `NameError` at
+/// runtime, when the module is imported.
 ///
 /// ## Example
 /// ```python
 /// from foo import bar
+///
 ///
 /// __all__ = ["bar", "baz"]  # undefined name `baz` in `__all__`
 /// ```
@@ -23,11 +28,12 @@ use ruff_python_semantic::scope::Scope;
 /// ```python
 /// from foo import bar, baz
 ///
+///
 /// __all__ = ["bar", "baz"]
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
+/// - [Python documentation: `__all__`](https://docs.python.org/3/tutorial/modules.html#importing-from-a-package)
 #[violation]
 pub struct UndefinedExport {
     name: String,

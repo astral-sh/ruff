@@ -6,22 +6,24 @@ use ruff_python_ast::helpers::except_range;
 use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
-/// Checks for bare `except` blocks that are not the last exception handler.
+/// Checks for `except` blocks that handle all exceptions, but are not the last
+/// `except` block in a `try` statement.
 ///
 /// ## Why is this bad?
-/// `except` blocks are executed in order, so if a `except` block that handles
-/// all exceptions is not the last one, it will prevent the following `except`
-/// blocks from being executed. This will result in `SyntaxError` being raised.
+/// When an exception is raised within a `try` block, the `except` blocks are
+/// evaluated in order, and the first matching block is executed. If an `except`
+/// block handles all exceptions, but isn't the last block, Python will raise a
+/// `SyntaxError`, as the following blocks would never be executed.
 ///
 /// ## Example
 /// ```python
 /// def reciprocal(n):
 ///     try:
 ///         reciprocal = 1 / n
-///     except:  # SyntaxError
+///     except:
 ///         print("An exception occurred.")
 ///     except ZeroDivisionError:
-///         print("Cannot divide by zero!")
+///         print("Cannot divide by zero.")
 ///     else:
 ///         return reciprocal
 /// ```
@@ -32,7 +34,7 @@ use ruff_python_ast::source_code::Locator;
 ///     try:
 ///         reciprocal = 1 / n
 ///     except ZeroDivisionError:
-///         print("Cannot divide by zero!")
+///         print("Cannot divide by zero.")
 ///     except:
 ///         print("An exception occurred.")
 ///     else:

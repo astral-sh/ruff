@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Referencing a local variable before it has been assigned will raise
-/// `UnboundLocalError`.
+/// an `UnboundLocalError` at runtime.
 ///
 /// ## Example
 /// ```python
@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// def foo():
-///     x += 1  # UnboundLocalError
+///     x += 1
 /// ```
 ///
 /// Use instead:
@@ -30,9 +30,6 @@ use crate::checkers::ast::Checker;
 ///     global x
 ///     x += 1
 /// ```
-///
-/// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[violation]
 pub struct UndefinedLocal {
     name: String,
