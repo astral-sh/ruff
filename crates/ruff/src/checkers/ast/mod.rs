@@ -1094,8 +1094,8 @@ where
                 }
 
                 if self.is_stub {
-                    if self.enabled(Rule::UnaliasedSetImport) {
-                        flake8_pyi::rules::unaliased_set_import(self, imp_from);
+                    if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, imp_from);
                     }
                 }
                 for alias in names {

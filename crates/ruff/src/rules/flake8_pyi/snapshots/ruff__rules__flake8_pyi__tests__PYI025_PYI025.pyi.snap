@@ -1,24 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI025.pyi:4:29: PYI025 [*] Always alias collections.abc.Set when importing it, so as to avoid confusion with builtins.set
+PYI025.pyi:4:29: PYI025 Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
   |
 4 | from collections.abc import Set  # PYI025
   |                             ^^^ PYI025
   |
   = help: Alias `Set` to `AbstractSet`
 
-ℹ Fix
-1 1 | from collections.abc import Set as AbstractSet  # Ok
-2 2 | 
-3 3 | 
-4   |-from collections.abc import Set  # PYI025
-  4 |+from collections.abc import Set as AbstractSet  # PYI025
-5 5 | 
-6 6 | 
-7 7 | from collections.abc import (
-
-PYI025.pyi:10:5: PYI025 [*] Always alias collections.abc.Set when importing it, so as to avoid confusion with builtins.set
+PYI025.pyi:10:5: PYI025 Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
    |
 10 |     Container,
 11 |     Sized,
@@ -28,15 +18,5 @@ PYI025.pyi:10:5: PYI025 [*] Always alias collections.abc.Set when importing it, 
 14 | )
    |
    = help: Alias `Set` to `AbstractSet`
-
-ℹ Fix
-7  7  | from collections.abc import (
-8  8  |     Container,
-9  9  |     Sized,
-10    |-    Set,  # PYI025
-   10 |+    Set as AbstractSet,  # PYI025
-11 11 |     ValuesView
-12 12 | )
-13 13 | 
 
 
