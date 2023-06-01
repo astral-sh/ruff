@@ -5,8 +5,8 @@ use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::prelude::Expr;
 use ruff_python_ast::prelude::Ranged;
+use ruff_python_ast::prelude::{Expr, StmtClassDef};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 
 /// ## What it does
@@ -125,14 +125,9 @@ const SYNC_ITER_RETURN_TYPES: &[&[&str]] = &[
 ];
 
 /// PYI034
-pub(crate) fn fixed_return_type(
-    checker: &mut Checker,
-    bases: &[Expr],
-    body: &[Stmt],
-    class_decorator_list: &[Expr],
-) {
+pub(crate) fn fixed_return_type(checker: &mut Checker, class: &StmtClassDef) {
     // If class is final, skip
-    if class_decorator_list.iter().any(|expr| {
+    if class.decorator_list.iter().any(|expr| {
         checker
             .semantic_model()
             .match_typing_expr(map_callable(expr), "final")
@@ -140,24 +135,25 @@ pub(crate) fn fixed_return_type(
         return;
     }
 
-    let mut is_iter_subclass: bool = false;
-    if bases.len() == 1 {
-        let base = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = &bases[0] {
+    let is_iter_subclass: bool = if class.bases.len() == 1 {
+        let base = if let Expr::Subscript(ast::ExprSubscript { value, .. }) = &class.bases[0] {
             // Ex) class Foo(Iterator[T]):
             value
         } else {
             // Ex) class Foo(Iterator):
-            &bases[0]
+            &class.bases[0]
         };
-        is_iter_subclass = checker
+        checker
             .semantic_model()
             .resolve_call_path(base)
             .map_or(false, |call_path| {
                 ITERATOR_BASES.contains(&call_path.as_slice())
-            });
-    }
+            })
+    } else {
+        false
+    };
 
-    for stmt in body {
+    for stmt in &class.body {
         let (
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 decorator_list: func_decorator_list,
@@ -174,16 +170,16 @@ pub(crate) fn fixed_return_type(
             continue;
         };
 
+        let Some(returns) = returns else {
+            continue;
+        };
+
         // Skip abstractmethods and overloaded methods
         if is_abstract(checker.semantic_model(), func_decorator_list)
             || is_overload(checker.semantic_model(), func_decorator_list)
         {
             continue;
         }
-
-        let Some(returns) = returns else {
-            continue;
-        };
 
         // Methods that should return self
         if SELF_RETURNING_METHODS.contains(&method_name.as_str()) {

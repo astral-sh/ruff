@@ -652,14 +652,16 @@ where
                     pylint::rules::return_in_init(self, stmt);
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                name,
-                bases,
-                keywords,
-                decorator_list,
-                body,
-                range: _,
-            }) => {
+            Stmt::ClassDef(
+                class @ ast::StmtClassDef {
+                    name,
+                    bases,
+                    keywords,
+                    decorator_list,
+                    body,
+                    range: _,
+                },
+            ) => {
                 if self.enabled(Rule::DjangoNullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
@@ -746,7 +748,7 @@ where
                         flake8_pyi::rules::ellipsis_in_non_empty_class_body(self, stmt, body);
                     }
                     if self.enabled(Rule::FixedReturnType) {
-                        flake8_pyi::rules::fixed_return_type(self, bases, body, decorator_list);
+                        flake8_pyi::rules::fixed_return_type(self, class);
                     }
                 }
 
