@@ -329,7 +329,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // flake8-future-annotations
         (Flake8FutureAnnotations, "100") => (RuleGroup::Unspecified, rules::flake8_future_annotations::rules::FutureRewritableTypeAnnotation),
-        (Flake8FutureAnnotations, "102") => (RuleGroup::Unspecified, rules::flake8_future_annotations::FutureRequiredTypeAnnotation),
+        (Flake8FutureAnnotations, "102") => (RuleGroup::Unspecified, rules::flake8_future_annotations::rules::FutureRequiredTypeAnnotation),
 
         // flake8-2020
         (Flake82020, "101") => (RuleGroup::Unspecified, rules::flake8_2020::rules::SysVersionSlice3),
