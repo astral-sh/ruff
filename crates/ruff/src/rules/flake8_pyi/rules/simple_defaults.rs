@@ -132,55 +132,36 @@ fn is_valid_default_value_with_annotation(
             value: Constant::Bytes(..),
             ..
         }) => return locator.slice(default.range()).len() <= 50,
-        // Ex) `123`, `True`, `False`, `3.14`
+        // Ex) `123`, `True`, `False`, `3.14`, `2j`
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
+            value:
+                Constant::Int(..) | Constant::Bool(..) | Constant::Float(..) | Constant::Complex { .. },
             ..
         }) => {
-            return locator.slice(default.range()).len() <= 10;
-        }
-        // Ex) `2j`
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Complex { real, .. },
-            ..
-        }) => {
-            if *real == 0.0 {
-                return locator.slice(default.range()).len() <= 10;
-            }
+            return true;
         }
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::USub,
             operand,
             range: _,
         }) => {
-            // Ex) `-1`, `-3.14`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(..) | Constant::Float(..),
-                ..
-            }) = operand.as_ref()
-            {
-                return locator.slice(operand.range()).len() <= 10;
-            }
-            // Ex) `-2j`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Complex { real, .. },
-                ..
-            }) = operand.as_ref()
-            {
-                if *real == 0.0 {
-                    return locator.slice(operand.range()).len() <= 10;
+            match operand.as_ref() {
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Int(..) | Constant::Float(..) | Constant::Complex { .. },
+                    ..
+                }) => return true,
+                Expr::Attribute(_) => {
+                    // Ex) `-math.inf`, `-math.pi`, etc.
+                    if model.resolve_call_path(operand).map_or(false, |call_path| {
+                        ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
+                            // reject `-math.nan`
+                            call_path.as_slice() == *target && *target != ["math", "nan"]
+                        })
+                    }) {
+                        return true;
+                    }
                 }
-            }
-            // Ex) `-math.inf`, `-math.pi`, etc.
-            if let Expr::Attribute(_) = operand.as_ref() {
-                if model.resolve_call_path(operand).map_or(false, |call_path| {
-                    ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
-                        // reject `-math.nan`
-                        call_path.as_slice() == *target && *target != ["math", "nan"]
-                    })
-                }) {
-                    return true;
-                }
+                _ => {}
             }
         }
         Expr::BinOp(ast::ExprBinOp {
