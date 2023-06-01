@@ -146,12 +146,13 @@ fn is_valid_default_value_with_annotation(
             range: _,
         }) => {
             match operand.as_ref() {
+                // Ex) `-1`, `-3.14`, `2j`
                 Expr::Constant(ast::ExprConstant {
                     value: Constant::Int(..) | Constant::Float(..) | Constant::Complex { .. },
                     ..
                 }) => return true,
+                // Ex) `-math.inf`, `-math.pi`, etc.
                 Expr::Attribute(_) => {
-                    // Ex) `-math.inf`, `-math.pi`, etc.
                     if model.resolve_call_path(operand).map_or(false, |call_path| {
                         ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
                             // reject `-math.nan`
