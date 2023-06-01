@@ -10,9 +10,9 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_textwrap::dedent;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
-    use textwrap::dedent;
 
     use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};

@@ -22,13 +22,13 @@ def bobtwo(): \
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,9 @@
+@@ -1,6 +1,7 @@
 -def bob():  # pylint: disable=W9016
 +def bob(): \
 +         # pylint: disable=W9016
      pass
- 
- 
+-
+-
 -def bobtwo():  # some comment here
 +def bobtwo(): \
 +    \
@@ -42,8 +42,6 @@ def bobtwo(): \
 def bob(): \
          # pylint: disable=W9016
     pass
-
-
 def bobtwo(): \
     \
   # some comment here

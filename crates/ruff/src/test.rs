@@ -1,13 +1,13 @@
 #![cfg(test)]
+//! Helper functions for the tests of rule implementations.
 
-/// Helper functions for the tests of rule implementations.
 use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
+use ruff_textwrap::dedent;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
-use textwrap::dedent;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};

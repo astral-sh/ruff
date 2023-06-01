@@ -2,7 +2,7 @@ use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{self, Cmpop, Expr};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_python_ast::newlines::Line;
+use ruff_newlines::Line;
 use ruff_python_ast::source_code::Generator;
 
 use crate::line_width::{LineLength, LineWidth, TabSize};

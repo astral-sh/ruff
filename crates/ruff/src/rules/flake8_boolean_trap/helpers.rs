@@ -28,6 +28,7 @@ pub(super) const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "pop",
     "remove",
     "setattr",
+    "__setattr__",
     "setdefault",
     "str",
 ];

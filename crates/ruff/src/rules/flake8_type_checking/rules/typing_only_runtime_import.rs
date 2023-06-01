@@ -1,10 +1,14 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use rustpython_parser::ast::Stmt;
+
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
     Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
 };
 
+use crate::autofix;
 use crate::checkers::ast::Checker;
+use crate::importer::StmtImport;
 use crate::registry::AsRule;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 
@@ -49,12 +53,18 @@ pub struct TypingOnlyFirstPartyImport {
 }
 
 impl Violation for TypingOnlyFirstPartyImport {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "Move application import `{}` into a type-checking block",
             self.full_name
         )
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some("Move into type-checking block".to_string())
     }
 }
 
@@ -99,12 +109,18 @@ pub struct TypingOnlyThirdPartyImport {
 }
 
 impl Violation for TypingOnlyThirdPartyImport {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "Move third-party import `{}` into a type-checking block",
             self.full_name
         )
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some("Move into type-checking block".to_string())
     }
 }
 
@@ -149,12 +165,18 @@ pub struct TypingOnlyStandardLibraryImport {
 }
 
 impl Violation for TypingOnlyStandardLibraryImport {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "Move standard library import `{}` into a type-checking block",
             self.full_name
         )
+    }
+
+    fn autofix_title(&self) -> Option<String> {
+        Some("Move into type-checking block".to_string())
     }
 }
 
@@ -285,6 +307,10 @@ pub(crate) fn typing_only_runtime_import(
         return;
     }
 
+    let Some(reference_id) = binding.references.first() else {
+        return;
+    };
+
     if binding.context.is_runtime()
         && binding.is_used()
         && binding.references().all(|reference_id| {
@@ -307,7 +333,7 @@ pub(crate) fn typing_only_runtime_import(
             .unwrap();
 
         // Categorize the import.
-        let diagnostic = match categorize(
+        let mut diagnostic = match categorize(
             full_name,
             Some(level),
             &checker.settings.src,
@@ -341,6 +367,43 @@ pub(crate) fn typing_only_runtime_import(
                 unreachable!("`__future__` imports should be marked as used")
             }
         };
+
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.try_set_fix(|| {
+                // Step 1) Remove the import.
+                // SAFETY: All non-builtin bindings have a source.
+                let source = binding.source.unwrap();
+                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+                let stmt = checker.semantic_model().stmts[source];
+                let parent = checker
+                    .semantic_model()
+                    .stmts
+                    .parent_id(source)
+                    .map(|id| checker.semantic_model().stmts[id]);
+                let remove_import_edit = autofix::edits::remove_unused_imports(
+                    std::iter::once(full_name),
+                    stmt,
+                    parent,
+                    &deleted,
+                    checker.locator,
+                    checker.indexer,
+                    checker.stylist,
+                )?;
+
+                // Step 2) Add the import to a `TYPE_CHECKING` block.
+                let reference = checker.semantic_model().references.resolve(*reference_id);
+                let add_import_edit = checker.importer.typing_import_edit(
+                    &StmtImport { stmt, full_name },
+                    reference.range().start(),
+                    checker.semantic_model(),
+                )?;
+
+                Ok(Fix::suggested_edits(
+                    remove_import_edit,
+                    add_import_edit.into_edits(),
+                ))
+            });
+        }
 
         if checker.enabled(diagnostic.kind.rule()) {
             diagnostics.push(diagnostic);

@@ -54,6 +54,12 @@ exclude = [
   "crates/ruff/src/rules/*/snapshots/**/*"
 ]
 
+[tool.ruff]
+extend-exclude = [
+  "crates/ruff/resources/",
+  "crates/ruff_python_formatter/resources/"
+]
+
 [tool.black]
 force-exclude = '''
 /(
