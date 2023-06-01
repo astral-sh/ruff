@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use ruff_text_size::TextRange;
+use std::ptr::NonNull;
 
 pub trait AstNode: Ranged {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -572,6 +573,30 @@ impl AnyNode {
             | AnyNode::Withitem(_)
             | AnyNode::MatchCase(_) => None,
         }
+    }
+
+    pub const fn is_statement(&self) -> bool {
+        self.as_ref().is_statement()
+    }
+
+    pub const fn is_expression(&self) -> bool {
+        self.as_ref().is_expression()
+    }
+
+    pub const fn is_module(&self) -> bool {
+        self.as_ref().is_module()
+    }
+
+    pub const fn is_pattern(&self) -> bool {
+        self.as_ref().is_pattern()
+    }
+
+    pub const fn is_except_handler(&self) -> bool {
+        self.as_ref().is_except_handler()
+    }
+
+    pub const fn is_type_ignore(&self) -> bool {
+        self.as_ref().is_type_ignore()
     }
 
     pub const fn as_ref(&self) -> AnyNodeRef {
@@ -2878,6 +2903,91 @@ pub enum AnyNodeRef<'a> {
 }
 
 impl AnyNodeRef<'_> {
+    pub fn as_ptr(&self) -> NonNull<()> {
+        match self {
+            AnyNodeRef::ModModule(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ModInteractive(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ModExpression(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ModFunctionType(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtFunctionDef(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAsyncFunctionDef(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtClassDef(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtReturn(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtDelete(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAssign(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAugAssign(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAnnAssign(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtFor(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAsyncFor(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtWhile(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtIf(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtWith(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAsyncWith(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtMatch(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtRaise(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtTry(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtTryStar(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtAssert(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtImport(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtImportFrom(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtGlobal(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtNonlocal(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtExpr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtPass(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtBreak(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtContinue(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprBoolOp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprNamedExpr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprBinOp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprUnaryOp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprLambda(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprIfExp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprDict(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSet(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprListComp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSetComp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprDictComp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprGeneratorExp(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprAwait(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprYield(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprYieldFrom(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprCompare(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprFormattedValue(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprJoinedStr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprConstant(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprAttribute(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSubscript(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprStarred(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprName(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprList(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprTuple(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExprSlice(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::ExcepthandlerExceptHandler(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchValue(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchSingleton(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchSequence(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchMapping(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchClass(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchStar(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchAs(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::PatternMatchOr(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::TypeIgnoreTypeIgnore(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Comprehension(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Arguments(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Arg(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Keyword(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Alias(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Withitem(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
+        }
+    }
+
+    /// Compares two any node refs by their pointers (referential equality).
+    pub fn ptr_eq(self, other: AnyNodeRef) -> bool {
+        self.as_ptr().eq(&other.as_ptr())
+    }
+
     /// Returns the node's [`kind`](NodeKind) that has no data associated and is [`Copy`].
     pub const fn kind(self) -> NodeKind {
         match self {
@@ -2956,6 +3066,492 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Alias(_) => NodeKind::Alias,
             AnyNodeRef::Withitem(_) => NodeKind::Withitem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
+        }
+    }
+
+    pub const fn is_statement(self) -> bool {
+        match self {
+            AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+            | AnyNodeRef::StmtReturn(_)
+            | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtAssign(_)
+            | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtAnnAssign(_)
+            | AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtAsyncFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtWith(_)
+            | AnyNodeRef::StmtAsyncWith(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::StmtRaise(_)
+            | AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtTryStar(_)
+            | AnyNodeRef::StmtAssert(_)
+            | AnyNodeRef::StmtImport(_)
+            | AnyNodeRef::StmtImportFrom(_)
+            | AnyNodeRef::StmtGlobal(_)
+            | AnyNodeRef::StmtNonlocal(_)
+            | AnyNodeRef::StmtExpr(_)
+            | AnyNodeRef::StmtPass(_)
+            | AnyNodeRef::StmtBreak(_)
+            | AnyNodeRef::StmtContinue(_) => true,
+
+            AnyNodeRef::ModModule(_)
+            | AnyNodeRef::ModInteractive(_)
+            | AnyNodeRef::ModExpression(_)
+            | AnyNodeRef::ModFunctionType(_)
+            | AnyNodeRef::ExprBoolOp(_)
+            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprBinOp(_)
+            | AnyNodeRef::ExprUnaryOp(_)
+            | AnyNodeRef::ExprLambda(_)
+            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprDict(_)
+            | AnyNodeRef::ExprSet(_)
+            | AnyNodeRef::ExprListComp(_)
+            | AnyNodeRef::ExprSetComp(_)
+            | AnyNodeRef::ExprDictComp(_)
+            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprAwait(_)
+            | AnyNodeRef::ExprYield(_)
+            | AnyNodeRef::ExprYieldFrom(_)
+            | AnyNodeRef::ExprCompare(_)
+            | AnyNodeRef::ExprCall(_)
+            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprConstant(_)
+            | AnyNodeRef::ExprAttribute(_)
+            | AnyNodeRef::ExprSubscript(_)
+            | AnyNodeRef::ExprStarred(_)
+            | AnyNodeRef::ExprName(_)
+            | AnyNodeRef::ExprList(_)
+            | AnyNodeRef::ExprTuple(_)
+            | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::PatternMatchValue(_)
+            | AnyNodeRef::PatternMatchSingleton(_)
+            | AnyNodeRef::PatternMatchSequence(_)
+            | AnyNodeRef::PatternMatchMapping(_)
+            | AnyNodeRef::PatternMatchClass(_)
+            | AnyNodeRef::PatternMatchStar(_)
+            | AnyNodeRef::PatternMatchAs(_)
+            | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
+            | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::Arg(_)
+            | AnyNodeRef::Keyword(_)
+            | AnyNodeRef::Alias(_)
+            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::MatchCase(_) => false,
+        }
+    }
+
+    pub const fn is_expression(self) -> bool {
+        match self {
+            AnyNodeRef::ExprBoolOp(_)
+            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprBinOp(_)
+            | AnyNodeRef::ExprUnaryOp(_)
+            | AnyNodeRef::ExprLambda(_)
+            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprDict(_)
+            | AnyNodeRef::ExprSet(_)
+            | AnyNodeRef::ExprListComp(_)
+            | AnyNodeRef::ExprSetComp(_)
+            | AnyNodeRef::ExprDictComp(_)
+            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprAwait(_)
+            | AnyNodeRef::ExprYield(_)
+            | AnyNodeRef::ExprYieldFrom(_)
+            | AnyNodeRef::ExprCompare(_)
+            | AnyNodeRef::ExprCall(_)
+            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprConstant(_)
+            | AnyNodeRef::ExprAttribute(_)
+            | AnyNodeRef::ExprSubscript(_)
+            | AnyNodeRef::ExprStarred(_)
+            | AnyNodeRef::ExprName(_)
+            | AnyNodeRef::ExprList(_)
+            | AnyNodeRef::ExprTuple(_)
+            | AnyNodeRef::ExprSlice(_) => true,
+
+            AnyNodeRef::ModModule(_)
+            | AnyNodeRef::ModInteractive(_)
+            | AnyNodeRef::ModExpression(_)
+            | AnyNodeRef::ModFunctionType(_)
+            | AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+            | AnyNodeRef::StmtReturn(_)
+            | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtAssign(_)
+            | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtAnnAssign(_)
+            | AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtAsyncFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtWith(_)
+            | AnyNodeRef::StmtAsyncWith(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::StmtRaise(_)
+            | AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtTryStar(_)
+            | AnyNodeRef::StmtAssert(_)
+            | AnyNodeRef::StmtImport(_)
+            | AnyNodeRef::StmtImportFrom(_)
+            | AnyNodeRef::StmtGlobal(_)
+            | AnyNodeRef::StmtNonlocal(_)
+            | AnyNodeRef::StmtExpr(_)
+            | AnyNodeRef::StmtPass(_)
+            | AnyNodeRef::StmtBreak(_)
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::PatternMatchValue(_)
+            | AnyNodeRef::PatternMatchSingleton(_)
+            | AnyNodeRef::PatternMatchSequence(_)
+            | AnyNodeRef::PatternMatchMapping(_)
+            | AnyNodeRef::PatternMatchClass(_)
+            | AnyNodeRef::PatternMatchStar(_)
+            | AnyNodeRef::PatternMatchAs(_)
+            | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
+            | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::Arg(_)
+            | AnyNodeRef::Keyword(_)
+            | AnyNodeRef::Alias(_)
+            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::MatchCase(_) => false,
+        }
+    }
+
+    pub const fn is_module(self) -> bool {
+        match self {
+            AnyNodeRef::ModModule(_)
+            | AnyNodeRef::ModInteractive(_)
+            | AnyNodeRef::ModExpression(_)
+            | AnyNodeRef::ModFunctionType(_) => true,
+
+            AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+            | AnyNodeRef::StmtReturn(_)
+            | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtAssign(_)
+            | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtAnnAssign(_)
+            | AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtAsyncFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtWith(_)
+            | AnyNodeRef::StmtAsyncWith(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::StmtRaise(_)
+            | AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtTryStar(_)
+            | AnyNodeRef::StmtAssert(_)
+            | AnyNodeRef::StmtImport(_)
+            | AnyNodeRef::StmtImportFrom(_)
+            | AnyNodeRef::StmtGlobal(_)
+            | AnyNodeRef::StmtNonlocal(_)
+            | AnyNodeRef::StmtExpr(_)
+            | AnyNodeRef::StmtPass(_)
+            | AnyNodeRef::StmtBreak(_)
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::ExprBoolOp(_)
+            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprBinOp(_)
+            | AnyNodeRef::ExprUnaryOp(_)
+            | AnyNodeRef::ExprLambda(_)
+            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprDict(_)
+            | AnyNodeRef::ExprSet(_)
+            | AnyNodeRef::ExprListComp(_)
+            | AnyNodeRef::ExprSetComp(_)
+            | AnyNodeRef::ExprDictComp(_)
+            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprAwait(_)
+            | AnyNodeRef::ExprYield(_)
+            | AnyNodeRef::ExprYieldFrom(_)
+            | AnyNodeRef::ExprCompare(_)
+            | AnyNodeRef::ExprCall(_)
+            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprConstant(_)
+            | AnyNodeRef::ExprAttribute(_)
+            | AnyNodeRef::ExprSubscript(_)
+            | AnyNodeRef::ExprStarred(_)
+            | AnyNodeRef::ExprName(_)
+            | AnyNodeRef::ExprList(_)
+            | AnyNodeRef::ExprTuple(_)
+            | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::PatternMatchValue(_)
+            | AnyNodeRef::PatternMatchSingleton(_)
+            | AnyNodeRef::PatternMatchSequence(_)
+            | AnyNodeRef::PatternMatchMapping(_)
+            | AnyNodeRef::PatternMatchClass(_)
+            | AnyNodeRef::PatternMatchStar(_)
+            | AnyNodeRef::PatternMatchAs(_)
+            | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
+            | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::Arg(_)
+            | AnyNodeRef::Keyword(_)
+            | AnyNodeRef::Alias(_)
+            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::MatchCase(_) => false,
+        }
+    }
+
+    pub const fn is_pattern(self) -> bool {
+        match self {
+            AnyNodeRef::PatternMatchValue(_)
+            | AnyNodeRef::PatternMatchSingleton(_)
+            | AnyNodeRef::PatternMatchSequence(_)
+            | AnyNodeRef::PatternMatchMapping(_)
+            | AnyNodeRef::PatternMatchClass(_)
+            | AnyNodeRef::PatternMatchStar(_)
+            | AnyNodeRef::PatternMatchAs(_)
+            | AnyNodeRef::PatternMatchOr(_) => true,
+
+            AnyNodeRef::ModModule(_)
+            | AnyNodeRef::ModInteractive(_)
+            | AnyNodeRef::ModExpression(_)
+            | AnyNodeRef::ModFunctionType(_)
+            | AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+            | AnyNodeRef::StmtReturn(_)
+            | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtAssign(_)
+            | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtAnnAssign(_)
+            | AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtAsyncFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtWith(_)
+            | AnyNodeRef::StmtAsyncWith(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::StmtRaise(_)
+            | AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtTryStar(_)
+            | AnyNodeRef::StmtAssert(_)
+            | AnyNodeRef::StmtImport(_)
+            | AnyNodeRef::StmtImportFrom(_)
+            | AnyNodeRef::StmtGlobal(_)
+            | AnyNodeRef::StmtNonlocal(_)
+            | AnyNodeRef::StmtExpr(_)
+            | AnyNodeRef::StmtPass(_)
+            | AnyNodeRef::StmtBreak(_)
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::ExprBoolOp(_)
+            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprBinOp(_)
+            | AnyNodeRef::ExprUnaryOp(_)
+            | AnyNodeRef::ExprLambda(_)
+            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprDict(_)
+            | AnyNodeRef::ExprSet(_)
+            | AnyNodeRef::ExprListComp(_)
+            | AnyNodeRef::ExprSetComp(_)
+            | AnyNodeRef::ExprDictComp(_)
+            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprAwait(_)
+            | AnyNodeRef::ExprYield(_)
+            | AnyNodeRef::ExprYieldFrom(_)
+            | AnyNodeRef::ExprCompare(_)
+            | AnyNodeRef::ExprCall(_)
+            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprConstant(_)
+            | AnyNodeRef::ExprAttribute(_)
+            | AnyNodeRef::ExprSubscript(_)
+            | AnyNodeRef::ExprStarred(_)
+            | AnyNodeRef::ExprName(_)
+            | AnyNodeRef::ExprList(_)
+            | AnyNodeRef::ExprTuple(_)
+            | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
+            | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::Arg(_)
+            | AnyNodeRef::Keyword(_)
+            | AnyNodeRef::Alias(_)
+            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::MatchCase(_) => false,
+        }
+    }
+
+    pub const fn is_except_handler(self) -> bool {
+        match self {
+            AnyNodeRef::ExcepthandlerExceptHandler(_) => true,
+
+            AnyNodeRef::ModModule(_)
+            | AnyNodeRef::ModInteractive(_)
+            | AnyNodeRef::ModExpression(_)
+            | AnyNodeRef::ModFunctionType(_)
+            | AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+            | AnyNodeRef::StmtReturn(_)
+            | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtAssign(_)
+            | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtAnnAssign(_)
+            | AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtAsyncFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtWith(_)
+            | AnyNodeRef::StmtAsyncWith(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::StmtRaise(_)
+            | AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtTryStar(_)
+            | AnyNodeRef::StmtAssert(_)
+            | AnyNodeRef::StmtImport(_)
+            | AnyNodeRef::StmtImportFrom(_)
+            | AnyNodeRef::StmtGlobal(_)
+            | AnyNodeRef::StmtNonlocal(_)
+            | AnyNodeRef::StmtExpr(_)
+            | AnyNodeRef::StmtPass(_)
+            | AnyNodeRef::StmtBreak(_)
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::ExprBoolOp(_)
+            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprBinOp(_)
+            | AnyNodeRef::ExprUnaryOp(_)
+            | AnyNodeRef::ExprLambda(_)
+            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprDict(_)
+            | AnyNodeRef::ExprSet(_)
+            | AnyNodeRef::ExprListComp(_)
+            | AnyNodeRef::ExprSetComp(_)
+            | AnyNodeRef::ExprDictComp(_)
+            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprAwait(_)
+            | AnyNodeRef::ExprYield(_)
+            | AnyNodeRef::ExprYieldFrom(_)
+            | AnyNodeRef::ExprCompare(_)
+            | AnyNodeRef::ExprCall(_)
+            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprConstant(_)
+            | AnyNodeRef::ExprAttribute(_)
+            | AnyNodeRef::ExprSubscript(_)
+            | AnyNodeRef::ExprStarred(_)
+            | AnyNodeRef::ExprName(_)
+            | AnyNodeRef::ExprList(_)
+            | AnyNodeRef::ExprTuple(_)
+            | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::PatternMatchValue(_)
+            | AnyNodeRef::PatternMatchSingleton(_)
+            | AnyNodeRef::PatternMatchSequence(_)
+            | AnyNodeRef::PatternMatchMapping(_)
+            | AnyNodeRef::PatternMatchClass(_)
+            | AnyNodeRef::PatternMatchStar(_)
+            | AnyNodeRef::PatternMatchAs(_)
+            | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::TypeIgnoreTypeIgnore(_)
+            | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::Arg(_)
+            | AnyNodeRef::Keyword(_)
+            | AnyNodeRef::Alias(_)
+            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::MatchCase(_) => false,
+        }
+    }
+
+    pub const fn is_type_ignore(self) -> bool {
+        match self {
+            AnyNodeRef::TypeIgnoreTypeIgnore(_) => true,
+
+            AnyNodeRef::ModModule(_)
+            | AnyNodeRef::ModInteractive(_)
+            | AnyNodeRef::ModExpression(_)
+            | AnyNodeRef::ModFunctionType(_)
+            | AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+            | AnyNodeRef::StmtReturn(_)
+            | AnyNodeRef::StmtDelete(_)
+            | AnyNodeRef::StmtAssign(_)
+            | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtAnnAssign(_)
+            | AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtAsyncFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtWith(_)
+            | AnyNodeRef::StmtAsyncWith(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::StmtRaise(_)
+            | AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtTryStar(_)
+            | AnyNodeRef::StmtAssert(_)
+            | AnyNodeRef::StmtImport(_)
+            | AnyNodeRef::StmtImportFrom(_)
+            | AnyNodeRef::StmtGlobal(_)
+            | AnyNodeRef::StmtNonlocal(_)
+            | AnyNodeRef::StmtExpr(_)
+            | AnyNodeRef::StmtPass(_)
+            | AnyNodeRef::StmtBreak(_)
+            | AnyNodeRef::StmtContinue(_)
+            | AnyNodeRef::ExprBoolOp(_)
+            | AnyNodeRef::ExprNamedExpr(_)
+            | AnyNodeRef::ExprBinOp(_)
+            | AnyNodeRef::ExprUnaryOp(_)
+            | AnyNodeRef::ExprLambda(_)
+            | AnyNodeRef::ExprIfExp(_)
+            | AnyNodeRef::ExprDict(_)
+            | AnyNodeRef::ExprSet(_)
+            | AnyNodeRef::ExprListComp(_)
+            | AnyNodeRef::ExprSetComp(_)
+            | AnyNodeRef::ExprDictComp(_)
+            | AnyNodeRef::ExprGeneratorExp(_)
+            | AnyNodeRef::ExprAwait(_)
+            | AnyNodeRef::ExprYield(_)
+            | AnyNodeRef::ExprYieldFrom(_)
+            | AnyNodeRef::ExprCompare(_)
+            | AnyNodeRef::ExprCall(_)
+            | AnyNodeRef::ExprFormattedValue(_)
+            | AnyNodeRef::ExprJoinedStr(_)
+            | AnyNodeRef::ExprConstant(_)
+            | AnyNodeRef::ExprAttribute(_)
+            | AnyNodeRef::ExprSubscript(_)
+            | AnyNodeRef::ExprStarred(_)
+            | AnyNodeRef::ExprName(_)
+            | AnyNodeRef::ExprList(_)
+            | AnyNodeRef::ExprTuple(_)
+            | AnyNodeRef::ExprSlice(_)
+            | AnyNodeRef::PatternMatchValue(_)
+            | AnyNodeRef::PatternMatchSingleton(_)
+            | AnyNodeRef::PatternMatchSequence(_)
+            | AnyNodeRef::PatternMatchMapping(_)
+            | AnyNodeRef::PatternMatchClass(_)
+            | AnyNodeRef::PatternMatchStar(_)
+            | AnyNodeRef::PatternMatchAs(_)
+            | AnyNodeRef::PatternMatchOr(_)
+            | AnyNodeRef::ExcepthandlerExceptHandler(_)
+            | AnyNodeRef::Comprehension(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::Arg(_)
+            | AnyNodeRef::Keyword(_)
+            | AnyNodeRef::Alias(_)
+            | AnyNodeRef::Withitem(_)
+            | AnyNodeRef::MatchCase(_) => false,
         }
     }
 }

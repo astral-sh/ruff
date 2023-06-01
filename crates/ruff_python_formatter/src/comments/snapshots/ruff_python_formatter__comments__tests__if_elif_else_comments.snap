@@ -4,45 +4,56 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
+        kind: StmtPass,
+        range: 16..20,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing `pass` comment",
+                position: EndOfLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# Root `if` trailing comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
         kind: StmtIf,
-        range: 21..117,
-        source: `if x == y:⏎`,
+        range: 104..192,
+        source: `elif x < y:⏎`,
     }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
+        "leading": [
             SourceComment {
-                text: "# Trailing `if` statement comment",
+                text: "# Leading elif comment",
                 position: OwnLine,
                 formatted: false,
             },
         ],
-    },
-    Node {
-        kind: StmtExpr,
-        range: 101..117,
-        source: `print("Greater")`,
-    }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
+        "dangling": [
             SourceComment {
-                text: "# trailing `else` comment",
+                text: "# Leading else comment",
                 position: OwnLine,
                 formatted: false,
             },
         ],
+        "trailing": [],
     },
     Node {
-        kind: StmtFunctionDef,
-        range: 193..237,
-        source: `def other(y, z):⏎`,
+        kind: StmtPass,
+        range: 120..124,
+        source: `pass`,
     }: {
         "leading": [],
         "dangling": [],
         "trailing": [
             SourceComment {
-                text: "# Trailing `other` function comment",
+                text: "# `elif` trailing comment",
                 position: OwnLine,
                 formatted: false,
             },
@@ -50,14 +61,14 @@ expression: comments.debug(test_case.source_code)
     },
     Node {
         kind: StmtPass,
-        range: 233..237,
+        range: 188..192,
         source: `pass`,
     }: {
         "leading": [],
         "dangling": [],
         "trailing": [
             SourceComment {
-                text: "# Trailing `if` comment",
+                text: "# `else` trailing comment",
                 position: OwnLine,
                 formatted: false,
             },

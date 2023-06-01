@@ -4,45 +4,15 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: StmtIf,
-        range: 21..117,
-        source: `if x == y:⏎`,
+        kind: StmtTry,
+        range: 17..136,
+        source: `try:⏎`,
     }: {
         "leading": [],
         "dangling": [],
         "trailing": [
             SourceComment {
-                text: "# Trailing `if` statement comment",
-                position: OwnLine,
-                formatted: false,
-            },
-        ],
-    },
-    Node {
-        kind: StmtExpr,
-        range: 101..117,
-        source: `print("Greater")`,
-    }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
-            SourceComment {
-                text: "# trailing `else` comment",
-                position: OwnLine,
-                formatted: false,
-            },
-        ],
-    },
-    Node {
-        kind: StmtFunctionDef,
-        range: 193..237,
-        source: `def other(y, z):⏎`,
-    }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
-            SourceComment {
-                text: "# Trailing `other` function comment",
+                text: "# Trailing function comment",
                 position: OwnLine,
                 formatted: false,
             },
@@ -50,14 +20,44 @@ expression: comments.debug(test_case.source_code)
     },
     Node {
         kind: StmtPass,
-        range: 233..237,
+        range: 30..34,
         source: `pass`,
     }: {
         "leading": [],
         "dangling": [],
         "trailing": [
             SourceComment {
-                text: "# Trailing `if` comment",
+                text: "# trailing try comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ExcepthandlerExceptHandler,
+        range: 100..136,
+        source: `except Exception as ex:⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# leading handler comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtPass,
+        range: 132..136,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing except comment",
                 position: OwnLine,
                 formatted: false,
             },
