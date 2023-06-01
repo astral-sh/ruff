@@ -76,12 +76,12 @@ pub(crate) fn repeated_isinstance_calls(
         if !matches!(func.as_ref(), Expr::Name(ast::ExprName { id, .. }) if id == "isinstance") {
             continue;
         }
-        if !checker.semantic_model().is_builtin("isinstance") {
-            continue;
-        }
         let [obj, types] = &args[..] else {
             continue;
         };
+        if !checker.semantic_model().is_builtin("isinstance") {
+            return;
+        }
         let (num_calls, matches) = obj_to_types
             .entry(obj.into())
             .or_insert_with(|| (0, FxHashSet::default()));
