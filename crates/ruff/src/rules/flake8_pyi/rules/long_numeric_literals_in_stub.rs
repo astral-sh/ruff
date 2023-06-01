@@ -21,7 +21,7 @@ impl Violation for LongNumericLiteralsInStub {
 }
 
 /// PYI054
-pub(crate) fn long_numeric_literals_in_stubs(checker: &mut Checker, range: TextRange) {
+pub(crate) fn long_numeric_literals_in_stub(checker: &mut Checker, range: TextRange) {
     if range.len() > TextSize::new(10) {
         checker
             .diagnostics

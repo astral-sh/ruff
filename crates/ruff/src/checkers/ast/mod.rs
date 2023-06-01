@@ -3399,7 +3399,7 @@ where
                 ..
             }) => {
                 if self.is_stub && self.enabled(Rule::LongNumericLiteralsInStub) {
-                    flake8_pyi::rules::long_numeric_literals_in_stubs(self, *range);
+                    flake8_pyi::rules::long_numeric_literals_in_stub(self, *range);
                 }
             }
             Expr::Constant(ast::ExprConstant {
