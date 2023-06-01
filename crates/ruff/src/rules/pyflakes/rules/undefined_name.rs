@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## Example
 /// ```python
 /// def double():
-///     return n * 2  # raises `NameError` at runtime if `n` is undefined when `double` is called
+///     return n * 2  # raises `NameError` if `n` is undefined when `double` is called
 /// ```
 ///
 /// Use instead:
