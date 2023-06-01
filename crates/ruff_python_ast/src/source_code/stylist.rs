@@ -1,6 +1,5 @@
 //! Detect code style from Python source code.
 
-use libcst_native::CodegenState;
 use std::fmt;
 use std::ops::Deref;
 
@@ -46,15 +45,6 @@ impl<'a> Stylist<'a> {
             indentation,
             quote: detect_quote(tokens, locator),
             line_ending: OnceCell::default(),
-        }
-    }
-
-    /// Convert this style to libcst style
-    pub fn codegen_state(&self) -> CodegenState {
-        CodegenState {
-            default_newline: self.line_ending().as_str(),
-            default_indent: self.indentation(),
-            ..Default::default()
         }
     }
 }

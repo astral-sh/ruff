@@ -4,6 +4,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 
@@ -29,7 +30,7 @@ pub(crate) fn adjust_indentation(
     let indented_block = match_indented_block(&mut embedding.body)?;
     indented_block.indent = Some(indentation);
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     indented_block.codegen(&mut state);
 
     let module_text = state.to_string();
@@ -57,7 +58,7 @@ pub(crate) fn remove_super_arguments(
     body.whitespace_before_args = ParenthesizableWhitespace::default();
     body.whitespace_after_func = ParenthesizableWhitespace::default();
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Some(Edit::range_replacement(state.to_string(), range))

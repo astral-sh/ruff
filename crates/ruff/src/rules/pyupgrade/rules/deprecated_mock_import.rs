@@ -6,6 +6,7 @@ use libcst_native::{
 use log::error;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
@@ -137,7 +138,7 @@ fn format_import(
     } else {
         import.names = clean_aliases;
 
-        let mut state = stylist.codegen_state();
+        let mut state = stylist_to_codegen_state(stylist);
         tree.codegen(&mut state);
 
         let mut content = state.to_string();
@@ -183,7 +184,7 @@ fn format_import_from(
             lpar: vec![],
             rpar: vec![],
         })));
-        let mut state = stylist.codegen_state();
+        let mut state = stylist_to_codegen_state(stylist);
         tree.codegen(&mut state);
         Ok(state.to_string())
     } else if let ImportFrom {
@@ -216,7 +217,7 @@ fn format_import_from(
                 rpar: vec![],
             })));
 
-            let mut state = stylist.codegen_state();
+            let mut state = stylist_to_codegen_state(stylist);
             tree.codegen(&mut state);
 
             let mut content = state.to_string();

@@ -9,6 +9,7 @@ use libcst_native::{
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, Truthiness};
@@ -410,7 +411,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }));
     }
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.

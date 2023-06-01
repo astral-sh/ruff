@@ -2,6 +2,7 @@ use anyhow::Result;
 use libcst_native::{Codegen, CompOp};
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged, Unaryop};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -117,7 +118,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
         _ => panic!("Expected comparison operator"),
     };
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     expression.codegen(&mut state);
     Ok(state.to_string())
 }

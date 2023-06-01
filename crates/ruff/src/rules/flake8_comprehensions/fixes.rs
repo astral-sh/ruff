@@ -9,6 +9,7 @@ use libcst_native::{
 };
 use rustpython_parser::ast::Ranged;
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
@@ -44,7 +45,7 @@ pub(crate) fn fix_unnecessary_generator_list(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -78,7 +79,7 @@ pub(crate) fn fix_unnecessary_generator_set(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     let mut content = state.to_string();
@@ -128,7 +129,7 @@ pub(crate) fn fix_unnecessary_generator_dict(
         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     let mut content = state.to_string();
@@ -170,7 +171,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -213,7 +214,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -298,7 +299,7 @@ pub(crate) fn fix_unnecessary_literal_set(
         }));
     }
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -362,7 +363,7 @@ pub(crate) fn fix_unnecessary_literal_dict(
         rpar: vec![],
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -467,7 +468,7 @@ pub(crate) fn fix_unnecessary_collection_call(
         }
     };
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -517,7 +518,7 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
         }],
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -569,7 +570,7 @@ pub(crate) fn fix_unnecessary_literal_within_list_call(
         rpar: vec![],
     }));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -589,7 +590,7 @@ pub(crate) fn fix_unnecessary_list_call(
 
     tree = arg.value.clone();
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -703,7 +704,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
         }
     }
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -733,7 +734,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
         None => bail!("Expected at least one argument in outer function call"),
     };
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -820,7 +821,7 @@ pub(crate) fn fix_unnecessary_comprehension(
         }
     }
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -962,7 +963,7 @@ pub(crate) fn fix_unnecessary_map(
             }
         }
 
-        let mut state = stylist.codegen_state();
+        let mut state = stylist_to_codegen_state(stylist);
         tree.codegen(&mut state);
 
         let mut content = state.to_string();
@@ -994,7 +995,7 @@ pub(crate) fn fix_unnecessary_literal_within_dict_call(
 
     tree = arg.value.clone();
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), expr.range()))
@@ -1167,7 +1168,7 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
         _ => whitespace_after_arg,
     };
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Fix::suggested(Edit::range_replacement(

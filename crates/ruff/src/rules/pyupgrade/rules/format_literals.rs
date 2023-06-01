@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{Expr, Ranged};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -99,13 +100,13 @@ fn generate_call(
     // Fix the string itself.
     let item = match_attribute(&mut call.func)?;
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     item.codegen(&mut state);
     let cleaned = remove_specifiers(&state.to_string());
 
     call.func = Box::new(match_expression(&cleaned)?);
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     expression.codegen(&mut state);
     if module_text == state.to_string() {
         // Ex) `'{' '0}'.format(1)`

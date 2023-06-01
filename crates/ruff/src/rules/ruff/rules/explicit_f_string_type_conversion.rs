@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use libcst_native::Codegen;
 use rustpython_parser::ast::{self, Expr, Ranged};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -77,7 +78,7 @@ fn fix_explicit_f_string_type_conversion(
     }
     formatted_string_expression.expression = call.args[0].value.clone();
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     expression.codegen(&mut state);
 
     Ok(Fix::automatic(Edit::range_replacement(

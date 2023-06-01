@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use libcst_native::{Codegen, CompoundStatement, Statement, Suite, With};
 use rustpython_parser::ast::Ranged;
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace;
@@ -70,7 +71,7 @@ pub(crate) fn fix_multiple_with_statements(
     }
     outer_with.body = inner_with.body.clone();
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.

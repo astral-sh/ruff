@@ -8,6 +8,7 @@ use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
 use crate::autofix;
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -324,7 +325,7 @@ impl<'a> Importer<'a> {
             asname: None,
             comma: aliases.last().and_then(|alias| alias.comma.clone()),
         });
-        let mut state = self.stylist.codegen_state();
+        let mut state = stylist_to_codegen_state(self.stylist);
         statement.codegen(&mut state);
         Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }

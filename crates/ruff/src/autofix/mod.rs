@@ -1,11 +1,12 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use libcst_native::CodegenState;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
@@ -102,6 +103,15 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
             (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
             _ => std::cmp::Ordering::Equal,
         })
+}
+
+/// Convert a rust stylist style to a libcst style
+pub(crate) fn stylist_to_codegen_state<'a>(stylist: &'a Stylist<'a>) -> CodegenState<'a> {
+    CodegenState {
+        default_newline: stylist.line_ending().as_str(),
+        default_indent: stylist.indentation(),
+        ..Default::default()
+    }
 }
 
 #[cfg(test)]

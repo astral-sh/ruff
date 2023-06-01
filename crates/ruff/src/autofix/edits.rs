@@ -11,6 +11,7 @@ use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
+use crate::autofix::stylist_to_codegen_state;
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_statement;
 
@@ -169,7 +170,7 @@ pub(crate) fn remove_unused_imports<'a>(
     if aliases.is_empty() {
         delete_stmt(stmt, parent, deleted, locator, indexer, stylist)
     } else {
-        let mut state = stylist.codegen_state();
+        let mut state = stylist_to_codegen_state(stylist);
         tree.codegen(&mut state);
 
         Ok(Edit::range_replacement(state.to_string(), stmt.range()))

@@ -7,6 +7,7 @@ use libcst_native::{
 };
 use rustpython_parser::ast::Ranged;
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace;
@@ -110,7 +111,7 @@ pub(crate) fn fix_nested_if_statements(
     }));
     outer_if.body = inner_if.body.clone();
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     // Reconstruct and reformat the code.

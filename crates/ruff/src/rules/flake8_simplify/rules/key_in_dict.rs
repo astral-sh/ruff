@@ -4,6 +4,7 @@ use log::error;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,7 +43,7 @@ fn get_value_content_for_key_in_dict(
     let call = match_call_mut(&mut expression)?;
     let attribute = match_attribute(&mut call.func)?;
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     attribute.value.codegen(&mut state);
 
     Ok(state.to_string())

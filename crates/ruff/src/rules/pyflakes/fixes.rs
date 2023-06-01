@@ -7,6 +7,7 @@ use rustpython_format::{
 use rustpython_parser::ast::{Excepthandler, Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::autofix::stylist_to_codegen_state;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::raw_contents;
@@ -33,7 +34,7 @@ pub(crate) fn remove_unused_format_arguments_from_dict(
         } if raw_contents(name.value).map_or(false, |name| unused_arguments.contains(&name)))
     });
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), stmt.range()))
@@ -53,7 +54,7 @@ pub(crate) fn remove_unused_keyword_arguments_from_format_call(
     call.args
         .retain(|e| !matches!(&e.keyword, Some(kw) if unused_arguments.contains(&kw.value)));
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), location))
@@ -153,7 +154,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
         simple_string.value = new_format_string.as_str();
     }
 
-    let mut state = stylist.codegen_state();
+    let mut state = stylist_to_codegen_state(stylist);
     tree.codegen(&mut state);
 
     Ok(Edit::range_replacement(state.to_string(), location))
