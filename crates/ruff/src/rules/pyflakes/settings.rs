@@ -1,4 +1,4 @@
-//! Settings for the `flake8-bugbear` plugin.
+//! Settings for the `Pyflakes` plugin.
 
 use serde::{Deserialize, Serialize};
 
@@ -17,22 +17,23 @@ pub struct Options {
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = "extend-annotated-subscripts = [\"django.db.models.ForeignKey\"]"
+        example = "extend-generics = [\"django.db.models.ForeignKey\"]"
     )]
-    /// Additional subcripts to consider as a generic, e.g., `ForeignKey` in
+    /// Additional functions or classes to consider generic, such that any
+    /// subscripts should be treated as type annotation (e.g., `ForeignKey` in
     /// `django.db.models.ForeignKey["User"]`.
-    pub extend_annotated_subscripts: Option<Vec<String>>,
+    pub extend_generics: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, CacheKey)]
 pub struct Settings {
-    pub extend_annotated_subscripts: Vec<String>,
+    pub extend_generics: Vec<String>,
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
-            extend_annotated_subscripts: options.extend_annotated_subscripts.unwrap_or_default(),
+            extend_generics: options.extend_generics.unwrap_or_default(),
         }
     }
 }
@@ -40,7 +41,7 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
-            extend_annotated_subscripts: Some(settings.extend_annotated_subscripts),
+            extend_generics: Some(settings.extend_generics),
         }
     }
 }

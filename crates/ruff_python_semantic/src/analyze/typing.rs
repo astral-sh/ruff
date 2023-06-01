@@ -29,7 +29,7 @@ pub fn match_annotated_subscript<'a>(
     expr: &Expr,
     semantic_model: &SemanticModel,
     typing_modules: impl Iterator<Item = &'a str>,
-    extend_annotated_subscripts: &[String],
+    extend_generics: &[String],
 ) -> Option<SubscriptKind> {
     if !matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
         return None;
@@ -39,7 +39,7 @@ pub fn match_annotated_subscript<'a>(
         .resolve_call_path(expr)
         .and_then(|call_path| {
             if SUBSCRIPTS.contains(&call_path.as_slice())
-                || extend_annotated_subscripts
+                || extend_generics
                     .iter()
                     .map(|target| from_qualified_name(target))
                     .any(|target| call_path == target)

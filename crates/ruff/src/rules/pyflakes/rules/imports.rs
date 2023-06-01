@@ -27,7 +27,7 @@ pub(crate) enum UnusedImportContext {
 ///
 /// ## Options
 ///
-/// - `pyflakes.extend-annotated-subscripts`
+/// - `pyflakes.extend-generics`
 ///
 /// ## Example
 /// ```python

@@ -255,13 +255,13 @@ mod tests {
     }
 
     #[test]
-    fn extend_annotated_subscripts() -> Result<()> {
+    fn extend_generics() -> Result<()> {
         let snapshot = "extend_immutable_calls".to_string();
         let diagnostics = test_path(
             Path::new("pyflakes/F401_15.py"),
             &Settings {
                 pyflakes: super::settings::Settings {
-                    extend_annotated_subscripts: vec!["django.db.models.ForeignKey".to_string()],
+                    extend_generics: vec!["django.db.models.ForeignKey".to_string()],
                 },
                 ..Settings::for_rules(vec![Rule::UnusedImport])
             },

@@ -1443,8 +1443,8 @@
     "PyflakesOptions": {
       "type": "object",
       "properties": {
-        "extend-annotated-subscripts": {
-          "description": "Additional subcripts to consider as a generic, e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.",
+        "extend-generics": {
+          "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.",
           "type": [
             "array",
             "null"
