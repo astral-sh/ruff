@@ -234,7 +234,7 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,219 +1,155 @@
+@@ -1,219 +1,157 @@
  class MyClass:
 +  """ Multiline
 +  class docstring
@@ -349,11 +349,11 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 +    - And the closing quote is too deep
      """
 -    pass
--
 +  pass
 +def single_line():
 +    """But with a newline after it!
  
+-
 -def over_indent():
 -    """
 -    This has a shallow indent
@@ -387,22 +387,22 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 +  """
 +  "hey yah" """
  def and_this():
--    '''
++  ''' 
++  "hey yah"'''
++def multiline_whitespace():
++    '''
++    
++    
++    
++    
+     '''
 -    "hey yah"'''
 -
 -
-+  ''' 
-+  "hey yah"'''
- def multiline_whitespace():
+-def multiline_whitespace():
 -    """ """
 -
 -
-+    '''
-+    
-+    
-+    
-+    
-+    '''
  def oneline_whitespace():
 -    """ """
 -
@@ -453,13 +453,13 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -
  def docstring_with_inline_tabs_and_tab_indentation():
 -    """hey
--
++	"""hey
+ 
 -    tab	separated	value
 -            tab at start of line and then a tab	separated	value
 -                                    multiple tabs at the beginning	and	inline
 -                            mixed tabs and spaces at beginning. next line has mixed tabs and spaces only.
-+	"""hey
- 
+-
 -    line ends with some tabs
 -    """
 -    pass
@@ -490,9 +490,9 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -    hey there \ """
 -
 -
--# Regression test for #3425
 +  '''
 +  hey there \ '''
+ # Regression test for #3425
  def multiline_backslash_really_long_dont_crash():
      """
      hey there hello guten tag hi hoow are you ola zdravstvuyte ciao como estas ca va \ """
@@ -509,7 +509,7 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
      "I'm sorry Dave\u2001"
 -
 -
--# the space below is actually a \u2001, removed in output
+ # the space below is actually a \u2001, removed in output
  def my_god_its_full_of_stars_2():
 -    "I'm sorry Dave"
 -
@@ -675,6 +675,7 @@ def multiline_backslash_1():
 def multiline_backslash_2():
   '''
   hey there \ '''
+# Regression test for #3425
 def multiline_backslash_really_long_dont_crash():
     """
     hey there hello guten tag hi hoow are you ola zdravstvuyte ciao como estas ca va \ """
@@ -683,6 +684,7 @@ def multiline_backslash_3():
   already escaped \\ '''
 def my_god_its_full_of_stars_1():
     "I'm sorry Dave\u2001"
+# the space below is actually a \u2001, removed in output
 def my_god_its_full_of_stars_2():
     "I'm sorry Dave "
 def docstring_almost_at_line_limit():

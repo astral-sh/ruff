@@ -76,7 +76,7 @@ x[
 ```diff
 --- Black
 +++ Ruff
-@@ -17,19 +17,12 @@
+@@ -17,19 +17,14 @@
  slice[not so_simple : 1 < val <= 10]
  slice[(1 for i in range(42)) : x]
  slice[:: [i for i in range(42)]]
@@ -86,17 +86,17 @@ x[
      slice[await x : [i async for i in arange(42)] : 42]
 -
 -
--# These are from PEP-8:
+ # These are from PEP-8:
  ham[1:9], ham[1:9:3], ham[:9:3], ham[1::3], ham[1:9:]
  ham[lower:upper], ham[lower:upper:], ham[lower::step]
--# ham[lower+offset : upper+offset]
+ # ham[lower+offset : upper+offset]
  ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
  ham[lower + offset : upper + offset]
 -
  slice[::, ::]
  slice[
      # A
-@@ -46,7 +39,6 @@
+@@ -46,7 +41,6 @@
      # C
      3
  ]
@@ -104,7 +104,7 @@ x[
  slice[
      # A
      1
-@@ -56,4 +48,8 @@
+@@ -56,4 +50,8 @@
      # C
      4
  ]
@@ -140,8 +140,10 @@ slice[(1 for i in range(42)) : x]
 slice[:: [i for i in range(42)]]
 async def f():
     slice[await x : [i async for i in arange(42)] : 42]
+# These are from PEP-8:
 ham[1:9], ham[1:9:3], ham[:9:3], ham[1::3], ham[1:9:]
 ham[lower:upper], ham[lower:upper:], ham[lower::step]
+# ham[lower+offset : upper+offset]
 ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
 ham[lower + offset : upper + offset]
 slice[::, ::]

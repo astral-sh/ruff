@@ -108,8 +108,8 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,100 +1,51 @@
--#!/usr/bin/env python3
+@@ -1,100 +1,52 @@
+ #!/usr/bin/env python3
  import asyncio
  import sys
 -
@@ -244,7 +244,7 @@ def __await__(): return (yield)
                  # trailing standalone comment
              )
          )
-@@ -117,23 +68,18 @@
+@@ -117,23 +69,18 @@
              \n?
          )
          $
@@ -276,7 +276,7 @@ def __await__(): return (yield)
  ) -> A:
      return (
          yield from A(
-@@ -142,7 +88,4 @@
+@@ -142,7 +89,4 @@
              **kwargs,
          )
      )
@@ -290,6 +290,7 @@ def __await__(): return (yield)
 ## Ruff Output
 
 ```py
+#!/usr/bin/env python3
 import asyncio
 import sys
 from third_party import X, Y, Z

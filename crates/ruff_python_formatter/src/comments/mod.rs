@@ -93,6 +93,7 @@ use std::fmt::Debug;
 use std::rc::Rc;
 
 mod debug;
+mod format;
 mod map;
 mod node_key;
 mod placement;
@@ -102,6 +103,7 @@ use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
+pub(crate) use format::{dangling_comments, leading_comments, trailing_comments};
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::CommentRanges;

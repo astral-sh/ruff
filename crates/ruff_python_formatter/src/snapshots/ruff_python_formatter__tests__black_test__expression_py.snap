@@ -401,7 +401,7 @@ last_call()
 +call(kwarg='hey')
 +call(arg, kwarg='hey')
 +call(arg, another, kwarg='hey', **kwargs)
-+call(this_is_a_very_long_variable_which_will_force_a_delimiter_split, arg, another, kwarg='hey', **kwargs)
++call(this_is_a_very_long_variable_which_will_force_a_delimiter_split, arg, another, kwarg='hey', **kwargs)  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
  call(a, *gidgets[:2])
  call(**self.screen_kwargs)
@@ -437,7 +437,7 @@ last_call()
 -)  # type: ignore
 +xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[
 +    ..., List[SomeClass]
-+] = classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
++] = classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
  slice[0]
  slice[0:1]
  slice[0:1:2]
@@ -510,7 +510,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -233,138 +170,82 @@
+@@ -233,138 +170,83 @@
      C: 0.1 * (10.0 / 12),
      D: 0.1 * (10.0 / 12),
  }
@@ -682,7 +682,7 @@ last_call()
 -)
 +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ^bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  last_call()
--# standalone comment at ENDMARKER
+ # standalone comment at ENDMARKER
 ```
 
 ## Ruff Output
@@ -773,7 +773,7 @@ call(arg)
 call(kwarg='hey')
 call(arg, kwarg='hey')
 call(arg, another, kwarg='hey', **kwargs)
-call(this_is_a_very_long_variable_which_will_force_a_delimiter_split, arg, another, kwarg='hey', **kwargs)
+call(this_is_a_very_long_variable_which_will_force_a_delimiter_split, arg, another, kwarg='hey', **kwargs)  # note: no trailing comma pre-3.6
 call(*gidgets[:2])
 call(a, *gidgets[:2])
 call(**self.screen_kwargs)
@@ -801,7 +801,7 @@ xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # t
 )
 xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[
     ..., List[SomeClass]
-] = classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
+] = classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
 slice[0]
 slice[0:1]
 slice[0:1:2]
@@ -939,6 +939,7 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >> aaaaaaaaaaaaa
 bbbb >> bbbb * bbbb
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ^bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 last_call()
+# standalone comment at ENDMARKER
 ```
 
 ## Black Output

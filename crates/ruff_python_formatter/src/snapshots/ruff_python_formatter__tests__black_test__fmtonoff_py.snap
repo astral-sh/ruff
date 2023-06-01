@@ -199,8 +199,8 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -1,22 +1,11 @@
--#!/usr/bin/env python3
+@@ -1,20 +1,17 @@
+ #!/usr/bin/env python3
  import asyncio
  import sys
 -
@@ -208,28 +208,25 @@ d={'a':1,
 -
 -from library import some_connection, some_decorator
 -
--# fmt: off
 +from library import some_connection, \
 +                    some_decorator
+ # fmt: off
  from third_party import (X,
                           Y, Z)
--# fmt: on
+ # fmt: on
 -f"trigger 3.6 mode"
--# Comment 1
--
--# Comment 2
--
--
--# fmt: off
 +f'trigger 3.6 mode'
+ # Comment 1
+ 
+ # Comment 2
+-
+ 
+ # fmt: off
  def func_no_args():
-   a; b; c
-   if True: raise RuntimeError
-@@ -38,73 +27,41 @@
- )
+@@ -39,72 +36,41 @@
  def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
   return text[number:-1]
--# fmt: on
+ # fmt: on
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
@@ -308,7 +305,7 @@ d={'a':1,
  def example(session):
      # fmt: off
      result = session\
-@@ -113,9 +70,6 @@
+@@ -113,9 +79,6 @@
                  models.Customer.email == email_address)\
          .order_by(models.Customer.id.asc())\
          .all()
@@ -318,23 +315,23 @@ d={'a':1,
  def off_and_on_without_data():
      """All comments here are technically on the same prefix.
  
-@@ -123,12 +77,12 @@
+@@ -123,12 +86,12 @@
      """
      # fmt: off
  
 -    # hey, that won't work
  
--    # fmt: on
--    pass
 +        #hey, that won't work
- 
- 
-+    # fmt: on
-+    pass
++
++
+     # fmt: on
+     pass
+-
+-
  def on_and_off_broken():
      """Another known limitation."""
      # fmt: on
-@@ -137,21 +91,10 @@
+@@ -137,21 +100,10 @@
      and_=indeed . it  is  not  formatted
      because . the . handling . inside . generate_ignored_nodes()
      now . considers . multiple . fmt . directives . within . one . prefix
@@ -357,7 +354,7 @@ d={'a':1,
          )
          # fmt: off
          a = (
-@@ -182,24 +125,19 @@
+@@ -182,24 +134,19 @@
          re.MULTILINE|re.VERBOSE
          # fmt: on
      )
@@ -372,7 +369,7 @@ d={'a':1,
 +        (1, 2, 3, 4),
 +        (5, 6, 7, 8),
 +        (9, 10, 11, 12)
-+    }
++    }  # yapf: disable
  cfg.rule(
 -    "Default",
 -    "address",
@@ -391,32 +388,36 @@ d={'a':1,
      # fmt: off
      xxxxxxx_xxxxxxxxxxxx={
          "xxxxxxxx": {
-@@ -214,11 +152,9 @@
+@@ -214,7 +161,7 @@
          },
      },
      # fmt: on
 -    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 +    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5
  )
--# fmt: off
+ # fmt: off
  yield  'hello'
--# No formatting to the end of the file
- l=[1,2,3]
- d={'a':1,
-    'b':2}
 ```
 
 ## Ruff Output
 
 ```py
+#!/usr/bin/env python3
 import asyncio
 import sys
 from third_party import X, Y, Z
 from library import some_connection, \
                     some_decorator
+# fmt: off
 from third_party import (X,
                          Y, Z)
+# fmt: on
 f'trigger 3.6 mode'
+# Comment 1
+
+# Comment 2
+
+# fmt: off
 def func_no_args():
   a; b; c
   if True: raise RuntimeError
@@ -438,6 +439,7 @@ many_args=[1,2,3]
 )
 def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
  return text[number:-1]
+# fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r''):
  offset = attr.ib(default=attr.Factory( lambda: _r.uniform(1, 2)))
  assert task._cancel_stack[:len(old_stack)] == old_stack
@@ -542,7 +544,7 @@ def single_literal_yapf_disable():
         (1, 2, 3, 4),
         (5, 6, 7, 8),
         (9, 10, 11, 12)
-    }
+    }  # yapf: disable
 cfg.rule(
     "Default", "address",
     xxxx_xxxx=["xxx-xxxxxx-xxxxxxxxxx"],
@@ -565,7 +567,9 @@ cfg.rule(
     # fmt: on
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5
 )
+# fmt: off
 yield  'hello'
+# No formatting to the end of the file
 l=[1,2,3]
 d={'a':1,
    'b':2}

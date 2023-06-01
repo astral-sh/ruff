@@ -152,13 +152,13 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,61 +1,23 @@
--# Test for https://github.com/psf/black/issues/246.
--
+@@ -1,60 +1,35 @@
+ # Test for https://github.com/psf/black/issues/246.
+ 
  some = statement
 -
 -
--# This comment should be split from the statement above by two lines.
+ # This comment should be split from the statement above by two lines.
  def function():
      pass
 -
@@ -166,9 +166,9 @@ def bar():
  some = statement
 -
 -
--# This multiline comments section
--# should be split from the statement
--# above by two lines.
+ # This multiline comments section
+ # should be split from the statement
+ # above by two lines.
  def function():
      pass
 -
@@ -176,7 +176,7 @@ def bar():
  some = statement
 -
 -
--# This comment should be split from the statement above by two lines.
+ # This comment should be split from the statement above by two lines.
  async def async_function():
      pass
 -
@@ -184,16 +184,16 @@ def bar():
  some = statement
 -
 -
--# This comment should be split from the statement above by two lines.
+ # This comment should be split from the statement above by two lines.
  class MyClass:
      pass
 -
 -
  some = statement
--# This should be stick to the statement above
+ # This should be stick to the statement above
+ 
 -
--
--# This should be split from the above by two lines
+ # This should be split from the above by two lines
  class MyClassWithComplexLeadingComments:
      pass
 -
@@ -202,7 +202,7 @@ def bar():
      """A docstring."""
 -
 -
--# Leading comment after a class with just a docstring
+ # Leading comment after a class with just a docstring
  class MyClassAfterAnotherClassWithDocstring:
      pass
 -
@@ -210,11 +210,10 @@ def bar():
  some = statement
 -
 -
--# leading 1
+ # leading 1
  @deco1
  # leading 2
- # leading 2 extra
-@@ -65,12 +27,7 @@
+@@ -65,11 +40,7 @@
  # leading 4
  def decorated():
      pass
@@ -223,11 +222,10 @@ def bar():
  some = statement
 -
 -
--# leading 1
+ # leading 1
  @deco1
  # leading 2
- @deco2(with_args=True)
-@@ -80,12 +37,7 @@
+@@ -80,11 +51,7 @@
  # leading 4
  def decorated_with_split_leading_comments():
      pass
@@ -236,11 +234,10 @@ def bar():
  some = statement
 -
 -
--# leading 1
+ # leading 1
  @deco1
  # leading 2
- @deco2(with_args=True)
-@@ -95,66 +47,42 @@
+@@ -95,66 +62,44 @@
  # leading 4 that already has an empty line
  def decorated_with_split_leading_comments():
      pass
@@ -284,7 +281,7 @@ def bar():
          pass
 -
 -
--# Regression test for https://github.com/psf/black/issues/3454.
+ # Regression test for https://github.com/psf/black/issues/3454.
  def foo():
      pass
 -    # Trailing comment that belongs to this function
@@ -296,7 +293,7 @@ def bar():
      pass
 -
 -
--# Regression test for https://github.com/psf/black/issues/3454.
+ # Regression test for https://github.com/psf/black/issues/3454.
  def foo():
      pass
 -    # Trailing comment that belongs to this function.
@@ -312,26 +309,39 @@ def bar():
 ## Ruff Output
 
 ```py
+# Test for https://github.com/psf/black/issues/246.
+
 some = statement
+# This comment should be split from the statement above by two lines.
 def function():
     pass
 some = statement
+# This multiline comments section
+# should be split from the statement
+# above by two lines.
 def function():
     pass
 some = statement
+# This comment should be split from the statement above by two lines.
 async def async_function():
     pass
 some = statement
+# This comment should be split from the statement above by two lines.
 class MyClass:
     pass
 some = statement
+# This should be stick to the statement above
+
+# This should be split from the above by two lines
 class MyClassWithComplexLeadingComments:
     pass
 class ClassWithDocstring:
     """A docstring."""
+# Leading comment after a class with just a docstring
 class MyClassAfterAnotherClassWithDocstring:
     pass
 some = statement
+# leading 1
 @deco1
 # leading 2
 # leading 2 extra
@@ -342,6 +352,7 @@ some = statement
 def decorated():
     pass
 some = statement
+# leading 1
 @deco1
 # leading 2
 @deco2(with_args=True)
@@ -352,6 +363,7 @@ some = statement
 def decorated_with_split_leading_comments():
     pass
 some = statement
+# leading 1
 @deco1
 # leading 2
 @deco2(with_args=True)
@@ -389,12 +401,14 @@ class MyClass:
     # More comments.
     def first_method(self):
         pass
+# Regression test for https://github.com/psf/black/issues/3454.
 def foo():
     pass
 @decorator1
 @decorator2  # fmt: skip
 def bar():
     pass
+# Regression test for https://github.com/psf/black/issues/3454.
 def foo():
     pass
 @decorator1

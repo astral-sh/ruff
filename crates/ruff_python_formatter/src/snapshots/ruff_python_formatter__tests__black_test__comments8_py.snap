@@ -19,18 +19,24 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +0,0 @@
--# The percent-percent comments are Spyder IDE cells.
--# Both `#%%`` and `# %%` are accepted, so `black` standardises
--# to the latter.
--
+@@ -2,5 +2,5 @@
+ # Both `#%%`` and `# %%` are accepted, so `black` standardises
+ # to the latter.
+ 
 -# %%
--# %%
++#%%
+ # %%
 ```
 
 ## Ruff Output
 
 ```py
+# The percent-percent comments are Spyder IDE cells.
+# Both `#%%`` and `# %%` are accepted, so `black` standardises
+# to the latter.
+
+#%%
+# %%
 ```
 
 ## Black Output
