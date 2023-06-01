@@ -1022,7 +1022,7 @@ where
                 }
             }
             Stmt::ImportFrom(
-                imp_from @ ast::StmtImportFrom {
+                import_from @ ast::StmtImportFrom {
                     names,
                     module,
                     level,
@@ -1095,7 +1095,7 @@ where
 
                 if self.is_stub {
                     if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
-                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, imp_from);
+                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
                     }
                 }
                 for alias in names {
