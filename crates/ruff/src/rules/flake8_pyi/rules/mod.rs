@@ -28,6 +28,7 @@ pub(crate) use type_alias_naming::{
     snake_case_type_alias, t_suffixed_type_alias, SnakeCaseTypeAlias, TSuffixedTypeAlias,
 };
 pub(crate) use type_comment_in_stub::{type_comment_in_stub, TypeCommentInStub};
+pub(crate) use unaliased_set_import::{unaliased_set_import, UnaliasedSetImport};
 pub(crate) use unrecognized_platform::{
     unrecognized_platform, UnrecognizedPlatformCheck, UnrecognizedPlatformName,
 };
@@ -48,4 +49,5 @@ mod simple_defaults;
 mod stub_body_multiple_statements;
 mod type_alias_naming;
 mod type_comment_in_stub;
+mod unaliased_set_import;
 mod unrecognized_platform;

@@ -48,6 +48,8 @@ mod tests {
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.pyi"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.py"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.pyi"))]
+    #[test_case(Rule::UnaliasedSetImport, Path::new("PYI025.py"))]
+    #[test_case(Rule::UnaliasedSetImport, Path::new("PYI025.pyi"))]
     #[test_case(Rule::UnannotatedAssignmentInStub, Path::new("PYI052.py"))]
     #[test_case(Rule::UnannotatedAssignmentInStub, Path::new("PYI052.pyi"))]
     #[test_case(Rule::UnprefixedTypeParam, Path::new("PYI001.py"))]
