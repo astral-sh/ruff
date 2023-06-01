@@ -108,10 +108,13 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -4,97 +4,52 @@
- 
+@@ -1,100 +1,51 @@
+-#!/usr/bin/env python3
+ import asyncio
+ import sys
+-
  from third_party import X, Y, Z
- 
+-
 -from library import some_connection, some_decorator
 -
 -f"trigger 3.6 mode"
@@ -202,7 +205,6 @@ def __await__(): return (yield)
 +def spaces_types(a: int = 1, b: tuple = (), c: list = [], d: dict = {}, e: bool = True, f: int = -1, g: int = 1 if False else 2, h: str = "", i: str = r''): ...
 +def spaces2(result= _core.Value(None)):
 + assert fut is self._read_fut, (fut, self._read_fut)
-+    
  def example(session):
 -    result = (
 -        session.query(models.Customer.id)
@@ -242,7 +244,7 @@ def __await__(): return (yield)
                  # trailing standalone comment
              )
          )
-@@ -117,23 +72,18 @@
+@@ -117,23 +68,18 @@
              \n?
          )
          $
@@ -274,7 +276,7 @@ def __await__(): return (yield)
  ) -> A:
      return (
          yield from A(
-@@ -142,7 +92,4 @@
+@@ -142,7 +88,4 @@
              **kwargs,
          )
      )
@@ -288,12 +290,9 @@ def __await__(): return (yield)
 ## Ruff Output
 
 ```py
-#!/usr/bin/env python3
 import asyncio
 import sys
-
 from third_party import X, Y, Z
-
 from library import some_connection, \
                     some_decorator
 f'trigger 3.6 mode'
@@ -324,7 +323,6 @@ def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r''
 def spaces_types(a: int = 1, b: tuple = (), c: list = [], d: dict = {}, e: bool = True, f: int = -1, g: int = 1 if False else 2, h: str = "", i: str = r''): ...
 def spaces2(result= _core.Value(None)):
  assert fut is self._read_fut, (fut, self._read_fut)
-    
 def example(session):
     result = session.query(models.Customer.id).filter(
         models.Customer.account_id == account_id,

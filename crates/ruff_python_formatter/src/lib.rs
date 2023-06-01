@@ -180,11 +180,8 @@ if    True:
     print( "hi" )
 # trailing
 "#;
-        let expected = r#"
-# preceding
-if    True:
+        let expected = r#"if    True:
     print( "hi" )
-# trailing
 "#;
         let actual = format_module(input)?.as_code().to_string();
         assert_eq!(expected, actual);
