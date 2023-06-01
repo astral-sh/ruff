@@ -1,0 +1,188 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtonoff2.py
+---
+## Input
+
+```py
+import pytest
+
+TmSt = 1
+TmEx = 2
+
+# fmt: off
+
+# Test data:
+#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+
+@pytest.mark.parametrize('test', [
+
+    # Test don't manage the volume
+    [
+        ('stuff', 'in')
+    ],
+])
+def test_fader(test):
+    pass
+
+def check_fader(test):
+
+    pass
+
+def verify_fader(test):
+  # misaligned comment
+    pass
+
+def verify_fader(test):
+    """Hey, ho."""
+    assert test.passed()
+
+def test_calculate_fades():
+    calcs = [
+        # one is zero/none
+        (0, 4, 0, 0, 10,        0, 0, 6, 10),
+        (None, 4, 0, 0, 10,     0, 0, 6, 10),
+    ]
+
+# fmt: on
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -2,12 +2,6 @@
+ 
+ TmSt = 1
+ TmEx = 2
+-
+-# fmt: off
+-
+-# Test data:
+-#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+-
+ @pytest.mark.parametrize('test', [
+ 
+     # Test don't manage the volume
+@@ -18,18 +12,22 @@
+ def test_fader(test):
+     pass
+ 
++
+ def check_fader(test):
+ 
+     pass
+ 
++
+ def verify_fader(test):
+   # misaligned comment
+     pass
+ 
++
+ def verify_fader(test):
+     """Hey, ho."""
+     assert test.passed()
+ 
++
+ def test_calculate_fades():
+     calcs = [
+         # one is zero/none
+@@ -37,4 +35,4 @@
+         (None, 4, 0, 0, 10,     0, 0, 6, 10),
+     ]
+ 
+-# fmt: on
++
+```
+
+## Ruff Output
+
+```py
+import pytest
+
+TmSt = 1
+TmEx = 2
+@pytest.mark.parametrize('test', [
+
+    # Test don't manage the volume
+    [
+        ('stuff', 'in')
+    ],
+])
+def test_fader(test):
+    pass
+
+
+def check_fader(test):
+
+    pass
+
+
+def verify_fader(test):
+  # misaligned comment
+    pass
+
+
+def verify_fader(test):
+    """Hey, ho."""
+    assert test.passed()
+
+
+def test_calculate_fades():
+    calcs = [
+        # one is zero/none
+        (0, 4, 0, 0, 10,        0, 0, 6, 10),
+        (None, 4, 0, 0, 10,     0, 0, 6, 10),
+    ]
+
+
+```
+
+## Black Output
+
+```py
+import pytest
+
+TmSt = 1
+TmEx = 2
+
+# fmt: off
+
+# Test data:
+#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+
+@pytest.mark.parametrize('test', [
+
+    # Test don't manage the volume
+    [
+        ('stuff', 'in')
+    ],
+])
+def test_fader(test):
+    pass
+
+def check_fader(test):
+
+    pass
+
+def verify_fader(test):
+  # misaligned comment
+    pass
+
+def verify_fader(test):
+    """Hey, ho."""
+    assert test.passed()
+
+def test_calculate_fades():
+    calcs = [
+        # one is zero/none
+        (0, 4, 0, 0, 10,        0, 0, 6, 10),
+        (None, 4, 0, 0, 10,     0, 0, 6, 10),
+    ]
+
+# fmt: on
+```
+
+
