@@ -386,6 +386,7 @@ def mutable_argument(z=set()):
   print(f"cell two: {z}")
 
 mutable_argument()
+
 "#
         );
         assert_eq!(
