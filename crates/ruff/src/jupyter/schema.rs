@@ -12,7 +12,7 @@
 //!   `"additionalProperties": true` as preparation for round-trip support.
 //! * `#[serde(skip_serializing_none)]` was added to all structs where one or
 //!   more fields were optional to avoid serializing `null` values.
-//! * `Output::data` & `Cell::attachements` were changed to `Value` because
+//! * `Output::data` & `Cell::attachments` were changed to `Value` because
 //!    the scheme had `patternProperties`.
 
 use std::collections::{BTreeMap, HashMap};
