@@ -119,6 +119,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
    `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based checks).
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
+
 1. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
