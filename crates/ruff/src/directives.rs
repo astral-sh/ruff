@@ -220,48 +220,46 @@ fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDirect
 }
 
 /// A comment that contains a [`TodoDirective`]
-pub struct TodoComment<'a> {
+pub(crate) struct TodoComment<'a> {
     /// The comment's text
-    pub content: &'a str,
+    pub(crate) content: &'a str,
     /// The directive found within the comment.
-    pub directive: TodoDirective<'a>,
+    pub(crate) directive: TodoDirective<'a>,
     /// The comment's actual [`TextRange`].
-    pub range: TextRange,
+    pub(crate) range: TextRange,
     /// The comment range's position in [`Indexer`].comment_ranges()
-    pub range_index: usize,
+    pub(crate) range_index: usize,
 }
 
 impl<'a> TodoComment<'a> {
     /// Attempt to transform a normal comment into a [`TodoComment`].
-    pub fn from_comment(content: &'a str, range: &TextRange, range_index: usize) -> Option<Self> {
+    pub(crate) fn from_comment(
+        content: &'a str,
+        range: TextRange,
+        range_index: usize,
+    ) -> Option<Self> {
         TodoDirective::from_comment(content, range).map(|directive| Self {
-            directive,
             content,
-            range: *range,
+            directive,
+            range,
             range_index,
         })
-    }
-
-    /// Determine the starting location for the [`TodoDirective`], relative to the comment's
-    /// starting offset
-    pub fn directive_offset(&self) -> TextSize {
-        self.directive.range.start() - self.range.start()
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub struct TodoDirective<'a> {
+pub(crate) struct TodoDirective<'a> {
     /// The actual directive
-    pub content: &'a str,
+    pub(crate) content: &'a str,
     /// The directive's [`TextRange`] in the file.
-    pub range: TextRange,
+    pub(crate) range: TextRange,
     /// The directive's kind: HACK, XXX, FIXME, or TODO.
-    pub kind: TodoDirectiveKind,
+    pub(crate) kind: TodoDirectiveKind,
 }
 
 impl<'a> TodoDirective<'a> {
     /// Extract a [`TodoDirective`] from a comment.
-    pub fn from_comment(comment: &'a str, comment_range: &TextRange) -> Option<Self> {
+    pub(crate) fn from_comment(comment: &'a str, comment_range: TextRange) -> Option<Self> {
         // The directive's offset from the start of the comment.
         let mut relative_offset = TextSize::new(0);
         let mut subset_opt = Some(comment);
@@ -297,15 +295,10 @@ impl<'a> TodoDirective<'a> {
 
         None
     }
-
-    /// Returns the length of the directive's content.
-    pub fn len(&self) -> TextSize {
-        self.kind.len()
-    }
 }
 
 #[derive(Debug, PartialEq)]
-pub enum TodoDirectiveKind {
+pub(crate) enum TodoDirectiveKind {
     Todo,
     Fixme,
     Xxx,
@@ -344,7 +337,7 @@ impl FromStr for TodoDirectiveKind {
 }
 
 impl TodoDirectiveKind {
-    pub fn len(&self) -> TextSize {
+    fn len(&self) -> TextSize {
         match self {
             TodoDirectiveKind::Xxx => TextSize::new(3),
             TodoDirectiveKind::Hack | TodoDirectiveKind::Todo => TextSize::new(4),
@@ -578,7 +571,7 @@ z = x + 1";
         };
         assert_eq!(
             expected,
-            TodoDirective::from_comment(test_comment, &test_comment_range).unwrap()
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
         );
 
         let test_comment = "#TODO: todo tag";
@@ -590,7 +583,7 @@ z = x + 1";
         };
         assert_eq!(
             expected,
-            TodoDirective::from_comment(test_comment, &test_comment_range).unwrap()
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
         );
 
         let test_comment = "# fixme: fixme tag";
@@ -602,7 +595,7 @@ z = x + 1";
         };
         assert_eq!(
             expected,
-            TodoDirective::from_comment(test_comment, &test_comment_range).unwrap()
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
         );
 
         let test_comment = "# noqa # TODO: todo";
@@ -614,14 +607,14 @@ z = x + 1";
         };
         assert_eq!(
             expected,
-            TodoDirective::from_comment(test_comment, &test_comment_range).unwrap()
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
         );
 
         let test_comment = "# no directive";
         let test_comment_range = TextRange::at(TextSize::new(0), test_comment.text_len());
         assert_eq!(
             None,
-            TodoDirective::from_comment(test_comment, &test_comment_range)
+            TodoDirective::from_comment(test_comment, test_comment_range)
         );
     }
 }

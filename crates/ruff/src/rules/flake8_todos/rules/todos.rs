@@ -225,15 +225,6 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-// If this struct ever gets pushed outside of this module, it may be worth creating an enum for
-// the different tag types + other convenience methods.
-/// Represents a TODO tag or any of its variants - FIXME, XXX, TODO.
-#[derive(Debug, PartialEq, Eq)]
-struct Tag<'a> {
-    range: TextRange,
-    content: &'a str,
-}
-
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r#"^#\s*(http|https)://.*"#, // issue link
@@ -255,9 +246,10 @@ pub(crate) fn todos(
         let TodoComment {
             directive,
             content,
-            range,
             range_index,
+            ..
         } = todo_comment;
+        let range = todo_comment.range;
 
         // flake8-todos doesn't support HACK directives.
         if matches!(directive.kind, TodoDirectiveKind::Hack) {
@@ -265,11 +257,16 @@ pub(crate) fn todos(
         }
 
         directive_errors(directive, &mut diagnostics, settings);
-        static_errors(&mut diagnostics, content, *range, directive);
+        static_errors(&mut diagnostics, content, range, directive);
 
         let mut has_issue_link = false;
         let mut curr_range = range;
-        for next_range in indexer.comment_ranges().iter().skip(range_index + 1) {
+        for next_range in indexer
+            .comment_ranges()
+            .iter()
+            .skip(range_index + 1)
+            .copied()
+        {
             // Ensure that next_comment_range is in the same multiline comment "block" as
             // comment_range.
             if !locator
@@ -280,7 +277,7 @@ pub(crate) fn todos(
                 break;
             }
 
-            let next_comment = locator.slice(*next_range);
+            let next_comment = locator.slice(next_range);
             if TodoDirective::from_comment(next_comment, next_range).is_some() {
                 break;
             }
