@@ -3394,6 +3394,15 @@ where
                 }
             }
             Expr::Constant(ast::ExprConstant {
+                value: Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. },
+                range,
+                ..
+            }) => {
+                if self.is_stub && self.enabled(Rule::LongNumericLiteralsInStub) {
+                    flake8_pyi::rules::long_numeric_literals_in_stubs(self, *range);
+                }
+            }
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 kind,
                 range: _,
