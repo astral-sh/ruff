@@ -1,3 +1,5 @@
+use ruff_textwrap::dedent;
+
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
@@ -126,7 +128,7 @@ fn handle_option(
     docs: Vec<&Attribute>,
 ) -> syn::Result<proc_macro2::TokenStream> {
     // Convert the list of `doc` attributes into a single string.
-    let doc = textwrap::dedent(
+    let doc = dedent(
         &docs
             .into_iter()
             .map(parse_doc)
@@ -179,7 +181,7 @@ impl Parse for FieldAttributes {
         Ok(Self {
             default,
             value_type,
-            example: textwrap::dedent(&example).trim_matches('\n').to_string(),
+            example: dedent(&example).trim_matches('\n').to_string(),
         })
     }
 }

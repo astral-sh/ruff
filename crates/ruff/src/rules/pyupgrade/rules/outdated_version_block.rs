@@ -12,7 +12,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::whitespace::indentation;
 
-use crate::autofix::actions::delete_stmt;
+use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes::adjust_indentation;

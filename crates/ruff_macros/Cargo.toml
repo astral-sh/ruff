@@ -10,8 +10,9 @@ proc-macro = true
 doctest = false
 
 [dependencies]
+ruff_textwrap = { path = "../ruff_textwrap" }
+
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true, features = ["derive", "parsing", "extra-traits", "full"] }
-textwrap = { workspace = true }
 itertools = { workspace = true }
