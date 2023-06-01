@@ -74,7 +74,12 @@ impl Emitter for GroupedEmitter {
                     }
                 )?;
             }
-            writeln!(writer)?;
+
+            // Print a blank line between files, unless we're showing the source, in which case
+            // we'll have already printed a blank line between messages.
+            if !self.show_source {
+                writeln!(writer)?;
+            }
         }
 
         Ok(())
@@ -136,10 +141,8 @@ impl Display for DisplayGroupedMessage<'_> {
         if self.show_source {
             use std::fmt::Write;
             let mut padded = PadAdapter::new(f);
-            write!(padded, "{}", MessageCodeFrame { message })?;
+            writeln!(padded, "{}", MessageCodeFrame { message })?;
         }
-
-        writeln!(f)?;
 
         Ok(())
     }
@@ -185,6 +188,14 @@ mod tests {
 
     #[test]
     fn default() {
+        let mut emitter = GroupedEmitter::default();
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn show_source() {
         let mut emitter = GroupedEmitter::default().with_show_source(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
