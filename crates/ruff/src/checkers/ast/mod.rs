@@ -1554,8 +1554,8 @@ where
                 if self.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
-                if self.enabled(Rule::SetIteration) {
-                    pylint::rules::set_iteration(self, iter);
+                if self.enabled(Rule::IterationOverSet) {
+                    pylint::rules::iteration_over_set(self, iter);
                 }
                 if matches!(stmt, Stmt::For(_)) {
                     if self.enabled(Rule::ReimplementedBuiltin) {
@@ -3505,9 +3505,9 @@ where
                         );
                     }
                 }
-                if self.enabled(Rule::SetIteration) {
+                if self.enabled(Rule::IterationOverSet) {
                     for generator in generators {
-                        pylint::rules::set_iteration(self, &generator.iter);
+                        pylint::rules::iteration_over_set(self, &generator.iter);
                     }
                 }
             }
@@ -3534,9 +3534,9 @@ where
                         );
                     }
                 }
-                if self.enabled(Rule::SetIteration) {
+                if self.enabled(Rule::IterationOverSet) {
                     for generator in generators {
-                        pylint::rules::set_iteration(self, &generator.iter);
+                        pylint::rules::iteration_over_set(self, &generator.iter);
                     }
                 }
             }
@@ -3557,9 +3557,9 @@ where
                         );
                     }
                 }
-                if self.enabled(Rule::SetIteration) {
+                if self.enabled(Rule::IterationOverSet) {
                     for generator in generators {
-                        pylint::rules::set_iteration(self, &generator.iter);
+                        pylint::rules::iteration_over_set(self, &generator.iter);
                     }
                 }
             }

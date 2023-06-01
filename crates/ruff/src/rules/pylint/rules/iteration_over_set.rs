@@ -27,9 +27,9 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[violation]
-pub struct SetIteration;
+pub struct IterationOverSet;
 
-impl Violation for SetIteration {
+impl Violation for IterationOverSet {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a sequence type instead of a `set` when iterating over values")
@@ -37,7 +37,7 @@ impl Violation for SetIteration {
 }
 
 /// PLC0208
-pub(crate) fn set_iteration(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
     let is_set = match expr {
         // Ex) `for i in {1, 2, 3}`
         Expr::Set(_) => true,
@@ -57,6 +57,6 @@ pub(crate) fn set_iteration(checker: &mut Checker, expr: &Expr) {
     if is_set {
         checker
             .diagnostics
-            .push(Diagnostic::new(SetIteration, expr.range()));
+            .push(Diagnostic::new(IterationOverSet, expr.range()));
     }
 }

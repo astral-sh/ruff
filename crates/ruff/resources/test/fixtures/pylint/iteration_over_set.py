@@ -1,14 +1,9 @@
-"""Test iterate-over-set rule.
-
-Should trigger seven times.
-"""
-
-# True positives.
+# Errors
 
 for item in {"apples", "lemons", "water"}:  # flags in-line set literals
     print(f"I like {item}.")
 
-for item in set("apples", "lemons", "water"):  # flags set() calls
+for item in set(("apples", "lemons", "water")):  # flags set() calls
     print(f"I like {item}.")
 
 for number in {i for i in range(10)}:  # flags set comprehensions
@@ -22,7 +17,7 @@ numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensio
 
 numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
 
-# True negatives.
+# Non-errors
 
 items = {"apples", "lemons", "water"}
 for item in items:  # only complains about in-line sets (as per Pylint)
