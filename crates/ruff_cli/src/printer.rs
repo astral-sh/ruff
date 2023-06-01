@@ -187,7 +187,7 @@ impl Printer {
             SerializationFormat::Junit => {
                 JunitEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Text => {
+            SerializationFormat::Short | SerializationFormat::Text => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.autofix_level))
                     .with_show_fix_diff(self.flags.contains(Flags::SHOW_FIX_DIFF))

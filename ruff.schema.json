@@ -2497,6 +2497,7 @@
     "SerializationFormat": {
       "type": "string",
       "enum": [
+        "short",
         "text",
         "json",
         "junit",

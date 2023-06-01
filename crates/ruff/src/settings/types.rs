@@ -212,6 +212,8 @@ impl FromStr for PatternPrefixPair {
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum SerializationFormat {
+    Short,
+    #[cfg_attr(feature = "clap", value(alias("Short"), hide(true)))]
     Text,
     Json,
     Junit,
