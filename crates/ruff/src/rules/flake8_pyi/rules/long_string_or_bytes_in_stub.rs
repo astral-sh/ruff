@@ -12,8 +12,9 @@ pub struct LongStringOrBytesInStub;
 /// Checks for `str` or `bytes` literals longer than 50 characters in stubs.
 ///
 /// ## Why is this bad?
-/// Extremely long strings used as argument defaults or otherwise are unlikely to be useful for
-/// users. Consider replacing them with ellipses.
+/// If a function has a default value where the string or bytes representation is greater than 50
+/// characters, it is likely to be an implementation detail or a constant that varies depending on
+/// the system you're running on.
 impl Violation for LongStringOrBytesInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
