@@ -1,0 +1,66 @@
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
+
+use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct StringOrBytesTooLong;
+
+/// ## What it does
+/// Checks for the use of string and bytes literals longer than 50 characters.
+///
+/// ## Why is this bad?
+/// If a function has a default value where the string or bytes representation
+/// is greater than 50 characters, it is likely to be an implementation detail
+/// or a constant that varies depending on the system you're running on.
+///
+/// Consider replacing such constants with ellipses (`...`).
+///
+/// ## Example
+/// ```python
+/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(arg: str = ...) -> None: ...
+/// ```
+impl Violation for StringOrBytesTooLong {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("String and bytes literals longer than 50 characters are not permitted")
+    }
+}
+
+/// PYI053
+pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
+    let length = match expr {
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(s),
+            ..
+        }) => s.chars().count(),
+        Expr::Constant(ast::ExprConstant {
+            value: Constant::Bytes(bytes),
+            ..
+        }) => bytes.len(),
+        _ => return,
+    };
+
+    if length <= 50 {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, expr.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            "...".to_string(),
+            expr.range(),
+        )));
+    }
+    checker
+        .diagnostics
+        .push(Diagnostic::new(StringOrBytesTooLong, expr.range()));
+}

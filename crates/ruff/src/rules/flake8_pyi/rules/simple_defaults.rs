@@ -125,13 +125,9 @@ fn is_valid_default_value_with_annotation(
             return true;
         }
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
+            value: Constant::Str(..) | Constant::Bytes(..),
             ..
-        }) => return locator.slice(default.range()).len() <= 50,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bytes(..),
-            ..
-        }) => return locator.slice(default.range()).len() <= 50,
+        }) => return true,
         // Ex) `123`, `True`, `False`, `3.14`
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
