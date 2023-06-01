@@ -1,7 +1,6 @@
 use crate::context::PyFormatContext;
 use crate::{AsFormat, IntoFormat, PyFormatter};
-use ruff_formatter::Format;
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
+use ruff_formatter::{Format, FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
 use rustpython_parser::ast::Mod;
 
 pub(crate) mod mod_expression;
@@ -22,12 +21,14 @@ impl FormatRule<Mod, PyFormatContext<'_>> for FormatMod {
         }
     }
 }
+
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Mod {
     type Format<'a> = FormatRefWithRule<'a, Mod, FormatMod, PyFormatContext<'ast>>;
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatMod::default())
     }
 }
+
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Mod {
     type Format = FormatOwnedWithRule<Mod, FormatMod, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
