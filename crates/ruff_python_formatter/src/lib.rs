@@ -3,22 +3,85 @@ use rustpython_parser::ast::Mod;
 use rustpython_parser::lexer::lex;
 use rustpython_parser::{parse_tokens, Mode};
 
+use ruff_formatter::formatter::Formatter;
+use ruff_formatter::prelude::source_position;
 use ruff_formatter::{
-    format, FormatResult, Formatted, IndentStyle, Printed, SimpleFormatOptions, SourceCode,
+    format, write, Buffer, FormatResult, Formatted, IndentStyle, Printed, SimpleFormatOptions,
+    SourceCode,
 };
+use ruff_python_ast::node::AstNode;
 use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 
 use crate::comments::Comments;
-use crate::context::ASTFormatContext;
+use crate::context::PyFormatContext;
 use crate::module::FormatModule;
 
 pub mod cli;
 mod comments;
-pub mod context;
-mod module;
+pub(crate) mod context;
+pub(crate) mod expression;
+mod generated;
+pub(crate) mod module;
+pub(crate) mod other;
+pub(crate) mod pattern;
 mod prelude;
+pub(crate) mod statement;
 
 include!("../../ruff_formatter/shared_traits.rs");
+
+pub(crate) type PyFormatter<'buf, 'ast> = Formatter<'buf, PyFormatContext<'ast>>;
+
+/// Rule for formatting a JavaScript [`AstNode`].
+pub(crate) trait FormatNodeRule<N>
+where
+    N: AstNode,
+{
+    fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [source_position(node.start())])?;
+        self.fmt_leading_comments(node, f)?;
+        self.fmt_node(node, f)?;
+        self.fmt_dangling_comments(node, f)?;
+        self.fmt_trailing_comments(node, f)?;
+        write!(f, [source_position(node.start())])
+    }
+
+    /// Formats the node without comments. Ignores any suppression comments.
+    fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        self.fmt_fields(node, f)?;
+
+        Ok(())
+    }
+
+    /// Formats the node's fields.
+    fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
+
+    /// Formats the [leading comments](crate::comments#leading-comments) of the node.
+    ///
+    /// You may want to override this method if you want to manually handle the formatting of comments
+    /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
+    fn fmt_leading_comments(&self, _node: &N, _f: &mut PyFormatter) -> FormatResult<()> {
+        Ok(())
+    }
+
+    /// Formats the [dangling comments](rome_formatter::comments#dangling-comments) of the node.
+    ///
+    /// You should override this method if the node handled by this rule can have dangling comments because the
+    /// default implementation formats the dangling comments at the end of the node, which isn't ideal but ensures that
+    /// no comments are dropped.
+    ///
+    /// A node can have dangling comments if all its children are tokens or if all node childrens are optional.
+    fn fmt_dangling_comments(&self, _node: &N, _f: &mut PyFormatter) -> FormatResult<()> {
+        Ok(())
+    }
+
+    /// Formats the [trailing comments](rome_formatter::comments#trailing-comments) of the node.
+    ///
+    /// You may want to override this method if you want to manually handle the formatting of comments
+    /// inside of the `fmt_fields` method or customize the formatting of the trailing comments.
+    fn fmt_trailing_comments(&self, _node: &N, _f: &mut PyFormatter) -> FormatResult<()> {
+        Ok(())
+    }
+}
 
 pub fn format_module(contents: &str) -> Result<Printed> {
     // Tokenize once
@@ -52,13 +115,13 @@ pub fn format_node<'a>(
     root: &'a Mod,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
-) -> FormatResult<Formatted<ASTFormatContext<'a>>> {
+) -> FormatResult<Formatted<PyFormatContext<'a>>> {
     let comments = Comments::from_ast(root, SourceCode::new(source), comment_ranges);
 
     let locator = Locator::new(source);
 
     format!(
-        ASTFormatContext::new(
+        PyFormatContext::new(
             SimpleFormatOptions {
                 indent_style: IndentStyle::Space(4),
                 line_width: 88.try_into().unwrap(),
