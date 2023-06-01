@@ -69,10 +69,12 @@ def func():
  def func():
      x = """
      a really long string
-@@ -45,4 +41,3 @@
+@@ -43,6 +39,3 @@
+         # shared between sub-exceptions are not omitted
+         _seen=set(_seen),
      )
- 
- 
+-
+-
 -# %%
 ```
 
@@ -120,8 +122,6 @@ def func():
         # shared between sub-exceptions are not omitted
         _seen=set(_seen),
     )
-
-
 ```
 
 ## Black Output

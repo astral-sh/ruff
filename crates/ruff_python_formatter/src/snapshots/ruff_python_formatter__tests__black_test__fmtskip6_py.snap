@@ -18,14 +18,12 @@ class A:
 ```diff
 --- Black
 +++ Ruff
-@@ -2,4 +2,6 @@
+@@ -2,4 +2,4 @@
      def f(self):
          for line in range(10):
              if True:
 -                pass  # fmt: skip
 +                pass
-+
-+
 ```
 
 ## Ruff Output
@@ -36,8 +34,6 @@ class A:
         for line in range(10):
             if True:
                 pass
-
-
 ```
 
 ## Black Output

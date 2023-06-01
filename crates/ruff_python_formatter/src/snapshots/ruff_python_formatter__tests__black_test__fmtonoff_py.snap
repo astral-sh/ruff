@@ -199,32 +199,37 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -4,18 +4,17 @@
- 
+@@ -1,22 +1,11 @@
+-#!/usr/bin/env python3
+ import asyncio
+ import sys
+-
  from third_party import X, Y, Z
- 
+-
 -from library import some_connection, some_decorator
 -
+-# fmt: off
 +from library import some_connection, \
 +                    some_decorator
- # fmt: off
  from third_party import (X,
                           Y, Z)
- # fmt: on
+-# fmt: on
 -f"trigger 3.6 mode"
-+f'trigger 3.6 mode'
- # Comment 1
- 
- # Comment 2
- 
+-# Comment 1
 -
- # fmt: off
+-# Comment 2
+-
+-
+-# fmt: off
++f'trigger 3.6 mode'
  def func_no_args():
    a; b; c
-@@ -39,34 +38,16 @@
+   if True: raise RuntimeError
+@@ -38,73 +27,41 @@
+ )
  def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
   return text[number:-1]
- # fmt: on
+-# fmt: on
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
@@ -259,10 +264,10 @@ d={'a':1,
      key: 'value',
  }
 -
- 
+-
  def subscriptlist():
      atom[
-@@ -74,17 +55,14 @@
+         # fmt: off
          'some big and',
          'complex subscript',
          # fmt: on
@@ -270,22 +275,22 @@ d={'a':1,
 -        andhere,
 -    ]
 -
+-
 +        goes + here, andhere,
 +       ]
- 
  def import_as_names():
      # fmt: off
      from hello import a,        b
      'unformatted'
-     # fmt: on
+-    # fmt: on
 -
- 
+-
  def testlist_star_expr():
      # fmt: off
-@@ -92,18 +70,16 @@
+     a , b = *hello
      'unformatted'
-     # fmt: on
- 
+-    # fmt: on
+-
 -
  def yield_expr():
      # fmt: off
@@ -297,43 +302,46 @@ d={'a':1,
      # fmt: off
      ( yield hello )
      'unformatted'
-     # fmt: on
+-    # fmt: on
 -
- 
+-
  def example(session):
      # fmt: off
-@@ -114,8 +90,6 @@
+     result = session\
+@@ -113,9 +70,6 @@
+                 models.Customer.email == email_address)\
          .order_by(models.Customer.id.asc())\
          .all()
-     # fmt: on
+-    # fmt: on
 -
 -
  def off_and_on_without_data():
      """All comments here are technically on the same prefix.
  
-@@ -123,12 +97,12 @@
+@@ -123,12 +77,12 @@
      """
      # fmt: off
  
 -    # hey, that won't work
  
+-    # fmt: on
+-    pass
 +        #hey, that won't work
-+
-+
-     # fmt: on
-     pass
--
--
+ 
+ 
++    # fmt: on
++    pass
  def on_and_off_broken():
      """Another known limitation."""
      # fmt: on
-@@ -139,19 +113,12 @@
+@@ -137,21 +91,10 @@
+     and_=indeed . it  is  not  formatted
+     because . the . handling . inside . generate_ignored_nodes()
      now . considers . multiple . fmt . directives . within . one . prefix
-     # fmt: on
-     # fmt: off
+-    # fmt: on
+-    # fmt: off
 -    # ...but comments still get reformatted even though they should not be
-+        # ...but comments still get reformatted even though they should not be
-     # fmt: on
+-    # fmt: on
 -
 -
  def long_lines():
@@ -349,7 +357,7 @@ d={'a':1,
          )
          # fmt: off
          a = (
-@@ -182,24 +149,19 @@
+@@ -182,24 +125,19 @@
          re.MULTILINE|re.VERBOSE
          # fmt: on
      )
@@ -364,7 +372,7 @@ d={'a':1,
 +        (1, 2, 3, 4),
 +        (5, 6, 7, 8),
 +        (9, 10, 11, 12)
-+    }  # yapf: disable
++    }
  cfg.rule(
 -    "Default",
 -    "address",
@@ -383,38 +391,32 @@ d={'a':1,
      # fmt: off
      xxxxxxx_xxxxxxxxxxxx={
          "xxxxxxxx": {
-@@ -214,7 +176,7 @@
+@@ -214,11 +152,9 @@
          },
      },
      # fmt: on
 -    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 +    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5
  )
- # fmt: off
+-# fmt: off
  yield  'hello'
+-# No formatting to the end of the file
+ l=[1,2,3]
+ d={'a':1,
+    'b':2}
 ```
 
 ## Ruff Output
 
 ```py
-#!/usr/bin/env python3
 import asyncio
 import sys
-
 from third_party import X, Y, Z
-
 from library import some_connection, \
                     some_decorator
-# fmt: off
 from third_party import (X,
                          Y, Z)
-# fmt: on
 f'trigger 3.6 mode'
-# Comment 1
-
-# Comment 2
-
-# fmt: off
 def func_no_args():
   a; b; c
   if True: raise RuntimeError
@@ -436,7 +438,6 @@ many_args=[1,2,3]
 )
 def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
  return text[number:-1]
-# fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r''):
  offset = attr.ib(default=attr.Factory( lambda: _r.uniform(1, 2)))
  assert task._cancel_stack[:len(old_stack)] == old_stack
@@ -447,7 +448,6 @@ something = {
     # fmt: off
     key: 'value',
 }
-
 def subscriptlist():
     atom[
         # fmt: off
@@ -456,19 +456,14 @@ def subscriptlist():
         # fmt: on
         goes + here, andhere,
        ]
-
 def import_as_names():
     # fmt: off
     from hello import a,        b
     'unformatted'
-    # fmt: on
-
 def testlist_star_expr():
     # fmt: off
     a , b = *hello
     'unformatted'
-    # fmt: on
-
 def yield_expr():
     # fmt: off
     yield hello
@@ -478,8 +473,6 @@ def yield_expr():
     # fmt: off
     ( yield hello )
     'unformatted'
-    # fmt: on
-
 def example(session):
     # fmt: off
     result = session\
@@ -488,7 +481,6 @@ def example(session):
                 models.Customer.email == email_address)\
         .order_by(models.Customer.id.asc())\
         .all()
-    # fmt: on
 def off_and_on_without_data():
     """All comments here are technically on the same prefix.
 
@@ -510,10 +502,6 @@ def on_and_off_broken():
     and_=indeed . it  is  not  formatted
     because . the . handling . inside . generate_ignored_nodes()
     now . considers . multiple . fmt . directives . within . one . prefix
-    # fmt: on
-    # fmt: off
-        # ...but comments still get reformatted even though they should not be
-    # fmt: on
 def long_lines():
     if True:
         typedargslist.extend(
@@ -554,7 +542,7 @@ def single_literal_yapf_disable():
         (1, 2, 3, 4),
         (5, 6, 7, 8),
         (9, 10, 11, 12)
-    }  # yapf: disable
+    }
 cfg.rule(
     "Default", "address",
     xxxx_xxxx=["xxx-xxxxxx-xxxxxxxxxx"],
@@ -577,9 +565,7 @@ cfg.rule(
     # fmt: on
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5
 )
-# fmt: off
 yield  'hello'
-# No formatting to the end of the file
 l=[1,2,3]
 d={'a':1,
    'b':2}

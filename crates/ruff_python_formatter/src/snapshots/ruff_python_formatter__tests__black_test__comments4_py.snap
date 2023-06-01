@@ -107,24 +107,42 @@ def foo3(list_a, list_b):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,10 +1,10 @@
- from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
-     MyLovelyCompanyTeamProjectComponent,  # NOT DRY
- )
-+
+@@ -4,8 +4,6 @@
  from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
      MyLovelyCompanyTeamProjectComponent as component,  # DRY
  )
 -
- 
+-
  class C:
      @pytest.mark.parametrize(
-@@ -92,3 +92,5 @@
+         ("post_data", "message"),
+@@ -54,8 +52,6 @@
+     ):
+         pyramid_config.testing_securitypolicy(userid=1)
+         db_request.POST = MultiDict(post_data)
+-
+-
+ def foo(list_a, list_b):
+     results = (
+         User.query.filter(User.foo == "bar")
+@@ -70,8 +66,6 @@
+         .all()
+     )
+     return results
+-
+-
+ def foo2(list_a, list_b):
+     # Standalone comment reasonably placed.
+     return (
+@@ -81,8 +75,6 @@
          )
          .filter(User.xyz.is_(None))
      )
-+
-+
+-
+-
+ def foo3(list_a, list_b):
+     return (
+         # Standalone comment but weirdly placed.
 ```
 
 ## Ruff Output
@@ -133,11 +151,9 @@ def foo3(list_a, list_b):
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
     MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 )
-
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
     MyLovelyCompanyTeamProjectComponent as component,  # DRY
 )
-
 class C:
     @pytest.mark.parametrize(
         ("post_data", "message"),
@@ -186,8 +202,6 @@ class C:
     ):
         pyramid_config.testing_securitypolicy(userid=1)
         db_request.POST = MultiDict(post_data)
-
-
 def foo(list_a, list_b):
     results = (
         User.query.filter(User.foo == "bar")
@@ -202,8 +216,6 @@ def foo(list_a, list_b):
         .all()
     )
     return results
-
-
 def foo2(list_a, list_b):
     # Standalone comment reasonably placed.
     return (
@@ -213,8 +225,6 @@ def foo2(list_a, list_b):
         )
         .filter(User.xyz.is_(None))
     )
-
-
 def foo3(list_a, list_b):
     return (
         # Standalone comment but weirdly placed.
@@ -224,8 +234,6 @@ def foo3(list_a, list_b):
         )
         .filter(User.xyz.is_(None))
     )
-
-
 ```
 
 ## Black Output

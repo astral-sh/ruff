@@ -86,7 +86,7 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -1,13 +1,7 @@
+@@ -1,13 +1,6 @@
  while True:
      if something.changed:
 -        do.stuff()  # trailing comment
@@ -94,32 +94,38 @@ if __name__ == "__main__":
 -    # This one belongs to the `while` block.
 -
 -    # Should this one, too?  I guess so.
-+        do.stuff()
- 
+-
 -# This one is properly standalone now.
 -
++        do.stuff()
  for i in range(100):
      # first we do this
      if i % 33 == 0:
-@@ -15,7 +9,6 @@
+@@ -15,31 +8,17 @@
  
      # then we do this
      print(i)
 -    # and finally we loop around
- 
+-
  with open(some_temp_file) as f:
      data = f.read()
-@@ -29,17 +22,10 @@
+-
+ try:
+     with open(some_other_file) as w:
+         w.write(data)
  
+ except OSError:
+     print("problems")
+-
  import sys
- 
+-
 -
 -# leading function comment
  def wat():
      ...
 -    # trailing function comment
- 
- 
+-
+-
 -# SECTION COMMENT
 -
 -
@@ -127,32 +133,34 @@ if __name__ == "__main__":
  @deco1
  # leading 2
  @deco2(with_args=True)
-@@ -49,7 +35,6 @@
+@@ -47,27 +26,14 @@
+ @deco3
+ def decorated1():
      ...
- 
- 
+-
+-
 -# leading 1
  @deco1
  # leading 2
  @deco2(with_args=True)
-@@ -58,16 +43,12 @@
+ # leading function comment
+ def decorated1():
      ...
- 
- 
+-
+-
 -# Note: this is fixed in
 -# Preview.empty_lines_before_class_or_def_with_leading_comments.
 -# In the current style, the user will have to split those lines by hand.
  some_instruction
 -
- 
+-
 -# This comment should be split from `some_instruction` by two lines but isn't.
  def g():
      ...
- 
- 
+-
+-
  if __name__ == "__main__":
      main()
-+
 ```
 
 ## Ruff Output
@@ -161,7 +169,6 @@ if __name__ == "__main__":
 while True:
     if something.changed:
         do.stuff()
-
 for i in range(100):
     # first we do this
     if i % 33 == 0:
@@ -169,23 +176,17 @@ for i in range(100):
 
     # then we do this
     print(i)
-
 with open(some_temp_file) as f:
     data = f.read()
-
 try:
     with open(some_other_file) as w:
         w.write(data)
 
 except OSError:
     print("problems")
-
 import sys
-
 def wat():
     ...
-
-
 @deco1
 # leading 2
 @deco2(with_args=True)
@@ -193,25 +194,17 @@ def wat():
 @deco3
 def decorated1():
     ...
-
-
 @deco1
 # leading 2
 @deco2(with_args=True)
 # leading function comment
 def decorated1():
     ...
-
-
 some_instruction
-
 def g():
     ...
-
-
 if __name__ == "__main__":
     main()
-
 ```
 
 ## Black Output

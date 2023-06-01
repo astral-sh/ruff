@@ -17,13 +17,11 @@ class ClassWithDocstring:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,4 @@
+@@ -1,4 +1,2 @@
 -# Make sure when the file ends with class's docstring,
 -# It doesn't add extra blank lines.
  class ClassWithDocstring:
      """A docstring."""
-+
-+
 ```
 
 ## Ruff Output
@@ -31,8 +29,6 @@ class ClassWithDocstring:
 ```py
 class ClassWithDocstring:
     """A docstring."""
-
-
 ```
 
 ## Black Output
