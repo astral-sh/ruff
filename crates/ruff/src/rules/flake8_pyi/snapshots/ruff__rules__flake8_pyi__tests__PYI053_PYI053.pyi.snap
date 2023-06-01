@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI053.pyi:3:14: PYI053 `str` and `bytes` literals longer than 50 characters should not be used in stubs
+PYI053.pyi:3:14: PYI053 String and bytes literals longer than 50 characters are not permitted
   |
 3 | def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
 4 | def f2(
@@ -11,16 +11,26 @@ PYI053.pyi:3:14: PYI053 `str` and `bytes` literals longer than 50 characters sho
 7 | def f3(
   |
 
-PYI053.pyi:21:16: PYI053 `str` and `bytes` literals longer than 50 characters should not be used in stubs
+PYI053.pyi:9:14: PYI053 String and bytes literals longer than 50 characters are not permitted
+   |
+ 9 | ) -> None: ...
+10 | def f4(
+11 |     x: str = "51 character stringggggggggggggggggggggggggggggggg\U0001f600",  # Error: PYI053
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+12 | ) -> None: ...
+13 | def f5(
+   |
+
+PYI053.pyi:21:16: PYI053 String and bytes literals longer than 50 characters are not permitted
    |
 21 | ) -> None: ...
 22 | def f8(
-23 |     x: bytes = b"50 character byte stringgggggggggggggggggggggggggg\xff",  # Error: PYI053
+23 |     x: bytes = b"51 character byte stringgggggggggggggggggggggggggg\xff",  # Error: PYI053
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
 24 | ) -> None: ...
    |
 
-PYI053.pyi:26:12: PYI053 `str` and `bytes` literals longer than 50 characters should not be used in stubs
+PYI053.pyi:26:12: PYI053 String and bytes literals longer than 50 characters are not permitted
    |
 26 | foo: str = "50 character stringggggggggggggggggggggggggggggggg"  # OK
 27 | 
@@ -30,7 +40,7 @@ PYI053.pyi:26:12: PYI053 `str` and `bytes` literals longer than 50 characters sh
 30 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
    |
 
-PYI053.pyi:30:14: PYI053 `str` and `bytes` literals longer than 50 characters should not be used in stubs
+PYI053.pyi:30:14: PYI053 String and bytes literals longer than 50 characters are not permitted
    |
 30 | baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
 31 | 

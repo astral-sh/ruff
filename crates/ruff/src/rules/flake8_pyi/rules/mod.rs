@@ -11,9 +11,7 @@ pub(crate) use ellipsis_in_non_empty_class_body::{
 pub(crate) use iter_method_return_iterable::{
     iter_method_return_iterable, IterMethodReturnIterable,
 };
-pub(crate) use long_string_or_bytes_in_stub::{
-    long_string_or_bytes_in_stub, LongStringOrBytesInStub,
-};
+pub(crate) use long_string_or_bytes_in_stub::{string_or_bytes_too_long, StringOrBytesTooLong};
 pub(crate) use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub(crate) use pass_in_class_body::{pass_in_class_body, PassInClassBody};
 pub(crate) use pass_statement_stub_body::{pass_statement_stub_body, PassStatementStubBody};

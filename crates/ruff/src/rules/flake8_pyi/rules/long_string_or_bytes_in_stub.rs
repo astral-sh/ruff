@@ -1,20 +1,23 @@
-use ruff_diagnostics::{Diagnostic, Violation};
 use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
+use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 #[violation]
-pub struct LongStringOrBytesInStub;
+pub struct StringOrBytesTooLong;
 
 /// ## What it does
-/// Checks for `str` or `bytes` literals longer than 50 characters in stubs.
+/// Checks for the use of string and bytes literals longer than 50 characters.
 ///
 /// ## Why is this bad?
-/// If a function has a default value where the string or bytes representation is greater than 50
-/// characters, it is likely to be an implementation detail or a constant that varies depending on
-/// the system you're running on. Consider replacing them with ellipses.
+/// If a function has a default value where the string or bytes representation
+/// is greater than 50 characters, it is likely to be an implementation detail
+/// or a constant that varies depending on the system you're running on.
+///
+/// Consider replacing such constants with ellipses (`...`).
 ///
 /// ## Example
 /// ```python
@@ -25,15 +28,15 @@ pub struct LongStringOrBytesInStub;
 /// ```python
 /// def foo(arg: str = ...) -> None: ...
 /// ```
-impl Violation for LongStringOrBytesInStub {
+impl Violation for StringOrBytesTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`str` and `bytes` literals longer than 50 characters should not be used in stubs")
+        format!("String and bytes literals longer than 50 characters are not permitted")
     }
 }
 
 /// PYI053
-pub(crate) fn long_string_or_bytes_in_stub(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
     let length = match expr {
         Expr::Constant(ast::ExprConstant {
             value: Constant::Str(s),
@@ -46,9 +49,18 @@ pub(crate) fn long_string_or_bytes_in_stub(checker: &mut Checker, expr: &Expr) {
         _ => return,
     };
 
-    if length > 50 {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(LongStringOrBytesInStub, expr.range()));
+    if length <= 50 {
+        return;
     }
+
+    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, expr.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+            "...".to_string(),
+            expr.range(),
+        )));
+    }
+    checker
+        .diagnostics
+        .push(Diagnostic::new(StringOrBytesTooLong, expr.range()));
 }
