@@ -3,6 +3,7 @@ pub(crate) mod cformat;
 pub(crate) mod fixes;
 pub(crate) mod format;
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -19,7 +20,7 @@ mod tests {
 
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
-    use crate::settings::flags;
+    use crate::settings::{flags, Settings};
     use crate::test::test_path;
     use crate::{assert_messages, directives, settings};
 
@@ -38,6 +39,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_12.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_13.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_14.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_15.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"))]
@@ -249,6 +251,22 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn extend_generics() -> Result<()> {
+        let snapshot = "extend_immutable_calls".to_string();
+        let diagnostics = test_path(
+            Path::new("pyflakes/F401_15.py"),
+            &Settings {
+                pyflakes: super::settings::Settings {
+                    extend_generics: vec!["django.db.models.ForeignKey".to_string()],
+                },
+                ..Settings::for_rules(vec![Rule::UnusedImport])
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 

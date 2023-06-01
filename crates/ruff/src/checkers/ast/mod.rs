@@ -3884,6 +3884,7 @@ where
                         value,
                         &self.semantic_model,
                         self.settings.typing_modules.iter().map(String::as_str),
+                        &self.settings.pyflakes.extend_generics,
                     ) {
                         Some(subscript) => {
                             match subscript {
