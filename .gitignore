@@ -5,6 +5,7 @@ ruff-old
 github_search*.jsonl
 schemastore
 .venv*
+scratch.py
 
 ###
 # Rust.gitignore

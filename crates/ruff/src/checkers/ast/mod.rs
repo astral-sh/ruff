@@ -1554,6 +1554,9 @@ where
                 if self.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    pylint::rules::iteration_over_set(self, iter);
+                }
                 if matches!(stmt, Stmt::For(_)) {
                     if self.enabled(Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
@@ -1976,10 +1979,17 @@ where
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
                     if let Some(call_path) = self.semantic_model.resolve_call_path(type_) {
-                        if call_path.as_slice() == ["", "NameError"] {
-                            handled_exceptions |= Exceptions::NAME_ERROR;
-                        } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
-                            handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                        match call_path.as_slice() {
+                            ["", "NameError"] => {
+                                handled_exceptions |= Exceptions::NAME_ERROR;
+                            }
+                            ["", "ModuleNotFoundError"] => {
+                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                            }
+                            ["", "ImportError"] => {
+                                handled_exceptions |= Exceptions::IMPORT_ERROR;
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -2292,6 +2302,11 @@ where
                         if self.enabled(Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
+                        if self.is_stub {
+                            if self.enabled(Rule::CollectionsNamedTuple) {
+                                flake8_pyi::rules::collections_named_tuple(self, expr);
+                            }
+                        }
 
                         // Ex) List[...]
                         if self.any_enabled(&[
@@ -2423,6 +2438,11 @@ where
                 }
                 if self.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
+                }
+                if self.is_stub {
+                    if self.enabled(Rule::CollectionsNamedTuple) {
+                        flake8_pyi::rules::collections_named_tuple(self, expr);
+                    }
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
@@ -3485,6 +3505,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -3509,6 +3534,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {
                 generators,
@@ -3525,6 +3555,11 @@ where
                             &generator.target,
                             &generator.iter,
                         );
+                    }
+                }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
                     }
                 }
             }
@@ -3849,6 +3884,7 @@ where
                         value,
                         &self.semantic_model,
                         self.settings.typing_modules.iter().map(String::as_str),
+                        &self.settings.pyflakes.extend_generics,
                     ) {
                         Some(subscript) => {
                             match subscript {
@@ -5213,7 +5249,7 @@ impl<'a> Checker<'a> {
 
                     let fix = if !in_init && !in_except_handler && self.patch(Rule::UnusedImport) {
                         let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
-                        match autofix::actions::remove_unused_imports(
+                        match autofix::edits::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
                             parent,

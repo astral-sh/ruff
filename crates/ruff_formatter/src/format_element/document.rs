@@ -144,6 +144,12 @@ impl std::fmt::Display for DisplayDocument<'_> {
     }
 }
 
+impl std::fmt::Debug for DisplayDocument<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
 #[derive(Clone, Debug)]
 struct IrFormatContext<'a> {
     /// The interned elements that have been printed to this point

@@ -21,6 +21,7 @@ pub(crate) use invalid_string_characters::{
     invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
     InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
 };
+pub(crate) use iteration_over_set::{iteration_over_set, IterationOverSet};
 pub(crate) use load_before_global_declaration::{
     load_before_global_declaration, LoadBeforeGlobalDeclaration,
 };
@@ -73,6 +74,7 @@ mod invalid_all_object;
 mod invalid_envvar_default;
 mod invalid_envvar_value;
 mod invalid_string_characters;
+mod iteration_over_set;
 mod load_before_global_declaration;
 mod logging;
 mod magic_value_comparison;

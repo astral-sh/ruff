@@ -4,6 +4,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
+use ruff_newlines::UniversalNewlineIterator;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -14,7 +15,6 @@ use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
-use crate::newlines::UniversalNewlineIterator;
 use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 
@@ -1026,7 +1026,7 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 
     let mut fix_start = None;
     let mut fix_end = None;
-    let mut count: usize = 0;
+    let mut count = 0u32;
 
     for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, start).flatten() {
         match tok {
@@ -1034,10 +1034,10 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
                 if count == 0 {
                     fix_start = Some(range.start());
                 }
-                count += 1;
+                count = count.saturating_add(1);
             }
             Tok::Rpar => {
-                count -= 1;
+                count = count.saturating_sub(1);
                 if count == 0 {
                     fix_end = Some(range.end());
                     break;
@@ -1433,16 +1433,16 @@ impl LocatedCmpop {
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
     let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];
-    let mut count: usize = 0;
+    let mut count = 0u32;
     loop {
         let Some((tok, range)) = tok_iter.next() else {
             break;
         };
         if matches!(tok, Tok::Lpar) {
-            count += 1;
+            count = count.saturating_add(1);
             continue;
         } else if matches!(tok, Tok::Rpar) {
-            count -= 1;
+            count = count.saturating_sub(1);
             continue;
         }
         if count == 0 {

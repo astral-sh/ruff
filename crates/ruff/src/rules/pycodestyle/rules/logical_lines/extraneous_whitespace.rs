@@ -1,9 +1,10 @@
-use ruff_text_size::TextRange;
-
-use ruff_diagnostics::DiagnosticKind;
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::Edit;
+use ruff_diagnostics::Fix;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
+use ruff_text_size::TextRange;
 
 use crate::checkers::logical_lines::LogicalLinesContext;
 
@@ -36,11 +37,16 @@ pub struct WhitespaceAfterOpenBracket {
     symbol: char,
 }
 
-impl Violation for WhitespaceAfterOpenBracket {
+impl AlwaysAutofixableViolation for WhitespaceAfterOpenBracket {
     #[derive_message_formats]
     fn message(&self) -> String {
         let WhitespaceAfterOpenBracket { symbol } = self;
         format!("Whitespace after '{symbol}'")
+    }
+
+    fn autofix_title(&self) -> String {
+        let WhitespaceAfterOpenBracket { symbol } = self;
+        format!("Remove whitespace before '{symbol}'")
     }
 }
 
@@ -71,11 +77,16 @@ pub struct WhitespaceBeforeCloseBracket {
     symbol: char,
 }
 
-impl Violation for WhitespaceBeforeCloseBracket {
+impl AlwaysAutofixableViolation for WhitespaceBeforeCloseBracket {
     #[derive_message_formats]
     fn message(&self) -> String {
         let WhitespaceBeforeCloseBracket { symbol } = self;
         format!("Whitespace before '{symbol}'")
+    }
+
+    fn autofix_title(&self) -> String {
+        let WhitespaceBeforeCloseBracket { symbol } = self;
+        format!("Remove whitespace before '{symbol}'")
     }
 }
 
@@ -104,16 +115,27 @@ pub struct WhitespaceBeforePunctuation {
     symbol: char,
 }
 
-impl Violation for WhitespaceBeforePunctuation {
+impl AlwaysAutofixableViolation for WhitespaceBeforePunctuation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let WhitespaceBeforePunctuation { symbol } = self;
         format!("Whitespace before '{symbol}'")
     }
+
+    fn autofix_title(&self) -> String {
+        let WhitespaceBeforePunctuation { symbol } = self;
+        format!("Remove whitespace before '{symbol}'")
+    }
 }
 
 /// E201, E202, E203
-pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn extraneous_whitespace(
+    line: &LogicalLine,
+    context: &mut LogicalLinesContext,
+    autofix_after_open_bracket: bool,
+    autofix_before_close_bracket: bool,
+    autofix_before_punctuation: bool,
+) {
     let mut prev_token = None;
 
     for token in line.tokens() {
@@ -123,10 +145,15 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                 BracketOrPunctuation::OpenBracket(symbol) => {
                     let (trailing, trailing_len) = line.trailing_whitespace(token);
                     if !matches!(trailing, Whitespace::None) {
-                        context.push(
+                        let mut diagnostic = Diagnostic::new(
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
                         );
+                        if autofix_after_open_bracket {
+                            diagnostic
+                                .set_fix(Fix::automatic(Edit::range_deletion(diagnostic.range())));
+                        }
+                        context.push_diagnostic(diagnostic);
                     }
                 }
                 BracketOrPunctuation::CloseBracket(symbol) => {
@@ -134,10 +161,16 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             line.leading_whitespace(token)
                         {
-                            context.push(
-                                DiagnosticKind::from(WhitespaceBeforeCloseBracket { symbol }),
+                            let mut diagnostic = Diagnostic::new(
+                                WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             );
+                            if autofix_before_close_bracket {
+                                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
+                                    diagnostic.range(),
+                                )));
+                            }
+                            context.push_diagnostic(diagnostic);
                         }
                     }
                 }
@@ -146,10 +179,16 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             line.leading_whitespace(token)
                         {
-                            context.push(
-                                DiagnosticKind::from(WhitespaceBeforePunctuation { symbol }),
+                            let mut diagnostic = Diagnostic::new(
+                                WhitespaceBeforePunctuation { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             );
+                            if autofix_before_punctuation {
+                                diagnostic.set_fix(Fix::automatic(Edit::range_deletion(
+                                    diagnostic.range(),
+                                )));
+                            }
+                            context.push_diagnostic(diagnostic);
                         }
                     }
                 }

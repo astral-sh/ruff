@@ -4,13 +4,13 @@ use ruff_python_ast::source_code::Locator;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
-pub struct ASTFormatContext<'a> {
+pub struct PyFormatContext<'a> {
     options: SimpleFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
 }
 
-impl<'a> ASTFormatContext<'a> {
+impl<'a> PyFormatContext<'a> {
     pub(crate) fn new(
         options: SimpleFormatOptions,
         contents: &'a str,
@@ -23,11 +23,13 @@ impl<'a> ASTFormatContext<'a> {
         }
     }
 
-    pub fn contents(&self) -> &'a str {
+    #[allow(unused)]
+    pub(crate) fn contents(&self) -> &'a str {
         self.contents
     }
 
-    pub fn locator(&self) -> Locator<'a> {
+    #[allow(unused)]
+    pub(crate) fn locator(&self) -> Locator<'a> {
         Locator::new(self.contents)
     }
 
@@ -37,7 +39,7 @@ impl<'a> ASTFormatContext<'a> {
     }
 }
 
-impl FormatContext for ASTFormatContext<'_> {
+impl FormatContext for PyFormatContext<'_> {
     type Options = SimpleFormatOptions;
 
     fn options(&self) -> &Self::Options {
@@ -49,9 +51,9 @@ impl FormatContext for ASTFormatContext<'_> {
     }
 }
 
-impl Debug for ASTFormatContext<'_> {
+impl Debug for PyFormatContext<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ASTFormatContext")
+        f.debug_struct("PyFormatContext")
             .field("options", &self.options)
             .field("comments", &self.comments.debug(self.source_code()))
             .field("source", &self.contents)

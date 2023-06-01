@@ -76,19 +76,51 @@ return np.divide(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,10 +1,10 @@
+@@ -1,16 +1,10 @@
  def function(**kwargs):
      t = a**2 + b**3
 -    return t**2
+-
+-
 +    return t ** 2
- 
- 
  def function_replace_spaces(**kwargs):
 -    t = a**2 + b**3 + c**4
+-
+-
 +    t = a **2 + b** 3 + c ** 4
- 
- 
  def function_dont_replace_spaces():
+     {**a, **b, **c}
+-
+-
+ a = 5**~4
+ b = 5 ** f()
+ c = -(5**2)
+@@ -29,7 +23,6 @@
+ p = {(k, k**2): v**2 for k, v in pairs}
+ q = [10**i for i in range(6)]
+ r = x**y
+-
+ a = 5.0**~4.0
+ b = 5.0 ** f()
+ c = -(5.0**2.0)
+@@ -47,9 +40,6 @@
+ o = settings(max_examples=10**6.0)
+ p = {(k, k**2): v**2.0 for k, v in pairs}
+ q = [10.5**i for i in range(6)]
+-
+-
+-# WE SHOULD DEFINITELY NOT EAT THESE COMMENTS (https://github.com/psf/black/issues/2873)
+ if hasattr(view, "sum_of_weights"):
+     return np.divide(  # type: ignore[no-any-return]
+         view.variance,  # type: ignore[union-attr]
+@@ -57,7 +47,6 @@
+         out=np.full(view.sum_of_weights.shape, np.nan),  # type: ignore[union-attr]
+         where=view.sum_of_weights**2 > view.sum_of_weights_squared,  # type: ignore[union-attr]
+     )
+-
+ return np.divide(
+     where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
+ )
 ```
 
 ## Ruff Output
@@ -97,16 +129,10 @@ return np.divide(
 def function(**kwargs):
     t = a**2 + b**3
     return t ** 2
-
-
 def function_replace_spaces(**kwargs):
     t = a **2 + b** 3 + c ** 4
-
-
 def function_dont_replace_spaces():
     {**a, **b, **c}
-
-
 a = 5**~4
 b = 5 ** f()
 c = -(5**2)
@@ -125,7 +151,6 @@ o = settings(max_examples=10**6)
 p = {(k, k**2): v**2 for k, v in pairs}
 q = [10**i for i in range(6)]
 r = x**y
-
 a = 5.0**~4.0
 b = 5.0 ** f()
 c = -(5.0**2.0)
@@ -143,9 +168,6 @@ n = count <= 10**5.0
 o = settings(max_examples=10**6.0)
 p = {(k, k**2): v**2.0 for k, v in pairs}
 q = [10.5**i for i in range(6)]
-
-
-# WE SHOULD DEFINITELY NOT EAT THESE COMMENTS (https://github.com/psf/black/issues/2873)
 if hasattr(view, "sum_of_weights"):
     return np.divide(  # type: ignore[no-any-return]
         view.variance,  # type: ignore[union-attr]
@@ -153,7 +175,6 @@ if hasattr(view, "sum_of_weights"):
         out=np.full(view.sum_of_weights.shape, np.nan),  # type: ignore[union-attr]
         where=view.sum_of_weights**2 > view.sum_of_weights_squared,  # type: ignore[union-attr]
     )
-
 return np.divide(
     where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
 )

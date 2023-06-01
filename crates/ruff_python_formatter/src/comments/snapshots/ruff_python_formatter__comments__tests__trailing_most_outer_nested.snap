@@ -4,21 +4,6 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: ExprConstant,
-        range: 11..12,
-        source: `3`,
-    }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
-            SourceComment {
-                text: "# trailing comment",
-                position: EndOfLine,
-                formatted: false,
-            },
-        ],
-    },
-    Node {
         kind: StmtExpr,
         range: 1..33,
         source: `x + (⏎`,
@@ -28,6 +13,21 @@ expression: comments.debug(test_case.source_code)
         "trailing": [
             SourceComment {
                 text: "# outer",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ExprConstant,
+        range: 11..12,
+        source: `3`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing comment",
                 position: EndOfLine,
                 formatted: false,
             },

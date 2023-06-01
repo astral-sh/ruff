@@ -60,11 +60,10 @@ pub(crate) fn whitespace_around_named_parameter_equals(
 
         match kind {
             TokenKind::Lpar | TokenKind::Lsqb => {
-                parens += 1;
+                parens = parens.saturating_add(1);
             }
             TokenKind::Rpar | TokenKind::Rsqb => {
-                parens -= 1;
-
+                parens = parens.saturating_sub(1);
                 if parens == 0 {
                     annotated_func_arg = false;
                 }

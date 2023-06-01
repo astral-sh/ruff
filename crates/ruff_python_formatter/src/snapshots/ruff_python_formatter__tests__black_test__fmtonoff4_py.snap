@@ -26,15 +26,17 @@ def f(): pass
 ```diff
 --- Black
 +++ Ruff
-@@ -4,17 +4,10 @@
+@@ -1,20 +1,11 @@
+-# fmt: off
+ @test([
+     1, 2,
      3, 4,
  ])
  # fmt: on
 -def f():
 -    pass
 -
-+def f(): pass
- 
+-
 -@test(
 -    [
 -        1,
@@ -45,6 +47,7 @@ def f(): pass
 -)
 -def f():
 -    pass
++def f(): pass
 +@test([
 +    1, 2,
 +    3, 4,
@@ -55,14 +58,12 @@ def f(): pass
 ## Ruff Output
 
 ```py
-# fmt: off
 @test([
     1, 2,
     3, 4,
 ])
 # fmt: on
 def f(): pass
-
 @test([
     1, 2,
     3, 4,
