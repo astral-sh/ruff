@@ -10,60 +10,51 @@ use syn::{
 
 use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_nursery};
 
+/// A rule entry in the big match statement such a
+/// `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
 #[derive(Clone)]
-struct LinterToRuleData {
-    /// The actual name of the rule, e.g., `UnusedImport`.
-    rule_name: Ident,
-    /// The linter associated with the rule, e.g., `Flake8Bugbear`.
+struct Rule {
+    /// The actual name of the rule, e.g., `NoIndentedBlock`.
+    name: Ident,
+    /// The linter associated with the rule, e.g., `Pycodestyle`.
     linter: Ident,
-    /// The code associated with the rule, e.g., `"002"`.
+    /// The code associated with the rule, e.g., `"E112"`.
     code: LitStr,
-    /// The rule group identifier, e.g., `RuleGroup::Unspecified`.
+    /// The rule group identifier, e.g., `RuleGroup::Nursery`.
     group: Path,
     /// The path to the struct implementing the rule, e.g.
     /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
-    rule: Path,
+    path: Path,
     /// The rule attributes, e.g. for feature gates
     attrs: Vec<Attribute>,
-}
-
-struct RuleToLinterData<'a> {
-    /// The linter associated with the rule, e.g., `Flake8Bugbear`.
-    linter: &'a Ident,
-    /// The code associated with the rule, e.g., `"002"`.
-    code: &'a str,
-    /// The rule group identifier, e.g., `RuleGroup::Unspecified`.
-    rule_group: &'a Path,
-    /// The rule attributes.
-    attrs: &'a [Attribute],
 }
 
 pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let Some(last_stmt) = func.block.stmts.last() else {
         return Err(Error::new(func.block.span(), "expected body to end in an expression"));
     };
-    let Stmt::Expr(Expr::Call(ExprCall{args: some_args, ..}), _) = last_stmt else {
-        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"))
+    let Stmt::Expr(Expr::Call(ExprCall { args: some_args, .. }), _) = last_stmt else {
+        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"));
     };
     let mut some_args = some_args.into_iter();
     let (Some(Expr::Match(ExprMatch { arms, .. })), None) = (some_args.next(), some_args.next()) else {
-        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"))
+        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"));
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
     // `(Rule::UnaryPrefixIncrement, RuleGroup::Unspecified, vec![])`).
-    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, LinterToRuleData>> = BTreeMap::new();
+    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
         if matches!(arm.pat, Pat::Wild(..)) {
             break;
         }
 
-        let entry = syn::parse::<LinterToRuleData>(arm.into_token_stream().into())?;
+        let rule = syn::parse::<Rule>(arm.into_token_stream().into())?;
         linter_to_rules
-            .entry(entry.linter.clone())
+            .entry(rule.linter.clone())
             .or_default()
-            .insert(entry.code.value(), entry);
+            .insert(rule.code.value(), rule);
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
@@ -97,7 +88,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             linter,
             rules
                 .iter()
-                .map(|(code, LinterToRuleData { group, attrs, .. })| (code.as_str(), group, attrs)),
+                .map(|(code, Rule { group, attrs, .. })| (code.as_str(), group, attrs)),
         ));
 
         output.extend(quote! {
@@ -195,22 +186,16 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
 /// Group the rules by their common prefixes.
 fn rules_by_prefix(
-    rules: &BTreeMap<String, LinterToRuleData>,
+    rules: &BTreeMap<String, Rule>,
 ) -> BTreeMap<String, Vec<(Path, Vec<Attribute>)>> {
     // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
     let mut rules_by_prefix = BTreeMap::new();
 
-    for (
-        code,
-        LinterToRuleData {
-            group, rule, attrs, ..
-        },
-    ) in rules
-    {
+    for (code, rule) in rules {
         // Nursery rules have to be explicitly selected, so we ignore them when looking at
         // prefixes.
-        if is_nursery(group) {
-            rules_by_prefix.insert(code.clone(), vec![(rule.clone(), attrs.clone())]);
+        if is_nursery(&rule.group) {
+            rules_by_prefix.insert(code.clone(), vec![(rule.path.clone(), rule.attrs.clone())]);
             continue;
         }
 
@@ -218,26 +203,19 @@ fn rules_by_prefix(
             let prefix = code[..i].to_string();
             let rules: Vec<_> = rules
                 .iter()
-                .filter_map(
-                    |(
-                        code,
-                        LinterToRuleData {
-                            attrs, rule, group, ..
-                        },
-                    )| {
-                        // Nursery rules have to be explicitly selected, so we ignore them when
-                        // looking at prefixes.
-                        if is_nursery(group) {
-                            return None;
-                        }
+                .filter_map(|(code, rule)| {
+                    // Nursery rules have to be explicitly selected, so we ignore them when
+                    // looking at prefixes.
+                    if is_nursery(&rule.group) {
+                        return None;
+                    }
 
-                        if code.starts_with(&prefix) {
-                            Some((rule.clone(), attrs.clone()))
-                        } else {
-                            None
-                        }
-                    },
-                )
+                    if code.starts_with(&prefix) {
+                        Some((rule.path.clone(), rule.attrs.clone()))
+                    } else {
+                        None
+                    }
+                })
                 .collect();
             rules_by_prefix.insert(prefix, rules);
         }
@@ -250,32 +228,18 @@ fn rules_by_prefix(
 /// to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
 /// different codes). We haven't actually activated this functionality yet, but some work was
 /// done to support it, so the logic exists here.
-fn generate_rule_to_code(
-    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, LinterToRuleData>>,
-) -> TokenStream {
-    let mut rule_to_codes: HashMap<&Path, Vec<RuleToLinterData>> = HashMap::new();
+fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>) -> TokenStream {
+    let mut rule_to_codes: HashMap<&Path, Vec<&Rule>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
     for (linter, map) in linter_to_rules {
-        for (
-            code,
-            LinterToRuleData {
-                attrs, rule, group, ..
-            },
-        ) in map
-        {
-            rule_to_codes
-                .entry(rule)
-                .or_default()
-                .push(RuleToLinterData {
-                    linter,
-                    code,
-                    rule_group: group,
-                    attrs,
-                });
-            let rule_name = rule.segments.last().unwrap();
+        for (code, rule) in map {
+            let Rule {
+                path, attrs, name, ..
+            } = rule;
+            rule_to_codes.entry(path).or_default().push(rule);
             linter_code_for_rule_match_arms.extend(quote! {
-                #(#attrs)* (Self::#linter, Rule::#rule_name) => Some(#code),
+                #(#attrs)* (Self::#linter, Rule::#name) => Some(#code),
             });
         }
     }
@@ -303,14 +267,15 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
         );
         let rule_name = rule.segments.last().unwrap();
 
-        let RuleToLinterData {
+        let Rule {
             linter,
             code,
-            rule_group,
+            group,
             attrs,
+            ..
         } = codes
             .iter()
-            .sorted_by_key(|data| *data.linter == "Pylint")
+            .sorted_by_key(|data| data.linter == "Pylint")
             .next()
             .unwrap();
 
@@ -319,7 +284,7 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
         });
 
         rule_group_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => #rule_group,
+            #(#attrs)* Rule::#rule_name => #group,
         });
     }
 
@@ -360,13 +325,13 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
 
 /// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
 fn generate_iter_impl(
-    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, LinterToRuleData>>,
+    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
     all_codes: &[TokenStream],
 ) -> TokenStream {
     let mut linter_into_iter_match_arms = quote!();
     for (linter, map) in linter_to_rules {
-        let rule_paths = map.values().map(|LinterToRuleData { attrs, rule, .. }| {
-            let rule_name = rule.segments.last().unwrap();
+        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
+            let rule_name = path.segments.last().unwrap();
             quote!(#(#attrs)* Rule::#rule_name)
         });
         linter_into_iter_match_arms.extend(quote! {
@@ -395,7 +360,7 @@ fn generate_iter_impl(
 }
 
 /// Generate the `Rule` enum
-fn register_rules<'a>(input: impl Iterator<Item = &'a LinterToRuleData>) -> TokenStream {
+fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
@@ -403,11 +368,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a LinterToRuleData>) -> Toke
 
     let mut from_impls_for_diagnostic_kind = quote!();
 
-    for LinterToRuleData {
-        rule_name: name,
-        attrs,
-        rule: path,
-        ..
+    for Rule {
+        name, attrs, path, ..
     } in input
     {
         rule_variants.extend(quote! {
@@ -475,7 +437,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a LinterToRuleData>) -> Toke
     }
 }
 
-impl Parse for LinterToRuleData {
+impl Parse for Rule {
     /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
@@ -492,12 +454,12 @@ impl Parse for LinterToRuleData {
         let rule_path: Path = pat_tuple.parse()?;
         let _: Token!(,) = input.parse()?;
         let rule_name = rule_path.segments.last().unwrap().ident.clone();
-        Ok(LinterToRuleData {
-            rule_name,
+        Ok(Rule {
+            name: rule_name,
             linter,
             code,
             group,
-            rule: rule_path,
+            path: rule_path,
             attrs,
         })
     }
