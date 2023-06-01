@@ -11,7 +11,6 @@ pub(crate) use ellipsis_in_non_empty_class_body::{
 pub(crate) use iter_method_return_iterable::{
     iter_method_return_iterable, IterMethodReturnIterable,
 };
-pub(crate) use long_string_or_bytes_in_stub::{string_or_bytes_too_long, StringOrBytesTooLong};
 pub(crate) use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub(crate) use pass_in_class_body::{pass_in_class_body, PassInClassBody};
 pub(crate) use pass_statement_stub_body::{pass_statement_stub_body, PassStatementStubBody};
@@ -22,6 +21,7 @@ pub(crate) use simple_defaults::{
     typed_argument_simple_defaults, unannotated_assignment_in_stub, ArgumentDefaultInStub,
     AssignmentDefaultInStub, TypedArgumentDefaultInStub, UnannotatedAssignmentInStub,
 };
+pub(crate) use string_or_bytes_too_long::{string_or_bytes_too_long, StringOrBytesTooLong};
 pub(crate) use stub_body_multiple_statements::{
     stub_body_multiple_statements, StubBodyMultipleStatements,
 };
@@ -40,13 +40,13 @@ mod docstring_in_stubs;
 mod duplicate_union_member;
 mod ellipsis_in_non_empty_class_body;
 mod iter_method_return_iterable;
-mod long_string_or_bytes_in_stub;
 mod non_empty_stub_body;
 mod pass_in_class_body;
 mod pass_statement_stub_body;
 mod prefix_type_params;
 mod quoted_annotation_in_stub;
 mod simple_defaults;
+mod string_or_bytes_too_long;
 mod stub_body_multiple_statements;
 mod type_alias_naming;
 mod type_comment_in_stub;
