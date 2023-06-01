@@ -39,3 +39,78 @@ pub(crate) fn find_first_non_trivia_character_in_range(
 
     None
 }
+
+/// Returns the number of newlines between `offset` and the first non whitespace character in the source code.
+#[allow(unused)] // TODO(micha) Remove after using for statements.
+pub(crate) fn lines_before(code: &str, offset: TextSize) -> u32 {
+    let head = &code[TextRange::up_to(offset)];
+    let mut newlines = 0u32;
+
+    for (index, c) in head.char_indices().rev() {
+        match c {
+            '\n' => {
+                if head.as_bytes()[index.saturating_sub(1)] == b'\r' {
+                    continue;
+                }
+                newlines += 1;
+            }
+
+            '\r' => {
+                newlines += 1;
+            }
+
+            c if is_python_whitespace(c) => continue,
+
+            _ => break,
+        }
+    }
+
+    newlines
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::trivia::lines_before;
+    use ruff_text_size::TextSize;
+
+    #[test]
+    fn lines_before_empty_string() {
+        assert_eq!(lines_before("", TextSize::new(0)), 0);
+    }
+
+    #[test]
+    fn lines_before_in_the_middle_of_a_line() {
+        assert_eq!(lines_before("a = 20", TextSize::new(4)), 0);
+    }
+
+    #[test]
+    fn lines_before_on_a_new_line() {
+        assert_eq!(lines_before("a = 20\nb = 10", TextSize::new(7)), 1);
+    }
+
+    #[test]
+    fn lines_before_multiple_leading_newlines() {
+        assert_eq!(lines_before("a = 20\n\r\nb = 10", TextSize::new(9)), 2);
+    }
+
+    #[test]
+    fn lines_before_with_comment_offset() {
+        assert_eq!(lines_before("a = 20\n# a comment", TextSize::new(8)), 0);
+    }
+
+    #[test]
+    fn lines_before_with_trailing_comment() {
+        assert_eq!(
+            lines_before("a = 20 # some comment\nb = 10", TextSize::new(22)),
+            1
+        );
+    }
+
+    #[test]
+    fn lines_before_with_comment_only_line() {
+        assert_eq!(
+            lines_before("a = 20\n# some comment\nb = 10", TextSize::new(22)),
+            1
+        );
+    }
+}
