@@ -802,4 +802,58 @@ def test(a=10,/, # trailing positional argument comment.
 
         assert_debug_snapshot!(comments.debug(test_case.source_code));
     }
+
+    #[test]
+    fn binary_expression_left_operand_comment() {
+        let source = r#"
+a = (
+    5
+    # trailing left comment
+    +
+    # leading right comment
+    3
+)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn binary_expression_left_operand_trailing_end_of_line_comment() {
+        let source = r#"
+a = (
+    5 # trailing left comment
+    + # trailing operator comment
+    # leading right comment
+    3
+)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn nested_binary_expression() {
+        let source = r#"
+a = (
+    (5 # trailing left comment
+        *
+        2)
+    + # trailing operator comment
+    # leading right comment
+    3
+)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
 }
