@@ -1,8 +1,11 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 
+use crate::comments::CommentTextPosition;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
 use std::cmp::Ordering;
 
 /// Implements the custom comment placement logic.
@@ -14,6 +17,7 @@ pub(super) fn place_comment<'a>(
         .or_else(|comment| handle_match_comment(comment, locator))
         .or_else(|comment| handle_in_between_bodies_comment(comment, locator))
         .or_else(|comment| handle_trailing_body_comment(comment, locator))
+        .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -391,6 +395,97 @@ fn handle_trailing_body_comment<'a>(
             }
         }
     }
+}
+
+/// Attaches comments for the positional-only arguments separator `/` as trailing comments to the
+/// enclosing [`Arguments`] node.
+///
+/// ```python
+/// def test(
+///     a,
+///     # Positional arguments only after here
+///     /, # trailing positional argument comment.
+///     b,
+/// ): pass
+/// ```
+fn handle_positional_only_arguments_separator_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    let AnyNodeRef::Arguments(arguments) = comment.enclosing_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Using the `/` without any leading arguments is a syntax error.
+    let Some(last_argument_or_default) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let is_last_positional_argument = are_same_optional(last_argument_or_default, arguments.posonlyargs.last())
+            // If the preceding node is the default for the last positional argument
+            // ```python
+            // def test(a=10, /, b): pass
+            // ```
+            || arguments
+                .defaults
+                .iter()
+                .position(|default| AnyNodeRef::from(default).ptr_eq(last_argument_or_default))
+                == Some(arguments.posonlyargs.len().saturating_sub(1));
+
+    if !is_last_positional_argument {
+        return CommentPlacement::Default(comment);
+    }
+
+    let trivia_end = comment
+        .following_node()
+        .map_or(arguments.end(), |following| following.start());
+    let trivia_range = TextRange::new(last_argument_or_default.end(), trivia_end);
+
+    if let Some(slash_offset) = find_pos_only_slash_offset(trivia_range, locator) {
+        let comment_start = comment.slice().range().start();
+        let is_slash_comment = match comment.text_position() {
+            CommentTextPosition::EndOfLine => {
+                let preceding_end_line = locator.line_end(last_argument_or_default.end());
+                let slash_comments_start = preceding_end_line.min(slash_offset);
+
+                comment_start >= slash_comments_start
+                    && locator.line_end(slash_offset) > comment_start
+            }
+            CommentTextPosition::OwnLine => comment_start < slash_offset,
+        };
+
+        if is_slash_comment {
+            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        } else {
+            CommentPlacement::Default(comment)
+        }
+    } else {
+        // Should not happen, but let's go with it
+        CommentPlacement::Default(comment)
+    }
+}
+
+fn find_pos_only_slash_offset(trivia_range: TextRange, locator: &Locator) -> Option<TextSize> {
+    let mut in_comment = false;
+
+    for (offset, c) in locator.slice(trivia_range).char_indices() {
+        match c {
+            '\n' | '\r' => {
+                in_comment = false;
+            }
+            '/' if !in_comment => {
+                return Some(trivia_range.start() + TextSize::try_from(offset).unwrap());
+            }
+            '#' => {
+                // SAFE because we know there's only trivia. So all content is either whitespace,
+                // or comments but never strings.
+                in_comment = true;
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 fn are_same_optional<'a, T>(left: AnyNodeRef, right: Option<T>) -> bool
