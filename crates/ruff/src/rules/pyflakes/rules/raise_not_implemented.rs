@@ -6,6 +6,34 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `raise` statements that raise `NotImplemented`.
+///
+/// ## Why is this bad?
+/// `NotImplemented` is an exception used by binary special methods to indicate
+/// that an operation is not implemented with respect to a particular type.
+///
+/// `NotImplemented` should not be raised directly. Instead, raise
+/// `NotImplementedError`, which is used to indicate that the method is
+/// abstract or not implemented in the derived class.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     def bar(self):
+///         raise NotImplemented
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     def bar(self):
+///         raise NotImplementedError
+/// ```
+///
+/// ## References
+/// - [Python documentation: `NotImplemented`](https://docs.python.org/3/library/constants.html#NotImplemented)
+/// - [Python documentation: `NotImplementedError`](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
 #[violation]
 pub struct RaiseNotImplemented;
 
