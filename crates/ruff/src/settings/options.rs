@@ -216,7 +216,7 @@ pub struct Options {
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     pub fix_only: Option<bool>,
     #[option(
-        default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]"#,
+        default = r#"["ALL"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
             # Only allow autofix behavior for `E` and `F` rules.
