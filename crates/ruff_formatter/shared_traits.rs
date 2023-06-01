@@ -44,6 +44,18 @@ where
     }
 }
 
+/// Implement [`IntoFormat`] for references to types that implement [`AsFormat`].
+impl<'a, T, C> IntoFormat<C> for &'a T
+where
+    T: AsFormat<C>,
+{
+    type Format = T::Format<'a>;
+
+    fn into_format(self) -> Self::Format {
+        AsFormat::format(self)
+    }
+}
+
 /// Formatting specific [`Iterator`] extensions
 pub trait FormattedIterExt {
     /// Converts every item to an object that knows how to format it.
