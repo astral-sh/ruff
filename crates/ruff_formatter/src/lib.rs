@@ -39,6 +39,7 @@ use crate::formatter::Formatter;
 use crate::group_id::UniqueGroupIdBuilder;
 use crate::prelude::TagKind;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
@@ -517,14 +518,12 @@ impl<Context> Format<Context> for () {
 ///
 /// That's why the `ruff_js_formatter` crate must define a new-type that implements the formatting
 /// of `JsIfStatement`.
-pub trait FormatRule<T> {
-    type Context;
-
-    fn fmt(&self, item: &T, f: &mut Formatter<Self::Context>) -> FormatResult<()>;
+pub trait FormatRule<T, C> {
+    fn fmt(&self, item: &T, f: &mut Formatter<C>) -> FormatResult<()>;
 }
 
 /// Rule that supports customizing how it formats an object of type `T`.
-pub trait FormatRuleWithOptions<T>: FormatRule<T> {
+pub trait FormatRuleWithOptions<T, C>: FormatRule<T, C> {
     type Options;
 
     /// Returns a new rule that uses the given options to format an object.
@@ -564,26 +563,31 @@ pub trait FormatWithRule<Context>: Format<Context> {
 
 /// Formats the referenced `item` with the specified rule.
 #[derive(Debug, Copy, Clone)]
-pub struct FormatRefWithRule<'a, T, R>
+pub struct FormatRefWithRule<'a, T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     item: &'a T,
     rule: R,
+    context: PhantomData<C>,
 }
 
-impl<'a, T, R> FormatRefWithRule<'a, T, R>
+impl<'a, T, R, C> FormatRefWithRule<'a, T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     pub fn new(item: &'a T, rule: R) -> Self {
-        Self { item, rule }
+        Self {
+            item,
+            rule,
+            context: PhantomData,
+        }
     }
 }
 
-impl<T, R, O> FormatRefWithRule<'_, T, R>
+impl<T, R, O, C> FormatRefWithRule<'_, T, R, C>
 where
-    R: FormatRuleWithOptions<T, Options = O>,
+    R: FormatRuleWithOptions<T, C, Options = O>,
 {
     pub fn with_options(mut self, options: O) -> Self {
         self.rule = self.rule.with_options(options);
@@ -591,9 +595,9 @@ where
     }
 }
 
-impl<T, R> FormatWithRule<R::Context> for FormatRefWithRule<'_, T, R>
+impl<T, R, C> FormatWithRule<C> for FormatRefWithRule<'_, T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     type Item = T;
 
@@ -602,32 +606,37 @@ where
     }
 }
 
-impl<T, R> Format<R::Context> for FormatRefWithRule<'_, T, R>
+impl<T, R, C> Format<C> for FormatRefWithRule<'_, T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     #[inline(always)]
-    fn fmt(&self, f: &mut Formatter<R::Context>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut Formatter<C>) -> FormatResult<()> {
         self.rule.fmt(self.item, f)
     }
 }
 
 /// Formats the `item` with the specified rule.
 #[derive(Debug, Clone)]
-pub struct FormatOwnedWithRule<T, R>
+pub struct FormatOwnedWithRule<T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     item: T,
     rule: R,
+    context: PhantomData<C>,
 }
 
-impl<T, R> FormatOwnedWithRule<T, R>
+impl<T, R, C> FormatOwnedWithRule<T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     pub fn new(item: T, rule: R) -> Self {
-        Self { item, rule }
+        Self {
+            item,
+            rule,
+            context: PhantomData,
+        }
     }
 
     pub fn with_item(mut self, item: T) -> Self {
@@ -640,19 +649,19 @@ where
     }
 }
 
-impl<T, R> Format<R::Context> for FormatOwnedWithRule<T, R>
+impl<T, R, C> Format<C> for FormatOwnedWithRule<T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     #[inline(always)]
-    fn fmt(&self, f: &mut Formatter<R::Context>) -> FormatResult<()> {
+    fn fmt(&self, f: &mut Formatter<C>) -> FormatResult<()> {
         self.rule.fmt(&self.item, f)
     }
 }
 
-impl<T, R, O> FormatOwnedWithRule<T, R>
+impl<T, R, O, C> FormatOwnedWithRule<T, R, C>
 where
-    R: FormatRuleWithOptions<T, Options = O>,
+    R: FormatRuleWithOptions<T, C, Options = O>,
 {
     pub fn with_options(mut self, options: O) -> Self {
         self.rule = self.rule.with_options(options);
@@ -660,9 +669,9 @@ where
     }
 }
 
-impl<T, R> FormatWithRule<R::Context> for FormatOwnedWithRule<T, R>
+impl<T, R, C> FormatWithRule<C> for FormatOwnedWithRule<T, R, C>
 where
-    R: FormatRule<T>,
+    R: FormatRule<T, C>,
 {
     type Item = T;
 

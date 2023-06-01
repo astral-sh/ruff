@@ -5,6 +5,31 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for undefined local variables.
+///
+/// ## Why is this bad?
+/// Referencing a local variable before it has been assigned will raise
+/// an `UnboundLocalError` at runtime.
+///
+/// ## Example
+/// ```python
+/// x = 1
+///
+///
+/// def foo():
+///     x += 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x = 1
+///
+///
+/// def foo():
+///     global x
+///     x += 1
+/// ```
 #[violation]
 pub struct UndefinedLocal {
     name: String,

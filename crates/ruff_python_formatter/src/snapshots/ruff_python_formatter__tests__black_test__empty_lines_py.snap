@@ -105,9 +105,11 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,9 +3,9 @@
- 
- # leading comment
+@@ -1,11 +1,8 @@
+ """Docstring."""
+-
+-
+-# leading comment
  def f():
 -    NO = ""
 -    SPACE = " "
@@ -118,7 +120,7 @@ def g():
  
      t = leaf.type
      p = leaf.parent  # trailing comment
-@@ -16,14 +16,19 @@
+@@ -16,14 +13,19 @@
      if t == token.COMMENT:  # another trailing comment
          return DOUBLESPACE
  
@@ -138,16 +140,17 @@ def g():
          if prevp.type == token.EQUAL:
              if prevp.parent and prevp.parent.type in {
                  syms.typedargslist,
-@@ -44,16 +49,14 @@
+@@ -43,17 +45,10 @@
+                 syms.dictsetmaker,
              }:
                  return NO
- 
 -
- ###############################################################################
- # SECTION BECAUSE SECTIONS
- ###############################################################################
 -
- 
+-###############################################################################
+-# SECTION BECAUSE SECTIONS
+-###############################################################################
+-
+-
  def g():
 -    NO = ""
 -    SPACE = " "
@@ -158,7 +161,7 @@ def g():
  
      t = leaf.type
      p = leaf.parent
-@@ -67,7 +70,7 @@
+@@ -67,7 +62,7 @@
          return DOUBLESPACE
  
      # Another comment because more comments
@@ -173,9 +176,6 @@ def g():
 
 ```py
 """Docstring."""
-
-
-# leading comment
 def f():
     NO = ''
     SPACE = ' '
@@ -222,11 +222,6 @@ def f():
                 syms.dictsetmaker,
             }:
                 return NO
-
-###############################################################################
-# SECTION BECAUSE SECTIONS
-###############################################################################
-
 def g():
     NO = ''
     SPACE = ' '

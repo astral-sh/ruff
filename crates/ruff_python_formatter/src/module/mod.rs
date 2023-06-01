@@ -1,33 +1,37 @@
-use crate::context::ASTFormatContext;
-use ruff_formatter::format_element::tag::VerbatimKind;
-use ruff_formatter::prelude::*;
-use ruff_formatter::write;
-use rustpython_parser::ast::{Mod, Ranged};
+use crate::context::PyFormatContext;
+use crate::{AsFormat, IntoFormat, PyFormatter};
+use ruff_formatter::{Format, FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
+use rustpython_parser::ast::Mod;
 
-pub(crate) struct FormatModule<'a> {
-    module: &'a Mod,
-}
+pub(crate) mod mod_expression;
+pub(crate) mod mod_function_type;
+pub(crate) mod mod_interactive;
+pub(crate) mod mod_module;
 
-impl<'a> FormatModule<'a> {
-    pub(crate) fn new(module: &'a Mod) -> Self {
-        Self { module }
+#[derive(Default)]
+pub struct FormatMod;
+
+impl FormatRule<Mod, PyFormatContext<'_>> for FormatMod {
+    fn fmt(&self, item: &Mod, f: &mut PyFormatter) -> FormatResult<()> {
+        match item {
+            Mod::Module(x) => x.format().fmt(f),
+            Mod::Interactive(x) => x.format().fmt(f),
+            Mod::Expression(x) => x.format().fmt(f),
+            Mod::FunctionType(x) => x.format().fmt(f),
+        }
     }
 }
 
-impl Format<ASTFormatContext<'_>> for FormatModule<'_> {
-    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let range = self.module.range();
+impl<'ast> AsFormat<PyFormatContext<'ast>> for Mod {
+    type Format<'a> = FormatRefWithRule<'a, Mod, FormatMod, PyFormatContext<'ast>>;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, FormatMod::default())
+    }
+}
 
-        write!(f, [source_position(range.start())])?;
-
-        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            VerbatimKind::Verbatim {
-                length: range.len(),
-            },
-        )))?;
-        write!(f, [source_text_slice(range, ContainsNewlines::Detect)])?;
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-
-        write!(f, [source_position(range.end())])
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for Mod {
+    type Format = FormatOwnedWithRule<Mod, FormatMod, PyFormatContext<'ast>>;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, FormatMod::default())
     }
 }

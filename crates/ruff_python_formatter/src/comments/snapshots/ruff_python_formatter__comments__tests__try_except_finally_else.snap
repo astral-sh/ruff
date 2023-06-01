@@ -1,0 +1,101 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtTry,
+        range: 1..253,
+        source: `try:⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# leading else comment",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# leading finally comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtPass,
+        range: 10..14,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing try comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ExcepthandlerExceptHandler,
+        range: 68..100,
+        source: `except Exception as ex:⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# leading handler comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtPass,
+        range: 96..100,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing except comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtPass,
+        range: 164..168,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing else comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtExpr,
+        range: 236..253,
+        source: `print("Finally!")`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing finally comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+}

@@ -1864,6 +1864,7 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_python_ast",
+ "ruff_python_formatter",
  "ruff_python_stdlib",
  "ruff_text_size",
  "ruff_textwrap",

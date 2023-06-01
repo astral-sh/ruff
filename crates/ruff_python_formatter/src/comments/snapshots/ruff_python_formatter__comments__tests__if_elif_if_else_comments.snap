@@ -1,0 +1,36 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtIf,
+        range: 21..128,
+        source: `elif x < y:⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# Leading else comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtIf,
+        range: 37..60,
+        source: `if x < 10:⏎`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# `elif` trailing comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+}

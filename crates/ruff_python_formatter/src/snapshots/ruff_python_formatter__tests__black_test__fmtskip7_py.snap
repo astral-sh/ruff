@@ -23,18 +23,18 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 -c = 9  # fmt: skip
 -d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
 +a =     "this is some code"
-+b =     5  #fmt:skip
-+c = 9  #fmt: skip
-+d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  #fmt:skip
++b =     5
++c = 9
++d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"
 ```
 
 ## Ruff Output
 
 ```py
 a =     "this is some code"
-b =     5  #fmt:skip
-c = 9  #fmt: skip
-d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  #fmt:skip
+b =     5
+c = 9
+d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"
 ```
 
 ## Black Output
