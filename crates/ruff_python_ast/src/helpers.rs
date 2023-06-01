@@ -4,6 +4,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
+use ruff_newlines::UniversalNewlineIterator;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -14,7 +15,6 @@ use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
-use crate::newlines::UniversalNewlineIterator;
 use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 

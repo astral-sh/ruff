@@ -11,8 +11,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::registry::Rule;
-    use crate::test::test_path;
+    use crate::registry::{Linter, Rule};
+    use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
@@ -133,5 +133,160 @@ mod tests {
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        import pandas as pd
+
+        def f(x: pd.DataFrame):
+            pass
+    "#,
+        "no_typing_import"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        import pandas as pd
+
+        def f(x: pd.DataFrame):
+            pass
+    "#,
+        "typing_import_before_package_import"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        import pandas as pd
+
+        from typing import TYPE_CHECKING
+
+        def f(x: pd.DataFrame):
+            pass
+    "#,
+        "typing_import_after_package_import"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        import pandas as pd
+
+        def f(x: pd.DataFrame):
+            pass
+
+        from typing import TYPE_CHECKING
+    "#,
+        "typing_import_after_usage"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        import pandas as pd
+
+        if TYPE_CHECKING:
+            import os
+
+        def f(x: pd.DataFrame):
+            pass
+    "#,
+        "type_checking_block_own_line"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        import pandas as pd
+
+        if TYPE_CHECKING: import os
+
+        def f(x: pd.DataFrame):
+            pass
+    "#,
+        "type_checking_block_inline"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        import pandas as pd
+
+        if TYPE_CHECKING:
+            # This is a comment.
+            import os
+
+        def f(x: pd.DataFrame):
+            pass
+    "#,
+        "type_checking_block_comment"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        import pandas as pd
+
+        def f(x: pd.DataFrame):
+            pass
+
+        if TYPE_CHECKING:
+            import os
+    "#,
+        "type_checking_block_after_usage"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from pandas import (
+            DataFrame,  # DataFrame
+            Series,  # Series
+        )
+
+        def f(x: DataFrame):
+            pass
+    "#,
+        "import_from"
+    )]
+    #[test_case(
+        r#"
+        from __future__ import annotations
+
+        from typing import TYPE_CHECKING
+
+        from pandas import (
+            DataFrame,  # DataFrame
+            Series,  # Series
+        )
+
+        if TYPE_CHECKING:
+            import os
+
+        def f(x: DataFrame):
+            pass
+    "#,
+        "import_from_type_checking_block"
+    )]
+    fn contents(contents: &str, snapshot: &str) {
+        let diagnostics = test_snippet(
+            contents,
+            &settings::Settings::for_rules(&Linter::Flake8TypeChecking),
+        );
+        assert_messages!(snapshot, diagnostics);
     }
 }

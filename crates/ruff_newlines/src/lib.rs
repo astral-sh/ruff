@@ -22,7 +22,7 @@ impl StrExt for str {
 ///
 /// ```rust
 /// # use ruff_text_size::TextSize;
-/// # use ruff_python_ast::newlines::{Line, UniversalNewlineIterator};
+/// # use ruff_newlines::{Line, UniversalNewlineIterator};
 /// let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
 ///
 /// assert_eq!(lines.next_back(), Some(Line::new("bop", TextSize::from(14))));
@@ -232,23 +232,29 @@ impl<'a> Line<'a> {
         TextRange::new(self.start(), self.end())
     }
 
+    /// Returns the line's new line character, if any.
+    #[inline]
+    pub fn line_ending(&self) -> Option<LineEnding> {
+        let mut bytes = self.text.bytes().rev();
+        match bytes.next() {
+            Some(b'\n') => {
+                if bytes.next() == Some(b'\r') {
+                    Some(LineEnding::CrLf)
+                } else {
+                    Some(LineEnding::Lf)
+                }
+            }
+            Some(b'\r') => Some(LineEnding::Cr),
+            _ => None,
+        }
+    }
+
     /// Returns the text of the line, excluding the terminating new line character.
     #[inline]
     pub fn as_str(&self) -> &'a str {
-        let mut bytes = self.text.bytes().rev();
-
-        let newline_len = match bytes.next() {
-            Some(b'\n') => {
-                if bytes.next() == Some(b'\r') {
-                    2
-                } else {
-                    1
-                }
-            }
-            Some(b'\r') => 1,
-            _ => 0,
-        };
-
+        let newline_len = self
+            .line_ending()
+            .map_or(0, |line_ending| line_ending.len());
         &self.text[..self.text.len() - newline_len]
     }
 
@@ -340,9 +346,7 @@ impl Deref for LineEnding {
 mod tests {
     use ruff_text_size::TextSize;
 
-    use crate::newlines::Line;
-
-    use super::UniversalNewlineIterator;
+    use super::{Line, UniversalNewlineIterator};
 
     #[test]
     fn universal_newlines_empty_str() {

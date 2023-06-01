@@ -6,7 +6,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
-use crate::autofix::actions::remove_argument;
+use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 

@@ -6,7 +6,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::RefEquality;
 
-use crate::autofix::actions;
+use crate::autofix::edits;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -58,7 +58,7 @@ pub(crate) fn useless_metaclass_type(
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         let defined_by = checker.semantic_model().stmt();
         let defined_in = checker.semantic_model().stmt_parent();
-        match actions::delete_stmt(
+        match edits::delete_stmt(
             defined_by,
             defined_in,
             &deleted,

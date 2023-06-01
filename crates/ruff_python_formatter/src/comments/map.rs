@@ -60,7 +60,7 @@ pub(super) struct MultiMap<K, V> {
 }
 
 impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             index: FxHashMap::default(),
             parts: Vec::new(),
@@ -69,7 +69,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Pushes a *leading* part for `key`.
-    pub fn push_leading(&mut self, key: K, part: V)
+    pub(super) fn push_leading(&mut self, key: K, part: V)
     where
         V: Clone,
     {
@@ -106,7 +106,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Pushes a *dangling* part for `key`
-    pub fn push_dangling(&mut self, key: K, part: V)
+    pub(super) fn push_dangling(&mut self, key: K, part: V)
     where
         V: Clone,
     {
@@ -143,7 +143,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Pushes a *trailing* part for `key`.
-    pub fn push_trailing(&mut self, key: K, part: V)
+    pub(super) fn push_trailing(&mut self, key: K, part: V)
     where
         V: Clone,
     {
@@ -210,14 +210,14 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
         }
     }
 
-    pub fn keys(&self) -> Keys<'_, K> {
+    pub(super) fn keys(&self) -> Keys<'_, K> {
         Keys {
             inner: self.index.keys(),
         }
     }
 
     /// Returns the *leading* parts of `key` in insertion-order.
-    pub fn leading(&self, key: &K) -> &[V] {
+    pub(super) fn leading(&self, key: &K) -> &[V] {
         match self.index.get(key) {
             None => &[],
             Some(Entry::InOrder(in_order)) => &self.parts[in_order.leading_range()],
@@ -226,7 +226,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns the *dangling* parts of `key` in insertion-order.
-    pub fn dangling(&self, key: &K) -> &[V] {
+    pub(super) fn dangling(&self, key: &K) -> &[V] {
         match self.index.get(key) {
             None => &[],
             Some(Entry::InOrder(in_order)) => &self.parts[in_order.dangling_range()],
@@ -235,7 +235,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns the *trailing* parts of `key` in insertion order.
-    pub fn trailing(&self, key: &K) -> &[V] {
+    pub(super) fn trailing(&self, key: &K) -> &[V] {
         match self.index.get(key) {
             None => &[],
             Some(Entry::InOrder(in_order)) => &self.parts[in_order.trailing_range()],
@@ -244,12 +244,12 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns `true` if `key` has any *leading*, *dangling*, or *trailing* parts.
-    pub fn has(&self, key: &K) -> bool {
+    pub(super) fn has(&self, key: &K) -> bool {
         self.index.get(key).is_some()
     }
 
     /// Returns an iterator over the *leading*, *dangling*, and *trailing* parts of `key`.
-    pub fn parts(&self, key: &K) -> PartsIterator<V> {
+    pub(super) fn parts(&self, key: &K) -> PartsIterator<V> {
         match self.index.get(key) {
             None => PartsIterator::Slice([].iter()),
             Some(entry) => PartsIterator::from_entry(entry, self),
@@ -258,7 +258,7 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
 
     /// Returns an iterator over the parts of all keys.
     #[allow(unused)]
-    pub fn all_parts(&self) -> impl Iterator<Item = &V> {
+    pub(super) fn all_parts(&self) -> impl Iterator<Item = &V> {
         self.index
             .values()
             .flat_map(|entry| PartsIterator::from_entry(entry, self))
@@ -767,7 +767,7 @@ impl PartIndex {
 }
 
 /// Iterator over the keys of a comments multi map
-pub struct Keys<'a, K> {
+pub(super) struct Keys<'a, K> {
     inner: std::collections::hash_map::Keys<'a, K, Entry>,
 }
 

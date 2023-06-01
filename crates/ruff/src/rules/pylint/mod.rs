@@ -114,6 +114,19 @@ mod tests {
     }
 
     #[test]
+    fn repeated_isinstance_calls() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/repeated_isinstance_calls.py"),
+            &Settings {
+                target_version: PythonVersion::Py39,
+                ..Settings::for_rules(vec![Rule::RepeatedIsinstanceCalls])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn continue_in_finally() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/continue_in_finally.py"),
