@@ -169,6 +169,20 @@ impl<'a> Checker<'a> {
         )
     }
 
+    /// Returns the [`IsolationLevel`] for fixes in the current context.
+    ///
+    /// The primary use-case for fix isolation is to ensure that we don't delete all statements
+    /// in a given indented block, which would cause a syntax error. We therefore need to ensure
+    /// that we delete at most one statement per indented block per fixer pass. Fix isolation should
+    /// thus be applied whenever we delete a statement, but can otherwise be omitted.
+    pub(crate) fn isolation(&self, parent: Option<&Stmt>) -> IsolationLevel {
+        parent
+            .and_then(|stmt| self.semantic_model.stmts.node_id(stmt))
+            .map_or(IsolationLevel::default(), |node_id| {
+                IsolationLevel::Group(node_id.into())
+            })
+    }
+
     pub(crate) const fn semantic_model(&self) -> &SemanticModel<'a> {
         &self.semantic_model
     }
@@ -5318,11 +5332,9 @@ impl<'a> Checker<'a> {
                         }
                         if let Some(edit) = fix.as_ref() {
                             diagnostic.set_fix(Fix::automatic(edit.clone()).isolate(
-                                if parent.is_some() {
-                                    IsolationLevel::Isolated
-                                } else {
-                                    IsolationLevel::NonOverlapping
-                                },
+                                parent_id.map_or(IsolationLevel::default(), |node_id| {
+                                    IsolationLevel::Group(node_id.into())
+                                }),
                             ));
                         }
                         diagnostics.push(diagnostic);

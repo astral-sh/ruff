@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, IsolationLevel};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::autofix;
@@ -119,11 +119,7 @@ pub(crate) fn unnecessary_builtin_import(
                 checker.indexer,
                 checker.stylist,
             )?;
-            Ok(Fix::suggested(edit).isolate(if parent.is_some() {
-                IsolationLevel::Isolated
-            } else {
-                IsolationLevel::NonOverlapping
-            }))
+            Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
         });
     }
     checker.diagnostics.push(diagnostic);

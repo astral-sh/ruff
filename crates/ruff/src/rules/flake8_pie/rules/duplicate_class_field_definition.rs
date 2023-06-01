@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Fix, IsolationLevel};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::autofix;
@@ -95,7 +95,7 @@ pub(crate) fn duplicate_class_field_definition<'a, 'b>(
                     checker.indexer,
                     checker.stylist,
                 );
-                diagnostic.set_fix(Fix::suggested(edit).isolate(IsolationLevel::Isolated));
+                diagnostic.set_fix(Fix::suggested(edit).isolate(checker.isolation(Some(parent))));
             }
             checker.diagnostics.push(diagnostic);
         }

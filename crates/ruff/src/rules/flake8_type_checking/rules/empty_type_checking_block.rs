@@ -1,7 +1,7 @@
 use rustpython_parser::ast;
 use rustpython_parser::ast::Ranged;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, IsolationLevel};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::autofix;
@@ -69,11 +69,7 @@ pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtI
             checker.indexer,
             checker.stylist,
         );
-        diagnostic.set_fix(Fix::automatic(edit).isolate(if parent.is_some() {
-            IsolationLevel::Isolated
-        } else {
-            IsolationLevel::NonOverlapping
-        }));
+        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
     }
     checker.diagnostics.push(diagnostic);
 }

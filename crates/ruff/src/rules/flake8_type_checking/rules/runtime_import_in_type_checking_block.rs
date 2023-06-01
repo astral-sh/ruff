@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, IsolationLevel, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
     Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
@@ -118,13 +118,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 )?;
 
                 Ok(
-                    Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
-                        if parent.is_some() {
-                            IsolationLevel::Isolated
-                        } else {
-                            IsolationLevel::NonOverlapping
-                        },
-                    ),
+                    Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits())
+                        .isolate(checker.isolation(parent)),
                 )
             });
         }

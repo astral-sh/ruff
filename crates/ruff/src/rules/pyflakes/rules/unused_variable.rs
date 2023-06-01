@@ -3,7 +3,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, IsolationLevel, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
@@ -215,11 +215,7 @@ fn remove_unused_variable(
                         checker.indexer,
                         checker.stylist,
                     );
-                    Some(Fix::suggested(edit).isolate(if parent.is_some() {
-                        IsolationLevel::Isolated
-                    } else {
-                        IsolationLevel::NonOverlapping
-                    }))
+                    Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
                 };
             }
         }
@@ -250,11 +246,7 @@ fn remove_unused_variable(
                     checker.indexer,
                     checker.stylist,
                 );
-                Some(Fix::suggested(edit).isolate(if parent.is_some() {
-                    IsolationLevel::Isolated
-                } else {
-                    IsolationLevel::NonOverlapping
-                }))
+                Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
             };
         }
     }

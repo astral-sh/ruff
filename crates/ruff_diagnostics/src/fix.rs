@@ -28,11 +28,11 @@ pub enum Applicability {
 }
 
 /// Indicates the level of isolation required to apply a fix.
-#[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, is_macro::Is)]
+#[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum IsolationLevel {
-    /// The fix should be applied in isolation.
-    Isolated(u32),
+    /// The fix should be applied as long as no other fixes in the same group have been applied.
+    Group(u32),
     /// The fix should be applied as long as it does not overlap with any other fixes.
     #[default]
     NonOverlapping,

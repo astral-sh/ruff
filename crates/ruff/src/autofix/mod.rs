@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use nohash_hasher::IntSet;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
 use ruff_python_ast::source_code::Locator;
 
 use crate::linter::FixTable;
@@ -37,8 +38,8 @@ fn apply_fixes<'a>(
 ) -> (String, FixTable) {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
-    let mut isolation = false;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
+    let mut isolated: IntSet<u32> = IntSet::default();
     let mut fixed = FxHashMap::default();
 
     for (rule, fix) in diagnostics
@@ -66,13 +67,12 @@ fn apply_fixes<'a>(
             continue;
         }
 
-        // If this fix requires isolation, and we've already applied another fix that
-        // requires isolation, skip it. We apply at most one isolated fix per run.
-        if fix.isolation().is_isolated() {
-            if isolation {
+        // If this fix requires isolation, and we've already applied another fix in the
+        // same isolation group, skip it.
+        if let IsolationLevel::Group(id) = fix.isolation() {
+            if !isolated.insert(id) {
                 continue;
             }
-            isolation = true;
         }
 
         for edit in fix
