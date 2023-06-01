@@ -4,6 +4,30 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::scope::Scope;
 
+/// ## What it does
+/// Checks for undefined names in `__all__`.
+///
+/// ## Why is this bad?
+/// `__all__` is used to define the names exported by a module. An undefined
+/// name in `__all__` is likely to raise `NameError` at runtime when the module
+/// is imported.
+///
+/// ## Example
+/// ```python
+/// from foo import bar
+///
+/// __all__ = ["bar", "baz"]  # undefined name `baz` in `__all__`
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from foo import bar, baz
+///
+/// __all__ = ["bar", "baz"]
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 #[violation]
 pub struct UndefinedExport {
     name: String,

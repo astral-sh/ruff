@@ -4,6 +4,21 @@ use ruff_python_semantic::scope::ScopeId;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for unused type annotations.
+///
+/// ## Why is this bad?
+/// Type annotations are used to provide type hints to static analysis tools. If
+/// they are not used, they are redundant.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     bar: int
+/// ```
+///
+/// ## References
+/// - [PEP 484](https://peps.python.org/pep-0484/)
 #[violation]
 pub struct UnusedAnnotation {
     name: String,
