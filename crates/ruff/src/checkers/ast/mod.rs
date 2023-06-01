@@ -1983,10 +1983,17 @@ where
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
                     if let Some(call_path) = self.semantic_model.resolve_call_path(type_) {
-                        if call_path.as_slice() == ["", "NameError"] {
-                            handled_exceptions |= Exceptions::NAME_ERROR;
-                        } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
-                            handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                        match call_path.as_slice() {
+                            ["", "NameError"] => {
+                                handled_exceptions |= Exceptions::NAME_ERROR;
+                            }
+                            ["", "ModuleNotFoundError"] => {
+                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                            }
+                            ["", "ImportError"] => {
+                                handled_exceptions |= Exceptions::IMPORT_ERROR;
+                            }
+                            _ => {}
                         }
                     }
                 }

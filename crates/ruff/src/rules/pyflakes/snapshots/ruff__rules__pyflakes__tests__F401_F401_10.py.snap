@@ -12,7 +12,7 @@ F401_10.py:6:16: F401 `orjson` imported but unused; consider using `importlib.ut
    |
    = help: Remove unused import: `orjson`
 
-F401_10.py:15:16: F401 [*] `orjson` imported but unused
+F401_10.py:15:16: F401 `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
    |
 15 | def import_error():
 16 |     try:
@@ -22,14 +22,5 @@ F401_10.py:15:16: F401 [*] `orjson` imported but unused
 19 |         return True
    |
    = help: Remove unused import: `orjson`
-
-ℹ Suggested fix
-12 12 | 
-13 13 | def import_error():
-14 14 |     try:
-15    |-        import orjson
-16 15 | 
-17 16 |         return True
-18 17 |     except ImportError:
 
 
