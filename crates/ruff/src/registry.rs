@@ -529,6 +529,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
     rules::flake8_pyi::rules::TypeCommentInStub,
     rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
+    rules::flake8_pyi::rules::UnaliasedCollectionsAbcSetImport,
     rules::flake8_pyi::rules::UnannotatedAssignmentInStub,
     rules::flake8_pyi::rules::UnprefixedTypeParam,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,

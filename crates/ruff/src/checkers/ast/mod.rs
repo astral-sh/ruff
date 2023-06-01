@@ -1021,12 +1021,14 @@ where
                     }
                 }
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-            }) => {
+            Stmt::ImportFrom(
+                import_from @ ast::StmtImportFrom {
+                    names,
+                    module,
+                    level,
+                    range: _,
+                },
+            ) => {
                 let module = module.as_deref();
                 let level = level.map(|level| level.to_u32());
                 if self.enabled(Rule::ModuleImportNotAtTopOfFile) {
@@ -1091,6 +1093,11 @@ where
                     }
                 }
 
+                if self.is_stub {
+                    if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
+                    }
+                }
                 for alias in names {
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
