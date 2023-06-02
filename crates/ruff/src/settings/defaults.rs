@@ -13,7 +13,7 @@ use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::types::FilePatternSet;
 
@@ -110,6 +110,7 @@ impl Default for Settings {
             pep8_naming: pep8_naming::settings::Settings::default(),
             pycodestyle: pycodestyle::settings::Settings::default(),
             pydocstyle: pydocstyle::settings::Settings::default(),
+            pyflakes: pyflakes::settings::Settings::default(),
             pylint: pylint::settings::Settings::default(),
         }
     }

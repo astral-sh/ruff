@@ -1026,12 +1026,14 @@ where
                     }
                 }
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-            }) => {
+            Stmt::ImportFrom(
+                import_from @ ast::StmtImportFrom {
+                    names,
+                    module,
+                    level,
+                    range: _,
+                },
+            ) => {
                 let module = module.as_deref();
                 let level = level.map(|level| level.to_u32());
                 if self.enabled(Rule::ModuleImportNotAtTopOfFile) {
@@ -1096,6 +1098,11 @@ where
                     }
                 }
 
+                if self.is_stub {
+                    if self.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+                        flake8_pyi::rules::unaliased_collections_abc_set_import(self, import_from);
+                    }
+                }
                 for alias in names {
                     if let Some("__future__") = module {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
@@ -1559,6 +1566,9 @@ where
                 if self.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    pylint::rules::iteration_over_set(self, iter);
+                }
                 if matches!(stmt, Stmt::For(_)) {
                     if self.enabled(Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
@@ -1981,10 +1991,17 @@ where
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
                     if let Some(call_path) = self.semantic_model.resolve_call_path(type_) {
-                        if call_path.as_slice() == ["", "NameError"] {
-                            handled_exceptions |= Exceptions::NAME_ERROR;
-                        } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
-                            handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                        match call_path.as_slice() {
+                            ["", "NameError"] => {
+                                handled_exceptions |= Exceptions::NAME_ERROR;
+                            }
+                            ["", "ModuleNotFoundError"] => {
+                                handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                            }
+                            ["", "ImportError"] => {
+                                handled_exceptions |= Exceptions::IMPORT_ERROR;
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -3399,6 +3416,14 @@ where
                 }
             }
             Expr::Constant(ast::ExprConstant {
+                value: Constant::Bytes(_),
+                ..
+            }) => {
+                if self.is_stub && self.enabled(Rule::StringOrBytesTooLong) {
+                    flake8_pyi::rules::string_or_bytes_too_long(self, expr);
+                }
+            }
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 kind,
                 range: _,
@@ -3431,6 +3456,9 @@ where
                 }
                 if self.enabled(Rule::UnicodeKindPrefix) {
                     pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
+                }
+                if self.is_stub && self.enabled(Rule::StringOrBytesTooLong) {
+                    flake8_pyi::rules::string_or_bytes_too_long(self, expr);
                 }
             }
             Expr::Lambda(
@@ -3500,6 +3528,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -3524,6 +3557,11 @@ where
                         );
                     }
                 }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
+                    }
+                }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {
                 generators,
@@ -3540,6 +3578,11 @@ where
                             &generator.target,
                             &generator.iter,
                         );
+                    }
+                }
+                if self.enabled(Rule::IterationOverSet) {
+                    for generator in generators {
+                        pylint::rules::iteration_over_set(self, &generator.iter);
                     }
                 }
             }
@@ -3864,6 +3907,7 @@ where
                         value,
                         &self.semantic_model,
                         self.settings.typing_modules.iter().map(String::as_str),
+                        &self.settings.pyflakes.extend_generics,
                     ) {
                         Some(subscript) => {
                             match subscript {

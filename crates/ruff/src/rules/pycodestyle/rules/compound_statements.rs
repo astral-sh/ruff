@@ -123,29 +123,29 @@ pub(crate) fn compound_statements(lxr: &[LexResult], settings: &Settings) -> Vec
     let mut allow_ellipsis = false;
 
     // Track the bracket depth.
-    let mut par_count = 0;
-    let mut sqb_count = 0;
-    let mut brace_count = 0;
+    let mut par_count = 0u32;
+    let mut sqb_count = 0u32;
+    let mut brace_count = 0u32;
 
     for &(ref tok, range) in lxr.iter().flatten() {
         match tok {
             Tok::Lpar => {
-                par_count += 1;
+                par_count = par_count.saturating_add(1);
             }
             Tok::Rpar => {
-                par_count -= 1;
+                par_count = par_count.saturating_sub(1);
             }
             Tok::Lsqb => {
-                sqb_count += 1;
+                sqb_count = sqb_count.saturating_add(1);
             }
             Tok::Rsqb => {
-                sqb_count -= 1;
+                sqb_count = sqb_count.saturating_sub(1);
             }
             Tok::Lbrace => {
-                brace_count += 1;
+                brace_count = brace_count.saturating_add(1);
             }
             Tok::Rbrace => {
-                brace_count -= 1;
+                brace_count = brace_count.saturating_sub(1);
             }
             _ => {}
         }

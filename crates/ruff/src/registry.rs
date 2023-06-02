@@ -163,6 +163,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::DuplicateValue,
     rules::pylint::rules::DuplicateBases,
     rules::pylint::rules::NamedExprWithoutContext,
+    rules::pylint::rules::IterationOverSet,
     // flake8-async
     rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
     rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction,
@@ -520,6 +521,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
     rules::flake8_pyi::rules::FixedReturnType,
     rules::flake8_pyi::rules::CollectionsNamedTuple,
+    rules::flake8_pyi::rules::StringOrBytesTooLong,
     rules::flake8_pyi::rules::NonEmptyStubBody,
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::PassStatementStubBody,
@@ -529,6 +531,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
     rules::flake8_pyi::rules::TypeCommentInStub,
     rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
+    rules::flake8_pyi::rules::UnaliasedCollectionsAbcSetImport,
     rules::flake8_pyi::rules::UnannotatedAssignmentInStub,
     rules::flake8_pyi::rules::UnprefixedTypeParam,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,

@@ -64,6 +64,7 @@ mod tests {
     )]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
+    #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]
     #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"))]
     #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"))]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
@@ -110,6 +111,19 @@ mod tests {
             &Settings::for_rules(vec![rule_code]),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn repeated_isinstance_calls() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/repeated_isinstance_calls.py"),
+            &Settings {
+                target_version: PythonVersion::Py39,
+                ..Settings::for_rules(vec![Rule::RepeatedIsinstanceCalls])
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

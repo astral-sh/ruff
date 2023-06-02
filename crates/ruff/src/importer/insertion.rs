@@ -1,9 +1,12 @@
 //! Insert statements into Python code.
+use std::ops::Add;
+
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
+use ruff_newlines::UniversalNewlineIterator;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_textwrap::indent;
@@ -52,13 +55,10 @@ impl<'a> Insertion<'a> {
     ) -> Insertion<'static> {
         // Skip over any docstrings.
         let mut location = if let Some(location) = match_docstring_end(body) {
-            // If the first token after the docstring is a semicolon, insert after the semicolon as an
-            // inline statement.
-            let first_token = lexer::lex_starts_at(locator.after(location), Mode::Module, location)
-                .flatten()
-                .next();
-            if let Some((Tok::Semi, range)) = first_token {
-                return Insertion::inline(" ", range.end(), ";");
+            // If the first token after the docstring is a semicolon, insert after the semicolon as
+            // an inline statement.
+            if let Some(offset) = match_leading_semicolon(locator.after(location)) {
+                return Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";");
             }
 
             // Otherwise, advance to the next row.
@@ -67,12 +67,10 @@ impl<'a> Insertion<'a> {
             TextSize::default()
         };
 
-        // Skip over any comments and empty lines.
-        for (tok, range) in
-            lexer::lex_starts_at(locator.after(location), Mode::Module, location).flatten()
-        {
-            if matches!(tok, Tok::Comment(..) | Tok::Newline) {
-                location = locator.full_line_end(range.end());
+        // Skip over commented lines.
+        for line in UniversalNewlineIterator::with_offset(locator.after(location), location) {
+            if line.trim_start().starts_with('#') {
+                location = line.full_end();
             } else {
                 break;
             }
@@ -107,12 +105,10 @@ impl<'a> Insertion<'a> {
         stylist: &Stylist,
     ) -> Insertion<'static> {
         let location = stmt.end();
-        let mut tokens =
-            lexer::lex_starts_at(locator.after(location), Mode::Module, location).flatten();
-        if let Some((Tok::Semi, range)) = tokens.next() {
+        if let Some(offset) = match_leading_semicolon(locator.after(location)) {
             // If the first token after the statement is a semicolon, insert after the semicolon as
             // an inline statement.
-            Insertion::inline(" ", range.end(), ";")
+            Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";")
         } else {
             // Otherwise, insert on the next line.
             Insertion::own_line(
@@ -286,6 +282,18 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
         stmt = next;
     }
     Some(stmt.end())
+}
+
+/// If a line starts with a semicolon, return its offset.
+fn match_leading_semicolon(s: &str) -> Option<TextSize> {
+    for (offset, c) in s.char_indices() {
+        match c {
+            ' ' | '\t' => continue,
+            ';' => return Some(TextSize::try_from(offset).unwrap()),
+            _ => break,
+        }
+    }
+    None
 }
 
 #[cfg(test)]

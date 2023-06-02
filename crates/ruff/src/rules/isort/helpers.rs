@@ -10,14 +10,14 @@ use crate::rules::isort::types::TrailingComma;
 /// trailing comma.
 pub(crate) fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice(stmt.range());
-    let mut count: usize = 0;
+    let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
     for (tok, _) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
         if matches!(tok, Tok::Lpar) {
-            count += 1;
+            count = count.saturating_add(1);
         }
         if matches!(tok, Tok::Rpar) {
-            count -= 1;
+            count = count.saturating_sub(1);
         }
         if count == 1 {
             if matches!(

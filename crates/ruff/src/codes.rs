@@ -150,6 +150,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0414") => (RuleGroup::Unspecified, Rule::UselessImportAlias),
         (Pylint, "C1901") => (RuleGroup::Unspecified, Rule::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Unspecified, Rule::UnnecessaryDirectLambdaCall),
+        (Pylint, "C0208") => (RuleGroup::Unspecified, Rule::IterationOverSet),
         (Pylint, "E0100") => (RuleGroup::Unspecified, Rule::YieldInInit),
         (Pylint, "E0101") => (RuleGroup::Unspecified, Rule::ReturnInInit),
         (Pylint, "E0116") => (RuleGroup::Unspecified, Rule::ContinueInFinally),
@@ -592,6 +593,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "020") => (RuleGroup::Unspecified, Rule::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Unspecified, Rule::DocstringInStub),
         (Flake8Pyi, "024") => (RuleGroup::Unspecified, Rule::CollectionsNamedTuple),
+        (Flake8Pyi, "025") => (RuleGroup::Unspecified, Rule::UnaliasedCollectionsAbcSetImport),
         (Flake8Pyi, "032") => (RuleGroup::Unspecified, Rule::AnyEqNeAnnotation),
         (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
         (Flake8Pyi, "034") => (RuleGroup::Unspecified, Rule::FixedReturnType),
@@ -600,6 +602,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "045") => (RuleGroup::Unspecified, Rule::IterMethodReturnIterable),
         (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
+        (Flake8Pyi, "053") => (RuleGroup::Unspecified, Rule::StringOrBytesTooLong),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Unspecified, Rule::PytestFixtureIncorrectParenthesesStyle),

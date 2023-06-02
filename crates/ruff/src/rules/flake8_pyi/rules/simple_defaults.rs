@@ -125,13 +125,9 @@ fn is_valid_default_value_with_annotation(
             return true;
         }
         Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
+            value: Constant::Str(..) | Constant::Bytes(..),
             ..
-        }) => return locator.slice(default.range()).len() <= 50,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bytes(..),
-            ..
-        }) => return locator.slice(default.range()).len() <= 50,
+        }) => return true,
         // Ex) `123`, `True`, `False`, `3.14`
         Expr::Constant(ast::ExprConstant {
             value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
@@ -336,8 +332,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Argum
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -368,8 +363,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Argum
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -403,8 +397,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -435,8 +428,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -479,8 +471,7 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             "...".to_string(),
             value.range(),
         )));
@@ -518,8 +509,7 @@ pub(crate) fn annotated_assignment_default_in_stub(
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             "...".to_string(),
             value.range(),
         )));
