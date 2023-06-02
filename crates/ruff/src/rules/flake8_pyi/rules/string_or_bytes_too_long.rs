@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -28,10 +28,14 @@ pub struct StringOrBytesTooLong;
 /// ```python
 /// def foo(arg: str = ...) -> None: ...
 /// ```
-impl Violation for StringOrBytesTooLong {
+impl AlwaysAutofixableViolation for StringOrBytesTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("String and bytes literals longer than 50 characters are not permitted")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `...`".to_string()
     }
 }
 
@@ -48,7 +52,6 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
         }) => bytes.len(),
         _ => return,
     };
-
     if length <= 50 {
         return;
     }
@@ -60,7 +63,5 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         )));
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(StringOrBytesTooLong, expr.range()));
+    checker.diagnostics.push(diagnostic);
 }

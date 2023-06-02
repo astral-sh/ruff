@@ -13,6 +13,7 @@ pub(crate) use iter_method_return_iterable::{
 };
 pub(crate) use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub(crate) use non_self_return_type::{non_self_return_type, NonSelfReturnType};
+pub(crate) use numeric_literal_too_long::{numeric_literal_too_long, NumericLiteralTooLong};
 pub(crate) use pass_in_class_body::{pass_in_class_body, PassInClassBody};
 pub(crate) use pass_statement_stub_body::{pass_statement_stub_body, PassStatementStubBody};
 pub(crate) use prefix_type_params::{prefix_type_params, UnprefixedTypeParam};
@@ -46,6 +47,7 @@ mod ellipsis_in_non_empty_class_body;
 mod iter_method_return_iterable;
 mod non_empty_stub_body;
 mod non_self_return_type;
+mod numeric_literal_too_long;
 mod pass_in_class_body;
 mod pass_statement_stub_body;
 mod prefix_type_params;
