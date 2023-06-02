@@ -12,5 +12,5 @@ rustpython-literal = { workspace = true }
 
 bitflags = "2.3.1"
 itertools = "0.10.5"
-num-bigint = { workspace = true }
+malachite-bigint = { workspace = true }
 num-traits = { workspace = true }

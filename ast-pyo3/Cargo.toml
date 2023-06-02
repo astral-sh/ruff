@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 rustpython-ast = { workspace = true, features = ["location"] }
-rustpython-parser = { workspace = true }
+rustpython-parser = { workspace = true, features = ["num-bigint"] }
 num-complex = { workspace = true }
 once_cell = { workspace = true }
 

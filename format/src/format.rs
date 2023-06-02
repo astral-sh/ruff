@@ -1,5 +1,5 @@
 use itertools::{Itertools, PeekingNext};
-use num_bigint::{BigInt, Sign};
+use malachite_bigint::{BigInt, Sign};
 use num_traits::{cast::ToPrimitive, Signed};
 use rustpython_literal::float;
 use rustpython_literal::format::Case;

@@ -1,7 +1,7 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 4ad71899432c2dd721d23812499e7f4385a10cb13467dbf34b4043443888f745
+// sha3: b94dbacf01253c4fc4605d489e98f5929504a78e0baa83381e126895ec61cb59
 use crate::{
-    ast::{self as ast, Ranged},
+    ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
     context::set_context,
@@ -9,7 +9,6 @@ use crate::{
     token::{self, StringKind},
     text_size::TextSize, parser::optional_range
 };
-use num_bigint::BigInt;
 #[allow(unused_extern_crates)]
 extern crate lalrpop_util as __lalrpop_util;
 #[allow(unused_imports)]
@@ -22,7 +21,7 @@ extern crate alloc;
 mod __parse__Top {
 
     use crate::{
-    ast::{self as ast, Ranged},
+    ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
     context::set_context,
@@ -30,7 +29,6 @@ mod __parse__Top {
     token::{self, StringKind},
     text_size::TextSize, parser::optional_range
 };
-    use num_bigint::BigInt;
     #[allow(unused_extern_crates)]
     extern crate lalrpop_util as __lalrpop_util;
     #[allow(unused_imports)]

@@ -4,7 +4,7 @@
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
 use crate::{
-    ast::{self as ast, Ranged},
+    ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, validate_pos_params, validate_arguments},
     context::set_context,
@@ -12,7 +12,6 @@ use crate::{
     token::{self, StringKind},
     text_size::TextSize, parser::optional_range
 };
-use num_bigint::BigInt;
 
 grammar;
 

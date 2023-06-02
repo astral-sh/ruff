@@ -21,7 +21,7 @@ rustpython-ast = { path = "ast", default-features = false }
 rustpython-parser-core = { path = "core", features = [] }
 rustpython-literal = { path = "literal" }
 rustpython-format = { path = "format" }
-rustpython-parser = { path = "parser" }
+rustpython-parser = { path = "parser", default-features = false }
 
 ahash = "0.7.6"
 anyhow = "1.0.45"
@@ -34,6 +34,7 @@ num-complex = "0.4.0"
 num-bigint = "0.4.3"
 num-traits = "0.2"
 pyo3 = { version = "0.18.3" }
+malachite-bigint = { version = "0.1.0" }
 rand = "0.8.5"
 serde = "1.0"
 static_assertions = "1.1"

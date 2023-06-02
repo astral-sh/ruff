@@ -4,8 +4,8 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h
+use crate::ast::bigint::BigInt;
 use crate::{text_size::TextSize, Mode};
-use num_bigint::BigInt;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.

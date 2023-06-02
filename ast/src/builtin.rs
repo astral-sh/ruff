@@ -1,6 +1,6 @@
 //! `builtin_types` in asdl.py and Attributed
 
-use num_bigint::BigInt;
+use crate::bigint::BigInt;
 
 pub type String = std::string::String;
 

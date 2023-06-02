@@ -9,11 +9,13 @@ license = "MIT"
 edition = "2021"
 
 [features]
-default = ["location"]
+default = ["location", "malachite-bigint"]
 location = ["rustpython-ast/location", "rustpython-parser-core/location"]
 serde = ["dep:serde", "rustpython-parser-core/serde"]
 all-nodes-with-ranges = ["rustpython-ast/all-nodes-with-ranges"]
 full-lexer = []
+malachite-bigint = ["dep:malachite-bigint", "rustpython-ast/malachite-bigint"]
+num-bigint = ["dep:num-bigint", "rustpython-ast/num-bigint"]
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -28,7 +30,8 @@ rustpython-parser-core = { workspace = true }
 itertools = { workspace = true }
 is-macro = { workspace = true }
 log = { workspace = true }
-num-bigint = { workspace = true }
+malachite-bigint = { workspace = true, optional = true }
+num-bigint = { workspace = true, optional = true }
 num-traits = { workspace = true }
 unicode_names2 = { workspace = true }
 

@@ -284,7 +284,6 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 /// For example, parsing a single expression denoting the addition of two numbers:
 ///
 ///  ```
-/// extern crate num_bigint;
 /// use rustpython_parser as parser;
 /// let expr = parser::parse_expression("1 + 2", "<embedded>");
 ///
