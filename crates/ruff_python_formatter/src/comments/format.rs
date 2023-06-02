@@ -27,7 +27,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
         for comment in comments.leading_comments(self.node) {
             let slice = comment.slice();
 
-            let lines_after_comment = lines_after(f.context().contents(), slice.end()).max(1);
+            let lines_after_comment = lines_after(f.context().contents(), slice.end());
             write!(
                 f,
                 [
@@ -162,17 +162,15 @@ struct FormatEmptyLines {
 impl Format<PyFormatContext<'_>> for FormatEmptyLines {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match f.context().node_level() {
-            NodeLevel::TopLevel | NodeLevel::Statement => match self.lines {
-                0 => Ok(()),
-                1 => write!(f, [hard_line_break()]),
-                lines => {
-                    write!(f, [empty_line()])?;
-                    if lines > 2 && f.context().node_level().is_top_level() {
-                        write!(f, [empty_line()])?;
-                    }
+            NodeLevel::TopLevel => match self.lines {
+                0 | 1 => write!(f, [hard_line_break()]),
+                2 => write!(f, [empty_line()]),
+                _ => write!(f, [empty_line(), empty_line()]),
+            },
 
-                    Ok(())
-                }
+            NodeLevel::Statement => match self.lines {
+                0 | 1 => write!(f, [hard_line_break()]),
+                _ => write!(f, [empty_line()]),
             },
 
             // Remove all whitespace in parenthesized expressions

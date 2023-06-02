@@ -88,9 +88,3 @@ pub(crate) enum NodeLevel {
     #[allow(unused)]
     Parenthesized,
 }
-
-impl NodeLevel {
-    pub(crate) const fn is_top_level(self) -> bool {
-        matches!(self, Self::TopLevel)
-    }
-}
