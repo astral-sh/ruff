@@ -17,6 +17,7 @@ use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator}
 use crate::comments::{dangling_comments, leading_comments, trailing_comments, Comments};
 use crate::context::PyFormatContext;
 
+pub(crate) mod builders;
 pub mod cli;
 mod comments;
 pub(crate) mod context;
