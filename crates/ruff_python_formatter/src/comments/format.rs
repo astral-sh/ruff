@@ -164,11 +164,19 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
         let slice = self.comment.slice();
         let comment_text = slice.text(SourceCode::new(f.context().contents()));
 
-        let (content, mut start_offset) = comment_text
+        let trimmed = comment_text.trim_end();
+        let trailing_whitespace_len = comment_text.text_len() - trimmed.text_len();
+
+        // Fast path for correctly formatted comments:
+        // * Start with a `#` and are followed by a space
+        // * Have no trailing whitespace.
+        if trailing_whitespace_len == TextSize::new(0) && trimmed.starts_with("# ") {
+            return source_text_slice(slice.range(), ContainsNewlines::No).fmt(f);
+        }
+
+        let (content, mut start_offset) = trimmed
             .strip_prefix('#')
-            .map_or((comment_text, TextSize::new(0)), |rest| {
-                (rest, '#'.text_len())
-            });
+            .map_or((trimmed, TextSize::new(0)), |rest| (rest, '#'.text_len()));
 
         write!(f, [source_position(slice.start()), text("#")])?;
 
@@ -184,8 +192,7 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
         }
 
         let start = slice.start() + start_offset;
-        let trimmed = content.trim_end();
-        let end = slice.range().end() - (content.text_len() - trimmed.text_len());
+        let end = slice.range().end() - trailing_whitespace_len;
 
         write!(
             f,
