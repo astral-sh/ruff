@@ -3976,7 +3976,7 @@ where
                 }
             }
             Expr::JoinedStr(_) => {
-                self.semantic_model.flags |= if self.ctx.in_f_string() {
+                self.semantic_model.flags |= if self.semantic_model.in_f_string() {
                     SemanticModelFlags::NESTED_F_STRING
                 } else {
                     SemanticModelFlags::F_STRING

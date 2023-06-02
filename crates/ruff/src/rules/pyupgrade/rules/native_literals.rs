@@ -53,14 +53,16 @@ pub(crate) fn native_literals(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else { return; };
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
+        return;
+    };
 
     if !keywords.is_empty() || args.len() > 1 {
         return;
     }
 
     // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
-    if checker.ctx.in_nested_f_string() {
+    if checker.semantic_model().in_nested_f_string() {
         return;
     }
 
