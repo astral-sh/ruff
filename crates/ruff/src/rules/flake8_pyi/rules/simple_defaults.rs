@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, Stmt, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -61,6 +61,35 @@ impl Violation for UnannotatedAssignmentInStub {
     fn message(&self) -> String {
         let UnannotatedAssignmentInStub { name } = self;
         format!("Need type annotation for `{name}`")
+    }
+}
+
+#[violation]
+pub struct UnassignedSpecialVariableInStub {
+    name: String,
+}
+
+/// ## What it does
+/// Checks that `__all__`, `__match_args__` and `__slots__` variables in stubs are assigned values.
+///
+/// ## Why is this bad?
+/// These special variables have the same semantics in stub files as they do in Python modules
+/// so they should be consistent with their counterparts.
+///
+/// ## Example
+/// ```python
+/// __all__ : list[str]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// __all__ : list[str] = ["foo", "bar"]
+/// ```
+impl Violation for UnassignedSpecialVariableInStub {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnassignedSpecialVariableInStub { name } = self;
+        format!("`{name}` in a stub file must be assigned a value")
     }
 }
 
@@ -526,5 +555,27 @@ pub(crate) fn unannotated_assignment_in_stub(
             name: id.to_string(),
         },
         value.range(),
+    ));
+}
+
+/// PYI035
+pub(crate) fn unassigned_special_variable_in_stub(
+    checker: &mut Checker,
+    target: &Expr,
+    stmt: &Stmt,
+) {
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return;
+    };
+
+    if !is_special_assignment(checker.semantic_model(), target) {
+        return;
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        UnassignedSpecialVariableInStub {
+            name: id.to_string(),
+        },
+        stmt.range(),
     ));
 }

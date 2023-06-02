@@ -1789,6 +1789,12 @@ where
                                 );
                             }
                         }
+                    } else {
+                        if self.enabled(Rule::AssignmentDefaultInStub) {
+                            flake8_pyi::rules::unassigned_special_variable_in_stub(
+                                self, target, stmt,
+                            );
+                        }
                     }
                     if self
                         .semantic_model
