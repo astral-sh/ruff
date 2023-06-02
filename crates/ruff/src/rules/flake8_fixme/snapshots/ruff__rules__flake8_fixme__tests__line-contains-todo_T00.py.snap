@@ -1,0 +1,21 @@
+---
+source: crates/ruff/src/rules/flake8_fixme/mod.rs
+---
+T00.py:1:3: T002 Line contains TODO
+  |
+1 | # TODO: todo
+  |   ^^^^ T002
+2 | # todo: todo
+3 | # XXX: xxx
+  |
+
+T00.py:2:3: T002 Line contains TODO
+  |
+2 | # TODO: todo
+3 | # todo: todo
+  |   ^^^^ T002
+4 | # XXX: xxx
+5 | # xxx: xxx
+  |
+
+
