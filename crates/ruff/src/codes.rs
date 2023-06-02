@@ -602,6 +602,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "048") => (RuleGroup::Unspecified, Rule::StubBodyMultipleStatements),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
         (Flake8Pyi, "054") => (RuleGroup::Unspecified, Rule::NumericLiteralTooLong),
+        (Flake8Pyi, "053") => (RuleGroup::Unspecified, Rule::StringOrBytesTooLong),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Unspecified, Rule::PytestFixtureIncorrectParenthesesStyle),

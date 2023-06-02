@@ -118,28 +118,6 @@ fn is_valid_default_value_with_annotation(
                     }) && is_valid_default_value_with_annotation(v, false, locator, model)
                 });
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Ellipsis | Constant::None,
-            ..
-        }) => {
-            return true;
-        }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
-            ..
-        }) => return locator.slice(default.range()).len() <= 50,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bytes(..),
-            ..
-        }) => return locator.slice(default.range()).len() <= 50,
-        // Ex) `123`, `True`, `False`, `3.14`, `2j`
-        Expr::Constant(ast::ExprConstant {
-            value:
-                Constant::Int(..) | Constant::Bool(..) | Constant::Float(..) | Constant::Complex { .. },
-            ..
-        }) => {
-            return true;
-        }
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::USub,
             operand,

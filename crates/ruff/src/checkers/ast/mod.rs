@@ -3420,6 +3420,14 @@ where
                 }
             }
             Expr::Constant(ast::ExprConstant {
+                value: Constant::Bytes(_),
+                ..
+            }) => {
+                if self.is_stub && self.enabled(Rule::StringOrBytesTooLong) {
+                    flake8_pyi::rules::string_or_bytes_too_long(self, expr);
+                }
+            }
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Str(value),
                 kind,
                 range: _,
@@ -3452,6 +3460,9 @@ where
                 }
                 if self.enabled(Rule::UnicodeKindPrefix) {
                     pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
+                }
+                if self.is_stub && self.enabled(Rule::StringOrBytesTooLong) {
+                    flake8_pyi::rules::string_or_bytes_too_long(self, expr);
                 }
             }
             Expr::Lambda(
