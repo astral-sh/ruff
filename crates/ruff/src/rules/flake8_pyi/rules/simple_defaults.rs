@@ -96,6 +96,9 @@ fn is_valid_default_value_with_annotation(
     model: &SemanticModel,
 ) -> bool {
     match default {
+        Expr::Constant(_) => {
+            return true;
+        }
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::Set(ast::ExprSet { elts, range: _ }) => {
