@@ -684,9 +684,24 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 /// callable.
 pub fn map_callable(decorator: &Expr) -> &Expr {
     if let Expr::Call(ast::ExprCall { func, .. }) = decorator {
+        // Ex) `@decorator()`
         func
     } else {
+        // Ex) `@decorator`
         decorator
+    }
+}
+
+/// Given an [`Expr`] that can be callable or not (like a decorator, which could
+/// be used with or without explicit call syntax), return the underlying
+/// callable.
+pub fn map_subscript(expr: &Expr) -> &Expr {
+    if let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr {
+        // Ex) `Iterable[T]`
+        value
+    } else {
+        // Ex) `Iterable`
+        expr
     }
 }
 

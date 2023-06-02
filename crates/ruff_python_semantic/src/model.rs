@@ -93,6 +93,10 @@ impl<'a> SemanticModel<'a> {
             return true;
         }
 
+        if call_path.as_slice() == ["_typeshed", target] {
+            return true;
+        }
+
         if TYPING_EXTENSIONS.contains(target) {
             if call_path.as_slice() == ["typing_extensions", target] {
                 return true;

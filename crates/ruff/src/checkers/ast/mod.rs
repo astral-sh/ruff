@@ -436,6 +436,17 @@ where
                     if self.enabled(Rule::AnyEqNeAnnotation) {
                         flake8_pyi::rules::any_eq_ne_annotation(self, name, args);
                     }
+                    if self.enabled(Rule::NonSelfReturnType) {
+                        flake8_pyi::rules::non_self_return_type(
+                            self,
+                            stmt,
+                            name,
+                            decorator_list,
+                            returns.as_ref().map(|expr| &**expr),
+                            args,
+                            stmt.is_async_function_def_stmt(),
+                        );
+                    }
                 }
 
                 if self.enabled(Rule::DunderFunctionName) {
@@ -652,16 +663,14 @@ where
                     pylint::rules::return_in_init(self, stmt);
                 }
             }
-            Stmt::ClassDef(
-                class @ ast::StmtClassDef {
-                    name,
-                    bases,
-                    keywords,
-                    decorator_list,
-                    body,
-                    range: _,
-                },
-            ) => {
+            Stmt::ClassDef(ast::StmtClassDef {
+                name,
+                bases,
+                keywords,
+                decorator_list,
+                body,
+                range: _,
+            }) => {
                 if self.enabled(Rule::DjangoNullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
@@ -746,9 +755,6 @@ where
                     }
                     if self.enabled(Rule::EllipsisInNonEmptyClassBody) {
                         flake8_pyi::rules::ellipsis_in_non_empty_class_body(self, stmt, body);
-                    }
-                    if self.enabled(Rule::FixedReturnType) {
-                        flake8_pyi::rules::fixed_return_type(self, class);
                     }
                 }
 

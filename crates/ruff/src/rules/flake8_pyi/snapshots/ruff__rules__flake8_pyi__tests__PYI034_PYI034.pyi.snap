@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-PYI034.pyi:8:50: PYI034 __new__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+PYI034.pyi:8:50: PYI034 `__new__` methods in classes like `Bad` usually return `self` at runtime
    |
  8 | class Bad:
  9 |   def __new__(cls, *args: Any, **kwargs: Any) -> Bad: ...  # Y034
@@ -9,8 +9,9 @@ PYI034.pyi:8:50: PYI034 __new__ methods on classes usually return `self` at runt
 10 |   def __enter__(self) -> Bad: ...  # Y034
 11 |   async def __aenter__(self) -> Bad: ...  # Y034
    |
+   = help: Consider using `typing_extensions.Self` as return type
 
-PYI034.pyi:9:26: PYI034 __enter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+PYI034.pyi:9:26: PYI034 `__enter__` methods in classes like `Bad` usually return `self` at runtime
    |
  9 | class Bad:
 10 |   def __new__(cls, *args: Any, **kwargs: Any) -> Bad: ...  # Y034
@@ -19,8 +20,9 @@ PYI034.pyi:9:26: PYI034 __enter__ methods on classes usually return `self` at ru
 12 |   async def __aenter__(self) -> Bad: ...  # Y034
 13 |   def __iadd__(self, other: Bad) -> Bad: ...  # Y034
    |
+   = help: Consider using `typing_extensions.Self` as return type
 
-PYI034.pyi:10:33: PYI034 __aenter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+PYI034.pyi:10:33: PYI034 `__aenter__` methods in classes like `Bad` usually return `self` at runtime
    |
 10 |   def __new__(cls, *args: Any, **kwargs: Any) -> Bad: ...  # Y034
 11 |   def __enter__(self) -> Bad: ...  # Y034
@@ -28,8 +30,19 @@ PYI034.pyi:10:33: PYI034 __aenter__ methods on classes usually return `self` at 
    |                                 ^^^ PYI034
 13 |   def __iadd__(self, other: Bad) -> Bad: ...  # Y034
    |
+   = help: Consider using `typing_extensions.Self` as return type
 
-PYI034.pyi:11:37: PYI034 __iadd__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+PYI034.pyi:10:33: PYI034 `__aenter__` methods in classes like `Bad` usually return `self` at runtime
+   |
+10 |   def __new__(cls, *args: Any, **kwargs: Any) -> Bad: ...  # Y034
+11 |   def __enter__(self) -> Bad: ...  # Y034
+12 |   async def __aenter__(self) -> Bad: ...  # Y034
+   |                                 ^^^ PYI034
+13 |   def __iadd__(self, other: Bad) -> Bad: ...  # Y034
+   |
+   = help: Consider using `typing_extensions.Self` as return type
+
+PYI034.pyi:11:37: PYI034 `__iadd__` methods in classes like `Bad` usually return `self` at runtime
    |
 11 |   def __enter__(self) -> Bad: ...  # Y034
 12 |   async def __aenter__(self) -> Bad: ...  # Y034
@@ -38,27 +51,66 @@ PYI034.pyi:11:37: PYI034 __iadd__ methods on classes usually return `self` at ru
 14 | 
 15 |   class Good:
    |
+   = help: Consider using `typing_extensions.Self` as return type
 
-PYI034.pyi:40:25: PYI034 __iter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+PYI034.pyi:33:52: PYI034 `__new__` methods in classes like `WillNotBeSubclassed` usually return `self` at runtime
    |
-40 | class BadIterator1(Iterator[int]):
-41 |   def __iter__(self) -> Iterator[int]: ...  # Y034
-   |                         ^^^^^^^^^^^^^ PYI034
+33 | @final
+34 | class WillNotBeSubclassed:
+35 |     def __new__(cls, *args: Any, **kwargs: Any) -> WillNotBeSubclassed: ...
+   |                                                    ^^^^^^^^^^^^^^^^^^^ PYI034
+36 |     def __enter__(self) -> WillNotBeSubclassed: ...
+37 |     async def __aenter__(self) -> WillNotBeSubclassed: ...
    |
+   = help: Consider using `typing_extensions.Self` as return type
 
-PYI034.pyi:45:27: PYI034 __iter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+PYI034.pyi:34:28: PYI034 `__enter__` methods in classes like `WillNotBeSubclassed` usually return `self` at runtime
    |
-45 | class BadIterator2(Iterator[int]):
-46 |     # Note: *Iterable*, not *Iterator*, returned!
-47 |     def __iter__(self) -> Iterable[int]: ...  # Y034
-   |                           ^^^^^^^^^^^^^ PYI034
+34 | class WillNotBeSubclassed:
+35 |     def __new__(cls, *args: Any, **kwargs: Any) -> WillNotBeSubclassed: ...
+36 |     def __enter__(self) -> WillNotBeSubclassed: ...
+   |                            ^^^^^^^^^^^^^^^^^^^ PYI034
+37 |     async def __aenter__(self) -> WillNotBeSubclassed: ...
    |
+   = help: Consider using `typing_extensions.Self` as return type
 
-PYI034.pyi:49:28: PYI034 __aiter__ methods on classes usually return `self` at runtime. Consider using `typing_extensions.Self` as return type
+PYI034.pyi:35:35: PYI034 `__aenter__` methods in classes like `WillNotBeSubclassed` usually return `self` at runtime
    |
-49 | class BadAsyncIterator(AsyncIterator[str]):
-50 |     def __aiter__(self) -> AsyncIterator[str]: ...  # Y034
-   |                            ^^^^^^^^^^^^^^^^^^ PYI034
+35 |     def __new__(cls, *args: Any, **kwargs: Any) -> WillNotBeSubclassed: ...
+36 |     def __enter__(self) -> WillNotBeSubclassed: ...
+37 |     async def __aenter__(self) -> WillNotBeSubclassed: ...
+   |                                   ^^^^^^^^^^^^^^^^^^^ PYI034
    |
+   = help: Consider using `typing_extensions.Self` as return type
+
+PYI034.pyi:61:52: PYI034 `__new__` methods in classes like `WillNotBeSubclassed` usually return `self` at runtime
+   |
+61 | @final
+62 | class WillNotBeSubclassed:
+63 |     def __new__(cls, *args: Any, **kwargs: Any) -> WillNotBeSubclassed: ...
+   |                                                    ^^^^^^^^^^^^^^^^^^^ PYI034
+64 |     def __enter__(self) -> WillNotBeSubclassed: ...
+65 |     async def __aenter__(self) -> WillNotBeSubclassed: ...
+   |
+   = help: Consider using `typing_extensions.Self` as return type
+
+PYI034.pyi:62:28: PYI034 `__enter__` methods in classes like `WillNotBeSubclassed` usually return `self` at runtime
+   |
+62 | class WillNotBeSubclassed:
+63 |     def __new__(cls, *args: Any, **kwargs: Any) -> WillNotBeSubclassed: ...
+64 |     def __enter__(self) -> WillNotBeSubclassed: ...
+   |                            ^^^^^^^^^^^^^^^^^^^ PYI034
+65 |     async def __aenter__(self) -> WillNotBeSubclassed: ...
+   |
+   = help: Consider using `typing_extensions.Self` as return type
+
+PYI034.pyi:63:35: PYI034 `__aenter__` methods in classes like `WillNotBeSubclassed` usually return `self` at runtime
+   |
+63 |     def __new__(cls, *args: Any, **kwargs: Any) -> WillNotBeSubclassed: ...
+64 |     def __enter__(self) -> WillNotBeSubclassed: ...
+65 |     async def __aenter__(self) -> WillNotBeSubclassed: ...
+   |                                   ^^^^^^^^^^^^^^^^^^^ PYI034
+   |
+   = help: Consider using `typing_extensions.Self` as return type
 
 
