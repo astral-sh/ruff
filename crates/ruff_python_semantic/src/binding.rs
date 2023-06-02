@@ -101,6 +101,35 @@ impl<'a> Binding<'a> {
         )
     }
 
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn qualified_name(&self) -> Option<&str> {
+        match &self.kind {
+            BindingKind::Importation(Importation { full_name }) => Some(full_name),
+            BindingKind::FromImportation(FromImportation { full_name }) => Some(full_name),
+            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => {
+                Some(full_name)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the fully-qualified name of the module from which this symbol was imported, if this
+    /// symbol was imported from another module.
+    pub fn module_name(&self) -> Option<&str> {
+        match &self.kind {
+            BindingKind::Importation(Importation { full_name })
+            | BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => {
+                Some(full_name.split('.').next().unwrap_or(full_name))
+            }
+            BindingKind::FromImportation(FromImportation { full_name }) => Some(
+                full_name
+                    .rsplit_once('.')
+                    .map_or(full_name, |(module, _)| module),
+            ),
+            _ => None,
+        }
+    }
+
     /// Returns the appropriate visual range for highlighting this binding.
     pub fn trimmed_range(&self, semantic_model: &SemanticModel, locator: &Locator) -> TextRange {
         match self.kind {
