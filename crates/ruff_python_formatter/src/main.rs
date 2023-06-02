@@ -4,8 +4,7 @@ use std::{fs, io};
 use anyhow::{bail, Context, Result};
 use clap::Parser as ClapParser;
 
-use ruff_python_formatter::cli::{Cli, Emit};
-use ruff_python_formatter::format_module;
+use ruff_python_formatter::cli::{format_and_debug_print, Cli, Emit};
 
 /// Read a `String` from `stdin`.
 pub(crate) fn read_from_stdin() -> Result<String> {
@@ -26,23 +25,23 @@ fn main() -> Result<()> {
             );
         }
         let input = read_from_stdin()?;
-        let formatted = format_module(&input)?;
+        let formatted = format_and_debug_print(&input, &cli)?;
         if cli.check {
-            if formatted.as_code() == input {
+            if formatted == input {
                 return Ok(());
             }
             bail!("Content not correctly formatted")
         }
-        stdout().lock().write_all(formatted.as_code().as_bytes())?;
+        stdout().lock().write_all(formatted.as_bytes())?;
     } else {
-        for file in cli.files {
-            let unformatted = fs::read_to_string(&file)
+        for file in &cli.files {
+            let input = fs::read_to_string(file)
                 .with_context(|| format!("Could not read {}: ", file.display()))?;
-            let formatted = format_module(&unformatted)?;
+            let formatted = format_and_debug_print(&input, &cli)?;
             match cli.emit {
-                Some(Emit::Stdout) => stdout().lock().write_all(formatted.as_code().as_bytes())?,
+                Some(Emit::Stdout) => stdout().lock().write_all(formatted.as_bytes())?,
                 None | Some(Emit::Files) => {
-                    fs::write(&file, formatted.as_code().as_bytes()).with_context(|| {
+                    fs::write(file, formatted.as_bytes()).with_context(|| {
                         format!("Could not write to {}, exiting", file.display())
                     })?;
                 }
