@@ -18,6 +18,7 @@ pub(super) fn place_comment<'a>(
         .or_else(|comment| handle_match_comment(comment, locator))
         .or_else(|comment| handle_in_between_bodies_comment(comment, locator))
         .or_else(|comment| handle_trailing_body_comment(comment, locator))
+        .or_else(handle_trailing_end_of_line_body_comment)
         .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
         .or_else(|comment| {
             handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
@@ -398,6 +399,41 @@ fn handle_trailing_body_comment<'a>(
                 }
             }
         }
+    }
+}
+
+/// Handles end of line comments of the last statement in an indented body:
+///
+/// ```python
+/// while True:
+///     if something.changed:
+///         do.stuff()  # trailing comment
+/// ```
+fn handle_trailing_end_of_line_body_comment(comment: DecoratedComment<'_>) -> CommentPlacement<'_> {
+    // Must be an end of line comment
+    if comment.text_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Must be *after* a statement
+    let Some(preceding) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Recursively get the last child of statements with a body.
+    let last_children = std::iter::successors(last_child_in_body(preceding), |parent| {
+        last_child_in_body(*parent)
+    });
+
+    if let Some(last_child) = last_children.last() {
+        CommentPlacement::trailing(last_child, comment)
+    } else {
+        // End of line comment of a statement that has no body. This is not what we're looking for.
+        // ```python
+        // a # trailing comment
+        // b
+        //  ```
+        CommentPlacement::Default(comment)
     }
 }
 
