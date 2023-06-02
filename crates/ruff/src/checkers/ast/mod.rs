@@ -49,7 +49,7 @@ use crate::rules::{
     flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
     flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
     flake8_simplify, flake8_slots, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming,
+    flake8_unused_arguments, flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming, perflint
     pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
@@ -1588,6 +1588,9 @@ where
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
                     }
                 }
+                if self.enabled(Rule::IncorrectDictIterator) {
+                    perflint::rules::incorrect_dict_iterator(self, target, iter);
+                }
             }
             Stmt::Try(ast::StmtTry {
                 body,
@@ -2459,12 +2462,14 @@ where
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                args,
-                keywords,
-                range: _,
-            }) => {
+            Expr::Call(
+                call @ ast::ExprCall {
+                    func,
+                    args,
+                    keywords,
+                    range: _,
+                },
+            ) => {
                 if self.any_enabled(&[
                     // pyflakes
                     Rule::StringDotFormatInvalidFormat,

@@ -780,6 +780,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // airflow
         (Airflow, "001") => (RuleGroup::Unspecified, rules::airflow::rules::AirflowVariableNameTaskIdMismatch),
 
+        // perflint
+        (Perflint, "8102") => (RuleGroup::Unspecified, rules::perflint::rules::IncorrectDictIterator),
+
         // flake8-fixme
         (Flake8Fixme, "001") => (RuleGroup::Unspecified, rules::flake8_fixme::rules::LineContainsFixme),
         (Flake8Fixme, "002") => (RuleGroup::Unspecified, rules::flake8_fixme::rules::LineContainsTodo),

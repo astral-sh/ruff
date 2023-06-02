@@ -1,0 +1,5 @@
+---
+source: crates/ruff/src/rules/perflint/mod.rs
+assertion_line: 24
+---
+
