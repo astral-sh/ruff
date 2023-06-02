@@ -30,9 +30,8 @@ fn main() -> Result<()> {
         if cli.check {
             if formatted.as_code() == input {
                 return Ok(());
-            } else {
-                bail!("Content not correctly formatted")
             }
+            bail!("Content not correctly formatted")
         }
         stdout().lock().write_all(formatted.as_code().as_bytes())?;
     } else {
