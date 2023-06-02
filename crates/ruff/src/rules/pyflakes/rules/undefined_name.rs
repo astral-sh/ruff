@@ -23,7 +23,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// - [Python documentation](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)
 #[violation]
 pub struct UndefinedName {
-    pub name: String,
+    pub(crate) name: String,
 }
 
 impl Violation for UndefinedName {

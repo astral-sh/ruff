@@ -3,14 +3,13 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::FxHashMap;
 use rustpython_format::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     self, Arg, Arguments, Comprehension, Constant, Excepthandler, Expr, ExprContext, Keyword,
     Operator, Pattern, Ranged, Stmt, Suite, Unaryop,
 };
 
-use ruff_diagnostics::{Diagnostic, Fix, IsolationLevel};
+use ruff_diagnostics::{Diagnostic, IsolationLevel};
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::source_code::{Generator, Indexer, Locator, Quote, Stylist};
@@ -31,7 +30,6 @@ use ruff_python_semantic::context::ExecutionContext;
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::globals::Globals;
 use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
-use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -56,7 +54,7 @@ use crate::rules::{
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::{autofix, docstrings, noqa, warn_user};
+use crate::{docstrings, noqa, warn_user};
 
 mod deferred;
 
@@ -189,6 +187,10 @@ impl<'a> Checker<'a> {
 
     pub(crate) const fn package(&self) -> Option<&'a Path> {
         self.package
+    }
+
+    pub(crate) const fn path(&self) -> &'a Path {
+        self.path
     }
 
     /// Returns whether the given rule should be checked.
@@ -1587,7 +1589,7 @@ where
                 if self.enabled(Rule::IterationOverSet) {
                     pylint::rules::iteration_over_set(self, iter);
                 }
-                if matches!(stmt, Stmt::For(_)) {
+                if stmt.is_for_stmt() {
                     if self.enabled(Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
@@ -5130,7 +5132,7 @@ impl<'a> Checker<'a> {
                     if binding.kind.is_global() {
                         if let Some(source) = binding.source {
                             let stmt = &self.semantic_model.stmts[source];
-                            if matches!(stmt, Stmt::Global(_)) {
+                            if stmt.is_global_stmt() {
                                 diagnostics.push(Diagnostic::new(
                                     pylint::rules::GlobalVariableNotAssigned {
                                         name: (*name).to_string(),
@@ -5229,146 +5231,7 @@ impl<'a> Checker<'a> {
             }
 
             if self.enabled(Rule::UnusedImport) {
-                // Collect all unused imports by location. (Multiple unused imports at the same
-                // location indicates an `import from`.)
-                type UnusedImport<'a> = (&'a str, &'a TextRange);
-                type BindingContext<'a> = (NodeId, Option<NodeId>, Exceptions);
-
-                let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
-                let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
-                    FxHashMap::default();
-
-                for binding_id in scope.binding_ids() {
-                    let binding = &self.semantic_model.bindings[binding_id];
-
-                    if binding.is_used() || binding.is_explicit_export() {
-                        continue;
-                    }
-
-                    let full_name = match &binding.kind {
-                        BindingKind::Importation(Importation { full_name, .. }) => full_name,
-                        BindingKind::FromImportation(FromImportation { full_name, .. }) => {
-                            full_name.as_str()
-                        }
-                        BindingKind::SubmoduleImportation(SubmoduleImportation {
-                            full_name,
-                            ..
-                        }) => full_name,
-                        _ => continue,
-                    };
-
-                    let stmt_id = binding.source.unwrap();
-                    let parent_id = self.semantic_model.stmts.parent_id(stmt_id);
-
-                    let exceptions = binding.exceptions;
-                    let diagnostic_offset = binding.range.start();
-                    let stmt = &self.semantic_model.stmts[stmt_id];
-                    let parent_offset = if matches!(stmt, Stmt::ImportFrom(_)) {
-                        Some(stmt.start())
-                    } else {
-                        None
-                    };
-
-                    if self.rule_is_ignored(Rule::UnusedImport, diagnostic_offset)
-                        || parent_offset.map_or(false, |parent_offset| {
-                            self.rule_is_ignored(Rule::UnusedImport, parent_offset)
-                        })
-                    {
-                        ignored
-                            .entry((stmt_id, parent_id, exceptions))
-                            .or_default()
-                            .push((full_name, &binding.range));
-                    } else {
-                        unused
-                            .entry((stmt_id, parent_id, exceptions))
-                            .or_default()
-                            .push((full_name, &binding.range));
-                    }
-                }
-
-                let in_init =
-                    self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
-                for ((stmt_id, parent_id, exceptions), unused_imports) in unused
-                    .into_iter()
-                    .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
-                {
-                    let stmt = self.semantic_model.stmts[stmt_id];
-                    let parent = parent_id.map(|parent_id| self.semantic_model.stmts[parent_id]);
-                    let multiple = unused_imports.len() > 1;
-                    let in_except_handler = exceptions
-                        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
-
-                    let fix = if !in_init && !in_except_handler && self.patch(Rule::UnusedImport) {
-                        autofix::edits::remove_unused_imports(
-                            unused_imports.iter().map(|(full_name, _)| *full_name),
-                            stmt,
-                            parent,
-                            self.locator,
-                            self.indexer,
-                            self.stylist,
-                        )
-                        .ok()
-                    } else {
-                        None
-                    };
-
-                    for (full_name, range) in unused_imports {
-                        let mut diagnostic = Diagnostic::new(
-                            pyflakes::rules::UnusedImport {
-                                name: full_name.to_string(),
-                                context: if in_except_handler {
-                                    Some(pyflakes::rules::UnusedImportContext::ExceptHandler)
-                                } else if in_init {
-                                    Some(pyflakes::rules::UnusedImportContext::Init)
-                                } else {
-                                    None
-                                },
-                                multiple,
-                            },
-                            *range,
-                        );
-                        if matches!(stmt, Stmt::ImportFrom(_)) {
-                            diagnostic.set_parent(stmt.start());
-                        }
-                        if let Some(edit) = fix.as_ref() {
-                            diagnostic.set_fix(Fix::automatic(edit.clone()).isolate(
-                                parent_id.map_or(IsolationLevel::default(), |node_id| {
-                                    IsolationLevel::Group(node_id.into())
-                                }),
-                            ));
-                        }
-                        diagnostics.push(diagnostic);
-                    }
-                }
-                for ((stmt_id, .., exceptions), unused_imports) in ignored
-                    .into_iter()
-                    .sorted_by_key(|((stmt_id, ..), ..)| *stmt_id)
-                {
-                    let stmt = self.semantic_model.stmts[stmt_id];
-                    let multiple = unused_imports.len() > 1;
-                    let in_except_handler = exceptions
-                        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
-                    for (full_name, range) in unused_imports {
-                        let mut diagnostic = Diagnostic::new(
-                            pyflakes::rules::UnusedImport {
-                                name: full_name.to_string(),
-                                context: if in_except_handler {
-                                    Some(pyflakes::rules::UnusedImportContext::ExceptHandler)
-                                } else if in_init {
-                                    Some(pyflakes::rules::UnusedImportContext::Init)
-                                } else {
-                                    None
-                                },
-                                multiple,
-                            },
-                            *range,
-                        );
-                        if matches!(stmt, Stmt::ImportFrom(_)) {
-                            diagnostic.set_parent(stmt.start());
-                        }
-                        diagnostics.push(diagnostic);
-                    }
-                }
+                pyflakes::rules::unused_import(self, scope, &mut diagnostics);
             }
         }
         self.diagnostics.extend(diagnostics);
