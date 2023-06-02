@@ -73,7 +73,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 if let Some(stmt) = orelse.first() {
                     // `elif:` and `else: if:` have the same AST representation.
                     // Avoid treating `elif:` as two statements.
-                    if !matches!(stmt, Stmt::If(_)) {
+                    if !stmt.is_if_stmt() {
                         count += 1;
                     }
                     count += num_statements(orelse);
