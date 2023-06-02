@@ -1,5 +1,9 @@
 # https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes#configuring-automatically-generated-release-notes
 changelog:
+  exclude:
+    labels:
+      - internal
+      - documentation
   categories:
     - title: Breaking Changes
       labels:
@@ -11,6 +15,7 @@ changelog:
     - title: Settings
       labels:
         - configuration
+        - cli
     - title: Bug Fixes
       labels:
         - bug
