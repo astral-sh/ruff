@@ -25,7 +25,6 @@ impl<'a> PyFormatContext<'a> {
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn contents(&self) -> &'a str {
         self.contents
     }
@@ -35,7 +34,6 @@ impl<'a> PyFormatContext<'a> {
         Locator::new(self.contents)
     }
 
-    #[allow(unused)]
     pub(crate) fn set_node_level(&mut self, level: NodeLevel) {
         self.node_level = level;
     }
@@ -44,7 +42,6 @@ impl<'a> PyFormatContext<'a> {
         self.node_level
     }
 
-    #[allow(unused)]
     pub(crate) fn comments(&self) -> &Comments<'a> {
         &self.comments
     }
@@ -80,11 +77,9 @@ pub(crate) enum NodeLevel {
     #[default]
     TopLevel,
 
-    /// Formatting nodes that are enclosed by a statement.
-    #[allow(unused)]
-    Statement,
+    /// Formatting nodes that are enclosed by a compound statement (`if`, `while`, `match`, etc.).
+    CompoundStatement,
 
     /// Formatting nodes that are enclosed in a parenthesized expression.
-    #[allow(unused)]
     Parenthesized,
 }

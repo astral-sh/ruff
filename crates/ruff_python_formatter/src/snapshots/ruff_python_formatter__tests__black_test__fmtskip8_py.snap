@@ -100,20 +100,24 @@ async def test_async_with():
  # Make sure a leading comment is not removed.
  if  unformatted_call(  args  ):  # fmt: skip
      print("First branch")
-@@ -30,33 +23,21 @@
+@@ -29,34 +22,22 @@
+ elif  another_unformatted_call(  args  ):  # fmt: skip
      print("Second branch")
  else  :  # fmt: skip
-     print("Last branch")
+-    print("Last branch")
 -
 -
- while  some_condition(  unformatted,  args  ):  # fmt: skip
+-while  some_condition(  unformatted,  args  ):  # fmt: skip
++    print("Last branch")  # fmt: skip
++while some_condition(  unformatted,  args  ):  # fmt: skip
      print("Do something")
 -
 -
  for  i  in  some_iter(  unformatted,  args  ):  # fmt: skip
-     print("Do something")
+-    print("Do something")
 -
 -
++    print("Do something")  # fmt: skip
  async def test_async_for():
      async  for  i  in  some_async_iter(  unformatted,  args  ):  # fmt: skip
          print("Do something")
@@ -128,9 +132,10 @@ async def test_async_with():
 -
 -
  with  give_me_context(  unformatted,  args  ):  # fmt: skip
-     print("Do something")
+-    print("Do something")
 -
 -
++    print("Do something")  # fmt: skip
  async def test_async_with():
      async  with  give_me_async_context(  unformatted,  args  ):  # fmt: skip
          print("Do something")
@@ -163,11 +168,11 @@ if  unformatted_call(  args  ):  # fmt: skip
 elif  another_unformatted_call(  args  ):  # fmt: skip
     print("Second branch")
 else  :  # fmt: skip
-    print("Last branch")
-while  some_condition(  unformatted,  args  ):  # fmt: skip
+    print("Last branch")  # fmt: skip
+while some_condition(  unformatted,  args  ):  # fmt: skip
     print("Do something")
 for  i  in  some_iter(  unformatted,  args  ):  # fmt: skip
-    print("Do something")
+    print("Do something")  # fmt: skip
 async def test_async_for():
     async  for  i  in  some_async_iter(  unformatted,  args  ):  # fmt: skip
         print("Do something")
@@ -178,7 +183,7 @@ except  UnformattedError  as  ex:  # fmt: skip
 finally  :  # fmt: skip
     finally_call()
 with  give_me_context(  unformatted,  args  ):  # fmt: skip
-    print("Do something")
+    print("Do something")  # fmt: skip
 async def test_async_with():
     async  with  give_me_async_context(  unformatted,  args  ):  # fmt: skip
         print("Do something")

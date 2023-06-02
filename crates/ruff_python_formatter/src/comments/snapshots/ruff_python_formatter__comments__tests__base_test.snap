@@ -19,19 +19,19 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: ExprCompare,
-        range: 51..57,
-        source: `x == y`,
+        kind: StmtIf,
+        range: 48..212,
+        source: `if x == y: # if statement e...ne comment⏎`,
     }: {
         "leading": [],
-        "dangling": [],
-        "trailing": [
+        "dangling": [
             SourceComment {
                 text: "# if statement end of line comment",
                 position: EndOfLine,
                 formatted: false,
             },
         ],
+        "trailing": [],
     },
     Node {
         kind: StmtIf,

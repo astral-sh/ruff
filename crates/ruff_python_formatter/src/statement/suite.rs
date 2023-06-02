@@ -28,10 +28,15 @@ impl Default for FormatSuite {
 
 impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
-        let mut joiner = f.join_nodes(match self.level {
+        let node_level = match self.level {
             SuiteLevel::TopLevel => NodeLevel::TopLevel,
-            SuiteLevel::Nested => NodeLevel::Statement,
-        });
+            SuiteLevel::Nested => NodeLevel::CompoundStatement,
+        };
+
+        let saved_level = f.context().node_level();
+        f.context_mut().set_node_level(node_level);
+
+        let mut joiner = f.join_nodes(node_level);
 
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
@@ -67,7 +72,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             is_last_function_or_class_definition = is_current_function_or_class_definition;
         }
 
-        joiner.finish()
+        let result = joiner.finish();
+
+        f.context_mut().set_node_level(saved_level);
+
+        result
     }
 }
 

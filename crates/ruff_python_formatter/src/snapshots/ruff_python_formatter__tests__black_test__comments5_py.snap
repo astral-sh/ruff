@@ -86,20 +86,20 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -1,11 +1,6 @@
+@@ -1,11 +1,9 @@
  while True:
      if something.changed:
 -        do.stuff()  # trailing comment
 -        # Comment belongs to the `if` block.
--    # This one belongs to the `while` block.
--
--    # Should this one, too?  I guess so.
--
 +        do.stuff()
+     # This one belongs to the `while` block.
+ 
+     # Should this one, too?  I guess so.
+-
  # This one is properly standalone now.
  
  for i in range(100):
-@@ -15,27 +10,18 @@
+@@ -15,27 +13,18 @@
  
      # then we do this
      print(i)
@@ -127,7 +127,7 @@ if __name__ == "__main__":
  # SECTION COMMENT
  
  
-@@ -47,8 +33,6 @@
+@@ -47,8 +36,6 @@
  @deco3
  def decorated1():
      ...
@@ -136,7 +136,7 @@ if __name__ == "__main__":
  # leading 1
  @deco1
  # leading 2
-@@ -56,18 +40,12 @@
+@@ -56,18 +43,12 @@
  # leading function comment
  def decorated1():
      ...
@@ -163,6 +163,9 @@ if __name__ == "__main__":
 while True:
     if something.changed:
         do.stuff()
+    # This one belongs to the `while` block.
+
+    # Should this one, too?  I guess so.
 # This one is properly standalone now.
 
 for i in range(100):

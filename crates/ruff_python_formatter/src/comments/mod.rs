@@ -103,7 +103,10 @@ use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
-pub(crate) use format::{dangling_comments, leading_comments, trailing_comments};
+pub(crate) use format::{
+    dangling_node_comments, leading_alternate_branch_comments, leading_node_comments,
+    trailing_comments, trailing_node_comments,
+};
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::CommentRanges;
@@ -121,8 +124,6 @@ pub(crate) struct SourceComment {
     position: CommentTextPosition,
 }
 
-#[allow(unused)]
-// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl SourceComment {
     /// Returns the location of the comment in the original source code.
     /// Allows retrieving the text of the comment.
@@ -184,8 +185,6 @@ pub(crate) enum CommentTextPosition {
     OwnLine,
 }
 
-#[allow(unused)]
-// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl CommentTextPosition {
     pub(crate) const fn is_own_line(self) -> bool {
         matches!(self, CommentTextPosition::OwnLine)

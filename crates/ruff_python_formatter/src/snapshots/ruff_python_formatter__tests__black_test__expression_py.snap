@@ -511,7 +511,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -233,138 +170,83 @@
+@@ -233,138 +170,84 @@
      C: 0.1 * (10.0 / 12),
      D: 0.1 * (10.0 / 12),
  }
@@ -550,15 +550,6 @@ last_call()
 -    ...
 -for j in 1 + (2 + 3):
 -    ...
--while this and that:
--    ...
--for (
--    addr_family,
--    addr_type,
--    addr_proto,
--    addr_canonname,
--    addr_sockaddr,
--) in socket.getaddrinfo("google.com", "http"):
 +print(* lambda x: x)
 +assert(not Test),("Short message")
 +assert this is ComplexTest and not requirements.fit_in_a_single_line(force=False), "Short message"
@@ -568,7 +559,15 @@ last_call()
 +for z in (i for i in (1, 2, 3)): ...
 +for i in (call()): ...
 +for j in (1 + (2 + 3)): ...
-+while(this and that): ...
+ while this and that:
+     ...
+-for (
+-    addr_family,
+-    addr_type,
+-    addr_proto,
+-    addr_canonname,
+-    addr_sockaddr,
+-) in socket.getaddrinfo("google.com", "http"):
 +for addr_family, addr_type, addr_proto, addr_canonname, addr_sockaddr in socket.getaddrinfo('google.com', 'http'):
      pass
 -a = (
@@ -879,7 +878,8 @@ for y in (): ...
 for z in (i for i in (1, 2, 3)): ...
 for i in (call()): ...
 for j in (1 + (2 + 3)): ...
-while(this and that): ...
+while this and that:
+    ...
 for addr_family, addr_type, addr_proto, addr_canonname, addr_sockaddr in socket.getaddrinfo('google.com', 'http'):
     pass
 a = aaaa.bbbb.cccc.dddd.eeee.ffff.gggg.hhhh.iiii.jjjj.kkkk.llll.mmmm.nnnn.oooo.pppp in qqqq.rrrr.ssss.tttt.uuuu.vvvv.xxxx.yyyy.zzzz
