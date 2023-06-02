@@ -1,7 +1,5 @@
 //! Checks relating to shell injection.
 
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -12,8 +10,6 @@ use ruff_python_semantic::model::SemanticModel;
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
-
-static FULL_PATH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^([A-Za-z]:|[\\/.])").unwrap());
 
 #[violation]
 pub struct SubprocessPopenWithShellEqualsTrue {
@@ -297,6 +293,40 @@ fn shell_call_seems_safe(arg: &Expr) -> bool {
     )
 }
 
+/// Return `true` if the string appears to be a full file path.
+///
+/// ## Examples
+/// ```python
+/// import subprocess
+///
+/// os.system("/bin/ls")
+/// os.system("./bin/ls")
+/// os.system(["/bin/ls"])
+/// os.system(["/bin/ls", "/tmp"])
+/// os.system(r"C:\\bin\ls")
+fn is_full_path(text: &str) -> bool {
+    let mut chars = text.chars();
+    let Some(first_char) = chars.next() else {
+        return false;
+    };
+
+    // Ex) `/bin/ls`
+    if first_char == '\\' || first_char == '/' || first_char == '.' {
+        return true;
+    }
+
+    // Ex) `C:`
+    if first_char.is_alphabetic() {
+        if let Some(second_char) = chars.next() {
+            if second_char == ':' {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 /// Return `true` if the [`Expr`] is a string literal or list of string literals that starts with a
 /// partial path.
 fn is_partial_path(expr: &Expr) -> bool {
@@ -304,7 +334,7 @@ fn is_partial_path(expr: &Expr) -> bool {
         Expr::List(ast::ExprList { elts, .. }) => elts.first().and_then(string_literal),
         _ => string_literal(expr),
     };
-    string_literal.map_or(false, |text| !FULL_PATH_REGEX.is_match(text))
+    string_literal.map_or(false, |text| !is_full_path(text))
 }
 
 /// Return `true` if the [`Expr`] is a wildcard command.
