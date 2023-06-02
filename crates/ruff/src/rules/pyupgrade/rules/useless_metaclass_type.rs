@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, IsolationLevel};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::autofix;
@@ -55,7 +55,7 @@ pub(crate) fn useless_metaclass_type(
             checker.indexer,
             checker.stylist,
         );
-        diagnostic.set_fix(Fix::automatic(edit).isolate(IsolationLevel::Isolated));
+        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, IsolationLevel};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::autofix;
@@ -46,7 +46,7 @@ pub(crate) fn pass_in_class_body<'a>(
                 checker.indexer,
                 checker.stylist,
             );
-            diagnostic.set_fix(Fix::automatic(edit).isolate(IsolationLevel::Isolated));
+            diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
         }
         checker.diagnostics.push(diagnostic);
     }

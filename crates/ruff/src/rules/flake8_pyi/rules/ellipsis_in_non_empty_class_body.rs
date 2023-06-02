@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprConstant, Ranged, Stmt, StmtExpr};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, IsolationLevel, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::autofix;
@@ -76,7 +76,7 @@ pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
                 checker.indexer,
                 checker.stylist,
             );
-            diagnostic.set_fix(Fix::automatic(edit).isolate(IsolationLevel::Isolated));
+            diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
         }
         checker.diagnostics.push(diagnostic);
     }
