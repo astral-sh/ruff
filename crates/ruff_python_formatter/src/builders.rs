@@ -5,7 +5,7 @@ use ruff_formatter::write;
 use rustpython_parser::ast::Ranged;
 
 /// Provides Python specific extensions to [`Formatter`].
-pub(crate) trait PyFormatterExtensions<'buf, 'context> {
+pub(crate) trait PyFormatterExtensions<'context, 'buf> {
     /// Creates a joiner that inserts the appropriate number of empty lines between two nodes, depending on the
     /// line breaks that separate the two nodes in the source document. The `level` customizes the maximum allowed
     /// empty lines between any two nodes. Separates any two nodes by at least a hard line break.
@@ -14,28 +14,28 @@ pub(crate) trait PyFormatterExtensions<'buf, 'context> {
     /// * [`NodeLevel::Statement`]: Up to one empty line
     /// * [`NodeLevel::Parenthesized`]: No empty lines
     fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel)
-        -> JoinNodesBuilder<'fmt, 'buf, 'context>;
+        -> JoinNodesBuilder<'fmt, 'context, 'buf>;
 }
 
-impl<'buf, 'context> PyFormatterExtensions<'buf, 'context> for PyFormatter<'buf, 'context> {
+impl<'buf, 'context> PyFormatterExtensions<'context, 'buf> for PyFormatter<'context, 'buf> {
     fn join_nodes<'fmt>(
         &'fmt mut self,
         level: NodeLevel,
-    ) -> JoinNodesBuilder<'fmt, 'buf, 'context> {
+    ) -> JoinNodesBuilder<'fmt, 'context, 'buf> {
         JoinNodesBuilder::new(self, level)
     }
 }
 
 #[must_use = "must eventually call `finish()` on the builder."]
-pub(crate) struct JoinNodesBuilder<'fmt, 'buf, 'context> {
-    fmt: &'fmt mut PyFormatter<'buf, 'context>,
+pub(crate) struct JoinNodesBuilder<'fmt, 'context, 'buf> {
+    fmt: &'fmt mut PyFormatter<'context, 'buf>,
     result: FormatResult<()>,
     has_elements: bool,
     node_level: NodeLevel,
 }
 
-impl<'fmt, 'buf, 'context> JoinNodesBuilder<'fmt, 'buf, 'context> {
-    fn new(fmt: &'fmt mut PyFormatter<'buf, 'context>, level: NodeLevel) -> Self {
+impl<'fmt, 'context, 'buf> JoinNodesBuilder<'fmt, 'context, 'buf> {
+    fn new(fmt: &'fmt mut PyFormatter<'context, 'buf>, level: NodeLevel) -> Self {
         Self {
             fmt,
             result: Ok(()),
