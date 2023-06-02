@@ -63,7 +63,5 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         )));
     }
-    checker
-        .diagnostics
-        .push(Diagnostic::new(StringOrBytesTooLong, expr.range()));
+    checker.diagnostics.push(diagnostic);
 }
