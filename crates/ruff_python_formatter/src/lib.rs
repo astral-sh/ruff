@@ -31,7 +31,8 @@ mod trivia;
 
 include!("../../ruff_formatter/shared_traits.rs");
 
-pub(crate) type PyFormatter<'buf, 'ast> = Formatter<'buf, PyFormatContext<'ast>>;
+/// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
+pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
 
 /// Rule for formatting a JavaScript [`AstNode`].
 pub(crate) trait FormatNodeRule<N>
