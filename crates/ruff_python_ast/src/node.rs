@@ -7,6 +7,12 @@ pub trait AstNode: Ranged {
     where
         Self: Sized;
     fn cast_ref(kind: AnyNodeRef) -> Option<&Self>;
+
+    /// Returns the [`AnyNodeRef`] referencing this node.
+    fn as_any_node_ref(&self) -> AnyNodeRef;
+
+    /// Consumes `self` and returns its [`AnyNode`] representation.
+    fn into_any_node(self) -> AnyNode;
 }
 
 #[derive(Clone, Debug, is_macro::Is, PartialEq)]
@@ -704,6 +710,14 @@ impl AstNode for ModModule<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ModInteractive<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -723,6 +737,14 @@ impl AstNode for ModInteractive<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ModExpression<TextRange> {
@@ -744,6 +766,14 @@ impl AstNode for ModExpression<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ModFunctionType<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -763,6 +793,14 @@ impl AstNode for ModFunctionType<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtFunctionDef<TextRange> {
@@ -784,6 +822,14 @@ impl AstNode for StmtFunctionDef<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtAsyncFunctionDef<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -803,6 +849,14 @@ impl AstNode for StmtAsyncFunctionDef<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtClassDef<TextRange> {
@@ -824,6 +878,14 @@ impl AstNode for StmtClassDef<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtReturn<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -843,6 +905,14 @@ impl AstNode for StmtReturn<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtDelete<TextRange> {
@@ -864,6 +934,14 @@ impl AstNode for StmtDelete<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtAssign<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -883,6 +961,14 @@ impl AstNode for StmtAssign<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtAugAssign<TextRange> {
@@ -904,6 +990,14 @@ impl AstNode for StmtAugAssign<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtAnnAssign<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -923,6 +1017,14 @@ impl AstNode for StmtAnnAssign<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtFor<TextRange> {
@@ -944,6 +1046,14 @@ impl AstNode for StmtFor<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtAsyncFor<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -963,6 +1073,14 @@ impl AstNode for StmtAsyncFor<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtWhile<TextRange> {
@@ -984,6 +1102,14 @@ impl AstNode for StmtWhile<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtIf<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1003,6 +1129,14 @@ impl AstNode for StmtIf<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtWith<TextRange> {
@@ -1024,6 +1158,14 @@ impl AstNode for StmtWith<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtAsyncWith<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1043,6 +1185,14 @@ impl AstNode for StmtAsyncWith<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtMatch<TextRange> {
@@ -1064,6 +1214,14 @@ impl AstNode for StmtMatch<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtRaise<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1083,6 +1241,14 @@ impl AstNode for StmtRaise<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtTry<TextRange> {
@@ -1104,6 +1270,14 @@ impl AstNode for StmtTry<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtTryStar<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1123,6 +1297,14 @@ impl AstNode for StmtTryStar<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtAssert<TextRange> {
@@ -1144,6 +1326,14 @@ impl AstNode for StmtAssert<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtImport<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1163,6 +1353,14 @@ impl AstNode for StmtImport<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtImportFrom<TextRange> {
@@ -1184,6 +1382,14 @@ impl AstNode for StmtImportFrom<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtGlobal<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1203,6 +1409,14 @@ impl AstNode for StmtGlobal<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtNonlocal<TextRange> {
@@ -1224,6 +1438,14 @@ impl AstNode for StmtNonlocal<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtExpr<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1243,6 +1465,14 @@ impl AstNode for StmtExpr<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtPass<TextRange> {
@@ -1264,6 +1494,14 @@ impl AstNode for StmtPass<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for StmtBreak<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1283,6 +1521,14 @@ impl AstNode for StmtBreak<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for StmtContinue<TextRange> {
@@ -1304,6 +1550,14 @@ impl AstNode for StmtContinue<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprBoolOp<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1323,6 +1577,14 @@ impl AstNode for ExprBoolOp<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprNamedExpr<TextRange> {
@@ -1344,6 +1606,14 @@ impl AstNode for ExprNamedExpr<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprBinOp<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1363,6 +1633,14 @@ impl AstNode for ExprBinOp<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprUnaryOp<TextRange> {
@@ -1384,6 +1662,14 @@ impl AstNode for ExprUnaryOp<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprLambda<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1403,6 +1689,14 @@ impl AstNode for ExprLambda<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprIfExp<TextRange> {
@@ -1424,6 +1718,14 @@ impl AstNode for ExprIfExp<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprDict<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1443,6 +1745,14 @@ impl AstNode for ExprDict<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprSet<TextRange> {
@@ -1464,6 +1774,14 @@ impl AstNode for ExprSet<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprListComp<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1483,6 +1801,14 @@ impl AstNode for ExprListComp<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprSetComp<TextRange> {
@@ -1504,6 +1830,14 @@ impl AstNode for ExprSetComp<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprDictComp<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1523,6 +1857,14 @@ impl AstNode for ExprDictComp<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprGeneratorExp<TextRange> {
@@ -1544,6 +1886,14 @@ impl AstNode for ExprGeneratorExp<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprAwait<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1563,6 +1913,14 @@ impl AstNode for ExprAwait<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprYield<TextRange> {
@@ -1584,6 +1942,14 @@ impl AstNode for ExprYield<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprYieldFrom<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1603,6 +1969,14 @@ impl AstNode for ExprYieldFrom<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprCompare<TextRange> {
@@ -1624,6 +1998,14 @@ impl AstNode for ExprCompare<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprCall<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1643,6 +2025,14 @@ impl AstNode for ExprCall<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprFormattedValue<TextRange> {
@@ -1664,6 +2054,14 @@ impl AstNode for ExprFormattedValue<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprJoinedStr<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1683,6 +2081,14 @@ impl AstNode for ExprJoinedStr<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprConstant<TextRange> {
@@ -1704,6 +2110,14 @@ impl AstNode for ExprConstant<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprAttribute<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1723,6 +2137,14 @@ impl AstNode for ExprAttribute<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprSubscript<TextRange> {
@@ -1744,6 +2166,14 @@ impl AstNode for ExprSubscript<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprStarred<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1763,6 +2193,14 @@ impl AstNode for ExprStarred<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprName<TextRange> {
@@ -1784,6 +2222,14 @@ impl AstNode for ExprName<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprList<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1803,6 +2249,14 @@ impl AstNode for ExprList<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExprTuple<TextRange> {
@@ -1824,6 +2278,14 @@ impl AstNode for ExprTuple<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for ExprSlice<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1843,6 +2305,14 @@ impl AstNode for ExprSlice<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for ExcepthandlerExceptHandler<TextRange> {
@@ -1864,6 +2334,14 @@ impl AstNode for ExcepthandlerExceptHandler<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for PatternMatchValue<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1883,6 +2361,14 @@ impl AstNode for PatternMatchValue<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for PatternMatchSingleton<TextRange> {
@@ -1904,6 +2390,14 @@ impl AstNode for PatternMatchSingleton<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for PatternMatchSequence<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1923,6 +2417,14 @@ impl AstNode for PatternMatchSequence<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for PatternMatchMapping<TextRange> {
@@ -1944,6 +2446,14 @@ impl AstNode for PatternMatchMapping<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for PatternMatchClass<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -1963,6 +2473,14 @@ impl AstNode for PatternMatchClass<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for PatternMatchStar<TextRange> {
@@ -1984,6 +2502,14 @@ impl AstNode for PatternMatchStar<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for PatternMatchAs<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2003,6 +2529,14 @@ impl AstNode for PatternMatchAs<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for PatternMatchOr<TextRange> {
@@ -2024,6 +2558,14 @@ impl AstNode for PatternMatchOr<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for TypeIgnoreTypeIgnore<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2043,6 +2585,14 @@ impl AstNode for TypeIgnoreTypeIgnore<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 
@@ -2065,6 +2615,14 @@ impl AstNode for Comprehension<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for Arguments<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2084,6 +2642,14 @@ impl AstNode for Arguments<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for Arg<TextRange> {
@@ -2105,6 +2671,14 @@ impl AstNode for Arg<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for Keyword<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2124,6 +2698,14 @@ impl AstNode for Keyword<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 impl AstNode for Alias<TextRange> {
@@ -2145,6 +2727,14 @@ impl AstNode for Alias<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for Withitem<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2165,6 +2755,14 @@ impl AstNode for Withitem<TextRange> {
             None
         }
     }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
 }
 impl AstNode for MatchCase<TextRange> {
     fn cast(kind: AnyNode) -> Option<Self>
@@ -2184,6 +2782,14 @@ impl AstNode for MatchCase<TextRange> {
         } else {
             None
         }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
     }
 }
 
