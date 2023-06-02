@@ -151,7 +151,7 @@ pub(crate) fn too_many_statements(
     max_statements: usize,
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    let statements = num_statements(body) + 1;
+    let statements = num_statements(body);
     if statements > max_statements {
         Some(Diagnostic::new(
             TooManyStatements {
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn pass() -> Result<()> {
         let source: &str = r#"
-def f():  # 2
+def f():
     pass
 "#;
         let stmts = Suite::parse(source, "<filename>")?;
@@ -216,7 +216,7 @@ def f():
     #[test]
     fn if_elif() -> Result<()> {
         let source: &str = r#"
-def f():  # 5
+def f():
     if a:
         print()
     elif a:
@@ -230,7 +230,7 @@ def f():  # 5
     #[test]
     fn if_elif_else() -> Result<()> {
         let source: &str = r#"
-def f():  # 9
+def f():
     if a:
         print()
     elif a == 2:
@@ -248,7 +248,7 @@ def f():  # 9
     #[test]
     fn many_statements() -> Result<()> {
         let source: &str = r#"
-async def f():  # 19
+async def f():
     a = 1
     b = 2
     c = 3
@@ -277,7 +277,7 @@ async def f():  # 19
     #[test]
     fn for_() -> Result<()> {
         let source: &str = r#"
-def f():  # 2
+def f():
     for i in range(10):
         pass
 "#;
@@ -289,7 +289,7 @@ def f():  # 2
     #[test]
     fn for_else() -> Result<()> {
         let source: &str = r#"
-def f():  # 3
+def f():
     for i in range(10):
         print()
     else:
@@ -303,7 +303,7 @@ def f():  # 3
     #[test]
     fn nested_def() -> Result<()> {
         let source: &str = r#"
-def f():  # 5
+def f():
     def g():
         print()
         print()
@@ -318,7 +318,7 @@ def f():  # 5
     #[test]
     fn nested_class() -> Result<()> {
         let source: &str = r#"
-def f():  # 3
+def f():
     class A:
         def __init__(self):
             pass
@@ -347,7 +347,7 @@ def f():
     #[test]
     fn with() -> Result<()> {
         let source: &str = r#"
-def f():  # 6
+def f():
     with a:
         if a:
             print()
@@ -363,7 +363,7 @@ def f():  # 6
     #[test]
     fn try_except() -> Result<()> {
         let source: &str = r#"
-def f():  # 5
+def f():
     try:
         print()
     except Exception:
@@ -377,7 +377,7 @@ def f():  # 5
     #[test]
     fn try_except_else() -> Result<()> {
         let source: &str = r#"
-def f():  # 7
+def f():
     try:
         print()
     except ValueError:
@@ -393,7 +393,7 @@ def f():  # 7
     #[test]
     fn try_except_else_finally() -> Result<()> {
         let source: &str = r#"
-def f():  # 10
+def f():
     try:
         print()
     except ValueError:
@@ -411,7 +411,7 @@ def f():  # 10
     #[test]
     fn try_except_except() -> Result<()> {
         let source: &str = r#"
-def f():  # 8
+def f():
     try:
         print()
     except ValueError:
@@ -427,7 +427,7 @@ def f():  # 8
     #[test]
     fn try_except_except_finally() -> Result<()> {
         let source: &str = r#"
-def f():  # 11
+def f():
     try:
         print()
     except:
@@ -445,7 +445,7 @@ def f():  # 11
     #[test]
     fn yield_() -> Result<()> {
         let source: &str = r#"
-def f():  # 2
+def f():
     for i in range(10):
         yield i
 "#;
