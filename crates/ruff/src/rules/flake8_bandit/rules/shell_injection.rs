@@ -107,17 +107,16 @@ pub(crate) fn shell_injection(
     keywords: &[Keyword],
 ) {
     let call_kind = get_call_kind(func, checker.semantic_model());
-    let mut subprocess_with_shell = false;
+    let shell_keyword = find_shell_keyword(checker.semantic_model(), keywords);
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
-            match find_shell_keyword(checker.semantic_model(), keywords) {
+            match shell_keyword {
                 // S602
                 Some(ShellKeyword {
                     truthiness: Truthiness::Truthy,
                     keyword,
                 }) => {
-                    subprocess_with_shell = true;
                     if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessPopenWithShellEqualsTrue {
@@ -153,7 +152,7 @@ pub(crate) fn shell_injection(
     } else if let Some(ShellKeyword {
         truthiness: Truthiness::Truthy,
         keyword,
-    }) = find_shell_keyword(checker.semantic_model(), keywords)
+    }) = shell_keyword
     {
         // S604
         if checker.enabled(Rule::CallWithShellEqualsTrue) {
@@ -201,7 +200,18 @@ pub(crate) fn shell_injection(
 
     // S609
     if checker.enabled(Rule::UnixCommandWildcardInjection) {
-        if matches!(call_kind, Some(CallKind::Shell)) || subprocess_with_shell {
+        if matches!(call_kind, Some(CallKind::Shell))
+            || matches!(
+                (call_kind, shell_keyword),
+                (
+                    Some(CallKind::Subprocess),
+                    Some(ShellKeyword {
+                        truthiness: Truthiness::Truthy,
+                        keyword: _,
+                    })
+                )
+            )
+        {
             if let Some(arg) = args.first() {
                 if is_wildcard_command(arg) {
                     checker

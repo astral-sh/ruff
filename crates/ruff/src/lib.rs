@@ -5,8 +5,6 @@
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
 
-extern crate core;
-
 pub use ruff_python_ast::source_code::round_trip;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
