@@ -1,101 +1,8 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Alias, Ranged};
 
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AutofixKind, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::OneIndexed;
-use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
-
-use crate::checkers::ast::Checker;
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum UnusedImportContext {
-    ExceptHandler,
-    Init,
-}
-
-/// ## What it does
-/// Checks for unused imports.
-///
-/// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. They also increase the cognitive load of reading the code.
-///
-/// If an import statement is used to check for the availability or existence
-/// of a module, consider using `importlib.util.find_spec` instead.
-///
-/// ## Options
-///
-/// - `pyflakes.extend-generics`
-///
-/// ## Example
-/// ```python
-/// import numpy as np  # unused import
-///
-///
-/// def area(radius):
-///     return 3.14 * radius**2
-/// ```
-///
-/// Use instead:
-/// ```python
-/// def area(radius):
-///     return 3.14 * radius**2
-/// ```
-///
-/// To check the availability of a module, use `importlib.util.find_spec`:
-/// ```python
-/// from importlib.util import find_spec
-///
-/// if find_spec("numpy") is not None:
-///     print("numpy is installed")
-/// else:
-///     print("numpy is not installed")
-/// ```
-///
-/// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
-/// - [Python documentation](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
-#[violation]
-pub struct UnusedImport {
-    pub(crate) name: String,
-    pub(crate) context: Option<UnusedImportContext>,
-    pub(crate) multiple: bool,
-}
-
-impl Violation for UnusedImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
-
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UnusedImport { name, context, .. } = self;
-        match context {
-            Some(UnusedImportContext::ExceptHandler) => {
-                format!(
-                    "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
-                )
-            }
-            Some(UnusedImportContext::Init) => {
-                format!(
-                    "`{name}` imported but unused; consider adding to `__all__` or using a redundant \
-                     alias"
-                )
-            }
-            None => format!("`{name}` imported but unused"),
-        }
-    }
-
-    fn autofix_title(&self) -> Option<String> {
-        let UnusedImport { name, multiple, .. } = self;
-
-        Some(if *multiple {
-            "Remove unused import".to_string()
-        } else {
-            format!("Remove unused import: `{name}`")
-        })
-    }
-}
 
 /// ## What it does
 /// Checks for import bindings that are shadowed by loop variables.
@@ -306,39 +213,5 @@ impl Violation for UndefinedLocalWithNestedImportStarUsage {
     fn message(&self) -> String {
         let UndefinedLocalWithNestedImportStarUsage { name } = self;
         format!("`from {name} import *` only allowed at module level")
-    }
-}
-
-/// ## What it does
-/// Checks for `__future__` imports that are not defined in the current Python
-/// version.
-///
-/// ## Why is this bad?
-/// Importing undefined or unsupported members from the `__future__` module is
-/// a `SyntaxError`.
-///
-/// ## References
-/// - [Python documentation](https://docs.python.org/3/library/__future__.html)
-#[violation]
-pub struct FutureFeatureNotDefined {
-    name: String,
-}
-
-impl Violation for FutureFeatureNotDefined {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let FutureFeatureNotDefined { name } = self;
-        format!("Future feature `{name}` is not defined")
-    }
-}
-
-pub(crate) fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
-    if !ALL_FEATURE_NAMES.contains(&alias.name.as_str()) {
-        checker.diagnostics.push(Diagnostic::new(
-            FutureFeatureNotDefined {
-                name: alias.name.to_string(),
-            },
-            alias.range(),
-        ));
     }
 }
