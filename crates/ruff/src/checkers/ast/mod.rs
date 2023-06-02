@@ -872,7 +872,6 @@ where
                             name,
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(SubmoduleImportation {
-                                    name,
                                     full_name,
                                 }),
                                 range: alias.range(),
@@ -889,7 +888,7 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::Importation(Importation { name, full_name }),
+                                kind: BindingKind::Importation(Importation { full_name }),
                                 range: alias.range(),
                                 references: Vec::new(),
                                 source: self.semantic_model.stmt_id,
@@ -1196,10 +1195,7 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::FromImportation(FromImportation {
-                                    name,
-                                    full_name,
-                                }),
+                                kind: BindingKind::FromImportation(FromImportation { full_name }),
                                 range: alias.range(),
                                 references: Vec::new(),
                                 source: self.semantic_model.stmt_id,

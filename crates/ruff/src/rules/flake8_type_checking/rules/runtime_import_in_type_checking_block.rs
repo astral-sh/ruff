@@ -67,9 +67,9 @@ pub(crate) fn runtime_import_in_type_checking_block(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let full_name = match &binding.kind {
-        BindingKind::Importation(Importation { full_name, .. }) => full_name,
-        BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
+        BindingKind::Importation(Importation { full_name }) => full_name,
+        BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
+        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => full_name,
         _ => return,
     };
 

@@ -183,61 +183,50 @@ fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
     match &this.kind {
         BindingKind::Importation(Importation {
             full_name: this_name,
-            ..
         })
         | BindingKind::SubmoduleImportation(SubmoduleImportation {
-            name: this_name, ..
+            full_name: this_name,
         }) => match &that.kind {
             BindingKind::FromImportation(FromImportation {
                 full_name: that_name,
-                ..
             }) => {
                 // Ex) `pkg.A` vs. `pkg`
-                this_name
+                let this_name = this_name.split('.').next().unwrap_or(this_name);
+                that_name
                     .rfind('.')
-                    .map_or(false, |i| this_name[..i] == *that_name)
+                    .map_or(false, |i| that_name[..i] == *this_name)
             }
             BindingKind::Importation(Importation {
                 full_name: that_name,
-                ..
             })
             | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                name: that_name, ..
+                full_name: that_name,
             }) => {
                 // Submodule importation with an alias (`import pkg.A as B`)
                 // are represented as `Importation`.
-                match (this_name.find('.'), that_name.find('.')) {
-                    // Ex) `pkg.A` vs. `pkg.B`
-                    (Some(i), Some(j)) => this_name[..i] == that_name[..j],
-                    // Ex) `pkg.A` vs. `pkg`
-                    (Some(i), None) => this_name[..i] == **that_name,
-                    // Ex) `pkg` vs. `pkg.B`
-                    (None, Some(j)) => **this_name == that_name[..j],
-                    // Ex) `pkg` vs. `pkg`
-                    (None, None) => this_name == that_name,
-                }
+                let this_name = this_name.split('.').next().unwrap_or(this_name);
+                let that_name = that_name.split('.').next().unwrap_or(that_name);
+                this_name == that_name
             }
             _ => false,
         },
         BindingKind::FromImportation(FromImportation {
             full_name: this_name,
-            ..
         }) => match &that.kind {
             BindingKind::Importation(Importation {
                 full_name: that_name,
-                ..
             })
             | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                name: that_name, ..
+                full_name: that_name,
             }) => {
                 // Ex) `pkg.A` vs. `pkg`
+                let that_name = that_name.split('.').next().unwrap_or(that_name);
                 this_name
                     .rfind('.')
-                    .map_or(false, |i| &this_name[..i] == *that_name)
+                    .map_or(false, |i| &this_name[..i] == that_name)
             }
             BindingKind::FromImportation(FromImportation {
                 full_name: that_name,
-                ..
             }) => {
                 // Ex) `pkg.A` vs. `pkg.B`
                 this_name.rfind('.').map_or(false, |i| {
@@ -286,9 +275,9 @@ pub(crate) fn typing_only_runtime_import(
     }
 
     let full_name = match &binding.kind {
-        BindingKind::Importation(Importation { full_name, .. }) => full_name,
-        BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
+        BindingKind::Importation(Importation { full_name }) => full_name,
+        BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
+        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => full_name,
         _ => return,
     };
 

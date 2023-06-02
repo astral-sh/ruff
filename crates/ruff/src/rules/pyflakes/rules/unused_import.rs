@@ -118,9 +118,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         }
 
         let full_name = match &binding.kind {
-            BindingKind::Importation(Importation { full_name, .. }) => full_name,
-            BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
+            BindingKind::Importation(Importation { full_name }) => full_name,
+            BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
+            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => full_name,
             _ => continue,
         };
 
