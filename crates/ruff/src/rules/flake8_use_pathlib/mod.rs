@@ -29,7 +29,7 @@ mod tests {
                 Rule::OsMkdir,
                 Rule::OsMakedirs,
                 Rule::OsRename,
-                Rule::PathlibReplace,
+                Rule::OsReplace,
                 Rule::OsRmdir,
                 Rule::OsRemove,
                 Rule::OsUnlink,
