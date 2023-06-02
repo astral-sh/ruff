@@ -21,7 +21,7 @@ impl StrExt for str {
 ///
 /// ```rust
 /// # use ruff_text_size::TextSize;
-/// # use ruff_python_ast::newlines::{Line, UniversalNewlineIterator};
+/// # use ruff_source_location::newlines::{Line, UniversalNewlineIterator};
 /// let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
 ///
 /// assert_eq!(lines.next_back(), Some(Line::new("bop", TextSize::from(14))));

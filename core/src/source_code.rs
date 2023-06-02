@@ -1,7 +1,11 @@
 // re-export our public interface
 use crate::text_size::{TextLen, TextSize};
-pub use ruff_source_location::*;
+use memchr::memrchr2;
 
+pub use ruff_source_location::{
+    newlines::{find_newline, UniversalNewlineIterator},
+    LineIndex, OneIndexed, SourceCode, SourceLocation,
+};
 pub type LineNumber = OneIndexed;
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -88,9 +92,12 @@ impl LinearLocatorState {
         if source.starts_with('\u{feff}') {
             line_start += '\u{feff}'.text_len();
         }
-        let (line_end, is_ascii) = if let Some(nl) = source.find('\n') {
-            let is_ascii = source[..nl].is_ascii();
-            (Some(TextSize::new(nl as u32 + 1)), is_ascii)
+        let (line_end, is_ascii) = if let Some((position, line_ending)) = find_newline(source) {
+            let is_ascii = source[..position].is_ascii();
+            (
+                Some(TextSize::new(position as u32 + line_ending.len() as u32)),
+                is_ascii,
+            )
         } else {
             (None, source.is_ascii())
         };
@@ -164,30 +171,34 @@ impl<'a> LinearLocator<'a> {
         let (column, new_state) = if let Some(new_line_start) = self.state.new_line_start(offset) {
             // not fit in current line
             let focused = &self.source[new_line_start.to_usize()..offset.to_usize()];
-            let (lines, line_start, column) = if let Some(last_newline) = focused.rfind('\n') {
-                let last_newline = new_line_start.to_usize() + last_newline;
-                let lines = self.source[self.state.cursor.to_usize()..last_newline]
-                    .matches('\n')
-                    .count() as u32
-                    + 1; // TODO: \r
-                let line_start = last_newline as u32 + 1;
-                let column = offset.to_u32() - line_start;
-                (lines, line_start, column)
-            } else {
-                let column = (offset - new_line_start).to_u32();
-                (1, new_line_start.to_u32(), column)
-            };
-            let line_number = self.state.line_number.saturating_add(lines);
-            let (line_end, is_ascii) =
-                if let Some(newline) = self.source[line_start as usize..].find('\n') {
-                    let newline = line_start as usize + newline;
-                    debug_assert_eq!(&self.source[newline..][..1], "\n");
-                    let is_ascii = self.source[line_start as usize..newline].is_ascii();
-                    (Some(TextSize::new(newline as u32 + 1)), is_ascii)
+            let (lines, line_start, column) =
+                if let Some(last_newline) = memrchr2(b'\r', b'\n', focused.as_bytes()) {
+                    let last_newline = new_line_start.to_usize() + last_newline;
+                    let lines = UniversalNewlineIterator::from(
+                        &self.source[self.state.cursor.to_usize()..last_newline + 1],
+                    )
+                    .count();
+                    let line_start = last_newline as u32 + 1;
+                    let column = offset.to_u32() - line_start;
+                    (lines as u32, line_start, column)
                 } else {
-                    let is_ascii = self.source[line_start as usize..].is_ascii();
-                    (None, is_ascii)
+                    let column = (offset - new_line_start).to_u32();
+                    (1, new_line_start.to_u32(), column)
                 };
+            let line_number = self.state.line_number.saturating_add(lines);
+            let (line_end, is_ascii) = if let Some((newline, line_ending)) =
+                find_newline(&self.source[line_start as usize..])
+            {
+                let newline = line_start as usize + newline;
+                let is_ascii = self.source[line_start as usize..newline].is_ascii();
+                (
+                    Some(TextSize::new(newline as u32 + line_ending.len() as u32)),
+                    is_ascii,
+                )
+            } else {
+                let is_ascii = self.source[line_start as usize..].is_ascii();
+                (None, is_ascii)
+            };
             let line_start = TextSize::new(line_start);
             let state = LinearLocatorState {
                 line_start,

@@ -35,6 +35,7 @@ num-bigint = "0.4.3"
 num-traits = "0.2"
 pyo3 = { version = "0.18.3" }
 malachite-bigint = { version = "0.1.0" }
+memchr = "2.5.0"
 rand = "0.8.5"
 serde = "1.0"
 static_assertions = "1.1"
