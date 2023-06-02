@@ -519,6 +519,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::IterMethodReturnIterable,
     rules::flake8_pyi::rules::DuplicateUnionMember,
     rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
+    rules::flake8_pyi::rules::NonSelfReturnType,
     rules::flake8_pyi::rules::CollectionsNamedTuple,
     rules::flake8_pyi::rules::StringOrBytesTooLong,
     rules::flake8_pyi::rules::NonEmptyStubBody,

@@ -436,6 +436,17 @@ where
                     if self.enabled(Rule::AnyEqNeAnnotation) {
                         flake8_pyi::rules::any_eq_ne_annotation(self, name, args);
                     }
+                    if self.enabled(Rule::NonSelfReturnType) {
+                        flake8_pyi::rules::non_self_return_type(
+                            self,
+                            stmt,
+                            name,
+                            decorator_list,
+                            returns.as_ref().map(|expr| &**expr),
+                            args,
+                            stmt.is_async_function_def_stmt(),
+                        );
+                    }
                 }
 
                 if self.enabled(Rule::DunderFunctionName) {
