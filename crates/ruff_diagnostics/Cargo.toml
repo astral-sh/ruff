@@ -8,7 +8,9 @@ rust-version = { workspace = true }
 [lib]
 
 [dependencies]
-anyhow = { workspace = true }
-log = { workspace = true }
 ruff_text_size = { workspace = true }
+
+anyhow = { workspace = true }
+is-macro = { workspace = true }
+log = { workspace = true }
 serde = { workspace = true, optional = true, features = [] }

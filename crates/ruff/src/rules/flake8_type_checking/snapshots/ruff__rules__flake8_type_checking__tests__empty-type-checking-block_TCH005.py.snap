@@ -9,7 +9,7 @@ TCH005.py:4:5: TCH005 [*] Found empty type-checking block
   |
   = help: Delete empty type-checking block
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | from typing import TYPE_CHECKING, List
 2 2 | 
 3   |-if TYPE_CHECKING:
@@ -28,7 +28,7 @@ TCH005.py:8:5: TCH005 [*] Found empty type-checking block
    |
    = help: Delete empty type-checking block
 
-ℹ Suggested fix
+ℹ Fix
 4 4 |     pass  # TCH005
 5 5 | 
 6 6 | 
@@ -46,7 +46,7 @@ TCH005.py:11:5: TCH005 [*] Found empty type-checking block
    |
    = help: Delete empty type-checking block
 
-ℹ Suggested fix
+ℹ Fix
 7  7  | if False:
 8  8  |     pass  # TCH005
 9  9  | 
@@ -66,7 +66,7 @@ TCH005.py:16:9: TCH005 [*] Found empty type-checking block
    |
    = help: Delete empty type-checking block
 
-ℹ Suggested fix
+ℹ Fix
 12 12 | 
 13 13 | 
 14 14 | def example():
@@ -86,7 +86,7 @@ TCH005.py:22:9: TCH005 [*] Found empty type-checking block
    |
    = help: Delete empty type-checking block
 
-ℹ Suggested fix
+ℹ Fix
 18 18 | 
 19 19 | 
 20 20 | class Test:

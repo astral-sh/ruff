@@ -1,6 +1,5 @@
 //! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
-use itertools::Itertools;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{self, Excepthandler, Expr, Keyword, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
@@ -28,21 +27,19 @@ use crate::autofix::codemods;
 pub(crate) fn delete_stmt(
     stmt: &Stmt,
     parent: Option<&Stmt>,
-    deleted: &[&Stmt],
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
-) -> Result<Edit> {
+) -> Edit {
     if parent
-        .map(|parent| is_lone_child(stmt, parent, deleted))
-        .map_or(Ok(None), |v| v.map(Some))?
+        .map(|parent| is_lone_child(stmt, parent))
         .unwrap_or_default()
     {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
-        Ok(Edit::range_replacement("pass".to_string(), stmt.range()))
+        Edit::range_replacement("pass".to_string(), stmt.range())
     } else {
-        Ok(if let Some(semicolon) = trailing_semicolon(stmt, locator) {
+        if let Some(semicolon) = trailing_semicolon(stmt, locator) {
             let next = next_stmt_break(semicolon, locator);
             Edit::deletion(stmt.start(), next)
         } else if helpers::has_leading_content(stmt, locator) {
@@ -57,7 +54,7 @@ pub(crate) fn delete_stmt(
         } else {
             let range = locator.full_lines_range(stmt.range());
             Edit::range_deletion(range)
-        })
+        }
     }
 }
 
@@ -66,13 +63,12 @@ pub(crate) fn remove_unused_imports<'a>(
     unused_imports: impl Iterator<Item = &'a str>,
     stmt: &Stmt,
     parent: Option<&Stmt>,
-    deleted: &[&Stmt],
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Edit> {
     match codemods::remove_imports(unused_imports, stmt, locator, stylist)? {
-        None => delete_stmt(stmt, parent, deleted, locator, indexer, stylist),
+        None => Ok(delete_stmt(stmt, parent, locator, indexer, stylist)),
         Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
     }
 }
@@ -179,36 +175,29 @@ pub(crate) fn remove_argument(
     }
 }
 
-/// Determine if a body contains only a single statement, taking into account
-/// deleted.
-fn has_single_child(body: &[Stmt], deleted: &[&Stmt]) -> bool {
-    body.iter().filter(|child| !deleted.contains(child)).count() == 1
+/// Determine if a vector contains only one, specific element.
+fn is_only<T: PartialEq>(vec: &[T], value: &T) -> bool {
+    vec.len() == 1 && vec[0] == *value
 }
 
 /// Determine if a child is the only statement in its body.
-fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool> {
+fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
         | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. })
         | Stmt::ClassDef(ast::StmtClassDef { body, .. })
         | Stmt::With(ast::StmtWith { body, .. })
         | Stmt::AsyncWith(ast::StmtAsyncWith { body, .. }) => {
-            if body.iter().contains(child) {
-                Ok(has_single_child(body, deleted))
-            } else {
-                bail!("Unable to find child in parent body")
+            if is_only(body, child) {
+                return true;
             }
         }
         Stmt::For(ast::StmtFor { body, orelse, .. })
         | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
         | Stmt::While(ast::StmtWhile { body, orelse, .. })
         | Stmt::If(ast::StmtIf { body, orelse, .. }) => {
-            if body.iter().contains(child) {
-                Ok(has_single_child(body, deleted))
-            } else if orelse.iter().contains(child) {
-                Ok(has_single_child(orelse, deleted))
-            } else {
-                bail!("Unable to find child in parent body")
+            if is_only(body, child) || is_only(orelse, child) {
+                return true;
             }
         }
         Stmt::Try(ast::StmtTry {
@@ -225,41 +214,26 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             finalbody,
             range: _,
         }) => {
-            if body.iter().contains(child) {
-                Ok(has_single_child(body, deleted))
-            } else if orelse.iter().contains(child) {
-                Ok(has_single_child(orelse, deleted))
-            } else if finalbody.iter().contains(child) {
-                Ok(has_single_child(finalbody, deleted))
-            } else if let Some(body) = handlers.iter().find_map(|handler| match handler {
-                Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) => {
-                    if body.iter().contains(child) {
-                        Some(body)
-                    } else {
-                        None
-                    }
-                }
-            }) {
-                Ok(has_single_child(body, deleted))
-            } else {
-                bail!("Unable to find child in parent body")
+            if is_only(body, child)
+                || is_only(orelse, child)
+                || is_only(finalbody, child)
+                || handlers.iter().any(|handler| match handler {
+                    Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler {
+                        body, ..
+                    }) => is_only(body, child),
+                })
+            {
+                return true;
             }
         }
         Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            if let Some(body) = cases.iter().find_map(|case| {
-                if case.body.iter().contains(child) {
-                    Some(&case.body)
-                } else {
-                    None
-                }
-            }) {
-                Ok(has_single_child(body, deleted))
-            } else {
-                bail!("Unable to find child in parent body")
+            if cases.iter().any(|case| is_only(&case.body, child)) {
+                return true;
             }
         }
-        _ => bail!("Unable to find child in parent body"),
+        _ => {}
     }
+    false
 }
 
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part

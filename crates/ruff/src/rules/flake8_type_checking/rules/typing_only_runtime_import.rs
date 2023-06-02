@@ -1,6 +1,4 @@
-use rustpython_parser::ast::Stmt;
-
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, IsolationLevel, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{
     Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
@@ -373,18 +371,12 @@ pub(crate) fn typing_only_runtime_import(
                 // Step 1) Remove the import.
                 // SAFETY: All non-builtin bindings have a source.
                 let source = binding.source.unwrap();
-                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 let stmt = checker.semantic_model().stmts[source];
-                let parent = checker
-                    .semantic_model()
-                    .stmts
-                    .parent_id(source)
-                    .map(|id| checker.semantic_model().stmts[id]);
+                let parent = checker.semantic_model().stmts.parent(stmt);
                 let remove_import_edit = autofix::edits::remove_unused_imports(
                     std::iter::once(full_name),
                     stmt,
                     parent,
-                    &deleted,
                     checker.locator,
                     checker.indexer,
                     checker.stylist,
@@ -398,10 +390,15 @@ pub(crate) fn typing_only_runtime_import(
                     checker.semantic_model(),
                 )?;
 
-                Ok(Fix::suggested_edits(
-                    remove_import_edit,
-                    add_import_edit.into_edits(),
-                ))
+                Ok(
+                    Fix::suggested_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
+                        if parent.is_some() {
+                            IsolationLevel::Isolated
+                        } else {
+                            IsolationLevel::NonOverlapping
+                        },
+                    ),
+                )
             });
         }
 

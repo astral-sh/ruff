@@ -40,9 +40,9 @@ pub(crate) fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> 
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
-/// asserts that autofixes converge after 10 iterations.
+/// asserts that autofixes converge after a fixed number of iterations.
 fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Message> {
-    static MAX_ITERATIONS: usize = 10;
+    static MAX_ITERATIONS: usize = 20;
 
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
     let locator = Locator::new(contents);
