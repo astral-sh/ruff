@@ -51,6 +51,8 @@ else:  # trailing else comment
     pass
 
     # trailing else body comment
+
+
 while (
     aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn
 ):  # trailing comment
@@ -58,8 +60,11 @@ while (
 
 else:
     ...
+
 while some_condition(unformatted, args) and anotherCondition or aThirdCondition:  # comment
     print("Do something")
+
+
 while (
     some_condition(unformatted, args) # trailing some condition
     and anotherCondition or aThirdCondition  # trailing third condition

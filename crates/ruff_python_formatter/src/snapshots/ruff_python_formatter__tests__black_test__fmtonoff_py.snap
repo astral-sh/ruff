@@ -199,13 +199,10 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -1,20 +1,17 @@
- #!/usr/bin/env python3
- import asyncio
- import sys
--
+@@ -4,17 +4,18 @@
+ 
  from third_party import X, Y, Z
--
+ 
 -from library import some_connection, some_decorator
 -
 +from library import some_connection, \
@@ -216,6 +213,8 @@ d={'a':1,
  # fmt: on
 -f"trigger 3.6 mode"
 +f'trigger 3.6 mode'
++
++
  # Comment 1
  
  # Comment 2
@@ -223,15 +222,37 @@ d={'a':1,
  
  # fmt: off
  def func_no_args():
-@@ -39,72 +36,41 @@
+@@ -26,11 +27,15 @@
+     continue
+   exec('new-style exec', {}, {})
+   return None
++
++
+ async def coroutine(arg, exec=False):
+  'Single-line docstring. Multiline is harder to reformat.'
+  async with some_connection() as conn:
+      await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
+  await asyncio.sleep(1)
++
++
+ @asyncio.coroutine
+ @some_decorator(
+ with_args=True,
+@@ -38,28 +43,19 @@
+ )
  def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
   return text[number:-1]
++
++
  # fmt: on
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
--
--
++def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r''):
++ offset = attr.ib(default=attr.Factory( lambda: _r.uniform(1, 2)))
++ assert task._cancel_stack[:len(old_stack)] == old_stack
+ 
+ 
 -def spaces_types(
 -    a: int = 1,
 -    b: tuple = (),
@@ -244,53 +265,43 @@ d={'a':1,
 -    i: str = r"",
 -):
 -    ...
--
--
++def spaces_types(a: int = 1, b: tuple = (), c: list = [], d: dict = {}, e: bool = True, f: int = -1, g: int = 1 if False else 2, h: str = "", i: str = r''): ...
+ 
+ 
 -def spaces2(result=_core.Value(None)):
 -    ...
--
--
-+def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r''):
-+ offset = attr.ib(default=attr.Factory( lambda: _r.uniform(1, 2)))
-+ assert task._cancel_stack[:len(old_stack)] == old_stack
-+def spaces_types(a: int = 1, b: tuple = (), c: list = [], d: dict = {}, e: bool = True, f: int = -1, g: int = 1 if False else 2, h: str = "", i: str = r''): ...
 +def spaces2(result= _core.Value(None)):
 + ...
+ 
+ 
  something = {
-     # fmt: off
-     key: 'value',
- }
--
--
- def subscriptlist():
-     atom[
-         # fmt: off
+@@ -74,23 +70,20 @@
          'some big and',
          'complex subscript',
          # fmt: on
 -        goes + here,
 -        andhere,
 -    ]
--
--
 +        goes + here, andhere,
 +       ]
+ 
+ 
  def import_as_names():
      # fmt: off
      from hello import a,        b
      'unformatted'
 -    # fmt: on
--
--
+ 
+ 
  def testlist_star_expr():
      # fmt: off
      a , b = *hello
      'unformatted'
 -    # fmt: on
--
--
+ 
+ 
  def yield_expr():
-     # fmt: off
+@@ -98,11 +91,10 @@
      yield hello
      'unformatted'
      # fmt: on
@@ -300,22 +311,18 @@ d={'a':1,
      ( yield hello )
      'unformatted'
 -    # fmt: on
--
--
+ 
+ 
  def example(session):
-     # fmt: off
-     result = session\
-@@ -113,9 +79,6 @@
+@@ -113,7 +105,6 @@
                  models.Customer.email == email_address)\
          .order_by(models.Customer.id.asc())\
          .all()
 -    # fmt: on
--
--
- def off_and_on_without_data():
-     """All comments here are technically on the same prefix.
  
-@@ -123,12 +86,12 @@
+ 
+ def off_and_on_without_data():
+@@ -123,8 +114,10 @@
      """
      # fmt: off
  
@@ -326,12 +333,8 @@ d={'a':1,
 +
      # fmt: on
      pass
--
--
- def on_and_off_broken():
-     """Another known limitation."""
-     # fmt: on
-@@ -137,21 +100,10 @@
+ 
+@@ -137,21 +130,12 @@
      and_=indeed . it  is  not  formatted
      because . the . handling . inside . generate_ignored_nodes()
      now . considers . multiple . fmt . directives . within . one . prefix
@@ -339,8 +342,8 @@ d={'a':1,
 -    # fmt: off
 -    # ...but comments still get reformatted even though they should not be
 -    # fmt: on
--
--
+ 
+ 
  def long_lines():
      if True:
          typedargslist.extend(
@@ -354,22 +357,18 @@ d={'a':1,
          )
          # fmt: off
          a = (
-@@ -182,24 +134,19 @@
-         re.MULTILINE|re.VERBOSE
-         # fmt: on
-     )
--
--
+@@ -186,20 +170,19 @@
+ 
  def single_literal_yapf_disable():
      """Black does not support this."""
 -    BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
--
--
 +    BAZ = {
 +        (1, 2, 3, 4),
 +        (5, 6, 7, 8),
 +        (9, 10, 11, 12)
 +    }
+ 
+ 
  cfg.rule(
 -    "Default",
 -    "address",
@@ -388,7 +387,7 @@ d={'a':1,
      # fmt: off
      xxxxxxx_xxxxxxxxxxxx={
          "xxxxxxxx": {
-@@ -214,7 +161,7 @@
+@@ -214,7 +197,7 @@
          },
      },
      # fmt: on
@@ -405,7 +404,9 @@ d={'a':1,
 #!/usr/bin/env python3
 import asyncio
 import sys
+
 from third_party import X, Y, Z
+
 from library import some_connection, \
                     some_decorator
 # fmt: off
@@ -413,6 +414,8 @@ from third_party import (X,
                          Y, Z)
 # fmt: on
 f'trigger 3.6 mode'
+
+
 # Comment 1
 
 # Comment 2
@@ -427,11 +430,15 @@ def func_no_args():
     continue
   exec('new-style exec', {}, {})
   return None
+
+
 async def coroutine(arg, exec=False):
  'Single-line docstring. Multiline is harder to reformat.'
  async with some_connection() as conn:
      await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
  await asyncio.sleep(1)
+
+
 @asyncio.coroutine
 @some_decorator(
 with_args=True,
@@ -439,17 +446,27 @@ many_args=[1,2,3]
 )
 def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
  return text[number:-1]
+
+
 # fmt: on
 def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r''):
  offset = attr.ib(default=attr.Factory( lambda: _r.uniform(1, 2)))
  assert task._cancel_stack[:len(old_stack)] == old_stack
+
+
 def spaces_types(a: int = 1, b: tuple = (), c: list = [], d: dict = {}, e: bool = True, f: int = -1, g: int = 1 if False else 2, h: str = "", i: str = r''): ...
+
+
 def spaces2(result= _core.Value(None)):
  ...
+
+
 something = {
     # fmt: off
     key: 'value',
 }
+
+
 def subscriptlist():
     atom[
         # fmt: off
@@ -458,14 +475,20 @@ def subscriptlist():
         # fmt: on
         goes + here, andhere,
        ]
+
+
 def import_as_names():
     # fmt: off
     from hello import a,        b
     'unformatted'
+
+
 def testlist_star_expr():
     # fmt: off
     a , b = *hello
     'unformatted'
+
+
 def yield_expr():
     # fmt: off
     yield hello
@@ -475,6 +498,8 @@ def yield_expr():
     # fmt: off
     ( yield hello )
     'unformatted'
+
+
 def example(session):
     # fmt: off
     result = session\
@@ -483,6 +508,8 @@ def example(session):
                 models.Customer.email == email_address)\
         .order_by(models.Customer.id.asc())\
         .all()
+
+
 def off_and_on_without_data():
     """All comments here are technically on the same prefix.
 
@@ -496,6 +523,8 @@ def off_and_on_without_data():
 
     # fmt: on
     pass
+
+
 def on_and_off_broken():
     """Another known limitation."""
     # fmt: on
@@ -504,6 +533,8 @@ def on_and_off_broken():
     and_=indeed . it  is  not  formatted
     because . the . handling . inside . generate_ignored_nodes()
     now . considers . multiple . fmt . directives . within . one . prefix
+
+
 def long_lines():
     if True:
         typedargslist.extend(
@@ -538,6 +569,8 @@ def long_lines():
         re.MULTILINE|re.VERBOSE
         # fmt: on
     )
+
+
 def single_literal_yapf_disable():
     """Black does not support this."""
     BAZ = {
@@ -545,6 +578,8 @@ def single_literal_yapf_disable():
         (5, 6, 7, 8),
         (9, 10, 11, 12)
     }
+
+
 cfg.rule(
     "Default", "address",
     xxxx_xxxx=["xxx-xxxxxx-xxxxxxxxxx"],
