@@ -518,7 +518,10 @@ impl<Context> Format<Context> for () {
 ///
 /// That's why the `ruff_js_formatter` crate must define a new-type that implements the formatting
 /// of `JsIfStatement`.
-pub trait FormatRule<T, C> {
+pub trait FormatRule<T, C>
+where
+    T: ?Sized,
+{
     fn fmt(&self, item: &T, f: &mut Formatter<C>) -> FormatResult<()>;
 }
 
