@@ -96,7 +96,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         + (if let Some(stmt) = orelse.first() {
                             // `elif:` and `else: if:` have the same AST representation.
                             // Avoid treating `elif:` as two statements.
-                            usize::from(!matches!(stmt, Stmt::If(_)))
+                            usize::from(!stmt.is_if_stmt())
                         } else {
                             0
                         })
