@@ -10,21 +10,15 @@ use ruff_python_semantic::scope::ScopeKind;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for common errors where certain methods are annotated as having a fixed return type,
-/// despite returning self at runtime. Such methods should be annotated with typing_extensions.Self
-///
-/// This check looks for:
-///
-///   1.  Any in-place BinOp dunder methods (__iadd__, __ior__, etc.) that do not return Self.
-///   2.  __new__, __enter__ and __aenter__ methods that return the class's name unparameterised.
-///   3.  __iter__ methods that return Iterator, even if the class inherits directly from Iterator.
-///   4.  __aiter__ methods that return AsyncIterator, even if the class inherits directly from AsyncIterator.
-///
-/// NOTE: This check excludes methods decorated with @overload or @AbstractMethod.
+/// Checks for methods that are annotated with a fixed return type, which
+/// should instead be returning `self`.
 ///
 /// ## Why is this bad?
-/// If the return type of these methods is fixed, and the class is subclassed, the type checker can
-/// get confused in scenarios such as:
+/// If methods like `__new__` or `__enter__` are annotated with a fixed return
+/// type, and the class is subclassed, type checkers will not be able to infer
+/// the correct return type.
+///
+/// For example:
 /// ```python
 /// class Shape:
 ///     def set_scale(self, scale: float) -> Shape:
@@ -32,14 +26,27 @@ use crate::checkers::ast::Checker;
 ///         return self
 ///
 /// class Circle(Shape):
-///     def set_radius(self, r: float) -> Circle:
-///         self.radius = r
+///     def set_radius(self, radius: float) -> Circle:
+///         self.radius = radius
 ///         return self
 ///
-/// Circle().set_scale(0.5)  # *Shape*, not Circle
+/// # This returns `Shape`, not `Circle`.
+/// Circle().set_scale(0.5)
+///
+/// # Thus, this expression is invalid, as `Shape` has no attribute `set_radius`.
 /// Circle().set_scale(0.5).set_radius(2.7)
-/// # => Error: Shape has no attribute set_radius
 /// ```
+///
+/// Specifically, this check enforces that the return type of the following
+/// methods is `Self`:
+///
+/// 1. In-place binary operations, like `__iadd__`, `__imul__`, etc.
+/// 1. `__new__`, `__enter__`, and `__aenter__`, if those methods return the
+///    class name.
+/// 1. `__iter__` methods that return `Iterator`, despite the class inheriting
+///    directly from `Iterator`.
+/// 1. `__aiter__` methods that return `AsyncIterator`, despite the class
+///    inheriting directly from `AsyncIterator`.
 ///
 /// ## Example
 /// ```python
