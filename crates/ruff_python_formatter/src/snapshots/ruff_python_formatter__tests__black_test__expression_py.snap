@@ -319,7 +319,7 @@ last_call()
 -)
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
-+((super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None))
++(super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None)
 +{'2.7': dead, '3.7': (long_live or die_hard)}
 +{'2.7': dead, '3.7': (long_live or die_hard), **{'3.6': verygood}}
  {**a, **b, **c}
@@ -450,8 +450,9 @@ last_call()
 +{'2.7': dead, '3.7': long_live or die_hard}
 +{'2.7', '3.6', '3.7', '3.8', '3.9', '4.0' if gilectomy else '3.10'}
  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
- (SomeName)
+-(SomeName)
  SomeName
++SomeName
  (Good, Bad, Ugly)
  (i for i in (1, 2, 3))
 -((i**2) for i in (1, 2, 3))
@@ -735,7 +736,7 @@ str or None if True else str or bytes or None
 (str or None) if True else (str or bytes or None)
 str or None if (1 if True else 2) else str or bytes or None
 (str or None) if (1 if True else 2) else (str or bytes or None)
-((super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None))
+(super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None)
 {'2.7': dead, '3.7': (long_live or die_hard)}
 {'2.7': dead, '3.7': (long_live or die_hard), **{'3.6': verygood}}
 {**a, **b, **c}
@@ -832,7 +833,7 @@ numpy[np.newaxis, :]
 {'2.7': dead, '3.7': long_live or die_hard}
 {'2.7', '3.6', '3.7', '3.8', '3.9', '4.0' if gilectomy else '3.10'}
 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
-(SomeName)
+SomeName
 SomeName
 (Good, Bad, Ugly)
 (i for i in (1, 2, 3))
