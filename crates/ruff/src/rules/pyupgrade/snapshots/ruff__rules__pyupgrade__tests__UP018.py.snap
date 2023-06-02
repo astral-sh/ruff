@@ -1,148 +1,148 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-UP018.py:20:1: UP018 [*] Unnecessary call to `str`
-   |
-20 | # These become string or byte literals
-21 | str()
-   | ^^^^^ UP018
-22 | str("foo")
-23 | str("""
-   |
-   = help: Replace with `str`
-
-ℹ Suggested fix
-17 17 | bytes("foo")
-18 18 | 
-19 19 | # These become string or byte literals
-20    |-str()
-   20 |+""
-21 21 | str("foo")
-22 22 | str("""
-23 23 | foo""")
-
 UP018.py:21:1: UP018 [*] Unnecessary call to `str`
    |
 21 | # These become string or byte literals
 22 | str()
+   | ^^^^^ UP018
 23 | str("foo")
-   | ^^^^^^^^^^ UP018
 24 | str("""
-25 | foo""")
    |
-   = help: Replace with `str`
+   = help: Replace with empty string
 
 ℹ Suggested fix
-18 18 | 
-19 19 | # These become string or byte literals
-20 20 | str()
-21    |-str("foo")
-   21 |+"foo"
-22 22 | str("""
-23 23 | foo""")
-24 24 | bytes()
+18 18 | f"{f'{str()}'}"
+19 19 | 
+20 20 | # These become string or byte literals
+21    |-str()
+   21 |+""
+22 22 | str("foo")
+23 23 | str("""
+24 24 | foo""")
 
 UP018.py:22:1: UP018 [*] Unnecessary call to `str`
    |
-22 |   str()
-23 |   str("foo")
-24 | / str("""
-25 | | foo""")
+22 | # These become string or byte literals
+23 | str()
+24 | str("foo")
+   | ^^^^^^^^^^ UP018
+25 | str("""
+26 | foo""")
+   |
+   = help: Replace with empty string
+
+ℹ Suggested fix
+19 19 | 
+20 20 | # These become string or byte literals
+21 21 | str()
+22    |-str("foo")
+   22 |+"foo"
+23 23 | str("""
+24 24 | foo""")
+25 25 | bytes()
+
+UP018.py:23:1: UP018 [*] Unnecessary call to `str`
+   |
+23 |   str()
+24 |   str("foo")
+25 | / str("""
+26 | | foo""")
    | |_______^ UP018
-26 |   bytes()
-27 |   bytes(b"foo")
+27 |   bytes()
+28 |   bytes(b"foo")
    |
-   = help: Replace with `str`
+   = help: Replace with empty string
 
 ℹ Suggested fix
-19 19 | # These become string or byte literals
-20 20 | str()
-21 21 | str("foo")
-22    |-str("""
-23    |-foo""")
-   22 |+"""
-   23 |+foo"""
-24 24 | bytes()
-25 25 | bytes(b"foo")
-26 26 | bytes(b"""
-
-UP018.py:24:1: UP018 [*] Unnecessary call to `bytes`
-   |
-24 | str("""
-25 | foo""")
-26 | bytes()
-   | ^^^^^^^ UP018
-27 | bytes(b"foo")
-28 | bytes(b"""
-   |
-   = help: Replace with `bytes`
-
-ℹ Suggested fix
-21 21 | str("foo")
-22 22 | str("""
-23 23 | foo""")
-24    |-bytes()
-   24 |+b""
-25 25 | bytes(b"foo")
-26 26 | bytes(b"""
-27 27 | foo""")
+20 20 | # These become string or byte literals
+21 21 | str()
+22 22 | str("foo")
+23    |-str("""
+24    |-foo""")
+   23 |+"""
+   24 |+foo"""
+25 25 | bytes()
+26 26 | bytes(b"foo")
+27 27 | bytes(b"""
 
 UP018.py:25:1: UP018 [*] Unnecessary call to `bytes`
    |
-25 | foo""")
-26 | bytes()
-27 | bytes(b"foo")
-   | ^^^^^^^^^^^^^ UP018
-28 | bytes(b"""
-29 | foo""")
+25 | str("""
+26 | foo""")
+27 | bytes()
+   | ^^^^^^^ UP018
+28 | bytes(b"foo")
+29 | bytes(b"""
    |
-   = help: Replace with `bytes`
+   = help: Replace with empty bytes
 
 ℹ Suggested fix
-22 22 | str("""
-23 23 | foo""")
-24 24 | bytes()
-25    |-bytes(b"foo")
-   25 |+b"foo"
-26 26 | bytes(b"""
-27 27 | foo""")
-28 28 | f"{str()}"
+22 22 | str("foo")
+23 23 | str("""
+24 24 | foo""")
+25    |-bytes()
+   25 |+b""
+26 26 | bytes(b"foo")
+27 27 | bytes(b"""
+28 28 | foo""")
 
 UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
    |
-26 |   bytes()
-27 |   bytes(b"foo")
-28 | / bytes(b"""
-29 | | foo""")
-   | |_______^ UP018
-30 |   f"{str()}"
+26 | foo""")
+27 | bytes()
+28 | bytes(b"foo")
+   | ^^^^^^^^^^^^^ UP018
+29 | bytes(b"""
+30 | foo""")
    |
-   = help: Replace with `bytes`
+   = help: Replace with empty bytes
 
 ℹ Suggested fix
-23 23 | foo""")
-24 24 | bytes()
-25 25 | bytes(b"foo")
-26    |-bytes(b"""
-27    |-foo""")
-   26 |+b"""
-   27 |+foo"""
-28 28 | f"{str()}"
+23 23 | str("""
+24 24 | foo""")
+25 25 | bytes()
+26    |-bytes(b"foo")
+   26 |+b"foo"
+27 27 | bytes(b"""
+28 28 | foo""")
+29 29 | f"{str()}"
 
-UP018.py:28:4: UP018 [*] Unnecessary call to `str`
+UP018.py:27:1: UP018 [*] Unnecessary call to `bytes`
    |
-28 | bytes(b"""
-29 | foo""")
-30 | f"{str()}"
+27 |   bytes()
+28 |   bytes(b"foo")
+29 | / bytes(b"""
+30 | | foo""")
+   | |_______^ UP018
+31 |   f"{str()}"
+   |
+   = help: Replace with empty bytes
+
+ℹ Suggested fix
+24 24 | foo""")
+25 25 | bytes()
+26 26 | bytes(b"foo")
+27    |-bytes(b"""
+28    |-foo""")
+   27 |+b"""
+   28 |+foo"""
+29 29 | f"{str()}"
+
+UP018.py:29:4: UP018 [*] Unnecessary call to `str`
+   |
+29 | bytes(b"""
+30 | foo""")
+31 | f"{str()}"
    |    ^^^^^ UP018
    |
-   = help: Replace with `str`
+   = help: Replace with empty string
 
 ℹ Suggested fix
-25 25 | bytes(b"foo")
-26 26 | bytes(b"""
-27 27 | foo""")
-28    |-f"{str()}"
-   28 |+f"{''}"
+26 26 | bytes(b"foo")
+27 27 | bytes(b"""
+28 28 | foo""")
+29    |-f"{str()}"
+   29 |+f"{''}"
 
 

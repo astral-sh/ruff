@@ -116,13 +116,12 @@ impl<'a> Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    /// Return `true` if a patch should be generated under the given autofix
-    /// `Mode`.
+    /// Return `true` if a patch should be generated for a given [`Rule`].
     pub(crate) fn patch(&self, code: Rule) -> bool {
         self.settings.rules.should_fix(code)
     }
 
-    /// Return `true` if a `Rule` is disabled by a `noqa` directive.
+    /// Return `true` if a [`Rule`] is disabled by a `noqa` directive.
     pub(crate) fn rule_is_ignored(&self, code: Rule, offset: TextSize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
@@ -3977,7 +3976,11 @@ where
                 }
             }
             Expr::JoinedStr(_) => {
-                self.semantic_model.flags |= SemanticModelFlags::F_STRING;
+                self.semantic_model.flags |= if self.semantic_model.in_f_string() {
+                    SemanticModelFlags::NESTED_F_STRING
+                } else {
+                    SemanticModelFlags::F_STRING
+                };
                 visitor::walk_expr(self, expr);
             }
             _ => visitor::walk_expr(self, expr),
