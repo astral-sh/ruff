@@ -1,8 +1,9 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use ruff_formatter::{format_args, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Stmt, Suite};
 
+/// Level at which the [`Suite`] appears in the source code.
 #[derive(Copy, Clone, Debug)]
 pub enum SuiteLevel {
     /// Statements at the module level / top level
@@ -25,8 +26,8 @@ impl Default for FormatSuite {
     }
 }
 
-impl FormatRule<Vec<Stmt>, PyFormatContext<'_>> for FormatSuite {
-    fn fmt(&self, statements: &Vec<Stmt>, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
+    fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
         let mut joiner = f.join_nodes(match self.level {
             SuiteLevel::TopLevel => NodeLevel::TopLevel,
             SuiteLevel::Nested => NodeLevel::Statement,
@@ -77,7 +78,7 @@ const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
     )
 }
 
-impl FormatRuleWithOptions<Vec<Stmt>, PyFormatContext<'_>> for FormatSuite {
+impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
     type Options = SuiteLevel;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -86,16 +87,16 @@ impl FormatRuleWithOptions<Vec<Stmt>, PyFormatContext<'_>> for FormatSuite {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Vec<Stmt> {
-    type Format<'a> = FormatRefWithRule<'a, Vec<Stmt>, FormatSuite, PyFormatContext<'ast>>;
+impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
+    type Format<'a> = FormatRefWithRule<'a, Suite, FormatSuite, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatSuite::default())
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Vec<Stmt> {
-    type Format = FormatOwnedWithRule<Vec<Stmt>, FormatSuite, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
+    type Format = FormatOwnedWithRule<Suite, FormatSuite, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
     }
@@ -107,7 +108,7 @@ mod tests {
     use crate::prelude::*;
     use crate::statement::suite::SuiteLevel;
     use ruff_formatter::{format, SimpleFormatOptions};
-    use rustpython_parser::ast::ModModule;
+    use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
     fn format_suite(level: SuiteLevel) -> String {
@@ -132,13 +133,13 @@ def trailing_func():
     pass
 "#;
 
-        let module = ModModule::parse(source, "test.py").unwrap();
+        let statements = Suite::parse(source, "test.py").unwrap();
 
         let context =
             PyFormatContext::new(SimpleFormatOptions::default(), source, Comments::default());
 
         let test_formatter =
-            format_with(|f: &mut PyFormatter| module.body.format().with_options(level).fmt(f));
+            format_with(|f: &mut PyFormatter| statements.format().with_options(level).fmt(f));
 
         let formatted = format!(context, [test_formatter]).unwrap();
         let printed = formatted.print().unwrap();

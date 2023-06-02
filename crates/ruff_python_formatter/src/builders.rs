@@ -5,7 +5,7 @@ use ruff_formatter::write;
 use rustpython_parser::ast::Ranged;
 
 /// Provides Python specific extensions to [`Formatter`].
-pub(crate) trait PyFormatterExtensions<'context, 'buf> {
+pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
     /// Creates a joiner that inserts the appropriate number of empty lines between two nodes, depending on the
     /// line breaks that separate the two nodes in the source document. The `level` customizes the maximum allowed
     /// empty lines between any two nodes. Separates any two nodes by at least a hard line break.
@@ -13,29 +13,25 @@ pub(crate) trait PyFormatterExtensions<'context, 'buf> {
     /// * [`NodeLevel::Module`]: Up to two empty lines
     /// * [`NodeLevel::Statement`]: Up to one empty line
     /// * [`NodeLevel::Parenthesized`]: No empty lines
-    fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel)
-        -> JoinNodesBuilder<'fmt, 'context, 'buf>;
+    fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf>;
 }
 
-impl<'buf, 'context> PyFormatterExtensions<'context, 'buf> for PyFormatter<'context, 'buf> {
-    fn join_nodes<'fmt>(
-        &'fmt mut self,
-        level: NodeLevel,
-    ) -> JoinNodesBuilder<'fmt, 'context, 'buf> {
+impl<'buf, 'ast> PyFormatterExtensions<'ast, 'buf> for PyFormatter<'ast, 'buf> {
+    fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf> {
         JoinNodesBuilder::new(self, level)
     }
 }
 
 #[must_use = "must eventually call `finish()` on the builder."]
-pub(crate) struct JoinNodesBuilder<'fmt, 'context, 'buf> {
-    fmt: &'fmt mut PyFormatter<'context, 'buf>,
+pub(crate) struct JoinNodesBuilder<'fmt, 'ast, 'buf> {
+    fmt: &'fmt mut PyFormatter<'ast, 'buf>,
     result: FormatResult<()>,
     has_elements: bool,
     node_level: NodeLevel,
 }
 
-impl<'fmt, 'context, 'buf> JoinNodesBuilder<'fmt, 'context, 'buf> {
-    fn new(fmt: &'fmt mut PyFormatter<'context, 'buf>, level: NodeLevel) -> Self {
+impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
+    fn new(fmt: &'fmt mut PyFormatter<'ast, 'buf>, level: NodeLevel) -> Self {
         Self {
             fmt,
             result: Ok(()),
@@ -46,7 +42,7 @@ impl<'fmt, 'context, 'buf> JoinNodesBuilder<'fmt, 'context, 'buf> {
 
     /// Writes a `node`, inserting the appropriate number of line breaks depending on the number of
     /// line breaks that were present in the source document. Uses `content` to format the `node`.
-    pub(crate) fn entry<T>(&mut self, node: &T, content: &dyn Format<PyFormatContext<'context>>)
+    pub(crate) fn entry<T>(&mut self, node: &T, content: &dyn Format<PyFormatContext<'ast>>)
     where
         T: Ranged,
     {
@@ -73,7 +69,7 @@ impl<'fmt, 'context, 'buf> JoinNodesBuilder<'fmt, 'context, 'buf> {
     pub(crate) fn entries<T, F, I>(&mut self, entries: I) -> &mut Self
     where
         T: Ranged,
-        F: Format<PyFormatContext<'context>>,
+        F: Format<PyFormatContext<'ast>>,
         I: IntoIterator<Item = (T, F)>,
     {
         for (node, content) in entries {
@@ -89,7 +85,7 @@ impl<'fmt, 'context, 'buf> JoinNodesBuilder<'fmt, 'context, 'buf> {
     #[allow(unused)]
     pub(crate) fn nodes<'a, T, I>(&mut self, nodes: I) -> &mut Self
     where
-        T: Ranged + AsFormat<PyFormatContext<'context>> + 'a,
+        T: Ranged + AsFormat<PyFormatContext<'ast>> + 'a,
         I: IntoIterator<Item = &'a T>,
     {
         for node in nodes {
@@ -102,8 +98,8 @@ impl<'fmt, 'context, 'buf> JoinNodesBuilder<'fmt, 'context, 'buf> {
     /// Writes a single entry using the specified separator to separate the entry from a previous entry.
     pub(crate) fn entry_with_separator(
         &mut self,
-        separator: &dyn Format<PyFormatContext<'context>>,
-        content: &dyn Format<PyFormatContext<'context>>,
+        separator: &dyn Format<PyFormatContext<'ast>>,
+        content: &dyn Format<PyFormatContext<'ast>>,
     ) {
         self.result = self.result.and_then(|_| {
             if self.has_elements {
