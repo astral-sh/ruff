@@ -2735,6 +2735,7 @@ where
                     Rule::StartProcessWithAShell,
                     Rule::StartProcessWithNoShell,
                     Rule::StartProcessWithPartialPath,
+                    Rule::UnixCommandWildcardInjection,
                 ]) {
                     flake8_bandit::rules::shell_injection(self, func, args, keywords);
                 }

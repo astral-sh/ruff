@@ -529,6 +529,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "606") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::StartProcessWithNoShell),
         (Flake8Bandit, "607") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::StartProcessWithPartialPath),
         (Flake8Bandit, "608") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::HardcodedSQLExpression),
+        (Flake8Bandit, "609") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::UnixCommandWildcardInjection),
         (Flake8Bandit, "612") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::LoggingConfigInsecureListen),
         (Flake8Bandit, "701") => (RuleGroup::Unspecified, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
 
