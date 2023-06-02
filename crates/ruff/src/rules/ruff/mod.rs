@@ -4,21 +4,25 @@ pub(crate) mod rules;
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::path::Path;
 
     use anyhow::Result;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
+    use ruff_python_ast::source_code::SourceFileBuilder;
+
+    use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
     use crate::settings::types::PerFileIgnore;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"); "RUF010")]
-    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"); "RUF005")]
-    #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
+    #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
+    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
+    #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -163,8 +167,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"); "RUF008")]
-    #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"); "RUF009")]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
     fn mutable_defaults(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -172,6 +176,24 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("bleach"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("invalid_author"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin"))]
+    #[test_case(Rule::InvalidPyprojectToml, Path::new("maturin_gh_1615"))]
+    fn invalid_pyproject_toml(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let path = test_resource_path("fixtures")
+            .join("ruff")
+            .join("pyproject_toml")
+            .join(path)
+            .join("pyproject.toml");
+        let contents = fs::read_to_string(path)?;
+        let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
+        let messages = lint_pyproject_toml(source_file)?;
+        assert_messages!(snapshot, messages);
         Ok(())
     }
 }

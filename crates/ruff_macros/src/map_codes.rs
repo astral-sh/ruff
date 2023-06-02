@@ -10,61 +10,59 @@ use syn::{
 
 use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_nursery};
 
-struct LinterToRuleData {
-    /// The rule identifier, e.g., `Rule::UnaryPrefixIncrement`.
-    rule_id: Path,
-    /// The rule group identifiers, e.g., `RuleGroup::Unspecified`.
-    rule_group_id: Path,
-    /// The rule attributes.
+/// A rule entry in the big match statement such a
+/// `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+#[derive(Clone)]
+struct Rule {
+    /// The actual name of the rule, e.g., `NoIndentedBlock`.
+    name: Ident,
+    /// The linter associated with the rule, e.g., `Pycodestyle`.
+    linter: Ident,
+    /// The code associated with the rule, e.g., `"E112"`.
+    code: LitStr,
+    /// The rule group identifier, e.g., `RuleGroup::Nursery`.
+    group: Path,
+    /// The path to the struct implementing the rule, e.g.
+    /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
+    path: Path,
+    /// The rule attributes, e.g. for feature gates
     attrs: Vec<Attribute>,
-}
-
-struct RuleToLinterData<'a> {
-    /// The linter associated with the rule, e.g., `Flake8Bugbear`.
-    linter: &'a Ident,
-    /// The code associated with the rule, e.g., `"002"`.
-    code: &'a str,
-    /// The rule group identifier, e.g., `RuleGroup::Unspecified`.
-    rule_group_id: &'a Path,
-    /// The rule attributes.
-    attrs: &'a [Attribute],
 }
 
 pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let Some(last_stmt) = func.block.stmts.last() else {
         return Err(Error::new(func.block.span(), "expected body to end in an expression"));
     };
-    let Stmt::Expr(Expr::Call(ExprCall{args: some_args, ..}), _) = last_stmt else {
-        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"))
+    let Stmt::Expr(Expr::Call(ExprCall { args: some_args, .. }), _) = last_stmt else {
+        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"));
     };
     let mut some_args = some_args.into_iter();
     let (Some(Expr::Match(ExprMatch { arms, .. })), None) = (some_args.next(), some_args.next()) else {
-        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"))
+        return Err(Error::new(last_stmt.span(), "expected last expression to be `Some(match (..) { .. })`"));
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
     // `(Rule::UnaryPrefixIncrement, RuleGroup::Unspecified, vec![])`).
-    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, LinterToRuleData>> = BTreeMap::new();
+    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
         if matches!(arm.pat, Pat::Wild(..)) {
             break;
         }
 
-        let entry = syn::parse::<Entry>(arm.into_token_stream().into())?;
-        linter_to_rules.entry(entry.linter).or_default().insert(
-            entry.code.value(),
-            LinterToRuleData {
-                rule_id: entry.rule,
-                rule_group_id: entry.group,
-                attrs: entry.attrs,
-            },
-        );
+        let rule = syn::parse::<Rule>(arm.into_token_stream().into())?;
+        linter_to_rules
+            .entry(rule.linter.clone())
+            .or_default()
+            .insert(rule.code.value(), rule);
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
 
-    let mut output = quote! {
+    let all_rules = linter_to_rules.values().flat_map(BTreeMap::values);
+    let mut output = register_rules(all_rules);
+
+    output.extend(quote! {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub enum RuleCodePrefix {
             #(#linter_idents(#linter_idents),)*
@@ -83,21 +81,14 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 }
             }
         }
-    };
+    });
 
     for (linter, rules) in &linter_to_rules {
         output.extend(super::rule_code_prefix::expand(
             linter,
-            rules.iter().map(
-                |(
-                    code,
-                    LinterToRuleData {
-                        rule_group_id,
-                        attrs,
-                        ..
-                    },
-                )| (code.as_str(), rule_group_id, attrs),
-            ),
+            rules
+                .iter()
+                .map(|(code, Rule { group, attrs, .. })| (code.as_str(), group, attrs)),
         ));
 
         output.extend(quote! {
@@ -117,56 +108,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let mut all_codes = Vec::new();
 
     for (linter, rules) in &linter_to_rules {
-        // Group the rules by their common prefixes.
-        // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
-        let mut rules_by_prefix = BTreeMap::new();
-
-        for (
-            code,
-            LinterToRuleData {
-                rule_id,
-                rule_group_id,
-                attrs,
-            },
-        ) in rules
-        {
-            // Nursery rules have to be explicitly selected, so we ignore them when looking at
-            // prefixes.
-            if is_nursery(rule_group_id) {
-                rules_by_prefix.insert(code.clone(), vec![(rule_id.clone(), attrs.clone())]);
-                continue;
-            }
-
-            for i in 1..=code.len() {
-                let prefix = code[..i].to_string();
-                let rules: Vec<_> = rules
-                    .iter()
-                    .filter_map(
-                        |(
-                            code,
-                            LinterToRuleData {
-                                rule_id,
-                                rule_group_id,
-                                attrs,
-                            },
-                        )| {
-                            // Nursery rules have to be explicitly selected, so we ignore them when
-                            // looking at prefixes.
-                            if is_nursery(rule_group_id) {
-                                return None;
-                            }
-
-                            if code.starts_with(&prefix) {
-                                Some((rule_id.clone(), attrs.clone()))
-                            } else {
-                                None
-                            }
-                        },
-                    )
-                    .collect();
-                rules_by_prefix.insert(prefix, rules);
-            }
-        }
+        let rules_by_prefix = rules_by_prefix(rules);
 
         for (prefix, rules) in &rules_by_prefix {
             let prefix_ident = get_prefix_ident(prefix);
@@ -182,9 +124,10 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         let mut prefix_into_iter_match_arms = quote!();
 
         for (prefix, rules) in rules_by_prefix {
-            let rule_paths = rules
-                .iter()
-                .map(|(path, .., attrs)| quote!(#(#attrs)* #path));
+            let rule_paths = rules.iter().map(|(path, .., attrs)| {
+                let rule_name = path.segments.last().unwrap();
+                quote!(#(#attrs)* Rule::#rule_name)
+            });
             let prefix_ident = get_prefix_ident(&prefix);
             let attr = match if_all_same(rules.iter().map(|(.., attrs)| attrs)) {
                 Some(attr) => quote!(#(#attr)*),
@@ -232,35 +175,71 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
     });
 
-    // Map from rule to codes that can be used to select it.
-    // This abstraction exists to support a one-to-many mapping, whereby a single rule could map
-    // to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
-    // different codes). We haven't actually activated this functionality yet, but some work was
-    // done to support it, so the logic exists here.
-    let mut rule_to_codes: HashMap<&Path, Vec<RuleToLinterData>> = HashMap::new();
+    let rule_to_code = generate_rule_to_code(&linter_to_rules);
+    output.extend(rule_to_code);
+
+    let iter = generate_iter_impl(&linter_to_rules, &all_codes);
+    output.extend(iter);
+
+    Ok(output)
+}
+
+/// Group the rules by their common prefixes.
+fn rules_by_prefix(
+    rules: &BTreeMap<String, Rule>,
+) -> BTreeMap<String, Vec<(Path, Vec<Attribute>)>> {
+    // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
+    let mut rules_by_prefix = BTreeMap::new();
+
+    for (code, rule) in rules {
+        // Nursery rules have to be explicitly selected, so we ignore them when looking at
+        // prefixes.
+        if is_nursery(&rule.group) {
+            rules_by_prefix.insert(code.clone(), vec![(rule.path.clone(), rule.attrs.clone())]);
+            continue;
+        }
+
+        for i in 1..=code.len() {
+            let prefix = code[..i].to_string();
+            let rules: Vec<_> = rules
+                .iter()
+                .filter_map(|(code, rule)| {
+                    // Nursery rules have to be explicitly selected, so we ignore them when
+                    // looking at prefixes.
+                    if is_nursery(&rule.group) {
+                        return None;
+                    }
+
+                    if code.starts_with(&prefix) {
+                        Some((rule.path.clone(), rule.attrs.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            rules_by_prefix.insert(prefix, rules);
+        }
+    }
+    rules_by_prefix
+}
+
+/// Map from rule to codes that can be used to select it.
+/// This abstraction exists to support a one-to-many mapping, whereby a single rule could map
+/// to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
+/// different codes). We haven't actually activated this functionality yet, but some work was
+/// done to support it, so the logic exists here.
+fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>) -> TokenStream {
+    let mut rule_to_codes: HashMap<&Path, Vec<&Rule>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
-    for (linter, map) in &linter_to_rules {
-        for (
-            code,
-            LinterToRuleData {
-                rule_id,
-                rule_group_id,
-                attrs,
-            },
-        ) in map
-        {
-            rule_to_codes
-                .entry(rule_id)
-                .or_default()
-                .push(RuleToLinterData {
-                    linter,
-                    code,
-                    rule_group_id,
-                    attrs,
-                });
+    for (linter, map) in linter_to_rules {
+        for (code, rule) in map {
+            let Rule {
+                path, attrs, name, ..
+            } = rule;
+            rule_to_codes.entry(path).or_default().push(rule);
             linter_code_for_rule_match_arms.extend(quote! {
-                #(#attrs)* (Self::#linter, #rule_id) => Some(#code),
+                #(#attrs)* (Self::#linter, Rule::#name) => Some(#code),
             });
         }
     }
@@ -269,6 +248,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let mut rule_group_match_arms = quote!();
 
     for (rule, codes) in rule_to_codes {
+        let rule_name = rule.segments.last().unwrap();
         assert_eq!(
             codes.len(),
             1,
@@ -284,30 +264,31 @@ and before we can do that we have to rename all our rules to match our naming co
 
 See also https://github.com/charliermarsh/ruff/issues/2186.
 ",
-            rule.segments.last().unwrap().ident
+            rule_name.ident
         );
 
-        let RuleToLinterData {
+        let Rule {
             linter,
             code,
-            rule_group_id,
+            group,
             attrs,
+            ..
         } = codes
             .iter()
-            .sorted_by_key(|data| *data.linter == "Pylint")
+            .sorted_by_key(|data| data.linter == "Pylint")
             .next()
             .unwrap();
 
         rule_noqa_code_match_arms.extend(quote! {
-            #(#attrs)* #rule => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
+            #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
         });
 
         rule_group_match_arms.extend(quote! {
-            #(#attrs)* #rule => #rule_group_id,
+            #(#attrs)* Rule::#rule_name => #group,
         });
     }
 
-    output.extend(quote! {
+    let rule_to_code = quote! {
         impl Rule {
             pub fn noqa_code(&self) -> NoqaCode {
                 use crate::registry::RuleNamespace;
@@ -338,19 +319,27 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
                 }
             }
         }
-    });
+    };
+    rule_to_code
+}
 
+/// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
+fn generate_iter_impl(
+    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
+    all_codes: &[TokenStream],
+) -> TokenStream {
     let mut linter_into_iter_match_arms = quote!();
-    for (linter, map) in &linter_to_rules {
-        let rule_paths = map
-            .values()
-            .map(|LinterToRuleData { rule_id, attrs, .. }| quote!(#(#attrs)* #rule_id));
+    for (linter, map) in linter_to_rules {
+        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
+            let rule_name = path.segments.last().unwrap();
+            quote!(#(#attrs)* Rule::#rule_name)
+        });
         linter_into_iter_match_arms.extend(quote! {
             Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
         });
     }
 
-    output.extend(quote! {
+    quote! {
         impl IntoIterator for &Linter {
             type Item = Rule;
             type IntoIter = ::std::vec::IntoIter<Self::Item>;
@@ -362,29 +351,94 @@ See also https://github.com/charliermarsh/ruff/issues/2186.
             }
         }
 
-    });
-
-    output.extend(quote! {
         impl RuleCodePrefix {
             pub fn iter() -> ::std::vec::IntoIter<RuleCodePrefix> {
                 vec![ #(#all_codes,)* ].into_iter()
             }
         }
-    });
-
-    Ok(output)
+    }
 }
 
-struct Entry {
-    linter: Ident,
-    code: LitStr,
-    group: Path,
-    rule: Path,
-    attrs: Vec<Attribute>,
+/// Generate the `Rule` enum
+fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
+    let mut rule_variants = quote!();
+    let mut rule_message_formats_match_arms = quote!();
+    let mut rule_autofixable_match_arms = quote!();
+    let mut rule_explanation_match_arms = quote!();
+
+    let mut from_impls_for_diagnostic_kind = quote!();
+
+    for Rule {
+        name, attrs, path, ..
+    } in input
+    {
+        rule_variants.extend(quote! {
+            #(#attrs)*
+            #name,
+        });
+        // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
+        rule_message_formats_match_arms
+            .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
+        rule_autofixable_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::AUTOFIX,},
+        );
+        rule_explanation_match_arms
+            .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
+
+        // Enable conversion from `DiagnosticKind` to `Rule`.
+        from_impls_for_diagnostic_kind
+            .extend(quote! {#(#attrs)* stringify!(#name) => Rule::#name,});
+    }
+
+    quote! {
+        #[derive(
+            EnumIter,
+            Debug,
+            PartialEq,
+            Eq,
+            Copy,
+            Clone,
+            Hash,
+            PartialOrd,
+            Ord,
+            ::ruff_macros::CacheKey,
+            AsRefStr,
+            ::strum_macros::IntoStaticStr,
+        )]
+        #[repr(u16)]
+        #[strum(serialize_all = "kebab-case")]
+        pub enum Rule { #rule_variants }
+
+        impl Rule {
+            /// Returns the format strings used to report violations of this rule.
+            pub fn message_formats(&self) -> &'static [&'static str] {
+                match self { #rule_message_formats_match_arms }
+            }
+
+            /// Returns the documentation for this rule.
+            pub fn explanation(&self) -> Option<&'static str> {
+                match self { #rule_explanation_match_arms }
+            }
+
+            /// Returns the autofix status of this rule.
+            pub const fn autofixable(&self) -> ruff_diagnostics::AutofixKind {
+                match self { #rule_autofixable_match_arms }
+            }
+        }
+
+        impl AsRule for ruff_diagnostics::DiagnosticKind {
+            fn rule(&self) -> Rule {
+                match self.name.as_str() {
+                    #from_impls_for_diagnostic_kind
+                    _ => unreachable!("invalid rule name: {}", self.name),
+                }
+            }
+        }
+    }
 }
 
-impl Parse for Entry {
-    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Nursery, Rule::NoIndentedBlock),`
+impl Parse for Rule {
+    /// Parses a match arm such as `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;
@@ -397,13 +451,15 @@ impl Parse for Entry {
         parenthesized!(pat_tuple in input);
         let group: Path = pat_tuple.parse()?;
         let _: Token!(,) = pat_tuple.parse()?;
-        let rule: Path = pat_tuple.parse()?;
+        let rule_path: Path = pat_tuple.parse()?;
         let _: Token!(,) = input.parse()?;
-        Ok(Entry {
+        let rule_name = rule_path.segments.last().unwrap().ident.clone();
+        Ok(Rule {
+            name: rule_name,
             linter,
             code,
             group,
-            rule,
+            path: rule_path,
             attrs,
         })
     }

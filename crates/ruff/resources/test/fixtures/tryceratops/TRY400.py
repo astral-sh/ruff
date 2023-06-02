@@ -4,6 +4,7 @@ Use '.exception' over '.error' inside except blocks
 """
 
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -60,3 +61,17 @@ def good():
         a = 1
     except Exception:
         foo.exception("Context message here")
+
+
+def fine():
+    try:
+        a = 1
+    except Exception:
+        logger.error("Context message here", exc_info=True)
+
+
+def fine():
+    try:
+        a = 1
+    except Exception:
+        logger.error("Context message here", exc_info=sys.exc_info())

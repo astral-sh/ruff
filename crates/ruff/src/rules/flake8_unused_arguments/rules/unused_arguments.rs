@@ -1,6 +1,7 @@
 use std::iter;
 
 use regex::Regex;
+use rustpython_parser::ast;
 use rustpython_parser::ast::{Arg, Arguments};
 
 use ruff_diagnostics::DiagnosticKind;
@@ -10,15 +11,15 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::binding::Bindings;
-use ruff_python_semantic::scope::{FunctionDef, Lambda, Scope, ScopeKind};
-
-use super::super::helpers;
+use ruff_python_semantic::scope::{Scope, ScopeKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
+use super::super::helpers;
+
 /// An AST node that can contain arguments.
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum Argumentable {
     Function,
     Method,
@@ -28,7 +29,7 @@ enum Argumentable {
 }
 
 impl Argumentable {
-    pub(crate) fn check_for(self, name: String) -> DiagnosticKind {
+    fn check_for(self, name: String) -> DiagnosticKind {
         match self {
             Self::Function => UnusedFunctionArgument { name }.into(),
             Self::Method => UnusedMethodArgument { name }.into(),
@@ -38,7 +39,7 @@ impl Argumentable {
         }
     }
 
-    pub(crate) const fn rule_code(self) -> Rule {
+    const fn rule_code(self) -> Rule {
         match self {
             Self::Function => Rule::UnusedFunctionArgument,
             Self::Method => Rule::UnusedMethodArgument,
@@ -89,15 +90,15 @@ impl Violation for UnusedFunctionArgument {
 ///
 /// ## Example
 /// ```python
-/// class MyClass:
-///     def my_method(self, arg1, arg2):
+/// class Class:
+///     def foo(self, arg1, arg2):
 ///         print(arg1)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class MyClass:
-///     def my_method(self, arg1):
+/// class Class:
+///     def foo(self, arg1):
 ///         print(arg1)
 /// ```
 #[violation]
@@ -122,24 +123,18 @@ impl Violation for UnusedMethodArgument {
 ///
 /// ## Example
 /// ```python
-/// class MyClass:
+/// class Class:
 ///     @classmethod
-///     def my_method(self, arg1, arg2):
+///     def foo(cls, arg1, arg2):
 ///         print(arg1)
-///
-///     def other_method(self):
-///         self.my_method("foo", "bar")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class MyClass:
+/// class Class:
 ///     @classmethod
-///     def my_method(self, arg1):
+///     def foo(cls, arg1):
 ///         print(arg1)
-///
-///     def other_method(self):
-///         self.my_method("foo", "bar")
 /// ```
 #[violation]
 pub struct UnusedClassMethodArgument {
@@ -163,24 +158,18 @@ impl Violation for UnusedClassMethodArgument {
 ///
 /// ## Example
 /// ```python
-/// class MyClass:
+/// class Class:
 ///     @staticmethod
-///     def my_static_method(self, arg1, arg2):
+///     def foo(arg1, arg2):
 ///         print(arg1)
-///
-///     def other_method(self):
-///         self.my_static_method("foo", "bar")
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class MyClass:
+/// class Class:
 ///     @static
-///     def my_static_method(self, arg1):
+///     def foo(arg1):
 ///         print(arg1)
-///
-///     def other_method(self):
-///         self.my_static_method("foo", "bar")
 /// ```
 #[violation]
 pub struct UnusedStaticMethodArgument {
@@ -317,7 +306,14 @@ pub(crate) fn unused_arguments(
     bindings: &Bindings,
 ) -> Vec<Diagnostic> {
     match &scope.kind {
-        ScopeKind::Function(FunctionDef {
+        ScopeKind::Function(ast::StmtFunctionDef {
+            name,
+            args,
+            body,
+            decorator_list,
+            ..
+        })
+        | ScopeKind::AsyncFunction(ast::StmtAsyncFunctionDef {
             name,
             args,
             body,
@@ -431,7 +427,7 @@ pub(crate) fn unused_arguments(
                 }
             }
         }
-        ScopeKind::Lambda(Lambda { args, .. }) => {
+        ScopeKind::Lambda(ast::ExprLambda { args, .. }) => {
             if checker.enabled(Argumentable::Lambda.rule_code()) {
                 function(
                     Argumentable::Lambda,

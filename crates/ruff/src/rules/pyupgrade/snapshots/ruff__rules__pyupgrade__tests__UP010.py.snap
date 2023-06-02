@@ -146,10 +146,9 @@ UP010.py:10:5: UP010 [*] Unnecessary `__future__` import `generators` for target
 8  8  | if True:
 9  9  |     from __future__ import generator_stop
 10    |-    from __future__ import generators
-   10 |+    pass
-11 11 | 
-12 12 | if True:
-13 13 |     from __future__ import generator_stop
+11 10 | 
+12 11 | if True:
+13 12 |     from __future__ import generator_stop
 
 UP010.py:13:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
    |

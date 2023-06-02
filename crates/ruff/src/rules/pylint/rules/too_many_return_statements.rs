@@ -99,12 +99,13 @@ pub(crate) fn too_many_return_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser as parser;
+    use rustpython_parser::ast::Suite;
+    use rustpython_parser::Parse;
 
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_returns(&stmts), expected);
         Ok(())
     }

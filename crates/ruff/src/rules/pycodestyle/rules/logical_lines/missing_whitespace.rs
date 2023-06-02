@@ -53,11 +53,11 @@ pub(crate) fn missing_whitespace(
         let kind = token.kind();
         match kind {
             TokenKind::Lsqb => {
-                open_parentheses += 1;
+                open_parentheses = open_parentheses.saturating_add(1);
                 prev_lsqb = token.start();
             }
             TokenKind::Rsqb => {
-                open_parentheses -= 1;
+                open_parentheses = open_parentheses.saturating_sub(1);
             }
             TokenKind::Lbrace => {
                 prev_lbrace = token.start();

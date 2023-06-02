@@ -4,7 +4,7 @@ use std::path::Path;
 use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Stmt};
+use rustpython_parser::ast::{Expr, Ranged, Stmt};
 use smallvec::smallvec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
@@ -13,11 +13,12 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::binding::{
-    Binding, BindingId, BindingKind, Bindings, Exceptions, FromImportation, Importation,
-    SubmoduleImportation,
+    Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImportation,
+    Importation, SubmoduleImportation,
 };
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
+use crate::globals::{Globals, GlobalsArena};
 use crate::node::{NodeId, Nodes};
 use crate::reference::References;
 use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
@@ -43,6 +44,8 @@ pub struct SemanticModel<'a> {
     pub bindings: Bindings<'a>,
     // Stack of all references created in any scope, at any point in execution.
     pub references: References,
+    // Arena of global bindings.
+    globals: GlobalsArena<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
     pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
@@ -68,6 +71,7 @@ impl<'a> SemanticModel<'a> {
             definition_id: DefinitionId::module(),
             bindings: Bindings::default(),
             references: References::default(),
+            globals: GlobalsArena::default(),
             shadowed_bindings: IntMap::default(),
             body: &[],
             body_index: 0,
@@ -86,6 +90,10 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
         if call_path.as_slice() == ["typing", target] {
+            return true;
+        }
+
+        if call_path.as_slice() == ["_typeshed", target] {
             return true;
         }
 
@@ -117,6 +125,12 @@ impl<'a> SemanticModel<'a> {
     pub fn is_builtin(&self, member: &str) -> bool {
         self.find_binding(member)
             .map_or(false, |binding| binding.kind.is_builtin())
+    }
+
+    /// Return `true` if `member` is unbound.
+    pub fn is_unbound(&self, member: &str) -> bool {
+        self.find_binding(member)
+            .map_or(true, |binding| binding.kind.is_builtin())
     }
 
     /// Resolve a reference to the given symbol.
@@ -212,7 +226,7 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_function();
+            seen_function |= scope.kind.is_any_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -350,7 +364,7 @@ impl<'a> SemanticModel<'a> {
         &self,
         module: &str,
         member: &str,
-    ) -> Option<(&Stmt, String)> {
+    ) -> Option<ImportedName> {
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
             scope.binding_ids().find_map(|binding_id| {
                 let binding = &self.bindings[binding_id];
@@ -360,14 +374,18 @@ impl<'a> SemanticModel<'a> {
                     // `import sys as sys2` -> `sys2.exit`
                     BindingKind::Importation(Importation { name, full_name }) => {
                         if full_name == &module {
-                            // Verify that `sys` isn't bound in an inner scope.
-                            if self
-                                .scopes()
-                                .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
-                            {
-                                if let Some(source) = binding.source {
-                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                            if let Some(source) = binding.source {
+                                // Verify that `sys` isn't bound in an inner scope.
+                                if self
+                                    .scopes()
+                                    .take(scope_index)
+                                    .all(|scope| scope.get(name).is_none())
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{name}.{member}"),
+                                        range: self.stmts[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -378,14 +396,18 @@ impl<'a> SemanticModel<'a> {
                     BindingKind::FromImportation(FromImportation { name, full_name }) => {
                         if let Some((target_module, target_member)) = full_name.split_once('.') {
                             if target_module == module && target_member == member {
-                                // Verify that `join` isn't bound in an inner scope.
-                                if self
-                                    .scopes()
-                                    .take(scope_index)
-                                    .all(|scope| scope.get(name).is_none())
-                                {
-                                    if let Some(source) = binding.source {
-                                        return Some((self.stmts[source], (*name).to_string()));
+                                if let Some(source) = binding.source {
+                                    // Verify that `join` isn't bound in an inner scope.
+                                    if self
+                                        .scopes()
+                                        .take(scope_index)
+                                        .all(|scope| scope.get(name).is_none())
+                                    {
+                                        return Some(ImportedName {
+                                            name: (*name).to_string(),
+                                            range: self.stmts[source].range(),
+                                            context: binding.context,
+                                        });
                                     }
                                 }
                             }
@@ -395,14 +417,18 @@ impl<'a> SemanticModel<'a> {
                     // `import os.path ` -> `os.name`
                     BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
                         if name == &module {
-                            // Verify that `os` isn't bound in an inner scope.
-                            if self
-                                .scopes()
-                                .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
-                            {
-                                if let Some(source) = binding.source {
-                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                            if let Some(source) = binding.source {
+                                // Verify that `os` isn't bound in an inner scope.
+                                if self
+                                    .scopes()
+                                    .take(scope_index)
+                                    .all(|scope| scope.get(name).is_none())
+                                {
+                                    return Some(ImportedName {
+                                        name: format!("{name}.{member}"),
+                                        range: self.stmts[source].range(),
+                                        context: binding.context,
+                                    });
                                 }
                             }
                         }
@@ -534,18 +560,60 @@ impl<'a> SemanticModel<'a> {
         self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
     }
 
+    /// Set the [`Globals`] for the current [`Scope`].
+    pub fn set_globals(&mut self, globals: Globals<'a>) {
+        // If any global bindings don't already exist in the global scope, add them.
+        for (name, range) in globals.iter() {
+            if self.global_scope().get(name).map_or(true, |binding_id| {
+                self.bindings[binding_id].kind.is_annotation()
+            }) {
+                let id = self.bindings.push(Binding {
+                    kind: BindingKind::Assignment,
+                    range: *range,
+                    references: Vec::new(),
+                    source: self.stmt_id,
+                    context: self.execution_context(),
+                    exceptions: self.exceptions(),
+                    flags: BindingFlags::empty(),
+                });
+                self.global_scope_mut().add(name, id);
+            }
+        }
+
+        self.scopes[self.scope_id].set_globals_id(self.globals.push(globals));
+    }
+
+    /// Return the [`TextRange`] at which a name is declared as global in the current [`Scope`].
+    pub fn global(&self, name: &str) -> Option<TextRange> {
+        let global_id = self.scopes[self.scope_id].globals_id()?;
+        self.globals[global_id].get(name).copied()
+    }
+
     /// Return `true` if the given [`ScopeId`] matches that of the current scope.
     pub fn is_current_scope(&self, scope_id: ScopeId) -> bool {
         self.scope_id == scope_id
     }
 
-    /// Return `true` if the context is at the top level of the module (i.e., in the module scope,
+    /// Return `true` if the model is at the top level of the module (i.e., in the module scope,
     /// and not nested within any statements).
     pub fn at_top_level(&self) -> bool {
         self.scope_id.is_global()
             && self
                 .stmt_id
                 .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
+    }
+
+    /// Return `true` if the model is in an async context.
+    pub fn in_async_context(&self) -> bool {
+        for scope in self.scopes() {
+            if scope.kind.is_async_function() {
+                return true;
+            }
+            if scope.kind.is_function() {
+                return false;
+            }
+        }
+        false
     }
 
     /// Returns `true` if the given [`BindingId`] is used.
@@ -666,6 +734,11 @@ impl<'a> SemanticModel<'a> {
         self.flags.contains(SemanticModelFlags::F_STRING)
     }
 
+    /// Return `true` if the context is in a nested f-string.
+    pub const fn in_nested_f_string(&self) -> bool {
+        self.flags.contains(SemanticModelFlags::NESTED_F_STRING)
+    }
+
     /// Return `true` if the context is in boolean test.
     pub const fn in_boolean_test(&self) -> bool {
         self.flags.contains(SemanticModelFlags::BOOLEAN_TEST)
@@ -782,6 +855,14 @@ bitflags! {
         /// ```
         const F_STRING = 1 << 6;
 
+        /// The context is in a nested f-string.
+        ///
+        /// For example, the context could be visiting `x` in:
+        /// ```python
+        /// f'{f"{x}"}'
+        /// ```
+        const NESTED_F_STRING = 1 << 7;
+
         /// The context is in a boolean test.
         ///
         /// For example, the context could be visiting `x` in:
@@ -792,7 +873,7 @@ bitflags! {
         ///
         /// The implication is that the actual value returned by the current expression is
         /// not used, only its truthiness.
-        const BOOLEAN_TEST = 1 << 7;
+        const BOOLEAN_TEST = 1 << 8;
 
         /// The context is in a `typing::Literal` annotation.
         ///
@@ -801,7 +882,7 @@ bitflags! {
         /// def f(x: Literal["A", "B", "C"]):
         ///     ...
         /// ```
-        const LITERAL = 1 << 8;
+        const LITERAL = 1 << 9;
 
         /// The context is in a subscript expression.
         ///
@@ -809,7 +890,7 @@ bitflags! {
         /// ```python
         /// x["a"]["b"]
         /// ```
-        const SUBSCRIPT = 1 << 9;
+        const SUBSCRIPT = 1 << 10;
 
         /// The context is in a type-checking block.
         ///
@@ -821,7 +902,7 @@ bitflags! {
         /// if TYPE_CHECKING:
         ///    x: int = 1
         /// ```
-        const TYPE_CHECKING_BLOCK = 1 << 10;
+        const TYPE_CHECKING_BLOCK = 1 << 11;
 
 
         /// The context has traversed past the "top-of-file" import boundary.
@@ -835,7 +916,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const IMPORT_BOUNDARY = 1 << 11;
+        const IMPORT_BOUNDARY = 1 << 12;
 
         /// The context has traversed past the `__future__` import boundary.
         ///
@@ -850,7 +931,7 @@ bitflags! {
         ///
         /// Python considers it a syntax error to import from `__future__` after
         /// any other non-`__future__`-importing statements.
-        const FUTURES_BOUNDARY = 1 << 12;
+        const FUTURES_BOUNDARY = 1 << 13;
 
         /// `__future__`-style type annotations are enabled in this context.
         ///
@@ -862,7 +943,7 @@ bitflags! {
         /// def f(x: int) -> int:
         ///   ...
         /// ```
-        const FUTURE_ANNOTATIONS = 1 << 13;
+        const FUTURE_ANNOTATIONS = 1 << 14;
     }
 }
 
@@ -897,4 +978,30 @@ pub enum ResolvedReference {
     StarImport,
     /// The reference is definitively unresolved.
     NotFound,
+}
+
+#[derive(Debug)]
+pub struct ImportedName {
+    /// The name to which the imported symbol is bound.
+    name: String,
+    /// The range at which the symbol is imported.
+    range: TextRange,
+    /// The context in which the symbol is imported.
+    context: ExecutionContext,
+}
+
+impl ImportedName {
+    pub fn into_name(self) -> String {
+        self.name
+    }
+
+    pub const fn context(&self) -> ExecutionContext {
+        self.context
+    }
+}
+
+impl Ranged for ImportedName {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }

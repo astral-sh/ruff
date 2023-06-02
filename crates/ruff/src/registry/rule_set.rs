@@ -254,7 +254,7 @@ impl RuleSet {
     ///
     /// let iter: Vec<_> = set.iter().collect();
     ///
-    /// assert_eq!(iter, vec![Rule::AmbiguousFunctionName, Rule::AnyType]);
+    /// assert_eq!(iter, vec![Rule::AnyType, Rule::AmbiguousFunctionName]);
     /// ```
     pub fn iter(&self) -> RuleSetIterator {
         RuleSetIterator {

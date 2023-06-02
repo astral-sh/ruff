@@ -1,5 +1,4 @@
 //! Rules from [flake8-async](https://pypi.org/project/flake8-async/).
-mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -14,9 +13,9 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC100.py"); "ASYNC100")]
-    #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC101.py"); "ASYNC101")]
-    #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASYNC102.py"); "ASYNC102")]
+    #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC100.py"))]
+    #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC101.py"))]
+    #[test_case(Rule::BlockingOsCallInAsyncFunction, Path::new("ASYNC102.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

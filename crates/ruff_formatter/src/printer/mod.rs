@@ -91,12 +91,7 @@ impl<'a> Printer<'a> {
         let args = stack.top();
 
         match element {
-            FormatElement::Space => {
-                if self.state.line_width > 0 {
-                    self.state.pending_space = true;
-                }
-            }
-
+            FormatElement::Space => self.print_text(" ", None),
             FormatElement::StaticText { text } => self.print_text(text, None),
             FormatElement::DynamicText { text } => self.print_text(text, None),
             FormatElement::SourceCodeSlice { slice, .. } => {
@@ -107,8 +102,8 @@ impl<'a> Printer<'a> {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
                 {
-                    if line_mode == &LineMode::SoftOrSpace && self.state.line_width > 0 {
-                        self.state.pending_space = true;
+                    if line_mode == &LineMode::SoftOrSpace {
+                        self.print_text(" ", None);
                     }
                 } else if self.state.line_suffixes.has_pending() {
                     self.flush_line_suffixes(queue, stack, Some(element));
@@ -302,12 +297,6 @@ impl<'a> Printer<'a> {
             for _ in 0..indent.align() {
                 self.print_char(' ');
             }
-        }
-
-        // Print pending spaces
-        if self.state.pending_space {
-            self.print_str(" ");
-            self.state.pending_space = false;
         }
 
         // Insert source map markers before and after the token
@@ -879,7 +868,6 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
         let fits_state = FitsState {
             pending_indent: printer.state.pending_indent,
-            pending_space: printer.state.pending_space,
             line_width: printer.state.line_width,
             has_line_suffix: printer.state.line_suffixes.has_pending(),
         };
@@ -968,18 +956,12 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         let args = self.stack.top();
 
         match element {
-            FormatElement::Space => {
-                if self.state.line_width > 0 {
-                    self.state.pending_space = true;
-                }
-            }
+            FormatElement::Space => return Ok(self.fits_text(" ")),
 
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat() {
                     match line_mode {
-                        LineMode::SoftOrSpace => {
-                            self.state.pending_space = true;
-                        }
+                        LineMode::SoftOrSpace => return Ok(self.fits_text(" ")),
                         LineMode::Soft => {}
                         LineMode::Hard | LineMode::Empty => {
                             return Ok(if self.must_be_flat {
@@ -1145,10 +1127,6 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         self.state.line_width += indent.level() as usize * self.options().indent_width() as usize
             + indent.align() as usize;
 
-        if self.state.pending_space {
-            self.state.line_width += 1;
-        }
-
         for c in text.chars() {
             let char_width = match c {
                 '\t' => self.options().tab_width as usize,
@@ -1167,8 +1145,6 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
         if self.state.line_width > self.options().print_width.into() {
             return Fits::No;
         }
-
-        self.state.pending_space = false;
 
         Fits::Maybe
     }
@@ -1254,7 +1230,6 @@ impl From<bool> for Fits {
 #[derive(Debug)]
 struct FitsState {
     pending_indent: Indention,
-    pending_space: bool,
     has_line_suffix: bool,
     line_width: usize,
 }
@@ -1555,7 +1530,7 @@ two lines`,
                 text("]")
             ]),
             text(";"),
-            &line_suffix(&format_args![space(), text("// trailing"), space()])
+            &line_suffix(&format_args![space(), text("// trailing")])
         ]);
 
         assert_eq!(printed.as_code(), "[1, 2, 3]; // trailing")

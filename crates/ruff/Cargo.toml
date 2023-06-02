@@ -17,11 +17,13 @@ name = "ruff"
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
 ruff_macros = { path = "../ruff_macros" }
+ruff_newlines = { path = "../ruff_newlines" }
 ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
 ruff_text_size = { workspace = true }
+ruff_textwrap = { path = "../ruff_textwrap" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
@@ -41,8 +43,8 @@ libcst = { workspace = true }
 log = { workspace = true }
 natord = { version = "1.0.9" }
 nohash-hasher = { workspace = true }
-num-bigint = { version = "0.4.3" }
-num-traits = { version = "0.2.15" }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
 once_cell = { workspace = true }
 path-absolutize = { workspace = true, features = [
   "once_cell_cache",
@@ -50,6 +52,7 @@ path-absolutize = { workspace = true, features = [
 ] }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.3.1", features = ["serde"] }
+pyproject-toml = { version = "0.6.0" }
 quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
@@ -65,7 +68,6 @@ shellexpand = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-textwrap = { workspace = true }
 thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }

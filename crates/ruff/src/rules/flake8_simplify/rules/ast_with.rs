@@ -5,8 +5,8 @@ use rustpython_parser::ast::{self, Ranged, Stmt, Withitem};
 use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::StrExt;
 use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
-use ruff_python_ast::newlines::StrExt;
 
 use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;
@@ -89,10 +89,7 @@ pub(crate) fn multiple_with_statements(
             ),
             checker.locator,
         );
-        let fixable = !has_comments_in(
-            TextRange::new(with_stmt.start(), with_body[0].start()),
-            checker.locator,
-        );
+
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements,
             colon.map_or_else(
@@ -100,27 +97,32 @@ pub(crate) fn multiple_with_statements(
                 |colon| TextRange::new(with_stmt.start(), colon.end()),
             ),
         );
-        if fixable && checker.patch(diagnostic.kind.rule()) {
-            match fix_with::fix_multiple_with_statements(
+        if checker.patch(diagnostic.kind.rule()) {
+            if !has_comments_in(
+                TextRange::new(with_stmt.start(), with_body[0].start()),
                 checker.locator,
-                checker.stylist,
-                with_stmt,
             ) {
-                Ok(edit) => {
-                    if edit
-                        .content()
-                        .unwrap_or_default()
-                        .universal_newlines()
-                        .all(|line| {
-                            LineWidth::new(checker.settings.tab_size).add_str(&line)
-                                <= checker.settings.line_length
-                        })
-                    {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(edit));
+                match fix_with::fix_multiple_with_statements(
+                    checker.locator,
+                    checker.stylist,
+                    with_stmt,
+                ) {
+                    Ok(edit) => {
+                        if edit
+                            .content()
+                            .unwrap_or_default()
+                            .universal_newlines()
+                            .all(|line| {
+                                LineWidth::new(checker.settings.tab_size).add_str(&line)
+                                    <= checker.settings.line_length
+                            })
+                        {
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(edit));
+                        }
                     }
+                    Err(err) => error!("Failed to fix nested with: {err}"),
                 }
-                Err(err) => error!("Failed to fix nested with: {err}"),
             }
         }
         checker.diagnostics.push(diagnostic);

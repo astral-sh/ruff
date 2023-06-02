@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::model::SemanticModel;
-use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
@@ -28,7 +27,7 @@ fn is_cache_func(model: &SemanticModel, expr: &Expr) -> bool {
 
 /// B019
 pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if !matches!(checker.semantic_model().scope().kind, ScopeKind::Class(_)) {
+    if !checker.semantic_model().scope().kind.is_class() {
         return;
     }
     for decorator in decorator_list {

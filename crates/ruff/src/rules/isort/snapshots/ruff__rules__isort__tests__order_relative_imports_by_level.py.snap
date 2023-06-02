@@ -10,7 +10,7 @@ order_relative_imports_by_level.py:1:1: I001 [*] Import block is un-sorted or un
   |
   = help: Organize imports
 
-ℹ Suggested fix
+ℹ Fix
 1   |-from .a import a
 2 1 | from ..a import a
 3 2 | from ..b import a

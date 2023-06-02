@@ -48,17 +48,29 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,7 @@
+@@ -1,42 +1,25 @@
  # These brackets are redundant, therefore remove.
  try:
      a.something
 -except AttributeError as err:
 +except (AttributeError) as err:
      raise err
- 
- # This is tuple of exceptions.
-@@ -21,9 +21,7 @@
- # Test long variants.
+-
+-# This is tuple of exceptions.
+-# Although this could be replaced with just the exception,
+-# we do not remove brackets to preserve AST.
+ try:
+     a.something
+ except (AttributeError,) as err:
+     raise err
+-
+-# This is a tuple of exceptions. Do not remove brackets.
+ try:
+     a.something
+ except (AttributeError, ValueError) as err:
+     raise err
+-
+-# Test long variants.
  try:
      a.something
 -except (
@@ -66,8 +78,23 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 -) as err:
 +except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
      raise err
- 
+-
  try:
+     a.something
+-except (
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+-) as err:
++except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,) as err:
+     raise err
+-
+ try:
+     a.something
+-except (
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+-) as err:
++except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error, some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
+     raise err
 ```
 
 ## Ruff Output
@@ -78,40 +105,25 @@ try:
     a.something
 except (AttributeError) as err:
     raise err
-
-# This is tuple of exceptions.
-# Although this could be replaced with just the exception,
-# we do not remove brackets to preserve AST.
 try:
     a.something
 except (AttributeError,) as err:
     raise err
-
-# This is a tuple of exceptions. Do not remove brackets.
 try:
     a.something
 except (AttributeError, ValueError) as err:
     raise err
-
-# Test long variants.
 try:
     a.something
 except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
     raise err
-
 try:
     a.something
-except (
-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-) as err:
+except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,) as err:
     raise err
-
 try:
     a.something
-except (
-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-) as err:
+except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error, some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
     raise err
 ```
 

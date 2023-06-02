@@ -1,15 +1,11 @@
-use log::error;
-
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
-use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
-use ruff_python_ast::types::RefEquality;
-
-use crate::autofix::actions::delete_stmt;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -35,17 +31,19 @@ use crate::registry::AsRule;
 ///     ...
 /// ```
 #[violation]
-pub struct DuplicateClassFieldDefinition(pub String);
+pub struct DuplicateClassFieldDefinition {
+    name: String,
+}
 
 impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateClassFieldDefinition(name) = self;
+        let DuplicateClassFieldDefinition { name } = self;
         format!("Class field `{name}` is defined multiple times")
     }
 
     fn autofix_title(&self) -> String {
-        let DuplicateClassFieldDefinition(name) = self;
+        let DuplicateClassFieldDefinition { name } = self;
         format!("Remove duplicate field definition for `{name}`")
     }
 }
@@ -84,29 +82,20 @@ pub(crate) fn duplicate_class_field_definition<'a, 'b>(
 
         if !seen_targets.insert(target) {
             let mut diagnostic = Diagnostic::new(
-                DuplicateClassFieldDefinition(target.to_string()),
+                DuplicateClassFieldDefinition {
+                    name: target.to_string(),
+                },
                 stmt.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-                let locator = checker.locator;
-                match delete_stmt(
+                let edit = autofix::edits::delete_stmt(
                     stmt,
                     Some(parent),
-                    &deleted,
-                    locator,
+                    checker.locator,
                     checker.indexer,
                     checker.stylist,
-                ) {
-                    Ok(fix) => {
-                        checker.deletions.insert(RefEquality(stmt));
-                        #[allow(deprecated)]
-                        diagnostic.set_fix_from_edit(fix);
-                    }
-                    Err(err) => {
-                        error!("Failed to remove duplicate class definition: {}", err);
-                    }
-                }
+                );
+                diagnostic.set_fix(Fix::suggested(edit).isolate(checker.isolation(Some(parent))));
             }
             checker.diagnostics.push(diagnostic);
         }

@@ -26,4 +26,6 @@ def foo(x):
 # TODO: followed by a new TODO with an issue link
 # TDO-3870
 
+# foo # TODO: no link!
+
 # TODO: here's a TODO on the last line with no link

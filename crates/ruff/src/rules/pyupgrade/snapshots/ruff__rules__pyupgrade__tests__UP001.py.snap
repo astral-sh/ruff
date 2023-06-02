@@ -9,7 +9,7 @@ UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
   |
   = help: Remove `metaclass = type`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | class A:
 2   |-    __metaclass__ = type
   2 |+    pass
@@ -27,7 +27,7 @@ UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
   |
   = help: Remove `metaclass = type`
 
-ℹ Suggested fix
+ℹ Fix
 3 3 | 
 4 4 | 
 5 5 | class B:

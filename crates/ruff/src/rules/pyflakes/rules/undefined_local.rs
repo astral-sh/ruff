@@ -5,6 +5,31 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for undefined local variables.
+///
+/// ## Why is this bad?
+/// Referencing a local variable before it has been assigned will raise
+/// an `UnboundLocalError` at runtime.
+///
+/// ## Example
+/// ```python
+/// x = 1
+///
+///
+/// def foo():
+///     x += 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x = 1
+///
+///
+/// def foo():
+///     global x
+///     x += 1
+/// ```
 #[violation]
 pub struct UndefinedLocal {
     name: String,
@@ -22,7 +47,7 @@ impl Violation for UndefinedLocal {
 pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
     // If the name hasn't already been defined in the current scope...
     let current = checker.semantic_model().scope();
-    if !current.kind.is_function() || current.defines(name) {
+    if !current.kind.is_any_function() || current.defines(name) {
         return;
     }
 
@@ -36,7 +61,7 @@ pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
         .scopes
         .ancestors(parent)
         .find_map(|scope| {
-            if !(scope.kind.is_function() || scope.kind.is_module()) {
+            if !(scope.kind.is_any_function() || scope.kind.is_module()) {
                 return None;
             }
 

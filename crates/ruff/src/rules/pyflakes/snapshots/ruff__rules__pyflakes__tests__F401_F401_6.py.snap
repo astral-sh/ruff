@@ -11,7 +11,7 @@ F401_6.py:7:25: F401 [*] `.background.BackgroundTasks` imported but unused
    |
    = help: Remove unused import: `.background.BackgroundTasks`
 
-ℹ Suggested fix
+ℹ Fix
 4 4 | from .applications import FastAPI as FastAPI
 5 5 | 
 6 6 | # F401 `background.BackgroundTasks` imported but unused
@@ -30,7 +30,7 @@ F401_6.py:10:29: F401 [*] `.datastructures.UploadFile` imported but unused
    |
    = help: Remove unused import: `.datastructures.UploadFile`
 
-ℹ Suggested fix
+ℹ Fix
 7  7  | from .background import BackgroundTasks
 8  8  | 
 9  9  | # F401 `datastructures.UploadFile` imported but unused
@@ -49,7 +49,7 @@ F401_6.py:16:8: F401 [*] `background` imported but unused
    |
    = help: Remove unused import: `background`
 
-ℹ Suggested fix
+ℹ Fix
 13 13 | import applications as applications
 14 14 | 
 15 15 | # F401 `background` imported but unused
@@ -66,7 +66,7 @@ F401_6.py:19:8: F401 [*] `datastructures` imported but unused
    |
    = help: Remove unused import: `datastructures`
 
-ℹ Suggested fix
+ℹ Fix
 16 16 | import background
 17 17 | 
 18 18 | # F401 `datastructures` imported but unused

@@ -64,7 +64,6 @@ pub(crate) fn manual_from_import(
         return;
     }
 
-    let fixable = names.len() == 1;
     let mut diagnostic = Diagnostic::new(
         ManualFromImport {
             module: module.to_string(),
@@ -72,22 +71,24 @@ pub(crate) fn manual_from_import(
         },
         alias.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        let node = ast::StmtImportFrom {
-            module: Some(module.into()),
-            names: vec![Alias {
-                name: asname.clone(),
-                asname: None,
+    if checker.patch(diagnostic.kind.rule()) {
+        if names.len() == 1 {
+            let node = ast::StmtImportFrom {
+                module: Some(module.into()),
+                names: vec![Alias {
+                    name: asname.clone(),
+                    asname: None,
+                    range: TextRange::default(),
+                }],
+                level: Some(Int::new(0)),
                 range: TextRange::default(),
-            }],
-            level: Some(Int::new(0)),
-            range: TextRange::default(),
-        };
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            checker.generator().stmt(&node.into()),
-            stmt.range(),
-        )));
+            };
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                checker.generator().stmt(&node.into()),
+                stmt.range(),
+            )));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

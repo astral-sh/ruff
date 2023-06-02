@@ -73,7 +73,7 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 if let Some(stmt) = orelse.first() {
                     // `elif:` and `else: if:` have the same AST representation.
                     // Avoid treating `elif:` as two statements.
-                    if !matches!(stmt, Stmt::If(_)) {
+                    if !stmt.is_if_stmt() {
                         count += 1;
                     }
                     count += num_statements(orelse);
@@ -151,7 +151,7 @@ pub(crate) fn too_many_statements(
     max_statements: usize,
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    let statements = num_statements(body) + 1;
+    let statements = num_statements(body);
     if statements > max_statements {
         Some(Diagnostic::new(
             TooManyStatements {
@@ -168,17 +168,18 @@ pub(crate) fn too_many_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser as parser;
+    use rustpython_parser::ast::Suite;
+    use rustpython_parser::Parse;
 
     use super::num_statements;
 
     #[test]
     fn pass() -> Result<()> {
         let source: &str = r#"
-def f():  # 2
+def f():
     pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -192,7 +193,7 @@ def f():
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -207,7 +208,7 @@ def f():
         if a:
             print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -215,13 +216,13 @@ def f():
     #[test]
     fn if_elif() -> Result<()> {
         let source: &str = r#"
-def f():  # 5
+def f():
     if a:
         print()
     elif a:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -229,7 +230,7 @@ def f():  # 5
     #[test]
     fn if_elif_else() -> Result<()> {
         let source: &str = r#"
-def f():  # 9
+def f():
     if a:
         print()
     elif a == 2:
@@ -239,7 +240,7 @@ def f():  # 9
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 9);
         Ok(())
     }
@@ -247,7 +248,7 @@ def f():  # 9
     #[test]
     fn many_statements() -> Result<()> {
         let source: &str = r#"
-async def f():  # 19
+async def f():
     a = 1
     b = 2
     c = 3
@@ -268,7 +269,7 @@ async def f():  # 19
             import time
             pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 19);
         Ok(())
     }
@@ -276,11 +277,11 @@ async def f():  # 19
     #[test]
     fn for_() -> Result<()> {
         let source: &str = r#"
-def f():  # 2
+def f():
     for i in range(10):
         pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
@@ -288,13 +289,13 @@ def f():  # 2
     #[test]
     fn for_else() -> Result<()> {
         let source: &str = r#"
-def f():  # 3
+def f():
     for i in range(10):
         print()
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -302,14 +303,14 @@ def f():  # 3
     #[test]
     fn nested_def() -> Result<()> {
         let source: &str = r#"
-def f():  # 5
+def f():
     def g():
         print()
         print()
 
     print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -317,7 +318,7 @@ def f():  # 5
     #[test]
     fn nested_class() -> Result<()> {
         let source: &str = r#"
-def f():  # 3
+def f():
     class A:
         def __init__(self):
             pass
@@ -327,7 +328,7 @@ def f():  # 3
 
     print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
@@ -338,7 +339,7 @@ def f():  # 3
 def f():
     return
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 1);
         Ok(())
     }
@@ -346,7 +347,7 @@ def f():
     #[test]
     fn with() -> Result<()> {
         let source: &str = r#"
-def f():  # 6
+def f():
     with a:
         if a:
             print()
@@ -354,7 +355,7 @@ def f():  # 6
             print()
 
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
@@ -362,13 +363,13 @@ def f():  # 6
     #[test]
     fn try_except() -> Result<()> {
         let source: &str = r#"
-def f():  # 5
+def f():
     try:
         print()
     except Exception:
         raise
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
@@ -376,7 +377,7 @@ def f():  # 5
     #[test]
     fn try_except_else() -> Result<()> {
         let source: &str = r#"
-def f():  # 7
+def f():
     try:
         print()
     except ValueError:
@@ -384,7 +385,7 @@ def f():  # 7
     else:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 7);
         Ok(())
     }
@@ -392,7 +393,7 @@ def f():  # 7
     #[test]
     fn try_except_else_finally() -> Result<()> {
         let source: &str = r#"
-def f():  # 10
+def f():
     try:
         print()
     except ValueError:
@@ -402,7 +403,7 @@ def f():  # 10
     finally:
         pass
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 10);
         Ok(())
     }
@@ -410,7 +411,7 @@ def f():  # 10
     #[test]
     fn try_except_except() -> Result<()> {
         let source: &str = r#"
-def f():  # 8
+def f():
     try:
         print()
     except ValueError:
@@ -418,7 +419,7 @@ def f():  # 8
     except Exception:
         raise
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 8);
         Ok(())
     }
@@ -426,7 +427,7 @@ def f():  # 8
     #[test]
     fn try_except_except_finally() -> Result<()> {
         let source: &str = r#"
-def f():  # 11
+def f():
     try:
         print()
     except:
@@ -436,7 +437,7 @@ def f():  # 11
     finally:
         print()
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 11);
         Ok(())
     }
@@ -444,11 +445,11 @@ def f():  # 11
     #[test]
     fn yield_() -> Result<()> {
         let source: &str = r#"
-def f():  # 2
+def f():
     for i in range(10):
         yield i
 "#;
-        let stmts = parser::parse_program(source, "<filename>")?;
+        let stmts = Suite::parse(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }

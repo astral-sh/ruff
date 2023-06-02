@@ -11,7 +11,6 @@ mod config;
 mod derive_message_formats;
 mod map_codes;
 mod newtype_index;
-mod register_rules;
 mod rule_code_prefix;
 mod rule_namespace;
 mod violation;
@@ -42,12 +41,6 @@ pub fn cache_key(input: TokenStream) -> TokenStream {
     let stream = result.unwrap_or_else(|err| err.to_compile_error());
 
     TokenStream::from(stream)
-}
-
-#[proc_macro]
-pub fn register_rules(item: TokenStream) -> TokenStream {
-    let mapping = parse_macro_input!(item as register_rules::Input);
-    register_rules::register_rules(&mapping).into()
 }
 
 /// Adds an `explanation()` method from the doc comment.

@@ -86,39 +86,74 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -23,7 +23,6 @@
+@@ -1,11 +1,6 @@
+ while True:
+     if something.changed:
+         do.stuff()  # trailing comment
+-        # Comment belongs to the `if` block.
+-    # This one belongs to the `while` block.
+-
+-    # Should this one, too?  I guess so.
+-
+ # This one is properly standalone now.
+ 
+ for i in range(100):
+@@ -15,27 +10,18 @@
+ 
+     # then we do this
+     print(i)
+-    # and finally we loop around
+-
+ with open(some_temp_file) as f:
+     data = f.read()
+-
  try:
      with open(some_other_file) as w:
          w.write(data)
--
+ 
  except OSError:
      print("problems")
+-
+ import sys
+-
+-
+ # leading function comment
+ def wat():
+     ...
+-    # trailing function comment
+-
+-
+ # SECTION COMMENT
  
-@@ -41,18 +40,18 @@
  
- # leading 1
- @deco1
--# leading 2
--@deco2(with_args=True)
--# leading 3
--@deco3
-+@# leading 2
-+deco2(with_args=True)
-+@# leading 3
-+deco3
+@@ -47,8 +33,6 @@
+ @deco3
  def decorated1():
      ...
- 
- 
+-
+-
  # leading 1
  @deco1
--# leading 2
--@deco2(with_args=True)
-+@# leading 2
-+deco2(with_args=True)
+ # leading 2
+@@ -56,18 +40,12 @@
  # leading function comment
  def decorated1():
      ...
+-
+-
+ # Note: this is fixed in
+ # Preview.empty_lines_before_class_or_def_with_leading_comments.
+ # In the current style, the user will have to split those lines by hand.
+ some_instruction
+-
+-
+ # This comment should be split from `some_instruction` by two lines but isn't.
+ def g():
+     ...
+-
+-
+ if __name__ == "__main__":
+     main()
 ```
 
 ## Ruff Output
@@ -127,11 +162,6 @@ if __name__ == "__main__":
 while True:
     if something.changed:
         do.stuff()  # trailing comment
-        # Comment belongs to the `if` block.
-    # This one belongs to the `while` block.
-
-    # Should this one, too?  I guess so.
-
 # This one is properly standalone now.
 
 for i in range(100):
@@ -141,59 +171,43 @@ for i in range(100):
 
     # then we do this
     print(i)
-    # and finally we loop around
-
 with open(some_temp_file) as f:
     data = f.read()
-
 try:
     with open(some_other_file) as w:
         w.write(data)
+
 except OSError:
     print("problems")
-
 import sys
-
-
 # leading function comment
 def wat():
     ...
-    # trailing function comment
-
-
 # SECTION COMMENT
 
 
 # leading 1
 @deco1
-@# leading 2
-deco2(with_args=True)
-@# leading 3
-deco3
+# leading 2
+@deco2(with_args=True)
+# leading 3
+@deco3
 def decorated1():
     ...
-
-
 # leading 1
 @deco1
-@# leading 2
-deco2(with_args=True)
+# leading 2
+@deco2(with_args=True)
 # leading function comment
 def decorated1():
     ...
-
-
 # Note: this is fixed in
 # Preview.empty_lines_before_class_or_def_with_leading_comments.
 # In the current style, the user will have to split those lines by hand.
 some_instruction
-
-
 # This comment should be split from `some_instruction` by two lines but isn't.
 def g():
     ...
-
-
 if __name__ == "__main__":
     main()
 ```

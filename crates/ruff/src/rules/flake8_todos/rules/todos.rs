@@ -6,7 +6,11 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::{registry::Rule, settings::Settings};
+use crate::{
+    directives::{TodoComment, TodoDirective, TodoDirectiveKind},
+    registry::Rule,
+    settings::Settings,
+};
 
 /// ## What it does
 /// Checks that a TODO comment is labelled with "TODO".
@@ -221,63 +225,6 @@ impl Violation for MissingSpaceAfterTodoColon {
     }
 }
 
-enum Directive {
-    Todo,
-    Fixme,
-    Xxx,
-}
-
-impl Directive {
-    /// Extract a [`Directive`] from a comment.
-    ///
-    /// Returns the offset of the directive within the comment, and the matching directive tag.
-    fn from_comment(comment: &str) -> Option<(Directive, TextSize)> {
-        let trimmed = comment.trim_start_matches('#').trim_start();
-        let offset = comment.text_len() - trimmed.text_len();
-        let mut chars = trimmed.chars();
-        match (
-            chars.next(),
-            chars.next(),
-            chars.next(),
-            chars.next(),
-            chars.next(),
-        ) {
-            (
-                Some('F' | 'f'),
-                Some('I' | 'i'),
-                Some('X' | 'x'),
-                Some('M' | 'm'),
-                Some('E' | 'e'),
-            ) => Some((Directive::Fixme, offset)),
-            (Some('T' | 't'), Some('O' | 'o'), Some('D' | 'd'), Some('O' | 'o'), ..) => {
-                Some((Directive::Todo, offset))
-            }
-            (Some('X' | 'x'), Some('X' | 'x'), Some('X' | 'x'), ..) => {
-                Some((Directive::Xxx, offset))
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns the length of the directive tag.
-    fn len(&self) -> TextSize {
-        match self {
-            Directive::Fixme => TextSize::new(5),
-            Directive::Todo => TextSize::new(4),
-            Directive::Xxx => TextSize::new(3),
-        }
-    }
-}
-
-// If this struct ever gets pushed outside of this module, it may be worth creating an enum for
-// the different tag types + other convenience methods.
-/// Represents a TODO tag or any of its variants - FIXME, XXX, TODO.
-#[derive(Debug, PartialEq, Eq)]
-struct Tag<'a> {
-    range: TextRange,
-    content: &'a str,
-}
-
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r#"^#\s*(http|https)://.*"#, // issue link
@@ -287,25 +234,39 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -> Vec<Diagnostic> {
+pub(crate) fn todos(
+    todo_comments: &[TodoComment],
+    indexer: &Indexer,
+    locator: &Locator,
+    settings: &Settings,
+) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let mut iter = indexer.comment_ranges().iter().peekable();
-    while let Some(comment_range) = iter.next() {
-        let comment = locator.slice(*comment_range);
+    for todo_comment in todo_comments {
+        let TodoComment {
+            directive,
+            content,
+            range_index,
+            ..
+        } = todo_comment;
+        let range = todo_comment.range;
 
-        // Check that the comment is a TODO (properly formed or not).
-        let Some(tag) = detect_tag(comment, comment_range.start()) else {
+        // flake8-todos doesn't support HACK directives.
+        if matches!(directive.kind, TodoDirectiveKind::Hack) {
             continue;
-        };
+        }
 
-        tag_errors(&tag, &mut diagnostics, settings);
-        static_errors(&mut diagnostics, comment, *comment_range, &tag);
+        directive_errors(directive, &mut diagnostics, settings);
+        static_errors(&mut diagnostics, content, range, directive);
 
-        // TD003
         let mut has_issue_link = false;
-        let mut curr_range = comment_range;
-        while let Some(next_range) = iter.peek() {
+        let mut curr_range = range;
+        for next_range in indexer
+            .comment_ranges()
+            .iter()
+            .skip(range_index + 1)
+            .copied()
+        {
             // Ensure that next_comment_range is in the same multiline comment "block" as
             // comment_range.
             if !locator
@@ -316,8 +277,8 @@ pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -
                 break;
             }
 
-            let next_comment = locator.slice(**next_range);
-            if detect_tag(next_comment, next_range.start()).is_some() {
+            let next_comment = locator.slice(next_range);
+            if TodoDirective::from_comment(next_comment, next_range).is_some() {
                 break;
             }
 
@@ -328,49 +289,41 @@ pub(crate) fn todos(indexer: &Indexer, locator: &Locator, settings: &Settings) -
             // If the next_comment isn't a tag or an issue, it's worthles in the context of this
             // linter. We can increment here instead of waiting for the next iteration of the outer
             // loop.
-            //
-            // Unwrap is safe because peek() is Some()
-            curr_range = iter.next().unwrap();
+            curr_range = next_range;
         }
 
         if !has_issue_link {
-            diagnostics.push(Diagnostic::new(MissingTodoLink, tag.range));
+            // TD-003
+            diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
         }
     }
 
     diagnostics
 }
 
-/// Returns the tag pulled out of a given comment, if it exists.
-fn detect_tag(comment: &str, start: TextSize) -> Option<Tag> {
-    let (directive, offset) = Directive::from_comment(comment)?;
-    let comment_range = TextRange::at(offset, directive.len());
-    let tag_range = TextRange::at(start + offset, directive.len());
-    Some(Tag {
-        content: &comment[comment_range],
-        range: tag_range,
-    })
-}
-
-/// Check that the tag itself is valid. This function modifies `diagnostics` in-place.
-fn tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: &Settings) {
-    if tag.content == "TODO" {
+/// Check that the directive itself is valid. This function modifies `diagnostics` in-place.
+fn directive_errors(
+    directive: &TodoDirective,
+    diagnostics: &mut Vec<Diagnostic>,
+    settings: &Settings,
+) {
+    if directive.content == "TODO" {
         return;
     }
 
-    if tag.content.to_uppercase() == "TODO" {
+    if directive.content.to_uppercase() == "TODO" {
         // TD006
         let mut diagnostic = Diagnostic::new(
             InvalidTodoCapitalization {
-                tag: tag.content.to_string(),
+                tag: directive.content.to_string(),
             },
-            tag.range,
+            directive.range,
         );
 
         if settings.rules.should_fix(Rule::InvalidTodoCapitalization) {
             diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
                 "TODO".to_string(),
-                tag.range,
+                directive.range,
             )));
         }
 
@@ -379,9 +332,9 @@ fn tag_errors(tag: &Tag, diagnostics: &mut Vec<Diagnostic>, settings: &Settings)
         // TD001
         diagnostics.push(Diagnostic::new(
             InvalidTodoTag {
-                tag: tag.content.to_string(),
+                tag: directive.content.to_string(),
             },
-            tag.range,
+            directive.range,
         ));
     }
 }
@@ -392,11 +345,11 @@ fn static_errors(
     diagnostics: &mut Vec<Diagnostic>,
     comment: &str,
     comment_range: TextRange,
-    tag: &Tag,
+    directive: &TodoDirective,
 ) {
-    let post_tag = &comment[usize::from(tag.range.end() - comment_range.start())..];
-    let trimmed = post_tag.trim_start();
-    let content_offset = post_tag.text_len() - trimmed.text_len();
+    let post_directive = &comment[usize::from(directive.range.end() - comment_range.start())..];
+    let trimmed = post_directive.trim_start();
+    let content_offset = post_directive.text_len() - trimmed.text_len();
 
     let author_end = content_offset
         + if trimmed.starts_with('(') {
@@ -407,64 +360,27 @@ fn static_errors(
             }
         } else {
             // TD-002
-            diagnostics.push(Diagnostic::new(MissingTodoAuthor, tag.range));
+            diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
 
             TextSize::new(0)
         };
 
-    let post_author = &post_tag[usize::from(author_end)..];
-
-    let post_colon = if let Some((.., after_colon)) = post_author.split_once(':') {
-        if let Some(stripped) = after_colon.strip_prefix(' ') {
-            stripped
-        } else {
+    let after_author = &post_directive[usize::from(author_end)..];
+    if let Some(after_colon) = after_author.strip_prefix(':') {
+        if after_colon.is_empty() {
+            // TD-005
+            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+        } else if !after_colon.starts_with(char::is_whitespace) {
             // TD-007
-            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, tag.range));
-            after_colon
+            diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, directive.range));
         }
     } else {
         // TD-004
-        diagnostics.push(Diagnostic::new(MissingTodoColon, tag.range));
-        ""
-    };
+        diagnostics.push(Diagnostic::new(MissingTodoColon, directive.range));
 
-    if post_colon.is_empty() {
-        // TD-005
-        diagnostics.push(Diagnostic::new(MissingTodoDescription, tag.range));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_detect_tag() {
-        let test_comment = "# TODO: todo tag";
-        let expected = Tag {
-            content: "TODO",
-            range: TextRange::new(TextSize::new(2), TextSize::new(6)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-
-        let test_comment = "#TODO: todo tag";
-        let expected = Tag {
-            content: "TODO",
-            range: TextRange::new(TextSize::new(1), TextSize::new(5)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-
-        let test_comment = "# todo: todo tag";
-        let expected = Tag {
-            content: "todo",
-            range: TextRange::new(TextSize::new(2), TextSize::new(6)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
-        let test_comment = "# fixme: fixme tag";
-        let expected = Tag {
-            content: "fixme",
-            range: TextRange::new(TextSize::new(2), TextSize::new(7)),
-        };
-        assert_eq!(Some(expected), detect_tag(test_comment, TextSize::new(0)));
+        if after_author.is_empty() {
+            // TD-005
+            diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
+        }
     }
 }

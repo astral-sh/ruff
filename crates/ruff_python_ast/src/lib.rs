@@ -5,7 +5,6 @@ pub mod comparable;
 pub mod hashable;
 pub mod helpers;
 pub mod imports;
-pub mod newlines;
 pub mod node;
 pub mod prelude;
 pub mod relocate;

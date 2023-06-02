@@ -12,8 +12,9 @@ cargo benchmark
 
 ## Benchmark driven Development
 
-You can use `--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
-`--benchmark=<name>` to compare against that benchmark. Criterion will print a message telling you if the benchmark improved/regressed compared to that baseline.
+You can use `--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and
+then use `--benchmark=<name>` to compare against that benchmark. Criterion will print a message
+telling you if the benchmark improved/regressed compared to that baseline.
 
 ```shell
 # Run once on your "baseline" code
@@ -46,7 +47,8 @@ cargo install critcmp
 
 ## Tips
 
-- Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic` to only run the pydantic tests.
+- Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
+  to only run the pydantic tests.
 - Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
 - Use `cargo benchmark --quick` to get faster results (more prone to noise)
 
@@ -84,5 +86,6 @@ Then run the profiler with
 cargo instruments -t time --bench linter --profile release-debug -p ruff_benchmark -- --profile-time=1
 ```
 
-- `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc` for profiling the allocations.
+- `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc`
+  for profiling the allocations.
 - You may want to pass an additional filter to run a single test file

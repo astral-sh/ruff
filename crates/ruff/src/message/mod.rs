@@ -6,7 +6,6 @@ use std::ops::Deref;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use crate::jupyter::JupyterIndex;
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
@@ -17,6 +16,8 @@ pub use pylint::PylintEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 pub use text::TextEmitter;
+
+use crate::jupyter::JupyterIndex;
 
 mod azure;
 mod diff;
@@ -150,11 +151,10 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
     use rustc_hash::FxHashMap;
 
-    use ruff_diagnostics::{Diagnostic, Edit, Fix};
+    use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
     use ruff_python_ast::source_code::SourceFileBuilder;
 
     use crate::message::{Emitter, EmitterContext, Message};
-    use crate::rules::pyflakes::rules::{UndefinedName, UnusedImport, UnusedVariable};
 
     pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os
@@ -172,10 +172,10 @@ def fibonacci(n):
 "#;
 
         let unused_import = Diagnostic::new(
-            UnusedImport {
-                name: "os".to_string(),
-                context: None,
-                multiple: false,
+            DiagnosticKind {
+                name: "UnusedImport".to_string(),
+                body: "`os` imported but unused".to_string(),
+                suggestion: Some("Remove unused import: `os`".to_string()),
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         )
@@ -187,8 +187,10 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_variable = Diagnostic::new(
-            UnusedVariable {
-                name: "x".to_string(),
+            DiagnosticKind {
+                name: "UnusedVariable".to_string(),
+                body: "Local variable `x` is assigned to but never used".to_string(),
+                suggestion: Some("Remove assignment to unused variable `x`".to_string()),
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
@@ -200,8 +202,10 @@ def fibonacci(n):
         let file_2 = r#"if a == 1: pass"#;
 
         let undefined_name = Diagnostic::new(
-            UndefinedName {
-                name: "a".to_string(),
+            DiagnosticKind {
+                name: "UndefinedName".to_string(),
+                body: "Undefined name `a`".to_string(),
+                suggestion: None,
             },
             TextRange::new(TextSize::from(3), TextSize::from(4)),
         );
