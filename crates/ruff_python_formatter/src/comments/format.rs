@@ -2,7 +2,7 @@ use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
 use crate::trivia::{lines_after, lines_before};
-use ruff_formatter::{format_args, write, SourceCode};
+use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::AstNode;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -167,24 +167,27 @@ impl Format<PyFormatContext<'_>> for FormatComment<'_> {
         let trimmed = comment_text.trim_end();
         let trailing_whitespace_len = comment_text.text_len() - trimmed.text_len();
 
+        let Some(content) = trimmed.strip_prefix('#') else {
+            return Err(FormatError::SyntaxError);
+        };
+
         // Fast path for correctly formatted comments:
         // * Start with a `#` and are followed by a space
         // * Have no trailing whitespace.
-        if trailing_whitespace_len == TextSize::new(0) && trimmed.starts_with("# ") {
+        if trailing_whitespace_len == TextSize::new(0) && content.starts_with(' ') {
             return source_text_slice(slice.range(), ContainsNewlines::No).fmt(f);
         }
-
-        let (content, mut start_offset) = trimmed
-            .strip_prefix('#')
-            .map_or((trimmed, TextSize::new(0)), |rest| (rest, '#'.text_len()));
 
         write!(f, [source_position(slice.start()), text("#")])?;
 
         // Starts with a non breaking space
-        if content.starts_with('\u{A0}') && !content.trim_start().starts_with("type:") {
-            // Replace non-breaking space with a space (if not followed by a normal space)
-            start_offset += '\u{A0}'.text_len();
-        }
+        let start_offset =
+            if content.starts_with('\u{A0}') && !content.trim_start().starts_with("type:") {
+                // Replace non-breaking space with a space (if not followed by a normal space)
+                "#\u{A0}".text_len()
+            } else {
+                '#'.text_len()
+            };
 
         // Add a space between the `#` and the text if the source contains none.
         if !content.is_empty() && !content.starts_with([' ', '!', ':', '#', '\'']) {
