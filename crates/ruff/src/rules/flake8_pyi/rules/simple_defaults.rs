@@ -96,6 +96,9 @@ fn is_valid_default_value_with_annotation(
     model: &SemanticModel,
 ) -> bool {
     match default {
+        Expr::Constant(_) => {
+            return true;
+        }
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::Set(ast::ExprSet { elts, range: _ }) => {
@@ -118,65 +121,29 @@ fn is_valid_default_value_with_annotation(
                     }) && is_valid_default_value_with_annotation(v, false, locator, model)
                 });
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Ellipsis | Constant::None,
-            ..
-        }) => {
-            return true;
-        }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..) | Constant::Bytes(..),
-            ..
-        }) => return true,
-        // Ex) `123`, `True`, `False`, `3.14`
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
-            ..
-        }) => {
-            return locator.slice(default.range()).len() <= 10;
-        }
-        // Ex) `2j`
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Complex { real, .. },
-            ..
-        }) => {
-            if *real == 0.0 {
-                return locator.slice(default.range()).len() <= 10;
-            }
-        }
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::USub,
             operand,
             range: _,
         }) => {
-            // Ex) `-1`, `-3.14`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(..) | Constant::Float(..),
-                ..
-            }) = operand.as_ref()
-            {
-                return locator.slice(operand.range()).len() <= 10;
-            }
-            // Ex) `-2j`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Complex { real, .. },
-                ..
-            }) = operand.as_ref()
-            {
-                if *real == 0.0 {
-                    return locator.slice(operand.range()).len() <= 10;
+            match operand.as_ref() {
+                // Ex) `-1`, `-3.14`, `2j`
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Int(..) | Constant::Float(..) | Constant::Complex { .. },
+                    ..
+                }) => return true,
+                // Ex) `-math.inf`, `-math.pi`, etc.
+                Expr::Attribute(_) => {
+                    if model.resolve_call_path(operand).map_or(false, |call_path| {
+                        ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
+                            // reject `-math.nan`
+                            call_path.as_slice() == *target && *target != ["math", "nan"]
+                        })
+                    }) {
+                        return true;
+                    }
                 }
-            }
-            // Ex) `-math.inf`, `-math.pi`, etc.
-            if let Expr::Attribute(_) = operand.as_ref() {
-                if model.resolve_call_path(operand).map_or(false, |call_path| {
-                    ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
-                        // reject `-math.nan`
-                        call_path.as_slice() == *target && *target != ["math", "nan"]
-                    })
-                }) {
-                    return true;
-                }
+                _ => {}
             }
         }
         Expr::BinOp(ast::ExprBinOp {

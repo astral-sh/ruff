@@ -3411,8 +3411,18 @@ where
                 }
             }
             Expr::Constant(ast::ExprConstant {
+                value: Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. },
+                kind: _,
+                range: _,
+            }) => {
+                if self.is_stub && self.enabled(Rule::NumericLiteralTooLong) {
+                    flake8_pyi::rules::numeric_literal_too_long(self, expr);
+                }
+            }
+            Expr::Constant(ast::ExprConstant {
                 value: Constant::Bytes(_),
-                ..
+                kind: _,
+                range: _,
             }) => {
                 if self.is_stub && self.enabled(Rule::StringOrBytesTooLong) {
                     flake8_pyi::rules::string_or_bytes_too_long(self, expr);
