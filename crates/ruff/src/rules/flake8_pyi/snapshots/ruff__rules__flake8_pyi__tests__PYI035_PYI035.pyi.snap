@@ -1,4 +1,31 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
+PYI035.pyi:1:1: PYI035 `__all__` in a stub file must be assigned a value
+  |
+1 | __all__: list[str]  # Error: PYI035
+  | ^^^^^^^^^^^^^^^^^^ PYI035
+2 | 
+3 | __all__: list[str] = ["foo"]
+  |
+
+PYI035.pyi:7:5: PYI035 `__match_args__` in a stub file must be assigned a value
+   |
+ 7 | class Foo:
+ 8 |     __all__: list[str]
+ 9 |     __match_args__: tuple[str, ...]  # Error: PYI035
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI035
+10 |     __slots__: tuple[str, ...]  # Error: PYI035
+   |
+
+PYI035.pyi:8:5: PYI035 `__slots__` in a stub file must be assigned a value
+   |
+ 8 |     __all__: list[str]
+ 9 |     __match_args__: tuple[str, ...]  # Error: PYI035
+10 |     __slots__: tuple[str, ...]  # Error: PYI035
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI035
+11 | 
+12 | class Bar:
+   |
+
 

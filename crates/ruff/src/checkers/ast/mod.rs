@@ -1790,7 +1790,7 @@ where
                             }
                         }
                     } else {
-                        if self.enabled(Rule::AssignmentDefaultInStub) {
+                        if self.enabled(Rule::UnassignedSpecialVariableInStub) {
                             flake8_pyi::rules::unassigned_special_variable_in_stub(
                                 self, target, stmt,
                             );
