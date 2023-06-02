@@ -97,62 +97,53 @@ elif   unformatted:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,3 @@
--# Regression test for https://github.com/psf/black/issues/3129.
- setup(
-     entry_points={
-         # fmt: off
-@@ -9,9 +8,6 @@
+@@ -9,8 +9,6 @@
              ]  # Includes an formatted indentation.
      },
  )
 -
 -
--# Regression test for https://github.com/psf/black/issues/2015.
+ # Regression test for https://github.com/psf/black/issues/2015.
  run(
      # fmt: off
-     [
-@@ -22,9 +18,6 @@
+@@ -22,8 +20,6 @@
      + path,
      check=True,
  )
 -
 -
--# Regression test for https://github.com/psf/black/issues/3026.
+ # Regression test for https://github.com/psf/black/issues/3026.
  def test_func():
      # yapf: disable
-     if  unformatted(  args  ):
-@@ -34,9 +27,6 @@
+@@ -34,8 +30,6 @@
          return True
  
      return False
 -
 -
--# Regression test for https://github.com/psf/black/issues/2567.
+ # Regression test for https://github.com/psf/black/issues/2567.
  if True:
      # fmt: off
-     for _ in range( 1 ):
-@@ -44,10 +34,7 @@
+@@ -44,9 +38,7 @@
          print ( "This won't be formatted" )
      print ( "This won't be formatted either" )
  else:
 -    print("This will be formatted")
 -
 -
--# Regression test for https://github.com/psf/black/issues/3184.
 +    print ( "This will be formatted" )
+ # Regression test for https://github.com/psf/black/issues/3184.
  class A:
      async def call(param):
-         if param:
-@@ -61,27 +48,16 @@
+@@ -61,27 +53,18 @@
              elif param[0:4] in ("ZZZZ",):
                  print ( "This won't be formatted either" )
  
 -        print("This will be formatted")
 -
 -
--# Regression test for https://github.com/psf/black/issues/2985.
 +        print ( "This will be formatted" )
+ # Regression test for https://github.com/psf/black/issues/2985.
  class Named(t.Protocol):
      # fmt: off
      @property
@@ -166,8 +157,8 @@ elif   unformatted:
 -    # fmt: on
 -
 -
--# Regression test for https://github.com/psf/black/issues/3436.
 +    def  this_will_be_formatted ( self, **kwargs ) -> Named: ...
+ # Regression test for https://github.com/psf/black/issues/3436.
  if x:
      return x
  # fmt: off
@@ -181,6 +172,7 @@ elif   unformatted:
 ## Ruff Output
 
 ```py
+# Regression test for https://github.com/psf/black/issues/3129.
 setup(
     entry_points={
         # fmt: off
@@ -191,6 +183,7 @@ setup(
             ]  # Includes an formatted indentation.
     },
 )
+# Regression test for https://github.com/psf/black/issues/2015.
 run(
     # fmt: off
     [
@@ -201,6 +194,7 @@ run(
     + path,
     check=True,
 )
+# Regression test for https://github.com/psf/black/issues/3026.
 def test_func():
     # yapf: disable
     if  unformatted(  args  ):
@@ -210,6 +204,7 @@ def test_func():
         return True
 
     return False
+# Regression test for https://github.com/psf/black/issues/2567.
 if True:
     # fmt: off
     for _ in range( 1 ):
@@ -218,6 +213,7 @@ if True:
     print ( "This won't be formatted either" )
 else:
     print ( "This will be formatted" )
+# Regression test for https://github.com/psf/black/issues/3184.
 class A:
     async def call(param):
         if param:
@@ -232,12 +228,14 @@ class A:
                 print ( "This won't be formatted either" )
 
         print ( "This will be formatted" )
+# Regression test for https://github.com/psf/black/issues/2985.
 class Named(t.Protocol):
     # fmt: off
     @property
     def  this_wont_be_formatted ( self ) -> str: ...
 class Factory(t.Protocol):
     def  this_will_be_formatted ( self, **kwargs ) -> Named: ...
+# Regression test for https://github.com/psf/black/issues/3436.
 if x:
     return x
 # fmt: off

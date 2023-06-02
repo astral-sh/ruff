@@ -109,14 +109,7 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,34 +1,20 @@
--#!/usr/bin/env python3
--# fmt: on
--# Some license here.
--#
--# Has many lines. Many, many lines.
--# Many, many, many lines.
- """Module docstring.
+@@ -8,27 +8,19 @@
  
  Possibly also many, many lines.
  """
@@ -125,9 +118,8 @@ async def wat():
  import sys
 -
  import a
--from b.c import X  # some noqa comment
+ from b.c import X  # some noqa comment
 -
-+from b.c import X
  try:
      import fast
  except ImportError:
@@ -145,50 +137,46 @@ async def wat():
  def function(default=None):
      """Docstring comes first.
  
-@@ -45,16 +31,7 @@
+@@ -45,12 +37,8 @@
  
      # This return is also commented for some reason.
      return default
 -
 -
--# Explains why we use global state.
+ # Explains why we use global state.
  GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
 -
 -
--# Another comment!
--# This time two lines.
--
--
- class Foo:
-     """Docstring for class Foo.  Example from Sphinx docs."""
+ # Another comment!
+ # This time two lines.
  
-@@ -73,11 +50,6 @@
+@@ -73,8 +61,6 @@
  
          self.spam = 4
          """Docstring for instance attribute spam."""
 -
 -
--#' <h1>This is pweave!</h1>
--
--
- @fast(really=True)
- async def wat():
-     # This comment, for some reason \
-@@ -89,8 +61,3 @@
-         print("A OK", file=sys.stdout)
-         # Comment between things.
-         print()
--
--
--# Some closing comments.
--# Maybe Vim or Emacs directives for formatting.
+ #' <h1>This is pweave!</h1>
+ 
+ 
+@@ -93,4 +79,4 @@
+ 
+ # Some closing comments.
+ # Maybe Vim or Emacs directives for formatting.
 -# Who knows.
 \ No newline at end of file
++# Who knows.
 ```
 
 ## Ruff Output
 
 ```py
+#!/usr/bin/env python3
+# fmt: on
+# Some license here.
+#
+# Has many lines. Many, many lines.
+# Many, many, many lines.
 """Module docstring.
 
 Possibly also many, many lines.
@@ -196,7 +184,7 @@ Possibly also many, many lines.
 import os.path
 import sys
 import a
-from b.c import X
+from b.c import X  # some noqa comment
 try:
     import fast
 except ImportError:
@@ -222,7 +210,12 @@ def function(default=None):
 
     # This return is also commented for some reason.
     return default
+# Explains why we use global state.
 GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
+# Another comment!
+# This time two lines.
+
+
 class Foo:
     """Docstring for class Foo.  Example from Sphinx docs."""
 
@@ -241,6 +234,9 @@ class Foo:
 
         self.spam = 4
         """Docstring for instance attribute spam."""
+#' <h1>This is pweave!</h1>
+
+
 @fast(really=True)
 async def wat():
     # This comment, for some reason \
@@ -252,6 +248,11 @@ async def wat():
         print("A OK", file=sys.stdout)
         # Comment between things.
         print()
+
+
+# Some closing comments.
+# Maybe Vim or Emacs directives for formatting.
+# Who knows.
 ```
 
 ## Black Output

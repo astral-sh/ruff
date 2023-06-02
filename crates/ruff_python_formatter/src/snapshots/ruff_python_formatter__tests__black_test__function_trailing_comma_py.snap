@@ -74,7 +74,7 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,114 +1,42 @@
+@@ -1,114 +1,46 @@
 -def f(
 -    a,
 -):
@@ -152,12 +152,12 @@ some_module.some_function(
 -    }
 -
 -
--# The type annotation shouldn't get a trailing comma since that would change its type.
--# Relevant bug report: https://github.com/psf/black/issues/2381.
 +def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
 +    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 +]:
 +    json = {"k": {"k2": {"k3": [1,]}}}
+ # The type annotation shouldn't get a trailing comma since that would change its type.
+ # Relevant bug report: https://github.com/psf/black/issues/2381.
  def some_function_with_a_really_long_name() -> (
      returning_a_deeply_nested_import_of_a_type_i_suppose
  ):
@@ -192,12 +192,12 @@ some_module.some_function(
      pass
 -
 -
--# Make sure inner one-element tuple won't explode
+ # Make sure inner one-element tuple won't explode
  some_module.some_function(
      argument1, (one_element_tuple,), argument4, argument5, argument6
  )
 -
--# Inner trailing comma causes outer to explode
+ # Inner trailing comma causes outer to explode
  some_module.some_function(
 -    argument1,
 -    (
@@ -233,6 +233,8 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ]:
     json = {"k": {"k2": {"k3": [1,]}}}
+# The type annotation shouldn't get a trailing comma since that would change its type.
+# Relevant bug report: https://github.com/psf/black/issues/2381.
 def some_function_with_a_really_long_name() -> (
     returning_a_deeply_nested_import_of_a_type_i_suppose
 ):
@@ -250,9 +252,11 @@ def func() -> ((also_super_long_type_annotation_that_may_cause_an_AST_related_cr
     ))
 ):
     pass
+# Make sure inner one-element tuple won't explode
 some_module.some_function(
     argument1, (one_element_tuple,), argument4, argument5, argument6
 )
+# Inner trailing comma causes outer to explode
 some_module.some_function(
     argument1, (one, two,), argument4, argument5, argument6
 )

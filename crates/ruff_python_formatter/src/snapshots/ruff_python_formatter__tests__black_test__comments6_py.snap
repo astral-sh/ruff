@@ -131,7 +131,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 ```diff
 --- Black
 +++ Ruff
-@@ -1,18 +1,11 @@
+@@ -1,18 +1,12 @@
  from typing import Any, Tuple
 -
 -
@@ -141,7 +141,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      pass
 -
 -
--# test type comments
+ # test type comments
  def f(a, b, c, d, e, f, g, h, i):
      # type: (int, int, int, int, int, int, int, int, int) -> None
      pass
@@ -150,7 +150,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  def f(
      a,  # type: int
      b,  # type: int
-@@ -26,8 +19,6 @@
+@@ -26,8 +20,6 @@
  ):
      # type: (...) -> None
      pass
@@ -159,7 +159,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  def f(
      arg,  # type: int
      *args,  # type: *Any
-@@ -36,8 +27,6 @@
+@@ -36,8 +28,6 @@
  ):
      # type: (...) -> None
      pass
@@ -168,14 +168,12 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  def f(
      a,  # type: int
      b,  # type: int
-@@ -66,23 +55,17 @@
-         + element
+@@ -67,22 +57,16 @@
          + another_element
          + another_element_with_long_name
--    )  # type: int
+     )  # type: int
 -
 -
-+    )
  def f(
      x,  # not a type comment
      y,  # type: int
@@ -193,7 +191,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  def func(
      a=some_list[0],  # type: int
  ):  # type: () -> int
-@@ -102,17 +85,12 @@
+@@ -102,17 +86,12 @@
      c = call(
          "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa"  # type: ignore
      )
@@ -203,16 +201,14 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
  )
 -
--AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA  # type: ignore
+ AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA  # type: ignore
 -
-+AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA
  call_to_some_function_asdf(
      foo,
      [AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, BBBBBBBBBBBB],  # type: ignore
  )
 -
--aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-+aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))
+ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
@@ -223,6 +219,7 @@ def f(
     a,  # type: int
 ):
     pass
+# test type comments
 def f(a, b, c, d, e, f, g, h, i):
     # type: (int, int, int, int, int, int, int, int, int) -> None
     pass
@@ -275,7 +272,7 @@ def f(
         + element
         + another_element
         + another_element_with_long_name
-    )
+    )  # type: int
 def f(
     x,  # not a type comment
     y,  # type: int
@@ -308,12 +305,12 @@ def func(
 result = (  # aaa
     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 )
-AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA
+AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA  # type: ignore
 call_to_some_function_asdf(
     foo,
     [AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, BBBBBBBBBBBB],  # type: ignore
 )
-aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))
+aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 ```
 
 ## Black Output

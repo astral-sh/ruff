@@ -14,7 +14,7 @@ use ruff_formatter::{
 use ruff_python_ast::node::AstNode;
 use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 
-use crate::comments::Comments;
+use crate::comments::{dangling_comments, leading_comments, trailing_comments, Comments};
 use crate::context::PyFormatContext;
 
 pub mod cli;
@@ -57,31 +57,31 @@ where
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
 
-    /// Formats the [leading comments](crate::comments#leading-comments) of the node.
+    /// Formats the [leading comments](comments#leading-comments) of the node.
     ///
     /// You may want to override this method if you want to manually handle the formatting of comments
     /// inside of the `fmt_fields` method or customize the formatting of the leading comments.
-    fn fmt_leading_comments(&self, _node: &N, _f: &mut PyFormatter) -> FormatResult<()> {
-        Ok(())
+    fn fmt_leading_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        leading_comments(node).fmt(f)
     }
 
-    /// Formats the [dangling comments](rome_formatter::comments#dangling-comments) of the node.
+    /// Formats the [dangling comments](comments#dangling-comments) of the node.
     ///
     /// You should override this method if the node handled by this rule can have dangling comments because the
     /// default implementation formats the dangling comments at the end of the node, which isn't ideal but ensures that
     /// no comments are dropped.
     ///
     /// A node can have dangling comments if all its children are tokens or if all node childrens are optional.
-    fn fmt_dangling_comments(&self, _node: &N, _f: &mut PyFormatter) -> FormatResult<()> {
-        Ok(())
+    fn fmt_dangling_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        dangling_comments(node).fmt(f)
     }
 
-    /// Formats the [trailing comments](rome_formatter::comments#trailing-comments) of the node.
+    /// Formats the [trailing comments](comments#trailing-comments) of the node.
     ///
     /// You may want to override this method if you want to manually handle the formatting of comments
     /// inside of the `fmt_fields` method or customize the formatting of the trailing comments.
-    fn fmt_trailing_comments(&self, _node: &N, _f: &mut PyFormatter) -> FormatResult<()> {
-        Ok(())
+    fn fmt_trailing_comments(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        trailing_comments(node).fmt(f)
     }
 }
 
@@ -180,8 +180,10 @@ if    True:
     print( "hi" )
 # trailing
 "#;
-        let expected = r#"if    True:
+        let expected = r#"# preceding
+if    True:
     print( "hi" )
+# trailing
 "#;
         let actual = format_module(input)?.as_code().to_string();
         assert_eq!(expected, actual);

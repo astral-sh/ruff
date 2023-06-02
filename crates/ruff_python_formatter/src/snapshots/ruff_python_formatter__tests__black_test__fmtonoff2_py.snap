@@ -53,21 +53,16 @@ def test_calculate_fades():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,13 +1,6 @@
+@@ -1,8 +1,6 @@
  import pytest
 -
  TmSt = 1
  TmEx = 2
 -
--# fmt: off
--
--# Test data:
--#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
--
- @pytest.mark.parametrize('test', [
+ # fmt: off
  
-     # Test don't manage the volume
-@@ -17,24 +10,18 @@
+ # Test data:
+@@ -17,19 +15,15 @@
  ])
  def test_fader(test):
      pass
@@ -87,11 +82,6 @@ def test_calculate_fades():
  def test_calculate_fades():
      calcs = [
          # one is zero/none
-         (0, 4, 0, 0, 10,        0, 0, 6, 10),
-         (None, 4, 0, 0, 10,     0, 0, 6, 10),
-     ]
--
--# fmt: on
 ```
 
 ## Ruff Output
@@ -100,6 +90,11 @@ def test_calculate_fades():
 import pytest
 TmSt = 1
 TmEx = 2
+# fmt: off
+
+# Test data:
+#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+
 @pytest.mark.parametrize('test', [
 
     # Test don't manage the volume
@@ -124,6 +119,8 @@ def test_calculate_fades():
         (0, 4, 0, 0, 10,        0, 0, 6, 10),
         (None, 4, 0, 0, 10,     0, 0, 6, 10),
     ]
+
+# fmt: on
 ```
 
 ## Black Output

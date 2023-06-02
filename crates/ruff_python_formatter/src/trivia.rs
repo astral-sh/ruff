@@ -68,9 +68,33 @@ pub(crate) fn lines_before(code: &str, offset: TextSize) -> u32 {
     newlines
 }
 
+/// Counts the empty lines between `offset` and the first non-whitespace character.
+pub(crate) fn lines_after(code: &str, offset: TextSize) -> u32 {
+    let rest = &code[usize::from(offset)..];
+    let mut newlines = 0;
+
+    for (index, c) in rest.char_indices() {
+        match c {
+            '\n' => {
+                newlines += 1;
+            }
+            '\r' if rest.as_bytes().get(index + 1).copied() == Some(b'\n') => {
+                continue;
+            }
+            '\r' => {
+                newlines += 1;
+            }
+            c if is_python_whitespace(c) => continue,
+            _ => break,
+        }
+    }
+
+    newlines
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::trivia::lines_before;
+    use crate::trivia::{lines_after, lines_before};
     use ruff_text_size::TextSize;
 
     #[test]
@@ -110,6 +134,39 @@ mod tests {
     fn lines_before_with_comment_only_line() {
         assert_eq!(
             lines_before("a = 20\n# some comment\nb = 10", TextSize::new(22)),
+            1
+        );
+    }
+
+    #[test]
+    fn lines_after_empty_string() {
+        assert_eq!(lines_after("", TextSize::new(0)), 0);
+    }
+
+    #[test]
+    fn lines_after_in_the_middle_of_a_line() {
+        assert_eq!(lines_after("a = 20", TextSize::new(4)), 0);
+    }
+
+    #[test]
+    fn lines_after_before_a_new_line() {
+        assert_eq!(lines_after("a = 20\nb = 10", TextSize::new(6)), 1);
+    }
+
+    #[test]
+    fn lines_after_multiple_newlines() {
+        assert_eq!(lines_after("a = 20\n\r\nb = 10", TextSize::new(6)), 2);
+    }
+
+    #[test]
+    fn lines_after_before_comment_offset() {
+        assert_eq!(lines_after("a = 20 # a comment\n", TextSize::new(7)), 0);
+    }
+
+    #[test]
+    fn lines_after_with_comment_only_line() {
+        assert_eq!(
+            lines_after("a = 20\n# some comment\nb = 10", TextSize::new(6)),
             1
         );
     }

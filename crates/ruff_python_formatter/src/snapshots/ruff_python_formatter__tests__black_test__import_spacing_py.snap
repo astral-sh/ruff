@@ -62,11 +62,11 @@ __all__ = (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,55 +1,30 @@
+@@ -1,55 +1,33 @@
  """The asyncio package, tracking PEP 3156."""
 -
--# flake8: noqa
--
+ # flake8: noqa
+ 
 -from logging import WARNING
  from logging import (
 +    WARNING
@@ -76,19 +76,16 @@ __all__ = (
  )
  import sys
 -
--# This relies on each of the submodules having an __all__ variable.
+ # This relies on each of the submodules having an __all__ variable.
  from .base_events import *
  from .coroutines import *
--from .events import *  # comment here
+ from .events import *  # comment here
 -
-+from .events import *
  from .futures import *
--from .locks import *  # comment here
-+from .locks import *
+ from .locks import *  # comment here
  from .protocols import *
 -
--from ..runners import *  # comment here
-+from ..runners import *
+ from ..runners import *  # comment here
  from ..queues import *
  from ..streams import *
 -
@@ -136,6 +133,8 @@ __all__ = (
 
 ```py
 """The asyncio package, tracking PEP 3156."""
+# flake8: noqa
+
 from logging import (
     WARNING
 )
@@ -143,13 +142,14 @@ from logging import (
     ERROR,
 )
 import sys
+# This relies on each of the submodules having an __all__ variable.
 from .base_events import *
 from .coroutines import *
-from .events import *
+from .events import *  # comment here
 from .futures import *
-from .locks import *
+from .locks import *  # comment here
 from .protocols import *
-from ..runners import *
+from ..runners import *  # comment here
 from ..queues import *
 from ..streams import *
 from some_library import (
