@@ -103,7 +103,7 @@ def add_code_to_rule_pair(
 ) -> None:
     """Add the relevant code-to-rule pair to `src/codes.rs`."""
     variant = pascal_case(linter)
-    rule = f"""rules::{linter.split(" ")[0]}::rules::{name}"""
+    rule = f"""rules::{dir_name(linter)}::rules::{name}"""
     new_code_to_rule_pair = (
         " " * 8 + f'({variant}, "{code}") => (RuleGroup::Unspecified, {rule}),\n'
     )
