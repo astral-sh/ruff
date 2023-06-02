@@ -127,7 +127,11 @@ pub(crate) fn remove_imports<'a>(
         }
     }
 
-    Ok(Some(tree.codegen_stylist(&stylist)))
+    if aliases.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(tree.codegen_stylist(stylist)))
 }
 
 /// Given an import statement, remove any imports that are not specified in the `imports` slice.
