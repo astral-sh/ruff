@@ -34,7 +34,7 @@ fn is_static_length(elts: &[Expr]) -> bool {
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
     let mut first = true;
-    let mut strings: Vec<&String> = vec![];
+    let mut string_args: Vec<&String> = vec![];
 
     for expr in joinees {
         if matches!(expr, Expr::JoinedStr(_)) {
@@ -52,13 +52,13 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             ..
         }) = expr
         {
-            strings.push(value);
+            string_args.push(value);
         }
     }
 
-    let node = if strings.len() == joinees.len() {
+    let node = if string_args.len() == joinees.len() {
         ast::Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(strings.iter().join(joiner)),
+            value: Constant::Str(string_args.iter().join(joiner)),
             range: TextRange::default(),
             kind: None,
         })
