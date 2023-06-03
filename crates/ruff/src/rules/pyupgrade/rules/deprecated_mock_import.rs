@@ -127,7 +127,7 @@ fn format_import(
 ) -> Result<String> {
     let module_text = locator.slice(stmt.range());
     let mut tree = match_statement(module_text)?;
-    let mut import = match_import(&mut tree)?;
+    let import = match_import(&mut tree)?;
 
     let Import { names, .. } = import.clone();
     let (clean_aliases, mock_aliases) = clean_import_aliases(names);
@@ -161,7 +161,7 @@ fn format_import_from(
 ) -> Result<String> {
     let module_text = locator.slice(stmt.range());
     let mut tree = match_statement(module_text).unwrap();
-    let mut import = match_import_from(&mut tree)?;
+    let import = match_import_from(&mut tree)?;
 
     if let ImportFrom {
         names: ImportNames::Star(..),

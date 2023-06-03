@@ -89,7 +89,7 @@ fn generate_call(
 ) -> Result<String> {
     let module_text = locator.slice(expr.range());
     let mut expression = match_expression(module_text)?;
-    let mut call = match_call_mut(&mut expression)?;
+    let call = match_call_mut(&mut expression)?;
 
     // Fix the call arguments.
     if !is_sequential(correct_order) {

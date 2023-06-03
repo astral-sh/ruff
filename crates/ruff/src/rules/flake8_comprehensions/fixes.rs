@@ -291,7 +291,7 @@ pub(crate) fn fix_unnecessary_literal_set(
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
-    let mut call = match_call_mut(&mut tree)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
     let (elements, whitespace_after, whitespace_before) = match &arg.value {
@@ -765,7 +765,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
-    let mut outer_call = match_call_mut(&mut tree)?;
+    let outer_call = match_call_mut(&mut tree)?;
 
     outer_call.args = match outer_call.args.split_first() {
         Some((first, rest)) => {
