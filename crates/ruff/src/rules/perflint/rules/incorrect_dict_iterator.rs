@@ -54,10 +54,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
         let Expr::Attribute(ast::ExprAttribute { attr, value, ..  }) = func.as_ref() else {
             return;
         };
-        if attr.to_string() != "items" {
+        if attr != "items" {
             return;
         }
-        if args.len() != 0 {
+        if !args.is_empty() {
             return;
         }
         if let Expr::Tuple(ast::ExprTuple {
@@ -71,19 +71,21 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
             }
 
             if let [Expr::Name(ast::ExprName {
-                id,
-                range: var_range,
+                id: id1,
+                range: var_range1,
                 ..
             }), Expr::Name(ast::ExprName {
                 id: id2,
-                range: var_range2, ..                                          })] = &elts.as_slice()
+                range: var_range2,
+                ..
+            })] = &elts.as_slice()
             {
-                if id.to_string() == "_" {
+                if id1 == "_" {
                     let mut diagnostic = Diagnostic::new(
                         IncorrectDictIterator {
                             subset: "values".to_string(),
                         },
-                        *var_range,
+                        *var_range1,
                     );
                     if let Expr::Name(ast::ExprName {
                         range: dict_range, ..
@@ -102,7 +104,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                         return;
                     }
                 }
-                if id2.to_string() == "_" {
+                if id2 == "_" {
                     let mut diagnostic = Diagnostic::new(
                         IncorrectDictIterator {
                             subset: "keys".to_string(),
@@ -119,11 +121,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
                                     ".keys".to_string(),
                                     TextRange::new(dict_range.end(), func.range().end()),
                                 ),
-                                [Edit::range_replacement(id.to_string(), *tup_range)],
+                                [Edit::range_replacement(id1.to_string(), *tup_range)],
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
-                        return;
                     }
                 }
             }
