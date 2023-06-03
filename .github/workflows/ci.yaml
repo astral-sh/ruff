@@ -99,7 +99,7 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz build -s none
+      - run: cargo fuzz build
 
   cargo-test-wasm:
     runs-on: ubuntu-latest
