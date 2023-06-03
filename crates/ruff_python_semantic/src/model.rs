@@ -256,14 +256,8 @@ impl<'a> SemanticModel<'a> {
         // import pyarrow.csv
         // print(pa.csv.read_csv("test.csv"))
         // ```
-        let full_name = match &self.bindings[binding_id].kind {
-            BindingKind::Importation(Importation { full_name }) => *full_name,
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => *full_name,
-            BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
-            _ => return None,
-        };
-
-        let has_alias = full_name
+        let qualified_name = self.bindings[binding_id].qualified_name()?;
+        let has_alias = qualified_name
             .split('.')
             .last()
             .map(|segment| segment != symbol)
@@ -272,7 +266,7 @@ impl<'a> SemanticModel<'a> {
             return None;
         }
 
-        self.scopes[scope_id].get(full_name)
+        self.scopes[scope_id].get(qualified_name)
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
