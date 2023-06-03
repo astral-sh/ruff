@@ -272,3 +272,34 @@ def str_to_bool(val):
     if isinstance(val, bool):
         return some_obj
     return val
+
+
+# Mixed assignments
+def function_assignment(x):
+    def f(): ...
+
+    return f
+
+
+def class_assignment(x):
+    class Foo: ...
+
+    return Foo
+
+
+def mixed_function_assignment(x):
+    if x:
+        def f(): ...
+    else:
+        f = 42
+
+    return f
+
+
+def mixed_class_assignment(x):
+    if x:
+        class Foo: ...
+    else:
+        Foo = 42
+
+    return Foo
