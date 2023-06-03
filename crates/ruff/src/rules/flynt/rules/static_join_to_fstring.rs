@@ -28,16 +28,48 @@ impl AlwaysAutofixableViolation for StaticJoinToFString {
 }
 
 fn is_static_length(elts: &[Expr]) -> bool {
-    elts.iter().all(|e| !matches!(e, Expr::Starred(_)))
+    elts.iter().all(|e| !e.is_starred_expr())
 }
 
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
+    // If all elements are string constants, join them into a single string.
+    if joinees.iter().all(|expr| {
+        matches!(
+            expr,
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(_),
+                ..
+            })
+        )
+    }) {
+        let node = ast::ExprConstant {
+            value: Constant::Str(
+                joinees
+                    .iter()
+                    .filter_map(|expr| {
+                        if let Expr::Constant(ast::ExprConstant {
+                            value: Constant::Str(string),
+                            ..
+                        }) = expr
+                        {
+                            Some(string.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .join(joiner),
+            ),
+            range: TextRange::default(),
+            kind: None,
+        };
+        return Some(node.into());
+    }
+
     let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
     let mut first = true;
-    let mut string_args: Vec<&String> = vec![];
 
     for expr in joinees {
-        if matches!(expr, Expr::JoinedStr(_)) {
+        if expr.is_joined_str_expr() {
             // Oops, already an f-string. We don't know how to handle those
             // gracefully right now.
             return None;
@@ -46,31 +78,13 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             fstring_elems.push(helpers::to_constant_string(joiner));
         }
         fstring_elems.push(helpers::to_fstring_elem(expr)?);
-
-        if let Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(value),
-            ..
-        }) = expr
-        {
-            string_args.push(value);
-        }
     }
 
-    let node = if string_args.len() == joinees.len() {
-        ast::Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(string_args.iter().join(joiner)),
-            range: TextRange::default(),
-            kind: None,
-        })
-    } else {
-        ast::ExprJoinedStr {
-            values: fstring_elems,
-            range: TextRange::default(),
-        }
-        .into()
+    let node = ast::ExprJoinedStr {
+        values: fstring_elems,
+        range: TextRange::default(),
     };
-
-    Some(node)
+    Some(node.into())
 }
 
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
