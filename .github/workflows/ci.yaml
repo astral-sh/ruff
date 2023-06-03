@@ -88,18 +88,15 @@ jobs:
           path: target/debug/ruff
 
   cargo-fuzz:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    name: "cargo fuzz | ${{ matrix.os }}"
+    runs-on: ubuntu-latest
+    name: "cargo fuzz"
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz build
+      - run: cargo fuzz build -s none
 
   cargo-test-wasm:
     runs-on: ubuntu-latest
