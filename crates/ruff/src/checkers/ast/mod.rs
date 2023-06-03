@@ -257,21 +257,15 @@ where
             Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
                 if !self.semantic_model.scope_id.is_global() {
-                    // Add the binding to the current scope.
-                    let context = self.semantic_model.execution_context();
-                    let exceptions = self.semantic_model.exceptions();
-                    let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let binding_id = self.semantic_model.bindings.push(Binding {
-                            kind: BindingKind::Global,
-                            range: *range,
-                            references: Vec::new(),
-                            source: self.semantic_model.stmt_id,
-                            context,
-                            exceptions,
-                            flags: BindingFlags::empty(),
-                        });
+                        let binding = self.semantic_model.declared_binding(
+                            *range,
+                            BindingKind::Global,
+                            BindingFlags::empty(),
+                        );
+                        let binding_id = self.semantic_model.bindings.push(binding);
+                        let scope = self.semantic_model.scope_mut();
                         scope.add(name, binding_id);
                     }
                 }
@@ -286,20 +280,15 @@ where
             Stmt::Nonlocal(ast::StmtNonlocal { names, range: _ }) => {
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
                 if !self.semantic_model.scope_id.is_global() {
-                    let context = self.semantic_model.execution_context();
-                    let exceptions = self.semantic_model.exceptions();
-                    let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let binding_id = self.semantic_model.bindings.push(Binding {
-                            kind: BindingKind::Nonlocal,
-                            range: *range,
-                            references: Vec::new(),
-                            source: self.semantic_model.stmt_id,
-                            context,
-                            exceptions,
-                            flags: BindingFlags::empty(),
-                        });
+                        let binding = self.semantic_model.declared_binding(
+                            *range,
+                            BindingKind::Nonlocal,
+                            BindingFlags::empty(),
+                        );
+                        let binding_id = self.semantic_model.bindings.push(binding);
+                        let scope = self.semantic_model.scope_mut();
                         scope.add(name, binding_id);
                     }
 
@@ -841,18 +830,11 @@ where
                 for alias in names {
                     if &alias.name == "__future__" {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-
                         self.add_binding(
                             name,
-                            Binding {
-                                kind: BindingKind::FutureImportation,
-                                range: alias.range(),
-                                references: Vec::new(),
-                                source: self.semantic_model.stmt_id,
-                                context: self.semantic_model.execution_context(),
-                                exceptions: self.semantic_model.exceptions(),
-                                flags: BindingFlags::empty(),
-                            },
+                            alias.range(),
+                            BindingKind::FutureImportation,
+                            BindingFlags::empty(),
                         );
 
                         if self.enabled(Rule::LateFutureImport) {
@@ -870,39 +852,25 @@ where
                         let full_name = &alias.name;
                         self.add_binding(
                             name,
-                            Binding {
-                                kind: BindingKind::SubmoduleImportation(SubmoduleImportation {
-                                    full_name,
-                                }),
-                                range: alias.range(),
-                                references: Vec::new(),
-                                source: self.semantic_model.stmt_id,
-                                context: self.semantic_model.execution_context(),
-                                exceptions: self.semantic_model.exceptions(),
-                                flags: BindingFlags::empty(),
-                            },
+                            alias.range(),
+                            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }),
+                            BindingFlags::empty(),
                         );
                     } else {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         let full_name = &alias.name;
                         self.add_binding(
                             name,
-                            Binding {
-                                kind: BindingKind::Importation(Importation { full_name }),
-                                range: alias.range(),
-                                references: Vec::new(),
-                                source: self.semantic_model.stmt_id,
-                                context: self.semantic_model.execution_context(),
-                                exceptions: self.semantic_model.exceptions(),
-                                flags: if alias
-                                    .asname
-                                    .as_ref()
-                                    .map_or(false, |asname| asname == &alias.name)
-                                {
-                                    BindingFlags::EXPLICIT_EXPORT
-                                } else {
-                                    BindingFlags::empty()
-                                },
+                            alias.range(),
+                            BindingKind::Importation(Importation { full_name }),
+                            if alias
+                                .asname
+                                .as_ref()
+                                .map_or(false, |asname| asname == &alias.name)
+                            {
+                                BindingFlags::EXPLICIT_EXPORT
+                            } else {
+                                BindingFlags::empty()
                             },
                         );
 
@@ -1127,15 +1095,9 @@ where
 
                         self.add_binding(
                             name,
-                            Binding {
-                                kind: BindingKind::FutureImportation,
-                                range: alias.range(),
-                                references: Vec::new(),
-                                source: self.semantic_model.stmt_id,
-                                context: self.semantic_model.execution_context(),
-                                exceptions: self.semantic_model.exceptions(),
-                                flags: BindingFlags::empty(),
-                            },
+                            alias.range(),
+                            BindingKind::FutureImportation,
+                            BindingFlags::empty(),
                         );
 
                         if self.enabled(Rule::FutureFeatureNotDefined) {
@@ -1194,22 +1156,16 @@ where
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
-                            Binding {
-                                kind: BindingKind::FromImportation(FromImportation { full_name }),
-                                range: alias.range(),
-                                references: Vec::new(),
-                                source: self.semantic_model.stmt_id,
-                                context: self.semantic_model.execution_context(),
-                                exceptions: self.semantic_model.exceptions(),
-                                flags: if alias
-                                    .asname
-                                    .as_ref()
-                                    .map_or(false, |asname| asname == &alias.name)
-                                {
-                                    BindingFlags::EXPLICIT_EXPORT
-                                } else {
-                                    BindingFlags::empty()
-                                },
+                            alias.range(),
+                            BindingKind::FromImportation(FromImportation { full_name }),
+                            if alias
+                                .asname
+                                .as_ref()
+                                .map_or(false, |asname| asname == &alias.name)
+                            {
+                                BindingFlags::EXPLICIT_EXPORT
+                            } else {
+                                BindingFlags::empty()
                             },
                         );
                     }
@@ -1927,15 +1883,9 @@ where
 
                 self.add_binding(
                     name,
-                    Binding {
-                        kind: BindingKind::FunctionDefinition,
-                        range: stmt.range(),
-                        references: Vec::new(),
-                        source: self.semantic_model.stmt_id,
-                        context: self.semantic_model.execution_context(),
-                        exceptions: self.semantic_model.exceptions(),
-                        flags: BindingFlags::empty(),
-                    },
+                    stmt.range(),
+                    BindingKind::FunctionDefinition,
+                    BindingFlags::empty(),
                 );
 
                 let definition = docstrings::extraction::extract_definition(
@@ -2163,15 +2113,9 @@ where
                 self.semantic_model.pop_definition();
                 self.add_binding(
                     name,
-                    Binding {
-                        kind: BindingKind::ClassDefinition,
-                        range: stmt.range(),
-                        references: Vec::new(),
-                        source: self.semantic_model.stmt_id,
-                        context: self.semantic_model.execution_context(),
-                        exceptions: self.semantic_model.exceptions(),
-                        flags: BindingFlags::empty(),
-                    },
+                    stmt.range(),
+                    BindingKind::ClassDefinition,
+                    BindingFlags::empty(),
                 );
             }
             _ => {}
@@ -4200,15 +4144,9 @@ where
         // upstream.
         self.add_binding(
             &arg.arg,
-            Binding {
-                kind: BindingKind::Argument,
-                range: arg.range(),
-                references: Vec::new(),
-                source: self.semantic_model.stmt_id,
-                context: self.semantic_model.execution_context(),
-                exceptions: self.semantic_model.exceptions(),
-                flags: BindingFlags::empty(),
-            },
+            arg.range(),
+            BindingKind::Argument,
+            BindingFlags::empty(),
         );
 
         if self.enabled(Rule::AmbiguousVariableName) {
@@ -4248,15 +4186,9 @@ where
         {
             self.add_binding(
                 name,
-                Binding {
-                    kind: BindingKind::Assignment,
-                    range: pattern.range(),
-                    references: Vec::new(),
-                    source: self.semantic_model.stmt_id,
-                    context: self.semantic_model.execution_context(),
-                    exceptions: self.semantic_model.exceptions(),
-                    flags: BindingFlags::empty(),
-                },
+                pattern.range(),
+                BindingKind::Assignment,
+                BindingFlags::empty(),
             );
         }
 
@@ -4380,8 +4312,16 @@ impl<'a> Checker<'a> {
     }
 
     /// Add a [`Binding`] to the current scope, bound to the given name.
-    fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) -> BindingId {
+    fn add_binding(
+        &mut self,
+        name: &'a str,
+        range: TextRange,
+        kind: BindingKind<'a>,
+        flags: BindingFlags,
+    ) -> BindingId {
         let binding_id = self.semantic_model.bindings.next_id();
+        let binding = self.semantic_model.declared_binding(range, kind, flags);
+
         if let Some((stack_index, existing_binding_id)) = self
             .semantic_model
             .scopes
@@ -4449,7 +4389,7 @@ impl<'a> Checker<'a> {
                             );
                             if let Some(parent) = binding.source {
                                 let parent = self.semantic_model.stmts[parent];
-                                if matches!(parent, Stmt::ImportFrom(_))
+                                if parent.is_import_from_stmt()
                                     && parent.range().contains_range(binding.range)
                                 {
                                     diagnostic.set_parent(parent.start());
@@ -4521,7 +4461,6 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        let scope = &mut self.semantic_model.scopes[self.semantic_model.scope_id];
         for builtin in BUILTINS
             .iter()
             .chain(MAGIC_GLOBALS.iter())
@@ -4529,15 +4468,9 @@ impl<'a> Checker<'a> {
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
             // Add the builtin to the scope.
-            let binding_id = self.semantic_model.bindings.push(Binding {
-                kind: BindingKind::Builtin,
-                range: TextRange::default(),
-                source: None,
-                references: Vec::new(),
-                context: ExecutionContext::Runtime,
-                exceptions: Exceptions::empty(),
-                flags: BindingFlags::empty(),
-            });
+            let binding = self.semantic_model.builtin_binding();
+            let binding_id = self.semantic_model.bindings.push(binding);
+            let scope = self.semantic_model.scope_mut();
             scope.add(builtin, binding_id);
         }
     }
@@ -4647,15 +4580,9 @@ impl<'a> Checker<'a> {
         ) {
             self.add_binding(
                 id,
-                Binding {
-                    kind: BindingKind::Annotation,
-                    range: expr.range(),
-                    references: Vec::new(),
-                    source: self.semantic_model.stmt_id,
-                    context: self.semantic_model.execution_context(),
-                    exceptions: self.semantic_model.exceptions(),
-                    flags: BindingFlags::empty(),
-                },
+                expr.range(),
+                BindingKind::Annotation,
+                BindingFlags::empty(),
             );
             return;
         }
@@ -4663,15 +4590,9 @@ impl<'a> Checker<'a> {
         if matches!(parent, Stmt::For(_) | Stmt::AsyncFor(_)) {
             self.add_binding(
                 id,
-                Binding {
-                    kind: BindingKind::LoopVar,
-                    range: expr.range(),
-                    references: Vec::new(),
-                    source: self.semantic_model.stmt_id,
-                    context: self.semantic_model.execution_context(),
-                    exceptions: self.semantic_model.exceptions(),
-                    flags: BindingFlags::empty(),
-                },
+                expr.range(),
+                BindingKind::LoopVar,
+                BindingFlags::empty(),
             );
             return;
         }
@@ -4679,15 +4600,9 @@ impl<'a> Checker<'a> {
         if helpers::is_unpacking_assignment(parent, expr) {
             self.add_binding(
                 id,
-                Binding {
-                    kind: BindingKind::Binding,
-                    range: expr.range(),
-                    references: Vec::new(),
-                    source: self.semantic_model.stmt_id,
-                    context: self.semantic_model.execution_context(),
-                    exceptions: self.semantic_model.exceptions(),
-                    flags: BindingFlags::empty(),
-                },
+                expr.range(),
+                BindingKind::Binding,
+                BindingFlags::empty(),
             );
             return;
         }
@@ -4759,15 +4674,9 @@ impl<'a> Checker<'a> {
 
                 self.add_binding(
                     id,
-                    Binding {
-                        kind: BindingKind::Export(Export { names: all_names }),
-                        range: expr.range(),
-                        references: Vec::new(),
-                        source: self.semantic_model.stmt_id,
-                        context: self.semantic_model.execution_context(),
-                        exceptions: self.semantic_model.exceptions(),
-                        flags: BindingFlags::empty(),
-                    },
+                    expr.range(),
+                    BindingKind::Export(Export { names: all_names }),
+                    BindingFlags::empty(),
                 );
                 return;
             }
@@ -4780,30 +4689,18 @@ impl<'a> Checker<'a> {
         {
             self.add_binding(
                 id,
-                Binding {
-                    kind: BindingKind::NamedExprAssignment,
-                    range: expr.range(),
-                    references: Vec::new(),
-                    source: self.semantic_model.stmt_id,
-                    context: self.semantic_model.execution_context(),
-                    exceptions: self.semantic_model.exceptions(),
-                    flags: BindingFlags::empty(),
-                },
+                expr.range(),
+                BindingKind::NamedExprAssignment,
+                BindingFlags::empty(),
             );
             return;
         }
 
         self.add_binding(
             id,
-            Binding {
-                kind: BindingKind::Assignment,
-                range: expr.range(),
-                references: Vec::new(),
-                source: self.semantic_model.stmt_id,
-                context: self.semantic_model.execution_context(),
-                exceptions: self.semantic_model.exceptions(),
-                flags: BindingFlags::empty(),
-            },
+            expr.range(),
+            BindingKind::Assignment,
+            BindingFlags::empty(),
         );
     }
 

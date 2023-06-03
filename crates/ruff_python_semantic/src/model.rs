@@ -114,6 +114,37 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
+    /// Create a new [`Binding`] for a builtin.
+    pub fn builtin_binding(&self) -> Binding<'static> {
+        Binding {
+            range: TextRange::default(),
+            kind: BindingKind::Builtin,
+            references: Vec::new(),
+            flags: BindingFlags::empty(),
+            source: None,
+            context: ExecutionContext::Runtime,
+            exceptions: Exceptions::empty(),
+        }
+    }
+
+    /// Create a new `Binding` for the given `name` and `range`.
+    pub fn declared_binding(
+        &self,
+        range: TextRange,
+        kind: BindingKind<'a>,
+        flags: BindingFlags,
+    ) -> Binding<'a> {
+        Binding {
+            range,
+            kind,
+            flags,
+            references: Vec::new(),
+            source: self.stmt_id,
+            context: self.execution_context(),
+            exceptions: self.exceptions(),
+        }
+    }
+
     /// Return the current `Binding` for a given `name`.
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.scopes()
