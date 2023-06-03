@@ -872,4 +872,19 @@ a = (
 
         assert_debug_snapshot!(comments.debug(test_case.source_code));
     }
+
+    #[test]
+    fn while_trailing_else_end_of_line_comment() {
+        let source = r#"while True:
+    pass
+else: # trailing comment
+    pass
+"#;
+
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
 }
