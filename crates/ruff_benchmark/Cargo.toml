@@ -30,7 +30,7 @@ ureq = "2.6.2"
 [dev-dependencies]
 ruff.path = "../ruff"
 ruff_python_ast.path = "../ruff_python_ast"
-criterion = { version = "0.4.0"}
+criterion = { version = "0.5.1"}
 rustpython-parser.workspace = true
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
