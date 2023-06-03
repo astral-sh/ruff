@@ -70,26 +70,28 @@ pub struct UnassignedSpecialVariableInStub {
 }
 
 /// ## What it does
-/// Checks that `__all__`, `__match_args__` and `__slots__` variables in stubs are assigned values.
+/// Checks that `__all__`, `__match_args__`, and `__slots__` variables are
+/// assigned to values when defined in stub files.
 ///
 /// ## Why is this bad?
-/// These special variables have the same semantics in stub files as they do in Python modules
-/// so they should be consistent with their counterparts.
+/// Special variables like `__all__` have the same semantics in stub files
+/// as they do in Python modules, and so should be consistent with their
+/// runtime counterparts.
 ///
 /// ## Example
 /// ```python
-/// __all__ : list[str]
+/// __all__: list[str]
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// __all__ : list[str] = ["foo", "bar"]
+/// __all__: list[str] = ["foo", "bar"]
 /// ```
 impl Violation for UnassignedSpecialVariableInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnassignedSpecialVariableInStub { name } = self;
-        format!("`{name}` in a stub file must be assigned a value")
+        format!("`{name}` in a stub file must have a value, as it has the same semantics as `{name}` at runtime")
     }
 }
 
