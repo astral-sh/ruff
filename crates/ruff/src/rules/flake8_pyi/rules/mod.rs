@@ -20,8 +20,9 @@ pub(crate) use prefix_type_params::{prefix_type_params, UnprefixedTypeParam};
 pub(crate) use quoted_annotation_in_stub::{quoted_annotation_in_stub, QuotedAnnotationInStub};
 pub(crate) use simple_defaults::{
     annotated_assignment_default_in_stub, argument_simple_defaults, assignment_default_in_stub,
-    typed_argument_simple_defaults, unannotated_assignment_in_stub, ArgumentDefaultInStub,
-    AssignmentDefaultInStub, TypedArgumentDefaultInStub, UnannotatedAssignmentInStub,
+    typed_argument_simple_defaults, unannotated_assignment_in_stub,
+    unassigned_special_variable_in_stub, ArgumentDefaultInStub, AssignmentDefaultInStub,
+    TypedArgumentDefaultInStub, UnannotatedAssignmentInStub, UnassignedSpecialVariableInStub,
 };
 pub(crate) use string_or_bytes_too_long::{string_or_bytes_too_long, StringOrBytesTooLong};
 pub(crate) use stub_body_multiple_statements::{
