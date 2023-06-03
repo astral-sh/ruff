@@ -168,12 +168,14 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  def f(
      a,  # type: int
      b,  # type: int
-@@ -67,22 +57,16 @@
+@@ -66,23 +56,17 @@
+         + element
          + another_element
          + another_element_with_long_name
-     )  # type: int
+-    )  # type: int
 -
 -
++    )
  def f(
      x,  # not a type comment
      y,  # type: int
@@ -272,7 +274,7 @@ def f(
         + element
         + another_element
         + another_element_with_long_name
-    )  # type: int
+    )
 def f(
     x,  # not a type comment
     y,  # type: int
