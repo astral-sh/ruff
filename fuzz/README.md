@@ -28,7 +28,7 @@ For specific details about how each fuzzer works, please read this document in i
 ### Debugging a crash
 
 Once you've found a crash, you'll need to debug it.
-The easiest first step in this process is to minimise the input such that the crash is still 
+The easiest first step in this process is to minimise the input such that the crash is still
 triggered with a smaller input.
 `cargo-fuzz` supports this out of the box with:
 
