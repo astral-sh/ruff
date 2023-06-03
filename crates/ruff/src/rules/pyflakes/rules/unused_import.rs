@@ -5,9 +5,7 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, IsolationLevel, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{
-    BindingKind, Exceptions, FromImportation, Importation, SubmoduleImportation,
-};
+use ruff_python_semantic::binding::Exceptions;
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::Scope;
 
@@ -117,11 +115,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         }
 
-        let full_name = match &binding.kind {
-            BindingKind::Importation(Importation { full_name, .. }) => full_name,
-            BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
-            _ => continue,
+        let Some(qualified_name) = binding.qualified_name() else {
+            continue;
         };
 
         let stmt_id = binding.source.unwrap();
@@ -144,12 +139,12 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             ignored
                 .entry((stmt_id, parent_id, exceptions))
                 .or_default()
-                .push((full_name, &binding.range));
+                .push((qualified_name, &binding.range));
         } else {
             unused
                 .entry((stmt_id, parent_id, exceptions))
                 .or_default()
-                .push((full_name, &binding.range));
+                .push((qualified_name, &binding.range));
         }
     }
 

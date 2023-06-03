@@ -48,39 +48,34 @@ impl<'a> Binding<'a> {
     /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Importation(Importation { full_name, .. }) => {
+            BindingKind::Importation(Importation { full_name }) => {
                 if let BindingKind::SubmoduleImportation(SubmoduleImportation {
                     full_name: existing,
-                    ..
                 }) = &existing.kind
                 {
                     return full_name == existing;
                 }
             }
-            BindingKind::FromImportation(FromImportation { full_name, .. }) => {
+            BindingKind::FromImportation(FromImportation { full_name }) => {
                 if let BindingKind::SubmoduleImportation(SubmoduleImportation {
                     full_name: existing,
-                    ..
                 }) = &existing.kind
                 {
                     return full_name == existing;
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => {
+            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => {
                 match &existing.kind {
                     BindingKind::Importation(Importation {
                         full_name: existing,
-                        ..
                     })
                     | BindingKind::SubmoduleImportation(SubmoduleImportation {
                         full_name: existing,
-                        ..
                     }) => {
                         return full_name == existing;
                     }
                     BindingKind::FromImportation(FromImportation {
                         full_name: existing,
-                        ..
                     }) => {
                         return full_name == existing;
                     }
@@ -104,6 +99,35 @@ impl<'a> Binding<'a> {
                 | BindingKind::FromImportation(..)
                 | BindingKind::SubmoduleImportation(..)
         )
+    }
+
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn qualified_name(&self) -> Option<&str> {
+        match &self.kind {
+            BindingKind::Importation(Importation { full_name }) => Some(full_name),
+            BindingKind::FromImportation(FromImportation { full_name }) => Some(full_name),
+            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => {
+                Some(full_name)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the fully-qualified name of the module from which this symbol was imported, if this
+    /// symbol was imported from another module.
+    pub fn module_name(&self) -> Option<&str> {
+        match &self.kind {
+            BindingKind::Importation(Importation { full_name })
+            | BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => {
+                Some(full_name.split('.').next().unwrap_or(full_name))
+            }
+            BindingKind::FromImportation(FromImportation { full_name }) => Some(
+                full_name
+                    .rsplit_once('.')
+                    .map_or(full_name, |(module, _)| module),
+            ),
+            _ => None,
+        }
     }
 
     /// Returns the appropriate visual range for highlighting this binding.
@@ -211,37 +235,34 @@ pub struct Export<'a> {
     pub names: Vec<&'a str>,
 }
 
+/// A binding for an `import`, keyed on the name to which the import is bound.
+/// Ex) `import foo` would be keyed on "foo".
+/// Ex) `import foo as bar` would be keyed on "bar".
 #[derive(Clone, Debug)]
 pub struct Importation<'a> {
-    /// The name to which the import is bound.
-    /// Given `import foo`, `name` would be "foo".
-    /// Given `import foo as bar`, `name` would be "bar".
-    pub name: &'a str,
     /// The full name of the module being imported.
-    /// Given `import foo`, `full_name` would be "foo".
-    /// Given `import foo as bar`, `full_name` would be "foo".
+    /// Ex) Given `import foo`, `full_name` would be "foo".
+    /// Ex) Given `import foo as bar`, `full_name` would be "foo".
     pub full_name: &'a str,
 }
 
+/// A binding for a member imported from a module, keyed on the name to which the member is bound.
+/// Ex) `from foo import bar` would be keyed on "bar".
+/// Ex) `from foo import bar as baz` would be keyed on "baz".
 #[derive(Clone, Debug)]
-pub struct FromImportation<'a> {
-    /// The name to which the import is bound.
-    /// Given `from foo import bar`, `name` would be "bar".
-    /// Given `from foo import bar as baz`, `name` would be "baz".
-    pub name: &'a str,
-    /// The full name of the module being imported.
-    /// Given `from foo import bar`, `full_name` would be "foo.bar".
-    /// Given `from foo import bar as baz`, `full_name` would be "foo.bar".
+pub struct FromImportation {
+    /// The full name of the member being imported.
+    /// Ex) Given `from foo import bar`, `full_name` would be "foo.bar".
+    /// Ex) Given `from foo import bar as baz`, `full_name` would be "foo.bar".
     pub full_name: String,
 }
 
+/// A binding for a submodule imported from a module, keyed on the name of the parent module.
+/// Ex) `import foo.bar` would be keyed on "foo".
 #[derive(Clone, Debug)]
 pub struct SubmoduleImportation<'a> {
-    /// The parent module imported by the submodule import.
-    /// Given `import foo.bar`, `module` would be "foo".
-    pub name: &'a str,
     /// The full name of the submodule being imported.
-    /// Given `import foo.bar`, `full_name` would be "foo.bar".
+    /// Ex) Given `import foo.bar`, `full_name` would be "foo.bar".
     pub full_name: &'a str,
 }
 
@@ -261,7 +282,7 @@ pub enum BindingKind<'a> {
     Export(Export<'a>),
     FutureImportation,
     Importation(Importation<'a>),
-    FromImportation(FromImportation<'a>),
+    FromImportation(FromImportation),
     SubmoduleImportation(SubmoduleImportation<'a>),
 }
 

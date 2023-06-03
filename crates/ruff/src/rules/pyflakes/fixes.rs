@@ -1,4 +1,5 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{anyhow, bail, Ok, Result};
+use itertools::Itertools;
 use libcst_native::{Codegen, CodegenState, DictElement, Expression};
 use ruff_text_size::TextRange;
 use rustpython_format::{
@@ -9,7 +10,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::str::raw_contents;
+use ruff_python_ast::str::{leading_quote, raw_contents, trailing_quote};
 
 use crate::cst::matchers::{
     match_attribute, match_call_mut, match_dict, match_expression, match_simple_string,
@@ -144,7 +145,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
     });
 
     let mut min_unused_index = 0;
-    for index in unused_arguments {
+    for index in unused_arguments.iter().sorted() {
         if *index == min_unused_index {
             min_unused_index += 1;
         } else {
@@ -152,12 +153,36 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
         }
     }
 
-    let mut new_format_string;
+    // If we removed an argument, we may need to rewrite the positional themselves.
+    // Ex) `"{1}{2}".format(a, b, c)` to `"{0}{1}".format(b, c)`
+    let new_format_string;
     if min_unused_index > 0 {
+        // Extract the format string verbatim.
         let func = match_attribute(&mut call.func)?;
         let simple_string = match_simple_string(&mut func.value)?;
-        new_format_string = update_field_types(format_string, min_unused_index);
-        new_format_string = format!(r#""{new_format_string}""#);
+
+        // Extract existing quotes from the format string.
+        let leading_quote = leading_quote(simple_string.value).ok_or_else(|| {
+            anyhow!(
+                "Could not find leading quote for format string: {}",
+                simple_string.value
+            )
+        })?;
+        let trailing_quote = trailing_quote(simple_string.value).ok_or_else(|| {
+            anyhow!(
+                "Could not find trailing quote for format string: {}",
+                simple_string.value
+            )
+        })?;
+
+        // Update the format string, preserving the quotes.
+        new_format_string = format!(
+            "{}{}{}",
+            leading_quote,
+            update_field_types(format_string, min_unused_index),
+            trailing_quote
+        );
+
         simple_string.value = new_format_string.as_str();
     }
 

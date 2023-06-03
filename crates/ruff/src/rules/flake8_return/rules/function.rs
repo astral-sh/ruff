@@ -506,34 +506,36 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
     }
 }
 
-/// Return `true` if the `id` has multiple assignments within the function.
-fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
-    if let Some(assigns) = stack.assignments.get(&id) {
-        if assigns.len() > 1 {
-            return true;
-        }
-    }
-    false
+/// Return `true` if the `id` has multiple declarations within the function.
+fn has_multiple_declarations(id: &str, stack: &Stack) -> bool {
+    stack
+        .declarations
+        .get(&id)
+        .map_or(false, |declarations| declarations.len() > 1)
 }
 
 /// Return `true` if the `id` has a (read) reference between the `return_location` and its
-/// preceding assignment.
-fn has_refs_before_next_assign(id: &str, return_range: TextRange, stack: &Stack) -> bool {
-    let mut assignment_before_return: Option<TextSize> = None;
-    let mut assignment_after_return: Option<TextSize> = None;
-    if let Some(assignments) = stack.assignments.get(&id) {
+/// preceding declaration.
+fn has_references_before_next_declaration(
+    id: &str,
+    return_range: TextRange,
+    stack: &Stack,
+) -> bool {
+    let mut declaration_before_return: Option<TextSize> = None;
+    let mut declaration_after_return: Option<TextSize> = None;
+    if let Some(assignments) = stack.declarations.get(&id) {
         for location in assignments.iter().sorted() {
             if *location > return_range.start() {
-                assignment_after_return = Some(*location);
+                declaration_after_return = Some(*location);
                 break;
             }
-            assignment_before_return = Some(*location);
+            declaration_before_return = Some(*location);
         }
     }
 
-    // If there is no assignment before the return, then the variable must be defined in
+    // If there is no declaration before the return, then the variable must be declared in
     // some other way (e.g., a function argument). No need to check for references.
-    let Some(assignment_before_return) = assignment_before_return else {
+    let Some(declaration_before_return) = declaration_before_return else {
         return true;
     };
 
@@ -543,9 +545,9 @@ fn has_refs_before_next_assign(id: &str, return_range: TextRange, stack: &Stack)
                 continue;
             }
 
-            if assignment_before_return < *location {
-                if let Some(assignment_after_return) = assignment_after_return {
-                    if *location <= assignment_after_return {
+            if declaration_before_return < *location {
+                if let Some(declaration_after_return) = declaration_after_return {
+                    if *location <= declaration_after_return {
                         return true;
                     }
                 } else {
@@ -559,7 +561,7 @@ fn has_refs_before_next_assign(id: &str, return_range: TextRange, stack: &Stack)
 }
 
 /// Return `true` if the `id` has a read or write reference within a `try` or loop body.
-fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
+fn has_references_or_declarations_within_try_or_loop(id: &str, stack: &Stack) -> bool {
     if let Some(references) = stack.references.get(&id) {
         for location in references {
             for try_range in &stack.tries {
@@ -574,7 +576,7 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
             }
         }
     }
-    if let Some(references) = stack.assignments.get(&id) {
+    if let Some(references) = stack.declarations.get(&id) {
         for location in references {
             for try_range in &stack.tries {
                 if try_range.contains(*location) {
@@ -594,7 +596,7 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
 /// RET504
 fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
     if let Expr::Name(ast::ExprName { id, .. }) = expr {
-        if !stack.assignments.contains_key(id.as_str()) {
+        if !stack.assigned_names.contains(id.as_str()) {
             return;
         }
 
@@ -605,9 +607,9 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        if has_multiple_assigns(id, stack)
-            || has_refs_before_next_assign(id, expr.range(), stack)
-            || has_refs_or_assigns_within_try_or_loop(id, stack)
+        if has_multiple_declarations(id, stack)
+            || has_references_before_next_declaration(id, expr.range(), stack)
+            || has_references_or_declarations_within_try_or_loop(id, stack)
         {
             return;
         }

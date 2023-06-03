@@ -17,3 +17,8 @@
 "{0}{1}".format(1, *args)  # No issues
 "{0}{1}".format(1, 2, *args)  # No issues
 "{0}{1}".format(1, 2, 3, *args)  # F523
+
+# With nested quotes
+"{''1:{0}}".format(1, 2, 3)  # F523
+"{\"\"1:{0}}".format(1, 2, 3)  # F523
+'{""1:{0}}'.format(1, 2, 3)  # F523

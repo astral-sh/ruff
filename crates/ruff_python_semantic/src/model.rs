@@ -114,6 +114,37 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
+    /// Create a new [`Binding`] for a builtin.
+    pub fn builtin_binding(&self) -> Binding<'static> {
+        Binding {
+            range: TextRange::default(),
+            kind: BindingKind::Builtin,
+            references: Vec::new(),
+            flags: BindingFlags::empty(),
+            source: None,
+            context: ExecutionContext::Runtime,
+            exceptions: Exceptions::empty(),
+        }
+    }
+
+    /// Create a new `Binding` for the given `name` and `range`.
+    pub fn declared_binding(
+        &self,
+        range: TextRange,
+        kind: BindingKind<'a>,
+        flags: BindingFlags,
+    ) -> Binding<'a> {
+        Binding {
+            range,
+            kind,
+            flags,
+            references: Vec::new(),
+            source: self.stmt_id,
+            context: self.execution_context(),
+            exceptions: self.exceptions(),
+        }
+    }
+
     /// Return the current `Binding` for a given `name`.
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.scopes()
@@ -145,7 +176,9 @@ impl<'a> SemanticModel<'a> {
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) = self.resolve_submodule(ScopeId::global(), binding_id) {
+                if let Some(binding_id) =
+                    self.resolve_submodule(symbol, ScopeId::global(), binding_id)
+                {
                     let reference_id = self.references.push(ScopeId::global(), range, context);
                     self.bindings[binding_id].references.push(reference_id);
                 }
@@ -181,7 +214,7 @@ impl<'a> SemanticModel<'a> {
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) = self.resolve_submodule(scope_id, binding_id) {
+                if let Some(binding_id) = self.resolve_submodule(symbol, scope_id, binding_id) {
                     let reference_id = self.references.push(self.scope_id, range, context);
                     self.bindings[binding_id].references.push(reference_id);
                 }
@@ -238,7 +271,12 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Given a `BindingId`, return the `BindingId` of the submodule import that it aliases.
-    fn resolve_submodule(&self, scope_id: ScopeId, binding_id: BindingId) -> Option<BindingId> {
+    fn resolve_submodule(
+        &self,
+        symbol: &str,
+        scope_id: ScopeId,
+        binding_id: BindingId,
+    ) -> Option<BindingId> {
         // If the name of a submodule import is the same as an alias of another import, and the
         // alias is used, then the submodule import should be marked as used too.
         //
@@ -249,27 +287,17 @@ impl<'a> SemanticModel<'a> {
         // import pyarrow.csv
         // print(pa.csv.read_csv("test.csv"))
         // ```
-        let (name, full_name) = match &self.bindings[binding_id].kind {
-            BindingKind::Importation(Importation { name, full_name }) => (*name, *full_name),
-            BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) => {
-                (*name, *full_name)
-            }
-            BindingKind::FromImportation(FromImportation { name, full_name }) => {
-                (*name, full_name.as_str())
-            }
-            _ => return None,
-        };
-
-        let has_alias = full_name
+        let qualified_name = self.bindings[binding_id].qualified_name()?;
+        let has_alias = qualified_name
             .split('.')
             .last()
-            .map(|segment| segment != name)
+            .map(|segment| segment != symbol)
             .unwrap_or_default();
         if !has_alias {
             return None;
         }
 
-        self.scopes[scope_id].get(full_name)
+        self.scopes[scope_id].get(qualified_name)
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
@@ -285,31 +313,18 @@ impl<'a> SemanticModel<'a> {
     ///
     /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_call_path(&'a self, value: &'a Expr) -> Option<CallPath<'a>> {
-        let Some(call_path) = collect_call_path(value) else {
-            return None;
-        };
-        let Some(head) = call_path.first() else {
-            return None;
-        };
-        let Some(binding) = self.find_binding(head) else {
-            return None;
-        };
+        let call_path = collect_call_path(value)?;
+        let head = call_path.first()?;
+        let binding = self.find_binding(head)?;
         match &binding.kind {
-            BindingKind::Importation(Importation {
-                full_name: name, ..
-            })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
+            BindingKind::Importation(Importation { full_name: name }) => {
                 if name.starts_with('.') {
-                    if let Some(module) = &self.module_path {
-                        let mut source_path = from_relative_import(module, name);
-                        if source_path.is_empty() {
-                            None
-                        } else {
-                            source_path.extend(call_path.into_iter().skip(1));
-                            Some(source_path)
-                        }
-                    } else {
+                    let mut source_path = from_relative_import(self.module_path?, name);
+                    if source_path.is_empty() {
                         None
+                    } else {
+                        source_path.extend(call_path.into_iter().skip(1));
+                        Some(source_path)
                     }
                 } else {
                     let mut source_path: CallPath = from_unqualified_name(name);
@@ -317,20 +332,20 @@ impl<'a> SemanticModel<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::FromImportation(FromImportation {
-                full_name: name, ..
-            }) => {
+            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name: name }) => {
+                let name = name.split('.').next().unwrap_or(name);
+                let mut source_path: CallPath = from_unqualified_name(name);
+                source_path.extend(call_path.into_iter().skip(1));
+                Some(source_path)
+            }
+            BindingKind::FromImportation(FromImportation { full_name: name }) => {
                 if name.starts_with('.') {
-                    if let Some(module) = &self.module_path {
-                        let mut source_path = from_relative_import(module, name);
-                        if source_path.is_empty() {
-                            None
-                        } else {
-                            source_path.extend(call_path.into_iter().skip(1));
-                            Some(source_path)
-                        }
-                    } else {
+                    let mut source_path = from_relative_import(self.module_path?, name);
+                    if source_path.is_empty() {
                         None
+                    } else {
+                        source_path.extend(call_path.into_iter().skip(1));
+                        Some(source_path)
                     }
                 } else {
                     let mut source_path: CallPath = from_unqualified_name(name);
@@ -366,13 +381,13 @@ impl<'a> SemanticModel<'a> {
         member: &str,
     ) -> Option<ImportedName> {
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
-            scope.binding_ids().find_map(|binding_id| {
+            scope.bindings().find_map(|(name, binding_id)| {
                 let binding = &self.bindings[binding_id];
                 match &binding.kind {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { name, full_name }) => {
+                    BindingKind::Importation(Importation { full_name }) => {
                         if full_name == &module {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
@@ -393,7 +408,7 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
+                    BindingKind::FromImportation(FromImportation { full_name }) => {
                         if let Some((target_module, target_member)) = full_name.split_once('.') {
                             if target_module == module && target_member == member {
                                 if let Some(source) = binding.source {
@@ -415,8 +430,8 @@ impl<'a> SemanticModel<'a> {
                     }
                     // Ex) Given `module="os"` and `object="name"`:
                     // `import os.path ` -> `os.name`
-                    BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
-                        if name == &module {
+                    BindingKind::SubmoduleImportation(SubmoduleImportation { .. }) => {
+                        if name == module {
                             if let Some(source) = binding.source {
                                 // Verify that `os` isn't bound in an inner scope.
                                 if self

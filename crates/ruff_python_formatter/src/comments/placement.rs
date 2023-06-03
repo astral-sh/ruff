@@ -16,8 +16,10 @@ pub(super) fn place_comment<'a>(
 ) -> CommentPlacement<'a> {
     handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_comment(comment, locator)
         .or_else(|comment| handle_match_comment(comment, locator))
-        .or_else(|comment| handle_in_between_bodies_comment(comment, locator))
+        .or_else(|comment| handle_in_between_bodies_own_line_comment(comment, locator))
+        .or_else(|comment| handle_in_between_bodies_end_of_line_comment(comment, locator))
         .or_else(|comment| handle_trailing_body_comment(comment, locator))
+        .or_else(handle_trailing_end_of_line_body_comment)
         .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
         .or_else(|comment| {
             handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
@@ -177,7 +179,7 @@ fn handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_commen
     CommentPlacement::Default(comment)
 }
 
-/// Handles comments between the last statement and the first statement of two bodies.
+/// Handles own line comments between the last statement and the first statement of two bodies.
 ///
 /// ```python
 /// if x == y:
@@ -187,15 +189,11 @@ fn handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_commen
 /// else:
 ///     print("I have no comments")
 /// ```
-fn handle_in_between_bodies_comment<'a>(
+fn handle_in_between_bodies_own_line_comment<'a>(
     comment: DecoratedComment<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    use ruff_python_ast::prelude::*;
-
-    // The rule only applies to own line comments. The default logic associates end of line comments
-    // correctly.
-    if comment.text_position().is_end_of_line() {
+    if !comment.text_position().is_own_line() {
         return CommentPlacement::Default(comment);
     }
 
@@ -203,39 +201,7 @@ fn handle_in_between_bodies_comment<'a>(
     if let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
     {
         // ...and the following statement must be the first statement in an alternate body of the parent...
-        let is_following_the_first_statement_in_a_parents_alternate_body =
-            match comment.enclosing_node() {
-                AnyNodeRef::StmtIf(StmtIf { orelse, .. })
-                | AnyNodeRef::StmtFor(StmtFor { orelse, .. })
-                | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { orelse, .. })
-                | AnyNodeRef::StmtWhile(StmtWhile { orelse, .. }) => {
-                    are_same_optional(following, orelse.first())
-                }
-
-                AnyNodeRef::StmtTry(StmtTry {
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                })
-                | AnyNodeRef::StmtTryStar(StmtTryStar {
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
-                    are_same_optional(following, handlers.first())
-                    // Comments between the handlers and the `else`, or comments between the `handlers` and the `finally`
-                    // are already handled by `handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_comment`
-                    || handlers.is_empty() && are_same_optional(following, orelse.first())
-                    || (handlers.is_empty() || !orelse.is_empty())
-                        && are_same_optional(following, finalbody.first())
-                }
-
-                _ => false,
-            };
-
-        if !is_following_the_first_statement_in_a_parents_alternate_body {
+        if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
             // ```python
             // if test:
             //     a
@@ -302,6 +268,75 @@ fn handle_in_between_bodies_comment<'a>(
     }
 
     CommentPlacement::Default(comment)
+}
+
+/// Handles end of line comments comments between the last statement and the first statement of two bodies.
+///
+/// ```python
+/// if x == y:
+///     pass # trailing comment of pass
+/// else: # trailing comment of `else`
+///     print("I have no comments")
+/// ```
+fn handle_in_between_bodies_end_of_line_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    if !comment.text_position().is_end_of_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // The comment must be between two statements...
+    if let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node())
+    {
+        // ...and the following statement must be the first statement in an alternate body of the parent...
+        if !is_first_statement_in_enclosing_alternate_body(following, comment.enclosing_node()) {
+            // ```python
+            // if test:
+            //     a
+            //     # comment
+            //     b
+            // ```
+            return CommentPlacement::Default(comment);
+        }
+
+        if !locator.contains_line_break(TextRange::new(preceding.end(), comment.slice().start())) {
+            // Trailing comment of the preceding statement
+            // ```python
+            // while test:
+            //     a # comment
+            // else:
+            //     b
+            // ```
+            CommentPlacement::trailing(preceding, comment)
+        } else if following.is_stmt_if() || following.is_except_handler() {
+            // The `elif` or except handlers have their own body to which we can attach the trailing comment
+            // ```python
+            // if test:
+            //     a
+            // elif c: # comment
+            //     b
+            // ```
+            CommentPlacement::trailing(following, comment)
+        } else {
+            // There are no bodies for the "else" branch and other bodies that are represented as a `Vec<Stmt>`.
+            // This means, there's no good place to attach the comments to.
+            // Make this a dangling comments and manually format the comment in
+            // in the enclosing node's formatting logic. For `try`, it's the formatters responsibility
+            // to correctly identify the comments for the `finally` and `orelse` block by looking
+            // at the comment's range.
+            //
+            // ```python
+            // while x == y:
+            //     pass
+            // else: # trailing
+            //     print("nooop")
+            // ```
+            CommentPlacement::dangling(comment.enclosing_node(), comment)
+        }
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Handles trailing comments at the end of a body block (or any other block that is indented).
@@ -398,6 +433,41 @@ fn handle_trailing_body_comment<'a>(
                 }
             }
         }
+    }
+}
+
+/// Handles end of line comments of the last statement in an indented body:
+///
+/// ```python
+/// while True:
+///     if something.changed:
+///         do.stuff()  # trailing comment
+/// ```
+fn handle_trailing_end_of_line_body_comment(comment: DecoratedComment<'_>) -> CommentPlacement<'_> {
+    // Must be an end of line comment
+    if comment.text_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Must be *after* a statement
+    let Some(preceding) = comment.preceding_node() else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // Recursively get the last child of statements with a body.
+    let last_children = std::iter::successors(last_child_in_body(preceding), |parent| {
+        last_child_in_body(*parent)
+    });
+
+    if let Some(last_child) = last_children.last() {
+        CommentPlacement::trailing(last_child, comment)
+    } else {
+        // End of line comment of a statement that has no body. This is not what we're looking for.
+        // ```python
+        // a # trailing comment
+        // b
+        //  ```
+        CommentPlacement::Default(comment)
     }
 }
 
@@ -666,4 +736,43 @@ fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
     };
 
     body.last().map(AnyNodeRef::from)
+}
+
+/// Returns `true` if `following` is the first statement in an alternate `body` (e.g. the else of an if statement) of the `enclosing` node.
+fn is_first_statement_in_enclosing_alternate_body(
+    following: AnyNodeRef,
+    enclosing: AnyNodeRef,
+) -> bool {
+    use ruff_python_ast::prelude::*;
+
+    match enclosing {
+        AnyNodeRef::StmtIf(StmtIf { orelse, .. })
+        | AnyNodeRef::StmtFor(StmtFor { orelse, .. })
+        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { orelse, .. })
+        | AnyNodeRef::StmtWhile(StmtWhile { orelse, .. }) => {
+            are_same_optional(following, orelse.first())
+        }
+
+        AnyNodeRef::StmtTry(StmtTry {
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        })
+        | AnyNodeRef::StmtTryStar(StmtTryStar {
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => {
+            are_same_optional(following, handlers.first())
+                // Comments between the handlers and the `else`, or comments between the `handlers` and the `finally`
+                // are already handled by `handle_in_between_excepthandlers_or_except_handler_and_else_or_finally_comment`
+                || handlers.is_empty() && are_same_optional(following, orelse.first())
+                || (handlers.is_empty() || !orelse.is_empty())
+                && are_same_optional(following, finalbody.first())
+        }
+
+        _ => false,
+    }
 }
