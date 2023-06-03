@@ -1,5 +1,4 @@
 use anyhow::{anyhow, bail, Ok, Result};
-use itertools::Itertools;
 use libcst_native::{Codegen, CodegenState, DictElement, Expression};
 use ruff_text_size::TextRange;
 use rustpython_format::{
@@ -88,7 +87,7 @@ fn unparse_format_part(format_part: FormatPart) -> String {
     }
 }
 
-fn update_field_types(format_string: &FormatString, min_unused: usize) -> String {
+fn update_field_types(format_string: &FormatString, index_map: &[usize]) -> String {
     format_string
         .format_parts
         .iter()
@@ -99,10 +98,11 @@ fn update_field_types(format_string: &FormatString, min_unused: usize) -> String
                 conversion_spec,
                 format_spec,
             } => {
-                let new_field_name = FieldName::parse(field_name).unwrap(); // This should never fail because we parsed it before
+                // SAFETY: We've already parsed this string before.
+                let new_field_name = FieldName::parse(field_name).unwrap();
                 let mut new_field_name_string = match new_field_name.field_type {
                     FieldType::Auto => String::new(),
-                    FieldType::Index(i) => (i - min_unused).to_string(),
+                    FieldType::Index(i) => index_map[i].to_string(),
                     FieldType::Keyword(keyword) => keyword,
                 };
                 for field_name_part in &new_field_name.parts {
@@ -113,8 +113,10 @@ fn update_field_types(format_string: &FormatString, min_unused: usize) -> String
                     };
                     new_field_name_string.push_str(&field_name_part_string);
                 }
-                let new_format_spec = FormatString::from_str(format_spec).unwrap(); // This should never fail because we parsed it before
-                let new_format_spec_string = update_field_types(&new_format_spec, min_unused);
+
+                // SAFETY: We've already parsed this string before.
+                let new_format_spec = FormatString::from_str(format_spec).unwrap();
+                let new_format_spec_string = update_field_types(&new_format_spec, index_map);
                 FormatPart::Field {
                     field_name: new_field_name_string,
                     conversion_spec: *conversion_spec,
@@ -138,25 +140,30 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
     let mut tree = match_expression(module_text)?;
     let call = match_call_mut(&mut tree)?;
 
+    // Remove any unused arguments, and generate a map from previous index to new index.
     let mut index = 0;
+    let mut offset = 0;
+    let mut index_map = Vec::with_capacity(call.args.len());
     call.args.retain(|_| {
+        index_map.push(index - offset);
+        let is_unused = unused_arguments.contains(&index);
         index += 1;
-        !unused_arguments.contains(&(index - 1))
-    });
-
-    let mut min_unused_index = 0;
-    for index in unused_arguments.iter().sorted() {
-        if *index == min_unused_index {
-            min_unused_index += 1;
-        } else {
-            break;
+        if is_unused {
+            offset += 1;
         }
-    }
+        !is_unused
+    });
 
     // If we removed an argument, we may need to rewrite the positional themselves.
     // Ex) `"{1}{2}".format(a, b, c)` to `"{0}{1}".format(b, c)`
+    let rewrite_arguments = index_map
+        .iter()
+        .enumerate()
+        .filter(|&(prev_index, _)| !unused_arguments.contains(&prev_index))
+        .any(|(prev_index, &new_index)| prev_index != new_index);
+
     let new_format_string;
-    if min_unused_index > 0 {
+    if rewrite_arguments {
         // Extract the format string verbatim.
         let func = match_attribute(&mut call.func)?;
         let simple_string = match_simple_string(&mut func.value)?;
@@ -179,7 +186,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
         new_format_string = format!(
             "{}{}{}",
             leading_quote,
-            update_field_types(format_string, min_unused_index),
+            update_field_types(format_string, &index_map),
             trailing_quote
         );
 
