@@ -1,0 +1,51 @@
+[package]
+name = "ruff-fuzz"
+version = "0.0.0"
+authors = [
+  "Addison Crump <research@addisoncrump.info>",
+]
+publish = false
+edition = "2021"
+
+[features]
+full-idempotency = []
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1.3.0", features = ["derive"] }
+libfuzzer-sys = { version = "0.4.1" }
+ruff = { path = "../crates/ruff" }
+ruff_python_ast = { path = "../crates/ruff_python_ast" }
+ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["all-nodes-with-ranges"]}
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "ruff_parse_simple"
+path = "fuzz_targets/ruff_parse_simple.rs"
+
+[[bin]]
+name = "ruff_fix_validity"
+path = "fuzz_targets/ruff_fix_validity.rs"
+
+[[bin]]
+name = "ruff_parse_idempotency"
+path = "fuzz_targets/ruff_parse_idempotency.rs"
+
+[profile.release]
+opt-level = 3
+debug = true
+
+[profile.dev]
+opt-level = 3
+debug = true
+
+[profile.test]
+opt-level = 3
+debug = true
