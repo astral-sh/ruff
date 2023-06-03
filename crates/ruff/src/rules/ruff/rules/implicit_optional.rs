@@ -52,7 +52,7 @@ use crate::settings::types::PythonVersion;
 ///
 ///
 /// def foo(arg: int | None = None):
-///    pass
+///     pass
 /// ```
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
