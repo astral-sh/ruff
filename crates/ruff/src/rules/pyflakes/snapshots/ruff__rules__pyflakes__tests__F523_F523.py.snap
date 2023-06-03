@@ -169,6 +169,8 @@ F523.py:19:1: F523 [*] `.format` call has unused arguments at position(s): 2
 20 | "{0}{1}".format(1, 2, *args)  # No issues
 21 | "{0}{1}".format(1, 2, 3, *args)  # F523
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+22 | 
+23 | # With nested quotes
    |
    = help: Remove extra positional arguments at position(s): 2
 
@@ -178,5 +180,61 @@ F523.py:19:1: F523 [*] `.format` call has unused arguments at position(s): 2
 18 18 | "{0}{1}".format(1, 2, *args)  # No issues
 19    |-"{0}{1}".format(1, 2, 3, *args)  # F523
    19 |+"{0}{1}".format(1, 2, *args)  # F523
+20 20 | 
+21 21 | # With nested quotes
+22 22 | "{''1:{0}}".format(1, 2, 3)  # F523
+
+F523.py:22:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
+   |
+22 | # With nested quotes
+23 | "{''1:{0}}".format(1, 2, 3)  # F523
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+24 | "{\"\"1:{0}}".format(1, 2, 3)  # F523
+25 | '{""1:{0}}'.format(1, 2, 3)  # F523
+   |
+   = help: Remove extra positional arguments at position(s): 1, 2
+
+ℹ Suggested fix
+19 19 | "{0}{1}".format(1, 2, 3, *args)  # F523
+20 20 | 
+21 21 | # With nested quotes
+22    |-"{''1:{0}}".format(1, 2, 3)  # F523
+   22 |+"{''1:{0}}".format(1, )  # F523
+23 23 | "{\"\"1:{0}}".format(1, 2, 3)  # F523
+24 24 | '{""1:{0}}'.format(1, 2, 3)  # F523
+
+F523.py:23:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
+   |
+23 | # With nested quotes
+24 | "{''1:{0}}".format(1, 2, 3)  # F523
+25 | "{\"\"1:{0}}".format(1, 2, 3)  # F523
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+26 | '{""1:{0}}'.format(1, 2, 3)  # F523
+   |
+   = help: Remove extra positional arguments at position(s): 1, 2
+
+ℹ Suggested fix
+20 20 | 
+21 21 | # With nested quotes
+22 22 | "{''1:{0}}".format(1, 2, 3)  # F523
+23    |-"{\"\"1:{0}}".format(1, 2, 3)  # F523
+   23 |+"{\"\"1:{0}}".format(1, )  # F523
+24 24 | '{""1:{0}}'.format(1, 2, 3)  # F523
+
+F523.py:24:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
+   |
+24 | "{''1:{0}}".format(1, 2, 3)  # F523
+25 | "{\"\"1:{0}}".format(1, 2, 3)  # F523
+26 | '{""1:{0}}'.format(1, 2, 3)  # F523
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+   |
+   = help: Remove extra positional arguments at position(s): 1, 2
+
+ℹ Suggested fix
+21 21 | # With nested quotes
+22 22 | "{''1:{0}}".format(1, 2, 3)  # F523
+23 23 | "{\"\"1:{0}}".format(1, 2, 3)  # F523
+24    |-'{""1:{0}}'.format(1, 2, 3)  # F523
+   24 |+'{""1:{0}}'.format(1, )  # F523
 
 
