@@ -1,7 +1,10 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::registry::AsRule;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::prelude::Ranged;
 use rustpython_parser::ast;
 
 use crate::checkers::ast::Checker;
@@ -29,56 +32,101 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct IncorrectDictIterator {
-    // TODO: Come up with a better name
-    method: String,
+    subset: String,
 }
 
-impl Violation for IncorrectDictIterator {
+impl AlwaysAutofixableViolation for IncorrectDictIterator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IncorrectDictIterator { method } = self;
-        format!("When using only the {method} of a dict use the {method}() method")
+        let IncorrectDictIterator { subset } = self;
+        format!("When using only the {subset} of a dict use the `{subset}()` method")
+    }
+
+    fn autofix_title(&self) -> String {
+        let IncorrectDictIterator { subset } = self;
+        format!("Replace `.items()` with `.{subset}()`.")
     }
 }
 
 /// PER8102
 pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
-    if let Expr::Call(ast::ExprCall { func, .. }) = iter {
-        let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    if let Expr::Call(ast::ExprCall { func, args, .. }) = iter {
+        let Expr::Attribute(ast::ExprAttribute { attr, value, ..  }) = func.as_ref() else {
             return;
         };
         if attr.to_string() != "items" {
             return;
         }
-        // TODO: Add check that `items()` is being called on a dict and is not a custom implementation
-    }
-    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = target {
-        if elts.len() != 2 {
+        if args.len() != 0 {
             return;
         }
+        if let Expr::Tuple(ast::ExprTuple {
+            elts,
+            range: tup_range,
+            ..
+        }) = target
+        {
+            if elts.len() != 2 {
+                return;
+            }
 
-        if let Expr::Name(ast::ExprName { id, range,.. }) = &elts[0] {
-            if id.to_string() == "_" {
-                checker.diagnostics.push(Diagnostic::new(
-                    IncorrectDictIterator {
-                        method: "values".to_string(),
-                    },
-                    *range,
-                ));
-                return;
+            if let [Expr::Name(ast::ExprName {
+                id,
+                range: var_range,
+                ..
+            }), Expr::Name(ast::ExprName {
+                id: id2,
+                range: var_range2, ..                                          })] = &elts.as_slice()
+            {
+                if id.to_string() == "_" {
+                    let mut diagnostic = Diagnostic::new(
+                        IncorrectDictIterator {
+                            subset: "values".to_string(),
+                        },
+                        *var_range,
+                    );
+                    if let Expr::Name(ast::ExprName {
+                        range: dict_range, ..
+                    }) = value.as_ref()
+                    {
+                        if checker.patch(diagnostic.kind.rule()) {
+                            diagnostic.set_fix(Fix::automatic_edits(
+                                Edit::range_replacement(
+                                    ".values".to_string(),
+                                    TextRange::new(dict_range.end(), func.range().end()),
+                                ),
+                                [Edit::range_replacement(id2.to_string(), *tup_range)],
+                            ));
+                        }
+                        checker.diagnostics.push(diagnostic);
+                        return;
+                    }
+                }
+                if id2.to_string() == "_" {
+                    let mut diagnostic = Diagnostic::new(
+                        IncorrectDictIterator {
+                            subset: "keys".to_string(),
+                        },
+                        *var_range2,
+                    );
+                    if let Expr::Name(ast::ExprName {
+                        range: dict_range, ..
+                    }) = value.as_ref()
+                    {
+                        if checker.patch(diagnostic.kind.rule()) {
+                            diagnostic.set_fix(Fix::automatic_edits(
+                                Edit::range_replacement(
+                                    ".keys".to_string(),
+                                    TextRange::new(dict_range.end(), func.range().end()),
+                                ),
+                                [Edit::range_replacement(id.to_string(), *tup_range)],
+                            ));
+                        }
+                        checker.diagnostics.push(diagnostic);
+                        return;
+                    }
+                }
             }
         }
-        if let Expr::Name(ast::ExprName { id, range, .. }) = &elts[1] {
-            if id.to_string() == "_" {
-                checker.diagnostics.push(Diagnostic::new(
-                    IncorrectDictIterator {
-                        method: "keys".to_string(),
-                    },
-                    *range,
-                ));
-                return;
-            }
-        }
-        // TODO: Add autofix
     }
 }

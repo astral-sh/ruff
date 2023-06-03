@@ -1,0 +1,60 @@
+---
+source: crates/ruff/src/rules/perflint/mod.rs
+---
+PER8102.py:7:5: PER8102 [*] When using only the values of a dict use the `values()` method
+   |
+ 7 | }
+ 8 | 
+ 9 | for _, value in some_dict.items():  # W8120
+   |     ^ PER8102
+10 |     print(value)
+   |
+   = help: Replace `.items()` with `.values()`.
+
+ℹ Fix
+4 4 |     "c": 44
+5 5 | }
+6 6 | 
+7   |-for _, value in some_dict.items():  # W8120
+  7 |+for value in some_dict.values():  # W8120
+8 8 |     print(value)
+9 9 | 
+10 10 | 
+
+PER8102.py:11:10: PER8102 [*] When using only the keys of a dict use the `keys()` method
+   |
+11 | for key, _ in some_dict.items():  # W8120
+   |          ^ PER8102
+12 |     print(key)
+   |
+   = help: Replace `.items()` with `.keys()`.
+
+ℹ Fix
+8  8  |     print(value)
+9  9  | 
+10 10 | 
+11    |-for key, _ in some_dict.items():  # W8120
+   11 |+for key in some_dict.keys():  # W8120
+12 12 |     print(key)
+13 13 | 
+14 14 | 
+
+PER8102.py:15:21: PER8102 [*] When using only the keys of a dict use the `keys()` method
+   |
+15 | for weird_arg_name, _ in some_dict.items():  # W8120
+   |                     ^ PER8102
+16 |     print(weird_arg_name)
+   |
+   = help: Replace `.items()` with `.keys()`.
+
+ℹ Fix
+12 12 |     print(key)
+13 13 | 
+14 14 | 
+15    |-for weird_arg_name, _ in some_dict.items():  # W8120
+   15 |+for weird_arg_name in some_dict.keys():  # W8120
+16 16 |     print(weird_arg_name)
+17 17 | 
+18 18 | 
+
+

@@ -12,8 +12,16 @@ for key, _ in some_dict.items():  # W8120
     print(key)
 
 
+for weird_arg_name, _ in some_dict.items():  # W8120
+    print(weird_arg_name)
+
+
 for key, value in some_dict.items():  # OK
     print(key, value)
+
+
+for _, value in some_dict.items(12):  # OK
+    print(value)
 
 
 for key in some_dict.keys():  # OK
@@ -22,14 +30,3 @@ for key in some_dict.keys():  # OK
 
 for value in some_dict.values():  # OK
     print(value)
-
-
-class Foo:
-    def items(self):
-        return [("some_key", 12), ("some_other_key", 34)]
-
-
-foo = Foo()
-
-for _, val in foo.items(): # OK
-    print(val)

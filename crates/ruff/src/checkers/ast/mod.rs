@@ -2462,14 +2462,12 @@ where
                 }
                 pandas_vet::rules::attr(self, attr, value, expr);
             }
-            Expr::Call(
-                call @ ast::ExprCall {
-                    func,
-                    args,
-                    keywords,
-                    range: _,
-                },
-            ) => {
+            Expr::Call(ast::ExprCall {
+                func,
+                args,
+                keywords,
+                range: _,
+            }) => {
                 if self.any_enabled(&[
                     // pyflakes
                     Rule::StringDotFormatInvalidFormat,
