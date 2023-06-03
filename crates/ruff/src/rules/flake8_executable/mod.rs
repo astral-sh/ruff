@@ -11,7 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, settings};
 
     #[test_case(Path::new("EXE001_1.py"))]
@@ -38,6 +38,7 @@ mod tests {
                 Rule::ShebangNotFirstLine,
                 Rule::ShebangMissingPython,
             ]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

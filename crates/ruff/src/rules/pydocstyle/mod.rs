@@ -12,7 +12,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, settings};
 
     use super::settings::{Convention, Settings};
@@ -97,6 +97,7 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(rule_code)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -107,6 +108,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/bom.py"),
             &settings::Settings::for_rule(Rule::TripleSingleQuotes),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -126,6 +128,7 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -144,6 +147,7 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -162,6 +166,7 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -172,6 +177,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/D209_D400.py"),
             &settings::Settings::for_rules([Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -191,6 +197,7 @@ mod tests {
                 Rule::UndocumentedPublicNestedClass,
                 Rule::UndocumentedPublicInit,
             ]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())

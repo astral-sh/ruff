@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::settings::types::PythonVersion;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, settings};
 
     #[test_case(Path::new("edge_case.py"))]
@@ -33,6 +33,7 @@ mod tests {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(Rule::FutureRewritableTypeAnnotation)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -51,6 +52,7 @@ mod tests {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(Rule::FutureRequiredTypeAnnotation)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

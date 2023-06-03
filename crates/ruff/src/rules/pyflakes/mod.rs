@@ -21,7 +21,7 @@ mod tests {
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::{flags, Settings};
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, directives, settings};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
@@ -135,6 +135,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -148,6 +149,7 @@ mod tests {
                 dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(Rule::UnusedVariable)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -158,6 +160,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/__init__.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName, Rule::UndefinedExport]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -168,6 +171,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/builtins.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -181,6 +185,7 @@ mod tests {
                 builtins: vec!["_".to_string()],
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -191,6 +196,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/typing_modules.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -204,6 +210,7 @@ mod tests {
                 typing_modules: vec!["airflow.typing_compat".to_string()],
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -214,6 +221,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/future_annotations.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UndefinedName]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -224,6 +232,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/multi_statement_lines.py"),
             &settings::Settings::for_rule(Rule::UnusedImport),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -237,6 +246,7 @@ mod tests {
                 typing_modules: vec!["foo.typical".to_string()],
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -250,6 +260,7 @@ mod tests {
                 typing_modules: vec!["foo.typical".to_string()],
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -266,6 +277,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::UnusedImport])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

@@ -13,7 +13,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::settings::types::PythonVersion;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"))]
@@ -79,6 +79,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -92,6 +93,7 @@ mod tests {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -105,6 +107,7 @@ mod tests {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -118,6 +121,7 @@ mod tests {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -131,6 +135,7 @@ mod tests {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -144,6 +149,7 @@ mod tests {
                 target_version: PythonVersion::Py311,
                 ..settings::Settings::for_rule(Rule::DatetimeTimezoneUTC)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())

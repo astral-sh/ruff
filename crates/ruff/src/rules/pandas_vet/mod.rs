@@ -11,7 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::test::{test_path, test_snippet};
+    use crate::test::{test_path, test_snippet, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, settings};
 
     #[test_case(
@@ -354,8 +354,11 @@ mod tests {
         "PD901_fail_df_var"
     )]
     fn contents(contents: &str, snapshot: &str) {
-        let diagnostics =
-            test_snippet(contents, &settings::Settings::for_rules(&Linter::PandasVet));
+        let diagnostics = test_snippet(
+            contents,
+            &settings::Settings::for_rules(&Linter::PandasVet),
+            DEFAULT_MAX_ITERATIONS,
+        );
         assert_messages!(snapshot, diagnostics);
     }
 
@@ -365,6 +368,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pandas_vet").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

@@ -1,4 +1,4 @@
-#![cfg(test)]
+#![cfg(any(test, fuzzing))]
 //! Helper functions for the tests of rule implementations.
 
 use std::path::Path;
@@ -21,29 +21,38 @@ use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::syntax_error;
 use crate::settings::{flags, Settings};
 
-pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+pub const DEFAULT_MAX_ITERATIONS: usize = 20;
+
+pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
 }
 
 /// Run [`check_path`] on a file in the `resources/test/fixtures` directory.
-pub(crate) fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
+pub fn test_path(
+    path: impl AsRef<Path>,
+    settings: &Settings,
+    max_iterations: usize,
+) -> Result<Vec<Message>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
-    Ok(test_contents(&contents, &path, settings))
+    Ok(test_contents(&contents, &path, settings, max_iterations))
 }
 
 /// Run [`check_path`] on a snippet of Python code.
-pub(crate) fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> {
+pub fn test_snippet(contents: &str, settings: &Settings, max_iterations: usize) -> Vec<Message> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
-    test_contents(&contents, path, settings)
+    test_contents(&contents, path, settings, max_iterations)
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after a fixed number of iterations.
-fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Message> {
-    static MAX_ITERATIONS: usize = 20;
-
+fn test_contents(
+    contents: &str,
+    path: &Path,
+    settings: &Settings,
+    max_iterations: usize,
+) -> Vec<Message> {
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
     let locator = Locator::new(contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
@@ -83,13 +92,13 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
         let mut contents = contents.to_string();
 
         while let Some((fixed_contents, _)) = fix_file(&diagnostics, &Locator::new(&contents)) {
-            if iterations < MAX_ITERATIONS {
+            if iterations < max_iterations {
                 iterations += 1;
             } else {
                 let output = print_diagnostics(diagnostics, path, &contents);
 
                 panic!(
-                    "Failed to converge after {MAX_ITERATIONS} iterations. This likely \
+                    "Failed to converge after {max_iterations} iterations. This likely \
                      indicates a bug in the implementation of the fix. Last diagnostics:\n{output}"
                 );
             }
@@ -134,7 +143,7 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
                         r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
 {syntax_errors}
 Last generated fixes:
-{fixes}
+{fixes}https://discord.gg/c9MhzV8aU5
 Source with applied fixes:
 {fixed_contents}"#
                     );

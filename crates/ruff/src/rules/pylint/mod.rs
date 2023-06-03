@@ -16,7 +16,7 @@ mod tests {
     use crate::rules::pylint;
     use crate::settings::types::PythonVersion;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
@@ -109,6 +109,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
             &Settings::for_rules(vec![rule_code]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -122,6 +123,7 @@ mod tests {
                 target_version: PythonVersion::Py39,
                 ..Settings::for_rules(vec![Rule::RepeatedIsinstanceCalls])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -135,6 +137,7 @@ mod tests {
                 target_version: PythonVersion::Py37,
                 ..Settings::for_rules(vec![Rule::ContinueInFinally])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -151,6 +154,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::MagicValueComparison])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -167,6 +171,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -180,6 +185,7 @@ mod tests {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -196,6 +202,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::TooManyBranches])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -212,6 +219,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::TooManyStatements])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -228,6 +236,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::TooManyReturnStatements])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())

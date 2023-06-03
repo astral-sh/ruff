@@ -13,7 +13,7 @@ mod tests {
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, settings};
 
     use super::settings::Settings;
@@ -51,6 +51,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -61,6 +62,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pycodestyle/W292_4.py"),
             &settings::Settings::for_rule(Rule::MissingNewlineAtEndOfFile),
+            DEFAULT_MAX_ITERATIONS,
         )?;
 
         assert_messages!(diagnostics);
@@ -109,6 +111,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -123,6 +126,7 @@ mod tests {
                 Rule::TrueFalseComparison,
                 Rule::IsLiteral,
             ]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -138,6 +142,7 @@ mod tests {
                 Rule::NoSpaceAfterBlockComment,
                 Rule::MultipleLeadingHashesForBlockComment,
             ]),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -156,6 +161,7 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -172,6 +178,7 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -188,6 +195,7 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -205,6 +213,7 @@ mod tests {
                 tab_size: tab_size.into(),
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

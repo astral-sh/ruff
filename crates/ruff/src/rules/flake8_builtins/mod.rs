@@ -13,7 +13,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
     #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
@@ -23,6 +23,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -46,6 +47,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![rule_code])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
 
         assert_messages!(snapshot, diagnostics);

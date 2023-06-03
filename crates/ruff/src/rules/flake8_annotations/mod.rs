@@ -13,7 +13,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     #[test]
     fn defaults() -> Result<()> {
@@ -34,6 +34,7 @@ mod tests {
                     Rule::AnyType,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -62,6 +63,7 @@ mod tests {
                     Rule::AnyType,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -84,6 +86,7 @@ mod tests {
                     Rule::MissingTypeCls,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -106,6 +109,7 @@ mod tests {
                     Rule::MissingReturnTypeClassMethod,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -134,6 +138,7 @@ mod tests {
                     Rule::AnyType,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -150,6 +155,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::AnyType])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -168,6 +174,7 @@ mod tests {
                     Rule::MissingReturnTypeClassMethod,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -186,6 +193,7 @@ mod tests {
                     Rule::MissingReturnTypeClassMethod,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -196,6 +204,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_annotations/simple_magic_methods.py"),
             &Settings::for_rule(Rule::MissingReturnTypeSpecialMethod),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())

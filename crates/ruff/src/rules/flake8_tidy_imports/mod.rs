@@ -15,7 +15,7 @@ mod tests {
     use crate::rules::flake8_tidy_imports;
     use crate::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     #[test]
     fn banned_api() -> Result<()> {
@@ -41,6 +41,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::BannedApi])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -71,6 +72,7 @@ mod tests {
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],
                 ..Settings::for_rules(vec![Rule::BannedApi])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -87,6 +89,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -103,6 +106,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -120,6 +124,7 @@ mod tests {
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())

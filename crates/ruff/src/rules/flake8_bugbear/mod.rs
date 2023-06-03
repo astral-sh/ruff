@@ -12,7 +12,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
@@ -54,6 +54,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -73,6 +74,7 @@ mod tests {
                 },
                 ..Settings::for_rules(vec![Rule::FunctionCallInDefaultArgument])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

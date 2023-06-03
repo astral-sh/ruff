@@ -12,7 +12,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     use super::settings::Quote;
 
@@ -40,6 +40,7 @@ mod tests {
                     Rule::AvoidableEscapedQuote,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -69,6 +70,7 @@ mod tests {
                     Rule::AvoidableEscapedQuote,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -102,6 +104,7 @@ mod tests {
                     Rule::AvoidableEscapedQuote,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -135,6 +138,7 @@ mod tests {
                     Rule::AvoidableEscapedQuote,
                 ])
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

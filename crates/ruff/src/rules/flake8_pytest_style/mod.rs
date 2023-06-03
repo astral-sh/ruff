@@ -11,7 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
     use crate::{assert_messages, settings};
 
     use super::settings::Settings;
@@ -262,6 +262,7 @@ mod tests {
                 flake8_pytest_style: plugin_settings,
                 ..settings::Settings::for_rule(rule_code)
             },
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(name, diagnostics);
         Ok(())

@@ -11,7 +11,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     #[test_case(Rule::BlockingHttpCallInAsyncFunction, Path::new("ASYNC100.py"))]
     #[test_case(Rule::OpenSleepOrSubprocessInAsyncFunction, Path::new("ASYNC101.py"))]
@@ -21,6 +21,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path).as_path(),
             &Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

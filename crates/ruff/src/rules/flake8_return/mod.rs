@@ -14,7 +14,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::test_path;
+    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
 
     #[test_case(Rule::UnnecessaryReturnNone, Path::new("RET501.py"))]
     #[test_case(Rule::ImplicitReturnValue, Path::new("RET502.py"))]
@@ -29,6 +29,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_return").join(path).as_path(),
             &Settings::for_rule(rule_code),
+            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
