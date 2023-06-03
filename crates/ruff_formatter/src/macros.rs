@@ -325,7 +325,7 @@ macro_rules! format {
 ///
 /// [`Flat`]: crate::format_element::PrintMode::Flat
 /// [`Expanded`]: crate::format_element::PrintMode::Expanded
-/// [`MostExpanded`]: crate::format_element::FormatBestFitting::most_expanded
+/// [`MostExpanded`]: crate::format_element::BestFitting::most_expanded
 #[macro_export]
 macro_rules! best_fitting {
     ($least_expanded:expr, $($tail:expr),+ $(,)?) => {{
