@@ -1,5 +1,6 @@
+use itertools::Itertools;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -33,6 +34,7 @@ fn is_static_length(elts: &[Expr]) -> bool {
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
     let mut first = true;
+    let mut strings: Vec<&String> = vec![];
 
     for expr in joinees {
         if matches!(expr, Expr::JoinedStr(_)) {
@@ -44,13 +46,31 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             fstring_elems.push(helpers::to_constant_string(joiner));
         }
         fstring_elems.push(helpers::to_fstring_elem(expr)?);
+
+        if let Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(value),
+            ..
+        }) = expr
+        {
+            strings.push(value);
+        }
     }
 
-    let node = ast::ExprJoinedStr {
-        values: fstring_elems,
-        range: TextRange::default(),
+    let node = if strings.len() == joinees.len() {
+        ast::Expr::Constant(ast::ExprConstant {
+            value: Constant::Str(strings.iter().join(joiner)),
+            range: TextRange::default(),
+            kind: None,
+        })
+    } else {
+        ast::ExprJoinedStr {
+            values: fstring_elems,
+            range: TextRange::default(),
+        }
+        .into()
     };
-    Some(node.into())
+
+    Some(node)
 }
 
 pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) {
@@ -58,7 +78,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         args,
         keywords,
         ..
-    })= expr else {
+    }) = expr else {
         return;
     };
 
