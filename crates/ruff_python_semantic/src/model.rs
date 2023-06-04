@@ -47,7 +47,7 @@ pub struct SemanticModel<'a> {
     // Arena of global bindings.
     globals: GlobalsArena<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
-    pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
+    pub shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -145,11 +145,21 @@ impl<'a> SemanticModel<'a> {
         })
     }
 
-    /// Return the current `Binding` for a given `name`.
+    /// Return the current [`Binding`] for a given `name`.
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.scopes()
             .find_map(|scope| scope.get(member))
             .map(|binding_id| &self.bindings[binding_id])
+    }
+
+    /// Return the [`Binding`] that the given [`BindingId`] shadows, if any.
+    ///
+    /// Note that this will only return bindings that are shadowed by a binding in a parent scope.
+    pub fn shadowed_binding(&self, binding_id: BindingId) -> Option<&Binding> {
+        self.shadowed_bindings
+            .get(&binding_id)
+            .copied()
+            .map(|id| &self.bindings[id])
     }
 
     /// Return `true` if `member` is bound as a builtin.

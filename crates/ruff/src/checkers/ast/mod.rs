@@ -4336,7 +4336,7 @@ impl<'a> Checker<'a> {
         let binding = &self.semantic_model.bindings[binding_id];
 
         // Determine whether the binding shadows any existing bindings.
-        if let Some((stack_index, existing_binding_id)) = self
+        if let Some((stack_index, shadowed_id)) = self
             .semantic_model
             .scopes
             .ancestors(self.semantic_model.scope_id)
@@ -4345,26 +4345,26 @@ impl<'a> Checker<'a> {
                 scope.get(name).map(|binding_id| (stack_index, binding_id))
             })
         {
-            let existing = &self.semantic_model.bindings[existing_binding_id];
+            let shadowed = &self.semantic_model.bindings[shadowed_id];
             let in_current_scope = stack_index == 0;
-            if !existing.kind.is_builtin()
-                && existing.source.map_or(true, |left| {
+            if !shadowed.kind.is_builtin()
+                && shadowed.source.map_or(true, |left| {
                     binding.source.map_or(true, |right| {
                         !branch_detection::different_forks(left, right, &self.semantic_model.stmts)
                     })
                 })
             {
-                let existing_is_import = matches!(
-                    existing.kind,
+                let shadows_import = matches!(
+                    shadowed.kind,
                     BindingKind::Importation(..)
                         | BindingKind::FromImportation(..)
                         | BindingKind::SubmoduleImportation(..)
                         | BindingKind::FutureImportation
                 );
-                if binding.kind.is_loop_var() && existing_is_import {
+                if binding.kind.is_loop_var() && shadows_import {
                     if self.enabled(Rule::ImportShadowedByLoopVar) {
                         #[allow(deprecated)]
-                        let line = self.locator.compute_line_index(existing.range.start());
+                        let line = self.locator.compute_line_index(shadowed.range.start());
 
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ImportShadowedByLoopVar {
@@ -4375,21 +4375,21 @@ impl<'a> Checker<'a> {
                         ));
                     }
                 } else if in_current_scope {
-                    if !existing.is_used()
-                        && binding.redefines(existing)
-                        && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
-                        && !(existing.kind.is_function_definition()
+                    if !shadowed.is_used()
+                        && binding.redefines(shadowed)
+                        && (!self.settings.dummy_variable_rgx.is_match(name) || shadows_import)
+                        && !(shadowed.kind.is_function_definition()
                             && analyze::visibility::is_overload(
                                 &self.semantic_model,
                                 cast::decorator_list(
-                                    self.semantic_model.stmts[existing.source.unwrap()],
+                                    self.semantic_model.stmts[shadowed.source.unwrap()],
                                 ),
                             ))
                     {
                         if self.enabled(Rule::RedefinedWhileUnused) {
                             #[allow(deprecated)]
                             let line = self.locator.compute_line_index(
-                                existing
+                                shadowed
                                     .trimmed_range(&self.semantic_model, self.locator)
                                     .start(),
                             );
@@ -4412,34 +4412,32 @@ impl<'a> Checker<'a> {
                             self.diagnostics.push(diagnostic);
                         }
                     }
-                } else if existing_is_import && binding.redefines(existing) {
+                } else if shadows_import && binding.redefines(shadowed) {
                     self.semantic_model
                         .shadowed_bindings
-                        .entry(existing_binding_id)
-                        .or_insert_with(Vec::new)
-                        .push(binding_id);
+                        .insert(binding_id, shadowed_id);
                 }
             }
         }
 
         // If there's an existing binding in this scope, copy its references.
-        if let Some(existing) = self.semantic_model.scopes[scope_id]
+        if let Some(shadowed) = self.semantic_model.scopes[scope_id]
             .get(name)
             .map(|binding_id| &self.semantic_model.bindings[binding_id])
         {
-            match &existing.kind {
+            match &shadowed.kind {
                 BindingKind::Builtin => {
                     // Avoid overriding builtins.
                 }
                 kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
                     // If the original binding was a global or nonlocal, then the new binding is
                     // too.
-                    let references = existing.references.clone();
+                    let references = shadowed.references.clone();
                     self.semantic_model.bindings[binding_id].kind = kind.clone();
                     self.semantic_model.bindings[binding_id].references = references;
                 }
                 _ => {
-                    let references = existing.references.clone();
+                    let references = shadowed.references.clone();
                     self.semantic_model.bindings[binding_id].references = references;
                 }
             }
@@ -5054,52 +5052,40 @@ impl<'a> Checker<'a> {
             }
 
             // Look for any bindings that were redefined in another scope, and remain
-            // unused. Note that we only store references in `redefinitions` if
+            // unused. Note that we only store references in `shadowed_bindings` if
             // the bindings are in different scopes.
             if self.enabled(Rule::RedefinedWhileUnused) {
                 for (name, binding_id) in scope.bindings() {
-                    let binding = &self.semantic_model.bindings[binding_id];
-
-                    if matches!(
-                        binding.kind,
-                        BindingKind::Importation(..)
-                            | BindingKind::FromImportation(..)
-                            | BindingKind::SubmoduleImportation(..)
-                    ) {
-                        if binding.is_used() {
+                    if let Some(shadowed) = self.semantic_model.shadowed_binding(binding_id) {
+                        if shadowed.is_used() {
                             continue;
                         }
 
-                        if let Some(shadowed_ids) =
-                            self.semantic_model.shadowed_bindings.get(&binding_id)
-                        {
-                            for binding_id in shadowed_ids.iter().copied() {
-                                let rebound = &self.semantic_model.bindings[binding_id];
-                                #[allow(deprecated)]
-                                let line = self.locator.compute_line_index(
-                                    binding
-                                        .trimmed_range(&self.semantic_model, self.locator)
-                                        .start(),
-                                );
+                        let binding = &self.semantic_model.bindings[binding_id];
 
-                                let mut diagnostic = Diagnostic::new(
-                                    pyflakes::rules::RedefinedWhileUnused {
-                                        name: (*name).to_string(),
-                                        line,
-                                    },
-                                    rebound.trimmed_range(&self.semantic_model, self.locator),
-                                );
-                                if let Some(source) = rebound.source {
-                                    let parent = &self.semantic_model.stmts[source];
-                                    if matches!(parent, Stmt::ImportFrom(_))
-                                        && parent.range().contains_range(rebound.range)
-                                    {
-                                        diagnostic.set_parent(parent.start());
-                                    }
-                                };
-                                diagnostics.push(diagnostic);
+                        #[allow(deprecated)]
+                        let line = self.locator.compute_line_index(
+                            shadowed
+                                .trimmed_range(&self.semantic_model, self.locator)
+                                .start(),
+                        );
+
+                        let mut diagnostic = Diagnostic::new(
+                            pyflakes::rules::RedefinedWhileUnused {
+                                name: (*name).to_string(),
+                                line,
+                            },
+                            binding.trimmed_range(&self.semantic_model, self.locator),
+                        );
+                        if let Some(parent) = binding
+                            .source
+                            .map(|source| &self.semantic_model.stmts[source])
+                        {
+                            if parent.is_import_from_stmt() {
+                                diagnostic.set_parent(parent.start());
                             }
                         }
+                        diagnostics.push(diagnostic);
                     }
                 }
             }
