@@ -94,7 +94,6 @@ impl<'a> Binding<'a> {
             existing.kind,
             BindingKind::ClassDefinition
                 | BindingKind::FunctionDefinition
-                | BindingKind::Builtin
                 | BindingKind::Importation(..)
                 | BindingKind::FromImportation(..)
                 | BindingKind::SubmoduleImportation(..)

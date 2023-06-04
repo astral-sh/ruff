@@ -87,6 +87,11 @@ impl<'a> Scope<'a> {
         self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
+    /// Returns a tuple of the name and id of all bindings defined in this scope.
+    pub fn shadowed_binding(&self, id: BindingId) -> Option<BindingId> {
+        self.shadowed_bindings.get(&id).copied()
+    }
+
     /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
     /// those that were shadowed by later bindings.
     pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
