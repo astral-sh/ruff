@@ -1,0 +1,61 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+---
+PYI029.pyi:17:5: PYI029 [*] Defining `__str__` in a stub is almost always redundant
+   |
+17 | class ShouldRemoveSingle:
+18 |     def __str__(self) -> builtins.str: ...
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI029
+19 | 
+20 | class ShouldRemove:
+   |
+   = help: Remove definition of `str`
+
+ℹ Fix
+14 14 | def __repr__(self, *, foo) -> str: ...
+15 15 | 
+16 16 | class ShouldRemoveSingle:
+17    |-    def __str__(self) -> builtins.str: ...
+   17 |+    ...
+18 18 | 
+19 19 | class ShouldRemove:
+20 20 |     def __repr__(self) -> str: ...
+
+PYI029.pyi:20:5: PYI029 [*] Defining `__repr__` in a stub is almost always redundant
+   |
+20 | class ShouldRemove:
+21 |     def __repr__(self) -> str: ...
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI029
+22 | 
+23 |     def __str__(self) -> builtins.str: ...
+   |
+   = help: Remove definition of `repr`
+
+ℹ Fix
+17 17 |     def __str__(self) -> builtins.str: ...
+18 18 | 
+19 19 | class ShouldRemove:
+20    |-    def __repr__(self) -> str: ...
+21 20 | 
+22 21 |     def __str__(self) -> builtins.str: ...
+23 22 | 
+
+PYI029.pyi:22:5: PYI029 [*] Defining `__str__` in a stub is almost always redundant
+   |
+22 |     def __repr__(self) -> str: ...
+23 | 
+24 |     def __str__(self) -> builtins.str: ...
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI029
+   |
+   = help: Remove definition of `str`
+
+ℹ Fix
+19 19 | class ShouldRemove:
+20 20 |     def __repr__(self) -> str: ...
+21 21 | 
+22    |-    def __str__(self) -> builtins.str: ...
+23 22 | 
+24 23 | 
+25 24 | class NoReturnSpecified:
+
+
