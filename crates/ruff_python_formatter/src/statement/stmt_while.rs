@@ -1,5 +1,5 @@
 use crate::comments::{leading_alternate_branch_comments, trailing_comments};
-use crate::expression::maybe_parenthesize::maybe_parenthesize;
+use crate::expression::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;
@@ -33,7 +33,7 @@ impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
             [
                 text("while"),
                 space(),
-                maybe_parenthesize(test),
+                test.format().with_options(Parenthesize::IfBreaks),
                 text(":"),
                 trailing_comments(trailing_condition_comments),
                 block_indent(&body.format())
