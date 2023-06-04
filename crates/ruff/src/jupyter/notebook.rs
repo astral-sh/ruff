@@ -2,16 +2,19 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
+use std::iter;
 use std::path::Path;
 
 use itertools::Itertools;
+use once_cell::sync::OnceCell;
 use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::jupyter::index::{JupyterIndex, JupyterIndexBuilder};
+use crate::jupyter::index::JupyterIndex;
 use crate::jupyter::{Cell, CellType, JupyterNotebook, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
 use crate::IOError;
@@ -67,7 +70,7 @@ pub struct Notebook {
     content: String,
     /// The index of the notebook. This is used to map between the concatenated
     /// source code and the original notebook.
-    index: JupyterIndex,
+    index: OnceCell<JupyterIndex>,
     /// The raw notebook.
     raw: JupyterNotebook,
     /// The offsets of each cell in the concatenated source code. This includes
@@ -178,15 +181,16 @@ impl Notebook {
             .map(|(pos, _)| u32::try_from(pos).unwrap())
             .collect::<Vec<_>>();
 
+        let mut contents = Vec::with_capacity(valid_code_cells.len());
         let mut current_offset = TextSize::from(0);
         let mut cell_offsets = Vec::with_capacity(notebook.cells.len());
         cell_offsets.push(TextSize::from(0));
 
-        let mut contents = Vec::with_capacity(valid_code_cells.len());
-        let mut builder = JupyterIndexBuilder::default();
-
         for &pos in &valid_code_cells {
-            let cell_contents = builder.add_code_cell(pos, &notebook.cells[pos as usize]);
+            let cell_contents = match &notebook.cells[pos as usize].source {
+                SourceValue::String(string) => string.clone(),
+                SourceValue::StringArray(string_array) => string_array.join(""),
+            };
             current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
             cell_offsets.push(current_offset);
             contents.push(cell_contents);
@@ -194,7 +198,7 @@ impl Notebook {
 
         Ok(Self {
             raw: notebook,
-            index: builder.finish(),
+            index: OnceCell::new(),
             // The additional newline at the end is to maintain consistency for
             // all cells. These newlines will be removed before updating the
             // source code with the transformed content. Refer `update_cell_content`.
@@ -270,17 +274,46 @@ impl Notebook {
         }
     }
 
-    fn refresh_index(&mut self) {
-        let mut contents = Vec::with_capacity(self.valid_code_cells.len());
-        let mut builder = JupyterIndexBuilder::default();
+    /// Build and return the [`JupyterIndex`].
+    fn build_index(&self) -> JupyterIndex {
+        let mut row_to_cell = vec![0];
+        let mut row_to_row_in_cell = vec![0];
 
         for &pos in &self.valid_code_cells {
-            let cell_contents = builder.add_code_cell(pos, &self.raw.cells[pos as usize]);
-            contents.push(cell_contents);
+            match &self.raw.cells[pos as usize].source {
+                SourceValue::String(string) => {
+                    let line_count =
+                        u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap();
+                    row_to_cell.extend(iter::repeat(pos + 1).take(line_count as usize));
+                    row_to_row_in_cell.extend(1..=line_count);
+                }
+                SourceValue::StringArray(string_array) => {
+                    // Trailing newlines for each line are part of the string itself.
+                    // So, to count the actual number of visible lines, we need to
+                    // check for any trailing newline for the last line.
+                    //
+                    // ```python
+                    // [
+                    //     "import os\n",
+                    //     "import sys\n",
+                    // ]
+                    // ```
+                    //
+                    // Here, the array suggests 2 lines but there are 3 visible lines.
+                    let trailing_newline =
+                        usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
+                    row_to_cell
+                        .extend(iter::repeat(pos + 1).take(string_array.len() + trailing_newline));
+                    row_to_row_in_cell
+                        .extend(1..=u32::try_from(string_array.len() + trailing_newline).unwrap());
+                }
+            }
         }
 
-        self.index = builder.finish();
-        self.content = contents.join("\n") + "\n";
+        JupyterIndex {
+            row_to_cell,
+            row_to_row_in_cell,
+        }
     }
 
     /// Return the notebook content.
@@ -290,16 +323,20 @@ impl Notebook {
         &self.content
     }
 
-    /// Return the notebook index.
+    /// Return the Jupyter notebook index.
+    ///
+    /// The index is built only once when required. This is only used to
+    /// report diagnostics, so by that time all of the autofixes must have
+    /// been applied if `--fix` was passed.
     pub fn index(&self) -> &JupyterIndex {
-        &self.index
+        self.index.get_or_init(|| self.build_index())
     }
 
     /// Update the notebook with the given edits and transformed content.
     pub fn update(&mut self, edits: BTreeSet<&Edit>, transformed: &str) {
         self.update_cell_offsets(edits);
         self.update_cell_content(transformed);
-        self.refresh_index();
+        self.content = transformed.to_string();
     }
 
     /// Return `true` if the notebook is a Python notebook, `false` otherwise.

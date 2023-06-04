@@ -18,7 +18,7 @@ use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 pub use text::TextEmitter;
 
-use crate::jupyter::JupyterIndex;
+
 
 mod azure;
 mod diff;
