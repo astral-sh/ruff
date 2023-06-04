@@ -157,6 +157,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0118") => (RuleGroup::Unspecified, Rule::LoadBeforeGlobalDeclaration),
         (Pylint, "E0241") => (RuleGroup::Unspecified, Rule::DuplicateBases),
         (Pylint, "E0302") => (RuleGroup::Unspecified, Rule::UnexpectedSpecialMethodSignature),
+        (Pylint, "E0307") => (RuleGroup::Unspecified, Rule::InvalidStrReturnType),
         (Pylint, "E0604") => (RuleGroup::Unspecified, Rule::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Unspecified, Rule::InvalidAllFormat),
         (Pylint, "E1142") => (RuleGroup::Unspecified, Rule::AwaitOutsideAsync),

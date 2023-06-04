@@ -356,6 +356,10 @@ where
                     }
                 }
 
+                if self.settings.rules.enabled(Rule::InvalidStrReturnType) {
+                    pylint::rules::invalid_str_return(self, name, body);
+                }
+
                 if self.settings.rules.enabled(Rule::InvalidFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
                         stmt,

@@ -17,6 +17,7 @@ pub(crate) use invalid_all_format::{invalid_all_format, InvalidAllFormat};
 pub(crate) use invalid_all_object::{invalid_all_object, InvalidAllObject};
 pub(crate) use invalid_envvar_default::{invalid_envvar_default, InvalidEnvvarDefault};
 pub(crate) use invalid_envvar_value::{invalid_envvar_value, InvalidEnvvarValue};
+pub(crate) use invalid_str_return::{invalid_str_return, InvalidStrReturnType};
 pub(crate) use invalid_string_characters::{
     invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
     InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
@@ -69,6 +70,7 @@ mod invalid_all_format;
 mod invalid_all_object;
 mod invalid_envvar_default;
 mod invalid_envvar_value;
+mod invalid_str_return;
 mod invalid_string_characters;
 mod load_before_global_declaration;
 mod logging;

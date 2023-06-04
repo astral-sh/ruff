@@ -1,0 +1,11 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+invalid_return_type_str.py:5:16: PLE0307 __str__ does not return str
+  |
+5 |     def __str__(self):
+6 |         return 1
+  |                ^ PLE0307
+  |
+
+
