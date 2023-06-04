@@ -115,8 +115,8 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Create a new [`Binding`] for a builtin.
-    pub fn builtin_binding(&self) -> Binding<'static> {
-        Binding {
+    pub fn push_builtin(&mut self) -> BindingId {
+        self.bindings.push(Binding {
             range: TextRange::default(),
             kind: BindingKind::Builtin,
             references: Vec::new(),
@@ -124,17 +124,17 @@ impl<'a> SemanticModel<'a> {
             source: None,
             context: ExecutionContext::Runtime,
             exceptions: Exceptions::empty(),
-        }
+        })
     }
 
-    /// Create a new `Binding` for the given `name` and `range`.
-    pub fn declared_binding(
-        &self,
+    /// Create a new [`Binding`] for the given `name` and `range`.
+    pub fn push_binding(
+        &mut self,
         range: TextRange,
         kind: BindingKind<'a>,
         flags: BindingFlags,
-    ) -> Binding<'a> {
-        Binding {
+    ) -> BindingId {
+        self.bindings.push(Binding {
             range,
             kind,
             flags,
@@ -142,7 +142,7 @@ impl<'a> SemanticModel<'a> {
             source: self.stmt_id,
             context: self.execution_context(),
             exceptions: self.exceptions(),
-        }
+        })
     }
 
     /// Return the current `Binding` for a given `name`.

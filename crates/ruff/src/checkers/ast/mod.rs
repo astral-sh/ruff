@@ -259,12 +259,11 @@ where
                 if !self.semantic_model.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let binding = self.semantic_model.declared_binding(
+                        let binding_id = self.semantic_model.push_binding(
                             *range,
                             BindingKind::Global,
                             BindingFlags::empty(),
                         );
-                        let binding_id = self.semantic_model.bindings.push(binding);
                         let scope = self.semantic_model.scope_mut();
                         scope.add(name, binding_id);
                     }
@@ -282,12 +281,11 @@ where
                 if !self.semantic_model.scope_id.is_global() {
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let binding = self.semantic_model.declared_binding(
+                        let binding_id = self.semantic_model.push_binding(
                             *range,
                             BindingKind::Nonlocal,
                             BindingFlags::empty(),
                         );
-                        let binding_id = self.semantic_model.bindings.push(binding);
                         let scope = self.semantic_model.scope_mut();
                         scope.add(name, binding_id);
                     }
@@ -4319,9 +4317,25 @@ impl<'a> Checker<'a> {
         kind: BindingKind<'a>,
         flags: BindingFlags,
     ) -> BindingId {
-        let binding_id = self.semantic_model.bindings.next_id();
-        let binding = self.semantic_model.declared_binding(range, kind, flags);
+        // Determine the scope to which the binding belongs.
+        // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
+        // expressions in generators and comprehensions bind to the scope that contains the
+        // outermost comprehension.
+        let scope_id = if kind.is_named_expr_assignment() {
+            self.semantic_model
+                .scopes
+                .ancestor_ids(self.semantic_model.scope_id)
+                .find_or_last(|scope_id| !self.semantic_model.scopes[*scope_id].kind.is_generator())
+                .unwrap_or(self.semantic_model.scope_id)
+        } else {
+            self.semantic_model.scope_id
+        };
 
+        // Create the `Binding`.
+        let binding_id = self.semantic_model.push_binding(range, kind, flags);
+        let binding = &self.semantic_model.bindings[binding_id];
+
+        // Determine whether the binding shadows any existing bindings.
         if let Some((stack_index, existing_binding_id)) = self
             .semantic_model
             .scopes
@@ -4408,56 +4422,43 @@ impl<'a> Checker<'a> {
             }
         }
 
-        // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
-        // expressions in generators and comprehensions bind to the scope that contains the
-        // outermost comprehension.
-        let scope_id = if binding.kind.is_named_expr_assignment() {
-            self.semantic_model
-                .scopes
-                .ancestor_ids(self.semantic_model.scope_id)
-                .find_or_last(|scope_id| !self.semantic_model.scopes[*scope_id].kind.is_generator())
-                .unwrap_or(self.semantic_model.scope_id)
-        } else {
-            self.semantic_model.scope_id
-        };
-        let scope = &mut self.semantic_model.scopes[scope_id];
-
-        let binding = if let Some(binding_id) = scope.get(name) {
-            let existing = &self.semantic_model.bindings[binding_id];
+        // If there's an existing binding in this scope, copy its references.
+        if let Some(existing) = self.semantic_model.scopes[scope_id]
+            .get(name)
+            .map(|binding_id| &self.semantic_model.bindings[binding_id])
+        {
             match &existing.kind {
                 BindingKind::Builtin => {
                     // Avoid overriding builtins.
-                    binding
                 }
                 kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
-                    // If the original binding was a global or nonlocal, and the new binding conflicts within
-                    // the current scope, then the new binding is also as the same.
-                    Binding {
-                        references: existing.references.clone(),
-                        kind: kind.clone(),
-                        ..binding
-                    }
+                    // If the original binding was a global or nonlocal, then the new binding is
+                    // too.
+                    let references = existing.references.clone();
+                    self.semantic_model.bindings[binding_id].kind = kind.clone();
+                    self.semantic_model.bindings[binding_id].references = references;
                 }
-                _ => Binding {
-                    references: existing.references.clone(),
-                    ..binding
-                },
+                _ => {
+                    let references = existing.references.clone();
+                    self.semantic_model.bindings[binding_id].references = references;
+                }
             }
-        } else {
-            binding
-        };
 
-        // Don't treat annotations as assignments if there is an existing value
-        // in scope.
-        if binding.kind.is_annotation() && scope.defines(name) {
-            return self.semantic_model.bindings.push(binding);
+            // If this is an annotation, and we already have an existing value in the same scope,
+            // don't treat it as an assignment (i.e., avoid adding it to the scope).
+            if self.semantic_model.bindings[binding_id]
+                .kind
+                .is_annotation()
+            {
+                return binding_id;
+            }
         }
 
         // Add the binding to the scope.
+        let scope = &mut self.semantic_model.scopes[scope_id];
         scope.add(name, binding_id);
 
-        // Add the binding to the arena.
-        self.semantic_model.bindings.push(binding)
+        binding_id
     }
 
     fn bind_builtins(&mut self) {
@@ -4468,8 +4469,7 @@ impl<'a> Checker<'a> {
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
             // Add the builtin to the scope.
-            let binding = self.semantic_model.builtin_binding();
-            let binding_id = self.semantic_model.bindings.push(binding);
+            let binding_id = self.semantic_model.push_builtin();
             let scope = self.semantic_model.scope_mut();
             scope.add(builtin, binding_id);
         }
