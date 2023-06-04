@@ -29,29 +29,31 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
         && cfg!(feature = "jupyter_notebook")
 }
 
-/// Return `true` if the given [`Cell`] is a valid code cell.
-///
-/// A valid code cell is a cell where the type is [`CellType::Code`] and the
-/// source is not a magic, shell or help command.
-fn is_valid_code_cell(cell: &Cell) -> bool {
-    if cell.cell_type != CellType::Code {
-        return false;
+impl Cell {
+    /// Return `true` if it's a valid code cell.
+    ///
+    /// A valid code cell is a cell where the type is [`CellType::Code`] and the
+    /// source doesn't contain a magic, shell or help command.
+    fn is_valid_code_cell(&self) -> bool {
+        if self.cell_type != CellType::Code {
+            return false;
+        }
+        let lines = match &self.source {
+            SourceValue::String(string) => string.lines().collect::<Vec<_>>(),
+            SourceValue::StringArray(string_array) => string_array
+                .iter()
+                .map(std::string::String::as_str)
+                .collect(),
+        };
+        // Ignore a cell if it contains a magic command. There could be valid
+        // Python code as well, but we'll ignore that for now.
+        // TODO(dhruvmanila): https://github.com/psf/black/blob/main/src/black/handle_ipynb_magics.py
+        !lines.iter().any(|line| {
+            MAGIC_PREFIX
+                .iter()
+                .any(|prefix| line.trim_start().starts_with(prefix))
+        })
     }
-    let lines = match &cell.source {
-        SourceValue::String(string) => string.lines().collect::<Vec<_>>(),
-        SourceValue::StringArray(string_array) => string_array
-            .iter()
-            .map(std::string::String::as_str)
-            .collect(),
-    };
-    // Ignore a cell if it contains a magic command. There could be valid
-    // Python code as well, but we'll ignore that for now.
-    // TODO(dhruvmanila): https://github.com/psf/black/blob/main/src/black/handle_ipynb_magics.py
-    !lines.iter().any(|line| {
-        MAGIC_PREFIX
-            .iter()
-            .any(|prefix| line.trim_start().starts_with(prefix))
-    })
 }
 
 #[derive(Debug, PartialEq)]
@@ -172,7 +174,7 @@ impl Notebook {
             .cells
             .iter()
             .enumerate()
-            .filter(|(_, cell)| is_valid_code_cell(cell))
+            .filter(|(_, cell)| cell.is_valid_code_cell())
             .map(|(pos, _)| pos)
             .collect::<Vec<_>>();
 
