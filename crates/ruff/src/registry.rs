@@ -192,7 +192,7 @@ pub enum Linter {
     #[prefix = "AIR"]
     Airflow,
     /// [Perflint](https://pypi.org/project/perflint/)
-    #[prefix = "PER"]
+    #[prefix = "W8"]
     Perflint,
     /// Ruff-specific rules
     #[prefix = "RUF"]

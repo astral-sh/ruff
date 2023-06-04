@@ -48,7 +48,7 @@ impl AlwaysAutofixableViolation for IncorrectDictIterator {
     }
 }
 
-/// PER8102
+/// W8102
 pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
     if let Expr::Call(ast::ExprCall { func, args, .. }) = iter {
         let Expr::Attribute(ast::ExprAttribute { attr, value, ..  }) = func.as_ref() else {
@@ -66,10 +66,6 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, target: &Expr, iter
             ..
         }) = target
         {
-            if elts.len() != 2 {
-                return;
-            }
-
             if let [Expr::Name(ast::ExprName {
                 id: id1,
                 range: var_range1,

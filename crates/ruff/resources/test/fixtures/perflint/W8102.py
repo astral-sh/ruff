@@ -4,15 +4,15 @@ some_dict = {
     "c": 44
 }
 
-for _, value in some_dict.items():  # W8120
+for _, value in some_dict.items():  # W8102
     print(value)
 
 
-for key, _ in some_dict.items():  # W8120
+for key, _ in some_dict.items():  # W8102
     print(key)
 
 
-for weird_arg_name, _ in some_dict.items():  # W8120
+for weird_arg_name, _ in some_dict.items():  # W8102
     print(weird_arg_name)
 
 
