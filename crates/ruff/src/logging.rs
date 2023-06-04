@@ -12,6 +12,7 @@ use rustpython_parser::{ParseError, ParseErrorType};
 use ruff_python_ast::source_code::{OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
+use crate::jupyter::Notebook;
 use crate::source_kind::SourceKind;
 
 pub(crate) static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
@@ -170,17 +171,20 @@ impl Display for DisplayParseError<'_> {
         // If we're working on a Jupyter notebook, translate the positions
         // with respect to the cell and row in the cell. This is the same
         // format as the `TextEmitter`.
-        let error_location = if let Some(SourceKind::Jupyter(notebook)) = self.source_kind {
-            let index = notebook.index();
+        let error_location = if let Some(jupyter_index) = self
+            .source_kind
+            .and_then(SourceKind::notebook)
+            .map(Notebook::index)
+        {
             write!(
                 f,
                 "cell {cell}{colon}",
-                cell = index.get_cell(source_location.row.get()),
+                cell = jupyter_index.cell(source_location.row.get()),
                 colon = ":".cyan(),
             )?;
 
             SourceLocation {
-                row: OneIndexed::new(index.get_row_in_cell(source_location.row.get()) as usize)
+                row: OneIndexed::new(jupyter_index.cell_row(source_location.row.get()) as usize)
                     .unwrap(),
                 column: source_location.column,
             }

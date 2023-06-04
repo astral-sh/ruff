@@ -54,7 +54,7 @@ fn is_valid_code_cell(cell: &Cell) -> bool {
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Notebook {
     /// Python source code of the notebook.
     ///
@@ -286,8 +286,8 @@ impl Notebook {
     }
 
     /// Return the notebook index.
-    pub fn index(&self) -> JupyterIndex {
-        self.index.clone()
+    pub fn index(&self) -> &JupyterIndex {
+        &self.index
     }
 
     /// Update the notebook with the given edits and transformed content.
@@ -320,9 +320,8 @@ impl Notebook {
 #[cfg(test)]
 mod test {
     use std::path::Path;
-    use std::sync::Arc;
 
-    use crate::jupyter::index::{JupyterIndex, JupyterIndexInner};
+    use crate::jupyter::index::JupyterIndex;
     #[cfg(feature = "jupyter_notebook")]
     use crate::jupyter::is_jupyter_notebook;
     use crate::jupyter::Notebook;
@@ -396,11 +395,9 @@ mutable_argument()
         );
         assert_eq!(
             notebook.index(),
-            JupyterIndex {
-                inner: Arc::new(JupyterIndexInner {
-                    row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
-                    row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5],
-                }),
+            &JupyterIndex {
+                row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
+                row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5],
             }
         );
     }

@@ -1,5 +1,4 @@
 use std::iter;
-use std::sync::Arc;
 
 use ruff_newlines::NewlineWithTrailingNewline;
 
@@ -11,28 +10,23 @@ use crate::jupyter::{Cell, SourceValue};
 /// [`ruff_text_size::TextSize`] to jupyter notebook cell/row/column.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JupyterIndex {
-    pub(super) inner: Arc<JupyterIndexInner>,
-}
-
-impl JupyterIndex {
-    /// Returns the cell number (1-based) for the given row (1-based).
-    pub fn get_cell(&self, row: usize) -> u32 {
-        self.inner.row_to_cell[row]
-    }
-
-    /// Returns the row number (1-based) in the cell (1-based) for the
-    /// given row (1-based).
-    pub fn get_row_in_cell(&self, row: usize) -> u32 {
-        self.inner.row_to_row_in_cell[row]
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct JupyterIndexInner {
     /// Enter a row (1-based), get back the cell (1-based)
     pub(super) row_to_cell: Vec<u32>,
     /// Enter a row (1-based), get back the row in cell (1-based)
     pub(super) row_to_row_in_cell: Vec<u32>,
+}
+
+impl JupyterIndex {
+    /// Returns the cell number (1-based) for the given row (1-based).
+    pub fn cell(&self, row: usize) -> u32 {
+        self.row_to_cell[row]
+    }
+
+    /// Returns the row number (1-based) in the cell (1-based) for the
+    /// given row (1-based).
+    pub fn cell_row(&self, row: usize) -> u32 {
+        self.row_to_row_in_cell[row]
+    }
 }
 
 /// Builder for [`JupyterIndex`].
@@ -87,10 +81,8 @@ impl JupyterIndexBuilder {
 
     pub(super) fn finish(&self) -> JupyterIndex {
         JupyterIndex {
-            inner: Arc::new(JupyterIndexInner {
-                row_to_cell: self.row_to_cell.clone(),
-                row_to_row_in_cell: self.row_to_row_in_cell.clone(),
-            }),
+            row_to_cell: self.row_to_cell.clone(),
+            row_to_row_in_cell: self.row_to_row_in_cell.clone(),
         }
     }
 }

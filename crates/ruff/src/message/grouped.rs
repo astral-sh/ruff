@@ -7,12 +7,13 @@ use colored::Colorize;
 use ruff_python_ast::source_code::OneIndexed;
 
 use crate::fs::relativize_path;
-use crate::jupyter::JupyterIndex;
+use crate::jupyter::{JupyterIndex, Notebook};
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
+use crate::source_kind::SourceKind;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
@@ -65,7 +66,10 @@ impl Emitter for GroupedEmitter {
                     writer,
                     "{}",
                     DisplayGroupedMessage {
-                        jupyter_index: context.jupyter_index(message.filename()),
+                        jupyter_index: context
+                            .source_kind(message.filename())
+                            .and_then(SourceKind::notebook)
+                            .map(Notebook::index),
                         message,
                         show_fix_status: self.show_fix_status,
                         show_source: self.show_source,
@@ -114,11 +118,11 @@ impl Display for DisplayGroupedMessage<'_> {
             write!(
                 f,
                 "cell {cell}{sep}",
-                cell = jupyter_index.get_cell(start_location.row.get()),
+                cell = jupyter_index.cell(start_location.row.get()),
                 sep = ":".cyan()
             )?;
             (
-                jupyter_index.get_row_in_cell(start_location.row.get()) as usize,
+                jupyter_index.cell_row(start_location.row.get()) as usize,
                 start_location.column.get(),
             )
         } else {

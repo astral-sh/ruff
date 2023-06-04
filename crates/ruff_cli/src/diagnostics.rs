@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
 use ruff::fs;
-use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, Notebook};
+use ruff::jupyter::{is_jupyter_notebook, Notebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::logging::DisplayParseError;
 use ruff::message::Message;
@@ -32,9 +32,7 @@ pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
     pub(crate) fixed: FxHashMap<String, FixTable>,
     pub(crate) imports: ImportMap,
-    /// Jupyter notebook indexing table for each input file that is a jupyter notebook
-    /// so we can rewrite the diagnostics in the end
-    pub(crate) jupyter_index: FxHashMap<String, JupyterIndex>,
+    pub(crate) source_kind: FxHashMap<String, SourceKind>,
 }
 
 impl Diagnostics {
@@ -43,7 +41,7 @@ impl Diagnostics {
             messages,
             fixed: FxHashMap::default(),
             imports,
-            jupyter_index: FxHashMap::default(),
+            source_kind: FxHashMap::default(),
         }
     }
 }
@@ -63,7 +61,7 @@ impl AddAssign for Diagnostics {
                 }
             }
         }
-        self.jupyter_index.extend(other.jupyter_index);
+        self.source_kind.extend(other.source_kind);
     }
 }
 
@@ -227,25 +225,16 @@ pub(crate) fn lint_path(
         }
     }
 
-    let jupyter_index = match &source_kind {
-        SourceKind::Python(_) => FxHashMap::default(),
-        SourceKind::Jupyter(notebook) => {
-            let mut index = FxHashMap::default();
-            index.insert(
-                path.to_str()
-                    .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
-                    .to_string(),
-                notebook.index(),
-            );
-            index
-        }
-    };
-
     Ok(Diagnostics {
         messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
         imports,
-        jupyter_index,
+        source_kind: FxHashMap::from_iter([(
+            path.to_str()
+                .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
+                .to_string(),
+            source_kind,
+        )]),
     })
 }
 
@@ -346,7 +335,7 @@ pub(crate) fn lint_stdin(
             fixed,
         )]),
         imports,
-        jupyter_index: FxHashMap::default(),
+        source_kind: FxHashMap::default(),
     })
 }
 
