@@ -195,6 +195,9 @@ impl Notebook {
         Ok(Self {
             raw: notebook,
             index: builder.finish(),
+            // The additional newline at the end is to maintain consistency for
+            // all cells. These newlines will be removed before updating the
+            // source code with the transformed content. Refer `update_cell_content`.
             content: contents.join("\n") + "\n",
             cell_offsets,
             valid_code_cells,

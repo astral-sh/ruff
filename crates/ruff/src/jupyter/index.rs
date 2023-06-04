@@ -63,6 +63,18 @@ impl JupyterIndexBuilder {
                 string.clone()
             }
             SourceValue::StringArray(string_array) => {
+                // Trailing newlines for each line are part of the string itself.
+                // So, to count the actual number of visible lines, we need to
+                // check for any trailing newline for the last line.
+                //
+                // ```python
+                // [
+                //     "import os\n",
+                //     "import sys\n",
+                // ]
+                // ```
+                //
+                // Here, the array suggests 2 lines but there are 3 visible lines.
                 let trailing_newline =
                     usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
                 self.row_to_cell
