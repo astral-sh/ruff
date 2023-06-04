@@ -32,7 +32,7 @@ sort_similar_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
    = help: Organize imports
 
-ℹ Suggested fix
+ℹ Fix
 1     |-from a import b
    1  |+import A
    2  |+import a

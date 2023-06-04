@@ -94,24 +94,24 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
                     // Ignore accesses on class members from _within_ the class.
                     if checker
-                        .ctx
+                        .semantic_model()
                         .scopes
                         .iter()
                         .rev()
                         .find_map(|scope| match &scope.kind {
-                            ScopeKind::Class(class_def) => Some(class_def),
+                            ScopeKind::Class(ast::StmtClassDef { name, .. }) => Some(name),
                             _ => None,
                         })
-                        .map_or(false, |class_def| {
-                            if call_path.as_slice() == [class_def.name] {
-                                checker
-                                    .ctx
-                                    .find_binding(class_def.name)
-                                    .map_or(false, |binding| {
+                        .map_or(false, |name| {
+                            if call_path.as_slice() == [name.as_str()] {
+                                checker.semantic_model().find_binding(name).map_or(
+                                    false,
+                                    |binding| {
                                         // TODO(charlie): Could the name ever be bound to a
                                         // _different_ class here?
                                         binding.kind.is_class_definition()
-                                    })
+                                    },
+                                )
                             } else {
                                 false
                             }

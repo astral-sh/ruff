@@ -3,6 +3,9 @@ use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
+use rustc_hash::FxHashMap;
+
+use ruff::line_width::LineLength;
 use ruff::logging::LogLevel;
 use ruff::registry::Rule;
 use ruff::resolver::ConfigProcessor;
@@ -11,7 +14,6 @@ use ruff::settings::types::{
     FilePattern, PatternPrefixPair, PerFileIgnore, PythonVersion, SerializationFormat,
 };
 use ruff::RuleSelector;
-use rustc_hash::FxHashMap;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -324,7 +326,6 @@ pub struct CheckArgs {
     )]
     pub show_settings: bool,
     /// Dev-only argument to show fixes
-    #[cfg(feature = "ecosystem_ci")]
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
 }
@@ -391,8 +392,9 @@ impl CheckArgs {
                 add_noqa: self.add_noqa,
                 config: self.config,
                 diff: self.diff,
-                exit_zero: self.exit_zero,
+                ecosystem_ci: self.ecosystem_ci,
                 exit_non_zero_on_fix: self.exit_non_zero_on_fix,
+                exit_zero: self.exit_zero,
                 files: self.files,
                 ignore_noqa: self.ignore_noqa,
                 isolated: self.isolated,
@@ -456,8 +458,9 @@ pub struct Arguments {
     pub add_noqa: bool,
     pub config: Option<PathBuf>,
     pub diff: bool,
-    pub exit_zero: bool,
+    pub ecosystem_ci: bool,
     pub exit_non_zero_on_fix: bool,
+    pub exit_zero: bool,
     pub files: Vec<PathBuf>,
     pub ignore_noqa: bool,
     pub isolated: bool,
@@ -545,7 +548,7 @@ impl ConfigProcessor for &Overrides {
             config.force_exclude = Some(*force_exclude);
         }
         if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+            config.line_length = Some(LineLength::from(*line_length));
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));

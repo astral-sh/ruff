@@ -8,7 +8,7 @@ use rustpython_parser::ast::{
     Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
 };
 
-use crate::newlines::LineEnding;
+use ruff_newlines::LineEnding;
 
 use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
@@ -132,11 +132,11 @@ impl<'a> Generator<'a> {
     }
 
     fn body<U>(&mut self, stmts: &[Stmt<U>]) {
-        self.indent_depth += 1;
+        self.indent_depth = self.indent_depth.saturating_add(1);
         for stmt in stmts {
             self.unparse_stmt(stmt);
         }
-        self.indent_depth -= 1;
+        self.indent_depth = self.indent_depth.saturating_sub(1);
     }
 
     fn p(&mut self, s: &str) {
@@ -531,11 +531,11 @@ impl<'a> Generator<'a> {
                     self.p(":");
                 });
                 for case in cases {
-                    self.indent_depth += 1;
+                    self.indent_depth = self.indent_depth.saturating_add(1);
                     statement!({
                         self.unparse_match_case(case);
                     });
-                    self.indent_depth -= 1;
+                    self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
             }
             Stmt::Raise(ast::StmtRaise {
@@ -1457,8 +1457,10 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::newlines::LineEnding;
-    use rustpython_parser as parser;
+    use rustpython_ast::Suite;
+    use rustpython_parser::Parse;
+
+    use ruff_newlines::LineEnding;
 
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;
@@ -1467,7 +1469,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let program = parser::parse_program(contents, "<filename>").unwrap();
+        let program = Suite::parse(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
@@ -1480,7 +1482,7 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let program = parser::parse_program(contents, "<filename>").unwrap();
+        let program = Suite::parse(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
         generator.unparse_stmt(stmt);

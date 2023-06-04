@@ -8,7 +8,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt, Suite};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 

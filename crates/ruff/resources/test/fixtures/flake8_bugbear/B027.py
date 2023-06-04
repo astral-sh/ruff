@@ -120,3 +120,11 @@ class AbstractClass(ABC):
     @abstractmethod
     def empty_1(self, foo: Union[str, int, list, float]):
         ...
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class Foo(ABC):  # noqa: B024
+    ...

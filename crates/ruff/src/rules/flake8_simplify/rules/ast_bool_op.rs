@@ -271,7 +271,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if func_name != "isinstance" {
             continue;
         }
-        if !checker.ctx.is_builtin("isinstance") {
+        if !checker.semantic_model().is_builtin("isinstance") {
             continue;
         }
 
@@ -293,7 +293,6 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
                     name: if let Expr::Name(ast::ExprName { id, .. }) = target {
@@ -304,73 +303,75 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 },
                 expr.range(),
             );
-            if fixable && checker.patch(diagnostic.kind.rule()) {
-                // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
-                // in `isinstance(obj, int) or isinstance(obj, str)`).
-                let types: Vec<&Expr> = indices
-                    .iter()
-                    .map(|index| &values[*index])
-                    .map(|expr| {
-                        let Expr::Call(ast::ExprCall { args, ..}) = expr else {
-                            unreachable!("Indices should only contain `isinstance` calls")
-                        };
-                        args.get(1).expect("`isinstance` should have two arguments")
-                    })
-                    .collect();
-
-                // Generate a single `isinstance` call.
-                let node = ast::ExprTuple {
-                    // Flatten all the types used across the `isinstance` calls.
-                    elts: types
+            if checker.patch(diagnostic.kind.rule()) {
+                if !contains_effect(target, |id| checker.semantic_model().is_builtin(id)) {
+                    // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
+                    // in `isinstance(obj, int) or isinstance(obj, str)`).
+                    let types: Vec<&Expr> = indices
                         .iter()
-                        .flat_map(|value| {
-                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                                Left(elts.iter())
-                            } else {
-                                Right(iter::once(*value))
-                            }
+                        .map(|index| &values[*index])
+                        .map(|expr| {
+                            let Expr::Call(ast::ExprCall { args, .. }) = expr else {
+                                unreachable!("Indices should only contain `isinstance` calls")
+                            };
+                            args.get(1).expect("`isinstance` should have two arguments")
                         })
-                        .map(Clone::clone)
-                        .collect(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                let node1 = ast::ExprName {
-                    id: "isinstance".into(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                let node2 = ast::ExprCall {
-                    func: Box::new(node1.into()),
-                    args: vec![target.clone(), node.into()],
-                    keywords: vec![],
-                    range: TextRange::default(),
-                };
-                let call = node2.into();
+                        .collect();
 
-                // Generate the combined `BoolOp`.
-                let node = ast::ExprBoolOp {
-                    op: Boolop::Or,
-                    values: iter::once(call)
-                        .chain(
-                            values
-                                .iter()
-                                .enumerate()
-                                .filter(|(index, _)| !indices.contains(index))
-                                .map(|(_, elt)| elt.clone()),
-                        )
-                        .collect(),
-                    range: TextRange::default(),
-                };
-                let bool_op = node.into();
+                    // Generate a single `isinstance` call.
+                    let node = ast::ExprTuple {
+                        // Flatten all the types used across the `isinstance` calls.
+                        elts: types
+                            .iter()
+                            .flat_map(|value| {
+                                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
+                                    Left(elts.iter())
+                                } else {
+                                    Right(iter::once(*value))
+                                }
+                            })
+                            .map(Clone::clone)
+                            .collect(),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    };
+                    let node1 = ast::ExprName {
+                        id: "isinstance".into(),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                    };
+                    let node2 = ast::ExprCall {
+                        func: Box::new(node1.into()),
+                        args: vec![target.clone(), node.into()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    };
+                    let call = node2.into();
 
-                // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
-                // multiple duplicates, the fixes will conflict.
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                    checker.generator().expr(&bool_op),
-                    expr.range(),
-                )));
+                    // Generate the combined `BoolOp`.
+                    let node = ast::ExprBoolOp {
+                        op: Boolop::Or,
+                        values: iter::once(call)
+                            .chain(
+                                values
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(index, _)| !indices.contains(index))
+                                    .map(|(_, elt)| elt.clone()),
+                            )
+                            .collect(),
+                        range: TextRange::default(),
+                    };
+                    let bool_op = node.into();
+
+                    // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
+                    // multiple duplicates, the fixes will conflict.
+                    #[allow(deprecated)]
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        checker.generator().expr(&bool_op),
+                        expr.range(),
+                    )));
+                }
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -425,7 +426,7 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(expr, |id| checker.ctx.is_builtin(id)))
+            .any(|expr| contains_effect(expr, |id| checker.semantic_model().is_builtin(id)))
         {
             continue;
         }
@@ -516,7 +517,7 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
+    if contains_effect(expr, |id| checker.semantic_model().is_builtin(id)) {
         return;
     }
 
@@ -571,7 +572,7 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
+    if contains_effect(expr, |id| checker.semantic_model().is_builtin(id)) {
         return;
     }
 
@@ -640,14 +641,15 @@ fn is_short_circuit(
 
     for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
         // Keep track of the location of the furthest-right, truthy or falsey expression.
-        let value_truthiness = Truthiness::from_expr(value, |id| checker.ctx.is_builtin(id));
+        let value_truthiness =
+            Truthiness::from_expr(value, |id| checker.semantic_model().is_builtin(id));
         let next_value_truthiness =
-            Truthiness::from_expr(next_value, |id| checker.ctx.is_builtin(id));
+            Truthiness::from_expr(next_value, |id| checker.semantic_model().is_builtin(id));
 
         // Keep track of the location of the furthest-right, non-effectful expression.
         if value_truthiness.is_unknown()
-            && (!checker.ctx.in_boolean_test()
-                || contains_effect(value, |id| checker.ctx.is_builtin(id)))
+            && (!checker.semantic_model().in_boolean_test()
+                || contains_effect(value, |id| checker.semantic_model().is_builtin(id)))
         {
             location = next_value.start();
             continue;
@@ -667,7 +669,7 @@ fn is_short_circuit(
                 value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                checker.ctx.in_boolean_test(),
+                checker.semantic_model().in_boolean_test(),
                 checker,
             ));
             break;
@@ -685,7 +687,7 @@ fn is_short_circuit(
                 next_value,
                 TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
-                checker.ctx.in_boolean_test(),
+                checker.semantic_model().in_boolean_test(),
                 checker,
             ));
             break;

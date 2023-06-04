@@ -6,14 +6,13 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Path::new("COM81.py"); "COM81")]
+    #[test_case(Path::new("COM81.py"))]
     fn rules(path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(

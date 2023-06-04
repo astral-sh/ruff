@@ -6,10 +6,9 @@ use rustpython_parser::ast::{self, Expr, ExprContext, Ranged, Stmt, Withitem};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::types::Node;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -139,16 +138,13 @@ struct ExprWithInnerBindingKind<'a> {
     binding_kind: InnerBindingKind,
 }
 
-struct InnerForWithAssignTargetsVisitor<'a> {
-    context: &'a Context<'a>,
+struct InnerForWithAssignTargetsVisitor<'a, 'b> {
+    context: &'a SemanticModel<'b>,
     dummy_variable_rgx: &'a Regex,
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a>
-where
-    'b: 'a,
-{
+impl<'a, 'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'a, 'b> {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
         match stmt {
@@ -240,7 +236,7 @@ where
 ///
 /// x = cast(int, x)
 /// ```
-fn assignment_is_cast_expr(context: &Context, value: &Expr, target: &Expr) -> bool {
+fn assignment_is_cast_expr(model: &SemanticModel, value: &Expr, target: &Expr) -> bool {
     let Expr::Call(ast::ExprCall { func, args, .. }) = value else {
         return false;
     };
@@ -256,7 +252,7 @@ fn assignment_is_cast_expr(context: &Context, value: &Expr, target: &Expr) -> bo
     if arg_id != target_id {
         return false;
     }
-    context.match_typing_expr(func, "cast")
+    model.match_typing_expr(func, "cast")
 }
 
 fn assignment_targets_from_expr<'a, U>(
@@ -349,7 +345,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: &checker.ctx,
+                    context: checker.semantic_model(),
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };
@@ -369,7 +365,7 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
-                    context: &checker.ctx,
+                    context: checker.semantic_model(),
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };
@@ -385,13 +381,15 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
         Node::Expr(_) => panic!("redefined_loop_name called on Node that is not a Statement"),
     };
 
+    let mut diagnostics = Vec::new();
+
     for outer_assignment_target in &outer_assignment_targets {
         for inner_assignment_target in &inner_assignment_targets {
             // Compare the targets structurally.
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                checker.diagnostics.push(Diagnostic::new(
+                diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
@@ -402,4 +400,6 @@ pub(crate) fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &N
             }
         }
     }
+
+    checker.diagnostics.extend(diagnostics);
 }

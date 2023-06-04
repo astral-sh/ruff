@@ -1,7 +1,7 @@
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Expr, Ranged, Stmt};
 
-use ruff_python_ast::newlines::StrExt;
+use ruff_newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
 
 /// Return `true` if a function's return statement include at least one

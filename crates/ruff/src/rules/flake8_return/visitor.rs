@@ -11,9 +11,14 @@ pub(crate) struct Stack<'a> {
     pub(crate) yields: Vec<&'a Expr>,
     pub(crate) elses: Vec<&'a Stmt>,
     pub(crate) elifs: Vec<&'a Stmt>,
+    /// The names that are assigned to in the current scope (e.g., anything on the left-hand side of
+    /// an assignment).
+    pub(crate) assigned_names: FxHashSet<&'a str>,
+    /// The names that are declared in the current scope, and the ranges of those declarations
+    /// (e.g., assignments, but also function and class definitions).
+    pub(crate) declarations: FxHashMap<&'a str, Vec<TextSize>>,
     pub(crate) references: FxHashMap<&'a str, Vec<TextSize>>,
     pub(crate) non_locals: FxHashSet<&'a str>,
-    pub(crate) assignments: FxHashMap<&'a str, Vec<TextSize>>,
     pub(crate) loops: Vec<TextRange>,
     pub(crate) tries: Vec<TextRange>,
 }
@@ -34,8 +39,9 @@ impl<'a> ReturnVisitor<'a> {
                 return;
             }
             Expr::Name(ast::ExprName { id, .. }) => {
+                self.stack.assigned_names.insert(id.as_str());
                 self.stack
-                    .assignments
+                    .declarations
                     .entry(id)
                     .or_insert_with(Vec::new)
                     .push(expr.start());
@@ -45,7 +51,7 @@ impl<'a> ReturnVisitor<'a> {
                 // Attribute assignments are often side-effects (e.g., `self.property = value`),
                 // so we conservatively treat them as references to every known
                 // variable.
-                for name in self.stack.assignments.keys() {
+                for name in self.stack.declarations.keys() {
                     self.stack
                         .references
                         .entry(name)
@@ -68,18 +74,44 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef {
+            Stmt::ClassDef(ast::StmtClassDef {
                 decorator_list,
+                name,
+                ..
+            }) => {
+                // Mark a declaration.
+                self.stack
+                    .declarations
+                    .entry(name.as_str())
+                    .or_insert_with(Vec::new)
+                    .push(stmt.start());
+
+                // Don't recurse into the body, but visit the decorators, etc.
+                for expr in decorator_list {
+                    visitor::walk_expr(self, expr);
+                }
+            }
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                name,
                 args,
+                decorator_list,
                 returns,
                 ..
             })
             | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
-                decorator_list,
+                name,
                 args,
+                decorator_list,
                 returns,
                 ..
             }) => {
+                // Mark a declaration.
+                self.stack
+                    .declarations
+                    .entry(name.as_str())
+                    .or_insert_with(Vec::new)
+                    .push(stmt.start());
+
                 // Don't recurse into the body, but visit the decorators, etc.
                 for expr in decorator_list {
                     visitor::walk_expr(self, expr);
@@ -138,7 +170,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
 
                 if let Some(target) = targets.first() {
                     // Skip unpacking assignments, like `x, y = my_object`.
-                    if matches!(target, Expr::Tuple(_)) && !value.is_tuple_expr() {
+                    if target.is_tuple_expr() && !value.is_tuple_expr() {
                         return;
                     }
 
@@ -172,7 +204,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
             Expr::Call(_) => {
                 // Arbitrary function calls can have side effects, so we conservatively treat
                 // every function call as a reference to every known variable.
-                for name in self.stack.assignments.keys() {
+                for name in self.stack.declarations.keys() {
                     self.stack
                         .references
                         .entry(name)

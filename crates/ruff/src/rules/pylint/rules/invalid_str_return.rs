@@ -36,7 +36,7 @@ fn is_str_returning(body: &[Stmt]) -> Option<Diagnostic> {
             return Some(Diagnostic::new(InvalidStrReturnType, expr.range()));
         }
     }
-    return None;
+    None
 }
 
 /// E0307

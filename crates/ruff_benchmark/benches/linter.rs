@@ -1,12 +1,14 @@
+use std::time::Duration;
+
 use criterion::measurement::WallTime;
 use criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
+
 use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
 use ruff::RuleSelector;
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
-use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

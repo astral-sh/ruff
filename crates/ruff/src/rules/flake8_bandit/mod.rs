@@ -7,43 +7,43 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::Assert, Path::new("S101.py"); "S101")]
-    #[test_case(Rule::BadFilePermissions, Path::new("S103.py"); "S103")]
-    #[test_case(Rule::CallWithShellEqualsTrue, Path::new("S604.py"); "S604")]
-    #[test_case(Rule::ExecBuiltin, Path::new("S102.py"); "S102")]
-    #[test_case(Rule::HardcodedBindAllInterfaces, Path::new("S104.py"); "S104")]
-    #[test_case(Rule::HardcodedPasswordDefault, Path::new("S107.py"); "S107")]
-    #[test_case(Rule::HardcodedPasswordFuncArg, Path::new("S106.py"); "S106")]
-    #[test_case(Rule::HardcodedPasswordString, Path::new("S105.py"); "S105")]
-    #[test_case(Rule::HardcodedSQLExpression, Path::new("S608.py"); "S608")]
-    #[test_case(Rule::HardcodedTempFile, Path::new("S108.py"); "S108")]
-    #[test_case(Rule::HashlibInsecureHashFunction, Path::new("S324.py"); "S324")]
-    #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"); "S701")]
-    #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"); "S612")]
-    #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"); "S501")]
-    #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"); "S113")]
-    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"); "S508")]
-    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"); "S509")]
-    #[test_case(Rule::StartProcessWithAShell, Path::new("S605.py"); "S605")]
-    #[test_case(Rule::StartProcessWithNoShell, Path::new("S606.py"); "S606")]
-    #[test_case(Rule::StartProcessWithPartialPath, Path::new("S607.py"); "S607")]
-    #[test_case(Rule::SubprocessPopenWithShellEqualsTrue, Path::new("S602.py"); "S602")]
-    #[test_case(Rule::SubprocessWithoutShellEqualsTrue, Path::new("S603.py"); "S603")]
-    #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"); "S301")]
-    #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"); "S312")]
-    #[test_case(Rule::TryExceptContinue, Path::new("S112.py"); "S112")]
-    #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
-    #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"); "S506")]
-    #[test_case(Rule::ParamikoCall, Path::new("S601.py"); "S601")]
+    #[test_case(Rule::Assert, Path::new("S101.py"))]
+    #[test_case(Rule::BadFilePermissions, Path::new("S103.py"))]
+    #[test_case(Rule::CallWithShellEqualsTrue, Path::new("S604.py"))]
+    #[test_case(Rule::ExecBuiltin, Path::new("S102.py"))]
+    #[test_case(Rule::HardcodedBindAllInterfaces, Path::new("S104.py"))]
+    #[test_case(Rule::HardcodedPasswordDefault, Path::new("S107.py"))]
+    #[test_case(Rule::HardcodedPasswordFuncArg, Path::new("S106.py"))]
+    #[test_case(Rule::HardcodedPasswordString, Path::new("S105.py"))]
+    #[test_case(Rule::HardcodedSQLExpression, Path::new("S608.py"))]
+    #[test_case(Rule::HardcodedTempFile, Path::new("S108.py"))]
+    #[test_case(Rule::HashlibInsecureHashFunction, Path::new("S324.py"))]
+    #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"))]
+    #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"))]
+    #[test_case(Rule::ParamikoCall, Path::new("S601.py"))]
+    #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"))]
+    #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"))]
+    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
+    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
+    #[test_case(Rule::StartProcessWithAShell, Path::new("S605.py"))]
+    #[test_case(Rule::StartProcessWithNoShell, Path::new("S606.py"))]
+    #[test_case(Rule::StartProcessWithPartialPath, Path::new("S607.py"))]
+    #[test_case(Rule::SubprocessPopenWithShellEqualsTrue, Path::new("S602.py"))]
+    #[test_case(Rule::SubprocessWithoutShellEqualsTrue, Path::new("S603.py"))]
+    #[test_case(Rule::SuspiciousPickleUsage, Path::new("S301.py"))]
+    #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
+    #[test_case(Rule::TryExceptContinue, Path::new("S112.py"))]
+    #[test_case(Rule::TryExceptPass, Path::new("S110.py"))]
+    #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]
+    #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

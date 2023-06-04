@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for TypingTextStrAlias {
 /// UP019
 pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(expr)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["typing", "Text"]

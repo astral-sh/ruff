@@ -1,13 +1,12 @@
 use std::collections::BTreeSet;
 
+use ruff_newlines::StrExt;
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_python_semantic::definition::{Definition, Member, MemberKind};
-
-use crate::checkers::ast::Checker;
+use ruff_python_semantic::model::SemanticModel;
 
 /// Return the index of the first logical line in a string.
 pub(crate) fn logical_line(content: &str) -> Option<usize> {
@@ -37,7 +36,7 @@ pub(crate) fn normalize_word(first_word: &str) -> String {
 
 /// Check decorator list to see if function should be ignored.
 pub(crate) fn should_ignore_definition(
-    checker: &Checker,
+    model: &SemanticModel,
     definition: &Definition,
     ignore_decorators: &BTreeSet<String>,
 ) -> bool {
@@ -52,7 +51,7 @@ pub(crate) fn should_ignore_definition(
     }) = definition
     {
         for decorator in cast::decorator_list(stmt) {
-            if let Some(call_path) = checker.ctx.resolve_call_path(map_callable(decorator)) {
+            if let Some(call_path) = model.resolve_call_path(map_callable(decorator)) {
                 if ignore_decorators
                     .iter()
                     .any(|decorator| from_qualified_name(decorator) == call_path)

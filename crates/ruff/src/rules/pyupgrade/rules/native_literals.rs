@@ -4,7 +4,6 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::str::is_implicit_concatenation;
 
 use crate::checkers::ast::Checker;
@@ -39,7 +38,10 @@ impl AlwaysAutofixableViolation for NativeLiterals {
 
     fn autofix_title(&self) -> String {
         let NativeLiterals { literal_type } = self;
-        format!("Replace with `{literal_type}`")
+        match literal_type {
+            LiteralType::Str => "Replace with empty string".to_string(),
+            LiteralType::Bytes => "Replace with empty bytes".to_string(),
+        }
     }
 }
 
@@ -51,13 +53,20 @@ pub(crate) fn native_literals(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = func else { return; };
+    let Expr::Name(ast::ExprName { id, .. }) = func else {
+        return;
+    };
 
     if !keywords.is_empty() || args.len() > 1 {
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.ctx.is_builtin(id) {
+    // There's no way to rewrite, e.g., `f"{f'{str()}'}"` within a nested f-string.
+    if checker.semantic_model().in_nested_f_string() {
+        return;
+    }
+
+    if (id == "str" || id == "bytes") && checker.semantic_model().is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str

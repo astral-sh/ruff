@@ -22,6 +22,7 @@ pub(crate) use invalid_string_characters::{
     invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
     InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
 };
+pub(crate) use iteration_over_set::{iteration_over_set, IterationOverSet};
 pub(crate) use load_before_global_declaration::{
     load_before_global_declaration, LoadBeforeGlobalDeclaration,
 };
@@ -49,6 +50,9 @@ pub(crate) use unnecessary_direct_lambda_call::{
 pub(crate) use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub(crate) use useless_import_alias::{useless_import_alias, UselessImportAlias};
 pub(crate) use useless_return::{useless_return, UselessReturn};
+pub(crate) use yield_from_in_async_function::{
+    yield_from_in_async_function, YieldFromInAsyncFunction,
+};
 pub(crate) use yield_in_init::{yield_in_init, YieldInInit};
 
 mod assert_on_string_literal;
@@ -72,6 +76,7 @@ mod invalid_envvar_default;
 mod invalid_envvar_value;
 mod invalid_str_return;
 mod invalid_string_characters;
+mod iteration_over_set;
 mod load_before_global_declaration;
 mod logging;
 mod magic_value_comparison;
@@ -93,4 +98,5 @@ mod unnecessary_direct_lambda_call;
 mod useless_else_on_loop;
 mod useless_import_alias;
 mod useless_return;
+mod yield_from_in_async_function;
 mod yield_in_init;

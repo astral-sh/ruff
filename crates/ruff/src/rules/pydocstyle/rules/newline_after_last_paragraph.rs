@@ -1,9 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
-use ruff_python_ast::whitespace;
 use ruff_text_size::{TextLen, TextSize};
 use rustpython_parser::ast::Ranged;
+
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::{NewlineWithTrailingNewline, StrExt};
+use ruff_python_ast::whitespace;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;

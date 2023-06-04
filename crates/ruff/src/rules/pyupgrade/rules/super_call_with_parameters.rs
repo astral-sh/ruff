@@ -2,7 +2,6 @@ use rustpython_parser::ast::{self, Arg, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -43,14 +42,14 @@ pub(crate) fn super_call_with_parameters(
     if !is_super_call_with_arguments(func, args) {
         return;
     }
-    let scope = checker.ctx.scope();
+    let scope = checker.semantic_model().scope();
 
     // Check: are we in a Function scope?
-    if !matches!(scope.kind, ScopeKind::Function(_)) {
+    if !scope.kind.is_any_function() {
         return;
     }
 
-    let mut parents = checker.ctx.parents();
+    let mut parents = checker.semantic_model().parents();
 
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
@@ -62,8 +61,7 @@ pub(crate) fn super_call_with_parameters(
     // Find the enclosing function definition (if any).
     let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
         args: parent_args, ..
-    })) = parents
-        .find(|stmt| stmt.is_function_def_stmt()) else {
+    })) = parents.find(|stmt| stmt.is_function_def_stmt()) else {
         return;
     };
 
@@ -77,8 +75,7 @@ pub(crate) fn super_call_with_parameters(
     // Find the enclosing class definition (if any).
     let Some(Stmt::ClassDef(ast::StmtClassDef {
         name: parent_name, ..
-    })) = parents
-        .find(|stmt| matches!(stmt, Stmt::ClassDef (_))) else {
+    })) = parents.find(|stmt| stmt.is_class_def_stmt()) else {
         return;
     };
 
@@ -97,11 +94,12 @@ pub(crate) fn super_call_with_parameters(
         return;
     }
 
+    drop(parents);
+
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(edit));
+            diagnostic.set_fix(Fix::suggested(edit));
         }
     }
     checker.diagnostics.push(diagnostic);

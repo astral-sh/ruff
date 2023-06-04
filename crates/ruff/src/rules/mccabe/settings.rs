@@ -1,7 +1,8 @@
 //! Settings for the `mccabe` plugin.
 
-use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,

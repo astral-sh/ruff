@@ -99,7 +99,7 @@ pub(crate) fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[E
     }
 
     // Require the function to be the builtin `zip`.
-    if !(id == "zip" && checker.ctx.is_builtin(id)) {
+    if !(id == "zip" && checker.semantic_model().is_builtin(id)) {
         return;
     }
 

@@ -8,26 +8,25 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Path::new("EXE001_1.py"); "EXE001_1")]
-    #[test_case(Path::new("EXE001_2.py"); "EXE001_2")]
-    #[test_case(Path::new("EXE001_3.py"); "EXE001_3")]
-    #[test_case(Path::new("EXE002_1.py"); "EXE002_1")]
-    #[test_case(Path::new("EXE002_2.py"); "EXE002_2")]
-    #[test_case(Path::new("EXE002_3.py"); "EXE002_3")]
-    #[test_case(Path::new("EXE003.py"); "EXE003")]
-    #[test_case(Path::new("EXE004_1.py"); "EXE004_1")]
-    #[test_case(Path::new("EXE004_2.py"); "EXE004_2")]
-    #[test_case(Path::new("EXE004_3.py"); "EXE004_3")]
-    #[test_case(Path::new("EXE005_1.py"); "EXE005_1")]
-    #[test_case(Path::new("EXE005_2.py"); "EXE005_2")]
-    #[test_case(Path::new("EXE005_3.py"); "EXE005_3")]
+    #[test_case(Path::new("EXE001_1.py"))]
+    #[test_case(Path::new("EXE001_2.py"))]
+    #[test_case(Path::new("EXE001_3.py"))]
+    #[test_case(Path::new("EXE002_1.py"))]
+    #[test_case(Path::new("EXE002_2.py"))]
+    #[test_case(Path::new("EXE002_3.py"))]
+    #[test_case(Path::new("EXE003.py"))]
+    #[test_case(Path::new("EXE004_1.py"))]
+    #[test_case(Path::new("EXE004_2.py"))]
+    #[test_case(Path::new("EXE004_3.py"))]
+    #[test_case(Path::new("EXE005_1.py"))]
+    #[test_case(Path::new("EXE005_2.py"))]
+    #[test_case(Path::new("EXE005_3.py"))]
     fn rules(path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(

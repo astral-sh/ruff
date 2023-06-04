@@ -10,12 +10,12 @@ which supports autofix actions, import sorting, and more.
 ## Language Server Protocol (Official)
 
 Ruff supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
-via the [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp) Python package, available on
+via the [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) Python package, available on
 [PyPI](https://pypi.org/project/ruff-lsp/).
 
-[`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp) enables Ruff to be used with any editor that
-supports the Language Server Protocol, including [Neovim](https://github.com/charliermarsh/ruff-lsp#example-neovim),
-[Sublime Text](https://github.com/charliermarsh/ruff-lsp#example-sublime-text), Emacs, and more.
+[`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) enables Ruff to be used with any editor that
+supports the Language Server Protocol, including [Neovim](https://github.com/astral-sh/ruff-lsp#example-neovim),
+[Sublime Text](https://github.com/astral-sh/ruff-lsp#example-sublime-text), Emacs, and more.
 
 For example, to use `ruff-lsp` with Neovim, install `ruff-lsp` from PyPI along with
 [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig). Then, add something like the following
@@ -80,7 +80,7 @@ Upon successful installation, you should see Ruff's diagnostics surfaced directl
 
 ![Code Actions available in Neovim](https://user-images.githubusercontent.com/1309177/208278707-25fa37e4-079d-4597-ad35-b95dba066960.png)
 
-To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/charliermarsh/ruff-lsp#installation-and-usage).
+To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/astral-sh/ruff-lsp#installation-and-usage).
 
 ## Language Server Protocol (Unofficial)
 
@@ -122,10 +122,10 @@ require'lspconfig'.pylsp.setup {
 
 ## Vim & Neovim
 
-Ruff can be integrated into any editor that supports the Language Server Protocol via [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp)
+Ruff can be integrated into any editor that supports the Language Server Protocol via [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp)
 (see: [Language Server Protocol](#language-server-protocol-official)), including Vim and Neovim.
 
-It's recommended that you use [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp), the
+It's recommended that you use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp), the
 officially supported LSP server for Ruff. To use `ruff-lsp` with Neovim, install `ruff-lsp` from
 PyPI along with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig). Then, add something
 like the following to your `init.lua`:
@@ -194,7 +194,16 @@ let g:ale_fixers = {
 </details>
 
 <details>
-<summary>Ruff can also be integrated via <a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm"><code>efm</code></a> in just a <a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">few lines</a>.</summary>
+<summary>
+Ruff can also be integrated via
+<a href="https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#efm">
+  <code>efm</code>
+</a>
+in just a
+<a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">
+  few lines.
+</a>
+</summary>
 <br>
 
 ```yaml
@@ -211,7 +220,12 @@ tools:
 </details>
 
 <details>
-<summary>For neovim users using <a href="https://github.com/jose-elias-alvarez/null-ls.nvim"><code>null-ls</code></a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.</summary>
+<summary>
+For neovim users using
+<a href="https://github.com/jose-elias-alvarez/null-ls.nvim">
+  <code>null-ls</code>
+</a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.
+</summary>
 <br>
 
 ```lua

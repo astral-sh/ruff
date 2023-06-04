@@ -1,7 +1,9 @@
+use std::io::Write;
+
+use ruff_python_ast::source_code::SourceLocation;
+
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use ruff_python_ast::source_code::SourceLocation;
-use std::io::Write;
 
 /// Generate error logging commands for Azure Pipelines format.
 /// See [documentation](https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning)
@@ -42,9 +44,10 @@ impl Emitter for AzureEmitter {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::AzureEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn output() {

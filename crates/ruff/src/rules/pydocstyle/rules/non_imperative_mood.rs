@@ -5,9 +5,9 @@ use once_cell::sync::Lazy;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::StrExt;
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::cast;
-use ruff_python_ast::newlines::StrExt;
 use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
@@ -41,7 +41,7 @@ pub(crate) fn non_imperative_mood(
 
     if is_test(cast::name(stmt))
         || is_property(
-            &checker.ctx,
+            checker.semantic_model(),
             cast::decorator_list(stmt),
             &property_decorators,
         )

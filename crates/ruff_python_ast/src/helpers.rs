@@ -4,6 +4,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use num_traits::Zero;
+use ruff_newlines::UniversalNewlineIterator;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
@@ -14,7 +15,6 @@ use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
-use crate::newlines::UniversalNewlineIterator;
 use crate::source_code::{Indexer, Locator};
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 
@@ -684,9 +684,24 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 /// callable.
 pub fn map_callable(decorator: &Expr) -> &Expr {
     if let Expr::Call(ast::ExprCall { func, .. }) = decorator {
+        // Ex) `@decorator()`
         func
     } else {
+        // Ex) `@decorator`
         decorator
+    }
+}
+
+/// Given an [`Expr`] that can be callable or not (like a decorator, which could
+/// be used with or without explicit call syntax), return the underlying
+/// callable.
+pub fn map_subscript(expr: &Expr) -> &Expr {
+    if let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr {
+        // Ex) `Iterable[T]`
+        value
+    } else {
+        // Ex) `Iterable`
+        expr
     }
 }
 
@@ -959,39 +974,6 @@ where
     }
 }
 
-#[derive(Default)]
-struct GlobalStatementVisitor<'a> {
-    globals: FxHashMap<&'a str, &'a Stmt>,
-}
-
-impl<'a> StatementVisitor<'a> for GlobalStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _range,
-            }) => {
-                for name in names {
-                    self.globals.insert(name.as_str(), stmt);
-                }
-            }
-            Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) | Stmt::ClassDef(_) => {
-                // Don't recurse.
-            }
-            _ => walk_stmt(self, stmt),
-        }
-    }
-}
-
-/// Extract a map from global name to its last-defining [`Stmt`].
-pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
-    let mut visitor = GlobalStatementVisitor::default();
-    for stmt in body {
-        visitor.visit_stmt(stmt);
-    }
-    visitor.globals
-}
-
 /// Return `true` if a [`Ranged`] has leading content.
 pub fn has_leading_content<T>(located: &T, locator: &Locator) -> bool
 where
@@ -1059,7 +1041,7 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 
     let mut fix_start = None;
     let mut fix_end = None;
-    let mut count: usize = 0;
+    let mut count = 0u32;
 
     for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, start).flatten() {
         match tok {
@@ -1067,10 +1049,10 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
                 if count == 0 {
                     fix_start = Some(range.start());
                 }
-                count += 1;
+                count = count.saturating_add(1);
             }
             Tok::Rpar => {
-                count -= 1;
+                count = count.saturating_sub(1);
                 if count == 0 {
                     fix_end = Some(range.end());
                     break;
@@ -1090,21 +1072,40 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 /// Specifically, this method returns the range of a function or class name,
 /// rather than that of the entire function or class body.
 pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
-    if matches!(
-        stmt,
-        Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_)
-    ) {
-        let contents = &locator.contents()[stmt.range()];
+    match stmt {
+        Stmt::ClassDef(ast::StmtClassDef {
+            decorator_list,
+            range,
+            ..
+        })
+        | Stmt::FunctionDef(ast::StmtFunctionDef {
+            decorator_list,
+            range,
+            ..
+        })
+        | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef {
+            decorator_list,
+            range,
+            ..
+        }) => {
+            let header_range = decorator_list.last().map_or(*range, |last_decorator| {
+                TextRange::new(last_decorator.end(), range.end())
+            });
 
-        for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, stmt.start()).flatten() {
-            if matches!(tok, Tok::Name { .. }) {
-                return range;
-            }
+            let contents = locator.slice(header_range);
+
+            let mut tokens =
+                lexer::lex_starts_at(contents, Mode::Module, header_range.start()).flatten();
+            tokens
+                .find_map(|(t, range)| t.is_name().then_some(range))
+                .unwrap_or_else(|| {
+                    error!("Failed to find identifier for {:?}", stmt);
+
+                    header_range
+                })
         }
-        error!("Failed to find identifier for {:?}", stmt);
+        _ => stmt.range(),
     }
-
-    stmt.range()
 }
 
 /// Return the ranges of [`Tok::Name`] tokens within a specified node.
@@ -1447,16 +1448,16 @@ impl LocatedCmpop {
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
     let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];
-    let mut count: usize = 0;
+    let mut count = 0u32;
     loop {
         let Some((tok, range)) = tok_iter.next() else {
             break;
         };
         if matches!(tok, Tok::Lpar) {
-            count += 1;
+            count = count.saturating_add(1);
             continue;
         } else if matches!(tok, Tok::Rpar) {
-            count -= 1;
+            count = count.saturating_sub(1);
             continue;
         }
         if count == 0 {
@@ -1610,8 +1611,9 @@ mod tests {
 
     use anyhow::Result;
     use ruff_text_size::{TextLen, TextRange, TextSize};
-    use rustpython_parser as parser;
+    use rustpython_ast::Suite;
     use rustpython_parser::ast::Cmpop;
+    use rustpython_parser::Parse;
 
     use crate::helpers::{
         elif_else_range, else_range, first_colon_range, has_trailing_content, identifier_range,
@@ -1622,25 +1624,25 @@ mod tests {
     #[test]
     fn trailing_content() -> Result<()> {
         let contents = "x = 1";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
 
         let contents = "x = 1; y = 2";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(has_trailing_content(stmt, &locator));
 
         let contents = "x = 1  ";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
 
         let contents = "x = 1  # Comment";
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
@@ -1650,7 +1652,7 @@ x = 1
 y = 2
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert!(!has_trailing_content(stmt, &locator));
@@ -1661,7 +1663,7 @@ y = 2
     #[test]
     fn extract_identifier_range() -> Result<()> {
         let contents = "def f(): pass".trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -1675,7 +1677,7 @@ def \
   pass
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -1684,7 +1686,7 @@ def \
         );
 
         let contents = "class Class(): pass".trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -1693,7 +1695,7 @@ def \
         );
 
         let contents = "class Class: pass".trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -1707,7 +1709,7 @@ class Class():
   pass
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -1716,7 +1718,7 @@ class Class():
         );
 
         let contents = r#"x = y + 1"#.trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -1773,7 +1775,7 @@ else:
     pass
 "#
         .trim();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         let range = else_range(stmt, &locator).unwrap();
@@ -1807,7 +1809,7 @@ elif b:
     ...
 "
         .trim_start();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();
@@ -1821,7 +1823,7 @@ else:
     ...
 "
         .trim_start();
-        let program = parser::parse_program(contents, "<filename>")?;
+        let program = Suite::parse(contents, "<filename>")?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         let range = elif_else_range(stmt, &locator).unwrap();

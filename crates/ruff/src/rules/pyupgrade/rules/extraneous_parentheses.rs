@@ -51,7 +51,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     let start = i;
 
     // Verify that we're not in a tuple or coroutine.
-    let mut depth = 1;
+    let mut depth = 1u32;
     while depth > 0 {
         i += 1;
         if i >= tokens.len() {
@@ -65,9 +65,9 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if depth == 1 && matches!(tok, Tok::Comma | Tok::Yield) {
             return None;
         } else if matches!(tok, Tok::Lpar | Tok::Lbrace | Tok::Lsqb) {
-            depth += 1;
+            depth = depth.saturating_add(1);
         } else if matches!(tok, Tok::Rpar | Tok::Rbrace | Tok::Rsqb) {
-            depth -= 1;
+            depth = depth.saturating_sub(1);
         }
     }
 

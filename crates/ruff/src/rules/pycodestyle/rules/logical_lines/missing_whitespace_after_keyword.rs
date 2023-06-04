@@ -1,8 +1,9 @@
-use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;

@@ -3,7 +3,6 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;
@@ -65,10 +64,8 @@ pub(crate) fn getattr_with_constant(
     }
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
-
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             checker.generator().expr(&attribute(obj, value)),
             expr.range(),
         )));

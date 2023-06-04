@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use libcst_native::{Arg, Codegen, CodegenState, Expression};
+use libcst_native::{Arg, Codegen, CodegenState};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{Expr, Ranged};
@@ -9,7 +9,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_call, match_expression};
+use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
 
@@ -89,7 +89,7 @@ fn generate_call(
 ) -> Result<String> {
     let module_text = locator.slice(expr.range());
     let mut expression = match_expression(module_text)?;
-    let mut call = match_call(&mut expression)?;
+    let call = match_call_mut(&mut expression)?;
 
     // Fix the call arguments.
     if !is_sequential(correct_order) {
@@ -97,9 +97,7 @@ fn generate_call(
     }
 
     // Fix the string itself.
-    let Expression::Attribute(item) = &*call.func else {
-        panic!("Expected: Expression::Attribute")
-    };
+    let item = match_attribute(&mut call.func)?;
 
     let mut state = CodegenState {
         default_newline: &stylist.line_ending(),

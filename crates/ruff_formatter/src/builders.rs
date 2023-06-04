@@ -1,14 +1,13 @@
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{format_element, write, Argument, Arguments, GroupId, TextSize};
+use crate::{format_element, write, Argument, Arguments, FormatContext, GroupId, TextSize};
 use crate::{Buffer, VecBuffer};
 
 use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::num::NonZeroU8;
-use std::rc::Rc;
 use Tag::*;
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -276,8 +275,62 @@ impl std::fmt::Debug for StaticText {
     }
 }
 
-/// Creates a text from a dynamic string and a range of the input source
-pub fn dynamic_text(text: &str, position: TextSize) -> DynamicText {
+/// Creates a source map entry from the passed source `position` to the position in the formatted output.
+///
+/// ## Examples
+///
+/// ```
+/// /// ```
+/// use ruff_formatter::format;
+/// use ruff_formatter::prelude::*;
+///
+/// # fn main() -> FormatResult<()> {
+/// // the tab must be encoded as \\t to not literally print a tab character ("Hello{tab}World" vs "Hello\tWorld")
+/// use ruff_text_size::TextSize;
+/// use ruff_formatter::SourceMarker;
+///
+///
+/// let elements = format!(SimpleFormatContext::default(), [
+///     source_position(TextSize::new(0)),
+///     text("\"Hello "),
+///     source_position(TextSize::new(8)),
+///     text("'Ruff'"),
+///     source_position(TextSize::new(14)),
+///     text("\""),
+///     source_position(TextSize::new(20))
+/// ])?;
+///
+/// let printed = elements.print()?;
+///
+/// assert_eq!(printed.as_code(), r#""Hello 'Ruff'""#);
+/// assert_eq!(printed.sourcemap(), [
+///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(0) },
+///     SourceMarker { source: TextSize::new(0), dest: TextSize::new(7) },
+///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(7) },
+///     SourceMarker { source: TextSize::new(8), dest: TextSize::new(13) },
+///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(13) },
+///     SourceMarker { source: TextSize::new(14), dest: TextSize::new(14) },
+///     SourceMarker { source: TextSize::new(20), dest: TextSize::new(14) },
+/// ]);
+///
+/// # Ok(())
+/// # }
+/// ```
+pub const fn source_position(position: TextSize) -> SourcePosition {
+    SourcePosition(position)
+}
+
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+pub struct SourcePosition(TextSize);
+
+impl<Context> Format<Context> for SourcePosition {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        f.write_element(FormatElement::SourcePosition(self.0))
+    }
+}
+
+/// Creates a text from a dynamic string with its optional start-position in the source document
+pub fn dynamic_text(text: &str, position: Option<TextSize>) -> DynamicText {
     debug_assert_no_newlines(text);
 
     DynamicText { text, position }
@@ -286,14 +339,17 @@ pub fn dynamic_text(text: &str, position: TextSize) -> DynamicText {
 #[derive(Eq, PartialEq)]
 pub struct DynamicText<'a> {
     text: &'a str,
-    position: TextSize,
+    position: Option<TextSize>,
 }
 
 impl<Context> Format<Context> for DynamicText<'_> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        if let Some(source_position) = self.position {
+            f.write_element(FormatElement::SourcePosition(source_position))?;
+        }
+
         f.write_element(FormatElement::DynamicText {
             text: self.text.to_string().into_boxed_str(),
-            source_position: self.position,
         })
     }
 }
@@ -304,31 +360,65 @@ impl std::fmt::Debug for DynamicText<'_> {
     }
 }
 
-/// Creates a text from a dynamic string and a range of the input source
-pub fn static_text_slice(text: Rc<str>, range: TextRange) -> StaticTextSlice {
-    debug_assert_no_newlines(&text[range]);
-
-    StaticTextSlice { text, range }
-}
-
-#[derive(Eq, PartialEq)]
-pub struct StaticTextSlice {
-    text: Rc<str>,
+/// Emits a text as it is written in the source document. Optimized to avoid allocations.
+pub const fn source_text_slice(
     range: TextRange,
-}
-
-impl<Context> Format<Context> for StaticTextSlice {
-    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        f.write_element(FormatElement::StaticTextSlice {
-            text: self.text.clone(),
-            range: self.range,
-        })
+    newlines: ContainsNewlines,
+) -> SourceTextSliceBuilder {
+    SourceTextSliceBuilder {
+        range,
+        new_lines: newlines,
     }
 }
 
-impl std::fmt::Debug for StaticTextSlice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "StaticTextSlice({})", &self.text[self.range])
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum ContainsNewlines {
+    /// The string contains newline characters
+    Yes,
+    /// The string contains no newline characters
+    No,
+
+    /// The string may contain newline characters, search the string to determine if there are any newlines.
+    Detect,
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub struct SourceTextSliceBuilder {
+    range: TextRange,
+    new_lines: ContainsNewlines,
+}
+
+impl<Context> Format<Context> for SourceTextSliceBuilder
+where
+    Context: FormatContext,
+{
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        let source_code = f.context().source_code();
+        let slice = source_code.slice(self.range);
+        debug_assert_no_newlines(slice.text(source_code));
+
+        let contains_newlines = match self.new_lines {
+            ContainsNewlines::Yes => {
+                debug_assert!(
+                    slice.text(source_code).contains('\n'),
+                    "Text contains no new line characters but the caller specified that it does."
+                );
+                true
+            }
+            ContainsNewlines::No => {
+                debug_assert!(
+                    !slice.text(source_code).contains('\n'),
+                    "Text contains new line characters but the caller specified that it does not."
+                );
+                false
+            }
+            ContainsNewlines::Detect => slice.text(source_code).contains('\n'),
+        };
+
+        f.write_element(FormatElement::SourceCodeSlice {
+            slice,
+            contains_newlines,
+        })
     }
 }
 
@@ -1781,7 +1871,7 @@ impl<Context, T> std::fmt::Debug for FormatWith<Context, T> {
 ///                 let mut join = f.join_with(&separator);
 ///
 ///                 for item in &self.items {
-///                     join.entry(&format_with(|f| write!(f, [dynamic_text(item, TextSize::default())])));
+///                     join.entry(&format_with(|f| write!(f, [dynamic_text(item, None)])));
 ///                 }
 ///                 join.finish()
 ///             })),
@@ -2041,11 +2131,11 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
 /// The first variant is the most flat, and the last is the most expanded variant.
 /// See [`best_fitting!`] macro for a more in-detail documentation
 #[derive(Copy, Clone)]
-pub struct BestFitting<'a, Context> {
+pub struct FormatBestFitting<'a, Context> {
     variants: Arguments<'a, Context>,
 }
 
-impl<'a, Context> BestFitting<'a, Context> {
+impl<'a, Context> FormatBestFitting<'a, Context> {
     /// Creates a new best fitting IR with the given variants. The method itself isn't unsafe
     /// but it is to discourage people from using it because the printer will panic if
     /// the slice doesn't contain at least the least and most expanded variants.
@@ -2064,7 +2154,7 @@ impl<'a, Context> BestFitting<'a, Context> {
     }
 }
 
-impl<Context> Format<Context> for BestFitting<'_, Context> {
+impl<Context> Format<Context> for FormatBestFitting<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let mut buffer = VecBuffer::new(f.state_mut());
         let variants = self.variants.items();

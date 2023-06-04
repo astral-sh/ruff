@@ -6,6 +6,21 @@ use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `return` statements outside of functions.
+///
+/// ## Why is this bad?
+/// The use of a `return` statement outside of a function will raise a
+/// `SyntaxError`.
+///
+/// ## Example
+/// ```python
+/// class Foo:
+///     return 1
+/// ```
+///
+/// ## References
+/// - [Python documentation: `return`](https://docs.python.org/3/reference/simple_stmts.html#the-return-statement)
 #[violation]
 pub struct ReturnOutsideFunction;
 
@@ -18,7 +33,7 @@ impl Violation for ReturnOutsideFunction {
 
 pub(crate) fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
     if matches!(
-        checker.ctx.scope().kind,
+        checker.semantic_model().scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         checker

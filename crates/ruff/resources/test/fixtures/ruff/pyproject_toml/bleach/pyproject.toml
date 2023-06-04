@@ -1,0 +1,7 @@
+[project]
+name = "hello-world"
+version = "0.1.0"
+# There's a comma missing here
+dependencies = [
+  "tinycss2>=1.1.0<1.2",
+]

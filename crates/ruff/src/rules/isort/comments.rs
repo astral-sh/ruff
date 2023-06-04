@@ -1,27 +1,23 @@
-use ruff_text_size::{TextRange, TextSize};
 use std::borrow::Cow;
 
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::source_code::Locator;
 
 #[derive(Debug)]
-pub struct Comment<'a> {
-    pub value: Cow<'a, str>,
-    pub range: TextRange,
+pub(crate) struct Comment<'a> {
+    pub(crate) value: Cow<'a, str>,
+    pub(crate) range: TextRange,
 }
 
 impl Comment<'_> {
-    pub const fn start(&self) -> TextSize {
+    pub(crate) const fn start(&self) -> TextSize {
         self.range.start()
     }
 
-    pub const fn end(&self) -> TextSize {
+    pub(crate) const fn end(&self) -> TextSize {
         self.range.end()
-    }
-
-    pub const fn range(&self) -> TextRange {
-        self.range
     }
 }
 

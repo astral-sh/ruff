@@ -1,12 +1,13 @@
+use std::borrow::Cow;
+
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
     Assert, BooleanOp, Codegen, CodegenState, CompoundStatement, Expression,
     ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
-    SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
+    SmallStatement, Statement, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
-use std::borrow::Cow;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -16,6 +17,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
 
 use crate::checkers::ast::Checker;
+use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::registry::AsRule;
 
@@ -182,25 +184,27 @@ pub(crate) fn unittest_assertion(
     match func {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
-                // We're converting an expression to a statement, so avoid applying the fix if
-                // the assertion is part of a larger expression.
-                let fixable = checker.ctx.stmt().is_expr_stmt()
-                    && checker.ctx.expr_parent().is_none()
-                    && !checker.ctx.scope().kind.is_lambda()
-                    && !has_comments_in(expr.range(), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {
                         assertion: unittest_assert.to_string(),
                     },
                     func.range(),
                 );
-                if fixable && checker.patch(diagnostic.kind.rule()) {
-                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        #[allow(deprecated)]
-                        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                            checker.generator().stmt(&stmt),
-                            expr.range(),
-                        )));
+                if checker.patch(diagnostic.kind.rule()) {
+                    // We're converting an expression to a statement, so avoid applying the fix if
+                    // the assertion is part of a larger expression.
+                    if checker.semantic_model().stmt().is_expr_stmt()
+                        && checker.semantic_model().expr_parent().is_none()
+                        && !checker.semantic_model().scope().kind.is_lambda()
+                        && !has_comments_in(expr.range(), checker.locator)
+                    {
+                        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                            #[allow(deprecated)]
+                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                                checker.generator().stmt(&stmt),
+                                expr.range(),
+                            )));
+                        }
                     }
                 }
                 Some(diagnostic)
@@ -214,7 +218,7 @@ pub(crate) fn unittest_assertion(
 
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if Truthiness::from_expr(test, |id| checker.ctx.is_builtin(id)).is_falsey() {
+    if Truthiness::from_expr(test, |id| checker.semantic_model().is_builtin(id)).is_falsey() {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
@@ -344,9 +348,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
             bail!("Expected statement to be embedded in a function definition")
         };
 
-        let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
-            bail!("Expected indented block")
-        };
+        let indented_block = match_indented_block(&mut embedding.body)?;
         indented_block.indent = Some(outer_indent);
 
         &mut indented_block.body
@@ -440,15 +442,17 @@ pub(crate) fn composite_condition(
 ) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
-        let fixable = matches!(composite, CompositionKind::Simple)
-            && msg.is_none()
-            && !has_comments_in(stmt.range(), checker.locator);
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
-        if fixable && checker.patch(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.try_set_fix_from_edit(|| {
-                fix_composite_condition(stmt, checker.locator, checker.stylist)
-            });
+        if checker.patch(diagnostic.kind.rule()) {
+            if matches!(composite, CompositionKind::Simple)
+                && msg.is_none()
+                && !has_comments_in(stmt.range(), checker.locator)
+            {
+                #[allow(deprecated)]
+                diagnostic.try_set_fix_from_edit(|| {
+                    fix_composite_condition(stmt, checker.locator, checker.stylist)
+                });
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -3,8 +3,8 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -65,7 +65,7 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         if id != name {
             continue;
         }
-        if !checker.ctx.is_builtin(name) {
+        if !checker.semantic_model().is_builtin(name) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(
@@ -76,13 +76,10 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = get_or_import_symbol(
-                    "sys",
-                    "exit",
+                let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                    &ImportRequest::import("sys", "exit"),
                     func.start(),
-                    &checker.ctx,
-                    &checker.importer,
-                    checker.locator,
+                    checker.semantic_model(),
                 )?;
                 let reference_edit = Edit::range_replacement(binding, func.range());
                 #[allow(deprecated)]

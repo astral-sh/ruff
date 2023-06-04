@@ -7,12 +7,13 @@ rust-version = { workspace = true }
 
 [dependencies]
 ruff_formatter = { path = "../ruff_formatter" }
+ruff_newlines = { path = "../ruff_newlines" }
 ruff_python_ast = { path = "../ruff_python_ast" }
-ruff_rustpython = { path = "../ruff_rustpython" }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
+countme = "3.0.1"
 is-macro = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }

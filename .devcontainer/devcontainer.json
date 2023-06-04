@@ -1,0 +1,46 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/rust
+{
+	"name": "Ruff",
+	"image": "mcr.microsoft.com/devcontainers/rust:0-1-bullseye",
+	"mounts": [
+		{
+			"source": "devcontainer-cargo-cache-${devcontainerId}",
+			"target": "/usr/local/cargo",
+			"type": "volume"
+		}
+	],
+	"customizations": {
+		"codespaces": {
+			"openFiles": [
+				"CONTRIBUTING.md"
+			]
+		},
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"rust-lang.rust-analyzer",
+				"serayuzgur.crates",
+				"tamasfe.even-better-toml",
+				"Swellaby.vscode-rust-test-adapter",
+				"charliermarsh.ruff"
+			],
+			"settings": {
+				"rust-analyzer.updates.askBeforeDownload": false
+			}
+		}
+	},
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/devcontainers/features/python": {
+			"installTools": false
+		}
+	},
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	"postCreateCommand": ".devcontainer/post-create.sh"
+	// Configure tool-specific properties.
+	// "customizations": {},
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

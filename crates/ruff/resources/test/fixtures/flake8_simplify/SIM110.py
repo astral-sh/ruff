@@ -155,3 +155,19 @@ def f():
         if check(x):
             return False
     return True
+
+
+def f():
+    # SIM110
+    for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ":
+        if x.isdigit():
+            return True
+    return False
+
+
+def f():
+    # OK (too long)
+    for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9":
+        if x.isdigit():
+            return True
+    return False
