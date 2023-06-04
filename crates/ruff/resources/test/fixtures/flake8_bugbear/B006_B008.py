@@ -67,6 +67,11 @@ def this_is_wrong(value=[1, 2, 3]):
 def this_is_also_wrong(value={}):
     ...
 
+class Foo:
+    @staticmethod
+    def this_is_also_wrong_and_more_indented(value={}):
+        pass
+
 
 def and_this(value=set()):
     ...

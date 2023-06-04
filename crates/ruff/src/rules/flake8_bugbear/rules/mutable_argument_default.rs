@@ -1,6 +1,7 @@
-use ruff_python_ast::{ParameterWithDefault, Parameters, Ranged};
+use ruff_python_ast::{ParameterWithDefault, Parameters, Ranged, Stmt};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use crate::registry::AsRule;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 
@@ -49,15 +50,24 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct MutableArgumentDefault;
 
-impl Violation for MutableArgumentDefault {
+impl AlwaysAutofixableViolation for MutableArgumentDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use mutable data structures for argument defaults")
     }
+    fn autofix_title(&self) -> String {
+        // TODO: Fix message
+        format!("Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`")
+    }
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &mut Checker, parameters: &Parameters) {
+pub(crate) fn mutable_argument_default(
+    checker: &mut Checker,
+    parameters: &Parameters,
+    body: &[Stmt],
+) {
+    let mut invalid_defaults = vec![];
     // Scan in reverse order to right-align zip().
     for ParameterWithDefault {
         parameter,
@@ -79,9 +89,29 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, parameters: &Param
                 .as_ref()
                 .is_some_and(|expr| is_immutable_annotation(expr, checker.semantic()))
         {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(MutableArgumentDefault, default.range()));
+            invalid_defaults.push((parameter, default));
+            let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
+            if checker.patch(diagnostic.kind.rule()) {
+                let arg_edit = Edit::range_replacement("None".to_string(), default.range());
+                let mut check_lines = String::new();
+                check_lines.push_str(format!("if {} is None:\n", parameter.name.as_str()).as_str());
+                let indent = checker.stylist().indentation();
+                check_lines.push_str(indent);
+                check_lines.push_str(indent);
+                check_lines.push_str(
+                    format!(
+                        "{} = {}\n",
+                        parameter.name.as_str(),
+                        checker.generator().expr(default)
+                    )
+                    .as_str(),
+                );
+                check_lines.push_str(indent);
+                let check_edit = Edit::insertion(check_lines, body[0].start());
+
+                diagnostic.set_fix(Fix::automatic_edits(arg_edit, [check_edit]));
+                checker.diagnostics.push(diagnostic);
+            }
         }
     }
 }
