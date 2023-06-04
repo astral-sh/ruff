@@ -103,7 +103,25 @@ ISC.py:46:5: ISC001 Implicitly concatenated string literals on one line
 47 | 
 48 | _ = 'a' "b"
    |     ^^^^^^^ ISC001
+49 | 
+50 | _ = rf"a" rf"b"
    |
    = help: Combine these string literals into one
+
+ISC.py:48:5: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+48 | _ = 'a' "b"
+49 | 
+50 | _ = rf"a" rf"b"
+   |     ^^^^^^^^^^^ ISC001
+   |
+   = help: Combine these string literals into one
+
+ℹ Fix
+45 45 | 
+46 46 | _ = 'a' "b"
+47 47 | 
+48    |-_ = rf"a" rf"b"
+   48 |+_ = rf"ab"
 
 
