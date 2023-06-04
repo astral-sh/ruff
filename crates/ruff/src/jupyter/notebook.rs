@@ -74,7 +74,7 @@ pub struct Notebook {
     /// the first and last character offsets as well.
     cell_offsets: Vec<TextSize>,
     /// The cell numbers of all valid code cells in the notebook.
-    valid_code_cells: Vec<usize>,
+    valid_code_cells: Vec<u32>,
 }
 
 impl Notebook {
@@ -175,7 +175,7 @@ impl Notebook {
             .iter()
             .enumerate()
             .filter(|(_, cell)| cell.is_valid_code_cell())
-            .map(|(pos, _)| pos)
+            .map(|(pos, _)| u32::try_from(pos).unwrap())
             .collect::<Vec<_>>();
 
         let mut current_offset = TextSize::from(0);
@@ -186,7 +186,7 @@ impl Notebook {
         let mut builder = JupyterIndexBuilder::default();
 
         for &pos in &valid_code_cells {
-            let cell_contents = builder.add_code_cell(pos, &notebook.cells[pos]);
+            let cell_contents = builder.add_code_cell(pos, &notebook.cells[pos as usize]);
             current_offset += TextSize::of(&cell_contents) + TextSize::new(1);
             cell_offsets.push(current_offset);
             contents.push(cell_contents);
@@ -258,7 +258,7 @@ impl Notebook {
                 .unwrap_or_else(|| {
                     panic!("cell content out of bounds ({start:?}..{end:?}): {transformed}")
                 });
-            self.raw.cells[pos].source = SourceValue::String(
+            self.raw.cells[pos as usize].source = SourceValue::String(
                 cell_content
                     .strip_suffix('\n')
                     .unwrap_or(cell_content)
@@ -272,7 +272,7 @@ impl Notebook {
         let mut builder = JupyterIndexBuilder::default();
 
         for &pos in &self.valid_code_cells {
-            let cell_contents = builder.add_code_cell(pos, &self.raw.cells[pos]);
+            let cell_contents = builder.add_code_cell(pos, &self.raw.cells[pos as usize]);
             contents.push(cell_contents);
         }
 

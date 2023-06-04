@@ -52,24 +52,21 @@ impl JupyterIndexBuilder {
     /// Add the given code cell to the index, returning the contents of the cell.
     /// The position of the cell is given by `pos` which is the absolute position
     /// of the cell in the notebook.
-    pub(super) fn add_code_cell(&mut self, pos: usize, cell: &Cell) -> String {
+    pub(super) fn add_code_cell(&mut self, pos: u32, cell: &Cell) -> String {
         let cell_contents = match &cell.source {
             SourceValue::String(string) => {
                 let line_count =
                     u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap();
-                self.row_to_cell.extend(
-                    iter::repeat(u32::try_from(pos + 1).unwrap()).take(line_count as usize),
-                );
+                self.row_to_cell
+                    .extend(iter::repeat(pos + 1).take(line_count as usize));
                 self.row_to_row_in_cell.extend(1..=line_count);
                 string.clone()
             }
             SourceValue::StringArray(string_array) => {
                 let trailing_newline =
                     usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
-                self.row_to_cell.extend(
-                    iter::repeat(u32::try_from(pos + 1).unwrap())
-                        .take(string_array.len() + trailing_newline),
-                );
+                self.row_to_cell
+                    .extend(iter::repeat(pos + 1).take(string_array.len() + trailing_newline));
                 self.row_to_row_in_cell
                     .extend(1..=u32::try_from(string_array.len() + trailing_newline).unwrap());
                 // lines already end in a newline character
