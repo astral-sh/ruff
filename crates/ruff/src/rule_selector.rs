@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::codes::RuleCodePrefix;
 use crate::codes::RuleIter;
+use crate::codes::{self, RuleCodePrefix};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 
@@ -161,7 +161,7 @@ impl IntoIterator for &RuleSelector {
                 RuleSelectorIter::All(Rule::iter().filter(|rule| select_all(*rule)))
             }
             RuleSelector::Nursery => {
-                RuleSelectorIter::Nursery(Rule::iter().filter(|rule| rule.is_nursery()))
+                RuleSelectorIter::Nursery(Rule::iter().filter(codes::Rule::is_nursery))
             }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
