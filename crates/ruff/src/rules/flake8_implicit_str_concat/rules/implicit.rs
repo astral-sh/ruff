@@ -118,7 +118,7 @@ pub(crate) fn implicit(
                 );
 
                 if let Some(fix) = get_fix_for_single_line_implicit_string_concatenation(
-                    &a_tok, *a_range, &b_tok, *b_range, locator,
+                    a_tok, *a_range, b_tok, *b_range, locator,
                 ) {
                     diagnostic.set_fix(fix);
                 }
