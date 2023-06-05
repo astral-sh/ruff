@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-invalid_return_type_str.py:3:16: PLE0307 __str__ does not return str
+invalid_return_type_str.py:3:16: PLE0307 `__str__` does not return `str`
   |
 3 | class Str:
 4 |     def __str__(self):
@@ -11,7 +11,7 @@ invalid_return_type_str.py:3:16: PLE0307 __str__ does not return str
 7 | class Float:
   |
 
-invalid_return_type_str.py:7:16: PLE0307 __str__ does not return str
+invalid_return_type_str.py:7:16: PLE0307 `__str__` does not return `str`
    |
  7 | class Float:
  8 |     def __str__(self):
@@ -21,7 +21,7 @@ invalid_return_type_str.py:7:16: PLE0307 __str__ does not return str
 11 | class Int:
    |
 
-invalid_return_type_str.py:11:16: PLE0307 __str__ does not return str
+invalid_return_type_str.py:11:16: PLE0307 `__str__` does not return `str`
    |
 11 | class Int:
 12 |     def __str__(self):
@@ -31,7 +31,7 @@ invalid_return_type_str.py:11:16: PLE0307 __str__ does not return str
 15 | class Bool:
    |
 
-invalid_return_type_str.py:15:16: PLE0307 __str__ does not return str
+invalid_return_type_str.py:15:16: PLE0307 `__str__` does not return `str`
    |
 15 | class Bool:
 16 |     def __str__(self):

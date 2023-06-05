@@ -1,42 +1,25 @@
-use rustpython_parser::ast::{Expr, Ranged, Stmt};
-
-use ruff_python_ast::{helpers::ReturnStatementVisitor, statement_visitor::StatementVisitor};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{helpers::ReturnStatementVisitor, statement_visitor::StatementVisitor};
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Returns Err when __str__ method returns something which is not a string
+/// Checks for `__str__` implementations that return a type other than `str`.
 ///
 /// ## Why is this bad?
-/// __str__ method should only return str type
-///
-///
+/// The `__str__` method should return a `str` object. Returning a different
+/// type may cause unexpected behavior.
 #[violation]
 pub struct InvalidStrReturnType;
 
 impl Violation for InvalidStrReturnType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("__str__ does not return str")
+        format!("`__str__` does not return `str`")
     }
-}
-
-// checks for str return type
-fn is_str_returning(body: &[Stmt]) -> Option<Diagnostic> {
-    let mut visitor = ReturnStatementVisitor::default();
-    visitor.visit_body(body);
-    for expr in visitor.returns.into_iter().flatten() {
-        if matches!(
-            expr,
-            Expr::Constant(ref constant) if constant.value.is_bool() || constant.value.is_int() || constant.value.is_tuple() || constant.value.is_float()
-        ) {
-            return Some(Diagnostic::new(InvalidStrReturnType, expr.range()));
-        }
-    }
-    None
 }
 
 /// E0307
@@ -44,7 +27,49 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, name: &str, body: &[Stmt
     if name != "__str__" {
         return;
     }
-    if let Some(non_str_return_type) = is_str_returning(body) {
-        checker.diagnostics.push(non_str_return_type);
+
+    if !checker.semantic_model().scope().kind.is_class() {
+        return;
+    }
+
+    let returns = {
+        let mut visitor = ReturnStatementVisitor::default();
+        visitor.visit_body(body);
+        visitor.returns
+    };
+
+    for stmt in returns {
+        // Disallow implicit `None`.
+        let Some(value) = stmt.value.as_deref() else {
+            checker.diagnostics.push(Diagnostic::new(InvalidStrReturnType, stmt.range()));
+            continue;
+        };
+
+        // Disallow other constants.
+        if matches!(
+            value,
+            Expr::List(_)
+                | Expr::Dict(_)
+                | Expr::Set(_)
+                | Expr::ListComp(_)
+                | Expr::DictComp(_)
+                | Expr::SetComp(_)
+                | Expr::GeneratorExp(_)
+                | Expr::Constant(ast::ExprConstant {
+                    value: Constant::None
+                        | Constant::Bool(_)
+                        | Constant::Bytes(_)
+                        | Constant::Int(_)
+                        | Constant::Tuple(_)
+                        | Constant::Float(_)
+                        | Constant::Complex { .. }
+                        | Constant::Ellipsis,
+                    ..
+                })
+        ) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(InvalidStrReturnType, value.range()));
+        }
     }
 }

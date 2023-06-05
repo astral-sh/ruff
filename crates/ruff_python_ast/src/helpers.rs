@@ -907,7 +907,7 @@ pub fn resolve_imported_module_path<'a>(
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
-    pub returns: Vec<Option<&'a Expr>>,
+    pub returns: Vec<&'a ast::StmtReturn>,
 }
 
 impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
@@ -919,10 +919,7 @@ where
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 // Don't recurse.
             }
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _range,
-            }) => self.returns.push(value.as_deref()),
+            Stmt::Return(stmt) => self.returns.push(stmt),
             _ => walk_stmt(self, stmt),
         }
     }
