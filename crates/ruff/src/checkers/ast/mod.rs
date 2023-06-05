@@ -3060,7 +3060,7 @@ where
             }
             Expr::Set(ast::ExprSet { elts, range: _ }) => {
                 if self.enabled(Rule::DuplicateValue) {
-                    pylint::rules::duplicate_value(self, elts);
+                    flake8_bugbear::rules::duplicate_value(self, elts);
                 }
             }
             Expr::Yield(_) => {

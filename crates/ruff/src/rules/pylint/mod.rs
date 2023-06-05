@@ -54,7 +54,6 @@ mod tests {
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
     #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
-    #[test_case(Rule::DuplicateValue, Path::new("duplicate_value.py"))]
     #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
     #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"))]
     #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]
