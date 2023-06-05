@@ -11,7 +11,7 @@ pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
     /// empty lines between any two nodes. Separates any two nodes by at least a hard line break.
     ///
     /// * [`NodeLevel::Module`]: Up to two empty lines
-    /// * [`NodeLevel::Statement`]: Up to one empty line
+    /// * [`NodeLevel::CompoundStatement`]: Up to one empty line
     /// * [`NodeLevel::Parenthesized`]: No empty lines
     fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf>;
 }
@@ -53,10 +53,12 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
                 2 => empty_line().fmt(f),
                 _ => write!(f, [empty_line(), empty_line()]),
             },
-            NodeLevel::Statement => match lines_before(f.context().contents(), node.start()) {
-                0 | 1 => hard_line_break().fmt(f),
-                _ => empty_line().fmt(f),
-            },
+            NodeLevel::CompoundStatement => {
+                match lines_before(f.context().contents(), node.start()) {
+                    0 | 1 => hard_line_break().fmt(f),
+                    _ => empty_line().fmt(f),
+                }
+            }
             NodeLevel::Parenthesized => hard_line_break().fmt(f),
         });
 
@@ -180,7 +182,7 @@ no_leading_newline = 30"#
     // Should keep at most one empty level
     #[test]
     fn ranged_builder_statement_level() {
-        let printed = format_ranged(NodeLevel::Statement);
+        let printed = format_ranged(NodeLevel::CompoundStatement);
 
         assert_eq!(
             &printed,

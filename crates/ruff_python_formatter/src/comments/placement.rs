@@ -5,7 +5,7 @@ use crate::trivia::find_first_non_trivia_character_in_range;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 use std::cmp::Ordering;
 
@@ -20,6 +20,7 @@ pub(super) fn place_comment<'a>(
         .or_else(|comment| handle_in_between_bodies_end_of_line_comment(comment, locator))
         .or_else(|comment| handle_trailing_body_comment(comment, locator))
         .or_else(handle_trailing_end_of_line_body_comment)
+        .or_else(|comment| handle_trailing_end_of_line_condition_comment(comment, locator))
         .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
         .or_else(|comment| {
             handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
@@ -469,6 +470,91 @@ fn handle_trailing_end_of_line_body_comment(comment: DecoratedComment<'_>) -> Co
         //  ```
         CommentPlacement::Default(comment)
     }
+}
+
+/// Handles end of line comments after the `:` of a condition
+///
+/// ```python
+/// while True: # comment
+///     pass
+/// ```
+///
+/// It attaches the comment as dangling comment to the enclosing `while` statement.
+fn handle_trailing_end_of_line_condition_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    use ruff_python_ast::prelude::*;
+
+    // Must be an end of line comment
+    if comment.text_position().is_own_line() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Must be between the condition expression and the first body element
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+        return CommentPlacement::Default(comment);
+    };
+
+    let expression_before_colon = match comment.enclosing_node() {
+        AnyNodeRef::StmtIf(StmtIf { test: expr, .. })
+        | AnyNodeRef::StmtWhile(StmtWhile { test: expr, .. })
+        | AnyNodeRef::StmtFor(StmtFor { iter: expr, .. })
+        | AnyNodeRef::StmtAsyncFor(StmtAsyncFor { iter: expr, .. }) => {
+            Some(AnyNodeRef::from(expr.as_ref()))
+        }
+
+        AnyNodeRef::StmtWith(StmtWith { items, .. })
+        | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { items, .. }) => {
+            items.last().map(AnyNodeRef::from)
+        }
+        _ => None,
+    };
+
+    let Some(last_before_colon) = expression_before_colon else {
+        return CommentPlacement::Default(comment);
+    };
+
+    // If the preceding is the node before the `colon`
+    // `while true:` The node before the `colon` is the `true` constant.
+    if preceding.ptr_eq(last_before_colon) {
+        let mut start = preceding.end();
+        while let Some((offset, c)) = find_first_non_trivia_character_in_range(
+            locator.contents(),
+            TextRange::new(start, following.start()),
+        ) {
+            match c {
+                ':' => {
+                    if comment.slice().start() > offset {
+                        // Comment comes after the colon
+                        // ```python
+                        // while a: # comment
+                        //      ...
+                        // ```
+                        return CommentPlacement::dangling(comment.enclosing_node(), comment);
+                    }
+
+                    // Comment comes before the colon
+                    // ```python
+                    // while (
+                    //  a # comment
+                    // ):
+                    //      ...
+                    // ```
+                    break;
+                }
+                ')' => {
+                    // Skip over any closing parentheses
+                    start = offset + ')'.text_len();
+                }
+                _ => {
+                    unreachable!("Only ')' or ':' should follow the condition")
+                }
+            }
+        }
+    }
+
+    CommentPlacement::Default(comment)
 }
 
 /// Attaches comments for the positional-only arguments separator `/` as trailing comments to the
