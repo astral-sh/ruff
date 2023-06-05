@@ -143,7 +143,7 @@ fn test_contents(
                         r#"Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
 {syntax_errors}
 Last generated fixes:
-{fixes}https://discord.gg/c9MhzV8aU5
+{fixes}
 Source with applied fixes:
 {fixed_contents}"#
                     );
