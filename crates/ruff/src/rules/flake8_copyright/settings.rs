@@ -1,4 +1,4 @@
-// //! Settings for the `flake8-copyright` plugin.
+//! Settings for the `flake8-copyright` plugin.
 
 use serde::{Deserialize, Serialize};
 

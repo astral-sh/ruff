@@ -738,7 +738,7 @@ pub enum Linter {
     #[prefix = "COM"]
     Flake8Commas,
     /// [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
-    #[prefix = "C80"]
+    #[prefix = "CPY80"]
     Flake8Copyright,
     /// [flake8-copyright](https://pypi.org/project/flake8-copyright/)
     #[prefix = "C4"]

@@ -1,10 +1,11 @@
+use once_cell::unsync::Lazy;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
 use crate::settings::Settings;
 
-use lazy_regex::Regex;
+use regex::Regex;
 
 // Three states are possible:
 // 1. Found copyright header
@@ -30,7 +31,7 @@ impl Violation for HeaderLacksCopyright {
 /// Checks for Copyright Header to exist within at the top of a file within `copyright_min_file_size chars`
 /// format Copyright (C) <year> <author>
 ///
-/// Error code C801
+/// Error code CPY801
 pub(crate) fn copyright_header_absent(
     line: &Line,
     settings: &Settings,
@@ -42,10 +43,10 @@ pub(crate) fn copyright_header_absent(
     );
 
     // use default string if we panic
-    let regex = match Regex::new(copyright_regexp.trim()) {
-        Ok(regex) => regex,
-        Err(_) => Regex::new("(?i)Copyright \\(C\\) \\d{4}").unwrap(),
-    };
+    let regex = Lazy::new(|| {
+        Regex::new(copyright_regexp.trim())
+            .unwrap_or_else(|_| Regex::new("(?i)Copyright \\(C\\) \\d{4}").unwrap())
+    });
 
     // flake8 copyright uses maximum allowed chars to be 1024 before copyright
     let copyright_file_size: u32 = match settings.flake8_copyright.copyright_min_file_size {

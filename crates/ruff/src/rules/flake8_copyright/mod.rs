@@ -16,7 +16,7 @@ mod tests {
     #[test]
     fn test_default_fail() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("flake8_copyright/C801_default_fail.py"),
+            Path::new("flake8_copyright/CPY801_default_fail.py"),
             &settings::Settings::for_rules(vec![Rule::HeaderLacksCopyright]),
         )?;
         assert_messages!("test_default_fail", diagnostics);
@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn test_default_pass() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("flake8_copyright/C801.py"),
+            Path::new("flake8_copyright/CPY801.py"),
             &settings::Settings::for_rules(vec![Rule::HeaderLacksCopyright]),
         )?;
         assert!(diagnostics.is_empty());
@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn test_custom_regex_fail() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("flake8_copyright/C801_custom_author_fail.py"),
+            Path::new("flake8_copyright/CPY801_custom_author_fail.py"),
             &settings::Settings {
                 flake8_copyright: super::settings::Settings {
                     copyright_author: "ruff".to_string(),
@@ -53,7 +53,7 @@ mod tests {
     #[test]
     fn test_custom_regex_pass() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("flake8_copyright/C801_custom_regexp_pass.py"),
+            Path::new("flake8_copyright/CPY801_custom_regexp_pass.py"),
             &settings::Settings {
                 flake8_copyright: super::settings::Settings {
                     copyright_author: "ruff".to_string(),
