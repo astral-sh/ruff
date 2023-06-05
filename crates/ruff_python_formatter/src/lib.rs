@@ -250,11 +250,15 @@ NOT_YET_IMPLEMENTED_StmtIf
 
         let formatted_code = printed.as_code();
 
-        let reformatted = format_module(formatted_code).unwrap_or_else(|err| {
-            panic!(
-                "Formatted code resulted introduced a syntax error {err:#?}. Code:\n{formatted_code}"
-            )
-        });
+        let reformatted = match format_module(formatted_code) {
+            Ok(reformatted) => reformatted,
+            Err(err) => {
+                panic!(
+                    "Expected formatted code to be valid syntax: {err}:\
+                    \n---\n{formatted_code}---\n",
+                );
+            }
+        };
 
         if reformatted.as_code() != formatted_code {
             let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
@@ -263,13 +267,16 @@ NOT_YET_IMPLEMENTED_StmtIf
                 .to_string();
             panic!(
                 r#"Reformatting the formatted code a second time resulted in formatting changes.
-{diff}
+---
+{diff}---
 
 Formatted once:
-{formatted_code}
+---
+{formatted_code}---
 
 Formatted twice:
-{}"#,
+---
+{}---"#,
                 reformatted.as_code()
             );
         }
