@@ -100,8 +100,8 @@ impl Violation for UnusedImport {
     }
 }
 
-type SpannedName<'a> = (&'a str, &'a TextRange);
-type BindingContext<'a> = (NodeId, Option<NodeId>, Exceptions);
+type SpannedName<'a> = (&'a str, TextRange);
+type BindingContext = (NodeId, Option<NodeId>, Exceptions);
 
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
@@ -139,12 +139,12 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             ignored
                 .entry((stmt_id, parent_id, exceptions))
                 .or_default()
-                .push((qualified_name, &binding.range));
+                .push((qualified_name, binding.range));
         } else {
             unused
                 .entry((stmt_id, parent_id, exceptions))
                 .or_default()
-                .push((qualified_name, &binding.range));
+                .push((qualified_name, binding.range));
         }
     }
 
@@ -192,7 +192,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     },
                     multiple,
                 },
-                *range,
+                range,
             );
             if stmt.is_import_from_stmt() {
                 diagnostic.set_parent(stmt.start());
@@ -232,7 +232,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     },
                     multiple,
                 },
-                *range,
+                range,
             );
             if stmt.is_import_from_stmt() {
                 diagnostic.set_parent(stmt.start());
