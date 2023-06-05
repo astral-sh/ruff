@@ -11,6 +11,6 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 fi
 cp -r "../../../crates/ruff/resources/test" .
 cd -
-cargo fuzz cmin -s none ruff_parse_simple
+cargo fuzz cmin -s none ruff_fix_validity
 
 echo "Done! You are ready to fuzz."
