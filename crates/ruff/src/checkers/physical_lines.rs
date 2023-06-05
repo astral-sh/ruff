@@ -1,18 +1,14 @@
 //! Lint rules based on checking physical lines.
 
 use ruff_text_size::TextSize;
-use std::convert::TryFrom;
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_text_size::TextRange;
 
 use crate::registry::Rule;
-use crate::rules::flake8_copyright::rules::{
-    copyright_header_absent, CopyrightHeaderKind, HeaderLacksCopyright,
-};
+use crate::rules::flake8_copyright::rules::copyright_header_absent;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
@@ -55,9 +51,6 @@ pub(crate) fn check_physical_lines(
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
     let enforce_copyright_header = settings.rules.enabled(Rule::HeaderLacksCopyright);
-
-    let mut checked_copyright_header_absent = false;
-    let mut chars_before_copyright_header: u32 = 0;
 
     let fix_unnecessary_coding_comment = settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace = settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
@@ -163,27 +156,6 @@ pub(crate) fn check_physical_lines(
                 diagnostics.push(diagnostic);
             }
         }
-        if enforce_copyright_header && !checked_copyright_header_absent {
-            let missing_copyright_header =
-                copyright_header_absent(&line, settings, chars_before_copyright_header);
-
-            match missing_copyright_header {
-                CopyrightHeaderKind::Present => checked_copyright_header_absent = true,
-                CopyrightHeaderKind::Missing => {
-                    let diagnostic = Diagnostic::new(
-                        HeaderLacksCopyright,
-                        TextRange::new(line.start(), line.end()),
-                    );
-                    diagnostics.push(diagnostic);
-                    checked_copyright_header_absent = true;
-                }
-                CopyrightHeaderKind::NotFoundInRange => (),
-            }
-
-            // this will only panic if chars count exceeds i32 max.
-            // Based on flake8-copyright max allowed chars before header is 1024
-            chars_before_copyright_header += u32::try_from(line.chars().count()).unwrap_or(1024);
-        }
     }
 
     if enforce_no_newline_at_end_of_file {
@@ -198,6 +170,12 @@ pub(crate) fn check_physical_lines(
 
     if enforce_shebang_missing && !has_any_shebang {
         if let Some(diagnostic) = shebang_missing(path) {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    if enforce_copyright_header {
+        if let Some(diagnostic) = copyright_header_absent(locator, settings) {
             diagnostics.push(diagnostic);
         }
     }
