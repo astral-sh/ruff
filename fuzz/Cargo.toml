@@ -2,6 +2,7 @@
 name = "ruff-fuzz"
 version = "0.0.0"
 authors = [
+  "Charlie Marsh <charlie.r.marsh@gmail.com>",
   "Addison Crump <research@addisoncrump.info>",
 ]
 publish = false
