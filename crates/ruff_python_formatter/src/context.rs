@@ -77,7 +77,8 @@ pub(crate) enum NodeLevel {
     #[default]
     TopLevel,
 
-    /// Formatting nodes that are enclosed by a compound statement (`if`, `while`, `match`, etc.).
+    /// Formatting the body statements of a [compound statement](https://docs.python.org/3/reference/compound_stmts.html#compound-statements)
+    /// (`if`, `while`, `match`, etc.).
     CompoundStatement,
 
     /// Formatting nodes that are enclosed in a parenthesized expression.
