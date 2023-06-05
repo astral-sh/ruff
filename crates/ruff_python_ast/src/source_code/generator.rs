@@ -209,14 +209,13 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(decorator, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.p("@");
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("def ");
                     self.p_id(name);
                     self.p("(");
@@ -242,13 +241,13 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(decorator, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("async def ");
                     self.p_id(name);
                     self.p("(");
@@ -274,13 +273,13 @@ impl<'a> Generator<'a> {
                 range: _range,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(decorator, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("class ");
                     self.p_id(name);
                     let mut first = true;
@@ -1614,6 +1613,29 @@ except* Exception as e:
         );
         assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
         assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);
+        assert_round_trip!(
+            r#"def f():
+
+    def f():
+        pass"#
+        );
+        assert_round_trip!(
+            r#"@foo
+def f():
+
+    @foo
+    def f():
+        pass"#
+        );
+
+        assert_round_trip!(
+            r#"@foo
+class Foo:
+
+    @foo
+    def f():
+        pass"#
+        );
     }
 
     #[test]
