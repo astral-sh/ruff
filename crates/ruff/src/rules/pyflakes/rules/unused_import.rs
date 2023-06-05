@@ -165,7 +165,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         let fix = if !in_init && !in_except_handler && checker.patch(Rule::UnusedImport) {
             autofix::edits::remove_unused_imports(
-                unused_imports.iter().map(|(full_name, _)| *full_name),
+                unused_imports
+                    .iter()
+                    .map(|(qualified_name, _)| *qualified_name),
                 stmt,
                 parent,
                 checker.locator,
@@ -177,10 +179,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             None
         };
 
-        for (full_name, range) in unused_imports {
+        for (qualified_name, range) in unused_imports {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: full_name.to_string(),
+                    name: qualified_name.to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -217,10 +219,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let multiple = unused_imports.len() > 1;
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
-        for (full_name, range) in unused_imports {
+        for (qualified_name, range) in unused_imports {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: full_name.to_string(),
+                    name: qualified_name.to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {

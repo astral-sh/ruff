@@ -57,11 +57,11 @@ pub(crate) fn remove_imports<'a>(
                 // entire statement.
                 let mut found_star = false;
                 for import in imports {
-                    let full_name = match import_body.module.as_ref() {
+                    let qualified_name = match import_body.module.as_ref() {
                         Some(module_name) => format!("{}.*", compose_module_path(module_name)),
                         None => "*".to_string(),
                     };
-                    if import == full_name {
+                    if import == qualified_name {
                         found_star = true;
                     } else {
                         bail!("Expected \"*\" for unused import (got: \"{}\")", import);
@@ -83,26 +83,26 @@ pub(crate) fn remove_imports<'a>(
 
     for import in imports {
         let alias_index = aliases.iter().position(|alias| {
-            let full_name = match import_module {
+            let qualified_name = match import_module {
                 Some((relative, module)) => {
                     let module = module.map(compose_module_path);
                     let member = compose_module_path(&alias.name);
-                    let mut full_name = String::with_capacity(
+                    let mut qualified_name = String::with_capacity(
                         relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
                     );
                     for _ in 0..relative.len() {
-                        full_name.push('.');
+                        qualified_name.push('.');
                     }
                     if let Some(module) = module {
-                        full_name.push_str(&module);
-                        full_name.push('.');
+                        qualified_name.push_str(&module);
+                        qualified_name.push('.');
                     }
-                    full_name.push_str(&member);
-                    full_name
+                    qualified_name.push_str(&member);
+                    qualified_name
                 }
                 None => compose_module_path(&alias.name),
             };
-            full_name == import
+            qualified_name == import
         });
 
         if let Some(index) = alias_index {
@@ -170,26 +170,26 @@ pub(crate) fn retain_imports(
 
     aliases.retain(|alias| {
         imports.iter().any(|import| {
-            let full_name = match import_module {
+            let qualified_name = match import_module {
                 Some((relative, module)) => {
                     let module = module.map(compose_module_path);
                     let member = compose_module_path(&alias.name);
-                    let mut full_name = String::with_capacity(
+                    let mut qualified_name = String::with_capacity(
                         relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
                     );
                     for _ in 0..relative.len() {
-                        full_name.push('.');
+                        qualified_name.push('.');
                     }
                     if let Some(module) = module {
-                        full_name.push_str(&module);
-                        full_name.push('.');
+                        qualified_name.push_str(&module);
+                        qualified_name.push('.');
                     }
-                    full_name.push_str(&member);
-                    full_name
+                    qualified_name.push_str(&member);
+                    qualified_name
                 }
                 None => compose_module_path(&alias.name),
             };
-            full_name == *import
+            qualified_name == *import
         })
     });
 
