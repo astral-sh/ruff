@@ -1,8 +1,9 @@
 use rustpython_parser::ast;
 use rustpython_parser::ast::{Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
 use crate::autofix::edits::delete_stmt;
@@ -13,7 +14,9 @@ use crate::registry::AsRule;
 /// Checks for redundant definitions of `__str__` or `__repr__` in stubs.
 ///
 /// ## Why is this bad?
-/// These definitions are redundant with `object.__str__` or `object.__repr__`.
+/// Defining `__str__` or `__repr__` in a stub is almost always redundant,
+/// as the signatures are almost always identical to those of the default
+/// equivalent, `object.__str__` and `object.__repr__`, respectively.
 ///
 /// ## Example
 /// ```python
@@ -42,12 +45,12 @@ impl AlwaysAutofixableViolation for StrOrReprDefinedInStub {
 /// PYI029
 pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
     let Stmt::FunctionDef(ast::StmtFunctionDef {
-                              name,
-                              decorator_list,
-                              returns,
-                              args,
-                              ..
-                          }) = stmt else {
+        name,
+        decorator_list,
+        returns,
+        args,
+        ..
+    }) = stmt else {
         return
     };
 
@@ -87,28 +90,21 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         StrOrReprDefinedInStub {
             name: name.to_string(),
         },
-        stmt.range(),
+        identifier_range(stmt, checker.locator),
     );
-
     if checker.patch(diagnostic.kind.rule()) {
-        let mut edit = delete_stmt(
+        let stmt = checker.semantic_model().stmt();
+        let parent = checker.semantic_model().stmt_parent();
+        let edit = delete_stmt(
             stmt,
-            checker.semantic_model().stmt_parent(),
+            parent,
             checker.locator,
             checker.indexer,
             checker.stylist,
         );
-
-        // If we removed the last statement, replace it with `...` instead of `pass` since we're
-        // editing a stub.
-        if edit.content() == Some("pass") {
-            edit = Edit::range_replacement("...".to_string(), edit.range());
-        }
-
         diagnostic.set_fix(
             Fix::automatic(edit).isolate(checker.isolation(checker.semantic_model().stmt_parent())),
         );
     }
-
     checker.diagnostics.push(diagnostic);
 }
