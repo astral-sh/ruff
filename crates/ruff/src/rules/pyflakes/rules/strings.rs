@@ -809,7 +809,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         StringDotFormatExtraPositionalArguments {
             missing: missing
                 .iter()
-                .map(std::string::ToString::to_string)
+                .map(ToString::to_string)
                 .collect::<Vec<String>>(),
         },
         location,
