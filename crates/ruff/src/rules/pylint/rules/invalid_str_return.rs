@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
+use rustpython_parser::ast::{Ranged, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{helpers::ReturnStatementVisitor, statement_visitor::StatementVisitor};
+use ruff_python_semantic::analyze::type_inference::PythonType;
 
 use crate::checkers::ast::Checker;
 
@@ -39,37 +40,21 @@ pub(crate) fn invalid_str_return(checker: &mut Checker, name: &str, body: &[Stmt
     };
 
     for stmt in returns {
-        // Disallow implicit `None`.
-        let Some(value) = stmt.value.as_deref() else {
-            checker.diagnostics.push(Diagnostic::new(InvalidStrReturnType, stmt.range()));
-            continue;
-        };
-
-        // Disallow other constants.
-        if matches!(
-            value,
-            Expr::List(_)
-                | Expr::Dict(_)
-                | Expr::Set(_)
-                | Expr::ListComp(_)
-                | Expr::DictComp(_)
-                | Expr::SetComp(_)
-                | Expr::GeneratorExp(_)
-                | Expr::Constant(ast::ExprConstant {
-                    value: Constant::None
-                        | Constant::Bool(_)
-                        | Constant::Bytes(_)
-                        | Constant::Int(_)
-                        | Constant::Tuple(_)
-                        | Constant::Float(_)
-                        | Constant::Complex { .. }
-                        | Constant::Ellipsis,
-                    ..
-                })
-        ) {
+        if let Some(value) = stmt.value.as_deref() {
+            // Disallow other, non-
+            if !matches!(
+                PythonType::from(value),
+                PythonType::String | PythonType::Unknown
+            ) {
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(InvalidStrReturnType, value.range()));
+            }
+        } else {
+            // Disallow implicit `None`.
             checker
                 .diagnostics
-                .push(Diagnostic::new(InvalidStrReturnType, value.range()));
+                .push(Diagnostic::new(InvalidStrReturnType, stmt.range()));
         }
     }
 }
