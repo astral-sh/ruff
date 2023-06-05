@@ -19,7 +19,7 @@ without it (very unlikely for the fuzzer to generate valid python code from "thi
 Once you have initialised the fuzzers, you can then execute any fuzzer with:
 
 ```bash
-cargo fuzz run -s none name_of_fuzzer
+cargo fuzz run -s none name_of_fuzzer -- -timeout=1
 ```
 
 You can view the names of the available fuzzers with `cargo fuzz list`.

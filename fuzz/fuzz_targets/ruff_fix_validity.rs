@@ -5,15 +5,16 @@
 
 use libfuzzer_sys::{fuzz_target, Corpus};
 use ruff::settings::Settings;
+use std::sync::OnceLock;
 
-static mut SETTINGS: Option<Settings> = None;
+static SETTINGS: OnceLock<Settings> = OnceLock::new();
 
 fn do_fuzz(case: &[u8]) -> Corpus {
     // throw away inputs which aren't utf-8
     let Ok(code) = std::str::from_utf8(case) else { return Corpus::Reject; };
 
     // the settings are immutable to test_snippet, so we avoid re-initialising here
-    let settings = unsafe { SETTINGS.get_or_insert_with(Settings::default) };
+    let settings = SETTINGS.get_or_init(Settings::default);
 
     // unlike in the test framework, where the number of iterations is well-defined, we are only
     // looking for situations where a fix is bad; thus, we set the iterations to "infinite"
