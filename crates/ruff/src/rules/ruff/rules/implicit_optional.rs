@@ -74,7 +74,9 @@ impl AlwaysAutofixableViolation for ImplicitOptional {
 
 #[derive(Debug, PartialEq, Eq)]
 enum ConversionType {
+    /// Conversion using the `|` operator e.g., `str | None`
     BinOpOr,
+    /// Conversion using the `typing.Optional` type e.g., `typing.Optional[str]`
     Optional,
 }
 
@@ -87,8 +89,8 @@ impl fmt::Display for ConversionType {
     }
 }
 
-impl ConversionType {
-    fn from_target_version(target_version: PythonVersion) -> Self {
+impl From<PythonVersion> for ConversionType {
+    fn from(target_version: PythonVersion) -> Self {
         if target_version >= PythonVersion::Py310 {
             Self::BinOpOr
         } else {
@@ -240,51 +242,50 @@ fn type_hint_explicitly_allows_none<'a>(
     }
 }
 
-/// Generate a [`Fix`] for the given [`Expr`] as per the current target version.
-///
-/// If the target version is 3.10 or higher, the pipe operator is used to
-/// indicate that `None` is allowed. Otherwise, the `typing.Optional` type
-/// is used.
-fn generate_fix(checker: &Checker, expr: &Expr) -> Result<Fix> {
-    if checker.settings.target_version >= PythonVersion::Py310 {
-        let new_expr = Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(expr.clone()),
-            op: Operator::BitOr,
-            right: Box::new(Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                kind: None,
+/// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
+fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
+    match conversion_type {
+        ConversionType::BinOpOr => {
+            let new_expr = Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(expr.clone()),
+                op: Operator::BitOr,
+                right: Box::new(Expr::Constant(ast::ExprConstant {
+                    value: Constant::None,
+                    kind: None,
+                    range: TextRange::default(),
+                })),
                 range: TextRange::default(),
-            })),
-            range: TextRange::default(),
-        });
-        let content = checker.generator().expr(&new_expr);
-        #[allow(deprecated)]
-        Ok(Fix::unspecified(Edit::range_replacement(
-            content,
-            expr.range(),
-        )))
-    } else {
-        let (import_edit, binding) = checker.importer.get_or_import_symbol(
-            &ImportRequest::import_from("typing", "Optional"),
-            expr.start(),
-            checker.semantic_model(),
-        )?;
-        let new_expr = Expr::Subscript(ast::ExprSubscript {
-            range: TextRange::default(),
-            value: Box::new(Expr::Name(ast::ExprName {
-                id: binding.into(),
-                ctx: ast::ExprContext::Store,
+            });
+            let content = checker.generator().expr(&new_expr);
+            #[allow(deprecated)]
+            Ok(Fix::unspecified(Edit::range_replacement(
+                content,
+                expr.range(),
+            )))
+        }
+        ConversionType::Optional => {
+            let (import_edit, binding) = checker.importer.get_or_import_symbol(
+                &ImportRequest::import_from("typing", "Optional"),
+                expr.start(),
+                checker.semantic_model(),
+            )?;
+            let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
-            })),
-            slice: Box::new(expr.clone()),
-            ctx: ast::ExprContext::Load,
-        });
-        let content = checker.generator().expr(&new_expr);
-        #[allow(deprecated)]
-        Ok(Fix::unspecified_edits(
-            Edit::range_replacement(content, expr.range()),
-            [import_edit],
-        ))
+                value: Box::new(Expr::Name(ast::ExprName {
+                    id: binding.into(),
+                    ctx: ast::ExprContext::Store,
+                    range: TextRange::default(),
+                })),
+                slice: Box::new(expr.clone()),
+                ctx: ast::ExprContext::Load,
+            });
+            let content = checker.generator().expr(&new_expr);
+            #[allow(deprecated)]
+            Ok(Fix::unspecified_edits(
+                Edit::range_replacement(content, expr.range()),
+                [import_edit],
+            ))
+        }
     }
 }
 
@@ -319,16 +320,10 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         let Some(expr) = type_hint_explicitly_allows_none(checker.semantic_model(), annotation) else {
             continue;
         };
-        let mut diagnostic = Diagnostic::new(
-            ImplicitOptional {
-                conversion_type: ConversionType::from_target_version(
-                    checker.settings.target_version,
-                ),
-            },
-            expr.range(),
-        );
+        let conversion_type = checker.settings.target_version.into();
+        let mut diagnostic = Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| generate_fix(checker, expr));
+            diagnostic.try_set_fix(|| generate_fix(&checker, conversion_type, expr));
         }
         checker.diagnostics.push(diagnostic);
     }
