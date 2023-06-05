@@ -28,26 +28,26 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 -    sdfsdjfklsdfjlksdljkf,
 -    sdsfsdfjskdflsfsdf,
 -) = (1, 2, 3)
-+NOT_YET_IMPLEMENTED_StmtAssign
++(1, 2) = (1, 2)
  
  # This is as well.
 -(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
-+NOT_YET_IMPLEMENTED_StmtAssign
++(1, 2) = NOT_IMPLEMENTED_call()
  
 -(a,) = call()
-+NOT_YET_IMPLEMENTED_StmtAssign
++(1, 2) = NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
 # This is a standalone comment.
-NOT_YET_IMPLEMENTED_StmtAssign
+(1, 2) = (1, 2)
 
 # This is as well.
-NOT_YET_IMPLEMENTED_StmtAssign
+(1, 2) = NOT_IMPLEMENTED_call()
 
-NOT_YET_IMPLEMENTED_StmtAssign
+(1, 2) = NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

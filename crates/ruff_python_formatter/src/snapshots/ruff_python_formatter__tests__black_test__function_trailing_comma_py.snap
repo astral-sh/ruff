@@ -185,7 +185,7 @@ some_module.some_function(
 -some_module.some_function(
 -    argument1, (one_element_tuple,), argument4, argument5, argument6
 -)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
  
  # Inner trailing comma causes outer to explode
 -some_module.some_function(
@@ -198,7 +198,7 @@ some_module.some_function(
 -    argument5,
 -    argument6,
 -)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
@@ -231,10 +231,10 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Make sure inner one-element tuple won't explode
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 
 # Inner trailing comma causes outer to explode
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

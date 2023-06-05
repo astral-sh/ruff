@@ -22,32 +22,32 @@ f = ["This is a very long line that should be formatted into a clearer line ", "
 +++ Ruff
 @@ -1,10 +1,7 @@
 -a = 3
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = 0x42
  # fmt: off
 -b,    c = 1, 2
 -d =    6  # fmt: skip
 -e = 5
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-+NOT_YET_IMPLEMENTED_StmtAssign
++(1, 2) = (1, 2)
++d = 0x42  # fmt: skip
++e = 0x42
  # fmt: on
 -f = [
 -    "This is a very long line that should be formatted into a clearer line ",
 -    "by rearranging.",
 -]
-+NOT_YET_IMPLEMENTED_StmtAssign
++f = [0x42, 0x42]
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
+a = 0x42
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-NOT_YET_IMPLEMENTED_StmtAssign
+(1, 2) = (1, 2)
+d = 0x42  # fmt: skip
+e = 0x42
 # fmt: on
-NOT_YET_IMPLEMENTED_StmtAssign
+f = [0x42, 0x42]
 ```
 
 ## Black Output

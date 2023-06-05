@@ -40,14 +40,14 @@ xxxxxxxxx_yyy_zzzzzzzz[xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxx
 -    arg1,
 -    arg2,
 -)
-+NOT_YET_IMPLEMENTED_StmtAssign
++(1, 2) = NOT_IMPLEMENTED_call()
  
  # Make when when the left side of assignment plus the opening paren "... = (" is
  # exactly line length limit + 1, it won't be split like that.
 -xxxxxxxxx_yyy_zzzzzzzz[
 -    xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxxx=1)
 -] = 1
-+NOT_YET_IMPLEMENTED_StmtAssign
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key] = 0x42
 ```
 
 ## Ruff Output
@@ -57,11 +57,11 @@ xxxxxxxxx_yyy_zzzzzzzz[xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxx
 
 # Left hand side fits in a single line but will still be exploded by the
 # magic trailing comma.
-NOT_YET_IMPLEMENTED_StmtAssign
+(1, 2) = NOT_IMPLEMENTED_call()
 
 # Make when when the left side of assignment plus the opening paren "... = (" is
 # exactly line length limit + 1, it won't be split like that.
-NOT_YET_IMPLEMENTED_StmtAssign
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key] = 0x42
 ```
 
 ## Black Output

@@ -308,7 +308,7 @@ d={'a':1,
 -    a , b = *hello
 -    'unformatted'
 -    # fmt: on
-+NOT_YET_IMPLEMENTED_StmtAssign
++something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
  
 -def yield_expr():
@@ -446,7 +446,7 @@ d={'a':1,
 -    # fmt: on
 -    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 -)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
  # fmt: off
 -yield  'hello'
 +NOT_YET_IMPLEMENTED_ExprYield
@@ -454,8 +454,8 @@ d={'a':1,
 -l=[1,2,3]
 -d={'a':1,
 -   'b':2}
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++l = [0x42, 0x42, 0x42]
++d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 ```
 
 ## Ruff Output
@@ -498,7 +498,7 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
 NOT_YET_IMPLEMENTED_StmtFunctionDef
@@ -528,12 +528,12 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 # fmt: off
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+l = [0x42, 0x42, 0x42]
+d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 ```
 
 ## Black Output

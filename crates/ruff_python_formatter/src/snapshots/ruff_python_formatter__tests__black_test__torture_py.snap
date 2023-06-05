@@ -42,15 +42,14 @@ assert (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,58 +1,20 @@
+@@ -1,58 +1,17 @@
  importA
- (
+-(
 -    ()
 -    << 0
 -    ** 101234234242352525425252352352525234890264906820496920680926538059059209922523523525
-+    NOT_YET_IMPLEMENTED_ExprTuple
-+    << NOT_YET_IMPLEMENTED_ExprConstant**NOT_YET_IMPLEMENTED_ExprConstant
- )  #
+-)  #
++(1, 2) << 0x42**0x42  #
  
 -assert sort_by_dependency(
 -    {
@@ -68,8 +67,8 @@ assert (
  importA
 -0
 -0 ^ 0  #
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant ^ NOT_YET_IMPLEMENTED_ExprConstant  #
++0x42
++0x42 ^ 0x42  #
  
  
 -class A:
@@ -115,16 +114,13 @@ assert (
 
 ```py
 importA
-(
-    NOT_YET_IMPLEMENTED_ExprTuple
-    << NOT_YET_IMPLEMENTED_ExprConstant**NOT_YET_IMPLEMENTED_ExprConstant
-)  #
+(1, 2) << 0x42**0x42  #
 
 NOT_YET_IMPLEMENTED_StmtAssert
 
 importA
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant ^ NOT_YET_IMPLEMENTED_ExprConstant  #
+0x42
+0x42 ^ 0x42  #
 
 
 NOT_YET_IMPLEMENTED_StmtClassDef

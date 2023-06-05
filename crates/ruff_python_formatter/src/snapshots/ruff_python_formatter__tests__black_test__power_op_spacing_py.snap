@@ -110,25 +110,24 @@ return np.divide(
 -o = settings(max_examples=10**6)
 -p = {(k, k**2): v**2 for k, v in pairs}
 -q = [10**i for i in range(6)]
--r = x**y
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = 0x42**NOT_YET_IMPLEMENTED_ExprUnaryOp
++b = 0x42 ** NOT_IMPLEMENTED_call()
++c = NOT_YET_IMPLEMENTED_ExprUnaryOp
++d = 0x42 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++e = NOT_IMPLEMENTED_call()
++f = NOT_IMPLEMENTED_call() ** 0x42
++g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
++h = 0x42 ** NOT_IMPLEMENTED_call()
++i = NOT_IMPLEMENTED_call() ** 0x42
++j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 0x42
++k = [i for i in []]
++l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++m = [(1, 2)]
++n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++o = NOT_IMPLEMENTED_call()
++p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++q = [i for i in []]
+ r = x**y
  
 -a = 5.0**~4.0
 -b = 5.0 ** f()
@@ -147,23 +146,23 @@ return np.divide(
 -o = settings(max_examples=10**6.0)
 -p = {(k, k**2): v**2.0 for k, v in pairs}
 -q = [10.5**i for i in range(6)]
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = 0x42**NOT_YET_IMPLEMENTED_ExprUnaryOp
++b = 0x42 ** NOT_IMPLEMENTED_call()
++c = NOT_YET_IMPLEMENTED_ExprUnaryOp
++d = 0x42 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++e = NOT_IMPLEMENTED_call()
++f = NOT_IMPLEMENTED_call() ** 0x42
++g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
++h = 0x42 ** NOT_IMPLEMENTED_call()
++i = NOT_IMPLEMENTED_call() ** 0x42
++j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 0x42
++k = [i for i in []]
++l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++m = [(1, 2)]
++n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++o = NOT_IMPLEMENTED_call()
++p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++q = [i for i in []]
  
  
  # WE SHOULD DEFINITELY NOT EAT THESE COMMENTS (https://github.com/psf/black/issues/2873)
@@ -194,42 +193,42 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+a = 0x42**NOT_YET_IMPLEMENTED_ExprUnaryOp
+b = 0x42 ** NOT_IMPLEMENTED_call()
+c = NOT_YET_IMPLEMENTED_ExprUnaryOp
+d = 0x42 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+e = NOT_IMPLEMENTED_call()
+f = NOT_IMPLEMENTED_call() ** 0x42
+g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
+h = 0x42 ** NOT_IMPLEMENTED_call()
+i = NOT_IMPLEMENTED_call() ** 0x42
+j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 0x42
+k = [i for i in []]
+l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+m = [(1, 2)]
+n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+o = NOT_IMPLEMENTED_call()
+p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+q = [i for i in []]
+r = x**y
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+a = 0x42**NOT_YET_IMPLEMENTED_ExprUnaryOp
+b = 0x42 ** NOT_IMPLEMENTED_call()
+c = NOT_YET_IMPLEMENTED_ExprUnaryOp
+d = 0x42 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+e = NOT_IMPLEMENTED_call()
+f = NOT_IMPLEMENTED_call() ** 0x42
+g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
+h = 0x42 ** NOT_IMPLEMENTED_call()
+i = NOT_IMPLEMENTED_call() ** 0x42
+j = NOT_IMPLEMENTED_call().NOT_IMPLEMENTED_attr ** 0x42
+k = [i for i in []]
+l = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+m = [(1, 2)]
+n = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+o = NOT_IMPLEMENTED_call()
+p = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+q = [i for i in []]
 
 
 # WE SHOULD DEFINITELY NOT EAT THESE COMMENTS (https://github.com/psf/black/issues/2873)

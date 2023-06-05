@@ -1,7 +1,7 @@
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
+use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprConstant;
 
@@ -10,7 +10,7 @@ pub struct FormatExprConstant;
 
 impl FormatNodeRule<ExprConstant> for FormatExprConstant {
     fn fmt_fields(&self, item: &ExprConstant, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented(item)])
+        write!(f, [not_yet_implemented_custom_text(item, "0x42")])
     }
 }
 

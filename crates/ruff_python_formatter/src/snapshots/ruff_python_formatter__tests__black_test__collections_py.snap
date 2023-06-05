@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,99 +1,48 @@
+@@ -1,99 +1,40 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -134,21 +134,7 @@ if True:
 -    "cccccccccccccccccccccccccccccccccccccccc",
 -    (1, 2, 3),
 -    "dddddddddddddddddddddddddddddddddddddddd",
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_ExprDict
-+[
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant
-+    % NOT_YET_IMPLEMENTED_ExprTuple,
- ]
+-]
 -{
 -    "oneple": (1,),
 -}
@@ -162,8 +148,19 @@ if True:
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
 -    % bar
 -)
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = {0x42, 0x42, 0x42}
++b = {0x42, 0x42, 0x42}
++c = {0x42, 0x42, 0x42}
++x = (1, 2)
++y = (1, 2)
++nested = {(1, 2), (1, 2)}
++nested_no_trailing_comma = {(1, 2), (1, 2)}
++nested_long_lines = [0x42, 0x42, 0x42, (1, 2), 0x42]
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++[0x42, 0x42 % (1, 2)]
++x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +NOT_YET_IMPLEMENTED_StmtAssert
  
  # looping over a 1-tuple should also not get wrapped
@@ -174,19 +171,17 @@ if True:
 +NOT_YET_IMPLEMENTED_StmtFor
 +NOT_YET_IMPLEMENTED_StmtFor
  
- [
+-[
 -    1,
 -    2,
 -    3,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
- ]
+-]
++[0x42, 0x42, 0x42]
  
 -division_result_tuple = (6 / 2,)
 -print("foo %r", (foo.bar,))
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_ExprCall
++division_result_tuple = (1, 2)
++NOT_IMPLEMENTED_call()
  
 -if True:
 -    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
@@ -233,37 +228,29 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 # `as` works as well
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_ExprDict
-NOT_YET_IMPLEMENTED_ExprDict
-[
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant
-    % NOT_YET_IMPLEMENTED_ExprTuple,
-]
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+a = {0x42, 0x42, 0x42}
+b = {0x42, 0x42, 0x42}
+c = {0x42, 0x42, 0x42}
+x = (1, 2)
+y = (1, 2)
+nested = {(1, 2), (1, 2)}
+nested_no_trailing_comma = {(1, 2), (1, 2)}
+nested_long_lines = [0x42, 0x42, 0x42, (1, 2), 0x42]
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+[0x42, 0x42 % (1, 2)]
+x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 NOT_YET_IMPLEMENTED_StmtAssert
 
 # looping over a 1-tuple should also not get wrapped
 NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 
-[
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-]
+[0x42, 0x42, 0x42]
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_ExprCall
+division_result_tuple = (1, 2)
+NOT_IMPLEMENTED_call()
 
 NOT_YET_IMPLEMENTED_StmtIf
 

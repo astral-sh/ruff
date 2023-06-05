@@ -267,12 +267,12 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -1,352 +1,253 @@
+@@ -1,352 +1,247 @@
 -"some_string"
 -b"\\xa3"
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant
++0x42
++0x42
++0x42
  Name
 -None
 -True
@@ -320,39 +320,11 @@ last_call()
 -(str or None) if True else (str or bytes or None)
 -str or None if (1 if True else 2) else str or bytes or None
 -(str or None) if (1 if True else 2) else (str or bytes or None)
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+v1 << NOT_YET_IMPLEMENTED_ExprConstant
-+NOT_YET_IMPLEMENTED_ExprConstant >> v2
-+NOT_YET_IMPLEMENTED_ExprConstant % finished
- (
+-(
 -    (super_long_variable_name or None)
 -    if (1 if super_long_test_name else 2)
 -    else (str or bytes or None)
-+    NOT_YET_IMPLEMENTED_ExprConstant
-+    + v2
-+    - v3 * NOT_YET_IMPLEMENTED_ExprConstant
-+    ^ NOT_YET_IMPLEMENTED_ExprConstant
-+    **v6
-+    / NOT_YET_IMPLEMENTED_ExprConstant
-+    // NOT_YET_IMPLEMENTED_ExprConstant
- )
+-)
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
 -{**a, **b, **c}
@@ -360,89 +332,103 @@ last_call()
 -({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 -()
 -(1,)
--(1, 2)
++0x42
++0x42
++0x42
++0x42
++0x42
++0x42
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++v1 << 0x42
++0x42 >> v2
++0x42 % finished
++0x42 + v2 - v3 * 0x42 ^ 0x42**v6 / 0x42 // 0x42
++((0x42 + v2) - (v3 * 0x42)) ^ (((0x42**v6) / 0x42) // 0x42)
++NOT_YET_IMPLEMENTED_ExprUnaryOp
++NOT_YET_IMPLEMENTED_ExprUnaryOp
++NOT_YET_IMPLEMENTED_ExprUnaryOp
++NOT_YET_IMPLEMENTED_ExprUnaryOp
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_YET_IMPLEMENTED_ExprUnaryOp
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++lambda x: True
++lambda x: True
++lambda x: True
++lambda x: True
++lambda x: True
++manylambdas = lambda x: True
++foo = lambda x: True
++NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++(NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++{
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
++}
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++(1, 2)
++(1, 2)
++(1, 2)
+ (1, 2)
 -(1, 2, 3)
-+(
-+    ((NOT_YET_IMPLEMENTED_ExprConstant + v2) - (v3 * NOT_YET_IMPLEMENTED_ExprConstant))
-+    ^ (
-+        ((NOT_YET_IMPLEMENTED_ExprConstant**v6) / NOT_YET_IMPLEMENTED_ExprConstant)
-+        // NOT_YET_IMPLEMENTED_ExprConstant
-+    )
-+)
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprUnaryOp
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprLambda
-+NOT_YET_IMPLEMENTED_ExprLambda
-+NOT_YET_IMPLEMENTED_ExprLambda
-+NOT_YET_IMPLEMENTED_ExprLambda
-+NOT_YET_IMPLEMENTED_ExprLambda
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_ExprIfExp
-+NOT_YET_IMPLEMENTED_ExprIfExp
-+NOT_YET_IMPLEMENTED_ExprIfExp
-+NOT_YET_IMPLEMENTED_ExprIfExp
-+NOT_YET_IMPLEMENTED_ExprIfExp
-+(NOT_YET_IMPLEMENTED_ExprIfExp)
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_ExprSet
-+NOT_YET_IMPLEMENTED_ExprBoolOp
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprTuple
  []
 -[1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
  [
 -    1,
 -    2,
 -    3,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    (NOT_YET_IMPLEMENTED_ExprBoolOp),
-+    (NOT_YET_IMPLEMENTED_ExprBoolOp),
-+    (NOT_YET_IMPLEMENTED_ExprBoolOp),
-+]
-+[
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
++    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
++    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
  ]
 -[*a]
 -[*range(10)]
-+[NOT_YET_IMPLEMENTED_ExprStarred]
-+[NOT_YET_IMPLEMENTED_ExprStarred]
- [
+-[
 -    *a,
 -    4,
 -    5,
-+    NOT_YET_IMPLEMENTED_ExprStarred,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
- ]
- [
+-]
+-[
 -    4,
 -    *a,
 -    5,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprStarred,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
- ]
+-]
++[0x42, 0x42, 0x42]
++[NOT_YET_IMPLEMENTED_ExprStarred]
++[NOT_YET_IMPLEMENTED_ExprStarred]
++[NOT_YET_IMPLEMENTED_ExprStarred, 0x42, 0x42]
++[0x42, NOT_YET_IMPLEMENTED_ExprStarred, 0x42]
  [
      this_is_a_very_long_variable_which_will_force_a_delimiter_split,
      element,
@@ -462,10 +448,83 @@ last_call()
 -{i: j for i, j in ((1, "a"), (2, "b"), (3, "c"))}
 -{a: b * 2 for a, b in dictionary.items()}
 -{a: b * -2 for a, b in dictionary.items()}
--{
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++NOT_YET_IMPLEMENTED_ExprSetComp
++[i for i in []]
++[i for i in []]
++[i for i in []]
++[i for i in []]
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
++NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()  # note: no trailing comma pre-3.6
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
++NOT_IMPLEMENTED_call()
++0x42.NOT_IMPLEMENTED_attr
++0x42.NOT_IMPLEMENTED_attr
++0x42.NOT_IMPLEMENTED_attr
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+ {
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
--}
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+ }
 -Python3 > Python2 > COBOL
 -Life is Life
 -call()
@@ -498,87 +557,19 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprSetComp
-+NOT_YET_IMPLEMENTED_ExprListComp
-+NOT_YET_IMPLEMENTED_ExprListComp
-+NOT_YET_IMPLEMENTED_ExprListComp
-+NOT_YET_IMPLEMENTED_ExprListComp
-+NOT_YET_IMPLEMENTED_ExprDictComp
-+NOT_YET_IMPLEMENTED_ExprDictComp
-+NOT_YET_IMPLEMENTED_ExprDictComp
-+NOT_YET_IMPLEMENTED_ExprDictComp
-+NOT_YET_IMPLEMENTED_ExprDictComp
-+NOT_YET_IMPLEMENTED_ExprCompare
-+NOT_YET_IMPLEMENTED_ExprCompare
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall  # note: no trailing comma pre-3.6
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprAttribute
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprAttribute
-+NOT_YET_IMPLEMENTED_ExprAttribute
-+NOT_YET_IMPLEMENTED_ExprAttribute
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprSubscript
-+NOT_YET_IMPLEMENTED_ExprIfExp
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_ExprSet
 +[
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprBoolOp,
-+    NOT_YET_IMPLEMENTED_ExprBoolOp,
-+    NOT_YET_IMPLEMENTED_ExprBoolOp,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
++    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
++    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
  ]
 -very_long_variable_name_filters: t.List[
 -    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
@@ -659,7 +650,24 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
--)
++(1, 2)
++(i for i in [])
++(i for i in [])
++(i for i in [])
++(i for i in [])
++(1, 2)
++{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++a = (1, 2)
++b = (1, 2)
++c = 0x42
++d = (1, 2) + a + (1, 2)
++e = NOT_IMPLEMENTED_call()
++f = (1, 2)
++g = (1, 2)
++what_is_up_with_those_new_coord_names = (
++    (coord_names + NOT_IMPLEMENTED_call())
++    + NOT_IMPLEMENTED_call()
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -669,7 +677,10 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_IMPLEMENTED_call())
++    - NOT_IMPLEMENTED_call()
+ )
 -Ø = set()
 -authors.łukasz.say_thanks()
 -mapping = {
@@ -678,27 +689,11 @@ last_call()
 -    C: 0.1 * (10.0 / 12),
 -    D: 0.1 * (10.0 / 12),
 -}
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_StmtAssign
++result = NOT_IMPLEMENTED_call()
++result = NOT_IMPLEMENTED_call()
++Ø = NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
  
 -def gen():
@@ -815,9 +810,9 @@ last_call()
 -    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 -):
 -    return True
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
 +NOT_YET_IMPLEMENTED_StmtAssert
@@ -826,13 +821,13 @@ last_call()
 +NOT_YET_IMPLEMENTED_StmtFor
 +NOT_YET_IMPLEMENTED_StmtFor
 +NOT_YET_IMPLEMENTED_StmtFor
-+while NOT_YET_IMPLEMENTED_ExprBoolOp:
-+    NOT_YET_IMPLEMENTED_ExprConstant
++while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++    0x42
 +NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +NOT_YET_IMPLEMENTED_StmtIf
 +NOT_YET_IMPLEMENTED_StmtIf
 +NOT_YET_IMPLEMENTED_StmtIf
@@ -846,126 +841,107 @@ last_call()
  (
      aaaaaaaaaaaaaaaa
      + aaaaaaaaaaaaaaaa
-@@ -363,8 +264,9 @@
+@@ -363,8 +258,9 @@
  bbbb >> bbbb * bbbb
  (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 -    ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-+    ^ NOT_YET_IMPLEMENTED_ExprAttribute
++    ^ bbbb.NOT_IMPLEMENTED_attr
 +    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
      ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  )
 -last_call()
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
  # standalone comment at ENDMARKER
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant
+0x42
+0x42
+0x42
 Name
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-v1 << NOT_YET_IMPLEMENTED_ExprConstant
-NOT_YET_IMPLEMENTED_ExprConstant >> v2
-NOT_YET_IMPLEMENTED_ExprConstant % finished
-(
-    NOT_YET_IMPLEMENTED_ExprConstant
-    + v2
-    - v3 * NOT_YET_IMPLEMENTED_ExprConstant
-    ^ NOT_YET_IMPLEMENTED_ExprConstant
-    **v6
-    / NOT_YET_IMPLEMENTED_ExprConstant
-    // NOT_YET_IMPLEMENTED_ExprConstant
-)
-(
-    ((NOT_YET_IMPLEMENTED_ExprConstant + v2) - (v3 * NOT_YET_IMPLEMENTED_ExprConstant))
-    ^ (
-        ((NOT_YET_IMPLEMENTED_ExprConstant**v6) / NOT_YET_IMPLEMENTED_ExprConstant)
-        // NOT_YET_IMPLEMENTED_ExprConstant
-    )
-)
+0x42
+0x42
+0x42
+0x42
+0x42
+0x42
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+v1 << 0x42
+0x42 >> v2
+0x42 % finished
+0x42 + v2 - v3 * 0x42 ^ 0x42**v6 / 0x42 // 0x42
+((0x42 + v2) - (v3 * 0x42)) ^ (((0x42**v6) / 0x42) // 0x42)
 NOT_YET_IMPLEMENTED_ExprUnaryOp
 NOT_YET_IMPLEMENTED_ExprUnaryOp
 NOT_YET_IMPLEMENTED_ExprUnaryOp
 NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 NOT_YET_IMPLEMENTED_ExprUnaryOp
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprLambda
-NOT_YET_IMPLEMENTED_ExprLambda
-NOT_YET_IMPLEMENTED_ExprLambda
-NOT_YET_IMPLEMENTED_ExprLambda
-NOT_YET_IMPLEMENTED_ExprLambda
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_ExprIfExp
-NOT_YET_IMPLEMENTED_ExprIfExp
-NOT_YET_IMPLEMENTED_ExprIfExp
-NOT_YET_IMPLEMENTED_ExprIfExp
-NOT_YET_IMPLEMENTED_ExprIfExp
-(NOT_YET_IMPLEMENTED_ExprIfExp)
-NOT_YET_IMPLEMENTED_ExprDict
-NOT_YET_IMPLEMENTED_ExprDict
-NOT_YET_IMPLEMENTED_ExprDict
-NOT_YET_IMPLEMENTED_ExprSet
-NOT_YET_IMPLEMENTED_ExprBoolOp
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprTuple
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+lambda x: True
+lambda x: True
+lambda x: True
+lambda x: True
+lambda x: True
+manylambdas = lambda x: True
+foo = lambda x: True
+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+(NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false)
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
+}
+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+(1, 2)
+(1, 2)
+(1, 2)
+(1, 2)
 []
 [
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    (NOT_YET_IMPLEMENTED_ExprBoolOp),
-    (NOT_YET_IMPLEMENTED_ExprBoolOp),
-    (NOT_YET_IMPLEMENTED_ExprBoolOp),
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
 ]
-[
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-]
+[0x42, 0x42, 0x42]
 [NOT_YET_IMPLEMENTED_ExprStarred]
 [NOT_YET_IMPLEMENTED_ExprStarred]
-[
-    NOT_YET_IMPLEMENTED_ExprStarred,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-]
-[
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprStarred,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-]
+[NOT_YET_IMPLEMENTED_ExprStarred, 0x42, 0x42]
+[0x42, NOT_YET_IMPLEMENTED_ExprStarred, 0x42]
 [
     this_is_a_very_long_variable_which_will_force_a_delimiter_split,
     element,
@@ -976,107 +952,120 @@ NOT_YET_IMPLEMENTED_ExprSetComp
 NOT_YET_IMPLEMENTED_ExprSetComp
 NOT_YET_IMPLEMENTED_ExprSetComp
 NOT_YET_IMPLEMENTED_ExprSetComp
-NOT_YET_IMPLEMENTED_ExprListComp
-NOT_YET_IMPLEMENTED_ExprListComp
-NOT_YET_IMPLEMENTED_ExprListComp
-NOT_YET_IMPLEMENTED_ExprListComp
-NOT_YET_IMPLEMENTED_ExprDictComp
-NOT_YET_IMPLEMENTED_ExprDictComp
-NOT_YET_IMPLEMENTED_ExprDictComp
-NOT_YET_IMPLEMENTED_ExprDictComp
-NOT_YET_IMPLEMENTED_ExprDictComp
-NOT_YET_IMPLEMENTED_ExprCompare
-NOT_YET_IMPLEMENTED_ExprCompare
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall  # note: no trailing comma pre-3.6
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprAttribute
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprAttribute
-NOT_YET_IMPLEMENTED_ExprAttribute
-NOT_YET_IMPLEMENTED_ExprAttribute
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
+[i for i in []]
+[i for i in []]
+[i for i in []]
+[i for i in []]
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
+NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()  # note: no trailing comma pre-3.6
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
+NOT_IMPLEMENTED_call()
+0x42.NOT_IMPLEMENTED_attr
+0x42.NOT_IMPLEMENTED_attr
+0x42.NOT_IMPLEMENTED_attr
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_YET_IMPLEMENTED_StmtAnnAssign
 NOT_YET_IMPLEMENTED_StmtAnnAssign
 NOT_YET_IMPLEMENTED_StmtAnnAssign
 NOT_YET_IMPLEMENTED_StmtAnnAssign  # type: ignore
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprSubscript
-NOT_YET_IMPLEMENTED_ExprIfExp
-NOT_YET_IMPLEMENTED_ExprDict
-NOT_YET_IMPLEMENTED_ExprSet
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+{
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+}
 [
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprConstant,
-    NOT_YET_IMPLEMENTED_ExprBoolOp,
-    NOT_YET_IMPLEMENTED_ExprBoolOp,
-    NOT_YET_IMPLEMENTED_ExprBoolOp,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
+    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
 ]
 (SomeName)
 SomeName
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprGeneratorExp
-NOT_YET_IMPLEMENTED_ExprGeneratorExp
-NOT_YET_IMPLEMENTED_ExprGeneratorExp
-NOT_YET_IMPLEMENTED_ExprGeneratorExp
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprDict
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_StmtAssign
+(1, 2)
+(i for i in [])
+(i for i in [])
+(i for i in [])
+(i for i in [])
+(1, 2)
+{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+a = (1, 2)
+b = (1, 2)
+c = 0x42
+d = (1, 2) + a + (1, 2)
+e = NOT_IMPLEMENTED_call()
+f = (1, 2)
+g = (1, 2)
+what_is_up_with_those_new_coord_names = (
+    (coord_names + NOT_IMPLEMENTED_call())
+    + NOT_IMPLEMENTED_call()
+)
+what_is_up_with_those_new_coord_names = (
+    (coord_names | NOT_IMPLEMENTED_call())
+    - NOT_IMPLEMENTED_call()
+)
+result = NOT_IMPLEMENTED_call()
+result = NOT_IMPLEMENTED_call()
+Ø = NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
 NOT_YET_IMPLEMENTED_StmtFunctionDef
@@ -1085,9 +1074,9 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
+NOT_IMPLEMENTED_call()
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtAssert
@@ -1096,13 +1085,13 @@ NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
-while NOT_YET_IMPLEMENTED_ExprBoolOp:
-    NOT_YET_IMPLEMENTED_ExprConstant
+while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    0x42
 NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 NOT_YET_IMPLEMENTED_StmtIf
 NOT_YET_IMPLEMENTED_StmtIf
 NOT_YET_IMPLEMENTED_StmtIf
@@ -1129,11 +1118,11 @@ aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
 bbbb >> bbbb * bbbb
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    ^ NOT_YET_IMPLEMENTED_ExprAttribute
+    ^ bbbb.NOT_IMPLEMENTED_attr
     & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 )
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 # standalone comment at ENDMARKER
 ```
 

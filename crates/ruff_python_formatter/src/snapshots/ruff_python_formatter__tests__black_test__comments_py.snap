@@ -114,7 +114,7 @@ async def wat():
  # Has many lines. Many, many lines.
  # Many, many, many lines.
 -"""Module docstring.
-+NOT_YET_IMPLEMENTED_ExprConstant
++0x42
  
 -Possibly also many, many lines.
 -"""
@@ -138,7 +138,7 @@ async def wat():
 -# Some comment before a function.
 -y = 1
 +NOT_YET_IMPLEMENTED_StmtTry
-+NOT_YET_IMPLEMENTED_StmtAssign
++y = 0x42
  (
      # some strings
      y  # type: ignore
@@ -166,7 +166,7 @@ async def wat():
  
  # Explains why we use global state.
 -GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
-+NOT_YET_IMPLEMENTED_StmtAssign
++GLOBAL_STATE = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
  
  # Another comment!
@@ -227,7 +227,7 @@ async def wat():
 #
 # Has many lines. Many, many lines.
 # Many, many, many lines.
-NOT_YET_IMPLEMENTED_ExprConstant
+0x42
 
 NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImport
@@ -236,7 +236,7 @@ NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
 
 NOT_YET_IMPLEMENTED_StmtTry
-NOT_YET_IMPLEMENTED_StmtAssign
+y = 0x42
 (
     # some strings
     y  # type: ignore
@@ -247,7 +247,7 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Explains why we use global state.
-NOT_YET_IMPLEMENTED_StmtAssign
+GLOBAL_STATE = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
 # Another comment!

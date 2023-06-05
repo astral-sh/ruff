@@ -68,18 +68,23 @@ not (aaaaaaaaaaaaaa + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 
 # Black breaks the right side first for the following expressions:
-aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprCall
+aaaaaaaaaaaaaa + NOT_IMPLEMENTED_call()
 aaaaaaaaaaaaaa + [
     bbbbbbbbbbbbbbbbbbbbbb,
     ccccccccccccccccccccc,
     dddddddddddddddd,
     eeeeeee,
 ]
-aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprTuple
-aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprDict
-aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSet
-aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprListComp
-aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprGeneratorExp
+aaaaaaaaaaaaaa + (1, 2)
+aaaaaaaaaaaaaa + {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+aaaaaaaaaaaaaa + {
+    bbbbbbbbbbbbbbbbbbbbbb,
+    ccccccccccccccccccccc,
+    dddddddddddddddd,
+    eeeeeee,
+}
+aaaaaaaaaaaaaa + [i for i in []]
+aaaaaaaaaaaaaa + (i for i in [])
 aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp
 
 # Wraps it in parentheses if it needs to break both left and right
@@ -91,7 +96,7 @@ aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp
 
 # But only for expressions that have a statement parent.
 NOT_YET_IMPLEMENTED_ExprUnaryOp
-[NOT_YET_IMPLEMENTED_ExprCompare]
+[NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right]
 
 
 # leading comment

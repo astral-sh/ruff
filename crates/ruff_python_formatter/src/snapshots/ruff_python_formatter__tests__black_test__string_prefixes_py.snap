@@ -41,16 +41,16 @@ def docstring_multiline():
 -(b"", b"")
 -("", "")
 -(r"", R"")
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprTuple
++name = 0x42
++(1, 2)
++(1, 2)
++(1, 2)
++(1, 2)
  
 -(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
 -(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprTuple
++(1, 2)
++(1, 2)
  
  
 -def docstring_singleline():
@@ -70,14 +70,14 @@ def docstring_multiline():
 ```py
 #!/usr/bin/env python3
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprTuple
+name = 0x42
+(1, 2)
+(1, 2)
+(1, 2)
+(1, 2)
 
-NOT_YET_IMPLEMENTED_ExprTuple
-NOT_YET_IMPLEMENTED_ExprTuple
+(1, 2)
+(1, 2)
 
 
 NOT_YET_IMPLEMENTED_StmtFunctionDef
