@@ -18,7 +18,8 @@ use crate::registry::AsRule;
 /// ## Example
 /// ```python
 /// class Foo:
-///    def __repr__(self) -> str: ...
+///     def __repr__(self) -> str:
+///         ...
 /// ```
 #[violation]
 pub struct StrOrReprDefinedInStub {
