@@ -13,12 +13,13 @@ if [ ! -d corpus/ruff_parse_simple ]; then
   mkdir -p corpus/ruff_parse_simple
   read -p "Would you like to build a corpus from a python source code dataset? (this will take a long time!) [Y/n] " -n 1 -r
   echo
+  cd corpus/ruff_parse_simple
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cd corpus/ruff_parse_simple
     curl -L 'https://zenodo.org/record/3628784/files/python-corpus.tar.gz?download=1' | tar xz
-    cd -
-    cargo fuzz cmin -s none ruff_parse_simple
   fi
+  cp -r "../../../crates/ruff/resources/test" .
+  cd -
+  cargo fuzz cmin -s none ruff_parse_simple
 fi
 
 echo "Done! You are ready to fuzz."
