@@ -148,15 +148,15 @@ impl<'a> TypingTarget<'a> {
                 if model.match_typing_expr(value, "Optional") {
                     return Some(TypingTarget::Optional);
                 }
-                let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() else{
+                let Expr::Tuple(ast::ExprTuple { elts: elements, .. }) = slice.as_ref() else{
                     return None;
                 };
                 if model.match_typing_expr(value, "Literal") {
-                    Some(TypingTarget::Literal(elts.iter().collect()))
+                    Some(TypingTarget::Literal(elements.iter().collect()))
                 } else if model.match_typing_expr(value, "Union") {
-                    Some(TypingTarget::Union(elts.iter().collect()))
+                    Some(TypingTarget::Union(elements.iter().collect()))
                 } else if model.match_typing_expr(value, "Annotated") {
-                    elts.first().map(TypingTarget::Annotated)
+                    elements.first().map(TypingTarget::Annotated)
                 } else {
                     None
                 }
@@ -171,40 +171,40 @@ impl<'a> TypingTarget<'a> {
             _ => None,
         }
     }
-}
 
-/// Check if the given [`TypingTarget`] explicitly allows `None`.
-fn is_typing_target_with_none(model: &SemanticModel, target: &TypingTarget) -> bool {
-    match target {
-        TypingTarget::None | TypingTarget::Optional => true,
-        TypingTarget::Literal(elts) => elts.iter().any(|elt| {
-            let Some(new_target) = TypingTarget::try_from_expr(model, elt) else {
+    /// Check if the [`TypingTarget`] explicitly allows `None`.
+    fn is_implicit_optional(&self, model: &SemanticModel) -> bool {
+        match self {
+            Self::None | Self::Optional => true,
+            Self::Literal(elements) => elements.iter().any(|element| {
+                let Some(new_target) = Self::try_from_expr(model, element) else {
                 return false;
             };
-            // Literal can only contain `None`, a literal value, other `Literal`
-            // or an enum value.
-            match new_target {
-                TypingTarget::None => true,
-                TypingTarget::Literal(_) => is_typing_target_with_none(model, &new_target),
-                _ => false,
-            }
-        }),
-        TypingTarget::Union(elts) => elts.iter().any(|elt| {
-            let Some(new_target) = TypingTarget::try_from_expr(model, elt) else {
+                // Literal can only contain `None`, a literal value, other `Literal`
+                // or an enum value.
+                match new_target {
+                    Self::None => true,
+                    Self::Literal(_) => new_target.is_implicit_optional(model),
+                    _ => false,
+                }
+            }),
+            Self::Union(elements) => elements.iter().any(|element| {
+                let Some(new_target) = Self::try_from_expr(model, element) else {
                 return false;
             };
-            match new_target {
-                TypingTarget::None => true,
-                _ => is_typing_target_with_none(model, &new_target),
-            }
-        }),
-        TypingTarget::Annotated(elt) => {
-            let Some(new_target) = TypingTarget::try_from_expr(model, elt) else {
+                match new_target {
+                    Self::None => true,
+                    _ => new_target.is_implicit_optional(model),
+                }
+            }),
+            Self::Annotated(element) => {
+                let Some(new_target) = Self::try_from_expr(model, element) else {
                 return false;
             };
-            match new_target {
-                TypingTarget::None => true,
-                _ => is_typing_target_with_none(model, &new_target),
+                match new_target {
+                    Self::None => true,
+                    _ => new_target.is_implicit_optional(model),
+                }
             }
         }
     }
@@ -233,7 +233,7 @@ fn type_hint_explicitly_allows_none<'a>(
         // be returned.
         TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(model, expr),
         _ => {
-            if is_typing_target_with_none(model, &target) {
+            if target.is_implicit_optional(model) {
                 None
             } else {
                 Some(annotation)
