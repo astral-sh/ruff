@@ -71,7 +71,7 @@ pub(crate) fn inplace_argument(
                 matches!(
                     binding.kind,
                     BindingKind::Importation(Importation {
-                        full_name: "pandas"
+                        qualified_name: "pandas"
                     })
                 )
             });

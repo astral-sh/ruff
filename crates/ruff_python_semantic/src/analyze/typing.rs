@@ -1,3 +1,5 @@
+//! Analysis rules for the `typing` module.
+
 use rustpython_parser::ast::{self, Constant, Expr, Operator};
 
 use num_traits::identities::Zero;

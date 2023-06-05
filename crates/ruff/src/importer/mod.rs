@@ -88,7 +88,7 @@ impl<'a> Importer<'a> {
     ) -> Result<RuntimeImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &[import.full_name],
+            &[import.qualified_name],
             import.stmt,
             self.locator,
             self.stylist,
@@ -120,7 +120,7 @@ impl<'a> Importer<'a> {
     ) -> Result<TypingImportEdit> {
         // Generate the modified import statement.
         let content = autofix::codemods::retain_imports(
-            &[import.full_name],
+            &[import.qualified_name],
             import.stmt,
             self.locator,
             self.stylist,
@@ -447,7 +447,7 @@ pub(crate) struct StmtImport<'a> {
     /// The import statement.
     pub(crate) stmt: &'a Stmt,
     /// The "full name" of the imported module or member.
-    pub(crate) full_name: &'a str,
+    pub(crate) qualified_name: &'a str,
 }
 
 /// The result of an [`Importer::get_or_import_symbol`] call.

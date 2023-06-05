@@ -48,7 +48,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 ```diff
 --- Black
 +++ Ruff
-@@ -1,42 +1,25 @@
+@@ -1,42 +1,27 @@
  # These brackets are redundant, therefore remove.
  try:
      a.something
@@ -78,7 +78,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 -) as err:
 +except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
      raise err
--
+ 
  try:
      a.something
 -except (
@@ -86,7 +86,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 -) as err:
 +except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,) as err:
      raise err
--
+ 
  try:
      a.something
 -except (
@@ -117,10 +117,12 @@ try:
     a.something
 except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
     raise err
+
 try:
     a.something
 except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,) as err:
     raise err
+
 try:
     a.something
 except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error, some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:

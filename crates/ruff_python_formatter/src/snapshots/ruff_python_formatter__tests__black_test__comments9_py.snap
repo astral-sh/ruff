@@ -152,99 +152,19 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,60 +1,35 @@
- # Test for https://github.com/psf/black/issues/246.
+@@ -35,9 +35,10 @@
+ 
  
  some = statement
--
--
- # This comment should be split from the statement above by two lines.
- def function():
-     pass
--
--
- some = statement
--
--
- # This multiline comments section
- # should be split from the statement
- # above by two lines.
- def function():
-     pass
--
--
- some = statement
--
--
- # This comment should be split from the statement above by two lines.
- async def async_function():
-     pass
--
--
- some = statement
--
--
- # This comment should be split from the statement above by two lines.
- class MyClass:
-     pass
--
--
- some = statement
- # This should be stick to the statement above
+-# This should be stick to the statement above
  
--
+ 
++# This should be stick to the statement above
++
  # This should be split from the above by two lines
  class MyClassWithComplexLeadingComments:
      pass
--
--
- class ClassWithDocstring:
-     """A docstring."""
--
--
- # Leading comment after a class with just a docstring
- class MyClassAfterAnotherClassWithDocstring:
-     pass
--
--
- some = statement
--
--
- # leading 1
- @deco1
- # leading 2
-@@ -65,11 +40,7 @@
- # leading 4
- def decorated():
-     pass
--
--
- some = statement
--
--
- # leading 1
- @deco1
- # leading 2
-@@ -80,11 +51,7 @@
- # leading 4
- def decorated_with_split_leading_comments():
-     pass
--
--
- some = statement
--
--
- # leading 1
- @deco1
- # leading 2
-@@ -95,66 +62,44 @@
- # leading 4 that already has an empty line
- def decorated_with_split_leading_comments():
-     pass
--
--
- def main():
-     if a:
+@@ -102,11 +103,9 @@
          # Leading comment before inline function
          def inline():
              pass
@@ -256,10 +176,7 @@ def bar():
      else:
          # More leading comments
          def inline_after_else():
-             pass
--
--
- if a:
+@@ -117,11 +116,9 @@
      # Leading comment before "top-level inline" function
      def top_level_quote_inline():
          pass
@@ -271,39 +188,24 @@ def bar():
  else:
      # More leading comments
      def top_level_quote_inline_after_else():
-         pass
--
--
- class MyClass:
-     # First method has no empty lines between bare class def.
-     # More comments.
-     def first_method(self):
-         pass
--
--
+@@ -138,7 +135,6 @@
  # Regression test for https://github.com/psf/black/issues/3454.
  def foo():
      pass
 -    # Trailing comment that belongs to this function
--
--
+ 
+ 
  @decorator1
- @decorator2  # fmt: skip
- def bar():
-     pass
--
--
+@@ -150,9 +146,6 @@
  # Regression test for https://github.com/psf/black/issues/3454.
  def foo():
      pass
 -    # Trailing comment that belongs to this function.
 -    # NOTE this comment only has one empty line below, and the formatter
 -    # should enforce two blank lines.
--
--
+ 
+ 
  @decorator1
- # A standalone comment
- def bar():
 ```
 
 ## Ruff Output
@@ -312,35 +214,61 @@ def bar():
 # Test for https://github.com/psf/black/issues/246.
 
 some = statement
+
+
 # This comment should be split from the statement above by two lines.
 def function():
     pass
+
+
 some = statement
+
+
 # This multiline comments section
 # should be split from the statement
 # above by two lines.
 def function():
     pass
+
+
 some = statement
+
+
 # This comment should be split from the statement above by two lines.
 async def async_function():
     pass
+
+
 some = statement
+
+
 # This comment should be split from the statement above by two lines.
 class MyClass:
     pass
+
+
 some = statement
+
+
 # This should be stick to the statement above
 
 # This should be split from the above by two lines
 class MyClassWithComplexLeadingComments:
     pass
+
+
 class ClassWithDocstring:
     """A docstring."""
+
+
 # Leading comment after a class with just a docstring
 class MyClassAfterAnotherClassWithDocstring:
     pass
+
+
 some = statement
+
+
 # leading 1
 @deco1
 # leading 2
@@ -351,7 +279,11 @@ some = statement
 # leading 4
 def decorated():
     pass
+
+
 some = statement
+
+
 # leading 1
 @deco1
 # leading 2
@@ -362,7 +294,11 @@ some = statement
 # leading 4
 def decorated_with_split_leading_comments():
     pass
+
+
 some = statement
+
+
 # leading 1
 @deco1
 # leading 2
@@ -373,6 +309,8 @@ some = statement
 # leading 4 that already has an empty line
 def decorated_with_split_leading_comments():
     pass
+
+
 def main():
     if a:
         # Leading comment before inline function
@@ -385,6 +323,8 @@ def main():
         # More leading comments
         def inline_after_else():
             pass
+
+
 if a:
     # Leading comment before "top-level inline" function
     def top_level_quote_inline():
@@ -396,21 +336,31 @@ else:
     # More leading comments
     def top_level_quote_inline_after_else():
         pass
+
+
 class MyClass:
     # First method has no empty lines between bare class def.
     # More comments.
     def first_method(self):
         pass
+
+
 # Regression test for https://github.com/psf/black/issues/3454.
 def foo():
     pass
+
+
 @decorator1
 @decorator2  # fmt: skip
 def bar():
     pass
+
+
 # Regression test for https://github.com/psf/black/issues/3454.
 def foo():
     pass
+
+
 @decorator1
 # A standalone comment
 def bar():

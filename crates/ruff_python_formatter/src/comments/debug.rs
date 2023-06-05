@@ -183,7 +183,6 @@ mod tests {
     use ruff_python_ast::node::AnyNode;
     use ruff_text_size::{TextRange, TextSize};
     use rustpython_parser::ast::{StmtBreak, StmtContinue};
-    use std::cell::Cell;
 
     #[test]
     fn debug() {
@@ -210,7 +209,7 @@ break;
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
                 #[cfg(debug_assertions)]
-                formatted: Cell::new(false),
+                formatted: std::cell::Cell::new(false),
                 position: CommentTextPosition::OwnLine,
             },
         );
@@ -220,7 +219,7 @@ break;
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
                 #[cfg(debug_assertions)]
-                formatted: Cell::new(false),
+                formatted: std::cell::Cell::new(false),
                 position: CommentTextPosition::EndOfLine,
             },
         );
@@ -230,7 +229,7 @@ break;
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
                 #[cfg(debug_assertions)]
-                formatted: Cell::new(false),
+                formatted: std::cell::Cell::new(false),
                 position: CommentTextPosition::OwnLine,
             },
         );

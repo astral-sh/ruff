@@ -382,6 +382,10 @@ where
                     }
                 }
 
+                if self.enabled(Rule::InvalidStrReturnType) {
+                    pylint::rules::invalid_str_return(self, name, body);
+                }
+
                 if self.enabled(Rule::InvalidFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
                         stmt,
@@ -446,6 +450,9 @@ where
                             args,
                             stmt.is_async_function_def_stmt(),
                         );
+                    }
+                    if self.enabled(Rule::StrOrReprDefinedInStub) {
+                        flake8_pyi::rules::str_or_repr_defined_in_stub(self, stmt);
                     }
                 }
 
@@ -844,23 +851,25 @@ where
                             }
                         }
                     } else if alias.name.contains('.') && alias.asname.is_none() {
-                        // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
+                        // Given `import foo.bar`, `name` would be "foo", and `qualified_name` would be
                         // "foo.bar".
                         let name = alias.name.split('.').next().unwrap();
-                        let full_name = &alias.name;
+                        let qualified_name = &alias.name;
                         self.add_binding(
                             name,
                             alias.range(),
-                            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }),
+                            BindingKind::SubmoduleImportation(SubmoduleImportation {
+                                qualified_name,
+                            }),
                             BindingFlags::empty(),
                         );
                     } else {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let full_name = &alias.name;
+                        let qualified_name = &alias.name;
                         self.add_binding(
                             name,
                             alias.range(),
-                            BindingKind::Importation(Importation { full_name }),
+                            BindingKind::Importation(Importation { qualified_name }),
                             if alias
                                 .asname
                                 .as_ref()
@@ -1146,16 +1155,16 @@ where
                             }
                         }
 
-                        // Given `from foo import bar`, `name` would be "bar" and `full_name` would
+                        // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
-                        // and `full_name` would be "foo.bar".
+                        // and `qualified_name` would be "foo.bar".
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let full_name =
+                        let qualified_name =
                             helpers::format_import_from_member(level, module, &alias.name);
                         self.add_binding(
                             name,
                             alias.range(),
-                            BindingKind::FromImportation(FromImportation { full_name }),
+                            BindingKind::FromImportation(FromImportation { qualified_name }),
                             if alias
                                 .asname
                                 .as_ref()
@@ -1191,12 +1200,12 @@ where
                     }
 
                     if self.enabled(Rule::UnconventionalImportAlias) {
-                        let full_name =
+                        let qualified_name =
                             helpers::format_import_from_member(level, module, &alias.name);
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::conventional_import_alias(
                                 stmt,
-                                &full_name,
+                                &qualified_name,
                                 alias.asname.as_deref(),
                                 &self.settings.flake8_import_conventions.aliases,
                             )
@@ -1207,12 +1216,12 @@ where
 
                     if self.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.asname {
-                            let full_name =
+                            let qualified_name =
                                 helpers::format_import_from_member(level, module, &alias.name);
                             if let Some(diagnostic) =
                                 flake8_import_conventions::rules::banned_import_alias(
                                     stmt,
-                                    &full_name,
+                                    &qualified_name,
                                     asname,
                                     &self.settings.flake8_import_conventions.banned_aliases,
                                 )

@@ -800,7 +800,7 @@ pub fn format_import_from(level: Option<u32>, module: Option<&str>) -> String {
 /// assert_eq!(format_import_from_member(Some(1), Some("foo"), "bar"), ".foo.bar".to_string());
 /// ```
 pub fn format_import_from_member(level: Option<u32>, module: Option<&str>, member: &str) -> String {
-    let mut full_name = String::with_capacity(
+    let mut qualified_name = String::with_capacity(
         (level.unwrap_or(0) as usize)
             + module.as_ref().map_or(0, |module| module.len())
             + 1
@@ -808,15 +808,15 @@ pub fn format_import_from_member(level: Option<u32>, module: Option<&str>, membe
     );
     if let Some(level) = level {
         for _ in 0..level {
-            full_name.push('.');
+            qualified_name.push('.');
         }
     }
     if let Some(module) = module {
-        full_name.push_str(module);
-        full_name.push('.');
+        qualified_name.push_str(module);
+        qualified_name.push('.');
     }
-    full_name.push_str(member);
-    full_name
+    qualified_name.push_str(member);
+    qualified_name
 }
 
 /// Create a module path from a (package, path) pair.
@@ -907,7 +907,7 @@ pub fn resolve_imported_module_path<'a>(
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
-    pub returns: Vec<Option<&'a Expr>>,
+    pub returns: Vec<&'a ast::StmtReturn>,
 }
 
 impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
@@ -919,10 +919,7 @@ where
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 // Don't recurse.
             }
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _range,
-            }) => self.returns.push(value.as_deref()),
+            Stmt::Return(stmt) => self.returns.push(stmt),
             _ => walk_stmt(self, stmt),
         }
     }
