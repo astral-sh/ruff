@@ -1,9 +1,7 @@
-use crate::builders::{JoinNodesBuilder, PyFormatterExtensions};
-use crate::context::NodeLevel;
 use crate::statement::suite::SuiteLevel;
 use crate::{AsFormat, FormatNodeRule, PyFormatter};
 use ruff_formatter::prelude::hard_line_break;
-use ruff_formatter::{write, Buffer, Format, FormatResult};
+use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ModModule;
 
 #[derive(Default)]
@@ -15,6 +13,7 @@ impl FormatNodeRule<ModModule> for FormatModModule {
             f,
             [
                 item.body.format().with_options(SuiteLevel::TopLevel),
+                // Trailing newline at the end of the file
                 hard_line_break()
             ]
         )
