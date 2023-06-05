@@ -29,9 +29,9 @@ fn is_str_returning(body: &[Stmt]) -> Option<Diagnostic> {
     let mut visitor = ReturnStatementVisitor::default();
     visitor.visit_body(body);
     for expr in visitor.returns.into_iter().flatten() {
-        if !matches!(
+        if matches!(
             expr,
-            Expr::Constant(ref constant) if constant.value.is_str()
+            Expr::Constant(ref constant) if constant.value.is_bool() || constant.value.is_int() || constant.value.is_tuple() || constant.value.is_float()
         ) {
             return Some(Diagnostic::new(InvalidStrReturnType, expr.range()));
         }
