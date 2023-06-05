@@ -38,7 +38,7 @@ class A:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,29 +1,17 @@
+@@ -1,18 +1,11 @@
 -if e1234123412341234.winerror not in (
 -    _winapi.ERROR_SEM_TIMEOUT,
 -    _winapi.ERROR_PIPE_BUSY,
@@ -46,7 +46,7 @@ class A:
 +if e1234123412341234.winerror not in (_winapi.ERROR_SEM_TIMEOUT,
 +                        _winapi.ERROR_PIPE_BUSY) or _check_timeout(t):
      pass
--
+ 
  if x:
      if y:
 -        new_id = (
@@ -56,23 +56,20 @@ class A:
 -            )
 -            + 1
 -        )
--
--
 +        new_id = max(Vegetable.objects.order_by('-id')[0].id,
 +                     Mineral.objects.order_by('-id')[0].id) + 1
+ 
+ 
  class X:
-     def get_help_text(self):
-         return ngettext(
+@@ -21,7 +14,7 @@
              "Your password must contain at least %(min_length)d character.",
              "Your password must contain at least %(min_length)d characters.",
              self.min_length,
 -        ) % {"min_length": self.min_length}
--
--
 +        ) % {'min_length': self.min_length}
+ 
+ 
  class A:
-     def b(self):
-         if self.connection.mysql_is_mariadb and (
 ```
 
 ## Ruff Output
@@ -81,10 +78,13 @@ class A:
 if e1234123412341234.winerror not in (_winapi.ERROR_SEM_TIMEOUT,
                         _winapi.ERROR_PIPE_BUSY) or _check_timeout(t):
     pass
+
 if x:
     if y:
         new_id = max(Vegetable.objects.order_by('-id')[0].id,
                      Mineral.objects.order_by('-id')[0].id) + 1
+
+
 class X:
     def get_help_text(self):
         return ngettext(
@@ -92,6 +92,8 @@ class X:
             "Your password must contain at least %(min_length)d characters.",
             self.min_length,
         ) % {'min_length': self.min_length}
+
+
 class A:
     def b(self):
         if self.connection.mysql_is_mariadb and (
