@@ -214,6 +214,7 @@ pub fn check_path(
             locator,
             indexer.comment_ranges(),
             &directives.noqa_line_for,
+            error.is_none(),
             settings,
         );
         if noqa.into() {
