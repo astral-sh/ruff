@@ -95,7 +95,7 @@ fn update_field_types(format_string: &FormatString, index_map: &[usize]) -> Stri
                 let new_field_name = FieldName::parse(field_name).unwrap();
                 let mut new_field_name_string = match new_field_name.field_type {
                     FieldType::Auto => String::new(),
-                    FieldType::Index(i) => index_map[i].to_string(),
+                    FieldType::Index(i) => index_map.get(i).unwrap_or(&i).to_string(),
                     FieldType::Keyword(keyword) => keyword,
                 };
                 for field_name_part in &new_field_name.parts {
