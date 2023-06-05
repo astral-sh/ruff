@@ -88,7 +88,6 @@
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
 use rustpython_parser::ast::Mod;
-use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -119,7 +118,7 @@ pub(crate) struct SourceComment {
 
     /// Whether the comment has been formatted or not.
     #[cfg(debug_assertions)]
-    formatted: Cell<bool>,
+    formatted: std::cell::Cell<bool>,
 
     position: CommentTextPosition,
 }
@@ -137,7 +136,7 @@ impl SourceComment {
 
     #[cfg(not(debug_assertions))]
     #[inline(always)]
-    pub fn mark_formatted(&self) {}
+    pub(crate) fn mark_formatted(&self) {}
 
     /// Marks the comment as formatted
     #[cfg(debug_assertions)]

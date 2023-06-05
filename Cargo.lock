@@ -1796,6 +1796,7 @@ dependencies = [
  "once_cell",
  "ruff",
  "ruff_python_ast",
+ "ruff_python_formatter",
  "rustpython-parser",
  "serde",
  "serde_json",
