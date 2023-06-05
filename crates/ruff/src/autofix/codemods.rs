@@ -13,11 +13,11 @@ use crate::cst::matchers::match_statement;
 
 /// Glue code to make libcst codegen work with ruff's Stylist
 pub(crate) trait CodegenStylist<'a>: Codegen<'a> {
-    fn codegen_stylist(&self, stylist: &'a Stylist<'a>) -> String;
+    fn codegen_stylist(&self, stylist: &'a Stylist) -> String;
 }
 
 impl<'a, T: Codegen<'a>> CodegenStylist<'a> for T {
-    fn codegen_stylist(&self, stylist: &'a Stylist<'a>) -> String {
+    fn codegen_stylist(&self, stylist: &'a Stylist) -> String {
         let mut state = CodegenState {
             default_newline: stylist.line_ending().as_str(),
             default_indent: stylist.indentation(),
