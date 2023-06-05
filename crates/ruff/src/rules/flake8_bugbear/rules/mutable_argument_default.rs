@@ -110,10 +110,7 @@ pub(crate) fn mutable_argument_default(
                     )
                     .as_str(),
                 );
-                let check_edit = Edit::insertion(
-                    check_lines,
-                    body[0].start(),
-                );
+                let check_edit = Edit::insertion(check_lines, body[0].start());
 
                 diagnostic.set_fix(Fix::automatic_edits(arg_edit, [check_edit]));
                 checker.diagnostics.push(diagnostic);
