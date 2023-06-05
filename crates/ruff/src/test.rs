@@ -81,6 +81,7 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
         &directives,
         settings,
         flags::Noqa::Enabled,
+        None,
     );
 
     let source_has_errors = error.is_some();
@@ -137,6 +138,7 @@ fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Messag
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
+                None,
             );
 
             if let Some(fixed_error) = fixed_error {

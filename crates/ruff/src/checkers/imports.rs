@@ -16,6 +16,7 @@ use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::Settings;
+use crate::source_kind::SourceKind;
 
 fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) -> Option<ImportMap> {
     let Some(package) = package else {
@@ -83,12 +84,13 @@ pub(crate) fn check_imports(
     stylist: &Stylist,
     path: &Path,
     package: Option<&Path>,
+    source_kind: Option<&SourceKind>,
 ) -> (Vec<Diagnostic>, Option<ImportMap>) {
     let is_stub = is_python_stub_file(path);
 
     // Extract all import blocks from the AST.
     let tracker = {
-        let mut tracker = BlockBuilder::new(locator, directives, is_stub);
+        let mut tracker = BlockBuilder::new(locator, directives, is_stub, source_kind);
         tracker.visit_body(python_ast);
         tracker
     };

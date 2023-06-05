@@ -78,6 +78,7 @@ pub fn check_path(
     directives: &Directives,
     settings: &Settings,
     noqa: flags::Noqa,
+    source_kind: Option<&SourceKind>,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -158,6 +159,7 @@ pub fn check_path(
                         stylist,
                         path,
                         package,
+                        source_kind,
                     );
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);
@@ -286,6 +288,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &directives,
         settings,
         flags::Noqa::Disabled,
+        None,
     );
 
     // Log any parse errors.
@@ -349,6 +352,7 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
+        None,
     );
 
     result.map(|(diagnostics, imports)| {
@@ -440,6 +444,7 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
+            Some(source_kind),
         );
 
         if iterations == 0 {

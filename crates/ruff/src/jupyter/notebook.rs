@@ -332,6 +332,12 @@ impl Notebook {
         self.index.get_or_init(|| self.build_index())
     }
 
+    /// Return the cell offsets for the concatenated source code corresponding
+    /// the Jupyter notebook.
+    pub fn cell_offsets(&self) -> &[TextSize] {
+        &self.cell_offsets
+    }
+
     /// Update the notebook with the given edits and transformed content.
     pub fn update(&mut self, edits: BTreeSet<&Edit>, transformed: &str) {
         self.update_cell_offsets(edits);
