@@ -1098,6 +1098,7 @@ dependencies = [
  "ruff_python_formatter",
  "rustpython-ast",
  "rustpython-parser",
+ "similar",
 ]
 
 [[package]]

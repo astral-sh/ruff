@@ -21,6 +21,7 @@ ruff_python_ast = { path = "../crates/ruff_python_ast" }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
 rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["all-nodes-with-ranges"]}
 rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
+similar = { version = "2.2.1" }
 
 # Prevent this from interfering with workspaces
 [workspace]
