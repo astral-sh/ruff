@@ -72,7 +72,7 @@ impl AlwaysAutofixableViolation for ImplicitOptional {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ConversionType {
     /// Conversion using the `|` operator e.g., `str | None`
     BinOpOr,
@@ -99,7 +99,8 @@ impl From<PythonVersion> for ConversionType {
     }
 }
 
-/// Custom iterator to collect all the `|`-separated expressions in a union.
+/// Custom iterator to collect all the `|` separated expressions in a PEP 604
+/// union type.
 struct PEP604UnionIterator<'a> {
     stack: Vec<&'a Expr>,
 }
@@ -323,7 +324,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
         let conversion_type = checker.settings.target_version.into();
         let mut diagnostic = Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| generate_fix(&checker, conversion_type, expr));
+            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
         }
         checker.diagnostics.push(diagnostic);
     }
