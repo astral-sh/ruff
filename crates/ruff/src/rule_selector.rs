@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
+use crate::codes::RuleCodePrefix;
 use crate::codes::RuleIter;
-use crate::codes::{self, RuleCodePrefix};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
-    /// Select all rules.
+    /// Select all stable rules.
     All,
     /// Select all nursery rules.
     Nursery,
@@ -144,13 +144,6 @@ impl From<RuleCodePrefix> for RuleSelector {
     }
 }
 
-/// Returns `true` if the given rule should be selected by the `RuleSelector::All` selector.
-fn select_all(rule: Rule) -> bool {
-    // Nursery rules have to be explicitly selected, so we ignore them when looking at
-    // prefixes.
-    !rule.is_nursery()
-}
-
 impl IntoIterator for &RuleSelector {
     type Item = Rule;
     type IntoIter = RuleSelectorIter;
@@ -158,10 +151,10 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => {
-                RuleSelectorIter::All(Rule::iter().filter(|rule| select_all(*rule)))
+                RuleSelectorIter::All(Rule::iter().filter(|rule| !rule.is_nursery()))
             }
             RuleSelector::Nursery => {
-                RuleSelectorIter::Nursery(Rule::iter().filter(codes::Rule::is_nursery))
+                RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
             }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
