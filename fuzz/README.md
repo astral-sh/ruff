@@ -25,6 +25,9 @@ cargo fuzz run -s none name_of_fuzzer -- -timeout=1
 You can view the names of the available fuzzers with `cargo fuzz list`.
 For specific details about how each fuzzer works, please read this document in its entirety.
 
+**IMPORTANT: You should run `./reinit-fuzzer.sh` after adding more file-based testcases.** This will
+allow the testing of new features that you've added unit tests for.
+
 ### Debugging a crash
 
 Once you've found a crash, you'll need to debug it.
