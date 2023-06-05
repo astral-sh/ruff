@@ -5,7 +5,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 cd "$SCRIPT_DIR"
 
-cd corpus/ruff_parse_simple
+cd corpus/ruff_fix_validity
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   curl -L 'https://zenodo.org/record/3628784/files/python-corpus.tar.gz?download=1' | tar xz
 fi
