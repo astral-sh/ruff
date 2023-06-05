@@ -4,7 +4,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Constant, Expr, Identifier, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -425,7 +425,9 @@ pub struct StringDotFormatExtraPositionalArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
+impl Violation for StringDotFormatExtraPositionalArguments {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatExtraPositionalArguments { missing } = self;
@@ -433,10 +435,12 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
         format!("`.format` call has unused arguments at position(s): {message}")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let StringDotFormatExtraPositionalArguments { missing } = self;
         let message = missing.join(", ");
-        format!("Remove extra positional arguments at position(s): {message}")
+        Some(format!(
+            "Remove extra positional arguments at position(s): {message}"
+        ))
     }
 }
 
