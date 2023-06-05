@@ -1,11 +1,12 @@
 use anyhow::Result;
 use libcst_native::{
-    AsName, AssignTargetExpression, Attribute, Codegen, CodegenState, Dot, Expression, Import,
-    ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
+    AsName, AssignTargetExpression, Attribute, Dot, Expression, Import, ImportAlias, ImportFrom,
+    ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
 use rustpython_parser::ast::{self, Expr, Ranged, Stmt};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
@@ -137,14 +138,7 @@ fn format_import(
     } else {
         import.names = clean_aliases;
 
-        let mut state = CodegenState {
-            default_newline: &stylist.line_ending(),
-            default_indent: stylist.indentation(),
-            ..CodegenState::default()
-        };
-        tree.codegen(&mut state);
-
-        let mut content = state.to_string();
+        let mut content = tree.codegen_stylist(stylist);
         content.push_str(&stylist.line_ending());
         content.push_str(indent);
         content.push_str(&format_mocks(mock_aliases, indent, stylist));
@@ -187,13 +181,7 @@ fn format_import_from(
             lpar: vec![],
             rpar: vec![],
         })));
-        let mut state = CodegenState {
-            default_newline: &stylist.line_ending(),
-            default_indent: stylist.indentation(),
-            ..CodegenState::default()
-        };
-        tree.codegen(&mut state);
-        Ok(state.to_string())
+        Ok(tree.codegen_stylist(stylist))
     } else if let ImportFrom {
         names: ImportNames::Aliases(aliases),
         ..
@@ -224,14 +212,7 @@ fn format_import_from(
                 rpar: vec![],
             })));
 
-            let mut state = CodegenState {
-                default_newline: &stylist.line_ending(),
-                default_indent: stylist.indentation(),
-                ..CodegenState::default()
-            };
-            tree.codegen(&mut state);
-
-            let mut content = state.to_string();
+            let mut content = tree.codegen_stylist(stylist);
             if !mock_aliases.is_empty() {
                 content.push_str(&stylist.line_ending());
                 content.push_str(indent);
