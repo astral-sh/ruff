@@ -2131,11 +2131,11 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
 /// The first variant is the most flat, and the last is the most expanded variant.
 /// See [`best_fitting!`] macro for a more in-detail documentation
 #[derive(Copy, Clone)]
-pub struct BestFitting<'a, Context> {
+pub struct FormatBestFitting<'a, Context> {
     variants: Arguments<'a, Context>,
 }
 
-impl<'a, Context> BestFitting<'a, Context> {
+impl<'a, Context> FormatBestFitting<'a, Context> {
     /// Creates a new best fitting IR with the given variants. The method itself isn't unsafe
     /// but it is to discourage people from using it because the printer will panic if
     /// the slice doesn't contain at least the least and most expanded variants.
@@ -2154,7 +2154,7 @@ impl<'a, Context> BestFitting<'a, Context> {
     }
 }
 
-impl<Context> Format<Context> for BestFitting<'_, Context> {
+impl<Context> Format<Context> for FormatBestFitting<'_, Context> {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let mut buffer = VecBuffer::new(f.state_mut());
         let variants = self.variants.items();

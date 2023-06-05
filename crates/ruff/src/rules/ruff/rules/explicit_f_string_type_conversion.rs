@@ -59,7 +59,7 @@ fn fix_explicit_f_string_type_conversion(
     let formatted_string = match_formatted_string(&mut expression)?;
 
     // Replace the formatted call expression at `index` with a conversion flag.
-    let mut formatted_string_expression =
+    let formatted_string_expression =
         match_formatted_string_expression(&mut formatted_string.parts[index])?;
     let call = match_call_mut(&mut formatted_string_expression.expression)?;
     let name = match_name(&call.func)?;

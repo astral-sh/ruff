@@ -89,12 +89,13 @@ if __name__ == "__main__":
 @@ -1,11 +1,6 @@
  while True:
      if something.changed:
-         do.stuff()  # trailing comment
+-        do.stuff()  # trailing comment
 -        # Comment belongs to the `if` block.
 -    # This one belongs to the `while` block.
 -
 -    # Should this one, too?  I guess so.
 -
++        do.stuff()
  # This one is properly standalone now.
  
  for i in range(100):
@@ -161,7 +162,7 @@ if __name__ == "__main__":
 ```py
 while True:
     if something.changed:
-        do.stuff()  # trailing comment
+        do.stuff()
 # This one is properly standalone now.
 
 for i in range(100):

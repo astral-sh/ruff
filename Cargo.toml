@@ -3,7 +3,7 @@ members = ["crates/*"]
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.69"
+rust-version = "1.70"
 homepage = "https://beta.ruff.rs/docs/"
 documentation = "https://beta.ruff.rs/docs/"
 repository = "https://github.com/charliermarsh/ruff"

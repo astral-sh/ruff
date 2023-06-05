@@ -59,7 +59,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
     let contents = locator.slice(range);
 
     let mut expression = match_expression(contents)?;
-    let mut comparison = match_comparison(&mut expression)?;
+    let comparison = match_comparison(&mut expression)?;
 
     let left = (*comparison.left).clone();
 

@@ -1,8 +1,6 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{
-    Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
-};
+use ruff_python_semantic::binding::Binding;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -66,11 +64,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
     binding: &Binding,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let full_name = match &binding.kind {
-        BindingKind::Importation(Importation { full_name }) => full_name,
-        BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => full_name,
-        _ => return,
+    let Some(qualified_name) = binding.qualified_name() else {
+        return;
     };
 
     let Some(reference_id) = binding.references.first() else {
@@ -89,7 +84,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     {
         let mut diagnostic = Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
-                full_name: full_name.to_string(),
+                full_name: qualified_name.to_string(),
             },
             binding.range,
         );
@@ -102,7 +97,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 let stmt = checker.semantic_model().stmts[source];
                 let parent = checker.semantic_model().stmts.parent(stmt);
                 let remove_import_edit = autofix::edits::remove_unused_imports(
-                    std::iter::once(full_name),
+                    std::iter::once(qualified_name),
                     stmt,
                     parent,
                     checker.locator,
@@ -113,7 +108,10 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 // Step 2) Add the import to the top-level.
                 let reference = checker.semantic_model().references.resolve(*reference_id);
                 let add_import_edit = checker.importer.runtime_import_edit(
-                    &StmtImport { stmt, full_name },
+                    &StmtImport {
+                        stmt,
+                        full_name: qualified_name,
+                    },
                     reference.range().start(),
                 )?;
 

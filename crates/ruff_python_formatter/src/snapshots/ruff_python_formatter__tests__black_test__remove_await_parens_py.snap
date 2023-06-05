@@ -143,7 +143,7 @@ async def main():
 -
 +    await (
 +        asyncio.sleep(1)
-+    )  # Hello
++    )
  # Long lines
  async def main():
 -    await asyncio.gather(
@@ -251,7 +251,7 @@ async def main():
 async def main():
     await (
         asyncio.sleep(1)
-    )  # Hello
+    )
 # Long lines
 async def main():
     await asyncio.gather(asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1))
