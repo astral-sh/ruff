@@ -32,7 +32,7 @@ for (((((k, v))))) in d.items():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,27 +1,15 @@
+@@ -1,27 +1,16 @@
  # Only remove tuple brackets after `for`
 -for k, v in d.items():
 +for (k, v) in d.items():
@@ -50,7 +50,7 @@ for (((((k, v))))) in d.items():
 -) in d.items():
 +for (why_would_anyone_choose_to_name_a_loop_variable_with_a_name_this_long, i_dont_know_but_we_should_still_check_the_behaviour_if_they_do) in d.items():
      print(k, v)
--
+ 
 -for (
 -    k,
 -    v,
@@ -79,6 +79,7 @@ for module in (core, _unicodefun):
 # Brackets remain for long for loop lines
 for (why_would_anyone_choose_to_name_a_loop_variable_with_a_name_this_long, i_dont_know_but_we_should_still_check_the_behaviour_if_they_do) in d.items():
     print(k, v)
+
 for (k, v) in dfkasdjfldsjflkdsjflkdsjfdslkfjldsjfgkjdshgkljjdsfldgkhsdofudsfudsofajdslkfjdslkfjldisfjdffjsdlkfjdlkjjkdflskadjldkfjsalkfjdasj.items():
     print(k, v)
 # Test deeply nested brackets

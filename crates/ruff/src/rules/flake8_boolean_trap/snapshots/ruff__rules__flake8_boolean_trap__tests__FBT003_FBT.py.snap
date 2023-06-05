@@ -28,4 +28,12 @@ FBT.py:57:17: FBT003 Boolean positional value in function call
 61 | mylist.index(True)
    |
 
+FBT.py:69:38: FBT003 Boolean positional value in function call
+   |
+69 | os.set_blocking(0, False)
+70 | g_action.set_enabled(True)
+71 | settings.set_enable_developer_extras(True)
+   |                                      ^^^^ FBT003
+   |
+
 

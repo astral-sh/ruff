@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Ok, Result};
-use libcst_native::{Codegen, CodegenState, DictElement, Expression};
+use libcst_native::{DictElement, Expression};
 use ruff_text_size::TextRange;
 use rustpython_format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
@@ -7,6 +7,7 @@ use rustpython_format::{
 use rustpython_parser::ast::{Excepthandler, Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::{leading_quote, raw_contents, trailing_quote};
@@ -33,14 +34,10 @@ pub(crate) fn remove_unused_format_arguments_from_dict(
         } if raw_contents(name.value).map_or(false, |name| unused_arguments.contains(&name)))
     });
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), stmt.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        stmt.range(),
+    ))
 }
 
 /// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
@@ -57,14 +54,10 @@ pub(crate) fn remove_unused_keyword_arguments_from_format_call(
     call.args
         .retain(|e| !matches!(&e.keyword, Some(kw) if unused_arguments.contains(&kw.value)));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), location))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        location,
+    ))
 }
 
 fn unparse_format_part(format_part: FormatPart) -> String {
@@ -193,14 +186,10 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
         simple_string.value = new_format_string.as_str();
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), location))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        location,
+    ))
 }
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.

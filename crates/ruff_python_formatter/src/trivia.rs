@@ -41,7 +41,6 @@ pub(crate) fn find_first_non_trivia_character_in_range(
 }
 
 /// Returns the number of newlines between `offset` and the first non whitespace character in the source code.
-#[allow(unused)] // TODO(micha) Remove after using for statements.
 pub(crate) fn lines_before(code: &str, offset: TextSize) -> u32 {
     let head = &code[TextRange::up_to(offset)];
     let mut newlines = 0u32;

@@ -259,7 +259,10 @@ impl From<&Configuration> for RuleTable {
         // The select_set keeps track of which rules have been selected.
         let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.into_iter().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All
+            .into_iter()
+            .chain(RuleSelector::Nursery.into_iter())
+            .collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`

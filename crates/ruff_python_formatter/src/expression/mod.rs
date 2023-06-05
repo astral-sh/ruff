@@ -29,6 +29,7 @@ pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
+pub(crate) mod maybe_parenthesize;
 
 #[derive(Default)]
 pub struct FormatExpr;

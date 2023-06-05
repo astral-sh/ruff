@@ -3,11 +3,12 @@
 use std::error::Error;
 
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
+use libcst_native::{ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
 use crate::autofix;
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -324,13 +325,10 @@ impl<'a> Importer<'a> {
             asname: None,
             comma: aliases.last().and_then(|alias| alias.comma.clone()),
         });
-        let mut state = CodegenState {
-            default_newline: &self.stylist.line_ending(),
-            default_indent: self.stylist.indentation(),
-            ..CodegenState::default()
-        };
-        statement.codegen(&mut state);
-        Ok(Edit::range_replacement(state.to_string(), stmt.range()))
+        Ok(Edit::range_replacement(
+            statement.codegen_stylist(self.stylist),
+            stmt.range(),
+        ))
     }
 
     /// Add a `TYPE_CHECKING` block to the given module.
