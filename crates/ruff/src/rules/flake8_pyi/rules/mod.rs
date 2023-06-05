@@ -24,6 +24,7 @@ pub(crate) use simple_defaults::{
     unassigned_special_variable_in_stub, ArgumentDefaultInStub, AssignmentDefaultInStub,
     TypedArgumentDefaultInStub, UnannotatedAssignmentInStub, UnassignedSpecialVariableInStub,
 };
+pub(crate) use str_or_repr_defined_in_stub::{str_or_repr_defined_in_stub, StrOrReprDefinedInStub};
 pub(crate) use string_or_bytes_too_long::{string_or_bytes_too_long, StringOrBytesTooLong};
 pub(crate) use stub_body_multiple_statements::{
     stub_body_multiple_statements, StubBodyMultipleStatements,
@@ -54,6 +55,7 @@ mod pass_statement_stub_body;
 mod prefix_type_params;
 mod quoted_annotation_in_stub;
 mod simple_defaults;
+mod str_or_repr_defined_in_stub;
 mod string_or_bytes_too_long;
 mod stub_body_multiple_statements;
 mod type_alias_naming;
