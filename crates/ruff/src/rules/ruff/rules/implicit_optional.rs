@@ -136,6 +136,7 @@ impl<'a> Iterator for PEP604UnionIterator<'a> {
 #[derive(Debug)]
 enum TypingTarget<'a> {
     None,
+    Any,
     Optional,
     Union(Vec<&'a Expr>),
     Literal(Vec<&'a Expr>),
@@ -169,14 +170,20 @@ impl<'a> TypingTarget<'a> {
                 value: Constant::None,
                 ..
             }) => Some(TypingTarget::None),
-            _ => None,
+            _ => {
+                if model.match_typing_expr(expr, "Any") {
+                    Some(TypingTarget::Any)
+                } else {
+                    None
+                }
+            }
         }
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `None`.
     fn is_implicit_optional(&self, model: &SemanticModel) -> bool {
         match self {
-            Self::None | Self::Optional => true,
+            Self::None | Self::Optional | Self::Any => true,
             Self::Literal(elements) => elements.iter().any(|element| {
                 let Some(new_target) = Self::try_from_expr(model, element) else {
                 return false;
@@ -226,8 +233,8 @@ fn type_hint_explicitly_allows_none<'a>(
         return Some(annotation);
     };
     match target {
-        // Short circuit on top level `None` or `Optional`
-        TypingTarget::None | TypingTarget::Optional => None,
+        // Short circuit on top level `None`, `Any` or `Optional`
+        TypingTarget::None | TypingTarget::Optional | TypingTarget::Any => None,
         // Top level `Annotated` node should check for the inner type and
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should

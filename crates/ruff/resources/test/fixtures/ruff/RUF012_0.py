@@ -1,5 +1,5 @@
 import typing
-from typing import Annotated, Literal, Optional, Tuple, Union
+from typing import Annotated, Any, Literal, Optional, Tuple, Union
 
 
 def f(arg: int):
@@ -7,6 +7,10 @@ def f(arg: int):
 
 
 def f(arg=None):
+    pass
+
+
+def f(arg: Any = None):
     pass
 
 
@@ -49,6 +53,10 @@ def f(arg: Union[str, None] = None):
 
 
 def f(arg: typing.Union[int, str, None] = None):
+    pass
+
+
+def f(arg: Union[int, str, Any] = None):
     pass
 
 
@@ -114,6 +122,10 @@ def f(arg: Annotated[Optional[int], ...] = None):
 
 
 def f(arg: Annotated[Union[int, None], ...] = None):
+    pass
+
+
+def f(arg: Annotated[Any, ...] = None):
     pass
 
 
