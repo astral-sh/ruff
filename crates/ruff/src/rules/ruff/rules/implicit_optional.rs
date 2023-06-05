@@ -290,19 +290,19 @@ fn generate_fix(checker: &Checker, expr: &Expr) -> Result<Fix> {
 
 /// RUF011
 pub(crate) fn implicit_optional(checker: &mut Checker, arguments: &Arguments) {
-	let arguments_with_defaults = arguments
-      .kwonlyargs
-      .iter()
-      .rev()
-      .zip(arguments.kw_defaults.iter().rev())
-      .chain(
-          arguments
-              .args
-              .iter()
-              .rev()
-              .chain(arguments.posonlyargs.iter().rev())
-              .zip(arguments.defaults.iter().rev()),
-	);	
+    let arguments_with_defaults = arguments
+        .kwonlyargs
+        .iter()
+        .rev()
+        .zip(arguments.kw_defaults.iter().rev())
+        .chain(
+            arguments
+                .args
+                .iter()
+                .rev()
+                .chain(arguments.posonlyargs.iter().rev())
+                .zip(arguments.defaults.iter().rev()),
+        );
     for (arg, default) in arguments_with_defaults {
         if !matches!(
             default,
