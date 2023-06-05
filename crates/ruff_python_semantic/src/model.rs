@@ -327,7 +327,9 @@ impl<'a> SemanticModel<'a> {
         let head = call_path.first()?;
         let binding = self.find_binding(head)?;
         match &binding.kind {
-            BindingKind::Importation(Importation { full_name: name }) => {
+            BindingKind::Importation(Importation {
+                qualified_name: name,
+            }) => {
                 if name.starts_with('.') {
                     let mut source_path = from_relative_import(self.module_path?, name);
                     if source_path.is_empty() {
@@ -342,13 +344,17 @@ impl<'a> SemanticModel<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name: name }) => {
+            BindingKind::SubmoduleImportation(SubmoduleImportation {
+                qualified_name: name,
+            }) => {
                 let name = name.split('.').next().unwrap_or(name);
                 let mut source_path: CallPath = from_unqualified_name(name);
                 source_path.extend(call_path.into_iter().skip(1));
                 Some(source_path)
             }
-            BindingKind::FromImportation(FromImportation { full_name: name }) => {
+            BindingKind::FromImportation(FromImportation {
+                qualified_name: name,
+            }) => {
                 if name.starts_with('.') {
                     let mut source_path = from_relative_import(self.module_path?, name);
                     if source_path.is_empty() {
@@ -397,8 +403,8 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { full_name }) => {
-                        if full_name == &module {
+                    BindingKind::Importation(Importation { qualified_name }) => {
+                        if qualified_name == &module {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
                                 if self
@@ -418,8 +424,9 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { full_name }) => {
-                        if let Some((target_module, target_member)) = full_name.split_once('.') {
+                    BindingKind::FromImportation(FromImportation { qualified_name }) => {
+                        if let Some((target_module, target_member)) = qualified_name.split_once('.')
+                        {
                             if target_module == module && target_member == member {
                                 if let Some(source) = binding.source {
                                     // Verify that `join` isn't bound in an inner scope.

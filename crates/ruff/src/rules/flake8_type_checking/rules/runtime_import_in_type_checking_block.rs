@@ -39,7 +39,7 @@ use crate::registry::AsRule;
 /// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for RuntimeImportInTypeCheckingBlock {
@@ -47,9 +47,9 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RuntimeImportInTypeCheckingBlock { full_name } = self;
+        let RuntimeImportInTypeCheckingBlock { qualified_name } = self;
         format!(
-            "Move import `{full_name}` out of type-checking block. Import is used for more than type hinting."
+            "Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting."
         )
     }
 
@@ -84,7 +84,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     {
         let mut diagnostic = Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
-                full_name: qualified_name.to_string(),
+                qualified_name: qualified_name.to_string(),
             },
             binding.range,
         );
@@ -110,7 +110,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 let add_import_edit = checker.importer.runtime_import_edit(
                     &StmtImport {
                         stmt,
-                        full_name: qualified_name,
+                        qualified_name,
                     },
                     reference.range().start(),
                 )?;

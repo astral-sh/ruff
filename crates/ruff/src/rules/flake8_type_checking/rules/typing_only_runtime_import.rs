@@ -45,7 +45,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyFirstPartyImport {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for TypingOnlyFirstPartyImport {
@@ -55,7 +55,7 @@ impl Violation for TypingOnlyFirstPartyImport {
     fn message(&self) -> String {
         format!(
             "Move application import `{}` into a type-checking block",
-            self.full_name
+            self.qualified_name
         )
     }
 
@@ -101,7 +101,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyThirdPartyImport {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for TypingOnlyThirdPartyImport {
@@ -111,7 +111,7 @@ impl Violation for TypingOnlyThirdPartyImport {
     fn message(&self) -> String {
         format!(
             "Move third-party import `{}` into a type-checking block",
-            self.full_name
+            self.qualified_name
         )
     }
 
@@ -157,7 +157,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyStandardLibraryImport {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for TypingOnlyStandardLibraryImport {
@@ -167,7 +167,7 @@ impl Violation for TypingOnlyStandardLibraryImport {
     fn message(&self) -> String {
         format!(
             "Move standard library import `{}` into a type-checking block",
-            self.full_name
+            self.qualified_name
         )
     }
 
@@ -274,7 +274,7 @@ pub(crate) fn typing_only_runtime_import(
             ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                 Diagnostic::new(
                     TypingOnlyFirstPartyImport {
-                        full_name: qualified_name.to_string(),
+                        qualified_name: qualified_name.to_string(),
                     },
                     binding.range,
                 )
@@ -282,14 +282,14 @@ pub(crate) fn typing_only_runtime_import(
             ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
                 Diagnostic::new(
                     TypingOnlyThirdPartyImport {
-                        full_name: qualified_name.to_string(),
+                        qualified_name: qualified_name.to_string(),
                     },
                     binding.range,
                 )
             }
             ImportSection::Known(ImportType::StandardLibrary) => Diagnostic::new(
                 TypingOnlyStandardLibraryImport {
-                    full_name: qualified_name.to_string(),
+                    qualified_name: qualified_name.to_string(),
                 },
                 binding.range,
             ),
@@ -319,7 +319,7 @@ pub(crate) fn typing_only_runtime_import(
                 let add_import_edit = checker.importer.typing_import_edit(
                     &StmtImport {
                         stmt,
-                        full_name: qualified_name,
+                        qualified_name,
                     },
                     reference.range().start(),
                     checker.semantic_model(),
