@@ -51,6 +51,10 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         return
     };
 
+    let Some(returns) = returns else {
+        return;
+    };
+
     if !matches!(name.as_str(), "__str__" | "__repr__") {
         return;
     }
@@ -68,10 +72,6 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
     if is_abstract(checker.semantic_model(), decorator_list) {
         return;
     }
-
-    let Some(returns) = returns else {
-        return;
-    };
 
     if checker
         .semantic_model()
