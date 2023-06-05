@@ -56,7 +56,6 @@ impl AlwaysAutofixableViolation for MutableArgumentDefault {
         format!("Do not use mutable data structures for argument defaults")
     }
     fn autofix_title(&self) -> String {
-        // TODO: Fix message
         format!("Replace mutable data structure with `None` in argument default and replace it with data structure inside the function if still `None`")
     }
 }
@@ -67,7 +66,6 @@ pub(crate) fn mutable_argument_default(
     arguments: &Arguments,
     body: &[Stmt],
 ) {
-    let mut invalid_defaults = vec![];
     // Scan in reverse order to right-align zip().
     for ArgWithDefault {
         def,
@@ -88,25 +86,34 @@ pub(crate) fn mutable_argument_default(
                 is_immutable_annotation(expr, checker.semantic())
             })
         {
-            invalid_defaults.push((arg, default));
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
+
             if checker.patch(diagnostic.kind.rule()) {
+                // Set the default arg value to None
                 let arg_edit = Edit::range_replacement("None".to_string(), default.range());
+
+                // Add conditional check to set the default arg to its original value if still None
                 let mut check_lines = String::new();
+                let indentation = checker.locator.slice(TextRange::new(
+                    checker.locator.line_start(body[0].start()),
+                    body[0].start(),
+                ));
+                let indentation = leading_space(indentation);
                 check_lines.push_str(format!("if {} is None:\n", arg.arg.as_str()).as_str());
-                let indent = checker.stylist.indentation();
-                check_lines.push_str(indent);
-                check_lines.push_str(indent);
                 check_lines.push_str(
                     format!(
-                        "{} = {}\n",
+                        "{}    {} = {}\n{}",
+                        indentation,
                         arg.arg.as_str(),
-                        checker.generator().expr(default)
+                        checker.generator().expr(default),
+                        indentation
                     )
                     .as_str(),
                 );
-                check_lines.push_str(indent);
-                let check_edit = Edit::insertion(check_lines, body[0].start());
+                let check_edit = Edit::insertion(
+                    check_lines,
+                    body[0].start(),
+                );
 
                 diagnostic.set_fix(Fix::automatic_edits(arg_edit, [check_edit]));
                 checker.diagnostics.push(diagnostic);
