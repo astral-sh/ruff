@@ -92,6 +92,7 @@ pub enum AnyNode {
     Alias(Alias<TextRange>),
     Withitem(Withitem<TextRange>),
     MatchCase(MatchCase<TextRange>),
+    Decorator(Decorator<TextRange>),
 }
 
 impl AnyNode {
@@ -172,7 +173,8 @@ impl AnyNode {
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::Withitem(_)
-            | AnyNode::MatchCase(_) => None,
+            | AnyNode::MatchCase(_)
+            | AnyNode::Decorator(_) => None,
         }
     }
 
@@ -253,7 +255,8 @@ impl AnyNode {
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::Withitem(_)
-            | AnyNode::MatchCase(_) => None,
+            | AnyNode::MatchCase(_)
+            | AnyNode::Decorator(_) => None,
         }
     }
 
@@ -334,7 +337,8 @@ impl AnyNode {
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::Withitem(_)
-            | AnyNode::MatchCase(_) => None,
+            | AnyNode::MatchCase(_)
+            | AnyNode::Decorator(_) => None,
         }
     }
 
@@ -415,7 +419,8 @@ impl AnyNode {
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::Withitem(_)
-            | AnyNode::MatchCase(_) => None,
+            | AnyNode::MatchCase(_)
+            | AnyNode::Decorator(_) => None,
         }
     }
 
@@ -496,7 +501,8 @@ impl AnyNode {
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::Withitem(_)
-            | AnyNode::MatchCase(_) => None,
+            | AnyNode::MatchCase(_)
+            | AnyNode::Decorator(_) => None,
         }
     }
 
@@ -577,7 +583,8 @@ impl AnyNode {
             | AnyNode::Keyword(_)
             | AnyNode::Alias(_)
             | AnyNode::Withitem(_)
-            | AnyNode::MatchCase(_) => None,
+            | AnyNode::MatchCase(_)
+            | AnyNode::Decorator(_) => None,
         }
     }
 
@@ -682,6 +689,7 @@ impl AnyNode {
             Self::Alias(node) => AnyNodeRef::Alias(node),
             Self::Withitem(node) => AnyNodeRef::Withitem(node),
             Self::MatchCase(node) => AnyNodeRef::MatchCase(node),
+            Self::Decorator(node) => AnyNodeRef::Decorator(node),
         }
     }
 
@@ -2793,6 +2801,35 @@ impl AstNode for MatchCase<TextRange> {
     }
 }
 
+impl AstNode for Decorator<TextRange> {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::Decorator(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::Decorator(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+}
+
 impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
@@ -3346,6 +3383,11 @@ impl From<MatchCase> for AnyNode {
         AnyNode::MatchCase(node)
     }
 }
+impl From<Decorator> for AnyNode {
+    fn from(node: Decorator) -> Self {
+        AnyNode::Decorator(node)
+    }
+}
 
 impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
@@ -3425,6 +3467,7 @@ impl Ranged for AnyNode {
             AnyNode::Alias(node) => node.range(),
             AnyNode::Withitem(node) => node.range(),
             AnyNode::MatchCase(node) => node.range(),
+            AnyNode::Decorator(node) => node.range(),
         }
     }
 }
@@ -3506,6 +3549,7 @@ pub enum AnyNodeRef<'a> {
     Alias(&'a Alias<TextRange>),
     Withitem(&'a Withitem<TextRange>),
     MatchCase(&'a MatchCase<TextRange>),
+    Decorator(&'a Decorator<TextRange>),
 }
 
 impl AnyNodeRef<'_> {
@@ -3586,6 +3630,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Alias(node) => NonNull::from(*node).cast(),
             AnyNodeRef::Withitem(node) => NonNull::from(*node).cast(),
             AnyNodeRef::MatchCase(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::Decorator(node) => NonNull::from(*node).cast(),
         }
     }
 
@@ -3672,6 +3717,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Alias(_) => NodeKind::Alias,
             AnyNodeRef::Withitem(_) => NodeKind::Withitem,
             AnyNodeRef::MatchCase(_) => NodeKind::MatchCase,
+            AnyNodeRef::Decorator(_) => NodeKind::Decorator,
         }
     }
 
@@ -3752,7 +3798,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::Withitem(_)
-            | AnyNodeRef::MatchCase(_) => false,
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::Decorator(_) => false,
         }
     }
 
@@ -3833,7 +3880,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::Withitem(_)
-            | AnyNodeRef::MatchCase(_) => false,
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::Decorator(_) => false,
         }
     }
 
@@ -3914,7 +3962,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::Withitem(_)
-            | AnyNodeRef::MatchCase(_) => false,
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::Decorator(_) => false,
         }
     }
 
@@ -3995,7 +4044,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::Withitem(_)
-            | AnyNodeRef::MatchCase(_) => false,
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::Decorator(_) => false,
         }
     }
 
@@ -4076,7 +4126,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::Withitem(_)
-            | AnyNodeRef::MatchCase(_) => false,
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::Decorator(_) => false,
         }
     }
 
@@ -4157,7 +4208,8 @@ impl AnyNodeRef<'_> {
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::Withitem(_)
-            | AnyNodeRef::MatchCase(_) => false,
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::Decorator(_) => false,
         }
     }
 }
@@ -4570,6 +4622,12 @@ impl<'a> From<&'a TypeIgnoreTypeIgnore> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a Decorator> for AnyNodeRef<'a> {
+    fn from(node: &'a Decorator) -> Self {
+        AnyNodeRef::Decorator(node)
+    }
+}
+
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match stmt {
@@ -4796,6 +4854,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::Alias(node) => node.range(),
             AnyNodeRef::Withitem(node) => node.range(),
             AnyNodeRef::MatchCase(node) => node.range(),
+            AnyNodeRef::Decorator(node) => node.range(),
         }
     }
 }
@@ -4877,4 +4936,5 @@ pub enum NodeKind {
     Alias,
     Withitem,
     MatchCase,
+    Decorator,
 }

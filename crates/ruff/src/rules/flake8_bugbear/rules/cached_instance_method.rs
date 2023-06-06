@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -26,14 +26,14 @@ fn is_cache_func(model: &SemanticModel, expr: &Expr) -> bool {
 }
 
 /// B019
-pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
+pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Decorator]) {
     if !checker.semantic_model().scope().kind.is_class() {
         return;
     }
     for decorator in decorator_list {
         // TODO(charlie): This should take into account `classmethod-decorators` and
         // `staticmethod-decorators`.
-        if let Expr::Name(ast::ExprName { id, .. }) = decorator {
+        if let Expr::Name(ast::ExprName { id, .. }) = &decorator.expression {
             if id == "classmethod" || id == "staticmethod" {
                 return;
             }
@@ -42,9 +42,9 @@ pub(crate) fn cached_instance_method(checker: &mut Checker, decorator_list: &[Ex
     for decorator in decorator_list {
         if is_cache_func(
             checker.semantic_model(),
-            match decorator {
+            match &decorator.expression {
                 Expr::Call(ast::ExprCall { func, .. }) => func,
-                _ => decorator,
+                _ => &decorator.expression,
             },
         ) {
             checker

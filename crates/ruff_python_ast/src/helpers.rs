@@ -363,7 +363,9 @@ where
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
                 || returns
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
@@ -380,7 +382,9 @@ where
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
         }
         Stmt::Return(ast::StmtReturn {
             value,
