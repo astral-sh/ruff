@@ -84,6 +84,11 @@ def f():
 
 
 def f():
+    with (Nested(m)) as (cm):
+        pass
+
+
+def f():
     toplevel = tt = lexer.get_token()
     if not tt:
         break
