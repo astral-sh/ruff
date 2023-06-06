@@ -109,7 +109,21 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -19,14 +19,9 @@
+@@ -4,10 +4,12 @@
+ #
+ # Has many lines. Many, many lines.
+ # Many, many, many lines.
+-"""Module docstring.
++(
++    """Module docstring.
+ 
+ Possibly also many, many lines.
+ """
++)
+ 
+ import os.path
+ import sys
+@@ -19,9 +21,6 @@
      import fast
  except ImportError:
      import slow as fast
@@ -117,16 +131,9 @@ async def wat():
 -
 -# Some comment before a function.
  y = 1
--(
--    # some strings
--    y  # type: ignore
--)
-+# some strings
-+y  # type: ignore
- 
- 
- def function(default=None):
-@@ -93,4 +88,4 @@
+ (
+     # some strings
+@@ -93,4 +92,4 @@
  
  # Some closing comments.
  # Maybe Vim or Emacs directives for formatting.
@@ -144,10 +151,12 @@ async def wat():
 #
 # Has many lines. Many, many lines.
 # Many, many, many lines.
-"""Module docstring.
+(
+    """Module docstring.
 
 Possibly also many, many lines.
 """
+)
 
 import os.path
 import sys
@@ -160,8 +169,10 @@ try:
 except ImportError:
     import slow as fast
 y = 1
-# some strings
-y  # type: ignore
+(
+    # some strings
+    y  # type: ignore
+)
 
 
 def function(default=None):

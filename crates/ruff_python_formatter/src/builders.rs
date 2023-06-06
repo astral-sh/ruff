@@ -12,7 +12,7 @@ pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
     ///
     /// * [`NodeLevel::Module`]: Up to two empty lines
     /// * [`NodeLevel::CompoundStatement`]: Up to one empty line
-    /// * [`NodeLevel::Parenthesized`]: No empty lines
+    /// * [`NodeLevel::Expression`]: No empty lines
     fn join_nodes<'fmt>(&'fmt mut self, level: NodeLevel) -> JoinNodesBuilder<'fmt, 'ast, 'buf>;
 }
 
@@ -48,18 +48,18 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
     {
         let node_level = self.node_level;
         let separator = format_with(|f: &mut PyFormatter| match node_level {
-            NodeLevel::TopLevel => match lines_before(f.context().contents(), node.start()) {
+            NodeLevel::TopLevel => match lines_before(node.start(), f.context().contents()) {
                 0 | 1 => hard_line_break().fmt(f),
                 2 => empty_line().fmt(f),
                 _ => write!(f, [empty_line(), empty_line()]),
             },
             NodeLevel::CompoundStatement => {
-                match lines_before(f.context().contents(), node.start()) {
+                match lines_before(node.start(), f.context().contents()) {
                     0 | 1 => hard_line_break().fmt(f),
                     _ => empty_line().fmt(f),
                 }
             }
-            NodeLevel::Parenthesized => hard_line_break().fmt(f),
+            NodeLevel::Expression => hard_line_break().fmt(f),
         });
 
         self.entry_with_separator(&separator, content);
@@ -200,7 +200,7 @@ no_leading_newline = 30"#
     // Removes all empty lines
     #[test]
     fn ranged_builder_parenthesized_level() {
-        let printed = format_ranged(NodeLevel::Parenthesized);
+        let printed = format_ranged(NodeLevel::Expression);
 
         assert_eq!(
             &printed,

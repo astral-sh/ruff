@@ -76,16 +76,51 @@ x[
 ```diff
 --- Black
 +++ Ruff
-@@ -56,4 +56,8 @@
+@@ -31,14 +31,17 @@
+ ham[lower + offset : upper + offset]
+ 
+ slice[::, ::]
+-slice[
++(
++    slice[
+     # A
+     :
+     # B
+     :
+     # C
+ ]
+-slice[
++)
++(
++    slice[
+     # A
+     1:
+     # B
+@@ -46,8 +49,10 @@
+     # C
+     3
+ ]
++)
+ 
+-slice[
++(
++    slice[
+     # A
+     1
+     + 2 :
+@@ -56,4 +61,11 @@
      # C
      4
  ]
 -x[1:2:3]  # A  # B  # C
-+x[
++)
++(
++    x[
 +    1:  # A
 +    2:  # B
 +    3  # C
 +]
++)
 ```
 
 ## Ruff Output
@@ -124,14 +159,17 @@ ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
 ham[lower + offset : upper + offset]
 
 slice[::, ::]
-slice[
+(
+    slice[
     # A
     :
     # B
     :
     # C
 ]
-slice[
+)
+(
+    slice[
     # A
     1:
     # B
@@ -139,8 +177,10 @@ slice[
     # C
     3
 ]
+)
 
-slice[
+(
+    slice[
     # A
     1
     + 2 :
@@ -149,11 +189,14 @@ slice[
     # C
     4
 ]
-x[
+)
+(
+    x[
     1:  # A
     2:  # B
     3  # C
 ]
+)
 ```
 
 ## Black Output

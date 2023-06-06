@@ -168,7 +168,7 @@ if True:
 -    2,
 -    3,
 -]
-+[1, 2, 3,]
++[1, 2, 3]
  
 -division_result_tuple = (6 / 2,)
 +division_result_tuple = (6/2,)
@@ -250,7 +250,7 @@ for x in (1,):
 for (x,) in (1,), (2,), (3,):
     pass
 
-[1, 2, 3,]
+[1, 2, 3]
 
 division_result_tuple = (6/2,)
 print("foo %r", (foo.bar,))

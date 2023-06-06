@@ -51,7 +51,7 @@ where
         self.fmt_node(node, f)?;
         self.fmt_dangling_comments(node, f)?;
         self.fmt_trailing_comments(node, f)?;
-        write!(f, [source_position(node.start())])
+        write!(f, [source_position(node.end())])
     }
 
     /// Formats the node without comments. Ignores any suppression comments.
@@ -225,8 +225,11 @@ if    True:
 
         let formatted_code = printed.as_code();
 
-        let reformatted =
-            format_module(formatted_code).expect("Expected formatted code to be valid syntax");
+        let reformatted = format_module(formatted_code).unwrap_or_else(|err| {
+            panic!(
+                "Formatted code resulted introduced a syntax error {err:#?}. Code:\n{formatted_code}"
+            )
+        });
 
         if reformatted.as_code() != formatted_code {
             let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
@@ -314,7 +317,7 @@ Formatted twice:
         let formatted_code = printed.as_code();
 
         let reformatted =
-            format_module(formatted_code).expect("Expected formatted code to be valid syntax");
+            format_module(formatted_code).unwrap_or_else(|err| panic!("Expected formatted code to be valid syntax but it contains syntax errors: {err}\n{formatted_code}"));
 
         if reformatted.as_code() != formatted_code {
             let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
@@ -378,7 +381,9 @@ other
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
         // inside of a `Format` implementation
-        // dbg!(formatted.document());
+        // dbg!(formatted
+        //     .document()
+        //     .display(formatted.context().source_code()));
 
         let printed = formatted.print().unwrap();
 

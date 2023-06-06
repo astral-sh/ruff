@@ -520,8 +520,8 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     if preceding.ptr_eq(last_before_colon) {
         let mut start = preceding.end();
         while let Some((offset, c)) = find_first_non_trivia_character_in_range(
-            locator.contents(),
             TextRange::new(start, following.start()),
+            locator.contents(),
         ) {
             match c {
                 ':' => {
@@ -655,7 +655,7 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     );
 
     let operator_offset = loop {
-        match find_first_non_trivia_character_in_range(locator.contents(), between_operands_range) {
+        match find_first_non_trivia_character_in_range(between_operands_range, locator.contents()) {
             // Skip over closing parens
             Some((offset, ')')) => {
                 between_operands_range =
@@ -733,17 +733,17 @@ fn find_pos_only_slash_offset(
     locator: &Locator,
 ) -> Option<TextSize> {
     // First find the comma separating the two arguments
-    find_first_non_trivia_character_in_range(locator.contents(), between_arguments_range).and_then(
+    find_first_non_trivia_character_in_range(between_arguments_range, locator.contents()).and_then(
         |(comma_offset, comma)| {
             debug_assert_eq!(comma, ',');
 
             // Then find the position of the `/` operator
             find_first_non_trivia_character_in_range(
-                locator.contents(),
                 TextRange::new(
                     comma_offset + TextSize::new(1),
                     between_arguments_range.end(),
                 ),
+                locator.contents(),
             )
             .map(|(offset, c)| {
                 debug_assert_eq!(c, '/');

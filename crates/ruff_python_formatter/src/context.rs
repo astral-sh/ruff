@@ -82,5 +82,5 @@ pub(crate) enum NodeLevel {
     CompoundStatement,
 
     /// Formatting nodes that are enclosed in a parenthesized expression.
-    Parenthesized,
+    Expression,
 }
