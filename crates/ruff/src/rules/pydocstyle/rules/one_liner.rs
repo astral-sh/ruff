@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::NewlineWithTrailingNewline;
+use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 
 use crate::checkers::ast::Checker;

@@ -14,7 +14,7 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use crate::directives::IsortDirectives;
 use crate::registry::Rule;
 use crate::rules::isort;
-use crate::rules::isort::track::{Block, ImportTracker};
+use crate::rules::isort::block::{Block, BlockBuilder};
 use crate::settings::Settings;
 
 fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) -> Option<ImportMap> {
@@ -86,9 +86,9 @@ pub(crate) fn check_imports(
 ) -> (Vec<Diagnostic>, Option<ImportMap>) {
     let is_stub = is_python_stub_file(path);
 
-    // Extract all imports from the AST.
+    // Extract all import blocks from the AST.
     let tracker = {
-        let mut tracker = ImportTracker::new(locator, directives, is_stub);
+        let mut tracker = BlockBuilder::new(locator, directives, is_stub);
         tracker.visit_body(python_ast);
         tracker
     };
@@ -109,7 +109,7 @@ pub(crate) fn check_imports(
     }
     if settings.rules.enabled(Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
-            &blocks, python_ast, locator, stylist, settings, is_stub,
+            python_ast, locator, stylist, settings, is_stub,
         ));
     }
 

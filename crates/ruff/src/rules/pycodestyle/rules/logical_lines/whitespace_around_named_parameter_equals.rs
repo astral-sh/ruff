@@ -1,9 +1,11 @@
-use crate::checkers::logical_lines::LogicalLinesContext;
-use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
+use ruff_text_size::{TextRange, TextSize};
+
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::{TextRange, TextSize};
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
@@ -58,11 +60,10 @@ pub(crate) fn whitespace_around_named_parameter_equals(
 
         match kind {
             TokenKind::Lpar | TokenKind::Lsqb => {
-                parens += 1;
+                parens = parens.saturating_add(1);
             }
             TokenKind::Rpar | TokenKind::Rsqb => {
-                parens -= 1;
-
+                parens = parens.saturating_sub(1);
                 if parens == 0 {
                     annotated_func_arg = false;
                 }

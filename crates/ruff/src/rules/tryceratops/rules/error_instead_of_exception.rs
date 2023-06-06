@@ -3,6 +3,7 @@ use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::analyze::logging::exc_info;
 
 use crate::checkers::ast::Checker;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
@@ -41,7 +42,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/library/logging.html#logging.exception)
+/// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[violation]
 pub struct ErrorInsteadOfException;
 
@@ -57,16 +58,18 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
     for handler in handlers {
         let Excepthandler::ExceptHandler(ast::ExcepthandlerExceptHandler { body, .. }) = handler;
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::new(&checker.ctx);
+            let mut visitor = LoggerCandidateVisitor::new(checker.semantic_model());
             visitor.visit_body(body);
             visitor.calls
         };
-        for (expr, func) in calls {
-            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
+        for expr in calls {
+            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr.func.as_ref() {
                 if attr == "error" {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));
+                    if exc_info(&expr.keywords, checker.semantic_model()).is_none() {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));
+                    }
                 }
             }
         }

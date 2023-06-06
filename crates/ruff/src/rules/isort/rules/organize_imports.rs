@@ -3,20 +3,22 @@ use std::path::Path;
 use itertools::{EitherOrBoth, Itertools};
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Ranged, Stmt};
-use textwrap::indent;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::StrExt;
 use ruff_python_ast::helpers::{
     followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::whitespace::leading_space;
+use ruff_textwrap::indent;
 
+use crate::line_width::LineWidth;
 use crate::registry::AsRule;
 use crate::settings::Settings;
 
-use super::super::track::Block;
+use super::super::block::Block;
 use super::super::{comments, format_imports};
 
 /// ## What it does
@@ -68,8 +70,8 @@ fn extract_indentation_range(body: &[&Stmt], locator: &Locator) -> TextRange {
 /// Compares two strings, returning true if they are equal modulo whitespace
 /// at the start of each line.
 fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
-    val1.lines()
-        .zip_longest(val2.lines())
+    val1.universal_newlines()
+        .zip_longest(val2.universal_newlines())
         .all(|pair| match pair {
             EitherOrBoth::Both(line1, line2) => line1.trim_start() == line2.trim_start(),
             _ => false,
@@ -116,7 +118,8 @@ pub(crate) fn organize_imports(
         block,
         comments,
         locator,
-        settings.line_length - indentation.len(),
+        settings.line_length,
+        LineWidth::new(settings.tab_size).add_str(indentation),
         stylist,
         &settings.src,
         package,
@@ -145,16 +148,15 @@ pub(crate) fn organize_imports(
     let range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
     let actual = locator.slice(range);
     if matches_ignoring_indentation(actual, &expected) {
-        None
-    } else {
-        let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-        if settings.rules.should_fix(diagnostic.kind.rule()) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                indent(&expected, indentation),
-                range,
-            )));
-        }
-        Some(diagnostic)
+        return None;
     }
+
+    let mut diagnostic = Diagnostic::new(UnsortedImports, range);
+    if settings.rules.should_fix(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
+            indent(&expected, indentation).to_string(),
+            range,
+        )));
+    }
+    Some(diagnostic)
 }

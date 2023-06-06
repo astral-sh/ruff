@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
 
-use crate::autofix::actions::remove_argument;
+use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -61,7 +61,7 @@ pub(crate) fn replace_stdout_stderr(
     keywords: &[Keyword],
 ) {
     if checker
-        .ctx
+        .semantic_model()
         .resolve_call_path(func)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["subprocess", "run"]
@@ -77,13 +77,13 @@ pub(crate) fn replace_stdout_stderr(
 
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
-            .ctx
+            .semantic_model()
             .resolve_call_path(&stdout.value)
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["subprocess", "PIPE"]
             })
             || !checker
-                .ctx
+                .semantic_model()
                 .resolve_call_path(&stderr.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["subprocess", "PIPE"]

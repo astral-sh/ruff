@@ -4,11 +4,10 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
+use ruff_newlines::{find_newline, LineEnding};
 use rustpython_literal::escape::Quote as StrQuote;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
-
-use crate::newlines::{find_newline, LineEnding};
 
 use crate::source_code::Locator;
 use crate::str::leading_quote;
@@ -164,9 +163,10 @@ impl Deref for Indentation {
 
 #[cfg(test)]
 mod tests {
-    use crate::newlines::{find_newline, LineEnding};
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
+
+    use ruff_newlines::{find_newline, LineEnding};
 
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::{Locator, Stylist};

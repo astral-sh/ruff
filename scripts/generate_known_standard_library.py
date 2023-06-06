@@ -21,13 +21,13 @@ VERSIONS: list[tuple[int, int]] = [
 ]
 
 
-class FakeConfig:  # noqa: D101
+class FakeConfig:
     intersphinx_timeout = None
     tls_verify = True
     user_agent = ""
 
 
-class FakeApp:  # noqa: D101
+class FakeApp:
     srcdir = ""
     config = FakeConfig()
 

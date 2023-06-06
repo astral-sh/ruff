@@ -96,7 +96,7 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         + (if let Some(stmt) = orelse.first() {
                             // `elif:` and `else: if:` have the same AST representation.
                             // Avoid treating `elif:` as two statements.
-                            usize::from(!matches!(stmt, Stmt::If(_)))
+                            usize::from(!stmt.is_if_stmt())
                         } else {
                             0
                         })
@@ -185,12 +185,13 @@ pub(crate) fn too_many_branches(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser as parser;
+    use rustpython_parser::ast::Suite;
+    use rustpython_parser::Parse;
 
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let branches = parser::parse_program(source, "<filename>")?;
+        let branches = Suite::parse(source, "<filename>")?;
         assert_eq!(num_branches(&branches), expected_num_branches);
         Ok(())
     }

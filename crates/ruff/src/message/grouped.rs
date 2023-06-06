@@ -1,3 +1,11 @@
+use std::fmt::{Display, Formatter};
+use std::io::Write;
+use std::num::NonZeroUsize;
+
+use colored::Colorize;
+
+use ruff_python_ast::source_code::OneIndexed;
+
 use crate::fs::relativize_path;
 use crate::jupyter::JupyterIndex;
 use crate::message::diff::calculate_print_width;
@@ -5,11 +13,6 @@ use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
-use colored::Colorize;
-use ruff_python_ast::source_code::OneIndexed;
-use std::fmt::{Display, Formatter};
-use std::io::Write;
-use std::num::NonZeroUsize;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
@@ -71,7 +74,12 @@ impl Emitter for GroupedEmitter {
                     }
                 )?;
             }
-            writeln!(writer)?;
+
+            // Print a blank line between files, unless we're showing the source, in which case
+            // we'll have already printed a blank line between messages.
+            if !self.show_source {
+                writeln!(writer)?;
+            }
         }
 
         Ok(())
@@ -133,10 +141,8 @@ impl Display for DisplayGroupedMessage<'_> {
         if self.show_source {
             use std::fmt::Write;
             let mut padded = PadAdapter::new(f);
-            write!(padded, "{}", MessageCodeFrame { message })?;
+            writeln!(padded, "{}", MessageCodeFrame { message })?;
         }
-
-        writeln!(f)?;
 
         Ok(())
     }
@@ -175,12 +181,21 @@ impl std::fmt::Write for PadAdapter<'_> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::GroupedEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn default() {
+        let mut emitter = GroupedEmitter::default();
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn show_source() {
         let mut emitter = GroupedEmitter::default().with_show_source(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 

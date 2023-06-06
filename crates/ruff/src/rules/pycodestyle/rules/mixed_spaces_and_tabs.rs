@@ -1,8 +1,9 @@
+use ruff_text_size::{TextLen, TextRange};
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::Line;
+use ruff_newlines::Line;
 use ruff_python_ast::whitespace::leading_space;
-use ruff_text_size::{TextLen, TextRange};
 
 /// ## What it does
 /// Checks for mixed tabs and spaces in indentation.

@@ -5,13 +5,14 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::ConfigurationOptions;
 
+use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -216,7 +217,7 @@ pub struct Options {
     /// Like `fix`, but disables reporting on leftover violation. Implies `fix`.
     pub fix_only: Option<bool>,
     #[option(
-        default = r#"["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]"#,
+        default = r#"["ALL"]"#,
         value_type = "list[RuleSelector]",
         example = r#"
             # Only allow autofix behavior for `E` and `F` rules.
@@ -254,7 +255,7 @@ pub struct Options {
     /// respect these exclusions unequivocally.
     ///
     /// This is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all
-    /// changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit)
+    /// changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit)
     /// plugin, regardless of whether they're marked as excluded by Ruff's own
     /// settings.
     pub force_exclude: Option<bool>,
@@ -304,13 +305,22 @@ pub struct Options {
         default = "88",
         value_type = "int",
         example = r#"
-            # Allow lines to be as long as 120 characters.
-            line-length = 120
+        # Allow lines to be as long as 120 characters.
+        line-length = 120
         "#
     )]
     /// The line length to use when enforcing long-lines violations (like
     /// `E501`).
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
+    #[option(
+        default = "4",
+        value_type = "int",
+        example = r#"
+            tab_size = 8
+        "#
+    )]
+    /// The tabulation size to calculate line length.
+    pub tab_size: Option<TabSize>,
     #[option(
         default = "None",
         value_type = "str",
@@ -398,11 +408,15 @@ pub struct Options {
     /// (e.g., `src = ["src"]`), such that when resolving imports,
     /// `my_package.foo` is considered a first-party import.
     ///
+    /// When omitted, the `src` directory will typically default to the
+    /// directory containing the nearest `pyproject.toml`, `ruff.toml`, or
+    /// `.ruff.toml` file (the "project root"), unless a configuration file
+    /// is explicitly provided (e.g., via the `--config` command-line flag).
+    ///
     /// This field supports globs. For example, if you have a series of Python
     /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
-    /// would expand to incorporate all of the
-    /// packages in that directory. User home directory and environment
-    /// variables will also be expanded.
+    /// would expand to incorporate all of the packages in that directory. User
+    /// home directory and environment variables will also be expanded.
     pub src: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -528,6 +542,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pydocstyle` plugin.
     pub pydocstyle: Option<pydocstyle::settings::Options>,
+    #[option_group]
+    /// Options for the `pyflakes` plugin.
+    pub pyflakes: Option<pyflakes::settings::Options>,
     #[option_group]
     /// Options for the `pylint` plugin.
     pub pylint: Option<pylint::settings::Options>,

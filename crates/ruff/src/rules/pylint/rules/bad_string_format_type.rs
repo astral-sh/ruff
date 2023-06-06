@@ -1,14 +1,15 @@
-use ruff_text_size::TextRange;
 use std::str::FromStr;
 
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_format::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{self, Constant, Expr, Operator, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_semantic::analyze::type_inference::PythonType;
 
 use crate::checkers::ast::Checker;
 
@@ -39,87 +40,6 @@ impl Violation for BadStringFormatType {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum DataType {
-    String,
-    Integer,
-    Float,
-    Object,
-    Unknown,
-}
-
-impl From<&Expr> for DataType {
-    fn from(expr: &Expr) -> Self {
-        match expr {
-            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => (&**value).into(),
-            Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => (&**operand).into(),
-            Expr::Dict(_) => DataType::Object,
-            Expr::Set(_) => DataType::Object,
-            Expr::ListComp(_) => DataType::Object,
-            Expr::SetComp(_) => DataType::Object,
-            Expr::DictComp(_) => DataType::Object,
-            Expr::GeneratorExp(_) => DataType::Object,
-            Expr::JoinedStr(_) => DataType::String,
-            Expr::BinOp(ast::ExprBinOp { left, op, .. }) => {
-                // Ex) "a" % "b"
-                if matches!(
-                    left.as_ref(),
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(..),
-                        ..
-                    })
-                ) && matches!(op, Operator::Mod)
-                {
-                    return DataType::String;
-                }
-                DataType::Unknown
-            }
-            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                Constant::Str(_) => DataType::String,
-                Constant::Int(_) => DataType::Integer,
-                Constant::Float(_) => DataType::Float,
-                _ => DataType::Unknown,
-            },
-            Expr::List(_) => DataType::Object,
-            Expr::Tuple(_) => DataType::Object,
-            _ => DataType::Unknown,
-        }
-    }
-}
-
-impl DataType {
-    fn is_compatible_with(self, format: FormatType) -> bool {
-        match self {
-            DataType::String => matches!(
-                format,
-                FormatType::Unknown | FormatType::String | FormatType::Repr
-            ),
-            DataType::Object => matches!(
-                format,
-                FormatType::Unknown | FormatType::String | FormatType::Repr
-            ),
-            DataType::Integer => matches!(
-                format,
-                FormatType::Unknown
-                    | FormatType::String
-                    | FormatType::Repr
-                    | FormatType::Integer
-                    | FormatType::Float
-                    | FormatType::Number
-            ),
-            DataType::Float => matches!(
-                format,
-                FormatType::Unknown
-                    | FormatType::String
-                    | FormatType::Repr
-                    | FormatType::Float
-                    | FormatType::Number
-            ),
-            DataType::Unknown => true,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
 enum FormatType {
     Repr,
     String,
@@ -127,6 +47,45 @@ enum FormatType {
     Float,
     Number,
     Unknown,
+}
+
+impl FormatType {
+    fn is_compatible_with(self, data_type: PythonType) -> bool {
+        match data_type {
+            PythonType::String
+            | PythonType::Bytes
+            | PythonType::List
+            | PythonType::Dict
+            | PythonType::Set
+            | PythonType::Tuple
+            | PythonType::Generator
+            | PythonType::Complex
+            | PythonType::Bool
+            | PythonType::Ellipsis
+            | PythonType::None => matches!(
+                self,
+                FormatType::Unknown | FormatType::String | FormatType::Repr
+            ),
+            PythonType::Integer => matches!(
+                self,
+                FormatType::Unknown
+                    | FormatType::String
+                    | FormatType::Repr
+                    | FormatType::Integer
+                    | FormatType::Float
+                    | FormatType::Number
+            ),
+            PythonType::Float => matches!(
+                self,
+                FormatType::Unknown
+                    | FormatType::String
+                    | FormatType::Repr
+                    | FormatType::Float
+                    | FormatType::Number
+            ),
+            PythonType::Unknown => true,
+        }
+    }
 }
 
 impl From<char> for FormatType {
@@ -159,9 +118,9 @@ fn collect_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 
 /// Return `true` if the format string is equivalent to the constant type
 fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
-    let constant: DataType = value.into();
     let format: FormatType = format.format_char.into();
-    constant.is_compatible_with(format)
+    let constant: PythonType = value.into();
+    format.is_compatible_with(constant)
 }
 
 /// Return `true` if the [`Constnat`] aligns with the format type.

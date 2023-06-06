@@ -1,9 +1,12 @@
 //! Settings for the `pydocstyle` plugin.
 
-use crate::registry::Rule;
-use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+
+use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
+
+use crate::registry::Rule;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]

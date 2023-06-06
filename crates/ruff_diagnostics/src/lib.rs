@@ -1,6 +1,6 @@
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use edit::Edit;
-pub use fix::{Applicability, Fix};
+pub use fix::{Applicability, Fix, IsolationLevel};
 pub use violation::{AlwaysAutofixableViolation, AutofixKind, Violation};
 
 mod diagnostic;

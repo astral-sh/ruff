@@ -8,7 +8,7 @@ use rustpython_parser::ast::{
     Excepthandler, Expr, Identifier, MatchCase, Operator, Pattern, Stmt, Suite, Withitem,
 };
 
-use crate::newlines::LineEnding;
+use ruff_newlines::LineEnding;
 
 use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
@@ -132,11 +132,11 @@ impl<'a> Generator<'a> {
     }
 
     fn body<U>(&mut self, stmts: &[Stmt<U>]) {
-        self.indent_depth += 1;
+        self.indent_depth = self.indent_depth.saturating_add(1);
         for stmt in stmts {
             self.unparse_stmt(stmt);
         }
-        self.indent_depth -= 1;
+        self.indent_depth = self.indent_depth.saturating_sub(1);
     }
 
     fn p(&mut self, s: &str) {
@@ -209,14 +209,13 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(decorator, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.p("@");
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("def ");
                     self.p_id(name);
                     self.p("(");
@@ -242,13 +241,13 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(decorator, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("async def ");
                     self.p_id(name);
                     self.p("(");
@@ -274,13 +273,13 @@ impl<'a> Generator<'a> {
                 range: _range,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(decorator, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("class ");
                     self.p_id(name);
                     let mut first = true;
@@ -531,11 +530,11 @@ impl<'a> Generator<'a> {
                     self.p(":");
                 });
                 for case in cases {
-                    self.indent_depth += 1;
+                    self.indent_depth = self.indent_depth.saturating_add(1);
                     statement!({
                         self.unparse_match_case(case);
                     });
-                    self.indent_depth -= 1;
+                    self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
             }
             Stmt::Raise(ast::StmtRaise {
@@ -1457,8 +1456,10 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::newlines::LineEnding;
-    use rustpython_parser as parser;
+    use rustpython_ast::Suite;
+    use rustpython_parser::Parse;
+
+    use ruff_newlines::LineEnding;
 
     use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;
@@ -1467,7 +1468,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let program = parser::parse_program(contents, "<filename>").unwrap();
+        let program = Suite::parse(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
@@ -1480,7 +1481,7 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let program = parser::parse_program(contents, "<filename>").unwrap();
+        let program = Suite::parse(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
@@ -1612,6 +1613,29 @@ except* Exception as e:
         );
         assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
         assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);
+        assert_round_trip!(
+            r#"def f():
+
+    def f():
+        pass"#
+        );
+        assert_round_trip!(
+            r#"@foo
+def f():
+
+    @foo
+    def f():
+        pass"#
+        );
+
+        assert_round_trip!(
+            r#"@foo
+class Foo:
+
+    @foo
+    def f():
+        pass"#
+        );
     }
 
     #[test]

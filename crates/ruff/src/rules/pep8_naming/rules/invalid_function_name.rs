@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 /// ## What it does
 /// Checks for functions names that do not follow the `snake_case` naming
@@ -53,7 +53,7 @@ pub(crate) fn invalid_function_name(
     name: &str,
     decorator_list: &[Expr],
     ignore_names: &[String],
-    ctx: &Context,
+    model: &SemanticModel,
     locator: &Locator,
 ) -> Option<Diagnostic> {
     // Ignore any explicitly-ignored function names.
@@ -68,7 +68,7 @@ pub(crate) fn invalid_function_name(
 
     // Ignore any functions that are explicitly `@override`. These are defined elsewhere,
     // so if they're first-party, we'll flag them at the definition site.
-    if visibility::is_override(ctx, decorator_list) {
+    if visibility::is_override(model, decorator_list) {
         return None;
     }
 

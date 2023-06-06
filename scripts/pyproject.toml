@@ -12,6 +12,7 @@ line-length = 88
 select = ["ALL"]
 ignore = [
   "C901",  # McCabe complexity
+  "D",     # pydocstyle
   "PL",    # pylint
   "S",     # bandit
   "G",     # flake8-logging

@@ -1,11 +1,14 @@
+use std::io::Write;
+use std::path::Path;
+
+use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
+
+use ruff_python_ast::source_code::SourceLocation;
+
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
 use crate::registry::AsRule;
-use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
-use ruff_python_ast::source_code::SourceLocation;
-use std::io::Write;
-use std::path::Path;
 
 #[derive(Default)]
 pub struct JunitEmitter;
@@ -83,9 +86,10 @@ impl Emitter for JunitEmitter {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::JunitEmitter;
-    use insta::assert_snapshot;
 
     #[test]
     fn output() {

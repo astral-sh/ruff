@@ -26,7 +26,7 @@ requires-python = ">=3.7"
 repository = "https://github.com/charliermarsh/ruff#subdirectory=crates/flake8_to_ruff"
 
 [build-system]
-requires = ["maturin>=0.15.2,<0.16"]
+requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]

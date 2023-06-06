@@ -1,11 +1,14 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
-use crate::newlines::find_newline;
-use crate::source_code::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use std::ops::Add;
+
 use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use std::ops::Add;
+
+use ruff_newlines::find_newline;
+
+use crate::source_code::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
 pub struct Locator<'a> {
     contents: &'a str,

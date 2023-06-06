@@ -86,39 +86,31 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -23,7 +23,6 @@
- try:
-     with open(some_other_file) as w:
-         w.write(data)
--
- except OSError:
-     print("problems")
+@@ -1,7 +1,6 @@
+ while True:
+     if something.changed:
+-        do.stuff()  # trailing comment
+-        # Comment belongs to the `if` block.
++        do.stuff()
+     # This one belongs to the `while` block.
  
-@@ -41,18 +40,18 @@
+     # Should this one, too?  I guess so.
+@@ -15,7 +14,6 @@
  
- # leading 1
- @deco1
--# leading 2
--@deco2(with_args=True)
--# leading 3
--@deco3
-+@# leading 2
-+deco2(with_args=True)
-+@# leading 3
-+deco3
- def decorated1():
-     ...
+     # then we do this
+     print(i)
+-    # and finally we loop around
  
- 
- # leading 1
- @deco1
--# leading 2
--@deco2(with_args=True)
-+@# leading 2
-+deco2(with_args=True)
+ with open(some_temp_file) as f:
+     data = f.read()
+@@ -33,7 +31,6 @@
  # leading function comment
- def decorated1():
+ def wat():
      ...
+-    # trailing function comment
+ 
+ 
+ # SECTION COMMENT
 ```
 
 ## Ruff Output
@@ -126,8 +118,7 @@ if __name__ == "__main__":
 ```py
 while True:
     if something.changed:
-        do.stuff()  # trailing comment
-        # Comment belongs to the `if` block.
+        do.stuff()
     # This one belongs to the `while` block.
 
     # Should this one, too?  I guess so.
@@ -141,7 +132,6 @@ for i in range(100):
 
     # then we do this
     print(i)
-    # and finally we loop around
 
 with open(some_temp_file) as f:
     data = f.read()
@@ -149,6 +139,7 @@ with open(some_temp_file) as f:
 try:
     with open(some_other_file) as w:
         w.write(data)
+
 except OSError:
     print("problems")
 
@@ -158,7 +149,6 @@ import sys
 # leading function comment
 def wat():
     ...
-    # trailing function comment
 
 
 # SECTION COMMENT
@@ -166,18 +156,18 @@ def wat():
 
 # leading 1
 @deco1
-@# leading 2
-deco2(with_args=True)
-@# leading 3
-deco3
+# leading 2
+@deco2(with_args=True)
+# leading 3
+@deco3
 def decorated1():
     ...
 
 
 # leading 1
 @deco1
-@# leading 2
-deco2(with_args=True)
+# leading 2
+@deco2(with_args=True)
 # leading function comment
 def decorated1():
     ...

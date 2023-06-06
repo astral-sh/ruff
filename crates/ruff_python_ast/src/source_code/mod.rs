@@ -1,26 +1,31 @@
+use std::cmp::Ordering;
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::{ast, lexer, Mode, Parse, ParseError};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+pub use comment_ranges::{CommentRanges, CommentRangesBuilder};
+pub use generator::Generator;
+pub use indexer::Indexer;
+pub use locator::Locator;
+pub use stylist::{Quote, Stylist};
+
+pub use crate::source_code::line_index::{LineIndex, OneIndexed};
+
+mod comment_ranges;
 mod generator;
 mod indexer;
 mod line_index;
 mod locator;
 mod stylist;
 
-pub use crate::source_code::line_index::{LineIndex, OneIndexed};
-pub use generator::Generator;
-pub use indexer::Indexer;
-pub use locator::Locator;
-use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser as parser;
-use rustpython_parser::{lexer, Mode, ParseError};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
-pub use stylist::{Quote, Stylist};
-
 /// Run round-trip source code generation on a given Python code.
 pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {
     let locator = Locator::new(code);
-    let python_ast = parser::parse_program(code, source_path)?;
+    let python_ast = ast::Suite::parse(code, source_path)?;
     let tokens: Vec<_> = lexer::lex(code, Mode::Module).collect();
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let mut generator: Generator = (&stylist).into();
@@ -201,6 +206,23 @@ impl SourceFile {
     #[inline]
     pub fn source_text(&self) -> &str {
         &self.inner.code
+    }
+}
+
+impl PartialOrd for SourceFile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SourceFile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Short circuit if these are the same source files
+        if Arc::ptr_eq(&self.inner, &other.inner) {
+            Ordering::Equal
+        } else {
+            self.inner.name.cmp(&other.inner.name)
+        }
     }
 }
 

@@ -11,8 +11,9 @@ use std::{fs, process, str};
 use anyhow::{anyhow, Context, Result};
 use assert_cmd::Command;
 use log::info;
-use ruff::logging::{set_up_logging, LogLevel};
 use walkdir::WalkDir;
+
+use ruff::logging::{set_up_logging, LogLevel};
 
 /// Handles `blackd` process and allows submitting code to it for formatting.
 struct Blackd {

@@ -26,7 +26,6 @@ pub(crate) struct FormatSummary {
     pub(crate) indices: Vec<usize>,
     pub(crate) keywords: Vec<String>,
     pub(crate) has_nested_parts: bool,
-    pub(crate) format_string: FormatString,
 }
 
 impl TryFrom<&str> for FormatSummary {
@@ -75,7 +74,6 @@ impl TryFrom<&str> for FormatSummary {
             indices,
             keywords,
             has_nested_parts,
-            format_string,
         })
     }
 }

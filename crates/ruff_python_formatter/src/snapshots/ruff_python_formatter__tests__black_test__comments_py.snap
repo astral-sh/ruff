@@ -109,7 +109,24 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -93,4 +93,4 @@
+@@ -19,14 +19,9 @@
+     import fast
+ except ImportError:
+     import slow as fast
+-
+-
+-# Some comment before a function.
+ y = 1
+-(
+-    # some strings
+-    y  # type: ignore
+-)
++# some strings
++y  # type: ignore
+ 
+ 
+ def function(default=None):
+@@ -93,4 +88,4 @@
  
  # Some closing comments.
  # Maybe Vim or Emacs directives for formatting.
@@ -142,14 +159,9 @@ try:
     import fast
 except ImportError:
     import slow as fast
-
-
-# Some comment before a function.
 y = 1
-(
-    # some strings
-    y  # type: ignore
-)
+# some strings
+y  # type: ignore
 
 
 def function(default=None):

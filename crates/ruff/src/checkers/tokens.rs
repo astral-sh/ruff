@@ -3,19 +3,21 @@
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use crate::directives::TodoComment;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, flake8_todos,
-    pycodestyle, pylint, pyupgrade, ruff,
+    eradicate, flake8_commas, flake8_fixme, flake8_implicit_str_concat, flake8_pyi, flake8_quotes,
+    flake8_todos, pycodestyle, pylint, pyupgrade, ruff,
 };
 use crate::settings::Settings;
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::source_code::{Indexer, Locator};
 
 pub(crate) fn check_tokens(
     locator: &Locator,
+    indexer: &Indexer,
     tokens: &[LexResult],
     settings: &Settings,
     is_stub: bool,
@@ -59,6 +61,8 @@ pub(crate) fn check_tokens(
     ]);
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
+
+    // Combine flake8_todos and flake8_fixme so that we can reuse detected [`TodoDirective`]s.
     let enforce_todos = settings.rules.any_enabled(&[
         Rule::InvalidTodoTag,
         Rule::MissingTodoAuthor,
@@ -67,6 +71,10 @@ pub(crate) fn check_tokens(
         Rule::MissingTodoDescription,
         Rule::InvalidTodoCapitalization,
         Rule::MissingSpaceAfterTodoColon,
+        Rule::LineContainsFixme,
+        Rule::LineContainsXxx,
+        Rule::LineContainsTodo,
+        Rule::LineContainsHack,
     ]);
 
     // RUF001, RUF002, RUF003
@@ -100,15 +108,9 @@ pub(crate) fn check_tokens(
 
     // ERA001
     if enforce_commented_out_code {
-        for (tok, range) in tokens.iter().flatten() {
-            if matches!(tok, Tok::Comment(_)) {
-                if let Some(diagnostic) =
-                    eradicate::rules::commented_out_code(locator, *range, settings)
-                {
-                    diagnostics.push(diagnostic);
-                }
-            }
-        }
+        diagnostics.extend(eradicate::rules::commented_out_code(
+            indexer, locator, settings,
+        ));
     }
 
     // W605
@@ -185,13 +187,30 @@ pub(crate) fn check_tokens(
 
     // PYI033
     if enforce_type_comment_in_stub && is_stub {
-        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(tokens));
+        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(indexer, locator));
     }
 
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007
+    // T001, T002, T003, T004
     if enforce_todos {
+        let todo_comments: Vec<TodoComment> = indexer
+            .comment_ranges()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, comment_range)| {
+                let comment = locator.slice(*comment_range);
+                TodoComment::from_comment(comment, *comment_range, i)
+            })
+            .collect();
+
         diagnostics.extend(
-            flake8_todos::rules::todos(tokens, settings)
+            flake8_todos::rules::todos(&todo_comments, indexer, locator, settings)
+                .into_iter()
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
+
+        diagnostics.extend(
+            flake8_fixme::rules::todos(&todo_comments)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );

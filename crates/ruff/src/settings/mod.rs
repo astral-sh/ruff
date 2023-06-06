@@ -20,13 +20,14 @@ use crate::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once_by_id;
 
 use self::rule_table::RuleTable;
+use super::line_width::{LineLength, TabSize};
 
 pub mod configuration;
 pub mod defaults;
@@ -99,7 +100,8 @@ pub struct Settings {
     pub dummy_variable_rgx: Regex,
     pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
-    pub line_length: usize,
+    pub line_length: LineLength,
+    pub tab_size: TabSize,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
     pub task_tags: Vec<String>,
@@ -118,7 +120,7 @@ pub struct Settings {
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_self: flake8_self::settings::Settings,
-    pub flake8_tidy_imports: flake8_tidy_imports::Settings,
+    pub flake8_tidy_imports: flake8_tidy_imports::settings::Settings,
     pub flake8_type_checking: flake8_type_checking::settings::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
     pub isort: isort::settings::Settings,
@@ -126,6 +128,7 @@ pub struct Settings {
     pub pep8_naming: pep8_naming::settings::Settings,
     pub pycodestyle: pycodestyle::settings::Settings,
     pub pydocstyle: pydocstyle::settings::Settings,
+    pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
 }
 
@@ -162,7 +165,8 @@ impl Settings {
                 config.include.unwrap_or_else(|| defaults::INCLUDE.clone()),
             )?,
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
-            line_length: config.line_length.unwrap_or(defaults::LINE_LENGTH),
+            line_length: config.line_length.unwrap_or_default(),
+            tab_size: config.tab_size.unwrap_or_default(),
             namespace_packages: config.namespace_packages.unwrap_or_default(),
             per_file_ignores: resolve_per_file_ignores(
                 config
@@ -231,6 +235,7 @@ impl Settings {
             pep8_naming: config.pep8_naming.map(Into::into).unwrap_or_default(),
             pycodestyle: config.pycodestyle.map(Into::into).unwrap_or_default(),
             pydocstyle: config.pydocstyle.map(Into::into).unwrap_or_default(),
+            pyflakes: config.pyflakes.map(Into::into).unwrap_or_default(),
             pylint: config.pylint.map(Into::into).unwrap_or_default(),
         })
     }
@@ -257,7 +262,10 @@ impl From<&Configuration> for RuleTable {
         // The select_set keeps track of which rules have been selected.
         let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.into_iter().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All
+            .into_iter()
+            .chain(RuleSelector::Nursery.into_iter())
+            .collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`

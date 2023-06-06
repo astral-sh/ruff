@@ -1,10 +1,13 @@
-use super::LogicalLine;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use ruff_text_size::TextSize;
+
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::TextSize;
+
+use crate::checkers::logical_lines::LogicalLinesContext;
+
+use super::LogicalLine;
 
 #[violation]
 pub struct MissingWhitespace {
@@ -50,11 +53,11 @@ pub(crate) fn missing_whitespace(
         let kind = token.kind();
         match kind {
             TokenKind::Lsqb => {
-                open_parentheses += 1;
+                open_parentheses = open_parentheses.saturating_add(1);
                 prev_lsqb = token.start();
             }
             TokenKind::Rsqb => {
-                open_parentheses -= 1;
+                open_parentheses = open_parentheses.saturating_sub(1);
             }
             TokenKind::Lbrace => {
                 prev_lbrace = token.start();

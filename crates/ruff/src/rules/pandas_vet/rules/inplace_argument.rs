@@ -1,8 +1,8 @@
-use ruff_python_semantic::binding::{BindingKind, Importation};
 use rustpython_parser::ast::{self, Constant, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::binding::{BindingKind, Importation};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -60,19 +60,21 @@ pub(crate) fn inplace_argument(
     let mut is_checkable = false;
     let mut is_pandas = false;
 
-    if let Some(call_path) = checker.ctx.resolve_call_path(func) {
+    if let Some(call_path) = checker.semantic_model().resolve_call_path(func) {
         is_checkable = true;
 
         let module = call_path[0];
-        is_pandas = checker.ctx.find_binding(module).map_or(false, |binding| {
-            matches!(
-                binding.kind,
-                BindingKind::Importation(Importation {
-                    full_name: "pandas",
-                    ..
-                })
-            )
-        });
+        is_pandas = checker
+            .semantic_model()
+            .find_binding(module)
+            .map_or(false, |binding| {
+                matches!(
+                    binding.kind,
+                    BindingKind::Importation(Importation {
+                        qualified_name: "pandas"
+                    })
+                )
+            });
     }
 
     for keyword in keywords.iter().rev() {
@@ -89,29 +91,31 @@ pub(crate) fn inplace_argument(
                 _ => false,
             };
             if is_true_literal {
-                // Avoid applying the fix if:
-                // 1. The keyword argument is followed by a star argument (we can't be certain that
-                //    the star argument _doesn't_ contain an override).
-                // 2. The call is part of a larger expression (we're converting an expression to a
-                //    statement, and expressions can't contain statements).
-                // 3. The call is in a lambda (we can't assign to a variable in a lambda). This
-                //    should be unnecessary, as lambdas are expressions, and so (2) should apply,
-                //    but we don't currently restore expression stacks when parsing deferred nodes,
-                //    and so the parent is lost.
-                let fixable = !seen_star
-                    && checker.ctx.stmt().is_expr_stmt()
-                    && checker.ctx.expr_parent().is_none()
-                    && !checker.ctx.scope().kind.is_lambda();
                 let mut diagnostic = Diagnostic::new(PandasUseOfInplaceArgument, keyword.range());
-                if fixable && checker.patch(diagnostic.kind.rule()) {
-                    if let Some(fix) = convert_inplace_argument_to_assignment(
-                        checker.locator,
-                        expr,
-                        diagnostic.range(),
-                        args,
-                        keywords,
-                    ) {
-                        diagnostic.set_fix(fix);
+                if checker.patch(diagnostic.kind.rule()) {
+                    // Avoid applying the fix if:
+                    // 1. The keyword argument is followed by a star argument (we can't be certain that
+                    //    the star argument _doesn't_ contain an override).
+                    // 2. The call is part of a larger expression (we're converting an expression to a
+                    //    statement, and expressions can't contain statements).
+                    // 3. The call is in a lambda (we can't assign to a variable in a lambda). This
+                    //    should be unnecessary, as lambdas are expressions, and so (2) should apply,
+                    //    but we don't currently restore expression stacks when parsing deferred nodes,
+                    //    and so the parent is lost.
+                    if !seen_star
+                        && checker.semantic_model().stmt().is_expr_stmt()
+                        && checker.semantic_model().expr_parent().is_none()
+                        && !checker.semantic_model().scope().kind.is_lambda()
+                    {
+                        if let Some(fix) = convert_inplace_argument_to_assignment(
+                            checker.locator,
+                            expr,
+                            diagnostic.range(),
+                            args,
+                            keywords,
+                        ) {
+                            diagnostic.set_fix(fix);
+                        }
                     }
                 }
 

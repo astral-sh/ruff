@@ -1,0 +1,126 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: MatchCase,
+        range: 84..132,
+        source: `case (x, y):⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# Leading `case(x, y)` comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtReturn,
+        range: 109..132,
+        source: `return Point3d(x, y, 0)`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing `case(x, y) comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: MatchCase,
+        range: 227..340,
+        source: `case (x, y, z):⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# Leading `case (x, y, z)` comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtIf,
+        range: 255..340,
+        source: `if x < y:⏎`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing case comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtExpr,
+        range: 327..340,
+        source: `print("else")`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing else comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: MatchCase,
+        range: 489..550,
+        source: `case _:⏎`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing match comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtRaise,
+        range: 509..550,
+        source: `raise TypeError("not a poin... support")`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing last case comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtExpr,
+        range: 656..670,
+        source: `print("other")`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# After match comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+}

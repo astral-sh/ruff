@@ -46,55 +46,58 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ```diff
 --- Black
 +++ Ruff
-@@ -20,9 +20,7 @@
-     b,
-     c,
-     d,
+@@ -1,28 +1,10 @@
+-zero(
+-    one,
+-).two(
+-    three,
+-).four(
+-    five,
+-)
+-
+-func1(arg1).func2(
+-    arg2,
+-).func3(arg3).func4(
+-    arg4,
+-).func5(arg5)
++zero(one,).two(three,).four(five,)
+ 
++func1(arg1).func2(arg2,).func3(arg3).func4(arg4,).func5(arg5)
+ # Inner one-element tuple shouldn't explode
+ func1(arg1).func2(arg1, (one_tuple,)).func3(arg3)
+ 
+-(
+-    a,
+-    b,
+-    c,
+-    d,
 -) = func1(
 -    arg1
 -) and func2(arg2)
-+) = func1(arg1) and func2(arg2)
++(a, b, c, d,) = func1(arg1) and func2(arg2)
  
  
  # Example from https://github.com/psf/black/issues/3229
-@@ -43,8 +41,6 @@
+@@ -41,7 +23,6 @@
+     long_module.long_class.long_func().another_func()
+     == long_module.long_class.long_func()["some_key"].another_func(arg1)
  )
- 
+-
  # Regression test for https://github.com/psf/black/issues/3414.
--assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
--    xxxxxxxxx
--).xxxxxxxxxxxxxxxxxx(), (
-+assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx(), (
-     "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
- )
+ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
+     xxxxxxxxx
 ```
 
 ## Ruff Output
 
 ```py
-zero(
-    one,
-).two(
-    three,
-).four(
-    five,
-)
+zero(one,).two(three,).four(five,)
 
-func1(arg1).func2(
-    arg2,
-).func3(arg3).func4(
-    arg4,
-).func5(arg5)
-
+func1(arg1).func2(arg2,).func3(arg3).func4(arg4,).func5(arg5)
 # Inner one-element tuple shouldn't explode
 func1(arg1).func2(arg1, (one_tuple,)).func3(arg3)
 
-(
-    a,
-    b,
-    c,
-    d,
-) = func1(arg1) and func2(arg2)
+(a, b, c, d,) = func1(arg1) and func2(arg2)
 
 
 # Example from https://github.com/psf/black/issues/3229
@@ -113,9 +116,10 @@ assert (
     long_module.long_class.long_func().another_func()
     == long_module.long_class.long_func()["some_key"].another_func(arg1)
 )
-
 # Regression test for https://github.com/psf/black/issues/3414.
-assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx(), (
+assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
+    xxxxxxxxx
+).xxxxxxxxxxxxxxxxxx(), (
     "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 )
 ```

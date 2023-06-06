@@ -13,13 +13,14 @@ use shellexpand;
 use shellexpand::LookupError;
 
 use crate::fs;
+use crate::line_width::{LineLength, TabSize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pylint,
+    pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -57,7 +58,8 @@ pub struct Configuration {
     pub format: Option<SerializationFormat>,
     pub ignore_init_module_imports: Option<bool>,
     pub include: Option<Vec<FilePattern>>,
-    pub line_length: Option<usize>,
+    pub line_length: Option<LineLength>,
+    pub tab_size: Option<TabSize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
@@ -89,6 +91,7 @@ pub struct Configuration {
     pub pep8_naming: Option<pep8_naming::settings::Options>,
     pub pycodestyle: Option<pycodestyle::settings::Options>,
     pub pydocstyle: Option<pydocstyle::settings::Options>,
+    pub pyflakes: Option<pyflakes::settings::Options>,
     pub pylint: Option<pylint::settings::Options>,
 }
 
@@ -196,6 +199,7 @@ impl Configuration {
                     .collect()
             }),
             line_length: options.line_length,
+            tab_size: options.tab_size,
             namespace_packages: options
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
@@ -241,6 +245,7 @@ impl Configuration {
             pep8_naming: options.pep8_naming,
             pycodestyle: options.pycodestyle,
             pydocstyle: options.pydocstyle,
+            pyflakes: options.pyflakes,
             pylint: options.pylint,
         })
     }
@@ -284,6 +289,7 @@ impl Configuration {
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),
             line_length: self.line_length.or(config.line_length),
+            tab_size: self.tab_size.or(config.tab_size),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             per_file_ignores: self.per_file_ignores.or(config.per_file_ignores),
             required_version: self.required_version.or(config.required_version),
@@ -326,6 +332,7 @@ impl Configuration {
             pep8_naming: self.pep8_naming.combine(config.pep8_naming),
             pycodestyle: self.pycodestyle.combine(config.pycodestyle),
             pydocstyle: self.pydocstyle.combine(config.pydocstyle),
+            pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
         }
     }

@@ -1,12 +1,13 @@
 use anyhow::{bail, Result};
-use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
+use libcst_native::{CompoundStatement, Statement, Suite, With};
 use rustpython_parser::ast::Ranged;
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::whitespace;
 
-use crate::cst::matchers::match_module;
+use crate::cst::matchers::{match_function_def, match_indented_block, match_statement, match_with};
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.
 pub(crate) fn fix_multiple_with_statements(
@@ -32,26 +33,23 @@ pub(crate) fn fix_multiple_with_statements(
     };
 
     // Parse the CST.
-    let mut tree = match_module(&module_text)?;
+    let mut tree = match_statement(&module_text)?;
 
-    let statements = if outer_indent.is_empty() {
-        &mut *tree.body
+    let statement = if outer_indent.is_empty() {
+        &mut tree
     } else {
-        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
-            bail!("Expected statement to be embedded in a function definition")
-        };
+        let embedding = match_function_def(&mut tree)?;
 
-        let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
-            bail!("Expected indented block")
-        };
+        let indented_block = match_indented_block(&mut embedding.body)?;
         indented_block.indent = Some(outer_indent);
 
-        &mut *indented_block.body
+        let Some(statement) = indented_block.body.first_mut() else {
+            bail!("Expected indented block to have at least one statement")
+        };
+        statement
     };
 
-    let [Statement::Compound(CompoundStatement::With(outer_with))] = statements else {
-        bail!("Expected one outer with statement")
-    };
+    let outer_with = match_with(statement)?;
 
     let With {
         body: Suite::IndentedBlock(ref mut outer_body),
@@ -73,15 +71,8 @@ pub(crate) fn fix_multiple_with_statements(
     }
     outer_with.body = inner_with.body.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
     // Reconstruct and reformat the code.
-    let module_text = state.to_string();
+    let module_text = tree.codegen_stylist(stylist);
     let contents = if outer_indent.is_empty() {
         module_text
     } else {

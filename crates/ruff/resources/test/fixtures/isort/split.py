@@ -6,7 +6,16 @@ import f
 import c
 import d
 
-# isort: split  
+# isort: split
 
 import a
 import b
+
+if True:
+    import C
+    import A
+
+    # isort: split
+
+    import D
+    import B

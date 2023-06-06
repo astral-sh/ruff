@@ -1,10 +1,8 @@
 use once_cell::unsync::Lazy;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{
-    newlines::{StrExt},
-    source_code::Locator,
-};
+use ruff_newlines::StrExt;
+use ruff_python_ast::source_code::Locator;
 
 use crate::settings::Settings;
 
@@ -53,11 +51,10 @@ pub(crate) fn copyright_header_absent(
         if !copyright_missing {
             // copyright found
             return None;
-        } else {
-            if out_of_range {
-                // Missing copyright header
-                return Some(Diagnostic::new(HeaderLacksCopyright, line.range()));
-            }
+        }
+        if out_of_range {
+            // Missing copyright header
+            return Some(Diagnostic::new(HeaderLacksCopyright, line.range()));
         }
         current_char_index += u32::try_from(line.chars().count()).unwrap_or(1024);
     }

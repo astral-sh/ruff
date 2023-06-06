@@ -5,23 +5,22 @@ pub(crate) mod rules;
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
 
-    #[test_case(Path::new("test_pass_init"), Path::new("example.py"); "INP001_0")]
-    #[test_case(Path::new("test_fail_empty"), Path::new("example.py"); "INP001_1")]
-    #[test_case(Path::new("test_fail_nonempty"), Path::new("example.py"); "INP001_2")]
-    #[test_case(Path::new("test_fail_shebang"), Path::new("example.py"); "INP001_3")]
-    #[test_case(Path::new("test_ignored"), Path::new("example.py"); "INP001_4")]
-    #[test_case(Path::new("test_pass_namespace_package"), Path::new("example.py"); "INP001_5")]
-    #[test_case(Path::new("test_pass_pyi"), Path::new("example.pyi"); "INP001_6")]
-    #[test_case(Path::new("test_pass_script"), Path::new("script"); "INP001_7")]
+    #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
+    #[test_case(Path::new("test_fail_empty"), Path::new("example.py"))]
+    #[test_case(Path::new("test_fail_nonempty"), Path::new("example.py"))]
+    #[test_case(Path::new("test_fail_shebang"), Path::new("example.py"))]
+    #[test_case(Path::new("test_ignored"), Path::new("example.py"))]
+    #[test_case(Path::new("test_pass_namespace_package"), Path::new("example.py"))]
+    #[test_case(Path::new("test_pass_pyi"), Path::new("example.pyi"))]
+    #[test_case(Path::new("test_pass_script"), Path::new("script"))]
     fn test_flake8_no_pep420(path: &Path, filename: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let p = PathBuf::from(format!(

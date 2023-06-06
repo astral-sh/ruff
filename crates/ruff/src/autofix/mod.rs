@@ -1,16 +1,18 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use nohash_hasher::IntSet;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
 use ruff_python_ast::source_code::Locator;
 
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
-pub(crate) mod actions;
+pub(crate) mod codemods;
+pub(crate) mod edits;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
@@ -37,6 +39,7 @@ fn apply_fixes<'a>(
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
+    let mut isolated: IntSet<u32> = IntSet::default();
     let mut fixed = FxHashMap::default();
 
     for (rule, fix) in diagnostics
@@ -64,7 +67,19 @@ fn apply_fixes<'a>(
             continue;
         }
 
-        for edit in fix.edits() {
+        // If this fix requires isolation, and we've already applied another fix in the
+        // same isolation group, skip it.
+        if let IsolationLevel::Group(id) = fix.isolation() {
+            if !isolated.insert(id) {
+                continue;
+            }
+        }
+
+        for edit in fix
+            .edits()
+            .iter()
+            .sorted_unstable_by_key(|edit| edit.start())
+        {
             // Add all contents from `last_pos` to `fix.location`.
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);

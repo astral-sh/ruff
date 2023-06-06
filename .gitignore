@@ -1,10 +1,11 @@
-# Local cache
-.ruff_cache
 crates/ruff/resources/test/cpython
 mkdocs.yml
 .overrides
 ruff-old
 github_search*.jsonl
+schemastore
+.venv*
+scratch.py
 
 ###
 # Rust.gitignore

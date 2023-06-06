@@ -104,26 +104,22 @@ A001.py:11:1: A001 Variable `id` is shadowing a Python builtin
 15 | def bytes():
    |
 
-A001.py:13:1: A001 Variable `bytes` is shadowing a Python builtin
+A001.py:13:5: A001 Variable `bytes` is shadowing a Python builtin
    |
-13 |   id = 4
-14 |   
-15 | / def bytes():
-16 | |     pass
-   | |________^ A001
-17 |   
-18 |   class slice:
+13 | id = 4
+14 | 
+15 | def bytes():
+   |     ^^^^^ A001
+16 |     pass
    |
 
-A001.py:16:1: A001 Variable `slice` is shadowing a Python builtin
+A001.py:16:7: A001 Variable `slice` is shadowing a Python builtin
    |
-16 |       pass
-17 |   
-18 | / class slice:
-19 | |     pass
-   | |________^ A001
-20 |   
-21 |   try:
+16 |     pass
+17 | 
+18 | class slice:
+   |       ^^^^^ A001
+19 |     pass
    |
 
 A001.py:21:1: A001 Variable `ValueError` is shadowing a Python builtin

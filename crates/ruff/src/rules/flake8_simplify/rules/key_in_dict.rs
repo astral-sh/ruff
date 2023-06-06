@@ -1,16 +1,17 @@
 use anyhow::Result;
-use libcst_native::{Codegen, CodegenState};
+
 use log::error;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{match_attribute, match_call, match_expression};
+use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 
 #[violation]
@@ -39,17 +40,10 @@ fn get_value_content_for_key_in_dict(
 ) -> Result<String> {
     let content = locator.slice(expr.range());
     let mut expression = match_expression(content)?;
-    let call = match_call(&mut expression)?;
+    let call = match_call_mut(&mut expression)?;
     let attribute = match_attribute(&mut call.func)?;
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    attribute.value.codegen(&mut state);
-
-    Ok(state.to_string())
+    Ok(attribute.value.codegen_stylist(stylist))
 }
 
 /// SIM118

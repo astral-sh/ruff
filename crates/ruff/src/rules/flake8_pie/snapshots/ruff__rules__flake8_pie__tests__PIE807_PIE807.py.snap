@@ -10,7 +10,7 @@ PIE807.py:3:44: PIE807 [*] Prefer `list` over useless lambda
   |
   = help: Replace with `list`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | @dataclass
 2 2 | class Foo:
 3   |-    foo: List[str] = field(default_factory=lambda: [])  # PIE807
@@ -27,7 +27,7 @@ PIE807.py:7:36: PIE807 [*] Prefer `list` over useless lambda
   |
   = help: Replace with `list`
 
-ℹ Suggested fix
+ℹ Fix
 4 4 | 
 5 5 | 
 6 6 | class FooTable(BaseTable):
@@ -45,7 +45,7 @@ PIE807.py:11:28: PIE807 [*] Prefer `list` over useless lambda
    |
    = help: Replace with `list`
 
-ℹ Suggested fix
+ℹ Fix
 8  8  | 
 9  9  | 
 10 10 | class FooTable(BaseTable):

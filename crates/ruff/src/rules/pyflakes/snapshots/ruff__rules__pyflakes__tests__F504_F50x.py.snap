@@ -12,7 +12,7 @@ F50x.py:8:1: F504 [*] `%`-format string has unused named argument(s): baz
    |
    = help: Remove extra named arguments: baz
 
-ℹ Suggested fix
+ℹ Fix
 5 5 | '%s %s' % (1,)  # F507
 6 6 | '%s %s' % (1, 2, 3)  # F507
 7 7 | '%(bar)s' % {}  # F505

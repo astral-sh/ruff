@@ -1,10 +1,14 @@
-use std::num::TryFromIntError;
-use std::ops::{Deref, Index, IndexMut};
+use nohash_hasher::{BuildNoHashHasher, IntMap};
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
+use rustpython_parser::ast;
+
+use ruff_index::{newtype_index, Idx, IndexSlice, IndexVec};
 
 use crate::binding::{BindingId, StarImportation};
+use crate::globals::GlobalsId;
 
 #[derive(Debug)]
 pub struct Scope<'a> {
@@ -15,10 +19,12 @@ pub struct Scope<'a> {
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
     star_imports: Vec<StarImportation<'a>>,
-    /// A map from bound name to binding index, for current bindings.
+    /// A map from bound name to binding ID.
     bindings: FxHashMap<&'a str, BindingId>,
-    /// A map from bound name to binding index, for bindings that were shadowed later in the scope.
-    shadowed_bindings: FxHashMap<&'a str, Vec<BindingId>>,
+    /// A map from binding ID to binding ID that it shadows.
+    shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
+    /// Index into the globals arena, if the scope contains any globally-declared symbols.
+    globals_id: Option<GlobalsId>,
 }
 
 impl<'a> Scope<'a> {
@@ -29,7 +35,8 @@ impl<'a> Scope<'a> {
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            shadowed_bindings: FxHashMap::default(),
+            shadowed_bindings: IntMap::default(),
+            globals_id: None,
         }
     }
 
@@ -40,20 +47,21 @@ impl<'a> Scope<'a> {
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            shadowed_bindings: FxHashMap::default(),
+            shadowed_bindings: IntMap::default(),
+            globals_id: None,
         }
     }
 
     /// Returns the [id](BindingId) of the binding bound to the given name.
-    pub fn get(&self, name: &str) -> Option<&BindingId> {
-        self.bindings.get(name)
+    pub fn get(&self, name: &str) -> Option<BindingId> {
+        self.bindings.get(name).copied()
     }
 
     /// Adds a new binding with the given name to this scope.
     pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
-        if let Some(id) = self.bindings.insert(name, id) {
-            self.shadowed_bindings.entry(name).or_default().push(id);
-            Some(id)
+        if let Some(shadowed) = self.bindings.insert(name, id) {
+            self.shadowed_bindings.insert(id, shadowed);
+            Some(shadowed)
         } else {
             None
         }
@@ -70,22 +78,21 @@ impl<'a> Scope<'a> {
     }
 
     /// Returns the ids of all bindings defined in this scope.
-    pub fn binding_ids(&self) -> std::collections::hash_map::Values<&str, BindingId> {
-        self.bindings.values()
+    pub fn binding_ids(&self) -> impl Iterator<Item = BindingId> + '_ {
+        self.bindings.values().copied()
     }
 
     /// Returns a tuple of the name and id of all bindings defined in this scope.
-    pub fn bindings(&self) -> std::collections::hash_map::Iter<&'a str, BindingId> {
-        self.bindings.iter()
+    pub fn bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
+        self.bindings.iter().map(|(&name, &id)| (name, id))
     }
 
     /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
     /// those that were shadowed by later bindings.
-    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = &BindingId> {
-        self.bindings
-            .get(name)
-            .into_iter()
-            .chain(self.shadowed_bindings.get(name).into_iter().flatten().rev())
+    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
+        std::iter::successors(self.bindings.get(name).copied(), |id| {
+            self.shadowed_bindings.get(id).copied()
+        })
     }
 
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.
@@ -102,48 +109,32 @@ impl<'a> Scope<'a> {
     pub fn star_imports(&self) -> impl Iterator<Item = &StarImportation<'a>> {
         self.star_imports.iter()
     }
+
+    /// Set the globals pointer for this scope.
+    pub fn set_globals_id(&mut self, globals: GlobalsId) {
+        self.globals_id = Some(globals);
+    }
+
+    /// Returns the globals pointer for this scope.
+    pub fn globals_id(&self) -> Option<GlobalsId> {
+        self.globals_id
+    }
 }
 
 #[derive(Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
-    Class(ClassDef<'a>),
-    Function(FunctionDef<'a>),
+    Class(&'a ast::StmtClassDef),
+    Function(&'a ast::StmtFunctionDef),
+    AsyncFunction(&'a ast::StmtAsyncFunctionDef),
     Generator,
     Module,
-    Lambda(Lambda<'a>),
+    Lambda(&'a ast::ExprLambda),
 }
 
-#[derive(Debug)]
-pub struct FunctionDef<'a> {
-    // Properties derived from Stmt::FunctionDef.
-    pub name: &'a str,
-    pub args: &'a Arguments,
-    pub body: &'a [Stmt],
-    pub decorator_list: &'a [Expr],
-    // pub returns: Option<&'a Expr>,
-    // pub type_comment: Option<&'a str>,
-    // Scope-specific properties.
-    // TODO(charlie): Create AsyncFunctionDef to mirror the AST.
-    pub async_: bool,
-    pub globals: FxHashMap<&'a str, &'a Stmt>,
-}
-
-#[derive(Debug)]
-pub struct ClassDef<'a> {
-    // Properties derived from Stmt::ClassDef.
-    pub name: &'a str,
-    pub bases: &'a [Expr],
-    pub keywords: &'a [Keyword],
-    // pub body: &'a [Stmt],
-    pub decorator_list: &'a [Expr],
-    // Scope-specific properties.
-    pub globals: FxHashMap<&'a str, &'a Stmt>,
-}
-
-#[derive(Debug)]
-pub struct Lambda<'a> {
-    pub args: &'a Arguments,
-    pub body: &'a Expr,
+impl ScopeKind<'_> {
+    pub const fn is_any_function(&self) -> bool {
+        matches!(self, ScopeKind::Function(_) | ScopeKind::AsyncFunction(_))
+    }
 }
 
 /// Id uniquely identifying a scope in a program.
@@ -151,39 +142,25 @@ pub struct Lambda<'a> {
 /// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
 /// and it is impossible to have more scopes than characters in the file (because defining a function or class
 /// requires more than one character).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct ScopeId(u32);
+#[newtype_index]
+pub struct ScopeId;
 
 impl ScopeId {
     /// Returns the ID for the global scope
     #[inline]
     pub const fn global() -> Self {
-        ScopeId(0)
+        ScopeId::from_u32(0)
     }
 
     /// Returns `true` if this is the id of the global scope
     pub const fn is_global(&self) -> bool {
-        self.0 == 0
-    }
-}
-
-impl TryFrom<usize> for ScopeId {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(u32::try_from(value)?))
-    }
-}
-
-impl From<ScopeId> for usize {
-    fn from(value: ScopeId) -> Self {
-        value.0 as usize
+        self.index() == 0
     }
 }
 
 /// The scopes of a program indexed by [`ScopeId`]
 #[derive(Debug)]
-pub struct Scopes<'a>(Vec<Scope<'a>>);
+pub struct Scopes<'a>(IndexVec<ScopeId, Scope<'a>>);
 
 impl<'a> Scopes<'a> {
     /// Returns a reference to the global scope
@@ -198,7 +175,7 @@ impl<'a> Scopes<'a> {
 
     /// Pushes a new scope and returns its unique id
     pub fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
-        let next_id = ScopeId::try_from(self.0.len()).unwrap();
+        let next_id = ScopeId::new(self.0.len());
         self.0.push(Scope::local(kind, parent));
         next_id
     }
@@ -218,27 +195,19 @@ impl<'a> Scopes<'a> {
 
 impl Default for Scopes<'_> {
     fn default() -> Self {
-        Self(vec![Scope::global()])
-    }
-}
-
-impl<'a> Index<ScopeId> for Scopes<'a> {
-    type Output = Scope<'a>;
-
-    fn index(&self, index: ScopeId) -> &Self::Output {
-        &self.0[usize::from(index)]
-    }
-}
-
-impl<'a> IndexMut<ScopeId> for Scopes<'a> {
-    fn index_mut(&mut self, index: ScopeId) -> &mut Self::Output {
-        &mut self.0[usize::from(index)]
+        Self(IndexVec::from_raw(vec![Scope::global()]))
     }
 }
 
 impl<'a> Deref for Scopes<'a> {
-    type Target = [Scope<'a>];
+    type Target = IndexSlice<ScopeId, Scope<'a>>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<'a> DerefMut for Scopes<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

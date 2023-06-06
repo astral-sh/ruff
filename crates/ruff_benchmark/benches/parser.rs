@@ -1,9 +1,11 @@
+use std::time::Duration;
+
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use rustpython_parser::ast::Stmt;
-use std::time::Duration;
+use rustpython_parser::ast::{Stmt, Suite};
+use rustpython_parser::Parse;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -64,8 +66,7 @@ fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    let parsed =
-                        rustpython_parser::parse_program(case.code(), case.name()).unwrap();
+                    let parsed = Suite::parse(case.code(), case.name()).unwrap();
 
                     let mut visitor = CountVisitor { count: 0 };
                     visitor.visit_body(&parsed);

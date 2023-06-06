@@ -1,9 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
-use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::Ranged;
+
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::{StrExt, UniversalNewlineIterator};
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
@@ -67,11 +68,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
         return;
     };
 
-    if checker
-        .settings
-        .rules
-        .enabled(Rule::OneBlankLineBeforeClass)
-        || checker.settings.rules.enabled(Rule::BlankLineBeforeClass)
+    if checker.enabled(Rule::OneBlankLineBeforeClass) || checker.enabled(Rule::BlankLineBeforeClass)
     {
         let before = checker
             .locator
@@ -90,7 +87,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
             }
         }
 
-        if checker.settings.rules.enabled(Rule::BlankLineBeforeClass) {
+        if checker.enabled(Rule::BlankLineBeforeClass) {
             if blank_lines_before != 0 {
                 let mut diagnostic = Diagnostic::new(
                     BlankLineBeforeClass {
@@ -109,11 +106,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
                 checker.diagnostics.push(diagnostic);
             }
         }
-        if checker
-            .settings
-            .rules
-            .enabled(Rule::OneBlankLineBeforeClass)
-        {
+        if checker.enabled(Rule::OneBlankLineBeforeClass) {
             if blank_lines_before != 1 {
                 let mut diagnostic = Diagnostic::new(
                     OneBlankLineBeforeClass {
@@ -135,7 +128,7 @@ pub(crate) fn blank_before_after_class(checker: &mut Checker, docstring: &Docstr
         }
     }
 
-    if checker.settings.rules.enabled(Rule::OneBlankLineAfterClass) {
+    if checker.enabled(Rule::OneBlankLineAfterClass) {
         let after = checker
             .locator
             .slice(TextRange::new(docstring.end(), stmt.end()));

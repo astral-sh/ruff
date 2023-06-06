@@ -9,6 +9,10 @@ def f_a_short():
     raise RuntimeError("Error")
 
 
+def f_a_empty():
+    raise RuntimeError("")
+
+
 def f_b():
     example = "example"
     raise RuntimeError(f"This is an {example} exception")

@@ -6,20 +6,19 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::DuplicateClassFieldDefinition, Path::new("PIE794.py"); "PIE794")]
-    #[test_case(Rule::UnnecessaryDictKwargs, Path::new("PIE804.py"); "PIE804")]
-    #[test_case(Rule::MultipleStartsEndsWith, Path::new("PIE810.py"); "PIE810")]
-    #[test_case(Rule::UnnecessaryPass, Path::new("PIE790.py"); "PIE790")]
-    #[test_case(Rule::UnnecessarySpread, Path::new("PIE800.py"); "PIE800")]
-    #[test_case(Rule::ReimplementedListBuiltin, Path::new("PIE807.py"); "PIE807")]
-    #[test_case(Rule::NonUniqueEnums, Path::new("PIE796.py"); "PIE796")]
+    #[test_case(Rule::DuplicateClassFieldDefinition, Path::new("PIE794.py"))]
+    #[test_case(Rule::UnnecessaryDictKwargs, Path::new("PIE804.py"))]
+    #[test_case(Rule::MultipleStartsEndsWith, Path::new("PIE810.py"))]
+    #[test_case(Rule::UnnecessaryPass, Path::new("PIE790.py"))]
+    #[test_case(Rule::UnnecessarySpread, Path::new("PIE800.py"))]
+    #[test_case(Rule::ReimplementedListBuiltin, Path::new("PIE807.py"))]
+    #[test_case(Rule::NonUniqueEnums, Path::new("PIE796.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

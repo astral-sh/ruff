@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::Line;
+use ruff_newlines::Line;
 
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
@@ -10,6 +10,9 @@ use crate::settings::Settings;
 ///
 /// ## Why is this bad?
 /// Overlong lines can hurt readability.
+///
+/// ## Options
+/// - `task-tags`
 ///
 /// ## Example
 /// ```python
@@ -43,6 +46,7 @@ pub(crate) fn line_too_long(line: &Line, settings: &Settings) -> Option<Diagnost
         limit,
         settings.pycodestyle.ignore_overlong_task_comments,
         &settings.task_tags,
+        settings.tab_size,
     )
-    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit), overlong.range()))
+    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit.get()), overlong.range()))
 }

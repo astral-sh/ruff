@@ -2,18 +2,18 @@ use log::error;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, ExprContext, Ranged, Stmt};
-use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::StrExt;
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
     any_over_expr, contains_effect, first_colon_range, has_comments, has_comments_in,
 };
-use ruff_python_ast::newlines::StrExt;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineWidth;
 use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
 
@@ -266,14 +266,6 @@ pub(crate) fn nested_if_statements(
         checker.locator,
     );
 
-    // The fixer preserves comments in the nested body, but removes comments between
-    // the outer and inner if statements.
-    let nested_if = &body[0];
-    let fixable = !has_comments_in(
-        TextRange::new(stmt.start(), nested_if.start()),
-        checker.locator,
-    );
-
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
         colon.map_or_else(
@@ -281,20 +273,31 @@ pub(crate) fn nested_if_statements(
             |colon| TextRange::new(stmt.start(), colon.end()),
         ),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
-            Ok(edit) => {
-                if edit
-                    .content()
-                    .unwrap_or_default()
-                    .universal_newlines()
-                    .all(|line| line.width() <= checker.settings.line_length)
-                {
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(edit));
+    if checker.patch(diagnostic.kind.rule()) {
+        // The fixer preserves comments in the nested body, but removes comments between
+        // the outer and inner if statements.
+        let nested_if = &body[0];
+        if !has_comments_in(
+            TextRange::new(stmt.start(), nested_if.start()),
+            checker.locator,
+        ) {
+            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
+                Ok(edit) => {
+                    if edit
+                        .content()
+                        .unwrap_or_default()
+                        .universal_newlines()
+                        .all(|line| {
+                            LineWidth::new(checker.settings.tab_size).add_str(&line)
+                                <= checker.settings.line_length
+                        })
+                    {
+                        #[allow(deprecated)]
+                        diagnostic.set_fix(Fix::unspecified(edit));
+                    }
                 }
+                Err(err) => error!("Failed to fix nested if: {err}"),
             }
-            Err(err) => error!("Failed to fix nested if: {err}"),
         }
     }
     checker.diagnostics.push(diagnostic);
@@ -348,48 +351,49 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     }
 
     let condition = checker.generator().expr(test);
-    let fixable = matches!(if_return, Bool::True)
-        && matches!(else_return, Bool::False)
-        && !has_comments(stmt, checker.locator)
-        && (test.is_compare_expr() || checker.ctx.is_builtin("bool"));
-
     let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, stmt.range());
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        if test.is_compare_expr() {
-            // If the condition is a comparison, we can replace it with the condition.
-            let node = ast::StmtReturn {
-                value: Some(test.clone()),
-                range: TextRange::default(),
+    if checker.patch(diagnostic.kind.rule()) {
+        if matches!(if_return, Bool::True)
+            && matches!(else_return, Bool::False)
+            && !has_comments(stmt, checker.locator)
+            && (test.is_compare_expr() || checker.semantic_model().is_builtin("bool"))
+        {
+            if test.is_compare_expr() {
+                // If the condition is a comparison, we can replace it with the condition.
+                let node = ast::StmtReturn {
+                    value: Some(test.clone()),
+                    range: TextRange::default(),
+                };
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    checker.generator().stmt(&node.into()),
+                    stmt.range(),
+                )));
+            } else {
+                // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
+                // verified, above, that `bool` is a builtin.)
+                let node = ast::ExprName {
+                    id: "bool".into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                let node1 = ast::ExprCall {
+                    func: Box::new(node.into()),
+                    args: vec![(**test).clone()],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                };
+                let node2 = ast::StmtReturn {
+                    value: Some(Box::new(node1.into())),
+                    range: TextRange::default(),
+                };
+                #[allow(deprecated)]
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    checker.generator().stmt(&node2.into()),
+                    stmt.range(),
+                )));
             };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                checker.generator().stmt(&node.into()),
-                stmt.range(),
-            )));
-        } else {
-            // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
-            // verified, above, that `bool` is a builtin.)
-            let node = ast::ExprName {
-                id: "bool".into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-            };
-            let node1 = ast::ExprCall {
-                func: Box::new(node.into()),
-                args: vec![(**test).clone()],
-                keywords: vec![],
-                range: TextRange::default(),
-            };
-            let node2 = ast::StmtReturn {
-                value: Some(Box::new(node1.into())),
-                range: TextRange::default(),
-            };
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                checker.generator().stmt(&node2.into()),
-                stmt.range(),
-            )));
-        };
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -411,9 +415,10 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
+fn contains_call_path(model: &SemanticModel, expr: &Expr, target: &[&str]) -> bool {
     any_over_expr(expr, &|expr| {
-        ctx.resolve_call_path(expr)
+        model
+            .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
@@ -446,13 +451,13 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(&checker.ctx, test, &["sys", "version_info"]) {
+    if contains_call_path(checker.semantic_model(), test, &["sys", "version_info"]) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(&checker.ctx, test, &["sys", "platform"]) {
+    if contains_call_path(checker.semantic_model(), test, &["sys", "platform"]) {
         return;
     }
 
@@ -507,26 +512,28 @@ pub(crate) fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: O
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-        + contents.width()
+    if LineWidth::new(checker.settings.tab_size)
+        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(&contents)
         > checker.settings.line_length
     {
         return;
     }
 
-    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            contents,
-            stmt.range(),
-        )));
+    if checker.patch(diagnostic.kind.rule()) {
+        if !has_comments(stmt, checker.locator) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                contents,
+                stmt.range(),
+            )));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -647,7 +654,7 @@ pub(crate) fn manual_dict_lookup(
         return;
     };
     if value.as_ref().map_or(false, |value| {
-        contains_effect(value, |id| checker.ctx.is_builtin(id))
+        contains_effect(value, |id| checker.semantic_model().is_builtin(id))
     }) {
         return;
     }
@@ -720,7 +727,7 @@ pub(crate) fn manual_dict_lookup(
             return;
         };
         if value.as_ref().map_or(false, |value| {
-            contains_effect(value, |id| checker.ctx.is_builtin(id))
+            contains_effect(value, |id| checker.semantic_model().is_builtin(id))
         }) {
             return;
         };
@@ -803,7 +810,7 @@ pub(crate) fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(default_value, |id| checker.ctx.is_builtin(id)) {
+    if contains_effect(default_value, |id| checker.semantic_model().is_builtin(id)) {
         return;
     }
 
@@ -862,26 +869,28 @@ pub(crate) fn use_dict_get_with_default(
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     let line_start = checker.locator.line_start(stmt.start());
-    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
-        + contents.width()
+    if LineWidth::new(checker.settings.tab_size)
+        .add_str(&checker.locator.contents()[TextRange::new(line_start, stmt.start())])
+        .add_str(&contents)
         > checker.settings.line_length
     {
         return;
     }
 
-    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-            contents,
-            stmt.range(),
-        )));
+    if checker.patch(diagnostic.kind.rule()) {
+        if !has_comments(stmt, checker.locator) {
+            #[allow(deprecated)]
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                contents,
+                stmt.range(),
+            )));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }

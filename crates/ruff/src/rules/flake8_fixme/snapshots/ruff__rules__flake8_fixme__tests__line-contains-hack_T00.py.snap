@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/flake8_fixme/mod.rs
+---
+T00.py:5:3: T004 Line contains HACK
+  |
+5 | # XXX: xxx
+6 | # xxx: xxx
+7 | # HACK: hack
+  |   ^^^^ T004
+8 | # hack: hack
+9 | # FIXME: fixme
+  |
+
+T00.py:6:3: T004 Line contains HACK
+   |
+ 6 | # xxx: xxx
+ 7 | # HACK: hack
+ 8 | # hack: hack
+   |   ^^^^ T004
+ 9 | # FIXME: fixme
+10 | # fixme: fixme
+   |
+
+

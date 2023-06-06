@@ -63,7 +63,7 @@ enum Reason<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn categorize<'a>(
+pub(crate) fn categorize<'a>(
     module_name: &str,
     level: Option<u32>,
     src: &[PathBuf],
@@ -220,7 +220,7 @@ pub struct KnownModules {
 }
 
 impl KnownModules {
-    pub fn new(
+    pub(crate) fn new(
         first_party: Vec<String>,
         third_party: Vec<String>,
         local_folder: Vec<String>,
@@ -318,7 +318,7 @@ impl KnownModules {
     }
 
     /// Return the list of modules that are known to be of a given type.
-    pub fn modules_for_known_type(&self, import_type: ImportType) -> Vec<String> {
+    pub(crate) fn modules_for_known_type(&self, import_type: ImportType) -> Vec<String> {
         self.known
             .iter()
             .filter_map(|(module, known_section)| {
@@ -336,7 +336,7 @@ impl KnownModules {
     }
 
     /// Return the list of user-defined modules, indexed by section.
-    pub fn user_defined(&self) -> FxHashMap<String, Vec<String>> {
+    pub(crate) fn user_defined(&self) -> FxHashMap<String, Vec<String>> {
         let mut user_defined: FxHashMap<String, Vec<String>> = FxHashMap::default();
         for (module, section) in &self.known {
             if let ImportSection::UserDefined(section_name) = section {

@@ -7,16 +7,15 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
-    #[test_case(Rule::SingleLineImplicitStringConcatenation, Path::new("ISC.py"); "ISC001")]
-    #[test_case(Rule::MultiLineImplicitStringConcatenation, Path::new("ISC.py"); "ISC002")]
-    #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC.py"); "ISC003")]
+    #[test_case(Rule::SingleLineImplicitStringConcatenation, Path::new("ISC.py"))]
+    #[test_case(Rule::MultiLineImplicitStringConcatenation, Path::new("ISC.py"))]
+    #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -27,9 +26,9 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::SingleLineImplicitStringConcatenation, Path::new("ISC.py"); "ISC001")]
-    #[test_case(Rule::MultiLineImplicitStringConcatenation, Path::new("ISC.py"); "ISC002")]
-    #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC.py"); "ISC003")]
+    #[test_case(Rule::SingleLineImplicitStringConcatenation, Path::new("ISC.py"))]
+    #[test_case(Rule::MultiLineImplicitStringConcatenation, Path::new("ISC.py"))]
+    #[test_case(Rule::ExplicitStringConcatenation, Path::new("ISC.py"))]
     fn multiline(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "multiline_{}_{}",

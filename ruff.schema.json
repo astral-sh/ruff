@@ -320,7 +320,7 @@
       ]
     },
     "force-exclude": {
-      "description": "Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to respect these exclusions unequivocally.\n\nThis is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all changed files to the [`ruff-pre-commit`](https://github.com/charliermarsh/ruff-pre-commit) plugin, regardless of whether they're marked as excluded by Ruff's own settings.",
+      "description": "Whether to enforce `exclude` and `extend-exclude` patterns, even for paths that are passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to respect these exclusions unequivocally.\n\nThis is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit) plugin, regardless of whether they're marked as excluded by Ruff's own settings.",
       "type": [
         "boolean",
         "null"
@@ -377,12 +377,14 @@
     },
     "line-length": {
       "description": "The line length to use when enforcing long-lines violations (like `E501`).",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint",
-      "minimum": 0.0
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LineLength"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "mccabe": {
       "description": "Options for the `mccabe` plugin.",
@@ -451,6 +453,17 @@
         }
       ]
     },
+    "pyflakes": {
+      "description": "Options for the `pyflakes` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PyflakesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pylint": {
       "description": "Options for the `pylint` plugin.",
       "anyOf": [
@@ -505,7 +518,7 @@
       ]
     },
     "src": {
-      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in the `src` option (e.g., `src = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
+      "description": "The source code paths to consider, e.g., when resolving first- vs. third-party imports.\n\nAs an example: given a Python package structure like:\n\n```text my_package/ pyproject.toml src/ my_package/ __init__.py foo.py bar.py ```\n\nThe `src` directory should be included in the `src` option (e.g., `src = [\"src\"]`), such that when resolving imports, `my_package.foo` is considered a first-party import.\n\nWhen omitted, the `src` directory will typically default to the directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the \"project root\"), unless a configuration file is explicitly provided (e.g., via the `--config` command-line flag).\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = [\"python_modules/*\"]` would expand to incorporate all of the packages in that directory. User home directory and environment variables will also be expanded.",
       "type": [
         "array",
         "null"
@@ -513,6 +526,17 @@
       "items": {
         "type": "string"
       }
+    },
+    "tab-size": {
+      "description": "The tabulation size to calculate line length.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/TabSize"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "target-version": {
       "description": "The Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, the target version will be inferred from the `project.requires-python` field in the relevant `pyproject.toml` (e.g., `requires-python = \">=3.8\"`), if present.",
@@ -1316,6 +1340,12 @@
       },
       "additionalProperties": false
     },
+    "LineLength": {
+      "description": "The length of a line of text that is considered too long.",
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0.0
+    },
     "McCabeOptions": {
       "type": "object",
       "properties": {
@@ -1401,12 +1431,14 @@
         },
         "max-doc-length": {
           "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint",
-          "minimum": 0.0
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineLength"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -1437,6 +1469,22 @@
         },
         "property-decorators": {
           "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PyflakesOptions": {
+      "type": "object",
+      "properties": {
+        "extend-generics": {
+          "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.",
           "type": [
             "array",
             "null"
@@ -1555,6 +1603,10 @@
         "A001",
         "A002",
         "A003",
+        "AIR",
+        "AIR0",
+        "AIR00",
+        "AIR001",
         "ALL",
         "ANN",
         "ANN0",
@@ -1627,6 +1679,7 @@
         "B030",
         "B031",
         "B032",
+        "B033",
         "B9",
         "B90",
         "B904",
@@ -1900,6 +1953,7 @@
         "FA1",
         "FA10",
         "FA100",
+        "FA102",
         "FBT",
         "FBT0",
         "FBT00",
@@ -2022,6 +2076,9 @@
         "PL",
         "PLC",
         "PLC0",
+        "PLC02",
+        "PLC020",
+        "PLC0208",
         "PLC04",
         "PLC041",
         "PLC0414",
@@ -2049,6 +2106,7 @@
         "PLE03",
         "PLE030",
         "PLE0302",
+        "PLE0307",
         "PLE06",
         "PLE060",
         "PLE0604",
@@ -2069,6 +2127,9 @@
         "PLE15",
         "PLE150",
         "PLE1507",
+        "PLE17",
+        "PLE170",
+        "PLE1700",
         "PLE2",
         "PLE25",
         "PLE250",
@@ -2119,7 +2180,6 @@
         "PLW0120",
         "PLW0129",
         "PLW013",
-        "PLW0130",
         "PLW0131",
         "PLW04",
         "PLW040",
@@ -2222,13 +2282,23 @@
         "PYI02",
         "PYI020",
         "PYI021",
+        "PYI024",
+        "PYI025",
+        "PYI029",
         "PYI03",
+        "PYI032",
         "PYI033",
+        "PYI034",
+        "PYI035",
         "PYI04",
         "PYI042",
         "PYI043",
+        "PYI045",
+        "PYI048",
         "PYI05",
         "PYI052",
+        "PYI053",
+        "PYI054",
         "Q",
         "Q0",
         "Q00",
@@ -2267,6 +2337,9 @@
         "RUF1",
         "RUF10",
         "RUF100",
+        "RUF2",
+        "RUF20",
+        "RUF200",
         "S",
         "S1",
         "S10",
@@ -2324,6 +2397,7 @@
         "S606",
         "S607",
         "S608",
+        "S609",
         "S61",
         "S612",
         "S7",
@@ -2375,6 +2449,13 @@
         "SLF00",
         "SLF001",
         "T",
+        "T",
+        "T0",
+        "T00",
+        "T001",
+        "T002",
+        "T003",
+        "T004",
         "T1",
         "T10",
         "T100",
@@ -2530,6 +2611,12 @@
           ]
         }
       ]
+    },
+    "TabSize": {
+      "description": "The size of a tab.",
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
     },
     "Version": {
       "type": "string"

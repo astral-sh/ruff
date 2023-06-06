@@ -1,0 +1,13 @@
+[package]
+name = "ruff_newlines"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_text_size = { workspace = true }
+
+memchr = { workspace = true }

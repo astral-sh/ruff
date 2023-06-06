@@ -2,7 +2,7 @@ use rustpython_parser::ast::{self, Constant, Expr, Keyword};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::model::SemanticModel;
 
 pub(super) fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (&Expr, CallPath)> {
     decorators.iter().filter_map(|decorator| {
@@ -17,30 +17,30 @@ pub(super) fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (
     })
 }
 
-pub(super) fn is_pytest_fail(context: &Context, call: &Expr) -> bool {
-    context.resolve_call_path(call).map_or(false, |call_path| {
+pub(super) fn is_pytest_fail(model: &SemanticModel, call: &Expr) -> bool {
+    model.resolve_call_path(call).map_or(false, |call_path| {
         call_path.as_slice() == ["pytest", "fail"]
     })
 }
 
-pub(super) fn is_pytest_fixture(context: &Context, decorator: &Expr) -> bool {
-    context
+pub(super) fn is_pytest_fixture(model: &SemanticModel, decorator: &Expr) -> bool {
+    model
         .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "fixture"]
         })
 }
 
-pub(super) fn is_pytest_yield_fixture(context: &Context, decorator: &Expr) -> bool {
-    context
+pub(super) fn is_pytest_yield_fixture(model: &SemanticModel, decorator: &Expr) -> bool {
+    model
         .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "yield_fixture"]
         })
 }
 
-pub(super) fn is_pytest_parametrize(context: &Context, decorator: &Expr) -> bool {
-    context
+pub(super) fn is_pytest_parametrize(model: &SemanticModel, decorator: &Expr) -> bool {
+    model
         .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "mark", "parametrize"]

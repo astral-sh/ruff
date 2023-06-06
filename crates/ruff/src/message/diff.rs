@@ -1,11 +1,15 @@
-use crate::message::Message;
-use colored::{Color, ColoredString, Colorize, Styles};
-use ruff_diagnostics::{Applicability, Fix};
-use ruff_python_ast::source_code::{OneIndexed, SourceFile};
-use ruff_text_size::{TextRange, TextSize};
-use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
+
+use colored::{Color, ColoredString, Colorize, Styles};
+use itertools::Itertools;
+use ruff_text_size::{TextRange, TextSize};
+use similar::{ChangeTag, TextDiff};
+
+use ruff_diagnostics::{Applicability, Fix};
+use ruff_python_ast::source_code::{OneIndexed, SourceFile};
+
+use crate::message::Message;
 
 /// Renders a diff that shows the code fixes.
 ///
@@ -34,7 +38,12 @@ impl Display for Diff<'_> {
         let mut output = String::with_capacity(self.source_code.source_text().len());
         let mut last_end = TextSize::default();
 
-        for edit in self.fix.edits() {
+        for edit in self
+            .fix
+            .edits()
+            .iter()
+            .sorted_unstable_by_key(|edit| edit.start())
+        {
             output.push_str(
                 self.source_code
                     .slice(TextRange::new(last_end, edit.start())),

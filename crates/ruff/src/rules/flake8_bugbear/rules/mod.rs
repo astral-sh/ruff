@@ -10,6 +10,7 @@ pub(crate) use cannot_raise_literal::{cannot_raise_literal, CannotRaiseLiteral};
 pub(crate) use duplicate_exceptions::{
     duplicate_exceptions, DuplicateHandlerException, DuplicateTryBlockException,
 };
+pub(crate) use duplicate_value::{duplicate_value, DuplicateValue};
 pub(crate) use except_with_empty_tuple::{except_with_empty_tuple, ExceptWithEmptyTuple};
 pub(crate) use except_with_non_exception_classes::{
     except_with_non_exception_classes, ExceptWithNonExceptionClasses,
@@ -66,6 +67,7 @@ mod assignment_to_os_environ;
 mod cached_instance_method;
 mod cannot_raise_literal;
 mod duplicate_exceptions;
+mod duplicate_value;
 mod except_with_empty_tuple;
 mod except_with_non_exception_classes;
 mod f_string_docstring;

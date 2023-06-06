@@ -11,7 +11,7 @@ RUF100_1.py:37:9: F401 [*] `typing.Union` imported but unused
    |
    = help: Remove unused import: `typing.Union`
 
-ℹ Suggested fix
+ℹ Fix
 34 34 |     # This should ignore the first error.
 35 35 |     from typing import (
 36 36 |         Mapping,  # noqa: F401
@@ -112,7 +112,7 @@ RUF100_1.py:89:24: F401 [*] `typing.Awaitable` imported but unused
    |
    = help: Remove unused import
 
-ℹ Suggested fix
+ℹ Fix
 86 86 | 
 87 87 | def f():
 88 88 |     # This should mark F501 as unused.
@@ -128,7 +128,7 @@ RUF100_1.py:89:35: F401 [*] `typing.AwaitableGenerator` imported but unused
    |
    = help: Remove unused import
 
-ℹ Suggested fix
+ℹ Fix
 86 86 | 
 87 87 | def f():
 88 88 |     # This should mark F501 as unused.

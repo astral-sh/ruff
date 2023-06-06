@@ -5,8 +5,8 @@ use rustpython_parser::ast::{self, Constant, Expr, ExprContext, Keyword, Ranged,
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-
 use ruff_python_ast::source_code::Generator;
+use ruff_python_semantic::model::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
@@ -15,7 +15,6 @@ use crate::registry::AsRule;
 #[violation]
 pub struct ConvertTypedDictFunctionalToClass {
     name: String,
-    fixable: bool,
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {
@@ -23,12 +22,12 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name, .. } = self;
+        let ConvertTypedDictFunctionalToClass { name } = self;
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let ConvertTypedDictFunctionalToClass { name, .. } = self;
+        let ConvertTypedDictFunctionalToClass { name } = self;
         Some(format!("Convert `{name}` to class syntax"))
     }
 }
@@ -36,7 +35,7 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
 fn match_typed_dict_assign<'a>(
-    checker: &Checker,
+    model: &SemanticModel,
     targets: &'a [Expr],
     value: &'a Expr,
 ) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
@@ -52,13 +51,9 @@ fn match_typed_dict_assign<'a>(
     }) = value else {
         return None;
     };
-    if !checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TypedDict"]
-        })
-    {
+    if !model.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypedDict"]
+    }) {
         return None;
     }
     Some((class_name, args, keywords, func))
@@ -244,7 +239,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     value: &Expr,
 ) {
     let Some((class_name, args, keywords, base_class)) =
-        match_typed_dict_assign(checker, targets, value) else
+        match_typed_dict_assign(checker.semantic_model(), targets, value) else
     {
         return;
     };
@@ -256,24 +251,25 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             return;
         }
     };
-    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-    let fixable = checker.locator.is_at_start_of_line(stmt.start());
+
     let mut diagnostic = Diagnostic::new(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
-            fixable,
         },
         stmt.range(),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(convert_to_class(
-            stmt,
-            class_name,
-            body,
-            total_keyword,
-            base_class,
-            checker.generator(),
-        ));
+    if checker.patch(diagnostic.kind.rule()) {
+        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+        if checker.locator.is_at_start_of_line(stmt.start()) {
+            diagnostic.set_fix(convert_to_class(
+                stmt,
+                class_name,
+                body,
+                total_keyword,
+                base_class,
+                checker.generator(),
+            ));
+        }
     }
     checker.diagnostics.push(diagnostic);
 }
