@@ -1,14 +1,15 @@
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
-    Arg, AssignEqual, AssignTargetExpression, Call, Codegen, CodegenState, Comment, CompFor, Dict,
-    DictComp, DictElement, Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
-    LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedWhitespace,
-    RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
+    Arg, AssignEqual, AssignTargetExpression, Call, Comment, CompFor, Dict, DictComp, DictElement,
+    Element, EmptyLine, Expression, GeneratorExp, LeftCurlyBrace, LeftParen, LeftSquareBracket,
+    List, ListComp, Name, ParenthesizableWhitespace, ParenthesizedWhitespace, RightCurlyBrace,
+    RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace,
     TrailingWhitespace, Tuple,
 };
 use rustpython_parser::ast::Ranged;
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
@@ -44,14 +45,10 @@ pub(crate) fn fix_unnecessary_generator_list(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C401) Convert `set(x for x in y)` to `{x for x in y}`.
@@ -82,14 +79,7 @@ pub(crate) fn fix_unnecessary_generator_set(
         rpar: generator_exp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    let mut content = state.to_string();
+    let mut content = tree.codegen_stylist(stylist);
 
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
@@ -136,14 +126,7 @@ pub(crate) fn fix_unnecessary_generator_dict(
         whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    let mut content = state.to_string();
+    let mut content = tree.codegen_stylist(stylist);
 
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
@@ -182,14 +165,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C404) Convert `dict([(i, i) for i in range(3)])` to `{i: i for i in
@@ -229,14 +208,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
         rpar: list_comp.rpar.clone(),
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// Drop a trailing comma from a list of tuple elements.
@@ -291,7 +266,7 @@ pub(crate) fn fix_unnecessary_literal_set(
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
-    let mut call = match_call_mut(&mut tree)?;
+    let call = match_call_mut(&mut tree)?;
     let arg = match_arg(call)?;
 
     let (elements, whitespace_after, whitespace_before) = match &arg.value {
@@ -318,14 +293,10 @@ pub(crate) fn fix_unnecessary_literal_set(
         }));
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
@@ -386,14 +357,10 @@ pub(crate) fn fix_unnecessary_literal_dict(
         rpar: vec![],
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C408)
@@ -495,14 +462,10 @@ pub(crate) fn fix_unnecessary_collection_call(
         }
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C409) Convert `tuple([1, 2])` to `tuple(1, 2)`
@@ -549,14 +512,10 @@ pub(crate) fn fix_unnecessary_literal_within_tuple_call(
         }],
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C410) Convert `list([1, 2])` to `[1, 2]`
@@ -605,14 +564,10 @@ pub(crate) fn fix_unnecessary_literal_within_list_call(
         rpar: vec![],
     }));
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
@@ -629,14 +584,10 @@ pub(crate) fn fix_unnecessary_list_call(
 
     tree = arg.value.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C413) Convert `list(sorted([2, 3, 1]))` to `sorted([2, 3, 1])`.
@@ -747,14 +698,10 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
         }
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C414) Convert `sorted(list(foo))` to `sorted(foo)`
@@ -765,7 +712,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
 ) -> Result<Edit> {
     let module_text = locator.slice(expr.range());
     let mut tree = match_expression(module_text)?;
-    let mut outer_call = match_call_mut(&mut tree)?;
+    let outer_call = match_call_mut(&mut tree)?;
 
     outer_call.args = match outer_call.args.split_first() {
         Some((first, rest)) => {
@@ -781,14 +728,10 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
         None => bail!("Expected at least one argument in outer function call"),
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C416) Convert `[i for i in x]` to `list(x)`.
@@ -872,14 +815,10 @@ pub(crate) fn fix_unnecessary_comprehension(
         }
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C417) Convert `map(lambda x: x * 2, bar)` to `(x * 2 for x in bar)`.
@@ -1018,14 +957,7 @@ pub(crate) fn fix_unnecessary_map(
             }
         }
 
-        let mut state = CodegenState {
-            default_newline: &stylist.line_ending(),
-            default_indent: stylist.indentation(),
-            ..CodegenState::default()
-        };
-        tree.codegen(&mut state);
-
-        let mut content = state.to_string();
+        let mut content = tree.codegen_stylist(stylist);
 
         // If the expression is embedded in an f-string, surround it with spaces to avoid
         // syntax errors.
@@ -1054,14 +986,10 @@ pub(crate) fn fix_unnecessary_literal_within_dict_call(
 
     tree = arg.value.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Edit::range_replacement(state.to_string(), expr.range()))
+    Ok(Edit::range_replacement(
+        tree.codegen_stylist(stylist),
+        expr.range(),
+    ))
 }
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`
@@ -1231,15 +1159,8 @@ pub(crate) fn fix_unnecessary_comprehension_any_all(
         _ => whitespace_after_arg,
     };
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
     Ok(Fix::suggested(Edit::range_replacement(
-        state.to_string(),
+        tree.codegen_stylist(stylist),
         expr.range(),
     )))
 }

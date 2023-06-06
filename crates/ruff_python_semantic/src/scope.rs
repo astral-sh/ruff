@@ -1,3 +1,5 @@
+use nohash_hasher::{BuildNoHashHasher, IntMap};
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use rustc_hash::FxHashMap;
@@ -17,10 +19,10 @@ pub struct Scope<'a> {
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
     star_imports: Vec<StarImportation<'a>>,
-    /// A map from bound name to binding index, for current bindings.
+    /// A map from bound name to binding ID.
     bindings: FxHashMap<&'a str, BindingId>,
-    /// A map from bound name to binding index, for bindings that were shadowed later in the scope.
-    shadowed_bindings: FxHashMap<&'a str, Vec<BindingId>>,
+    /// A map from binding ID to binding ID that it shadows.
+    shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
 }
@@ -33,7 +35,7 @@ impl<'a> Scope<'a> {
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            shadowed_bindings: FxHashMap::default(),
+            shadowed_bindings: IntMap::default(),
             globals_id: None,
         }
     }
@@ -45,7 +47,7 @@ impl<'a> Scope<'a> {
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            shadowed_bindings: FxHashMap::default(),
+            shadowed_bindings: IntMap::default(),
             globals_id: None,
         }
     }
@@ -57,9 +59,9 @@ impl<'a> Scope<'a> {
 
     /// Adds a new binding with the given name to this scope.
     pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
-        if let Some(id) = self.bindings.insert(name, id) {
-            self.shadowed_bindings.entry(name).or_default().push(id);
-            Some(id)
+        if let Some(shadowed) = self.bindings.insert(name, id) {
+            self.shadowed_bindings.insert(id, shadowed);
+            Some(shadowed)
         } else {
             None
         }
@@ -88,11 +90,9 @@ impl<'a> Scope<'a> {
     /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
     /// those that were shadowed by later bindings.
     pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
-        self.bindings
-            .get(name)
-            .into_iter()
-            .chain(self.shadowed_bindings.get(name).into_iter().flatten().rev())
-            .copied()
+        std::iter::successors(self.bindings.get(name).copied(), |id| {
+            self.shadowed_bindings.get(id).copied()
+        })
     }
 
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.

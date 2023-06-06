@@ -20,31 +20,31 @@ f = ["This is a very long line that should be formatted into a clearer line ", "
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,7 @@
- a = 3
+@@ -1,10 +1,7 @@
+-a = 3
++a  =    3
  # fmt: off
--b,    c = 1, 2
--d =    6  # fmt: skip
-+b, c = 1, 2
-+d = 6  # fmt: skip
+ b,    c = 1, 2
+ d =    6  # fmt: skip
  e = 5
  # fmt: on
- f = [
+-f = [
+-    "This is a very long line that should be formatted into a clearer line ",
+-    "by rearranging.",
+-]
++f = ["This is a very long line that should be formatted into a clearer line ", "by rearranging."]
 ```
 
 ## Ruff Output
 
 ```py
-a = 3
+a  =    3
 # fmt: off
-b, c = 1, 2
-d = 6  # fmt: skip
+b,    c = 1, 2
+d =    6  # fmt: skip
 e = 5
 # fmt: on
-f = [
-    "This is a very long line that should be formatted into a clearer line ",
-    "by rearranging.",
-]
+f = ["This is a very long line that should be formatted into a clearer line ", "by rearranging."]
 ```
 
 ## Black Output

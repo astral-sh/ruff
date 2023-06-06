@@ -1,5 +1,3 @@
-#![allow(unused, unreachable_pub)] // TODO(micha): Remove after using the new comments infrastructure in the formatter.
-
 //! Types for extracting and representing comments of a syntax tree.
 //!
 //! Most programming languages support comments allowing programmers to document their programs.
@@ -90,11 +88,11 @@
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
 use rustpython_parser::ast::Mod;
-use std::cell::Cell;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 mod debug;
+mod format;
 mod map;
 mod node_key;
 mod placement;
@@ -104,6 +102,10 @@ use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
+pub(crate) use format::{
+    dangling_comments, dangling_node_comments, leading_alternate_branch_comments,
+    leading_node_comments, trailing_comments, trailing_node_comments,
+};
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::CommentRanges;
@@ -116,7 +118,7 @@ pub(crate) struct SourceComment {
 
     /// Whether the comment has been formatted or not.
     #[cfg(debug_assertions)]
-    formatted: Cell<bool>,
+    formatted: std::cell::Cell<bool>,
 
     position: CommentTextPosition,
 }
@@ -134,7 +136,7 @@ impl SourceComment {
 
     #[cfg(not(debug_assertions))]
     #[inline(always)]
-    pub fn mark_formatted(&self) {}
+    pub(crate) fn mark_formatted(&self) {}
 
     /// Marks the comment as formatted
     #[cfg(debug_assertions)]
@@ -224,6 +226,8 @@ pub(crate) struct Comments<'a> {
     data: Rc<CommentsData<'a>>,
 }
 
+#[allow(unused)]
+// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>) -> Self {
         Self {
@@ -496,10 +500,160 @@ def test(x, y):
     else:
         print("Greater")
 
-    # Trailing comment
+        # trailing `else` comment
+
+    # Trailing `if` statement comment
+
+def other(y, z):
+    if y == z:
+        pass
+            # Trailing `if` comment
+      # Trailing `other` function comment
 
 test(10, 20)
 "#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn trailing_comment_after_single_statement_body() {
+        let source = r#"
+if x == y: pass
+
+    # Test
+print("test")
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn if_elif_else_comments() {
+        let source = r#"
+if x == y:
+    pass # trailing `pass` comment
+    # Root `if` trailing comment
+
+# Leading elif comment
+elif x < y:
+    pass
+    # `elif` trailing comment
+# Leading else comment
+else:
+    pass
+    # `else` trailing comment
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn if_elif_if_else_comments() {
+        let source = r#"
+if x == y:
+    pass
+elif x < y:
+    if x < 10:
+        pass
+    # `elif` trailing comment
+# Leading else comment
+else:
+    pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn try_except_finally_else() {
+        let source = r#"
+try:
+    pass
+    # trailing try comment
+# leading handler comment
+except Exception as ex:
+    pass
+    # Trailing except comment
+# leading else comment
+else:
+    pass
+    # trailing else comment
+# leading finally comment
+finally:
+    print("Finally!")
+    # Trailing finally comment
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn try_except() {
+        let source = r#"
+def test():
+    try:
+        pass
+        # trailing try comment
+    # leading handler comment
+    except Exception as ex:
+        pass
+        # Trailing except comment
+
+    # Trailing function comment
+
+print("Next statement");
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    // Issue: Match cases
+    #[test]
+    fn match_cases() {
+        let source = r#"def make_point_3d(pt):
+    match pt:
+        # Leading `case(x, y)` comment
+        case (x, y):
+            return Point3d(x, y, 0)
+            # Trailing `case(x, y) comment
+        # Leading `case (x, y, z)` comment
+        case (x, y, z):
+            if x < y:
+                print("if")
+            else:
+                print("else")
+                # Trailing else comment
+            # trailing case comment
+        case Point2d(x, y):
+            return Point3d(x, y, 0)
+        case _:
+            raise TypeError("not a point we support")
+            # Trailing last case comment
+        # Trailing match comment
+    # After match comment
+
+    print("other")
+        "#;
+
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -556,6 +710,175 @@ def test(
     b,
 ): pass
 "#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn positional_argument_only_comment() {
+        let source = r#"
+def test(
+    a, # trailing positional comment
+    # Positional arguments only after here
+    /, # trailing positional argument comment.
+    # leading b comment
+    b,
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn positional_argument_only_leading_comma_comment() {
+        let source = r#"
+def test(
+    a # trailing positional comment
+    # Positional arguments only after here
+    ,/, # trailing positional argument comment.
+    # leading b comment
+    b,
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn positional_argument_only_comment_without_following_node() {
+        let source = r#"
+def test(
+    a, # trailing positional comment
+    # Positional arguments only after here
+    /, # trailing positional argument comment.
+    # Trailing on new line
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn non_positional_arguments_with_defaults() {
+        let source = r#"
+def test(
+    a=10 # trailing positional comment
+    # Positional arguments only after here
+    ,/, # trailing positional argument comment.
+    # leading comment for b
+    b=20
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn non_positional_arguments_slash_on_same_line() {
+        let source = r#"
+def test(a=10,/, # trailing positional argument comment.
+    # leading comment for b
+    b=20
+): pass
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn binary_expression_left_operand_comment() {
+        let source = r#"
+a = (
+    5
+    # trailing left comment
+    +
+    # leading right comment
+    3
+)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn binary_expression_left_operand_trailing_end_of_line_comment() {
+        let source = r#"
+a = (
+    5 # trailing left comment
+    + # trailing operator comment
+    # leading right comment
+    3
+)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn nested_binary_expression() {
+        let source = r#"
+a = (
+    (5 # trailing left comment
+        *
+        2)
+    + # trailing operator comment
+    # leading right comment
+    3
+)
+"#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn while_trailing_end_of_line_comment() {
+        let source = r#"while True:
+    if something.changed:
+        do.stuff()  # trailing comment
+"#;
+
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn while_trailing_else_end_of_line_comment() {
+        let source = r#"while True:
+    pass
+else: # trailing comment
+    pass
+"#;
+
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();

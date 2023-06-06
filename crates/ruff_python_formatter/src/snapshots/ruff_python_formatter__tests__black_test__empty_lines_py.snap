@@ -105,61 +105,56 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -25,23 +25,30 @@
+@@ -3,9 +3,9 @@
+ 
+ # leading comment
+ def f():
+-    NO = ""
+-    SPACE = " "
+-    DOUBLESPACE = "  "
++    NO = ''
++    SPACE = ' '
++    DOUBLESPACE = '  '
+ 
+     t = leaf.type
+     p = leaf.parent  # trailing comment
+@@ -16,14 +16,19 @@
+     if t == token.COMMENT:  # another trailing comment
+         return DOUBLESPACE
+ 
++
+     assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
+ 
++
+     prev = leaf.prev_sibling
+     if not prev:
+         prevp = preceding_leaf(p)
+         if not prevp or prevp.type in OPENING_BRACKETS:
++
++
              return NO
  
++
          if prevp.type == token.EQUAL:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.argument,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.argument,
-+                }
-+            ):
-                 return NO
--
-         elif prevp.type == token.DOUBLESTAR:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.dictsetmaker,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.dictsetmaker,
-+                }
-+            ):
-                 return NO
- 
- 
-@@ -49,7 +56,6 @@
+             if prevp.parent and prevp.parent.type in {
+                 syms.typedargslist,
+@@ -48,12 +53,11 @@
+ ###############################################################################
  # SECTION BECAUSE SECTIONS
  ###############################################################################
- 
 -
+ 
  def g():
-     NO = ""
-     SPACE = " "
-@@ -67,7 +73,7 @@
+-    NO = ""
+-    SPACE = " "
+-    DOUBLESPACE = "  "
++    NO = ''
++    SPACE = ' '
++    DOUBLESPACE = '  '
+ 
+     t = leaf.type
+     p = leaf.parent
+@@ -67,7 +71,7 @@
          return DOUBLESPACE
  
      # Another comment because more comments
@@ -168,29 +163,6 @@ def g():
  
      prev = leaf.prev_sibling
      if not prev:
-@@ -79,11 +85,15 @@
-             return NO
- 
-         if prevp.type == token.EQUAL:
--            if prevp.parent and prevp.parent.type in {
--                syms.typedargslist,
--                syms.varargslist,
--                syms.parameters,
--                syms.arglist,
--                syms.argument,
--            }:
-+            if (
-+                prevp.parent
-+                and prevp.parent.type
-+                in {
-+                    syms.typedargslist,
-+                    syms.varargslist,
-+                    syms.parameters,
-+                    syms.arglist,
-+                    syms.argument,
-+                }
-+            ):
-                 return NO
 ```
 
 ## Ruff Output
@@ -201,9 +173,9 @@ def g():
 
 # leading comment
 def f():
-    NO = ""
-    SPACE = " "
-    DOUBLESPACE = "  "
+    NO = ''
+    SPACE = ' '
+    DOUBLESPACE = '  '
 
     t = leaf.type
     p = leaf.parent  # trailing comment
@@ -214,39 +186,37 @@ def f():
     if t == token.COMMENT:  # another trailing comment
         return DOUBLESPACE
 
+
     assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
+
 
     prev = leaf.prev_sibling
     if not prev:
         prevp = preceding_leaf(p)
         if not prevp or prevp.type in OPENING_BRACKETS:
+
+
             return NO
 
+
         if prevp.type == token.EQUAL:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.argument,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.argument,
+            }:
                 return NO
+
         elif prevp.type == token.DOUBLESTAR:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.dictsetmaker,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.dictsetmaker,
+            }:
                 return NO
 
 
@@ -255,9 +225,9 @@ def f():
 ###############################################################################
 
 def g():
-    NO = ""
-    SPACE = " "
-    DOUBLESPACE = "  "
+    NO = ''
+    SPACE = ' '
+    DOUBLESPACE = '  '
 
     t = leaf.type
     p = leaf.parent
@@ -283,17 +253,13 @@ def g():
             return NO
 
         if prevp.type == token.EQUAL:
-            if (
-                prevp.parent
-                and prevp.parent.type
-                in {
-                    syms.typedargslist,
-                    syms.varargslist,
-                    syms.parameters,
-                    syms.arglist,
-                    syms.argument,
-                }
-            ):
+            if prevp.parent and prevp.parent.type in {
+                syms.typedargslist,
+                syms.varargslist,
+                syms.parameters,
+                syms.arglist,
+                syms.argument,
+            }:
                 return NO
 ```
 

@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, Unaryop};
+use rustpython_parser::ast::{self, Arguments, Constant, Expr, Operator, Ranged, Stmt, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -64,6 +64,37 @@ impl Violation for UnannotatedAssignmentInStub {
     }
 }
 
+#[violation]
+pub struct UnassignedSpecialVariableInStub {
+    name: String,
+}
+
+/// ## What it does
+/// Checks that `__all__`, `__match_args__`, and `__slots__` variables are
+/// assigned to values when defined in stub files.
+///
+/// ## Why is this bad?
+/// Special variables like `__all__` have the same semantics in stub files
+/// as they do in Python modules, and so should be consistent with their
+/// runtime counterparts.
+///
+/// ## Example
+/// ```python
+/// __all__: list[str]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// __all__: list[str] = ["foo", "bar"]
+/// ```
+impl Violation for UnassignedSpecialVariableInStub {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnassignedSpecialVariableInStub { name } = self;
+        format!("`{name}` in a stub file must have a value, as it has the same semantics as `{name}` at runtime")
+    }
+}
+
 const ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
     &["math", "inf"],
     &["math", "nan"],
@@ -96,6 +127,9 @@ fn is_valid_default_value_with_annotation(
     model: &SemanticModel,
 ) -> bool {
     match default {
+        Expr::Constant(_) => {
+            return true;
+        }
         Expr::List(ast::ExprList { elts, .. })
         | Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::Set(ast::ExprSet { elts, range: _ }) => {
@@ -118,69 +152,29 @@ fn is_valid_default_value_with_annotation(
                     }) && is_valid_default_value_with_annotation(v, false, locator, model)
                 });
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Ellipsis | Constant::None,
-            ..
-        }) => {
-            return true;
-        }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
-            ..
-        }) => return locator.slice(default.range()).len() <= 50,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bytes(..),
-            ..
-        }) => return locator.slice(default.range()).len() <= 50,
-        // Ex) `123`, `True`, `False`, `3.14`
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
-            ..
-        }) => {
-            return locator.slice(default.range()).len() <= 10;
-        }
-        // Ex) `2j`
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Complex { real, .. },
-            ..
-        }) => {
-            if *real == 0.0 {
-                return locator.slice(default.range()).len() <= 10;
-            }
-        }
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: Unaryop::USub,
             operand,
             range: _,
         }) => {
-            // Ex) `-1`, `-3.14`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(..) | Constant::Float(..),
-                ..
-            }) = operand.as_ref()
-            {
-                return locator.slice(operand.range()).len() <= 10;
-            }
-            // Ex) `-2j`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Complex { real, .. },
-                ..
-            }) = operand.as_ref()
-            {
-                if *real == 0.0 {
-                    return locator.slice(operand.range()).len() <= 10;
+            match operand.as_ref() {
+                // Ex) `-1`, `-3.14`, `2j`
+                Expr::Constant(ast::ExprConstant {
+                    value: Constant::Int(..) | Constant::Float(..) | Constant::Complex { .. },
+                    ..
+                }) => return true,
+                // Ex) `-math.inf`, `-math.pi`, etc.
+                Expr::Attribute(_) => {
+                    if model.resolve_call_path(operand).map_or(false, |call_path| {
+                        ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
+                            // reject `-math.nan`
+                            call_path.as_slice() == *target && *target != ["math", "nan"]
+                        })
+                    }) {
+                        return true;
+                    }
                 }
-            }
-            // Ex) `-math.inf`, `-math.pi`, etc.
-            if let Expr::Attribute(_) = operand.as_ref() {
-                if model.resolve_call_path(operand).map_or(false, |call_path| {
-                    ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
-                        // reject `-math.nan`
-                        call_path.as_slice() == *target && *target != ["math", "nan"]
-                    })
-                }) {
-                    return true;
-                }
+                _ => {}
             }
         }
         Expr::BinOp(ast::ExprBinOp {
@@ -336,8 +330,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Argum
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -368,8 +361,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, args: &Argum
                             Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -403,8 +395,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -435,8 +426,7 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) 
                             Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            #[allow(deprecated)]
-                            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
                                 "...".to_string(),
                                 default.range(),
                             )));
@@ -479,8 +469,7 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             "...".to_string(),
             value.range(),
         )));
@@ -518,8 +507,7 @@ pub(crate) fn annotated_assignment_default_in_stub(
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
             "...".to_string(),
             value.range(),
         )));
@@ -569,5 +557,27 @@ pub(crate) fn unannotated_assignment_in_stub(
             name: id.to_string(),
         },
         value.range(),
+    ));
+}
+
+/// PYI035
+pub(crate) fn unassigned_special_variable_in_stub(
+    checker: &mut Checker,
+    target: &Expr,
+    stmt: &Stmt,
+) {
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return;
+    };
+
+    if !is_special_assignment(checker.semantic_model(), target) {
+        return;
+    }
+
+    checker.diagnostics.push(Diagnostic::new(
+        UnassignedSpecialVariableInStub {
+            name: id.to_string(),
+        },
+        stmt.range(),
     ));
 }

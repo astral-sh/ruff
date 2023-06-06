@@ -1,5 +1,6 @@
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{CommentsMap, SourceComment};
+use itertools::Itertools;
 use ruff_formatter::SourceCode;
 use ruff_python_ast::prelude::*;
 use std::fmt::{Debug, Formatter, Write};
@@ -53,7 +54,7 @@ impl Debug for DebugComments<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut map = f.debug_map();
 
-        for node in self.comments.keys() {
+        for node in self.comments.keys().sorted_by_key(|key| key.node().start()) {
             map.entry(
                 &NodeKindWithSource {
                     key: *node,
@@ -176,19 +177,12 @@ impl Debug for DebugNodeCommentSlice<'_> {
 #[cfg(test)]
 mod tests {
     use crate::comments::map::MultiMap;
-    use crate::comments::node_key::NodeRefEqualityKey;
-    use crate::comments::{
-        CommentTextPosition, Comments, CommentsData, CommentsMap, SourceComment,
-    };
-    use insta::_macro_support::assert_snapshot;
-    use insta::{assert_debug_snapshot, assert_snapshot};
+    use crate::comments::{CommentTextPosition, Comments, CommentsMap, SourceComment};
+    use insta::assert_debug_snapshot;
     use ruff_formatter::SourceCode;
     use ruff_python_ast::node::AnyNode;
-    use ruff_python_ast::source_code;
     use ruff_text_size::{TextRange, TextSize};
     use rustpython_parser::ast::{StmtBreak, StmtContinue};
-    use std::cell::Cell;
-    use std::rc::Rc;
 
     #[test]
     fn debug() {
@@ -214,7 +208,8 @@ break;
             continue_statement.as_ref().into(),
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
-                formatted: Cell::new(false),
+                #[cfg(debug_assertions)]
+                formatted: std::cell::Cell::new(false),
                 position: CommentTextPosition::OwnLine,
             },
         );
@@ -223,7 +218,8 @@ break;
             continue_statement.as_ref().into(),
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
-                formatted: Cell::new(false),
+                #[cfg(debug_assertions)]
+                formatted: std::cell::Cell::new(false),
                 position: CommentTextPosition::EndOfLine,
             },
         );
@@ -232,7 +228,8 @@ break;
             break_statement.as_ref().into(),
             SourceComment {
                 slice: source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
-                formatted: Cell::new(false),
+                #[cfg(debug_assertions)]
+                formatted: std::cell::Cell::new(false),
                 position: CommentTextPosition::OwnLine,
             },
         );

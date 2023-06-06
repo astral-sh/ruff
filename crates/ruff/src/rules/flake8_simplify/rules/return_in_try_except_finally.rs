@@ -50,7 +50,7 @@ impl Violation for ReturnInTryExceptFinally {
 }
 
 fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
-    stmts.iter().find(|stmt| matches!(stmt, Stmt::Return(_)))
+    stmts.iter().find(|stmt| stmt.is_return_stmt())
 }
 
 /// SIM107

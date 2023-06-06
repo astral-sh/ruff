@@ -1,0 +1,572 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/class_methods_new_line.py
+---
+## Input
+
+```py
+class ClassSimplest:
+    pass
+class ClassWithSingleField:
+    a = 1
+class ClassWithJustTheDocstring:
+    """Just a docstring."""
+class ClassWithInit:
+    def __init__(self):
+        pass
+class ClassWithTheDocstringAndInit:
+    """Just a docstring."""
+    def __init__(self):
+        pass
+class ClassWithInitAndVars:
+    cls_var = 100
+    def __init__(self):
+        pass
+class ClassWithInitAndVarsAndDocstring:
+    """Test class"""
+    cls_var = 100
+    def __init__(self):
+        pass
+class ClassWithDecoInit:
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVars:
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsAndDocstring:
+    """Test class"""
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+class ClassSimplestWithInner:
+    class Inner:
+        pass
+class ClassSimplestWithInnerWithDocstring:
+    class Inner:
+        """Just a docstring."""
+        def __init__(self):
+            pass
+class ClassWithSingleFieldWithInner:
+    a = 1
+    class Inner:
+        pass
+class ClassWithJustTheDocstringWithInner:
+    """Just a docstring."""
+    class Inner:
+        pass
+class ClassWithInitWithInner:
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+class ClassWithInitAndVarsWithInner:
+    cls_var = 100
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+class ClassWithInitAndVarsAndDocstringWithInner:
+    """Test class"""
+    cls_var = 100
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+class ClassWithDecoInitWithInner:
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsWithInner:
+    cls_var = 100
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsAndDocstringWithInner:
+    """Test class"""
+    cls_var = 100
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+class ClassWithDecoInitAndVarsAndDocstringWithInner2:
+    """Test class"""
+    class Inner:
+        pass
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -17,23 +17,19 @@
+ 
+ class ClassWithTheDocstringAndInit:
+     """Just a docstring."""
+-
+     def __init__(self):
+         pass
+ 
+ 
+ class ClassWithInitAndVars:
+     cls_var = 100
+-
+     def __init__(self):
+         pass
+ 
+ 
+ class ClassWithInitAndVarsAndDocstring:
+     """Test class"""
+-
+     cls_var = 100
+-
+     def __init__(self):
+         pass
+ 
+@@ -46,7 +42,6 @@
+ 
+ class ClassWithDecoInitAndVars:
+     cls_var = 100
+-
+     @deco
+     def __init__(self):
+         pass
+@@ -54,9 +49,7 @@
+ 
+ class ClassWithDecoInitAndVarsAndDocstring:
+     """Test class"""
+-
+     cls_var = 100
+-
+     @deco
+     def __init__(self):
+         pass
+@@ -70,21 +63,18 @@
+ class ClassSimplestWithInnerWithDocstring:
+     class Inner:
+         """Just a docstring."""
+-
+         def __init__(self):
+             pass
+ 
+ 
+ class ClassWithSingleFieldWithInner:
+     a = 1
+-
+     class Inner:
+         pass
+ 
+ 
+ class ClassWithJustTheDocstringWithInner:
+     """Just a docstring."""
+-
+     class Inner:
+         pass
+ 
+@@ -92,29 +82,23 @@
+ class ClassWithInitWithInner:
+     class Inner:
+         pass
+-
+     def __init__(self):
+         pass
+ 
+ 
+ class ClassWithInitAndVarsWithInner:
+     cls_var = 100
+-
+     class Inner:
+         pass
+-
+     def __init__(self):
+         pass
+ 
+ 
+ class ClassWithInitAndVarsAndDocstringWithInner:
+     """Test class"""
+-
+     cls_var = 100
+-
+     class Inner:
+         pass
+-
+     def __init__(self):
+         pass
+ 
+@@ -122,7 +106,6 @@
+ class ClassWithDecoInitWithInner:
+     class Inner:
+         pass
+-
+     @deco
+     def __init__(self):
+         pass
+@@ -130,10 +113,8 @@
+ 
+ class ClassWithDecoInitAndVarsWithInner:
+     cls_var = 100
+-
+     class Inner:
+         pass
+-
+     @deco
+     def __init__(self):
+         pass
+@@ -141,12 +122,9 @@
+ 
+ class ClassWithDecoInitAndVarsAndDocstringWithInner:
+     """Test class"""
+-
+     cls_var = 100
+-
+     class Inner:
+         pass
+-
+     @deco
+     def __init__(self):
+         pass
+@@ -154,12 +132,9 @@
+ 
+ class ClassWithDecoInitAndVarsAndDocstringWithInner2:
+     """Test class"""
+-
+     class Inner:
+         pass
+-
+     cls_var = 100
+-
+     @deco
+     def __init__(self):
+         pass
+```
+
+## Ruff Output
+
+```py
+class ClassSimplest:
+    pass
+
+
+class ClassWithSingleField:
+    a = 1
+
+
+class ClassWithJustTheDocstring:
+    """Just a docstring."""
+
+
+class ClassWithInit:
+    def __init__(self):
+        pass
+
+
+class ClassWithTheDocstringAndInit:
+    """Just a docstring."""
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVars:
+    cls_var = 100
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsAndDocstring:
+    """Test class"""
+    cls_var = 100
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInit:
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVars:
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstring:
+    """Test class"""
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassSimplestWithInner:
+    class Inner:
+        pass
+
+
+class ClassSimplestWithInnerWithDocstring:
+    class Inner:
+        """Just a docstring."""
+        def __init__(self):
+            pass
+
+
+class ClassWithSingleFieldWithInner:
+    a = 1
+    class Inner:
+        pass
+
+
+class ClassWithJustTheDocstringWithInner:
+    """Just a docstring."""
+    class Inner:
+        pass
+
+
+class ClassWithInitWithInner:
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsWithInner:
+    cls_var = 100
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsAndDocstringWithInner:
+    """Test class"""
+    cls_var = 100
+    class Inner:
+        pass
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitWithInner:
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsWithInner:
+    cls_var = 100
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstringWithInner:
+    """Test class"""
+    cls_var = 100
+    class Inner:
+        pass
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstringWithInner2:
+    """Test class"""
+    class Inner:
+        pass
+    cls_var = 100
+    @deco
+    def __init__(self):
+        pass
+```
+
+## Black Output
+
+```py
+class ClassSimplest:
+    pass
+
+
+class ClassWithSingleField:
+    a = 1
+
+
+class ClassWithJustTheDocstring:
+    """Just a docstring."""
+
+
+class ClassWithInit:
+    def __init__(self):
+        pass
+
+
+class ClassWithTheDocstringAndInit:
+    """Just a docstring."""
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVars:
+    cls_var = 100
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsAndDocstring:
+    """Test class"""
+
+    cls_var = 100
+
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInit:
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVars:
+    cls_var = 100
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstring:
+    """Test class"""
+
+    cls_var = 100
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassSimplestWithInner:
+    class Inner:
+        pass
+
+
+class ClassSimplestWithInnerWithDocstring:
+    class Inner:
+        """Just a docstring."""
+
+        def __init__(self):
+            pass
+
+
+class ClassWithSingleFieldWithInner:
+    a = 1
+
+    class Inner:
+        pass
+
+
+class ClassWithJustTheDocstringWithInner:
+    """Just a docstring."""
+
+    class Inner:
+        pass
+
+
+class ClassWithInitWithInner:
+    class Inner:
+        pass
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsWithInner:
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    def __init__(self):
+        pass
+
+
+class ClassWithInitAndVarsAndDocstringWithInner:
+    """Test class"""
+
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitWithInner:
+    class Inner:
+        pass
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsWithInner:
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstringWithInner:
+    """Test class"""
+
+    cls_var = 100
+
+    class Inner:
+        pass
+
+    @deco
+    def __init__(self):
+        pass
+
+
+class ClassWithDecoInitAndVarsAndDocstringWithInner2:
+    """Test class"""
+
+    class Inner:
+        pass
+
+    cls_var = 100
+
+    @deco
+    def __init__(self):
+        pass
+```
+
+

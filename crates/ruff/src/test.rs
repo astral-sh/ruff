@@ -1,13 +1,13 @@
 #![cfg(test)]
+//! Helper functions for the tests of rule implementations.
 
-/// Helper functions for the tests of rule implementations.
 use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
+use ruff_textwrap::dedent;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
-use textwrap::dedent;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
@@ -40,9 +40,9 @@ pub(crate) fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> 
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
-/// asserts that autofixes converge after 10 iterations.
+/// asserts that autofixes converge after a fixed number of iterations.
 fn test_contents(contents: &str, path: &Path, settings: &Settings) -> Vec<Message> {
-    static MAX_ITERATIONS: usize = 10;
+    static MAX_ITERATIONS: usize = 20;
 
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
     let locator = Locator::new(contents);

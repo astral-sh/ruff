@@ -7,6 +7,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 ruff_formatter = { path = "../ruff_formatter" }
+ruff_newlines = { path = "../ruff_newlines" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_text_size = { workspace = true }
 

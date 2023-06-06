@@ -3,8 +3,8 @@ use rustpython_parser::ast::{self, Arg, Arguments, Constant, Expr, Ranged, Stmt}
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_newlines::StrExt;
 use ruff_python_ast::helpers::{has_leading_content, has_trailing_content};
-use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Generator;
 use ruff_python_ast::whitespace::leading_space;
 use ruff_python_semantic::model::SemanticModel;

@@ -16,7 +16,7 @@ fn default_broad_exceptions() -> Vec<String> {
         "EnvironmentError",
         "socket.error",
     ]
-    .map(std::string::ToString::to_string)
+    .map(ToString::to_string)
     .to_vec()
 }
 

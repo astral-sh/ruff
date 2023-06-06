@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
-use libcst_native::{Codegen, CodegenState};
 use rustpython_parser::ast::{self, Expr, Ranged};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -59,7 +59,7 @@ fn fix_explicit_f_string_type_conversion(
     let formatted_string = match_formatted_string(&mut expression)?;
 
     // Replace the formatted call expression at `index` with a conversion flag.
-    let mut formatted_string_expression =
+    let formatted_string_expression =
         match_formatted_string_expression(&mut formatted_string.parts[index])?;
     let call = match_call_mut(&mut formatted_string_expression.expression)?;
     let name = match_name(&call.func)?;
@@ -77,15 +77,8 @@ fn fix_explicit_f_string_type_conversion(
     }
     formatted_string_expression.expression = call.args[0].value.clone();
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    expression.codegen(&mut state);
-
     Ok(Fix::automatic(Edit::range_replacement(
-        state.to_string(),
+        expression.codegen_stylist(stylist),
         range,
     )))
 }
@@ -104,9 +97,10 @@ pub(crate) fn explicit_f_string_type_conversion(
         }) = &formatted_value else {
             continue;
         };
+
         // Skip if there's already a conversion flag.
         if !conversion.is_none() {
-            return;
+            continue;
         }
 
         let Expr::Call(ast::ExprCall {
@@ -115,24 +109,24 @@ pub(crate) fn explicit_f_string_type_conversion(
             keywords,
             ..
         }) = value.as_ref() else {
-            return;
+            continue;
         };
 
         // Can't be a conversion otherwise.
         if args.len() != 1 || !keywords.is_empty() {
-            return;
+            continue;
         }
 
         let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-            return;
+            continue;
         };
 
         if !matches!(id.as_str(), "str" | "repr" | "ascii") {
-            return;
+            continue;
         };
 
         if !checker.semantic_model().is_builtin(id) {
-            return;
+            continue;
         }
 
         let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, value.range());

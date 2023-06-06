@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ruff_text_size::{TextLen, TextRange};
-use rustpython_parser as parser;
 use rustpython_parser::ast::Expr;
+use rustpython_parser::Parse;
 
 use crate::relocate::relocate_expr;
 use crate::source_code::Locator;
@@ -35,7 +35,7 @@ pub fn parse_type_annotation(
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
         let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = parser::parse_expression_starts_at(
+        let expr = Expr::parse_starts_at(
             value,
             "<filename>",
             range.start() + leading_quote.text_len(),
@@ -43,7 +43,7 @@ pub fn parse_type_annotation(
         Ok((expr, AnnotationKind::Simple))
     } else {
         // Otherwise, consider this a "complex" annotation.
-        let mut expr = parser::parse_expression(value, "<filename>")?;
+        let mut expr = Expr::parse(value, "<filename>")?;
         relocate_expr(&mut expr, range);
         Ok((expr, AnnotationKind::Complex))
     }

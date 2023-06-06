@@ -93,7 +93,7 @@ fn stdin_json() -> Result<()> {
     "code": "F401",
     "message": "`os` imported but unused",
     "fix": {{
-      "applicability": "Unspecified",
+      "applicability": "Automatic",
       "message": "Remove unused import: `os`",
       "edits": [
         {{

@@ -7,14 +7,14 @@ use ruff_python_semantic::model::SemanticModel;
 
 /// Collect `logging`-like calls from an AST.
 pub(crate) struct LoggerCandidateVisitor<'a, 'b> {
-    context: &'a SemanticModel<'b>,
-    pub(crate) calls: Vec<(&'b Expr, &'b Expr)>,
+    semantic_model: &'a SemanticModel<'b>,
+    pub(crate) calls: Vec<&'b ast::ExprCall>,
 }
 
 impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
-    pub(crate) fn new(context: &'a SemanticModel<'b>) -> Self {
+    pub(crate) fn new(semantic_model: &'a SemanticModel<'b>) -> Self {
         LoggerCandidateVisitor {
-            context,
+            semantic_model,
             calls: Vec::new(),
         }
     }
@@ -22,9 +22,9 @@ impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
 
 impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            if logging::is_logger_candidate(func, self.context) {
-                self.calls.push((expr, func));
+        if let Expr::Call(call) = expr {
+            if logging::is_logger_candidate(&call.func, self.semantic_model) {
+                self.calls.push(call);
             }
         }
         visitor::walk_expr(self, expr);

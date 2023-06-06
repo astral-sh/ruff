@@ -4,7 +4,7 @@ use ruff_text_size::TextSize;
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::newlines::StrExt;
+use ruff_newlines::StrExt;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 use crate::registry::Rule;

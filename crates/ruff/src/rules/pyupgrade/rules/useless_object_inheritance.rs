@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::{Binding, BindingKind, Bindings};
 use ruff_python_semantic::scope::Scope;
 
-use crate::autofix::actions::remove_argument;
+use crate::autofix::edits::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 

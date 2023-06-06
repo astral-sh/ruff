@@ -1,7 +1,7 @@
 use log::error;
 use ruff_text_size::{TextRange, TextSize};
-use rustpython_parser as parser;
 use rustpython_parser::ast::{self, Stmt, Suite};
+use rustpython_parser::Parse;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -140,7 +140,7 @@ pub(crate) fn add_required_imports(
         .required_imports
         .iter()
         .flat_map(|required_import| {
-            let Ok(body) = parser::parse_program(required_import, "<filename>") else {
+            let Ok(body) = Suite::parse(required_import, "<filename>") else {
                 error!("Failed to parse required import: `{}`", required_import);
                 return vec![];
             };

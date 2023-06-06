@@ -19,7 +19,7 @@ use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
@@ -126,6 +126,7 @@ pub struct Settings {
     pub pep8_naming: pep8_naming::settings::Settings,
     pub pycodestyle: pycodestyle::settings::Settings,
     pub pydocstyle: pydocstyle::settings::Settings,
+    pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
 }
 
@@ -231,6 +232,7 @@ impl Settings {
             pep8_naming: config.pep8_naming.map(Into::into).unwrap_or_default(),
             pycodestyle: config.pycodestyle.map(Into::into).unwrap_or_default(),
             pydocstyle: config.pydocstyle.map(Into::into).unwrap_or_default(),
+            pyflakes: config.pyflakes.map(Into::into).unwrap_or_default(),
             pylint: config.pylint.map(Into::into).unwrap_or_default(),
         })
     }
@@ -257,7 +259,10 @@ impl From<&Configuration> for RuleTable {
         // The select_set keeps track of which rules have been selected.
         let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.into_iter().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All
+            .into_iter()
+            .chain(RuleSelector::Nursery.into_iter())
+            .collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`

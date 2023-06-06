@@ -3,7 +3,7 @@ use libcst_native::{
     Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FormattedString,
     FormattedStringContent, FormattedStringExpression, FunctionDef, GeneratorExp, If, Import,
     ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, Name,
-    SimpleString, SmallStatement, Statement, Suite, Tuple, With,
+    SmallStatement, Statement, Suite, Tuple, With,
 };
 
 pub(crate) fn match_module(module_text: &str) -> Result<Module> {
@@ -106,16 +106,6 @@ pub(crate) fn match_attribute<'a, 'b>(
         Ok(attribute)
     } else {
         bail!("Expected Expression::Attribute")
-    }
-}
-
-pub(crate) fn match_simple_string<'a, 'b>(
-    expression: &'a mut Expression<'b>,
-) -> Result<&'a mut SimpleString<'b>> {
-    if let Expression::SimpleString(simple_string) = expression {
-        Ok(simple_string)
-    } else {
-        bail!("Expected Expression::SimpleString")
     }
 }
 

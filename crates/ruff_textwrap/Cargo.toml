@@ -1,0 +1,10 @@
+[package]
+name = "ruff_textwrap"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+ruff_newlines = { path = "../ruff_newlines" }
+ruff_text_size = { workspace = true }

@@ -1,7 +1,9 @@
+//! Analysis rules for the `typing` module.
+
 use rustpython_parser::ast::{self, Constant, Expr, Operator};
 
 use num_traits::identities::Zero;
-use ruff_python_ast::call_path::{from_unqualified_name, CallPath};
+use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
 use ruff_python_stdlib::typing::{
     IMMUTABLE_GENERIC_TYPES, IMMUTABLE_TYPES, PEP_585_GENERICS, PEP_593_SUBSCRIPTS, SUBSCRIPTS,
 };
@@ -29,6 +31,7 @@ pub fn match_annotated_subscript<'a>(
     expr: &Expr,
     semantic_model: &SemanticModel,
     typing_modules: impl Iterator<Item = &'a str>,
+    extend_generics: &[String],
 ) -> Option<SubscriptKind> {
     if !matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
         return None;
@@ -37,7 +40,12 @@ pub fn match_annotated_subscript<'a>(
     semantic_model
         .resolve_call_path(expr)
         .and_then(|call_path| {
-            if SUBSCRIPTS.contains(&call_path.as_slice()) {
+            if SUBSCRIPTS.contains(&call_path.as_slice())
+                || extend_generics
+                    .iter()
+                    .map(|target| from_qualified_name(target))
+                    .any(|target| call_path == target)
+            {
                 return Some(SubscriptKind::AnnotatedSubscript);
             }
             if PEP_593_SUBSCRIPTS.contains(&call_path.as_slice()) {

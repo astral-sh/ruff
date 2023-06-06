@@ -442,6 +442,17 @@
         }
       ]
     },
+    "pyflakes": {
+      "description": "Options for the `pyflakes` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PyflakesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "pylint": {
       "description": "Options for the `pylint` plugin.",
       "anyOf": [
@@ -1429,6 +1440,22 @@
       },
       "additionalProperties": false
     },
+    "PyflakesOptions": {
+      "type": "object",
+      "properties": {
+        "extend-generics": {
+          "description": "Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey[\"User\"]`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "PylintOptions": {
       "type": "object",
       "properties": {
@@ -1612,6 +1639,7 @@
         "B030",
         "B031",
         "B032",
+        "B033",
         "B9",
         "B90",
         "B904",
@@ -2006,6 +2034,9 @@
         "PL",
         "PLC",
         "PLC0",
+        "PLC02",
+        "PLC020",
+        "PLC0208",
         "PLC04",
         "PLC041",
         "PLC0414",
@@ -2033,6 +2064,7 @@
         "PLE03",
         "PLE030",
         "PLE0302",
+        "PLE0307",
         "PLE06",
         "PLE060",
         "PLE0604",
@@ -2106,7 +2138,6 @@
         "PLW0120",
         "PLW0129",
         "PLW013",
-        "PLW0130",
         "PLW0131",
         "PLW04",
         "PLW040",
@@ -2209,9 +2240,14 @@
         "PYI02",
         "PYI020",
         "PYI021",
+        "PYI024",
+        "PYI025",
+        "PYI029",
         "PYI03",
         "PYI032",
         "PYI033",
+        "PYI034",
+        "PYI035",
         "PYI04",
         "PYI042",
         "PYI043",
@@ -2219,6 +2255,8 @@
         "PYI048",
         "PYI05",
         "PYI052",
+        "PYI053",
+        "PYI054",
         "Q",
         "Q0",
         "Q00",
@@ -2318,6 +2356,7 @@
         "S606",
         "S607",
         "S608",
+        "S609",
         "S61",
         "S612",
         "S7",
@@ -2369,6 +2408,13 @@
         "SLF00",
         "SLF001",
         "T",
+        "T",
+        "T0",
+        "T00",
+        "T001",
+        "T002",
+        "T003",
+        "T004",
         "T1",
         "T10",
         "T100",

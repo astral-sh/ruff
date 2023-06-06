@@ -28,7 +28,7 @@ pub(crate) use request_without_timeout::{request_without_timeout, RequestWithout
 pub(crate) use shell_injection::{
     shell_injection, CallWithShellEqualsTrue, StartProcessWithAShell, StartProcessWithNoShell,
     StartProcessWithPartialPath, SubprocessPopenWithShellEqualsTrue,
-    SubprocessWithoutShellEqualsTrue,
+    SubprocessWithoutShellEqualsTrue, UnixCommandWildcardInjection,
 };
 pub(crate) use snmp_insecure_version::{snmp_insecure_version, SnmpInsecureVersion};
 pub(crate) use snmp_weak_cryptography::{snmp_weak_cryptography, SnmpWeakCryptography};

@@ -2,9 +2,8 @@ use rustpython_parser::ast::{Expr, ExprConstant, Ranged, Stmt, StmtExpr};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 
-use crate::autofix::actions::delete_stmt;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -56,38 +55,29 @@ pub(crate) fn ellipsis_in_non_empty_class_body<'a>(
     }
 
     for stmt in body {
-        if let Stmt::Expr(StmtExpr { value, .. }) = &stmt {
-            if let Expr::Constant(ExprConstant { value, .. }) = value.as_ref() {
-                if value.is_ellipsis() {
-                    let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
+        let Stmt::Expr(StmtExpr { value, .. }) = &stmt else {
+            continue;
+        };
 
-                    if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.try_set_fix(|| {
-                            let deleted: Vec<&Stmt> =
-                                checker.deletions.iter().map(Into::into).collect();
-                            let edit = delete_stmt(
-                                stmt,
-                                Some(parent),
-                                &deleted,
-                                checker.locator,
-                                checker.indexer,
-                                checker.stylist,
-                            )?;
+        let Expr::Constant(ExprConstant { value, .. }) = value.as_ref() else {
+            continue;
+        };
 
-                            // In the unlikely event the class body consists solely of several
-                            // consecutive ellipses, `delete_stmt` can actually result in a
-                            // `pass`.
-                            if edit.is_deletion() || edit.content() == Some("pass") {
-                                checker.deletions.insert(RefEquality(stmt));
-                            }
-
-                            Ok(Fix::automatic(edit))
-                        });
-                    }
-
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
+        if !value.is_ellipsis() {
+            continue;
         }
+
+        let mut diagnostic = Diagnostic::new(EllipsisInNonEmptyClassBody, stmt.range());
+        if checker.patch(diagnostic.kind.rule()) {
+            let edit = autofix::edits::delete_stmt(
+                stmt,
+                Some(parent),
+                checker.locator,
+                checker.indexer,
+                checker.stylist,
+            );
+            diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }

@@ -228,7 +228,7 @@ RUF100_0.py:85:8: F401 [*] `shelve` imported but unused
    |
    = help: Remove unused import: `shelve`
 
-ℹ Suggested fix
+ℹ Fix
 82 82 | 
 83 83 | import collections  # noqa
 84 84 | import os  # noqa: F401, RUF100

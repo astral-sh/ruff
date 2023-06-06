@@ -89,6 +89,14 @@ pub fn is_property(
             })
     })
 }
+
+/// Returns `true` if a class is an `final`.
+pub fn is_final(model: &SemanticModel, decorator_list: &[Expr]) -> bool {
+    decorator_list
+        .iter()
+        .any(|expr| model.match_typing_expr(map_callable(expr), "final"))
+}
+
 /// Returns `true` if a function is a "magic method".
 pub fn is_magic(name: &str) -> bool {
     name.starts_with("__") && name.ends_with("__")

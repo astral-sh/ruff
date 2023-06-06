@@ -9,7 +9,7 @@ F401_11.py:4:27: F401 [*] `pathlib.PurePath` imported but unused
   |
   = help: Remove unused import: `pathlib.PurePath`
 
-ℹ Suggested fix
+ℹ Fix
 1 1 | """Test: parsing of nested string annotations."""
 2 2 | 
 3 3 | from typing import List
