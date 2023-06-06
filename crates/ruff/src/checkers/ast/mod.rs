@@ -460,6 +460,9 @@ where
                             stmt.is_async_function_def_stmt(),
                         );
                     }
+                    if self.enabled(Rule::NoReturnArgumentAnnotationInStub) {
+                        flake8_pyi::rules::no_return_argument_annotation(self, args);
+                    }
                 }
 
                 if self.enabled(Rule::DunderFunctionName) {
