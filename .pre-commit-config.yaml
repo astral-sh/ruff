@@ -1,4 +1,12 @@
 fail_fast: true
+
+exclude: |
+  (?x)^(
+    crates/ruff/resources/.*|
+    crates/ruff_python_formatter/resources/.*|
+    crates/ruff_python_formatter/src/snapshots/.*
+  )$
+
 repos:
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.12.1
@@ -19,7 +27,7 @@ repos:
       - id: markdownlint-fix
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.14.8
+    rev: v1.14.12
     hooks:
       - id: typos
 

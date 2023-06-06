@@ -1,5 +1,5 @@
 [files]
-extend-exclude = ["snapshots", "black"]
+extend-exclude = ["resources", "snapshots"]
 
 [default.extend-words]
 trivias = "trivias"
