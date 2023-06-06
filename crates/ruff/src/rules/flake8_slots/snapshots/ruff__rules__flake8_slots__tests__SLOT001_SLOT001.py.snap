@@ -1,0 +1,11 @@
+---
+source: crates/ruff/src/rules/flake8_slots/mod.rs
+---
+SLOT001.py:1:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+  |
+1 | class Bad(tuple):  # SLOT001
+  |       ^^^ SLOT001
+2 |     pass
+  |
+
+

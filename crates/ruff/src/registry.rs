@@ -137,6 +137,9 @@ pub enum Linter {
     /// [flake8-self](https://pypi.org/project/flake8-self/)
     #[prefix = "SLF"]
     Flake8Self,
+    /// [flake8-slots](https://pypi.org/project/flake8-slots/)
+    #[prefix = "SLOT"]
+    Flake8Slots,
     /// [flake8-simplify](https://pypi.org/project/flake8-simplify/)
     #[prefix = "SIM"]
     Flake8Simplify,
