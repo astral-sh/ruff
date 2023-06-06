@@ -31,7 +31,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ```python
 /// from collections import namedtuple
 ///
-/// 
+///
 /// class Foo(namedtuple("foo", ["name", "age"])):
 ///     __slots__ = ()
 /// ```
