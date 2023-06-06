@@ -375,6 +375,7 @@ mod test {
     use crate::jupyter::index::JupyterIndex;
     #[cfg(feature = "jupyter_notebook")]
     use crate::jupyter::is_jupyter_notebook;
+    use crate::jupyter::schema::Cell;
     use crate::jupyter::Notebook;
 
     use crate::test::test_resource_path;
