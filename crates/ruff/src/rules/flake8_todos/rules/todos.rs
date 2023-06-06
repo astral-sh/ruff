@@ -356,10 +356,10 @@ fn static_errors(
             if let Some(end_index) = trimmed.find(')') {
                 TextSize::try_from(end_index + 1).unwrap()
             } else {
-                TextSize::try_from(trimmed.find(' ') + 1).unwrap()
+                trimmed.text_len()
             }
         } else if trimmed.starts_with('@') {
-            TextSize::try_from(trimmed.find(' ') + 1).unwrap()
+            TextSize::try_from(trimmed.find(char::is_whitespace)).unwrap()
         } else {
             // TD-002
             diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
