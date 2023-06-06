@@ -9,7 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     #[test_case(Path::new("COM81.py"))]
@@ -22,7 +22,6 @@ mod tests {
                 Rule::TrailingCommaOnBareTuple,
                 Rule::ProhibitedTrailingComma,
             ]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

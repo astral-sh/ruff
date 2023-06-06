@@ -12,7 +12,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::test::{test_path, test_snippet, DEFAULT_MAX_ITERATIONS};
+    use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
@@ -39,7 +39,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -56,7 +55,6 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(rule_code)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -73,7 +71,6 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(rule_code)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -102,7 +99,6 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(rule_code)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -134,7 +130,6 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(rule_code)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -291,7 +286,6 @@ mod tests {
         let diagnostics = test_snippet(
             contents,
             &settings::Settings::for_rules(&Linter::Flake8TypeChecking),
-            DEFAULT_MAX_ITERATIONS,
         );
         assert_messages!(snapshot, diagnostics);
     }

@@ -12,7 +12,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"))]
@@ -81,7 +81,6 @@ mod tests {
             &settings::Settings {
                 ..settings::Settings::for_rule(rule_code)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -101,7 +100,6 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())

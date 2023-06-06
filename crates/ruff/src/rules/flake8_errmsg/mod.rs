@@ -9,7 +9,7 @@ mod tests {
     use anyhow::Result;
 
     use crate::registry::Rule;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     #[test]
@@ -21,7 +21,6 @@ mod tests {
                 Rule::FStringInException,
                 Rule::DotFormatInException,
             ]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("defaults", diagnostics);
         Ok(())
@@ -41,7 +40,6 @@ mod tests {
                     Rule::DotFormatInException,
                 ])
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("custom", diagnostics);
         Ok(())

@@ -13,7 +13,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
 
     #[test_case(Rule::UnnecessaryCallAroundSorted, Path::new("C413.py"))]
     #[test_case(Rule::UnnecessaryCollectionCall, Path::new("C408.py"))]
@@ -38,7 +38,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_comprehensions").join(path).as_path(),
             &Settings::for_rule(rule_code),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -59,7 +58,6 @@ mod tests {
                 },
                 ..Settings::for_rule(rule_code)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

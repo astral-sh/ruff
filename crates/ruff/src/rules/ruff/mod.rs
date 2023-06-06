@@ -17,7 +17,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
     use crate::settings::types::PerFileIgnore;
-    use crate::test::{test_path, test_resource_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
@@ -28,7 +28,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -46,7 +45,6 @@ mod tests {
                     Rule::AmbiguousUnicodeCharacterComment,
                 ])
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -57,7 +55,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedVariable, Rule::AmbiguousVariableName]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -74,7 +71,6 @@ mod tests {
                 Rule::UnusedVariable,
                 Rule::TabIndentation,
             ]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -85,7 +81,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_1.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -103,11 +98,7 @@ mod tests {
         )])
         .unwrap();
 
-        let diagnostics = test_path(
-            Path::new("ruff/RUF100_2.py"),
-            &settings,
-            DEFAULT_MAX_ITERATIONS,
-        )?;
+        let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
         assert_messages!(diagnostics);
         Ok(())
     }
@@ -121,7 +112,6 @@ mod tests {
                 Rule::LineTooLong,
                 Rule::UndefinedName,
             ]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -132,7 +122,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/flake8_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -143,7 +132,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/ruff_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -154,7 +142,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/ruff_targeted_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -165,7 +152,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),
             &settings::Settings::for_rules(vec![Rule::NonPEP604Annotation]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -176,7 +162,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF007.py"),
             &settings::Settings::for_rules(vec![Rule::PairwiseOverZipped]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(diagnostics);
         Ok(())
@@ -189,7 +174,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

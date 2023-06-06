@@ -18,10 +18,11 @@ fn do_fuzz(case: &[u8]) -> Corpus {
 
     // the settings are immutable to test_snippet, so we avoid re-initialising here
     let settings = SETTINGS.get_or_init(Settings::default);
+    ruff::test::set_max_iterations(usize::MAX);
 
     // unlike in the test framework, where the number of iterations is well-defined, we are only
     // looking for situations where a fix is bad; thus, we set the iterations to "infinite"
-    let _ = ruff::test::test_snippet(code, settings, usize::MAX);
+    let _ = ruff::test::test_snippet(code, settings);
 
     Corpus::Keep
 }

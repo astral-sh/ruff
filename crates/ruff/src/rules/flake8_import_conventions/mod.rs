@@ -12,14 +12,13 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
 
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/defaults.py"),
             &Settings::for_rule(Rule::UnconventionalImportAlias),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("defaults", diagnostics);
         Ok(())
@@ -42,7 +41,6 @@ mod tests {
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("custom", diagnostics);
         Ok(())
@@ -76,7 +74,6 @@ mod tests {
                 .into(),
                 ..Settings::for_rule(Rule::BannedImportAlias)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("custom_banned", diagnostics);
         Ok(())
@@ -100,7 +97,6 @@ mod tests {
                 .into(),
                 ..Settings::for_rule(Rule::BannedImportFrom)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("custom_banned_from", diagnostics);
         Ok(())
@@ -125,7 +121,6 @@ mod tests {
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("remove_default", diagnostics);
         Ok(())
@@ -148,7 +143,6 @@ mod tests {
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("override_default", diagnostics);
         Ok(())
@@ -174,7 +168,6 @@ mod tests {
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!("from_imports", diagnostics);
         Ok(())

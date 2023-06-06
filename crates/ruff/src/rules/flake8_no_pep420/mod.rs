@@ -11,7 +11,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::{test_path, test_resource_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
     #[test_case(Path::new("test_fail_empty"), Path::new("example.py"))]
@@ -36,7 +36,6 @@ mod tests {
                 )],
                 ..Settings::for_rule(Rule::ImplicitNamespacePackage)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

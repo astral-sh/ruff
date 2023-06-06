@@ -12,7 +12,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
 
     #[test_case(Path::new("full_name.py"))]
     #[test_case(Path::new("import_as.py"))]
@@ -49,7 +49,6 @@ mod tests {
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
             ]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -62,7 +61,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

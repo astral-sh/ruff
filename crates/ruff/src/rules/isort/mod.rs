@@ -296,7 +296,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;
-    use crate::test::{test_path, test_resource_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::{test_path, test_resource_path};
 
     use super::categorize::ImportType;
     use super::settings::RelativeImportsOrder;
@@ -354,7 +354,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -379,7 +378,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -404,7 +402,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -447,7 +444,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -472,7 +468,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -491,7 +486,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -511,7 +505,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -530,7 +523,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -552,7 +544,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -571,7 +562,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -590,7 +580,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -619,7 +608,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -650,7 +638,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -679,7 +666,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -700,7 +686,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -731,7 +716,6 @@ mod tests {
                 },
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -756,7 +740,6 @@ mod tests {
                 },
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -780,7 +763,6 @@ mod tests {
                 },
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -802,7 +784,6 @@ mod tests {
                 },
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -821,7 +802,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -846,7 +826,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -872,7 +851,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -894,7 +872,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -914,7 +891,6 @@ mod tests {
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         diagnostics.sort_by_key(Message::start);
         assert_messages!(snapshot, diagnostics);
@@ -939,7 +915,6 @@ mod tests {
                 },
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -973,7 +948,6 @@ mod tests {
                 },
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -1006,7 +980,6 @@ mod tests {
                 },
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

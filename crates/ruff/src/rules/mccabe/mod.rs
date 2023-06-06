@@ -12,7 +12,7 @@ mod tests {
     use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
 
     #[test_case(0)]
     #[test_case(3)]
@@ -25,7 +25,6 @@ mod tests {
                 mccabe: super::settings::Settings { max_complexity },
                 ..Settings::for_rules(vec![Rule::ComplexStructure])
             },
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

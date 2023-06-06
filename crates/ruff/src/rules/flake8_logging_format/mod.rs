@@ -10,7 +10,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     #[test_case(Path::new("G_argparse_parser_error_ok.py"))]
@@ -41,7 +41,6 @@ mod tests {
                 Rule::LoggingExcInfo,
                 Rule::LoggingRedundantExcInfo,
             ]),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

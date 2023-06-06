@@ -12,6 +12,7 @@ edition = "2021"
 default = ["libfuzzer"]
 full-idempotency = []
 libafl = ["libafl_libfuzzer"]
+libafl_merge = ["libafl", "libafl_libfuzzer/merge"]
 libfuzzer = ["libfuzzer-sys/link_libfuzzer"]
 
 [package.metadata]

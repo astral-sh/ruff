@@ -9,7 +9,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::test::{test_path, DEFAULT_MAX_ITERATIONS};
+    use crate::test::test_path;
     use crate::{assert_messages, settings};
 
     #[test_case(Rule::BlindExcept, Path::new("BLE.py"))]
@@ -18,7 +18,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_blind_except").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
-            DEFAULT_MAX_ITERATIONS,
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
