@@ -165,6 +165,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
         self.finish_node(expr);
     }
 
+    fn visit_decorator(&mut self, decorator: &'ast Decorator) {
+        if self.start_node(decorator).is_traverse() {
+            walk_decorator(self, decorator);
+        }
+        self.finish_node(decorator);
+    }
+
     fn visit_expr(&mut self, expr: &'ast Expr) {
         if self.start_node(expr).is_traverse() {
             walk_expr(self, expr);

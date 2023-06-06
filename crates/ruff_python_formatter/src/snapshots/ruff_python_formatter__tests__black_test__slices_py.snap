@@ -76,7 +76,7 @@ x[
 ```diff
 --- Black
 +++ Ruff
-@@ -1,59 +1,37 @@
+@@ -1,59 +1,38 @@
 -slice[a.b : c.d]
 -slice[d :: d + 1]
 -slice[d + 1 :: d]
@@ -117,9 +117,9 @@ x[
 +NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  
--async def f():
+ async def f():
 -    slice[await x : [i async for i in arange(42)] : 42]
-+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
++    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  
  # These are from PEP-8:
@@ -191,7 +191,8 @@ NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
-NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+async def f():
+    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
 # These are from PEP-8:

@@ -121,40 +121,40 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,78 +1,56 @@
+@@ -1,78 +1,64 @@
 -import random
 +NOT_YET_IMPLEMENTED_StmtImport
  
  
--def foo1():
+ def foo1():
 -    print("The newline above me should be deleted!")
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_IMPLEMENTED_call()
  
  
--def foo2():
+ def foo2():
 -    print("All the newlines above me should be deleted!")
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_IMPLEMENTED_call()
  
  
--def foo3():
+ def foo3():
 -    print("No newline above me!")
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_IMPLEMENTED_call()
  
 -    print("There is a newline above me, and that's OK!")
++    NOT_IMPLEMENTED_call()
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def foo4():
--    # There is a comment here
+ def foo4():
+     # There is a comment here
  
 -    print("The newline above me should not be deleted!")
-+NOT_YET_IMPLEMENTED_StmtClassDef
++    NOT_IMPLEMENTED_call()
  
  
 -class Foo:
 -    def bar(self):
 -        print("The newline above me should be deleted!")
-+NOT_YET_IMPLEMENTED_StmtFor
++NOT_YET_IMPLEMENTED_StmtClassDef
  
  
 -for i in range(5):
@@ -170,8 +170,9 @@ with open("/path/to/file.txt", mode="r") as read_file:
 -for i in range(5):
 -    for j in range(7):
 -        print(f"{i}) The lines above me should be removed!")
--
--
++NOT_YET_IMPLEMENTED_StmtFor
+ 
+ 
 -if random.randint(0, 3) == 0:
 -    print("The new line above me is about to be removed!")
 +NOT_YET_IMPLEMENTED_StmtIf
@@ -226,16 +227,24 @@ with open("/path/to/file.txt", mode="r") as read_file:
 NOT_YET_IMPLEMENTED_StmtImport
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo1():
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo2():
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo3():
+    NOT_IMPLEMENTED_call()
+
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo4():
+    # There is a comment here
+
+    NOT_IMPLEMENTED_call()
 
 
 NOT_YET_IMPLEMENTED_StmtClassDef

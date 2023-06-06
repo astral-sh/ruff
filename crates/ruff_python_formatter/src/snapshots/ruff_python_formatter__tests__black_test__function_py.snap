@@ -108,7 +108,7 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,148 +1,41 @@
+@@ -1,148 +1,94 @@
  #!/usr/bin/env python3
 -import asyncio
 -import sys
@@ -125,10 +125,10 @@ def __await__(): return (yield)
 -f"trigger 3.6 mode"
 -
  
--def func_no_args():
--    a
--    b
--    c
+ def func_no_args():
+     a
+     b
+     c
 -    if True:
 -        raise RuntimeError
 -    if False:
@@ -138,58 +138,85 @@ def __await__(): return (yield)
 -        continue
 -    exec("new-style exec", {}, {})
 -    return None
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_StmtFor
++    NOT_IMPLEMENTED_call()
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--async def coroutine(arg, exec=False):
+ async def coroutine(arg, exec=False):
 -    "Single-line docstring. Multiline is harder to reformat."
 -    async with some_connection() as conn:
 -        await conn.do_what_i_mean("SELECT bobby, tables FROM xkcd", timeout=2)
 -    await asyncio.sleep(1)
-+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
++    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    await NOT_IMPLEMENTED_call()
  
  
 -@asyncio.coroutine
 -@some_decorator(with_args=True, many_args=[1, 2, 3])
--def function_signature_stress_test(
--    number: int,
--    no_annotation=None,
++@asyncio.NOT_IMPLEMENTED_attr
++@NOT_IMPLEMENTED_call()
+ def function_signature_stress_test(
+     number: int,
+     no_annotation=None,
 -    text: str = "default",
 -    *,
--    debug: bool = False,
--    **kwargs,
--) -> str:
++    text: str = "NOT_YET_IMPLEMENTED_STRING",
+     debug: bool = False,
+     **kwargs,
+ ) -> str:
 -    return text[number:-1]
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(10000, 200000)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def spaces(
++    a=1,
++    b=(1, 2),
++    c=[],
++    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
++    e=True,
++    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
++    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++    h="NOT_YET_IMPLEMENTED_STRING",
++    i="NOT_YET_IMPLEMENTED_STRING",
++):
++    offset = NOT_IMPLEMENTED_call()
++    NOT_YET_IMPLEMENTED_StmtAssert
  
  
--def spaces_types(
--    a: int = 1,
+ def spaces_types(
+     a: int = 1,
 -    b: tuple = (),
--    c: list = [],
++    b: tuple = (1, 2),
+     c: list = [],
 -    d: dict = {},
--    e: bool = True,
++    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+     e: bool = True,
 -    f: int = -1,
 -    g: int = 1 if False else 2,
 -    h: str = "",
 -    i: str = r"",
--):
--    ...
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
++    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++    h: str = "NOT_YET_IMPLEMENTED_STRING",
++    i: str = "NOT_YET_IMPLEMENTED_STRING",
+ ):
+     ...
  
  
 -def spaces2(result=_core.Value(None)):
 -    assert fut is self._read_fut, (fut, self._read_fut)
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def spaces2(result=NOT_IMPLEMENTED_call()):
++    NOT_YET_IMPLEMENTED_StmtAssert
  
  
--def example(session):
+ def example(session):
 -    result = (
 -        session.query(models.Customer.id)
 -        .filter(
@@ -199,10 +226,10 @@ def __await__(): return (yield)
 -        .order_by(models.Customer.id.asc())
 -        .all()
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    result = NOT_IMPLEMENTED_call()
  
  
--def long_lines():
+ def long_lines():
 -    if True:
 -        typedargslist.extend(
 -            gen_annotated_params(
@@ -243,23 +270,24 @@ def __await__(): return (yield)
 -        """,
 -        re.MULTILINE | re.VERBOSE,
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtIf
++    _type_comment_re = NOT_IMPLEMENTED_call()
  
  
--def trailing_comma():
+ def trailing_comma():
 -    mapping = {
 -        A: 0.25 * (10.0 / 12),
 -        B: 0.1 * (10.0 / 12),
 -        C: 0.1 * (10.0 / 12),
 -        D: 0.1 * (10.0 / 12),
 -    }
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
  
--def f(
--    a,
--    **kwargs,
--) -> A:
+ def f(
+     a,
+     **kwargs,
+ ) -> A:
 -    return (
 -        yield from A(
 -            very_long_argument_name1=very_long_value_for_the_argument,
@@ -267,12 +295,12 @@ def __await__(): return (yield)
 -            **kwargs,
 -        )
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def __await__():
+ def __await__():
 -    return (yield)
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
 ```
 
 ## Ruff Output
@@ -288,37 +316,90 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 NOT_YET_IMPLEMENTED_ExprJoinedStr
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def func_no_args():
+    a
+    b
+    c
+    NOT_YET_IMPLEMENTED_StmtIf
+    NOT_YET_IMPLEMENTED_StmtIf
+    NOT_YET_IMPLEMENTED_StmtFor
+    NOT_IMPLEMENTED_call()
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+async def coroutine(arg, exec=False):
+    "NOT_YET_IMPLEMENTED_STRING"
+    NOT_YET_IMPLEMENTED_StmtAsyncWith
+    await NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+@asyncio.NOT_IMPLEMENTED_attr
+@NOT_IMPLEMENTED_call()
+def function_signature_stress_test(
+    number: int,
+    no_annotation=None,
+    text: str = "NOT_YET_IMPLEMENTED_STRING",
+    debug: bool = False,
+    **kwargs,
+) -> str:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def spaces(
+    a=1,
+    b=(1, 2),
+    c=[],
+    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    e=True,
+    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    h="NOT_YET_IMPLEMENTED_STRING",
+    i="NOT_YET_IMPLEMENTED_STRING",
+):
+    offset = NOT_IMPLEMENTED_call()
+    NOT_YET_IMPLEMENTED_StmtAssert
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def spaces_types(
+    a: int = 1,
+    b: tuple = (1, 2),
+    c: list = [],
+    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    e: bool = True,
+    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    h: str = "NOT_YET_IMPLEMENTED_STRING",
+    i: str = "NOT_YET_IMPLEMENTED_STRING",
+):
+    ...
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def spaces2(result=NOT_IMPLEMENTED_call()):
+    NOT_YET_IMPLEMENTED_StmtAssert
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example(session):
+    result = NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def long_lines():
+    NOT_YET_IMPLEMENTED_StmtIf
+    _type_comment_re = NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def trailing_comma():
+    mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def f(
+    a,
+    **kwargs,
+) -> A:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def __await__():
+    NOT_YET_IMPLEMENTED_StmtReturn
 ```
 
 ## Black Output

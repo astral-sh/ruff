@@ -101,123 +101,126 @@ def foo() -> tuple[int, int, int,]:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,120 +1,65 @@
+@@ -1,61 +1,65 @@
  # Control
--def double(a: int) -> int:
+ def double(a: int) -> int:
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Remove the brackets
--def double(a: int) -> int:
+ def double(a: int) -> int:
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Some newline variations
--def double(a: int) -> int:
+ def double(a: int) -> int:
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def double(a: int) -> int:
+ def double(a: int) -> int:
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def double(a: int) -> int:
+ def double(a: int) -> int:
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Don't lose the comments
--def double(a: int) -> int:  # Hello
+ def double(a: int) -> int:  # Hello
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
 -def double(a: int) -> int:  # Hello
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def double(a: int) -> (
++    int  # Hello
++):
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Really long annotations
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
+ def foo() -> (
+     intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+ ):
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
+ def foo() -> (
+     intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+ ):
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
+ def foo() -> (
+     intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+     | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+ ):
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def foo(
--    a: int,
--    b: int,
--    c: int,
+ def foo(
+     a: int,
+     b: int,
+     c: int,
 -) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++) -> (
++    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
++):
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def foo(
--    a: int,
--    b: int,
--    c: int,
--) -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
+ def foo(
+@@ -66,7 +70,7 @@
+     intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+     | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+ ):
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Split args but no need to split return
--def foo(
--    a: int,
--    b: int,
--    c: int,
--) -> int:
+@@ -75,46 +79,34 @@
+     b: int,
+     c: int,
+ ) -> int:
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Deeply nested brackets
  # with *interesting* spacing
--def double(a: int) -> int:
+ def double(a: int) -> int:
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def double(a: int) -> int:
+ def double(a: int) -> int:
 -    return 2 * a
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def foo() -> (
--    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
--):
+ def foo() -> (
+     intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+ ):
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Return type with commas
 -def foo() -> tuple[int, int, int]:
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
 -def foo() -> (
@@ -228,7 +231,8 @@ def foo() -> tuple[int, int, int,]:
 -    ]
 -):
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
  # Magic trailing comma example
@@ -240,77 +244,125 @@ def foo() -> tuple[int, int, int,]:
 -    ]
 -):
 -    return 2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
++    NOT_YET_IMPLEMENTED_StmtReturn
 ```
 
 ## Ruff Output
 
 ```py
 # Control
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Remove the brackets
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Some newline variations
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Don't lose the comments
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:  # Hello
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> (
+    int  # Hello
+):
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Really long annotations
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo(
+    a: int,
+    b: int,
+    c: int,
+) -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo(
+    a: int,
+    b: int,
+    c: int,
+) -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Split args but no need to split return
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo(
+    a: int,
+    b: int,
+    c: int,
+) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Deeply nested brackets
 # with *interesting* spacing
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def double(a: int) -> int:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo() -> (
+    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+):
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Return type with commas
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Magic trailing comma example
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+    NOT_YET_IMPLEMENTED_StmtReturn
 ```
 
 ## Black Output

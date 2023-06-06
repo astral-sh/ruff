@@ -76,21 +76,20 @@ return np.divide(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,63 +1,51 @@
--def function(**kwargs):
--    t = a**2 + b**3
+@@ -1,6 +1,6 @@
+ def function(**kwargs):
+     t = a**2 + b**3
 -    return t**2
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def function_replace_spaces(**kwargs):
--    t = a**2 + b**3 + c**4
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
+ def function_replace_spaces(**kwargs):
+@@ -8,56 +8,48 @@
  
  
--def function_dont_replace_spaces():
+ def function_dont_replace_spaces():
 -    {**a, **b, **c}
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
  
 -a = 5**~4
@@ -184,13 +183,17 @@ return np.divide(
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def function(**kwargs):
+    t = a**2 + b**3
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def function_replace_spaces(**kwargs):
+    t = a**2 + b**3 + c**4
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def function_dont_replace_spaces():
+    {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
 a = 5**NOT_YET_IMPLEMENTED_ExprUnaryOp

@@ -68,7 +68,7 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,85 +1,37 @@
+@@ -1,85 +1,49 @@
  x = 1
  x = 1.2
  
@@ -78,8 +78,8 @@ def example8():
 +data = NOT_IMPLEMENTED_call()
  
  
--async def show_status():
--    while True:
+ async def show_status():
+     while True:
 -        try:
 -            if report_host:
 -                data = (
@@ -87,54 +87,54 @@ def example8():
 -                ).encode()
 -        except Exception as e:
 -            pass
-+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
++        NOT_YET_IMPLEMENTED_StmtTry
  
  
--def example():
+ def example():
 -    return "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example1():
+ def example1():
 -    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example1point5():
+ def example1point5():
 -    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example2():
+ def example2():
 -    return (
 -        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example3():
+ def example3():
 -    return (
 -        1111111111111111111111111111111111111111111111111111111111111111111111111111111
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example4():
+ def example4():
 -    return True
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example5():
+ def example5():
 -    return ()
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example6():
+ def example6():
 -    return {a: a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]}
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example7():
+ def example7():
 -    return {
 -        a: a
 -        for a in [
@@ -160,12 +160,12 @@ def example8():
 -            20000000000000000000,
 -        ]
 -    }
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
--def example8():
+ def example8():
 -    return None
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
 ```
 
 ## Ruff Output
@@ -177,37 +177,49 @@ x = 1.2
 data = NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+async def show_status():
+    while True:
+        NOT_YET_IMPLEMENTED_StmtTry
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example1():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example1point5():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example2():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example3():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example4():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example5():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example6():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example7():
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example8():
+    NOT_YET_IMPLEMENTED_StmtReturn
 ```
 
 ## Black Output

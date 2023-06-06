@@ -276,7 +276,7 @@ last_call()
  Name
  None
  True
-@@ -7,346 +8,240 @@
+@@ -7,346 +8,245 @@
  1
  1.0
  1j
@@ -541,6 +541,9 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
+-]
+-very_long_variable_name_filters: t.List[
+-    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
 +[
 +    1,
 +    2,
@@ -555,9 +558,6 @@ last_call()
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
  ]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
--]
 -xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)
@@ -679,17 +679,20 @@ last_call()
 +mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
  
--def gen():
+ def gen():
 -    yield from outside_of_generator
 -    a = yield
 -    b = yield
 -    c = yield
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_ExprYieldFrom
++    a = NOT_YET_IMPLEMENTED_ExprYield
++    b = NOT_YET_IMPLEMENTED_ExprYield
++    c = NOT_YET_IMPLEMENTED_ExprYield
  
  
--async def f():
+ async def f():
 -    await some.complicated[0].call(with_args=(True or (1 is not 1)))
-+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
++    await NOT_IMPLEMENTED_call()
  
  
 -print(*[] or [1])
@@ -823,7 +826,7 @@ last_call()
  (
      aaaaaaaaaaaaaaaa
      + aaaaaaaaaaaaaaaa
-@@ -363,8 +258,9 @@
+@@ -363,8 +263,9 @@
  bbbb >> bbbb * bbbb
  (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -1050,10 +1053,15 @@ NOT_IMPLEMENTED_call()
 mapping = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def gen():
+    NOT_YET_IMPLEMENTED_ExprYieldFrom
+    a = NOT_YET_IMPLEMENTED_ExprYield
+    b = NOT_YET_IMPLEMENTED_ExprYield
+    c = NOT_YET_IMPLEMENTED_ExprYield
 
 
-NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+async def f():
+    await NOT_IMPLEMENTED_call()
 
 
 NOT_IMPLEMENTED_call()

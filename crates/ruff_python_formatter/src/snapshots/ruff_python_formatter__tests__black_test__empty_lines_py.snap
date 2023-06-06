@@ -105,13 +105,13 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,89 +1,12 @@
+@@ -1,89 +1,45 @@
 -"""Docstring."""
 +"NOT_YET_IMPLEMENTED_STRING"
  
  
  # leading comment
--def f():
+ def f():
 -    NO = ""
 -    SPACE = " "
 -    DOUBLESPACE = "  "
@@ -124,15 +124,23 @@ def g():
 -        pass
 -    if t == token.COMMENT:  # another trailing comment
 -        return DOUBLESPACE
--
++    NO = "NOT_YET_IMPLEMENTED_STRING"
++    SPACE = "NOT_YET_IMPLEMENTED_STRING"
++    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
+ 
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
--
++    t = leaf.NOT_IMPLEMENTED_attr
++    p = leaf.NOT_IMPLEMENTED_attr  # trailing comment
++    v = leaf.NOT_IMPLEMENTED_attr
+ 
 -    prev = leaf.prev_sibling
 -    if not prev:
 -        prevp = preceding_leaf(p)
 -        if not prevp or prevp.type in OPENING_BRACKETS:
 -            return NO
--
++    NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_StmtIf  # another trailing comment
+ 
 -        if prevp.type == token.EQUAL:
 -            if prevp.parent and prevp.parent.type in {
 -                syms.typedargslist,
@@ -142,7 +150,8 @@ def g():
 -                syms.argument,
 -            }:
 -                return NO
--
++    NOT_YET_IMPLEMENTED_StmtAssert
+ 
 -        elif prevp.type == token.DOUBLESTAR:
 -            if prevp.parent and prevp.parent.type in {
 -                syms.typedargslist,
@@ -152,7 +161,8 @@ def g():
 -                syms.dictsetmaker,
 -            }:
 -                return NO
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    prev = leaf.NOT_IMPLEMENTED_attr
++    NOT_YET_IMPLEMENTED_StmtIf
  
  
  ###############################################################################
@@ -160,29 +170,38 @@ def g():
  ###############################################################################
 -
  
--def g():
+ def g():
 -    NO = ""
 -    SPACE = " "
 -    DOUBLESPACE = "  "
--
++    NO = "NOT_YET_IMPLEMENTED_STRING"
++    SPACE = "NOT_YET_IMPLEMENTED_STRING"
++    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
+ 
 -    t = leaf.type
 -    p = leaf.parent
 -    v = leaf.value
--
--    # Comment because comments
--
++    t = leaf.NOT_IMPLEMENTED_attr
++    p = leaf.NOT_IMPLEMENTED_attr
++    v = leaf.NOT_IMPLEMENTED_attr
+ 
+     # Comment because comments
+ 
 -    if t in ALWAYS_NO_SPACE:
 -        pass
 -    if t == token.COMMENT:
 -        return DOUBLESPACE
--
--    # Another comment because more comments
++    NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_StmtIf
+ 
+     # Another comment because more comments
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
 -
 -    prev = leaf.prev_sibling
 -    if not prev:
 -        prevp = preceding_leaf(p)
--
++    NOT_YET_IMPLEMENTED_StmtAssert
+ 
 -        if not prevp or prevp.type in OPENING_BRACKETS:
 -            # Start of the line or a bracketed expression.
 -            # More than one line for the comment.
@@ -197,7 +216,8 @@ def g():
 -                syms.argument,
 -            }:
 -                return NO
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    prev = leaf.NOT_IMPLEMENTED_attr
++    NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Ruff Output
@@ -207,14 +227,47 @@ def g():
 
 
 # leading comment
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def f():
+    NO = "NOT_YET_IMPLEMENTED_STRING"
+    SPACE = "NOT_YET_IMPLEMENTED_STRING"
+    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
+
+    t = leaf.NOT_IMPLEMENTED_attr
+    p = leaf.NOT_IMPLEMENTED_attr  # trailing comment
+    v = leaf.NOT_IMPLEMENTED_attr
+
+    NOT_YET_IMPLEMENTED_StmtIf
+    NOT_YET_IMPLEMENTED_StmtIf  # another trailing comment
+
+    NOT_YET_IMPLEMENTED_StmtAssert
+
+    prev = leaf.NOT_IMPLEMENTED_attr
+    NOT_YET_IMPLEMENTED_StmtIf
 
 
 ###############################################################################
 # SECTION BECAUSE SECTIONS
 ###############################################################################
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def g():
+    NO = "NOT_YET_IMPLEMENTED_STRING"
+    SPACE = "NOT_YET_IMPLEMENTED_STRING"
+    DOUBLESPACE = "NOT_YET_IMPLEMENTED_STRING"
+
+    t = leaf.NOT_IMPLEMENTED_attr
+    p = leaf.NOT_IMPLEMENTED_attr
+    v = leaf.NOT_IMPLEMENTED_attr
+
+    # Comment because comments
+
+    NOT_YET_IMPLEMENTED_StmtIf
+    NOT_YET_IMPLEMENTED_StmtIf
+
+    # Another comment because more comments
+    NOT_YET_IMPLEMENTED_StmtAssert
+
+    prev = leaf.NOT_IMPLEMENTED_attr
+    NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Black Output

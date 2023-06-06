@@ -42,6 +42,9 @@ impl FormatNodeRule<ExprConstant> for FormatExprConstant {
 
 impl NeedsParentheses for ExprConstant {
     fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source)
+        match default_expression_needs_parentheses(self.into(), parenthesize, source) {
+            Parentheses::Optional => Parentheses::Never,
+            parentheses => parentheses,
+        }
     }
 }

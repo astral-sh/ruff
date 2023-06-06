@@ -97,7 +97,7 @@ elif   unformatted:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,87 +1,29 @@
+@@ -1,87 +1,33 @@
  # Regression test for https://github.com/psf/black/issues/3129.
 -setup(
 -    entry_points={
@@ -127,18 +127,19 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/3026.
--def test_func():
--    # yapf: disable
+ def test_func():
+     # yapf: disable
 -    if  unformatted(  args  ):
 -        return True
 -    # yapf: enable
 -    elif b:
 -        return True
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtIf
  
 -    return False
++    NOT_YET_IMPLEMENTED_StmtReturn
  
--
+ 
  # Regression test for https://github.com/psf/black/issues/2567.
 -if True:
 -    # fmt: off
@@ -207,7 +208,11 @@ NOT_IMPLEMENTED_call()
 
 
 # Regression test for https://github.com/psf/black/issues/3026.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def test_func():
+    # yapf: disable
+    NOT_YET_IMPLEMENTED_StmtIf
+
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 # Regression test for https://github.com/psf/black/issues/2567.

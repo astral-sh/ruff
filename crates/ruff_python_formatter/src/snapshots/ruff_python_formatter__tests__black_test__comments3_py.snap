@@ -61,11 +61,10 @@ def func():
 ```diff
 --- Black
 +++ Ruff
-@@ -2,47 +2,7 @@
- 
+@@ -3,46 +3,13 @@
  
  # %%
--def func():
+ def func():
 -    x = """
 -    a really long string
 -    """
@@ -77,7 +76,9 @@ def func():
 -        # right
 -        if element is not None
 -    ]
--    # Capture each of the exceptions in the MultiError along with each of their causes and contexts
++    x = "NOT_YET_IMPLEMENTED_STRING"
++    lcomp3 = [i for i in []]
+     # Capture each of the exceptions in the MultiError along with each of their causes and contexts
 -    if isinstance(exc_value, MultiError):
 -        embedded = []
 -        for exc in exc_value.exceptions:
@@ -95,8 +96,9 @@ def func():
 -                    )
 -                    # This should be left alone (after)
 -                )
--
--    # everything is fine if the expression isn't nested
++    NOT_YET_IMPLEMENTED_StmtIf
+ 
+     # everything is fine if the expression isn't nested
 -    traceback.TracebackException.from_exception(
 -        exc,
 -        limit=limit,
@@ -106,7 +108,7 @@ def func():
 -        # shared between sub-exceptions are not omitted
 -        _seen=set(_seen),
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_IMPLEMENTED_call()
  
  
  # %%
@@ -119,7 +121,14 @@ def func():
 
 
 # %%
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def func():
+    x = "NOT_YET_IMPLEMENTED_STRING"
+    lcomp3 = [i for i in []]
+    # Capture each of the exceptions in the MultiError along with each of their causes and contexts
+    NOT_YET_IMPLEMENTED_StmtIf
+
+    # everything is fine if the expression isn't nested
+    NOT_IMPLEMENTED_call()
 
 
 # %%

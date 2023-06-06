@@ -188,7 +188,7 @@ mod tests {
     use crate::comments::Comments;
     use crate::prelude::*;
     use crate::statement::suite::SuiteLevel;
-    use ruff_formatter::{format, SimpleFormatOptions};
+    use ruff_formatter::{format, IndentStyle, SimpleFormatOptions};
     use rustpython_parser::ast::Suite;
     use rustpython_parser::Parse;
 
@@ -216,8 +216,14 @@ def trailing_func():
 
         let statements = Suite::parse(source, "test.py").unwrap();
 
-        let context =
-            PyFormatContext::new(SimpleFormatOptions::default(), source, Comments::default());
+        let context = PyFormatContext::new(
+            SimpleFormatOptions {
+                indent_style: IndentStyle::Space(4),
+                ..SimpleFormatOptions::default()
+            },
+            source,
+            Comments::default(),
+        );
 
         let test_formatter =
             format_with(|f: &mut PyFormatter| statements.format().with_options(level).fmt(f));
@@ -252,10 +258,13 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 trailing_statement = 1
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def func():
+    NOT_YET_IMPLEMENTED_StmtPass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef"#
+def trailing_func():
+    NOT_YET_IMPLEMENTED_StmtPass
+"#
         );
     }
 
@@ -278,9 +287,12 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 trailing_statement = 1
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def func():
+    NOT_YET_IMPLEMENTED_StmtPass
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef"#
+def trailing_func():
+    NOT_YET_IMPLEMENTED_StmtPass
+"#
         );
     }
 }

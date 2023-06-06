@@ -112,3 +112,22 @@ impl<'a> From<&'a StmtAsyncFunctionDef> for AnyFunctionDefinition<'a> {
         Self::AsyncFunctionDefinition(value)
     }
 }
+
+impl<'a> From<AnyFunctionDefinition<'a>> for AnyNodeRef<'a> {
+    fn from(value: AnyFunctionDefinition<'a>) -> Self {
+        match value {
+            AnyFunctionDefinition::FunctionDefinition(function_def) => {
+                AnyNodeRef::StmtFunctionDef(function_def)
+            }
+            AnyFunctionDefinition::AsyncFunctionDefinition(async_def) => {
+                AnyNodeRef::StmtAsyncFunctionDef(async_def)
+            }
+        }
+    }
+}
+
+impl<'a> From<&'a AnyFunctionDefinition<'a>> for AnyNodeRef<'a> {
+    fn from(value: &'a AnyFunctionDefinition<'a>) -> Self {
+        (*value).into()
+    }
+}

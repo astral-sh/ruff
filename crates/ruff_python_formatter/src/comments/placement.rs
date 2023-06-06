@@ -28,6 +28,7 @@ pub(super) fn place_comment<'a>(
         .or_else(|comment| {
             handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
         })
+        .or_else(handle_leading_function_with_decorators_comment)
 }
 
 /// Handles leading comments in front of a match case or a trailing comment of the `match` statement.
@@ -103,9 +104,8 @@ fn handle_match_comment<'a>(
         }
     } else {
         // Comment after the last statement in a match case...
-        let match_stmt_indentation = whitespace::indentation(locator, match_stmt)
-            .unwrap_or_default()
-            .len();
+        let match_stmt_indentation =
+            whitespace::indentation(locator, match_stmt).map_or(usize::MAX, str::len);
 
         if comment_indentation <= match_case_indentation
             && comment_indentation > match_stmt_indentation
@@ -379,9 +379,8 @@ fn handle_trailing_body_comment<'a>(
     let mut grand_parent_body = None;
 
     loop {
-        let child_indentation = whitespace::indentation(locator, &current_child)
-            .map(str::len)
-            .unwrap_or_default();
+        let child_indentation =
+            whitespace::indentation(locator, &current_child).map_or(usize::MAX, str::len);
 
         match comment_indentation_len.cmp(&child_indentation) {
             Ordering::Less => {
@@ -511,6 +510,11 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
         | AnyNodeRef::StmtAsyncWith(StmtAsyncWith { items, .. }) => {
             items.last().map(AnyNodeRef::from)
         }
+        AnyNodeRef::StmtFunctionDef(StmtFunctionDef { returns, args, .. })
+        | AnyNodeRef::StmtAsyncFunctionDef(StmtAsyncFunctionDef { returns, args, .. }) => returns
+            .as_deref()
+            .map(AnyNodeRef::from)
+            .or_else(|| Some(AnyNodeRef::from(args.as_ref()))),
         _ => None,
     };
 
@@ -818,6 +822,32 @@ fn find_pos_only_slash_offset(
     }
 
     None
+}
+
+/// Handles own line comments between the last function decorator and the *header* of the function.
+/// It attaches these comments as dangling comments to the function instead of making them
+/// leading argument comments.
+///
+/// ```python
+/// @decorator
+/// # leading function comment
+/// def test():
+///      ...
+/// ```
+fn handle_leading_function_with_decorators_comment(comment: DecoratedComment) -> CommentPlacement {
+    let is_preceding_decorator = comment
+        .preceding_node()
+        .map_or(false, |node| node.is_decorator());
+
+    let is_following_arguments = comment
+        .following_node()
+        .map_or(false, |node| node.is_arguments());
+
+    if comment.text_position().is_own_line() && is_preceding_decorator && is_following_arguments {
+        CommentPlacement::dangling(comment.enclosing_node(), comment)
+    } else {
+        CommentPlacement::Default(comment)
+    }
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.

@@ -227,7 +227,7 @@ instruction()#comment with bad spacing
  ]
  
  not_shareables = [
-@@ -37,129 +33,28 @@
+@@ -37,51 +33,24 @@
      # builtin types and objects
      type,
      object,
@@ -258,7 +258,7 @@ instruction()#comment with bad spacing
  
  
  # Comment before function.
--def inline_comments_in_brackets_ruin_everything():
+ def inline_comments_in_brackets_ruin_everything():
 -    if typedargslist:
 -        parameters.children = [children[0], body, children[-1]]  # (1  # )1
 -        parameters.children = [
@@ -282,15 +282,15 @@ instruction()#comment with bad spacing
 -        and self._proc.poll() is None
 -    ):
 -        pass
--    # no newline before or after
--    short = [
--        # one
--        1,
--        # two
--        2,
--    ]
--
--    # no newline after
++    NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_StmtIf
+     # no newline before or after
+     short = [
+         # one
+@@ -91,75 +60,26 @@
+     ]
+ 
+     # no newline after
 -    call(
 -        arg1,
 -        arg2,
@@ -299,9 +299,10 @@ instruction()#comment with bad spacing
 -""",
 -        arg3=True,
 -    )
--
--    ############################################################################
--
++    NOT_IMPLEMENTED_call()
+ 
+     ############################################################################
+ 
 -    call2(
 -        # short
 -        arg1,
@@ -333,19 +334,24 @@ instruction()#comment with bad spacing
 -        # right
 -        if element is not None
 -    ]
--    while True:
++    NOT_IMPLEMENTED_call()
++    lcomp = [i for i in []]
++    lcomp2 = [i for i in []]
++    lcomp3 = [i for i in []]
+     while True:
 -        if False:
 -            continue
 -
 -            # and round and round we go
--        # and round and round we go
--
--    # let's return
++        NOT_YET_IMPLEMENTED_StmtIf
+         # and round and round we go
+ 
+     # let's return
 -    return Node(
 -        syms.simple_stmt,
 -        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtReturn
  
  
 -CONFIG_FILES = (
@@ -366,7 +372,7 @@ instruction()#comment with bad spacing
  
  
  #######################
-@@ -167,7 +62,7 @@
+@@ -167,7 +87,7 @@
  #######################
  
  
@@ -430,7 +436,32 @@ NOT_YET_IMPLEMENTED_StmtIf
 
 
 # Comment before function.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def inline_comments_in_brackets_ruin_everything():
+    NOT_YET_IMPLEMENTED_StmtIf
+    NOT_YET_IMPLEMENTED_StmtIf
+    # no newline before or after
+    short = [
+        # one
+        1,
+        # two
+        2,
+    ]
+
+    # no newline after
+    NOT_IMPLEMENTED_call()
+
+    ############################################################################
+
+    NOT_IMPLEMENTED_call()
+    lcomp = [i for i in []]
+    lcomp2 = [i for i in []]
+    lcomp3 = [i for i in []]
+    while True:
+        NOT_YET_IMPLEMENTED_StmtIf
+        # and round and round we go
+
+    # let's return
+    NOT_YET_IMPLEMENTED_StmtReturn
 
 
 CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final

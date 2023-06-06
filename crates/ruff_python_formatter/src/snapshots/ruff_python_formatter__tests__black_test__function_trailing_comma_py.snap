@@ -74,21 +74,22 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,114 +1,31 @@
--def f(
--    a,
--):
+@@ -1,69 +1,29 @@
+ def f(
+     a,
+ ):
 -    d = {
 -        "key": "value",
 -    }
 -    tup = (1,)
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++    tup = (1, 2)
  
  
--def f2(
--    a,
--    b,
--):
+ def f2(
+     a,
+     b,
+ ):
 -    d = {
 -        "key": "value",
 -        "key2": "value2",
@@ -97,12 +98,13 @@ some_module.some_function(
 -        1,
 -        2,
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
++    tup = (1, 2)
  
  
--def f(
--    a: int = 1,
--):
+ def f(
+     a: int = 1,
+ ):
 -    call(
 -        arg={
 -            "explode": "this",
@@ -129,7 +131,10 @@ some_module.some_function(
 -        }["a"]
 -    ):
 -        pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call()
++    x = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++    NOT_YET_IMPLEMENTED_StmtIf
  
  
 -def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
@@ -144,23 +149,24 @@ some_module.some_function(
 -            }
 -        }
 -    }
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
++    json = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
  
  # The type annotation shouldn't get a trailing comma since that would change its type.
- # Relevant bug report: https://github.com/psf/black/issues/2381.
--def some_function_with_a_really_long_name() -> (
--    returning_a_deeply_nested_import_of_a_type_i_suppose
--):
+@@ -71,44 +31,25 @@
+ def some_function_with_a_really_long_name() -> (
+     returning_a_deeply_nested_import_of_a_type_i_suppose
+ ):
 -    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtPass
  
  
--def some_method_with_a_really_long_name(
--    very_long_parameter_so_yeah: str, another_long_parameter: int
--) -> another_case_of_returning_a_deeply_nested_import_of_a_type_i_suppose_cause_why_not:
+ def some_method_with_a_really_long_name(
+     very_long_parameter_so_yeah: str, another_long_parameter: int
+ ) -> another_case_of_returning_a_deeply_nested_import_of_a_type_i_suppose_cause_why_not:
 -    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtPass
  
  
 -def func() -> (
@@ -169,7 +175,8 @@ some_module.some_function(
 -    )
 -):
 -    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def func() -> NOT_IMPLEMENTED_call():
++    NOT_YET_IMPLEMENTED_StmtPass
  
  
 -def func() -> (
@@ -178,7 +185,8 @@ some_module.some_function(
 -    )
 -):
 -    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def func() -> NOT_IMPLEMENTED_call():
++    NOT_YET_IMPLEMENTED_StmtPass
  
  
  # Make sure inner one-element tuple won't explode
@@ -204,30 +212,54 @@ some_module.some_function(
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def f(
+    a,
+):
+    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    tup = (1, 2)
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def f2(
+    a,
+    b,
+):
+    d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
+    tup = (1, 2)
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def f(
+    a: int = 1,
+):
+    NOT_IMPLEMENTED_call()
+    NOT_IMPLEMENTED_call()
+    x = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    NOT_YET_IMPLEMENTED_StmtIf
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+    json = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
 # The type annotation shouldn't get a trailing comma since that would change its type.
 # Relevant bug report: https://github.com/psf/black/issues/2381.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def some_function_with_a_really_long_name() -> (
+    returning_a_deeply_nested_import_of_a_type_i_suppose
+):
+    NOT_YET_IMPLEMENTED_StmtPass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def some_method_with_a_really_long_name(
+    very_long_parameter_so_yeah: str, another_long_parameter: int
+) -> another_case_of_returning_a_deeply_nested_import_of_a_type_i_suppose_cause_why_not:
+    NOT_YET_IMPLEMENTED_StmtPass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def func() -> NOT_IMPLEMENTED_call():
+    NOT_YET_IMPLEMENTED_StmtPass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def func() -> NOT_IMPLEMENTED_call():
+    NOT_YET_IMPLEMENTED_StmtPass
 
 
 # Make sure inner one-element tuple won't explode
