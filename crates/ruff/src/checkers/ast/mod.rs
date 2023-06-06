@@ -4616,14 +4616,8 @@ impl<'a> Checker<'a> {
 
         let scope = self.semantic_model.scope();
 
-        if id == "__all__"
-            && scope.kind.is_module()
-            && matches!(
-                parent,
-                Stmt::Assign(_) | Stmt::AugAssign(_) | Stmt::AnnAssign(_)
-            )
-        {
-            if match parent {
+        if scope.kind.is_module()
+            && match parent {
                 Stmt::Assign(ast::StmtAssign { targets, .. }) => {
                     if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
                         id == "__all__"
@@ -4646,47 +4640,32 @@ impl<'a> Checker<'a> {
                     }
                 }
                 _ => false,
-            } {
-                let (all_names, all_names_flags) = {
-                    let (mut names, flags) =
-                        extract_all_names(parent, |name| self.semantic_model.is_builtin(name));
-
-                    // Grab the existing bound __all__ values.
-                    if let Stmt::AugAssign(_) = parent {
-                        if let Some(binding_id) = scope.get("__all__") {
-                            if let BindingKind::Export(Export { names: existing }) =
-                                &self.semantic_model.bindings[binding_id].kind
-                            {
-                                names.extend_from_slice(existing);
-                            }
-                        }
-                    }
-
-                    (names, flags)
-                };
-
-                if self.enabled(Rule::InvalidAllFormat) {
-                    if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
-                        self.diagnostics
-                            .push(pylint::rules::invalid_all_format(expr));
-                    }
-                }
-
-                if self.enabled(Rule::InvalidAllObject) {
-                    if matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT) {
-                        self.diagnostics
-                            .push(pylint::rules::invalid_all_object(expr));
-                    }
-                }
-
-                self.add_binding(
-                    id,
-                    expr.range(),
-                    BindingKind::Export(Export { names: all_names }),
-                    BindingFlags::empty(),
-                );
-                return;
             }
+        {
+            let (names, flags) =
+                extract_all_names(parent, |name| self.semantic_model.is_builtin(name));
+
+            if self.enabled(Rule::InvalidAllFormat) {
+                if matches!(flags, AllNamesFlags::INVALID_FORMAT) {
+                    self.diagnostics
+                        .push(pylint::rules::invalid_all_format(expr));
+                }
+            }
+
+            if self.enabled(Rule::InvalidAllObject) {
+                if matches!(flags, AllNamesFlags::INVALID_OBJECT) {
+                    self.diagnostics
+                        .push(pylint::rules::invalid_all_object(expr));
+                }
+            }
+
+            self.add_binding(
+                id,
+                expr.range(),
+                BindingKind::Export(Export { names }),
+                BindingFlags::empty(),
+            );
+            return;
         }
 
         if self
@@ -4920,49 +4899,30 @@ impl<'a> Checker<'a> {
         }
 
         // Mark anything referenced in `__all__` as used.
-        let all_bindings: Option<(Vec<BindingId>, TextRange)> = {
+        let exports: Vec<(&str, TextRange)> = {
             let global_scope = self.semantic_model.global_scope();
-            let all_names: Option<(&[&str], TextRange)> = global_scope
-                .get("__all__")
+            global_scope
+                .bindings_for_name("__all__")
                 .map(|binding_id| &self.semantic_model.bindings[binding_id])
-                .and_then(|binding| match &binding.kind {
+                .filter_map(|binding| match &binding.kind {
                     BindingKind::Export(Export { names }) => {
-                        Some((names.as_slice(), binding.range))
+                        Some(names.iter().map(|name| (*name, binding.range)))
                     }
                     _ => None,
-                });
-
-            all_names.map(|(names, range)| {
-                (
-                    names
-                        .iter()
-                        .filter_map(|name| global_scope.get(name))
-                        .collect(),
-                    range,
-                )
-            })
+                })
+                .flatten()
+                .collect()
         };
 
-        if let Some((bindings, range)) = all_bindings {
-            for binding_id in bindings {
+        for (name, range) in &exports {
+            if let Some(binding_id) = self.semantic_model.global_scope().get(name) {
                 self.semantic_model.add_global_reference(
                     binding_id,
-                    range,
+                    *range,
                     ExecutionContext::Runtime,
                 );
             }
         }
-
-        // Extract `__all__` names from the global scope.
-        let all_names: Option<(&[&str], TextRange)> = self
-            .semantic_model
-            .global_scope()
-            .get("__all__")
-            .map(|binding_id| &self.semantic_model.bindings[binding_id])
-            .and_then(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => Some((names.as_slice(), binding.range)),
-                _ => None,
-            });
 
         // Identify any valid runtime imports. If a module is imported at runtime, and
         // used at runtime, then by default, we avoid flagging any other
@@ -5000,35 +4960,33 @@ impl<'a> Checker<'a> {
                 // F822
                 if self.enabled(Rule::UndefinedExport) {
                     if !self.path.ends_with("__init__.py") {
-                        if let Some((names, range)) = all_names {
+                        for (name, range) in &exports {
                             diagnostics
-                                .extend(pyflakes::rules::undefined_export(names, range, scope));
+                                .extend(pyflakes::rules::undefined_export(name, *range, scope));
                         }
                     }
                 }
 
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                    if let Some((names, range)) = &all_names {
-                        let sources: Vec<String> = scope
-                            .star_imports()
-                            .map(|StarImportation { level, module }| {
-                                helpers::format_import_from(*level, *module)
-                            })
-                            .sorted()
-                            .dedup()
-                            .collect();
-                        if !sources.is_empty() {
-                            for name in names.iter() {
-                                if !scope.defines(name) {
-                                    diagnostics.push(Diagnostic::new(
-                                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                            name: (*name).to_string(),
-                                            sources: sources.clone(),
-                                        },
-                                        *range,
-                                    ));
-                                }
+                    let sources: Vec<String> = scope
+                        .star_imports()
+                        .map(|StarImportation { level, module }| {
+                            helpers::format_import_from(*level, *module)
+                        })
+                        .sorted()
+                        .dedup()
+                        .collect();
+                    if !sources.is_empty() {
+                        for (name, range) in &exports {
+                            if !scope.defines(name) {
+                                diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                        name: (*name).to_string(),
+                                        sources: sources.clone(),
+                                    },
+                                    *range,
+                                ));
                             }
                         }
                     }
