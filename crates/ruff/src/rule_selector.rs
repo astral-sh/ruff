@@ -12,8 +12,10 @@ use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
-    /// Select all rules.
+    /// Select all stable rules.
     All,
+    /// Select all nursery rules.
+    Nursery,
     /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
     /// via a single selector.
     C,
@@ -39,30 +41,30 @@ impl FromStr for RuleSelector {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "ALL" {
-            Ok(Self::All)
-        } else if s == "C" {
-            Ok(Self::C)
-        } else if s == "T" {
-            Ok(Self::T)
-        } else {
-            let (s, redirected_from) = match get_redirect(s) {
-                Some((from, target)) => (target, Some(from)),
-                None => (s, None),
-            };
+        match s {
+            "ALL" => Ok(Self::All),
+            "NURSERY" => Ok(Self::Nursery),
+            "C" => Ok(Self::C),
+            "T" => Ok(Self::T),
+            _ => {
+                let (s, redirected_from) = match get_redirect(s) {
+                    Some((from, target)) => (target, Some(from)),
+                    None => (s, None),
+                };
 
-            let (linter, code) =
-                Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+                let (linter, code) =
+                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
 
-            if code.is_empty() {
-                return Ok(Self::Linter(linter));
+                if code.is_empty() {
+                    return Ok(Self::Linter(linter));
+                }
+
+                Ok(Self::Prefix {
+                    prefix: RuleCodePrefix::parse(&linter, code)
+                        .map_err(|_| ParseError::Unknown(s.to_string()))?,
+                    redirected_from,
+                })
             }
-
-            Ok(Self::Prefix {
-                prefix: RuleCodePrefix::parse(&linter, code)
-                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
-                redirected_from,
-            })
         }
     }
 }
@@ -79,6 +81,7 @@ impl RuleSelector {
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
+            RuleSelector::Nursery => ("", "NURSERY"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
             RuleSelector::Prefix { prefix, .. } => {
@@ -141,13 +144,6 @@ impl From<RuleCodePrefix> for RuleSelector {
     }
 }
 
-/// Returns `true` if the given rule should be selected by the `RuleSelector::All` selector.
-fn select_all(rule: Rule) -> bool {
-    // Nursery rules have to be explicitly selected, so we ignore them when looking at
-    // prefixes.
-    !rule.is_nursery()
-}
-
 impl IntoIterator for &RuleSelector {
     type Item = Rule;
     type IntoIter = RuleSelectorIter;
@@ -155,7 +151,10 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => {
-                RuleSelectorIter::All(Rule::iter().filter(|rule| select_all(*rule)))
+                RuleSelectorIter::All(Rule::iter().filter(|rule| !rule.is_nursery()))
+            }
+            RuleSelector::Nursery => {
+                RuleSelectorIter::Nursery(Rule::iter().filter(Rule::is_nursery))
             }
             RuleSelector::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
@@ -175,6 +174,7 @@ impl IntoIterator for &RuleSelector {
 
 pub enum RuleSelectorIter {
     All(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
+    Nursery(std::iter::Filter<RuleIter, fn(&Rule) -> bool>),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
 }
@@ -185,6 +185,7 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
+            RuleSelectorIter::Nursery(iter) => iter.next(),
             RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),
         }
@@ -262,6 +263,7 @@ impl RuleSelector {
     pub(crate) fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
+            RuleSelector::Nursery => Specificity::All,
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,

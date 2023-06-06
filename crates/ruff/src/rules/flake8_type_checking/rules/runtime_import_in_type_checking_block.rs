@@ -1,8 +1,6 @@
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{
-    Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
-};
+use ruff_python_semantic::binding::Binding;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -41,7 +39,7 @@ use crate::registry::AsRule;
 /// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for RuntimeImportInTypeCheckingBlock {
@@ -49,9 +47,9 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RuntimeImportInTypeCheckingBlock { full_name } = self;
+        let RuntimeImportInTypeCheckingBlock { qualified_name } = self;
         format!(
-            "Move import `{full_name}` out of type-checking block. Import is used for more than type hinting."
+            "Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting."
         )
     }
 
@@ -66,11 +64,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
     binding: &Binding,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let full_name = match &binding.kind {
-        BindingKind::Importation(Importation { full_name }) => full_name,
-        BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => full_name,
-        _ => return,
+    let Some(qualified_name) = binding.qualified_name() else {
+        return;
     };
 
     let Some(reference_id) = binding.references.first() else {
@@ -89,10 +84,13 @@ pub(crate) fn runtime_import_in_type_checking_block(
     {
         let mut diagnostic = Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
-                full_name: full_name.to_string(),
+                qualified_name: qualified_name.to_string(),
             },
-            binding.range,
+            binding.trimmed_range(checker.semantic_model(), checker.locator),
         );
+        if let Some(range) = binding.parent_range(checker.semantic_model()) {
+            diagnostic.set_parent(range.start());
+        }
 
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
@@ -102,7 +100,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 let stmt = checker.semantic_model().stmts[source];
                 let parent = checker.semantic_model().stmts.parent(stmt);
                 let remove_import_edit = autofix::edits::remove_unused_imports(
-                    std::iter::once(full_name),
+                    std::iter::once(qualified_name),
                     stmt,
                     parent,
                     checker.locator,
@@ -113,7 +111,10 @@ pub(crate) fn runtime_import_in_type_checking_block(
                 // Step 2) Add the import to the top-level.
                 let reference = checker.semantic_model().references.resolve(*reference_id);
                 let add_import_edit = checker.importer.runtime_import_edit(
-                    &StmtImport { stmt, full_name },
+                    &StmtImport {
+                        stmt,
+                        qualified_name,
+                    },
                     reference.range().start(),
                 )?;
 

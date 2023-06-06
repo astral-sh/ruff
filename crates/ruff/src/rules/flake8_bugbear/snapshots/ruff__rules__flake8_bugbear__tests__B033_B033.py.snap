@@ -1,0 +1,23 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+---
+B033.py:4:35: B033 Sets should not contain duplicate item `"value1"`
+  |
+4 | # Errors.
+5 | ###
+6 | incorrect_set = {"value1", 23, 5, "value1"}
+  |                                   ^^^^^^^^ B033
+7 | incorrect_set = {1, 1}
+  |
+
+B033.py:5:21: B033 Sets should not contain duplicate item `1`
+  |
+5 | ###
+6 | incorrect_set = {"value1", 23, 5, "value1"}
+7 | incorrect_set = {1, 1}
+  |                     ^ B033
+8 | 
+9 | ###
+  |
+
+

@@ -33,7 +33,7 @@ def docstring_multiline():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,19 +1,14 @@
+@@ -1,13 +1,13 @@
  #!/usr/bin/env python3
  
  name = "Łukasz"
@@ -44,20 +44,14 @@ def docstring_multiline():
 +(b"", B"")
 +(u"", U"")
  (r"", R"")
--
+ 
 -(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
 -(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
--
--
 +(rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
 +(rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
+ 
+ 
  def docstring_singleline():
-     R"""2020 was one hell of a year. The good news is that we were able to"""
--
--
- def docstring_multiline():
-     R"""
-     clear out all of the issues opened in that time :p
 ```
 
 ## Ruff Output
@@ -70,10 +64,15 @@ name = "Łukasz"
 (b"", B"")
 (u"", U"")
 (r"", R"")
+
 (rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
 (rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
+
+
 def docstring_singleline():
     R"""2020 was one hell of a year. The good news is that we were able to"""
+
+
 def docstring_multiline():
     R"""
     clear out all of the issues opened in that time :p

@@ -9,7 +9,6 @@ pub(crate) use compare_to_empty_string::{compare_to_empty_string, CompareToEmpty
 pub(crate) use comparison_of_constant::{comparison_of_constant, ComparisonOfConstant};
 pub(crate) use continue_in_finally::{continue_in_finally, ContinueInFinally};
 pub(crate) use duplicate_bases::{duplicate_bases, DuplicateBases};
-pub(crate) use duplicate_value::{duplicate_value, DuplicateValue};
 pub(crate) use global_statement::{global_statement, GlobalStatement};
 pub(crate) use global_variable_not_assigned::GlobalVariableNotAssigned;
 pub(crate) use import_self::{import_from_self, import_self, ImportSelf};
@@ -17,6 +16,7 @@ pub(crate) use invalid_all_format::{invalid_all_format, InvalidAllFormat};
 pub(crate) use invalid_all_object::{invalid_all_object, InvalidAllObject};
 pub(crate) use invalid_envvar_default::{invalid_envvar_default, InvalidEnvvarDefault};
 pub(crate) use invalid_envvar_value::{invalid_envvar_value, InvalidEnvvarValue};
+pub(crate) use invalid_str_return::{invalid_str_return, InvalidStrReturnType};
 pub(crate) use invalid_string_characters::{
     invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
     InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
@@ -65,7 +65,6 @@ mod compare_to_empty_string;
 mod comparison_of_constant;
 mod continue_in_finally;
 mod duplicate_bases;
-mod duplicate_value;
 mod global_statement;
 mod global_variable_not_assigned;
 mod import_self;
@@ -73,6 +72,7 @@ mod invalid_all_format;
 mod invalid_all_object;
 mod invalid_envvar_default;
 mod invalid_envvar_value;
+mod invalid_str_return;
 mod invalid_string_characters;
 mod iteration_over_set;
 mod load_before_global_declaration;

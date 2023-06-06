@@ -88,7 +88,6 @@
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
 use rustpython_parser::ast::Mod;
-use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -103,7 +102,10 @@ use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
-pub(crate) use format::{dangling_comments, leading_comments, trailing_comments};
+pub(crate) use format::{
+    dangling_node_comments, leading_alternate_branch_comments, leading_node_comments,
+    trailing_comments, trailing_node_comments,
+};
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::CommentRanges;
@@ -116,13 +118,11 @@ pub(crate) struct SourceComment {
 
     /// Whether the comment has been formatted or not.
     #[cfg(debug_assertions)]
-    formatted: Cell<bool>,
+    formatted: std::cell::Cell<bool>,
 
     position: CommentTextPosition,
 }
 
-#[allow(unused)]
-// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl SourceComment {
     /// Returns the location of the comment in the original source code.
     /// Allows retrieving the text of the comment.
@@ -136,7 +136,7 @@ impl SourceComment {
 
     #[cfg(not(debug_assertions))]
     #[inline(always)]
-    pub fn mark_formatted(&self) {}
+    pub(crate) fn mark_formatted(&self) {}
 
     /// Marks the comment as formatted
     #[cfg(debug_assertions)]
@@ -184,8 +184,6 @@ pub(crate) enum CommentTextPosition {
     OwnLine,
 }
 
-#[allow(unused)]
-// TODO(micha): Remove after using the new comments infrastructure in the formatter.
 impl CommentTextPosition {
     pub(crate) const fn is_own_line(self) -> bool {
         matches!(self, CommentTextPosition::OwnLine)
@@ -852,6 +850,35 @@ a = (
     3
 )
 "#;
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn while_trailing_end_of_line_comment() {
+        let source = r#"while True:
+    if something.changed:
+        do.stuff()  # trailing comment
+"#;
+
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
+
+    #[test]
+    fn while_trailing_else_end_of_line_comment() {
+        let source = r#"while True:
+    pass
+else: # trailing comment
+    pass
+"#;
+
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();

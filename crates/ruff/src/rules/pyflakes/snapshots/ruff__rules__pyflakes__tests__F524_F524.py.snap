@@ -45,6 +45,7 @@ F524.py:5:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, b
 7 | "{0} {bar}".format()  # F524
   | ^^^^^^^^^^^^^^^^^^^^ F524
 8 | "{bar} {0}".format()  # F524
+9 | "{1} {8}".format(0, 1)
   |
 
 F524.py:6:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
@@ -53,6 +54,15 @@ F524.py:6:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, b
 7 | "{0} {bar}".format()  # F524
 8 | "{bar} {0}".format()  # F524
   | ^^^^^^^^^^^^^^^^^^^^ F524
+9 | "{1} {8}".format(0, 1)
+  |
+
+F524.py:7:1: F524 `.format` call is missing argument(s) for placeholder(s): 8
+  |
+7 | "{0} {bar}".format()  # F524
+8 | "{bar} {0}".format()  # F524
+9 | "{1} {8}".format(0, 1)
+  | ^^^^^^^^^^^^^^^^^^^^^^ F524
   |
 
 

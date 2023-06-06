@@ -48,6 +48,8 @@ mod tests {
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
     #[test_case(Rule::UnassignedSpecialVariableInStub, Path::new("PYI035.py"))]
     #[test_case(Rule::UnassignedSpecialVariableInStub, Path::new("PYI035.pyi"))]
+    #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.py"))]
+    #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.pyi"))]
     #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.py"))]
     #[test_case(Rule::StubBodyMultipleStatements, Path::new("PYI048.pyi"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]

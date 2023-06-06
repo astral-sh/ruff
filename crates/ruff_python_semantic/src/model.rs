@@ -47,7 +47,7 @@ pub struct SemanticModel<'a> {
     // Arena of global bindings.
     globals: GlobalsArena<'a>,
     // Map from binding index to indexes of bindings that shadow it in other scopes.
-    pub shadowed_bindings: HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
+    pub shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -114,11 +114,52 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
-    /// Return the current `Binding` for a given `name`.
+    /// Create a new [`Binding`] for a builtin.
+    pub fn push_builtin(&mut self) -> BindingId {
+        self.bindings.push(Binding {
+            range: TextRange::default(),
+            kind: BindingKind::Builtin,
+            references: Vec::new(),
+            flags: BindingFlags::empty(),
+            source: None,
+            context: ExecutionContext::Runtime,
+            exceptions: Exceptions::empty(),
+        })
+    }
+
+    /// Create a new [`Binding`] for the given `name` and `range`.
+    pub fn push_binding(
+        &mut self,
+        range: TextRange,
+        kind: BindingKind<'a>,
+        flags: BindingFlags,
+    ) -> BindingId {
+        self.bindings.push(Binding {
+            range,
+            kind,
+            flags,
+            references: Vec::new(),
+            source: self.stmt_id,
+            context: self.execution_context(),
+            exceptions: self.exceptions(),
+        })
+    }
+
+    /// Return the current [`Binding`] for a given `name`.
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.scopes()
             .find_map(|scope| scope.get(member))
             .map(|binding_id| &self.bindings[binding_id])
+    }
+
+    /// Return the [`Binding`] that the given [`BindingId`] shadows, if any.
+    ///
+    /// Note that this will only return bindings that are shadowed by a binding in a parent scope.
+    pub fn shadowed_binding(&self, binding_id: BindingId) -> Option<&Binding> {
+        self.shadowed_bindings
+            .get(&binding_id)
+            .copied()
+            .map(|id| &self.bindings[id])
     }
 
     /// Return `true` if `member` is bound as a builtin.
@@ -256,14 +297,8 @@ impl<'a> SemanticModel<'a> {
         // import pyarrow.csv
         // print(pa.csv.read_csv("test.csv"))
         // ```
-        let full_name = match &self.bindings[binding_id].kind {
-            BindingKind::Importation(Importation { full_name }) => *full_name,
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => *full_name,
-            BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
-            _ => return None,
-        };
-
-        let has_alias = full_name
+        let qualified_name = self.bindings[binding_id].qualified_name()?;
+        let has_alias = qualified_name
             .split('.')
             .last()
             .map(|segment| segment != symbol)
@@ -272,7 +307,7 @@ impl<'a> SemanticModel<'a> {
             return None;
         }
 
-        self.scopes[scope_id].get(full_name)
+        self.scopes[scope_id].get(qualified_name)
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
@@ -292,7 +327,9 @@ impl<'a> SemanticModel<'a> {
         let head = call_path.first()?;
         let binding = self.find_binding(head)?;
         match &binding.kind {
-            BindingKind::Importation(Importation { full_name: name }) => {
+            BindingKind::Importation(Importation {
+                qualified_name: name,
+            }) => {
                 if name.starts_with('.') {
                     let mut source_path = from_relative_import(self.module_path?, name);
                     if source_path.is_empty() {
@@ -307,13 +344,17 @@ impl<'a> SemanticModel<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name: name }) => {
+            BindingKind::SubmoduleImportation(SubmoduleImportation {
+                qualified_name: name,
+            }) => {
                 let name = name.split('.').next().unwrap_or(name);
                 let mut source_path: CallPath = from_unqualified_name(name);
                 source_path.extend(call_path.into_iter().skip(1));
                 Some(source_path)
             }
-            BindingKind::FromImportation(FromImportation { full_name: name }) => {
+            BindingKind::FromImportation(FromImportation {
+                qualified_name: name,
+            }) => {
                 if name.starts_with('.') {
                     let mut source_path = from_relative_import(self.module_path?, name);
                     if source_path.is_empty() {
@@ -362,8 +403,8 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { full_name }) => {
-                        if full_name == &module {
+                    BindingKind::Importation(Importation { qualified_name }) => {
+                        if qualified_name == &module {
                             if let Some(source) = binding.source {
                                 // Verify that `sys` isn't bound in an inner scope.
                                 if self
@@ -383,8 +424,9 @@ impl<'a> SemanticModel<'a> {
                     // Ex) Given `module="os.path"` and `object="join"`:
                     // `from os.path import join`          -> `join`
                     // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { full_name }) => {
-                        if let Some((target_module, target_member)) = full_name.split_once('.') {
+                    BindingKind::FromImportation(FromImportation { qualified_name }) => {
+                        if let Some((target_module, target_member)) = qualified_name.split_once('.')
+                        {
                             if target_module == module && target_member == member {
                                 if let Some(source) = binding.source {
                                     // Verify that `join` isn't bound in an inner scope.

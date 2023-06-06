@@ -234,7 +234,7 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,219 +1,157 @@
+@@ -1,83 +1,85 @@
  class MyClass:
 +  """ Multiline
 +  class docstring
@@ -251,64 +251,64 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -        method docstring
 -        """
 -        pass
--
--
 +    pass
+ 
+ 
  def foo():
 -    """This is a docstring with
 -    some lines of text here
 -    """
 -    return
--
--
 +  """This is a docstring with             
 +  some lines of text here
 +  """
 +  return
+ 
+ 
  def bar():
 -    """This is another docstring
 -    with more lines of text
 -    """
 -    return
--
--
 +  '''This is another docstring
 +  with more lines of text
 +  '''
 +  return
+ 
+ 
  def baz():
 -    '''"This" is a string with some
 -    embedded "quotes"'''
 -    return
--
--
 +  '''"This" is a string with some
 +  embedded "quotes"'''
 +  return
+ 
+ 
  def troz():
 -    """Indentation with tabs
 -    is just as OK
 -    """
 -    return
--
--
 +	'''Indentation with tabs
 +	is just as OK
 +	'''
 +	return
+ 
+ 
  def zort():
 -    """Another
 -    multiline
 -    docstring
 -    """
 -    pass
--
--
 +        """Another
 +        multiline
 +        docstring
 +        """
 +        pass
+ 
+ 
  def poit():
 -    """
 -    Lorem ipsum dolor sit amet.
@@ -323,8 +323,6 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -     - aliquip ex ea commodo consequat
 -    """
 -    pass
--
--
 +  Consectetur adipiscing elit:
 +   - sed do eiusmod tempor incididunt ut labore
 +   - dolore magna aliqua
@@ -333,16 +331,26 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 +   - aliquip ex ea commodo consequat
 +  """
 +  pass
+ 
+ 
  def under_indent():
 -    """
 -      These lines are indented in a way that does not
 -    make sense.
+-    """
+-    pass
 +  """
 +  These lines are indented in a way that does not
 +make sense.
 +  """
 +  pass
-+def over_indent():
+ 
+ 
+ def over_indent():
+-    """
+-    This has a shallow indent
+-      - But some lines are deeper
+-      - And the closing quote is too deep
 +  """
 +  This has a shallow indent
 +    - But some lines are deeper
@@ -350,90 +358,78 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
      """
 -    pass
 +  pass
-+def single_line():
-+    """But with a newline after it!
  
--
--def over_indent():
--    """
--    This has a shallow indent
--      - But some lines are deeper
--      - And the closing quote is too deep
-     """
-     pass
--
--
--def single_line():
+ 
+ def single_line():
 -    """But with a newline after it!"""
--    pass
--
--
- def this():
-     r"""
-     'hey ho'
-     """
--
--
++    """But with a newline after it!
++
++    """
+     pass
+ 
+ 
+@@ -88,25 +90,30 @@
+ 
+ 
  def that():
 -    """ "hey yah" """
--
--
 +  """ "hey yah" """
+ 
+ 
  def and_that():
 -    """
 -    "hey yah" """
--
--
 +  """
 +  "hey yah" """
+ 
+ 
  def and_this():
+-    '''
+-    "hey yah"'''
 +  ''' 
 +  "hey yah"'''
-+def multiline_whitespace():
+ 
+ 
+ def multiline_whitespace():
+-    """ """
 +    '''
 +    
 +    
 +    
 +    
-     '''
--    "hey yah"'''
--
--
--def multiline_whitespace():
--    """ """
--
--
++    '''
+ 
+ 
  def oneline_whitespace():
 -    """ """
--
--
 +    '''      '''
+ 
+ 
  def empty():
-     """"""
--
--
+@@ -114,12 +121,11 @@
+ 
+ 
  def single_quotes():
 -    "testing"
--
--
++    'testing'
+ 
+ 
 -def believe_it_or_not_this_is_in_the_py_stdlib():
 -    '''
 -    "hey yah"'''
--
--
-+    'testing'
 +def believe_it_or_not_this_is_in_the_py_stdlib(): ''' 
 +"hey yah"'''
+ 
+ 
  def ignored_docstring():
-     """a => \
- b"""
--
--
+@@ -128,32 +134,32 @@
+ 
+ 
  def single_line_docstring_with_whitespace():
 -    """This should be stripped"""
--
--
 +    """   This should be stripped """
+ 
+ 
  def docstring_with_inline_tabs_and_space_indentation():
      """hey
  
@@ -449,8 +445,8 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 +    			 	  		
 +    line ends with some tabs		
      """
--
--
+ 
+ 
  def docstring_with_inline_tabs_and_tab_indentation():
 -    """hey
 +	"""hey
@@ -463,8 +459,6 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -    line ends with some tabs
 -    """
 -    pass
--
--
 +	tab	separated	value
 +		tab at start of line and then a tab	separated	value
 +					multiple tabs at the beginning	and	inline
@@ -473,69 +467,51 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 +	line ends with some tabs		
 +	"""
 +	pass
+ 
+ 
  def backslash_space():
-     """\ """
--
--
+@@ -161,14 +167,14 @@
+ 
+ 
  def multiline_backslash_1():
 -    """
 +  '''
    hey\there\
 -  \ """
--
--
 +  \ '''
+ 
+ 
  def multiline_backslash_2():
 -    """
 -    hey there \ """
--
--
 +  '''
 +  hey there \ '''
+ 
+ 
  # Regression test for #3425
- def multiline_backslash_really_long_dont_crash():
-     """
-     hey there hello guten tag hi hoow are you ola zdravstvuyte ciao como estas ca va \ """
--
--
+@@ -178,8 +184,8 @@
+ 
+ 
  def multiline_backslash_3():
 -    """
 -    already escaped \\"""
--
--
 +  '''
 +  already escaped \\ '''
+ 
+ 
  def my_god_its_full_of_stars_1():
-     "I'm sorry Dave\u2001"
--
--
+@@ -188,7 +194,7 @@
+ 
  # the space below is actually a \u2001, removed in output
  def my_god_its_full_of_stars_2():
 -    "I'm sorry Dave"
--
--
 +    "I'm sorry Dave "
+ 
+ 
  def docstring_almost_at_line_limit():
-     """long docstring................................................................."""
--
--
- def docstring_almost_at_line_limit2():
-     """long docstring.................................................................
+@@ -213,7 +219,7 @@
  
-     ..................................................................................
-     """
--
--
- def docstring_at_line_limit():
-     """long docstring................................................................"""
--
--
- def multiline_docstring_at_line_limit():
-     """first line-----------------------------------------------------------------------
  
-     second line----------------------------------------------------------------------"""
--
--
  def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -    """'<text here>
 +    ''''<text here>
@@ -558,31 +534,43 @@ class MyClass:
     method docstring
     """
     pass
+
+
 def foo():
   """This is a docstring with             
   some lines of text here
   """
   return
+
+
 def bar():
   '''This is another docstring
   with more lines of text
   '''
   return
+
+
 def baz():
   '''"This" is a string with some
   embedded "quotes"'''
   return
+
+
 def troz():
 	'''Indentation with tabs
 	is just as OK
 	'''
 	return
+
+
 def zort():
         """Another
         multiline
         docstring
         """
         pass
+
+
 def poit():
   """
   Lorem ipsum dolor sit amet.       
@@ -595,12 +583,16 @@ def poit():
    - aliquip ex ea commodo consequat
   """
   pass
+
+
 def under_indent():
   """
   These lines are indented in a way that does not
 make sense.
   """
   pass
+
+
 def over_indent():
   """
   This has a shallow indent
@@ -608,23 +600,35 @@ def over_indent():
     - And the closing quote is too deep
     """
   pass
+
+
 def single_line():
     """But with a newline after it!
 
     """
     pass
+
+
 def this():
     r"""
     'hey ho'
     """
+
+
 def that():
   """ "hey yah" """
+
+
 def and_that():
   """
   "hey yah" """
+
+
 def and_this():
   ''' 
   "hey yah"'''
+
+
 def multiline_whitespace():
     '''
     
@@ -632,19 +636,33 @@ def multiline_whitespace():
     
     
     '''
+
+
 def oneline_whitespace():
     '''      '''
+
+
 def empty():
     """"""
+
+
 def single_quotes():
     'testing'
+
+
 def believe_it_or_not_this_is_in_the_py_stdlib(): ''' 
 "hey yah"'''
+
+
 def ignored_docstring():
     """a => \
 b"""
+
+
 def single_line_docstring_with_whitespace():
     """   This should be stripped """
+
+
 def docstring_with_inline_tabs_and_space_indentation():
     """hey
 
@@ -655,6 +673,8 @@ def docstring_with_inline_tabs_and_space_indentation():
     			 	  		
     line ends with some tabs		
     """
+
+
 def docstring_with_inline_tabs_and_tab_indentation():
 	"""hey
 
@@ -666,40 +686,64 @@ def docstring_with_inline_tabs_and_tab_indentation():
 	line ends with some tabs		
 	"""
 	pass
+
+
 def backslash_space():
     """\ """
+
+
 def multiline_backslash_1():
   '''
   hey\there\
   \ '''
+
+
 def multiline_backslash_2():
   '''
   hey there \ '''
+
+
 # Regression test for #3425
 def multiline_backslash_really_long_dont_crash():
     """
     hey there hello guten tag hi hoow are you ola zdravstvuyte ciao como estas ca va \ """
+
+
 def multiline_backslash_3():
   '''
   already escaped \\ '''
+
+
 def my_god_its_full_of_stars_1():
     "I'm sorry Dave\u2001"
+
+
 # the space below is actually a \u2001, removed in output
 def my_god_its_full_of_stars_2():
     "I'm sorry Dave "
+
+
 def docstring_almost_at_line_limit():
     """long docstring................................................................."""
+
+
 def docstring_almost_at_line_limit2():
     """long docstring.................................................................
 
     ..................................................................................
     """
+
+
 def docstring_at_line_limit():
     """long docstring................................................................"""
+
+
 def multiline_docstring_at_line_limit():
     """first line-----------------------------------------------------------------------
 
     second line----------------------------------------------------------------------"""
+
+
 def stable_quote_normalization_with_immediate_inner_single_quote(self):
     ''''<text here>
 

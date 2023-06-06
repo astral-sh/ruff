@@ -1,8 +1,6 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{
-    Binding, BindingKind, FromImportation, Importation, SubmoduleImportation,
-};
+use ruff_python_semantic::binding::Binding;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -47,7 +45,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyFirstPartyImport {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for TypingOnlyFirstPartyImport {
@@ -57,7 +55,7 @@ impl Violation for TypingOnlyFirstPartyImport {
     fn message(&self) -> String {
         format!(
             "Move application import `{}` into a type-checking block",
-            self.full_name
+            self.qualified_name
         )
     }
 
@@ -103,7 +101,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyThirdPartyImport {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for TypingOnlyThirdPartyImport {
@@ -113,7 +111,7 @@ impl Violation for TypingOnlyThirdPartyImport {
     fn message(&self) -> String {
         format!(
             "Move third-party import `{}` into a type-checking block",
-            self.full_name
+            self.qualified_name
         )
     }
 
@@ -159,7 +157,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - [PEP 536](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct TypingOnlyStandardLibraryImport {
-    full_name: String,
+    qualified_name: String,
 }
 
 impl Violation for TypingOnlyStandardLibraryImport {
@@ -169,7 +167,7 @@ impl Violation for TypingOnlyStandardLibraryImport {
     fn message(&self) -> String {
         format!(
             "Move standard library import `{}` into a type-checking block",
-            self.full_name
+            self.qualified_name
         )
     }
 
@@ -180,65 +178,13 @@ impl Violation for TypingOnlyStandardLibraryImport {
 
 /// Return `true` if `this` is implicitly loaded via importing `that`.
 fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
-    match &this.kind {
-        BindingKind::Importation(Importation {
-            full_name: this_name,
-        })
-        | BindingKind::SubmoduleImportation(SubmoduleImportation {
-            full_name: this_name,
-        }) => match &that.kind {
-            BindingKind::FromImportation(FromImportation {
-                full_name: that_name,
-            }) => {
-                // Ex) `pkg.A` vs. `pkg`
-                let this_name = this_name.split('.').next().unwrap_or(this_name);
-                that_name
-                    .rfind('.')
-                    .map_or(false, |i| that_name[..i] == *this_name)
-            }
-            BindingKind::Importation(Importation {
-                full_name: that_name,
-            })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                full_name: that_name,
-            }) => {
-                // Submodule importation with an alias (`import pkg.A as B`)
-                // are represented as `Importation`.
-                let this_name = this_name.split('.').next().unwrap_or(this_name);
-                let that_name = that_name.split('.').next().unwrap_or(that_name);
-                this_name == that_name
-            }
-            _ => false,
-        },
-        BindingKind::FromImportation(FromImportation {
-            full_name: this_name,
-        }) => match &that.kind {
-            BindingKind::Importation(Importation {
-                full_name: that_name,
-            })
-            | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                full_name: that_name,
-            }) => {
-                // Ex) `pkg.A` vs. `pkg`
-                let that_name = that_name.split('.').next().unwrap_or(that_name);
-                this_name
-                    .rfind('.')
-                    .map_or(false, |i| &this_name[..i] == that_name)
-            }
-            BindingKind::FromImportation(FromImportation {
-                full_name: that_name,
-            }) => {
-                // Ex) `pkg.A` vs. `pkg.B`
-                this_name.rfind('.').map_or(false, |i| {
-                    that_name
-                        .rfind('.')
-                        .map_or(false, |j| this_name[..i] == that_name[..j])
-                })
-            }
-            _ => false,
-        },
-        _ => false,
-    }
+    let Some(this_module) = this.module_name() else {
+        return false;
+    };
+    let Some(that_module) = that.module_name() else {
+        return false;
+    };
+    this_module == that_module
 }
 
 /// Return `true` if `name` is exempt from typing-only enforcement.
@@ -274,15 +220,12 @@ pub(crate) fn typing_only_runtime_import(
         return;
     }
 
-    let full_name = match &binding.kind {
-        BindingKind::Importation(Importation { full_name }) => full_name,
-        BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => full_name,
-        _ => return,
+    let Some(qualified_name) = binding.qualified_name() else {
+        return;
     };
 
     if is_exempt(
-        full_name,
+        qualified_name,
         &checker
             .settings
             .flake8_type_checking
@@ -312,7 +255,7 @@ pub(crate) fn typing_only_runtime_import(
         // Extract the module base and level from the full name.
         // Ex) `foo.bar.baz` -> `foo`, `0`
         // Ex) `.foo.bar.baz` -> `foo`, `1`
-        let level = full_name
+        let level = qualified_name
             .chars()
             .take_while(|c| *c == '.')
             .count()
@@ -320,8 +263,8 @@ pub(crate) fn typing_only_runtime_import(
             .unwrap();
 
         // Categorize the import.
-        let mut diagnostic = match categorize(
-            full_name,
+        let kind: DiagnosticKind = match categorize(
+            qualified_name,
             Some(level),
             &checker.settings.src,
             checker.package(),
@@ -329,31 +272,34 @@ pub(crate) fn typing_only_runtime_import(
             checker.settings.target_version,
         ) {
             ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
-                Diagnostic::new(
-                    TypingOnlyFirstPartyImport {
-                        full_name: full_name.to_string(),
-                    },
-                    binding.range,
-                )
+                TypingOnlyFirstPartyImport {
+                    qualified_name: qualified_name.to_string(),
+                }
+                .into()
             }
             ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
-                Diagnostic::new(
-                    TypingOnlyThirdPartyImport {
-                        full_name: full_name.to_string(),
-                    },
-                    binding.range,
-                )
+                TypingOnlyThirdPartyImport {
+                    qualified_name: qualified_name.to_string(),
+                }
+                .into()
             }
-            ImportSection::Known(ImportType::StandardLibrary) => Diagnostic::new(
-                TypingOnlyStandardLibraryImport {
-                    full_name: full_name.to_string(),
-                },
-                binding.range,
-            ),
+            ImportSection::Known(ImportType::StandardLibrary) => TypingOnlyStandardLibraryImport {
+                qualified_name: qualified_name.to_string(),
+            }
+            .into(),
+
             ImportSection::Known(ImportType::Future) => {
                 unreachable!("`__future__` imports should be marked as used")
             }
         };
+
+        let mut diagnostic = Diagnostic::new(
+            kind,
+            binding.trimmed_range(checker.semantic_model(), checker.locator),
+        );
+        if let Some(range) = binding.parent_range(checker.semantic_model()) {
+            diagnostic.set_parent(range.start());
+        }
 
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
@@ -363,7 +309,7 @@ pub(crate) fn typing_only_runtime_import(
                 let stmt = checker.semantic_model().stmts[source];
                 let parent = checker.semantic_model().stmts.parent(stmt);
                 let remove_import_edit = autofix::edits::remove_unused_imports(
-                    std::iter::once(full_name),
+                    std::iter::once(qualified_name),
                     stmt,
                     parent,
                     checker.locator,
@@ -374,7 +320,10 @@ pub(crate) fn typing_only_runtime_import(
                 // Step 2) Add the import to a `TYPE_CHECKING` block.
                 let reference = checker.semantic_model().references.resolve(*reference_id);
                 let add_import_edit = checker.importer.typing_import_edit(
-                    &StmtImport { stmt, full_name },
+                    &StmtImport {
+                        stmt,
+                        qualified_name,
+                    },
                     reference.range().start(),
                     checker.semantic_model(),
                 )?;

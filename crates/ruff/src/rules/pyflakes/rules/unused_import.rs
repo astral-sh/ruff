@@ -5,9 +5,7 @@ use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, IsolationLevel, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::{
-    BindingKind, Exceptions, FromImportation, Importation, SubmoduleImportation,
-};
+use ruff_python_semantic::binding::Exceptions;
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::Scope;
 
@@ -102,8 +100,8 @@ impl Violation for UnusedImport {
     }
 }
 
-type SpannedName<'a> = (&'a str, &'a TextRange);
-type BindingContext<'a> = (NodeId, Option<NodeId>, Exceptions);
+type SpannedName<'a> = (&'a str, TextRange);
+type BindingContext = (NodeId, Option<NodeId>, Exceptions);
 
 pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
     // Collect all unused imports by statement.
@@ -117,11 +115,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             continue;
         }
 
-        let full_name = match &binding.kind {
-            BindingKind::Importation(Importation { full_name }) => full_name,
-            BindingKind::FromImportation(FromImportation { full_name }) => full_name.as_str(),
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name }) => full_name,
-            _ => continue,
+        let Some(qualified_name) = binding.qualified_name() else {
+            continue;
         };
 
         let stmt_id = binding.source.unwrap();
@@ -144,12 +139,12 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             ignored
                 .entry((stmt_id, parent_id, exceptions))
                 .or_default()
-                .push((full_name, &binding.range));
+                .push((qualified_name, binding.range));
         } else {
             unused
                 .entry((stmt_id, parent_id, exceptions))
                 .or_default()
-                .push((full_name, &binding.range));
+                .push((qualified_name, binding.range));
         }
     }
 
@@ -170,7 +165,9 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
 
         let fix = if !in_init && !in_except_handler && checker.patch(Rule::UnusedImport) {
             autofix::edits::remove_unused_imports(
-                unused_imports.iter().map(|(full_name, _)| *full_name),
+                unused_imports
+                    .iter()
+                    .map(|(qualified_name, _)| *qualified_name),
                 stmt,
                 parent,
                 checker.locator,
@@ -182,10 +179,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             None
         };
 
-        for (full_name, range) in unused_imports {
+        for (qualified_name, range) in unused_imports {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: full_name.to_string(),
+                    name: qualified_name.to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -195,7 +192,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     },
                     multiple,
                 },
-                *range,
+                range,
             );
             if stmt.is_import_from_stmt() {
                 diagnostic.set_parent(stmt.start());
@@ -222,10 +219,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let multiple = unused_imports.len() > 1;
         let in_except_handler =
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
-        for (full_name, range) in unused_imports {
+        for (qualified_name, range) in unused_imports {
             let mut diagnostic = Diagnostic::new(
                 UnusedImport {
-                    name: full_name.to_string(),
+                    name: qualified_name.to_string(),
                     context: if in_except_handler {
                         Some(UnusedImportContext::ExceptHandler)
                     } else if in_init {
@@ -235,7 +232,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
                     },
                     multiple,
                 },
-                *range,
+                range,
             );
             if stmt.is_import_from_stmt() {
                 diagnostic.set_parent(stmt.start());

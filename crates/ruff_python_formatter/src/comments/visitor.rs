@@ -5,7 +5,6 @@ use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::*;
 use ruff_python_ast::source_code::{CommentRanges, Locator};
-use std::cell::Cell;
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
@@ -418,7 +417,7 @@ impl From<DecoratedComment<'_>> for SourceComment {
             slice: decorated.slice,
             position: decorated.text_position,
             #[cfg(debug_assertions)]
-            formatted: Cell::new(false),
+            formatted: std::cell::Cell::new(false),
         }
     }
 }

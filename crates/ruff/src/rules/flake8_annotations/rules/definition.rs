@@ -418,12 +418,14 @@ impl Violation for AnyType {
 fn is_none_returning(body: &[Stmt]) -> bool {
     let mut visitor = ReturnStatementVisitor::default();
     visitor.visit_body(body);
-    for expr in visitor.returns.into_iter().flatten() {
-        if !matches!(
-            expr,
-            Expr::Constant(ref constant) if constant.value.is_none()
-        ) {
-            return false;
+    for stmt in visitor.returns {
+        if let Some(value) = stmt.value.as_deref() {
+            if !matches!(
+                value,
+                Expr::Constant(constant) if constant.value.is_none()
+            ) {
+                return false;
+            }
         }
     }
     true

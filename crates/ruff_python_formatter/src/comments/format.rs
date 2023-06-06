@@ -6,27 +6,37 @@ use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::AstNode;
 use ruff_text_size::{TextLen, TextRange, TextSize};
+use rustpython_parser::ast::Ranged;
 
 /// Formats the leading comments of a node.
-pub(crate) fn leading_comments<T>(node: &T) -> FormatLeadingComments
+pub(crate) fn leading_node_comments<T>(node: &T) -> FormatLeadingComments
 where
     T: AstNode,
 {
-    FormatLeadingComments {
-        node: node.as_any_node_ref(),
-    }
+    FormatLeadingComments::Node(node.as_any_node_ref())
+}
+
+/// Formats the passed comments as leading comments
+pub(crate) const fn leading_comments(comments: &[SourceComment]) -> FormatLeadingComments {
+    FormatLeadingComments::Comments(comments)
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct FormatLeadingComments<'a> {
-    node: AnyNodeRef<'a>,
+pub(crate) enum FormatLeadingComments<'a> {
+    Node(AnyNodeRef<'a>),
+    Comments(&'a [SourceComment]),
 }
 
 impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
 
-        for comment in comments.leading_comments(self.node) {
+        let leading_comments = match self {
+            FormatLeadingComments::Node(node) => comments.leading_comments(*node),
+            FormatLeadingComments::Comments(comments) => comments,
+        };
+
+        for comment in leading_comments {
             let slice = comment.slice();
 
             let lines_after_comment = lines_after(f.context().contents(), slice.end());
@@ -42,32 +52,88 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
     }
 }
 
-/// Formats the trailing comments of `node`
-pub(crate) fn trailing_comments<T>(node: &T) -> FormatTrailingComments
+/// Formats the leading `comments` of an alternate branch and ensures that it preserves the right
+/// number of empty lines before. The `last_node` is the last node of the preceding body.
+///
+/// For example, `last_node` is the last statement in the if body when formatting the leading
+/// comments of the `else` branch.
+pub(crate) fn leading_alternate_branch_comments<'a, T>(
+    comments: &'a [SourceComment],
+    last_node: Option<T>,
+) -> FormatLeadingAlternateBranchComments<'a>
 where
-    T: AstNode,
+    T: Into<AnyNodeRef<'a>>,
 {
-    FormatTrailingComments {
-        node: node.as_any_node_ref(),
+    FormatLeadingAlternateBranchComments {
+        comments,
+        last_node: last_node.map(std::convert::Into::into),
     }
 }
 
-pub(crate) struct FormatTrailingComments<'a> {
-    node: AnyNodeRef<'a>,
+pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
+    comments: &'a [SourceComment],
+    last_node: Option<AnyNodeRef<'a>>,
+}
+
+impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if let Some(first_leading) = self.comments.first() {
+            // Leading comments only preserves the lines after the comment but not before.
+            // Insert the necessary lines.
+            if lines_before(f.context().contents(), first_leading.slice().start()) > 1 {
+                write!(f, [empty_line()])?;
+            }
+
+            write!(f, [leading_comments(self.comments)])?;
+        } else if let Some(last_preceding) = self.last_node {
+            // The leading comments formatting ensures that it preserves the right amount of lines after
+            // We need to take care of this ourselves, if there's no leading `else` comment.
+            if lines_after(f.context().contents(), last_preceding.end()) > 1 {
+                write!(f, [empty_line()])?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Formats the trailing comments of `node`
+pub(crate) fn trailing_node_comments<T>(node: &T) -> FormatTrailingComments
+where
+    T: AstNode,
+{
+    FormatTrailingComments::Node(node.as_any_node_ref())
+}
+
+/// Formats the passed comments as trailing comments
+pub(crate) fn trailing_comments(comments: &[SourceComment]) -> FormatTrailingComments {
+    FormatTrailingComments::Comments(comments)
+}
+
+pub(crate) enum FormatTrailingComments<'a> {
+    Node(AnyNodeRef<'a>),
+    Comments(&'a [SourceComment]),
 }
 
 impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let mut has_empty_lines_before = false;
 
-        for trailing in comments.trailing_comments(self.node) {
+        let trailing_comments = match self {
+            FormatTrailingComments::Node(node) => comments.trailing_comments(*node),
+            FormatTrailingComments::Comments(comments) => comments,
+        };
+
+        let mut has_trailing_own_line_comment = false;
+
+        for trailing in trailing_comments {
             let slice = trailing.slice();
 
-            let lines_before_comment = lines_before(f.context().contents(), slice.start());
-            has_empty_lines_before |= lines_before_comment > 0;
+            has_trailing_own_line_comment |= trailing.position().is_own_line();
 
-            if has_empty_lines_before {
+            if has_trailing_own_line_comment {
+                let lines_before_comment = lines_before(f.context().contents(), slice.start());
+
                 // A trailing comment at the end of a body or list
                 // ```python
                 // def test():
@@ -105,7 +171,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
 }
 
 /// Formats the dangling comments of `node`.
-pub(crate) fn dangling_comments<T>(node: &T) -> FormatDanglingComments
+pub(crate) fn dangling_node_comments<T>(node: &T) -> FormatDanglingComments
 where
     T: AstNode,
 {
@@ -229,7 +295,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
                 _ => write!(f, [empty_line(), empty_line()]),
             },
 
-            NodeLevel::Statement => match self.lines {
+            NodeLevel::CompoundStatement => match self.lines {
                 0 | 1 => write!(f, [hard_line_break()]),
                 _ => write!(f, [empty_line()]),
             },
