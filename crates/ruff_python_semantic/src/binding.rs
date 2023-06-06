@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
+use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
@@ -142,6 +143,19 @@ impl<'a> Binding<'a> {
             }
             _ => self.range,
         }
+    }
+
+    /// Returns the range of the binding's parent.
+    pub fn parent_range(&self, semantic_model: &SemanticModel) -> Option<TextRange> {
+        self.source
+            .map(|node_id| semantic_model.stmts[node_id])
+            .and_then(|parent| {
+                if parent.is_import_from_stmt() {
+                    Some(parent.range())
+                } else {
+                    None
+                }
+            })
     }
 }
 

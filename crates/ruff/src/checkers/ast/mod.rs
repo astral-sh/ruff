@@ -4410,13 +4410,8 @@ impl<'a> Checker<'a> {
                                 },
                                 binding.trimmed_range(&self.semantic_model, self.locator),
                             );
-                            if let Some(parent) = binding.source {
-                                let parent = self.semantic_model.stmts[parent];
-                                if parent.is_import_from_stmt()
-                                    && parent.range().contains_range(binding.range)
-                                {
-                                    diagnostic.set_parent(parent.start());
-                                }
+                            if let Some(range) = binding.parent_range(&self.semantic_model) {
+                                diagnostic.set_parent(range.start());
                             }
                             self.diagnostics.push(diagnostic);
                         }
@@ -5044,13 +5039,8 @@ impl<'a> Checker<'a> {
                             },
                             binding.trimmed_range(&self.semantic_model, self.locator),
                         );
-                        if let Some(parent) = binding
-                            .source
-                            .map(|source| &self.semantic_model.stmts[source])
-                        {
-                            if parent.is_import_from_stmt() {
-                                diagnostic.set_parent(parent.start());
-                            }
+                        if let Some(range) = binding.parent_range(&self.semantic_model) {
+                            diagnostic.set_parent(range.start());
                         }
                         diagnostics.push(diagnostic);
                     }

@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, DiagnosticKind, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::binding::Binding;
 
@@ -263,7 +263,7 @@ pub(crate) fn typing_only_runtime_import(
             .unwrap();
 
         // Categorize the import.
-        let mut diagnostic = match categorize(
+        let kind: DiagnosticKind = match categorize(
             qualified_name,
             Some(level),
             &checker.settings.src,
@@ -272,31 +272,34 @@ pub(crate) fn typing_only_runtime_import(
             checker.settings.target_version,
         ) {
             ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
-                Diagnostic::new(
-                    TypingOnlyFirstPartyImport {
-                        qualified_name: qualified_name.to_string(),
-                    },
-                    binding.range,
-                )
+                TypingOnlyFirstPartyImport {
+                    qualified_name: qualified_name.to_string(),
+                }
+                .into()
             }
             ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
-                Diagnostic::new(
-                    TypingOnlyThirdPartyImport {
-                        qualified_name: qualified_name.to_string(),
-                    },
-                    binding.range,
-                )
-            }
-            ImportSection::Known(ImportType::StandardLibrary) => Diagnostic::new(
-                TypingOnlyStandardLibraryImport {
+                TypingOnlyThirdPartyImport {
                     qualified_name: qualified_name.to_string(),
-                },
-                binding.range,
-            ),
+                }
+                .into()
+            }
+            ImportSection::Known(ImportType::StandardLibrary) => TypingOnlyStandardLibraryImport {
+                qualified_name: qualified_name.to_string(),
+            }
+            .into(),
+
             ImportSection::Known(ImportType::Future) => {
                 unreachable!("`__future__` imports should be marked as used")
             }
         };
+
+        let mut diagnostic = Diagnostic::new(
+            kind,
+            binding.trimmed_range(checker.semantic_model(), checker.locator),
+        );
+        if let Some(range) = binding.parent_range(checker.semantic_model()) {
+            diagnostic.set_parent(range.start());
+        }
 
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
