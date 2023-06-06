@@ -745,9 +745,13 @@ fn find_pos_only_slash_offset(
                 ),
                 locator.contents(),
             )
-            .map(|(offset, c)| {
-                debug_assert_eq!(c, '/');
-                offset
+            .and_then(|(offset, c)| {
+                if c == '/' {
+                    Some(offset)
+                } else {
+                    debug_assert_eq!(c, ')');
+                    None
+                }
             })
         },
     )
