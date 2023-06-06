@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_todos/mod.rs
 ---
 TD002.py:7:3: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
    |
- 7 | # TODO(evanrittenhouse): this also has an author
+ 7 | # TODO @someauthor: this also has an author
  8 | # T002 - errors
  9 | # TODO: this has no author
    |   ^^^^ TD002
