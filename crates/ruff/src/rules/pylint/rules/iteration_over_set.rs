@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for iterations over `set` literals and comprehensions.
+/// Checks for iterations over `set` literals.
 ///
 /// ## Why is this bad?
 /// Iterating over a `set` is less efficient than iterating over a sequence
