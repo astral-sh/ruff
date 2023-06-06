@@ -67,7 +67,7 @@ pub struct MissingTodoAuthor;
 impl Violation for MissingTodoAuthor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author in TODO; try: `# TODO(<author_name>): ...`")
+        format!("Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`")
     }
 }
 
@@ -358,6 +358,8 @@ fn static_errors(
             } else {
                 trimmed.text_len()
             }
+        } else if trimmed.starts_with('@') {
+            trimmed.text_len()
         } else {
             // TD-002
             diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
