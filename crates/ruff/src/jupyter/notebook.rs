@@ -15,7 +15,7 @@ use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::jupyter::index::JupyterIndex;
-use crate::jupyter::{Cell, CellType, JupyterNotebook, SourceValue};
+use crate::jupyter::{Cell, CellType, RawNotebook, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
 use crate::IOError;
 
@@ -71,8 +71,8 @@ pub struct Notebook {
     /// The index of the notebook. This is used to map between the concatenated
     /// source code and the original notebook.
     index: OnceCell<JupyterIndex>,
-    /// The raw notebook.
-    raw: JupyterNotebook,
+    /// The raw notebook i.e., the deserialized version of JSON string.
+    raw: RawNotebook,
     /// The offsets of each cell in the concatenated source code. This includes
     /// the first and last character offsets as well.
     cell_offsets: Vec<TextSize>,
@@ -92,7 +92,7 @@ impl Notebook {
                 TextRange::default(),
             )
         })?);
-        let notebook: JupyterNotebook = match serde_json::from_reader(reader) {
+        let notebook: RawNotebook = match serde_json::from_reader(reader) {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
