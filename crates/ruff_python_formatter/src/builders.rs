@@ -70,7 +70,7 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
                 };
 
                 match node_level {
-                    NodeLevel::TopLevel => match dbg!(count_lines(last_end)) {
+                    NodeLevel::TopLevel => match count_lines(last_end) {
                         0 | 1 => hard_line_break().fmt(self.fmt),
                         2 => empty_line().fmt(self.fmt),
                         _ => write!(self.fmt, [empty_line(), empty_line()]),

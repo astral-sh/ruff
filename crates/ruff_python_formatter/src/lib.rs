@@ -355,11 +355,12 @@ Formatted twice:
     #[ignore]
     #[test]
     fn quick_test() {
-        let src = r#"
-while True:
-    if something.changed:
-        do.stuff()  # trailing comment
-other
+        let src = r#"AAAAAAAAAAAAA = AAAAAAAAAAAAA  # type: ignore
+
+call_to_some_function_asdf(
+    foo,
+    [AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, BBBBBBBBBBBB],  # type: ignore
+)
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
