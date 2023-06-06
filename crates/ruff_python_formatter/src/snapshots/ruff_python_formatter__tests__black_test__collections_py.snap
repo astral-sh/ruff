@@ -84,9 +84,31 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -18,44 +18,26 @@
-     xyzzy as magic,
- )
+@@ -1,99 +1,48 @@
+-import core, time, a
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+-from . import A, B, C
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
+ # keeps existing trailing comma
+-from foo import (
+-    bar,
+-)
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
+ # also keeps existing structure
+-from foo import (
+-    baz,
+-    qux,
+-)
++NOT_YET_IMPLEMENTED_StmtImportFrom
+ 
+ # `as` works as well
+-from foo import (
+-    xyzzy as magic,
+-)
++NOT_YET_IMPLEMENTED_StmtImportFrom
  
 -a = {
 -    1,
@@ -94,15 +116,11 @@ if True:
 -    3,
 -}
 -b = {1, 2, 3}
-+a = {1,2,3,}
-+b = {
-+1,2,
-+     3}
- c = {
-     1,
-     2,
-     3,
- }
+-c = {
+-    1,
+-    2,
+-    3,
+-}
 -x = (1,)
 -y = (narf(),)
 -nested = {
@@ -116,20 +134,27 @@ if True:
 -    "cccccccccccccccccccccccccccccccccccccccc",
 -    (1, 2, 3),
 -    "dddddddddddddddddddddddddddddddddddddddd",
--]
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_ExprDict
++NOT_YET_IMPLEMENTED_ExprDict
++[
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant
++    % NOT_YET_IMPLEMENTED_ExprTuple,
+ ]
 -{
 -    "oneple": (1,),
 -}
-+x = 1,
-+y = narf(),
-+nested = {(1,2,3),(4,5,6),}
-+nested_no_trailing_comma = {(1,2,3),(4,5,6)}
-+nested_long_lines = ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccccccccccccccccccccccc", (1, 2, 3), "dddddddddddddddddddddddddddddddddddddddd"]
-+{"oneple": (1,),}
- {"oneple": (1,)}
+-{"oneple": (1,)}
 -["ls", "lsoneple/%s" % (foo,)]
-+['ls', 'lsoneple/%s' % (foo,)]
- x = {"oneple": (1,)}
+-x = {"oneple": (1,)}
 -y = {
 -    "oneple": (1,),
 -}
@@ -137,130 +162,112 @@ if True:
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
 -    % bar
 -)
-+y = {"oneple": (1,),}
-+assert False, ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s" % bar)
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssert
  
  # looping over a 1-tuple should also not get wrapped
- for x in (1,):
-@@ -63,13 +45,9 @@
- for (x,) in (1,), (2,), (3,):
-     pass
+-for x in (1,):
+-    pass
+-for (x,) in (1,), (2,), (3,):
+-    pass
++NOT_YET_IMPLEMENTED_StmtFor
++NOT_YET_IMPLEMENTED_StmtFor
  
--[
+ [
 -    1,
 -    2,
 -    3,
--]
-+[1, 2, 3]
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
+ ]
  
 -division_result_tuple = (6 / 2,)
-+division_result_tuple = (6/2,)
- print("foo %r", (foo.bar,))
+-print("foo %r", (foo.bar,))
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_ExprCall
  
- if True:
-@@ -79,21 +57,15 @@
-     )
- 
- if True:
--    ec2client.get_waiter("instance_stopped").wait(
-+    ec2client.get_waiter('instance_stopped').wait(
-         InstanceIds=[instance.id],
-         WaiterConfig={
--            "Delay": 5,
--        },
+-if True:
+-    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
+-        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
+-        | {pylons.controllers.WSGIController}
 -    )
-+            'Delay': 5,
-+        })
-     ec2client.get_waiter("instance_stopped").wait(
-         InstanceIds=[instance.id],
--        WaiterConfig={
--            "Delay": 5,
--        },
-+        WaiterConfig={"Delay": 5,},
-     )
-     ec2client.get_waiter("instance_stopped").wait(
++NOT_YET_IMPLEMENTED_StmtIf
+ 
+-if True:
+-    ec2client.get_waiter("instance_stopped").wait(
 -        InstanceIds=[instance.id],
 -        WaiterConfig={
 -            "Delay": 5,
 -        },
-+        InstanceIds=[instance.id], WaiterConfig={"Delay": 5,},
-     )
+-    )
+-    ec2client.get_waiter("instance_stopped").wait(
+-        InstanceIds=[instance.id],
+-        WaiterConfig={
+-            "Delay": 5,
+-        },
+-    )
+-    ec2client.get_waiter("instance_stopped").wait(
+-        InstanceIds=[instance.id],
+-        WaiterConfig={
+-            "Delay": 5,
+-        },
+-    )
++NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Ruff Output
 
 ```py
-import core, time, a
+NOT_YET_IMPLEMENTED_StmtImport
 
-from . import A, B, C
+NOT_YET_IMPLEMENTED_StmtImportFrom
 
 # keeps existing trailing comma
-from foo import (
-    bar,
-)
+NOT_YET_IMPLEMENTED_StmtImportFrom
 
 # also keeps existing structure
-from foo import (
-    baz,
-    qux,
-)
+NOT_YET_IMPLEMENTED_StmtImportFrom
 
 # `as` works as well
-from foo import (
-    xyzzy as magic,
-)
+NOT_YET_IMPLEMENTED_StmtImportFrom
 
-a = {1,2,3,}
-b = {
-1,2,
-     3}
-c = {
-    1,
-    2,
-    3,
-}
-x = 1,
-y = narf(),
-nested = {(1,2,3),(4,5,6),}
-nested_no_trailing_comma = {(1,2,3),(4,5,6)}
-nested_long_lines = ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccccccccccccccccccccccc", (1, 2, 3), "dddddddddddddddddddddddddddddddddddddddd"]
-{"oneple": (1,),}
-{"oneple": (1,)}
-['ls', 'lsoneple/%s' % (foo,)]
-x = {"oneple": (1,)}
-y = {"oneple": (1,),}
-assert False, ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s" % bar)
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_ExprDict
+NOT_YET_IMPLEMENTED_ExprDict
+[
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant
+    % NOT_YET_IMPLEMENTED_ExprTuple,
+]
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssert
 
 # looping over a 1-tuple should also not get wrapped
-for x in (1,):
-    pass
-for (x,) in (1,), (2,), (3,):
-    pass
+NOT_YET_IMPLEMENTED_StmtFor
+NOT_YET_IMPLEMENTED_StmtFor
 
-[1, 2, 3]
+[
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+]
 
-division_result_tuple = (6/2,)
-print("foo %r", (foo.bar,))
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_ExprCall
 
-if True:
-    IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING = (
-        Config.IGNORED_TYPES_FOR_ATTRIBUTE_CHECKING
-        | {pylons.controllers.WSGIController}
-    )
+NOT_YET_IMPLEMENTED_StmtIf
 
-if True:
-    ec2client.get_waiter('instance_stopped').wait(
-        InstanceIds=[instance.id],
-        WaiterConfig={
-            'Delay': 5,
-        })
-    ec2client.get_waiter("instance_stopped").wait(
-        InstanceIds=[instance.id],
-        WaiterConfig={"Delay": 5,},
-    )
-    ec2client.get_waiter("instance_stopped").wait(
-        InstanceIds=[instance.id], WaiterConfig={"Delay": 5,},
-    )
+NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Black Output

@@ -234,31 +234,28 @@ def trailing_func():
 
         assert_eq!(
             formatted,
-            r#"a = 10
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
 
 
-three_leading_newlines = 80
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
-two_leading_newlines = 20
+NOT_YET_IMPLEMENTED_StmtAssign
 
-one_leading_newline = 10
-no_leading_newline = 30
-
-
-class InTheMiddle:
-    pass
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
-trailing_statement = 1
+NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-def func():
-    pass
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
-def trailing_func():
-    pass"#
+NOT_YET_IMPLEMENTED_StmtFunctionDef
+
+
+NOT_YET_IMPLEMENTED_StmtFunctionDef"#
         );
     }
 
@@ -268,25 +265,22 @@ def trailing_func():
 
         assert_eq!(
             formatted,
-            r#"a = 10
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
 
-three_leading_newlines = 80
+NOT_YET_IMPLEMENTED_StmtAssign
 
-two_leading_newlines = 20
+NOT_YET_IMPLEMENTED_StmtAssign
 
-one_leading_newline = 10
-no_leading_newline = 30
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
 
-class InTheMiddle:
-    pass
+NOT_YET_IMPLEMENTED_StmtClassDef
 
-trailing_statement = 1
+NOT_YET_IMPLEMENTED_StmtAssign
 
-def func():
-    pass
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
-def trailing_func():
-    pass"#
+NOT_YET_IMPLEMENTED_StmtFunctionDef"#
         );
     }
 }

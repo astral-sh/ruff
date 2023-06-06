@@ -1,7 +1,7 @@
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{verbatim_text, FormatNodeRule, PyFormatter};
+use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprSubscript;
 
@@ -10,7 +10,7 @@ pub struct FormatExprSubscript;
 
 impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
     fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [verbatim_text(item.range)])
+        write!(f, [not_yet_implemented(item)])
     }
 }
 

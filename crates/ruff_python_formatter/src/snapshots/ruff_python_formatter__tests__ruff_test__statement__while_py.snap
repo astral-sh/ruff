@@ -40,15 +40,15 @@ while (
 
 ## Output
 ```py
-while 34:  # trailing test comment
-    pass  # trailing last statement comment
+while NOT_YET_IMPLEMENTED_ExprConstant:  # trailing test comment
+    NOT_YET_IMPLEMENTED_StmtPass  # trailing last statement comment
 
     # trailing while body comment
 
 # leading else comment
 
 else:  # trailing else comment
-    pass
+    NOT_YET_IMPLEMENTED_StmtPass
 
     # trailing else body comment
 
@@ -56,20 +56,19 @@ else:  # trailing else comment
 while (
     aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAndOnAndOnAndOnAndOnAndOnAndOnAndOnAndOn
 ):  # trailing comment
-    pass
+    NOT_YET_IMPLEMENTED_StmtPass
 
 else:
-    ...
+    NOT_YET_IMPLEMENTED_ExprConstant
 
-while some_condition(unformatted, args) and anotherCondition or aThirdCondition:  # comment
-    print("Do something")
+while NOT_YET_IMPLEMENTED_ExprBoolOp:  # comment
+    NOT_YET_IMPLEMENTED_ExprCall
 
 
 while (
-    some_condition(unformatted, args) # trailing some condition
-    and anotherCondition or aThirdCondition  # trailing third condition
+    NOT_YET_IMPLEMENTED_ExprBoolOp  # trailing third condition
 ):  # comment
-    print("Do something")
+    NOT_YET_IMPLEMENTED_ExprCall
 ```
 
 

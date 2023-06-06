@@ -101,78 +101,67 @@ def foo() -> tuple[int, int, int,]:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,33 +1,41 @@
+@@ -1,120 +1,65 @@
  # Control
- def double(a: int) -> int:
+-def double(a: int) -> int:
 -    return 2 * a
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Remove the brackets
 -def double(a: int) -> int:
 -    return 2 * a
-+def double(a: int) -> (int):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Some newline variations
 -def double(a: int) -> int:
 -    return 2 * a
-+def double(a: int) -> (
-+    int):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def double(a: int) -> int:
 -    return 2 * a
-+def double(a: int) -> (int
-+):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def double(a: int) -> int:
 -    return 2 * a
-+def double(a: int) -> (
-+    int
-+):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Don't lose the comments
 -def double(a: int) -> int:  # Hello
 -    return 2 * a
-+def double(a: int) -> ( # Hello
-+    int
-+):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def double(a: int) -> int:  # Hello
 -    return 2 * a
-+def double(a: int) -> (
-+    int # Hello
-+):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Really long annotations
-@@ -37,84 +45,62 @@
-     return 2
+-def foo() -> (
+-    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+-):
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def foo() -> (
 -    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
 -):
-+def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def foo() -> (
 -    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
 -    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
 -):
-+def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def foo(
@@ -180,8 +169,8 @@ def foo() -> tuple[int, int, int,]:
 -    b: int,
 -    c: int,
 -) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-+def foo(a: int, b: int, c: int,) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def foo(
@@ -192,8 +181,8 @@ def foo() -> tuple[int, int, int,]:
 -    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
 -    | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
 -):
-+def foo(a: int, b: int, c: int,) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Split args but no need to split return
@@ -202,45 +191,33 @@ def foo() -> tuple[int, int, int,]:
 -    b: int,
 -    c: int,
 -) -> int:
-+def foo(a: int, b: int, c: int,) -> int:
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Deeply nested brackets
  # with *interesting* spacing
 -def double(a: int) -> int:
 -    return 2 * a
-+def double(a: int) -> (((((int))))):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def double(a: int) -> int:
 -    return 2 * a
-+def double(a: int) -> (
-+    (  (
-+        ((int)
-+         )
-+           )
-+            )
-+        ):
-+    return 2*a
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def foo() -> (
-+    (  (
-     intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
+-def foo() -> (
+-    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
 -):
-+)
-+)):
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Return type with commas
 -def foo() -> tuple[int, int, int]:
-+def foo() -> (
-+    tuple[int, int, int]
-+):
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -def foo() -> (
@@ -250,8 +227,8 @@ def foo() -> tuple[int, int, int,]:
 -        loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong,
 -    ]
 -):
-+def foo() -> tuple[loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong, loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong, loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong]:
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # Magic trailing comma example
@@ -262,119 +239,78 @@ def foo() -> tuple[int, int, int,]:
 -        int,
 -    ]
 -):
-+def foo() -> tuple[int, int, int,]:
-     return 2
+-    return 2
++NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Ruff Output
 
 ```py
 # Control
-def double(a: int) -> int:
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Remove the brackets
-def double(a: int) -> (int):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Some newline variations
-def double(a: int) -> (
-    int):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def double(a: int) -> (int
-):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def double(a: int) -> (
-    int
-):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Don't lose the comments
-def double(a: int) -> ( # Hello
-    int
-):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def double(a: int) -> (
-    int # Hello
-):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Really long annotations
-def foo() -> (
-    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-):
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def foo() -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def foo(a: int, b: int, c: int,) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def foo(a: int, b: int, c: int,) -> intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds | intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds:
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Split args but no need to split return
-def foo(a: int, b: int, c: int,) -> int:
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Deeply nested brackets
 # with *interesting* spacing
-def double(a: int) -> (((((int))))):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def double(a: int) -> (
-    (  (
-        ((int)
-         )
-           )
-            )
-        ):
-    return 2*a
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def foo() -> (
-    (  (
-    intsdfsafafafdfdsasdfsfsdfasdfafdsafdfdsfasdskdsdsfdsafdsafsdfdasfffsfdsfdsafafhdskfhdsfjdslkfdlfsdkjhsdfjkdshfkljds
-)
-)):
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Return type with commas
-def foo() -> (
-    tuple[int, int, int]
-):
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def foo() -> tuple[loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong, loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong, loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong]:
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Magic trailing comma example
-def foo() -> tuple[int, int, int,]:
-    return 2
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Black Output

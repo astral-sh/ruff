@@ -86,91 +86,124 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,6 @@
- while True:
-     if something.changed:
+@@ -1,61 +1,33 @@
+-while True:
+-    if something.changed:
 -        do.stuff()  # trailing comment
 -        # Comment belongs to the `if` block.
-+        do.stuff()
++while NOT_YET_IMPLEMENTED_ExprConstant:
++    NOT_YET_IMPLEMENTED_StmtIf
      # This one belongs to the `while` block.
  
      # Should this one, too?  I guess so.
-@@ -15,7 +14,6 @@
  
-     # then we do this
-     print(i)
+ # This one is properly standalone now.
+ 
+-for i in range(100):
+-    # first we do this
+-    if i % 33 == 0:
+-        break
++NOT_YET_IMPLEMENTED_StmtFor
+ 
+-    # then we do this
+-    print(i)
 -    # and finally we loop around
++NOT_YET_IMPLEMENTED_StmtWith
  
- with open(some_temp_file) as f:
-     data = f.read()
-@@ -33,7 +31,6 @@
+-with open(some_temp_file) as f:
+-    data = f.read()
+-
+-try:
+-    with open(some_other_file) as w:
+-        w.write(data)
++NOT_YET_IMPLEMENTED_StmtTry
+ 
+-except OSError:
+-    print("problems")
+-
+-import sys
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+ 
  # leading function comment
- def wat():
-     ...
+-def wat():
+-    ...
 -    # trailing function comment
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
  # SECTION COMMENT
+ 
+ 
+ # leading 1
+-@deco1
+-# leading 2
+-@deco2(with_args=True)
+-# leading 3
+-@deco3
+-def decorated1():
+-    ...
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+ 
+ # leading 1
+-@deco1
+-# leading 2
+-@deco2(with_args=True)
+-# leading function comment
+-def decorated1():
+-    ...
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+ 
+ # Note: this is fixed in
+@@ -65,9 +37,7 @@
+ 
+ 
+ # This comment should be split from `some_instruction` by two lines but isn't.
+-def g():
+-    ...
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+ 
+-if __name__ == "__main__":
+-    main()
++NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Ruff Output
 
 ```py
-while True:
-    if something.changed:
-        do.stuff()
+while NOT_YET_IMPLEMENTED_ExprConstant:
+    NOT_YET_IMPLEMENTED_StmtIf
     # This one belongs to the `while` block.
 
     # Should this one, too?  I guess so.
 
 # This one is properly standalone now.
 
-for i in range(100):
-    # first we do this
-    if i % 33 == 0:
-        break
+NOT_YET_IMPLEMENTED_StmtFor
 
-    # then we do this
-    print(i)
+NOT_YET_IMPLEMENTED_StmtWith
 
-with open(some_temp_file) as f:
-    data = f.read()
+NOT_YET_IMPLEMENTED_StmtTry
 
-try:
-    with open(some_other_file) as w:
-        w.write(data)
-
-except OSError:
-    print("problems")
-
-import sys
+NOT_YET_IMPLEMENTED_StmtImport
 
 
 # leading function comment
-def wat():
-    ...
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # SECTION COMMENT
 
 
 # leading 1
-@deco1
-# leading 2
-@deco2(with_args=True)
-# leading 3
-@deco3
-def decorated1():
-    ...
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # leading 1
-@deco1
-# leading 2
-@deco2(with_args=True)
-# leading function comment
-def decorated1():
-    ...
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Note: this is fixed in
@@ -180,12 +213,10 @@ some_instruction
 
 
 # This comment should be split from `some_instruction` by two lines but isn't.
-def g():
-    ...
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-if __name__ == "__main__":
-    main()
+NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Black Output

@@ -30,36 +30,39 @@ x = [
 ```diff
 --- Black
 +++ Ruff
-@@ -12,4 +12,6 @@
- ]
+@@ -1,15 +1,9 @@
+ # fmt: off
+-x = [
+-    1, 2,
+-    3, 4,
+-]
++NOT_YET_IMPLEMENTED_StmtAssign
+ # fmt: on
+ 
+ # fmt: off
+-x = [
+-    1, 2,
+-    3, 4,
+-]
++NOT_YET_IMPLEMENTED_StmtAssign
  # fmt: on
  
 -x = [1, 2, 3, 4]
-+x = [
-+    1, 2, 3, 4
-+]
++NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Ruff Output
 
 ```py
 # fmt: off
-x = [
-    1, 2,
-    3, 4,
-]
+NOT_YET_IMPLEMENTED_StmtAssign
 # fmt: on
 
 # fmt: off
-x = [
-    1, 2,
-    3, 4,
-]
+NOT_YET_IMPLEMENTED_StmtAssign
 # fmt: on
 
-x = [
-    1, 2, 3, 4
-]
+NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Black Output
