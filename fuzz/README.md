@@ -95,3 +95,11 @@ This fuzz harness checks that fixes applied by Ruff do not introduce new errors 
 [`ruff::test::test_snippet`](../crates/ruff/src/test.rs) testing utility.
 It currently is only configured to use default settings, but may be extended in future versions to
 test non-default linter settings.
+
+## Experimental settings
+
+You can optionally use `--no-default-features --features libafl` to use the libafl fuzzer instead of
+libfuzzer.
+This fuzzer has experimental support, but can vastly improve fuzzer performance.
+If you are not already familiar with [LibAFL](https://github.com/AFLplusplus/LibAFL), this mode is
+not currently recommended.

@@ -3,6 +3,9 @@
 
 #![no_main]
 
+#[cfg(feature = "libafl")]
+extern crate libafl_libfuzzer;
+
 use libfuzzer_sys::{fuzz_target, Corpus};
 use ruff::settings::Settings;
 use std::sync::OnceLock;
