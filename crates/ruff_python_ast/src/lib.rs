@@ -2,6 +2,7 @@ pub mod all;
 pub mod call_path;
 pub mod cast;
 pub mod comparable;
+pub mod function;
 pub mod hashable;
 pub mod helpers;
 pub mod imports;
