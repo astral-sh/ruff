@@ -3,9 +3,16 @@ source: crates/ruff/src/rules/flake8_slots/mod.rs
 ---
 SLOT002.py:5:7: SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`
   |
-5 | class Bad(namedtuple("foo", ["str", "int"])):  # SLOT002
-  |       ^^^ SLOT002
+5 | class Bad1(namedtuple("foo", ["str", "int"])):  # SLOT002
+  |       ^^^^ SLOT002
 6 |     pass
   |
+
+SLOT002.py:12:7: SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`
+   |
+12 | class Bad2(named_tup):  # SLOT002
+   |       ^^^^ SLOT002
+13 |     pass
+   |
 
 
