@@ -38,7 +38,7 @@ impl Violation for IterationOverSet {
 
 /// PLC0208
 pub(crate) fn iteration_over_set(checker: &mut Checker, expr: &Expr) {
-    if let Expr::Set(_) = expr {
+    if expr.is_set_expr() {
         checker
             .diagnostics
             .push(Diagnostic::new(IterationOverSet, expr.range()));
