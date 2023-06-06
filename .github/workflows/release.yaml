@@ -34,6 +34,7 @@ jobs:
           args: --out dist
       - name: "Test sdist"
         run: |
+          rustup default $(cat rust-toolchain)
           pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
           ruff --help
           python -m ruff --help
