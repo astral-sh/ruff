@@ -181,7 +181,7 @@ impl<'a> TypingTarget<'a> {
     }
 
     /// Check if the [`TypingTarget`] explicitly allows `None`.
-    fn is_implicit_optional(&self, model: &SemanticModel) -> bool {
+    fn contains_none(&self, model: &SemanticModel) -> bool {
         match self {
             Self::None | Self::Optional | Self::Any => true,
             Self::Literal(elements) => elements.iter().any(|element| {
@@ -192,7 +192,7 @@ impl<'a> TypingTarget<'a> {
                 // or an enum value.
                 match new_target {
                     Self::None => true,
-                    Self::Literal(_) => new_target.is_implicit_optional(model),
+                    Self::Literal(_) => new_target.contains_none(model),
                     _ => false,
                 }
             }),
@@ -202,7 +202,7 @@ impl<'a> TypingTarget<'a> {
             };
                 match new_target {
                     Self::None => true,
-                    _ => new_target.is_implicit_optional(model),
+                    _ => new_target.contains_none(model),
                 }
             }),
             Self::Annotated(element) => {
@@ -211,7 +211,7 @@ impl<'a> TypingTarget<'a> {
             };
                 match new_target {
                     Self::None => true,
-                    _ => new_target.is_implicit_optional(model),
+                    _ => new_target.contains_none(model),
                 }
             }
         }
@@ -241,7 +241,7 @@ fn type_hint_explicitly_allows_none<'a>(
         // be returned.
         TypingTarget::Annotated(expr) => type_hint_explicitly_allows_none(model, expr),
         _ => {
-            if target.is_implicit_optional(model) {
+            if target.contains_none(model) {
                 None
             } else {
                 Some(annotation)
