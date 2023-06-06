@@ -41,21 +41,21 @@ impl Cell {
         if self.cell_type != CellType::Code {
             return false;
         }
-        let lines = match &self.source {
-            SourceValue::String(string) => string.lines().collect::<Vec<_>>(),
-            SourceValue::StringArray(string_array) => string_array
-                .iter()
-                .map(std::string::String::as_str)
-                .collect(),
-        };
         // Ignore a cell if it contains a magic command. There could be valid
         // Python code as well, but we'll ignore that for now.
         // TODO(dhruvmanila): https://github.com/psf/black/blob/main/src/black/handle_ipynb_magics.py
-        !lines.iter().any(|line| {
-            MAGIC_PREFIX
-                .iter()
-                .any(|prefix| line.trim_start().starts_with(prefix))
-        })
+        !match &self.source {
+            SourceValue::String(string) => string.lines().any(|line| {
+                MAGIC_PREFIX
+                    .iter()
+                    .any(|prefix| line.trim_start().starts_with(prefix))
+            }),
+            SourceValue::StringArray(string_array) => string_array.iter().any(|line| {
+                MAGIC_PREFIX
+                    .iter()
+                    .any(|prefix| line.trim_start().starts_with(prefix))
+            }),
+        }
     }
 }
 
@@ -369,10 +369,22 @@ impl Notebook {
 mod test {
     use std::path::Path;
 
+    use anyhow::Result;
+    use test_case::test_case;
+
     use crate::jupyter::index::JupyterIndex;
     #[cfg(feature = "jupyter_notebook")]
     use crate::jupyter::is_jupyter_notebook;
     use crate::jupyter::Notebook;
+
+    use crate::test::test_resource_path;
+
+    /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
+    fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
+        let path = test_resource_path("fixtures/jupyter/cell").join(path);
+        let contents = std::fs::read_to_string(path)?;
+        Ok(serde_json::from_str(&contents)?)
+    }
 
     #[test]
     fn test_valid() {
@@ -410,6 +422,14 @@ mod test {
             "SyntaxError: This file does not match the schema expected of Jupyter Notebooks: \
             missing field `cells` at line 1 column 2"
         );
+    }
+
+    #[test_case(Path::new("markdown.json"), false; "markdown")]
+    #[test_case(Path::new("python_magic.json"), false; "python_magic")]
+    #[test_case(Path::new("python_no_magic.json"), true; "python_no_magic")]
+    fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
+        assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
+        Ok(())
     }
 
     #[test]
