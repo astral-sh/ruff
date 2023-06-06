@@ -359,8 +359,14 @@ fn static_errors(
                 trimmed.text_len()
             }
         } else if trimmed.starts_with('@') {
-            let Some(end_index) = trimmed.find(char::is_whitespace);
-            TextSize::try_from(end_index + 1).unwrap()
+            if let Some(end_index) = trimmed.find(char::is_whitespace){
+                TextSize::try_from(end_index + 1).unwrap()
+            } else {
+                // TD-002
+                diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
+
+                TextSize::new(0)
+            }
         } else {
             // TD-002
             diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
