@@ -19,6 +19,8 @@ pub struct Scope<'a> {
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
     star_imports: Vec<StarImportation<'a>>,
+    /// A list of all names declared in the scope.
+    declared_symbols: Vec<&'a str>,
     /// A map from bound name to binding ID.
     bindings: FxHashMap<&'a str, BindingId>,
     /// A map from binding ID to binding ID that it shadows.
@@ -34,6 +36,7 @@ impl<'a> Scope<'a> {
             parent: None,
             uses_locals: false,
             star_imports: Vec::default(),
+            declared_symbols: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
             globals_id: None,
@@ -46,6 +49,7 @@ impl<'a> Scope<'a> {
             parent: Some(parent),
             uses_locals: false,
             star_imports: Vec::default(),
+            declared_symbols: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
             globals_id: None,
@@ -63,18 +67,28 @@ impl<'a> Scope<'a> {
             self.shadowed_bindings.insert(id, shadowed);
             Some(shadowed)
         } else {
+            self.declared_symbols.push(name);
             None
         }
     }
 
-    /// Returns `true` if this scope defines a binding with the given name.
-    pub fn defines(&self, name: &str) -> bool {
+    /// Removes the binding with the given name.
+    pub fn delete(&mut self, name: &'a str) -> Option<BindingId> {
+        self.declared_symbols.push(name);
+        self.bindings.remove(name)
+    }
+
+    /// Returns `true` if this scope has a binding with the given name.
+    pub fn has(&self, name: &str) -> bool {
         self.bindings.contains_key(name)
     }
 
-    /// Removes the binding with the given name
-    pub fn remove(&mut self, name: &str) -> Option<BindingId> {
-        self.bindings.remove(name)
+    /// Returns `true` if the scope declares a symbol with the given name.
+    ///
+    /// Unlike [`Scope::has`], the name may no longer be bound to a value (e.g., it could be
+    /// deleted).
+    pub fn declares(&self, name: &str) -> bool {
+        self.declared_symbols.contains(&name)
     }
 
     /// Returns the ids of all bindings defined in this scope.

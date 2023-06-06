@@ -47,7 +47,7 @@ impl Violation for UndefinedLocal {
 pub(crate) fn undefined_local(checker: &mut Checker, name: &str) {
     // If the name hasn't already been defined in the current scope...
     let current = checker.semantic_model().scope();
-    if !current.kind.is_any_function() || current.defines(name) {
+    if !current.kind.is_any_function() || current.has(name) {
         return;
     }
 

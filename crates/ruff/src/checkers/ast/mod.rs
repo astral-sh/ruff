@@ -307,9 +307,17 @@ where
                                 stmt.range(),
                                 ExecutionContext::Runtime,
                             );
-                        } else {
-                            // Ensure that every nonlocal has an existing binding from a parent scope.
-                            if self.enabled(Rule::NonlocalWithoutBinding) {
+                        }
+
+                        // Ensure that every nonlocal has an existing binding from a parent scope.
+                        if self.enabled(Rule::NonlocalWithoutBinding) {
+                            if self
+                                .semantic_model
+                                .scopes
+                                .ancestors(self.semantic_model.scope_id)
+                                .skip(1)
+                                .all(|scope| !scope.declares(name.as_str()))
+                            {
                                 self.diagnostics.push(Diagnostic::new(
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
@@ -4039,7 +4047,7 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self.semantic_model.scope().defines(name) {
+                        if self.semantic_model.scope().has(name) {
                             self.handle_node_store(
                                 name,
                                 &Expr::Name(ast::ExprName {
@@ -4064,7 +4072,7 @@ where
 
                         if let Some(binding_id) = {
                             let scope = self.semantic_model.scope_mut();
-                            scope.remove(name)
+                            scope.delete(name)
                         } {
                             if !self.semantic_model.is_used(binding_id) {
                                 if self.enabled(Rule::UnusedVariable) {
@@ -4694,19 +4702,16 @@ impl<'a> Checker<'a> {
         }
 
         let scope = self.semantic_model.scope_mut();
-        if scope.remove(id.as_str()).is_some() {
-            return;
+        if scope.delete(id.as_str()).is_none() {
+            if self.enabled(Rule::UndefinedName) {
+                self.diagnostics.push(Diagnostic::new(
+                    pyflakes::rules::UndefinedName {
+                        name: id.to_string(),
+                    },
+                    expr.range(),
+                ));
+            }
         }
-        if !self.enabled(Rule::UndefinedName) {
-            return;
-        }
-
-        self.diagnostics.push(Diagnostic::new(
-            pyflakes::rules::UndefinedName {
-                name: id.to_string(),
-            },
-            expr.range(),
-        ));
     }
 
     fn check_deferred_future_type_definitions(&mut self) {
@@ -4974,7 +4979,7 @@ impl<'a> Checker<'a> {
                         .collect();
                     if !sources.is_empty() {
                         for (name, range) in &exports {
-                            if !scope.defines(name) {
+                            if !scope.has(name) {
                                 diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: (*name).to_string(),
