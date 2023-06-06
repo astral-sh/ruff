@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Expr, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::prelude::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
@@ -51,30 +52,81 @@ pub(crate) fn no_slots_in_namedtuple_subclass<F>(
     class: &StmtClassDef,
     locate: F,
 ) where
-    F: FnOnce() -> TextRange,
+    F: FnOnce() -> TextRange + Copy,
 {
     if class.bases.len() != 1 {
         return;
     }
 
-    let Expr::Call(ast::ExprCall { func, .. }) = &class.bases[0] else {
-        return;
-    };
-
-    if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-        if id.as_str() == "namedtuple"
-            && checker
-                .semantic_model()
-                .resolve_call_path(func)
-                .map_or(false, |call_path| {
-                    matches!(call_path.as_slice(), ["collections", "namedtuple"])
-                })
-        {
-            if !has_slots(&class.body) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(NoSlotsInNamedtupleSubclass, locate()));
+    if let Expr::Name(ast::ExprName { id, .. }) = &class.bases[0] {
+        let scope = checker.semantic_model().scope();
+        if let Some(binding_id) = scope.get(id) {
+            let binding = &checker.semantic_model().bindings[binding_id];
+            if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
+                if let Some(parent) = binding.source {
+                    let parent = checker.semantic_model().stmts[parent];
+                    match parent {
+                        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+                            if is_indirect_namedtuple_subclass(checker, value.as_ref()) {
+                                if !has_slots(&class.body) {
+                                    checker.diagnostics.push(Diagnostic::new(
+                                        NoSlotsInNamedtupleSubclass,
+                                        locate(),
+                                    ));
+                                }
+                            }
+                        }
+                        Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => {
+                            if let Some(val) = value.as_ref() {
+                                if is_indirect_namedtuple_subclass(checker, val) {
+                                    if !has_slots(&class.body) {
+                                        checker.diagnostics.push(Diagnostic::new(
+                                            NoSlotsInNamedtupleSubclass,
+                                            locate(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        _ => return,
+                    }
+                }
             }
         }
+    };
+
+    if let Expr::Call(ast::ExprCall { func, .. }) = &class.bases[0] {
+        if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+            if id.as_str() == "namedtuple"
+                && checker
+                    .semantic_model()
+                    .resolve_call_path(func)
+                    .map_or(false, |call_path| {
+                        matches!(call_path.as_slice(), ["collections", "namedtuple"])
+                    })
+            {
+                if !has_slots(&class.body) {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(NoSlotsInNamedtupleSubclass, locate()));
+                }
+            }
+        }
+    };
+}
+
+fn is_indirect_namedtuple_subclass(checker: &mut Checker, value: &Expr) -> bool {
+    if let Expr::Call(ast::ExprCall { func, .. }) = value {
+        if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+            return id.as_str() == "namedtuple"
+                && checker
+                    .semantic_model()
+                    .resolve_call_path(func)
+                    .map_or(false, |call_path| {
+                        matches!(call_path.as_slice(), ["collections", "namedtuple"])
+                    });
+        }
+        return false;
     }
+    false
 }
