@@ -94,7 +94,6 @@ where
                 | Expr::GeneratorExp(_)
                 | Expr::ListComp(_)
                 | Expr::SetComp(_)
-                | Expr::Subscript(_)
                 | Expr::Yield(_)
                 | Expr::YieldFrom(_)
         )

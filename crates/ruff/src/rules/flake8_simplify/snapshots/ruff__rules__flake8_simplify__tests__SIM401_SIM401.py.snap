@@ -131,4 +131,30 @@ SIM401.py:36:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6
 41 38 | ###
 42 39 | # Negative cases
 
+SIM401.py:96:1: SIM401 [*] Use `var = a_dict.get(key, a_dict["fallback"])` instead of an `if` block
+    |
+ 96 |   # OK (complex default value)
+ 97 | / if key in a_dict:
+ 98 | |     var = a_dict[key]
+ 99 | | else:
+100 | |     var = a_dict["fallback"]
+    | |____________________________^ SIM401
+101 |   
+102 |   # OK (false negative for elif)
+    |
+    = help: Replace with `var = a_dict.get(key, a_dict["fallback"])`
+
+ℹ Suggested fix
+93  93  |     var = foo()
+94  94  | 
+95  95  | # OK (complex default value)
+96      |-if key in a_dict:
+97      |-    var = a_dict[key]
+98      |-else:
+99      |-    var = a_dict["fallback"]
+    96  |+var = a_dict.get(key, a_dict["fallback"])
+100 97  | 
+101 98  | # OK (false negative for elif)
+102 99  | if foo():
+
 
