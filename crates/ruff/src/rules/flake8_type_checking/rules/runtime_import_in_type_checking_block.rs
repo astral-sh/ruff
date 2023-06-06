@@ -86,8 +86,11 @@ pub(crate) fn runtime_import_in_type_checking_block(
             RuntimeImportInTypeCheckingBlock {
                 qualified_name: qualified_name.to_string(),
             },
-            binding.range,
+            binding.trimmed_range(checker.semantic_model(), checker.locator),
         );
+        if let Some(range) = binding.parent_range(checker.semantic_model()) {
+            diagnostic.set_parent(range.start());
+        }
 
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
