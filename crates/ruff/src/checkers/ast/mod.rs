@@ -316,6 +316,7 @@ where
                                 .scopes
                                 .ancestors(self.semantic_model.scope_id)
                                 .skip(1)
+                                .take_while(|scope| !scope.kind.is_module())
                                 .all(|scope| !scope.declares(name.as_str()))
                             {
                                 self.diagnostics.push(Diagnostic::new(
