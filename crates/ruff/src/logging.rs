@@ -179,13 +179,19 @@ impl Display for DisplayParseError<'_> {
             write!(
                 f,
                 "cell {cell}{colon}",
-                cell = jupyter_index.cell(source_location.row.get()),
+                cell = jupyter_index
+                    .cell(source_location.row.get())
+                    .unwrap_or_default(),
                 colon = ":".cyan(),
             )?;
 
             SourceLocation {
-                row: OneIndexed::new(jupyter_index.cell_row(source_location.row.get()) as usize)
-                    .unwrap(),
+                row: OneIndexed::new(
+                    jupyter_index
+                        .cell_row(source_location.row.get())
+                        .unwrap_or(1) as usize,
+                )
+                .unwrap(),
                 column: source_location.column,
             }
         } else {

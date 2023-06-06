@@ -12,13 +12,13 @@ pub struct JupyterIndex {
 
 impl JupyterIndex {
     /// Returns the cell number (1-based) for the given row (1-based).
-    pub fn cell(&self, row: usize) -> u32 {
-        self.row_to_cell[row]
+    pub fn cell(&self, row: usize) -> Option<u32> {
+        self.row_to_cell.get(row).copied()
     }
 
     /// Returns the row number (1-based) in the cell (1-based) for the
     /// given row (1-based).
-    pub fn cell_row(&self, row: usize) -> u32 {
-        self.row_to_row_in_cell[row]
+    pub fn cell_row(&self, row: usize) -> Option<u32> {
+        self.row_to_row_in_cell.get(row).copied()
     }
 }

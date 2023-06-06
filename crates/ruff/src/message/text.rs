@@ -82,13 +82,19 @@ impl Emitter for TextEmitter {
                 write!(
                     writer,
                     "cell {cell}{sep}",
-                    cell = jupyter_index.cell(start_location.row.get()),
+                    cell = jupyter_index
+                        .cell(start_location.row.get())
+                        .unwrap_or_default(),
                     sep = ":".cyan(),
                 )?;
 
                 SourceLocation {
-                    row: OneIndexed::new(jupyter_index.cell_row(start_location.row.get()) as usize)
-                        .unwrap(),
+                    row: OneIndexed::new(
+                        jupyter_index
+                            .cell_row(start_location.row.get())
+                            .unwrap_or(1) as usize,
+                    )
+                    .unwrap(),
                     column: start_location.column,
                 }
             } else {
