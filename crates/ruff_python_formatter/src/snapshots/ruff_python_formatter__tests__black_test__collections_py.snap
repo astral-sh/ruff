@@ -84,24 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,75 +1,49 @@
- import core, time, a
- 
- from . import A, B, C
--
- # keeps existing trailing comma
- from foo import (
-     bar,
- )
--
- # also keeps existing structure
- from foo import (
-     baz,
-     qux,
- )
--
- # `as` works as well
- from foo import (
+@@ -18,44 +18,26 @@
      xyzzy as magic,
  )
  
@@ -154,12 +137,12 @@ if True:
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
 -    % bar
 -)
--
 +y = {"oneple": (1,),}
 +assert False, ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s" % bar)
+ 
  # looping over a 1-tuple should also not get wrapped
  for x in (1,):
-     pass
+@@ -63,13 +45,9 @@
  for (x,) in (1,), (2,), (3,):
      pass
  
@@ -175,7 +158,7 @@ if True:
  print("foo %r", (foo.bar,))
  
  if True:
-@@ -79,21 +53,15 @@
+@@ -79,21 +57,15 @@
      )
  
  if True:
@@ -210,15 +193,18 @@ if True:
 import core, time, a
 
 from . import A, B, C
+
 # keeps existing trailing comma
 from foo import (
     bar,
 )
+
 # also keeps existing structure
 from foo import (
     baz,
     qux,
 )
+
 # `as` works as well
 from foo import (
     xyzzy as magic,
@@ -244,6 +230,7 @@ nested_long_lines = ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbb
 x = {"oneple": (1,)}
 y = {"oneple": (1,),}
 assert False, ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s" % bar)
+
 # looping over a 1-tuple should also not get wrapped
 for x in (1,):
     pass

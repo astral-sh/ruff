@@ -188,11 +188,8 @@ some_module.some_function(
  ):
      pass
  
-@@ -100,15 +56,7 @@
- some_module.some_function(
-     argument1, (one_element_tuple,), argument4, argument5, argument6
- )
--
+@@ -103,12 +59,5 @@
+ 
  # Inner trailing comma causes outer to explode
  some_module.some_function(
 -    argument1,
@@ -268,6 +265,7 @@ def func() -> ((also_super_long_type_annotation_that_may_cause_an_AST_related_cr
 some_module.some_function(
     argument1, (one_element_tuple,), argument4, argument5, argument6
 )
+
 # Inner trailing comma causes outer to explode
 some_module.some_function(
     argument1, (one, two,), argument4, argument5, argument6

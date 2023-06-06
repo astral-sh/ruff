@@ -65,6 +65,8 @@ not (aaaaaaaaaaaaaa + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     # leading right comment
     b
 )
+
+
 # Black breaks the right side first for the following expressions:
 (
     aaaaaaaaaaaaaa
@@ -100,11 +102,14 @@ aaaaaaaaaaaaaa + [
     aaaaaaaaaaaaaa
     + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
 )
+
 # Wraps it in parentheses if it needs to break both left and right
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + [bbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc, dddddddddddddddd, eee]
 )  # comment
+
+
 # But only for expressions that have a statement parent.
 (
     not (aaaaaaaaaaaaaa + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb})
@@ -112,6 +117,8 @@ aaaaaaaaaaaaaa + [
 [
     a + [bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb] in c,
 ]
+
+
 # leading comment
 (
     # comment

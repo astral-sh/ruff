@@ -146,6 +146,33 @@ pub(crate) fn lines_after(offset: TextSize, code: &str) -> u32 {
     newlines
 }
 
+/// Returns the position after skipping any trailing trivia up to, but not including the newline character.
+pub(crate) fn skip_trailing_trivia(offset: TextSize, code: &str) -> TextSize {
+    let rest = &code[usize::from(offset)..];
+    let mut iter = rest.char_indices();
+
+    while let Some((relative_offset, c)) = iter.next() {
+        match c {
+            '\n' | '\r' => return offset + TextSize::try_from(relative_offset).unwrap(),
+            '#' => {
+                // Skip the comment
+                let newline_offset = iter
+                    .as_str()
+                    .find(['\n', '\r'])
+                    .unwrap_or(iter.as_str().len());
+
+                return offset
+                    + TextSize::try_from(relative_offset + '#'.len_utf8() + newline_offset)
+                        .unwrap();
+            }
+            c if is_python_whitespace(c) => continue,
+            _ => return offset + TextSize::try_from(relative_offset).unwrap(),
+        }
+    }
+
+    offset + rest.text_len()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::trivia::{lines_after, lines_before};
