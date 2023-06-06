@@ -97,9 +97,10 @@ pub(crate) fn explicit_f_string_type_conversion(
         }) = &formatted_value else {
             continue;
         };
+
         // Skip if there's already a conversion flag.
         if !conversion.is_none() {
-            return;
+            continue;
         }
 
         let Expr::Call(ast::ExprCall {
@@ -108,24 +109,24 @@ pub(crate) fn explicit_f_string_type_conversion(
             keywords,
             ..
         }) = value.as_ref() else {
-            return;
+            continue;
         };
 
         // Can't be a conversion otherwise.
         if args.len() != 1 || !keywords.is_empty() {
-            return;
+            continue;
         }
 
         let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-            return;
+            continue;
         };
 
         if !matches!(id.as_str(), "str" | "repr" | "ascii") {
-            return;
+            continue;
         };
 
         if !checker.semantic_model().is_builtin(id) {
-            return;
+            continue;
         }
 
         let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, value.range());
