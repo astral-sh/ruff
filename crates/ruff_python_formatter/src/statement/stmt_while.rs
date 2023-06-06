@@ -1,5 +1,5 @@
 use crate::comments::{leading_alternate_branch_comments, trailing_comments};
-use crate::expression::Parenthesize;
+use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::write;

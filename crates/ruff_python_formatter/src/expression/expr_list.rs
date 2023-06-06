@@ -1,4 +1,7 @@
 use crate::comments::dangling_comments;
+use crate::expression::parentheses::{
+    default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
+};
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use ruff_formatter::{format_args, write};
@@ -16,15 +19,14 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         } = item;
 
         let items = format_with(|f| {
-            let mut first = true;
-            for item in elts {
-                if !first {
-                    write!(f, [text(","), soft_line_break_or_space()])?;
-                }
+            let mut iter = elts.iter();
 
-                write!(f, [item.format()])?;
+            if let Some(first) = iter.next() {
+                write!(f, [first.format()])?;
+            }
 
-                first = false;
+            for item in iter {
+                write!(f, [text(","), soft_line_break_or_space(), item.format()])?;
             }
 
             if !elts.is_empty() {
@@ -51,5 +53,14 @@ impl FormatNodeRule<ExprList> for FormatExprList {
     fn fmt_dangling_comments(&self, _node: &ExprList, _f: &mut PyFormatter) -> FormatResult<()> {
         // Handled as part of `fmt_fields`
         Ok(())
+    }
+}
+
+impl NeedsParentheses for ExprList {
+    fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
+        match default_expression_needs_parentheses(self.into(), parenthesize, source) {
+            Parentheses::Optional => Parentheses::Never,
+            parentheses => parentheses,
+        }
     }
 }

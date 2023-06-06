@@ -1,14 +1,10 @@
 use crate::context::NodeLevel;
-use crate::expression::expr_bin_op::should_binary_break_right_side_first;
+use crate::expression::parentheses::{NeedsParentheses, Parentheses, Parenthesize};
 use crate::prelude::*;
-use crate::trivia::{
-    find_first_non_trivia_character_after, find_first_non_trivia_character_before,
-};
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
-use rustpython_parser::ast::{Expr, Ranged};
-use std::fmt::Debug;
+use rustpython_parser::ast::Expr;
 
 pub(crate) mod expr_attribute;
 pub(crate) mod expr_await;
@@ -37,6 +33,7 @@ pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
+pub(crate) mod parentheses;
 
 #[derive(Default)]
 pub struct FormatExpr {
@@ -54,23 +51,7 @@ impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
 
 impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     fn fmt(&self, item: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
-        let parenthesize = !self.parenthesize.is_if_breaks()
-            && is_expression_parenthesized(item, f.context().contents());
-
-        let saved_level = f.context().node_level();
-        f.context_mut().set_node_level(NodeLevel::Expression);
-
-        // `Optional` or `Preserve` and expression has parentheses in source code.
-        let parentheses = if parenthesize {
-            Parentheses::Always
-        }
-        // `Optional` or `IfBreaks`: Add parentheses if the expression doesn't fit on a line
-        else if !self.parenthesize.is_preserve() {
-            Parentheses::Optional
-        } else {
-            //`Preserve` and expression has no parentheses in the source code
-            Parentheses::Never
-        };
+        let parentheses = item.needs_parentheses(self.parenthesize, f.context().contents());
 
         let format_expr = format_with(|f| match item {
             Expr::BoolOp(expr) => expr.format().fmt(f),
@@ -102,6 +83,9 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Slice(expr) => expr.format().fmt(f),
         });
 
+        let saved_level = f.context().node_level();
+        f.context_mut().set_node_level(NodeLevel::Expression);
+
         let result = match parentheses {
             Parentheses::Always => {
                 write!(
@@ -114,7 +98,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
                 )
             }
             // Add optional parentheses. Ignore if the item renders parentheses itself.
-            Parentheses::Optional if !has_own_parentheses(item) => {
+            Parentheses::Optional => {
                 write!(
                     f,
                     [group(&format_args![
@@ -124,7 +108,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
                     ])]
                 )
             }
-            Parentheses::Never | Parentheses::Optional => Format::fmt(&format_expr, f),
+            Parentheses::Custom | Parentheses::Never => Format::fmt(&format_expr, f),
         };
 
         f.context_mut().set_node_level(saved_level);
@@ -133,73 +117,37 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     }
 }
 
-/// Configures if the expression should be parenthesized.
-#[derive(Copy, Clone, Debug, Default)]
-pub enum Parenthesize {
-    /// Parenthesize the expression if it has parenthesis in the source.
-    #[default]
-    Preserve,
-
-    /// Parenthesizes the expression if it doesn't fit on a line OR if the expression is parenthesized in the source code.
-    Optional,
-
-    /// Parenthesizes the expression only if it doesn't fit on a line.
-    IfBreaks,
-}
-
-impl Parenthesize {
-    const fn is_if_breaks(self) -> bool {
-        matches!(self, Parenthesize::IfBreaks)
-    }
-
-    const fn is_preserve(self) -> bool {
-        matches!(self, Parenthesize::Preserve)
-    }
-}
-
-/// Whether it is necessary to add parentheses around an expression.
-/// This is different from [`Parenthesize`] in that it is the resolved representation: It takes into account
-/// whether there are parentheses in the source code or not.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Parentheses {
-    /// Always create parentheses
-    Always,
-
-    /// Only add parentheses when necessary because the expression breaks over multiple lines.
-    Optional,
-
-    /// Never add parentheses
-    Never,
-}
-
-fn is_expression_parenthesized(expr: &Expr, contents: &str) -> bool {
-    // Search backwards to avoid ambiguity with `(a, )` and because it's faster
-    matches!(
-        find_first_non_trivia_character_after(expr.end(), contents),
-        Some((_, ')'))
-    )
-    // Search forwards to confirm that this is not a nested expression `(5 + d * 3)`
-    && matches!(
-        find_first_non_trivia_character_before(expr.start(), contents),
-        Some((_, '('))
-    )
-}
-
-/// Returns `true` if `expr` adds its own parentheses.
-fn has_own_parentheses(expr: &Expr) -> bool {
-    match expr {
-        Expr::Tuple(_)
-        | Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_)
-        | Expr::GeneratorExp(_)
-        | Expr::Call(_) => true,
-        // Handles parentheses on its own.
-        Expr::BinOp(binary) => should_binary_break_right_side_first(binary),
-        _ => false,
+impl NeedsParentheses for Expr {
+    fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
+        match self {
+            Expr::BoolOp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::NamedExpr(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::BinOp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::UnaryOp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Lambda(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::IfExp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Dict(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Set(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::ListComp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::SetComp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::DictComp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::GeneratorExp(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Await(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Yield(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::YieldFrom(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Compare(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Call(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::FormattedValue(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::JoinedStr(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Constant(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Attribute(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Subscript(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Starred(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Name(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::List(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Tuple(expr) => expr.needs_parentheses(parenthesize, source),
+            Expr::Slice(expr) => expr.needs_parentheses(parenthesize, source),
+        }
     }
 }
 

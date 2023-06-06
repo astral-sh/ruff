@@ -1,4 +1,4 @@
-use crate::expression::Parenthesize;
+use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::FormatNodeRule;
 use rustpython_parser::ast::StmtExpr;

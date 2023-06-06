@@ -1,4 +1,7 @@
 use crate::comments::trailing_comments;
+use crate::expression::parentheses::{
+    default_expression_needs_parentheses, NeedsParentheses, Parenthesize,
+};
 use crate::expression::Parentheses;
 use crate::prelude::*;
 use crate::FormatNodeRule;
@@ -33,8 +36,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
             range: _,
         } = item;
 
-        let should_break_right = self.parentheses == Some(Parentheses::Optional)
-            && should_binary_break_right_side_first(item);
+        let should_break_right = self.parentheses == Some(Parentheses::Custom);
 
         if should_break_right {
             let left = left.format().memoized();
@@ -48,9 +50,9 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                     // Break the right, but keep the left flat
                     format_args![
                         left,
-                        text(" "),
+                        space(),
                         op.format(),
-                        text(" "),
+                        space(),
                         group(&right).should_expand(true),
                     ],
                     // Break after the operator, try to keep the right flat, otherwise expand it
@@ -88,7 +90,7 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                 ]
             )?;
 
-            // Format the operator on its own line if it has any trailing comments at the right side has leading comments.
+            // Format the operator on its own line if the operator has trailing comments and the right side has leading comments.
             if !operator_comments.is_empty() && comments.has_leading_comments(right.as_ref().into())
             {
                 write!(f, [hard_line_break()])?;
@@ -125,35 +127,6 @@ const fn is_simple_power_operand(expr: &Expr) -> bool {
         Expr::UnaryOp(ExprUnaryOp { operand, .. }) => is_simple_power_operand(operand),
         Expr::Attribute(ExprAttribute { value, .. }) => is_simple_power_operand(value),
         _ => false,
-    }
-}
-
-pub(super) fn should_binary_break_right_side_first(expr: &ExprBinOp) -> bool {
-    use ruff_python_ast::prelude::*;
-
-    if expr.left.is_bin_op_expr() {
-        false
-    } else {
-        match expr.right.as_ref() {
-            Expr::Tuple(ExprTuple {
-                elts: expressions, ..
-            })
-            | Expr::List(ExprList {
-                elts: expressions, ..
-            })
-            | Expr::Set(ExprSet {
-                elts: expressions, ..
-            })
-            | Expr::Dict(ExprDict {
-                values: expressions,
-                ..
-            }) => !expressions.is_empty(),
-            Expr::Call(ExprCall { args, keywords, .. }) => !args.is_empty() && !keywords.is_empty(),
-            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::GeneratorExp(_) => {
-                true
-            }
-            _ => false,
-        }
     }
 }
 
@@ -194,5 +167,49 @@ impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
         };
 
         text(operator).fmt(f)
+    }
+}
+
+impl NeedsParentheses for ExprBinOp {
+    fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
+        match default_expression_needs_parentheses(self.into(), parenthesize, source) {
+            Parentheses::Optional => {
+                if should_binary_break_right_side_first(self) {
+                    Parentheses::Custom
+                } else {
+                    Parentheses::Optional
+                }
+            }
+            parentheses => parentheses,
+        }
+    }
+}
+
+pub(super) fn should_binary_break_right_side_first(expr: &ExprBinOp) -> bool {
+    use ruff_python_ast::prelude::*;
+
+    if expr.left.is_bin_op_expr() {
+        false
+    } else {
+        match expr.right.as_ref() {
+            Expr::Tuple(ExprTuple {
+                elts: expressions, ..
+            })
+            | Expr::List(ExprList {
+                elts: expressions, ..
+            })
+            | Expr::Set(ExprSet {
+                elts: expressions, ..
+            })
+            | Expr::Dict(ExprDict {
+                values: expressions,
+                ..
+            }) => !expressions.is_empty(),
+            Expr::Call(ExprCall { args, keywords, .. }) => !args.is_empty() && !keywords.is_empty(),
+            Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::GeneratorExp(_) => {
+                true
+            }
+            _ => false,
+        }
     }
 }
