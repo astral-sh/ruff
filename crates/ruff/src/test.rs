@@ -43,15 +43,15 @@ pub fn test_snippet(contents: &str, settings: &Settings) -> Vec<Message> {
 }
 
 thread_local! {
-    static MAX_ITERATIONS: std::cell::Cell<usize> = std::cell::Cell::new(1);
+    static MAX_ITERATIONS: std::cell::Cell<usize> = std::cell::Cell::new(20);
 }
 
 pub fn set_max_iterations(max: usize) {
-    MAX_ITERATIONS.with(|iterations| iterations.set(max))
+    MAX_ITERATIONS.with(|iterations| iterations.set(max));
 }
 
 pub(crate) fn max_iterations() -> usize {
-    MAX_ITERATIONS.with(|iterations| iterations.get())
+    MAX_ITERATIONS.with(std::cell::Cell::get)
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
