@@ -19,8 +19,9 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 ///
 /// Use instead:
 /// ```python
-/// a = "some string"
+/// data = ["some", "Data"]
 /// {value: value.upper() for value in data}
+/// # Will map every value to itself in uppercase
 /// ```
 #[violation]
 pub struct StaticKeyDictComprehension;
