@@ -823,7 +823,7 @@ where
 
                 if self.enabled(Rule::NoSlotsInStrSubclass) {
                     flake8_slots::rules::no_slots_in_str_subclass(self, class_def, || {
-                        helpers::identifier_range(stmt, self.locator)
+                        helpers::identifier_range(class_def, self.locator)
                     });
                 }
 
