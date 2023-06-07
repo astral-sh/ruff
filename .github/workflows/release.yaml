@@ -400,6 +400,8 @@ jobs:
     permissions:
       # For pypi trusted publishing
       id-token: write
+      # For GitHub release publishing
+      contents: write
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -415,7 +417,7 @@ jobs:
         with:
           name: binaries
           path: binaries
-      - name: Release
+      - name: "Publish to GitHub"
         uses: softprops/action-gh-release@v1
         with:
           files: binaries/*
