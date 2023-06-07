@@ -22,32 +22,32 @@ f = ["This is a very long line that should be formatted into a clearer line ", "
 +++ Ruff
 @@ -1,10 +1,7 @@
 -a = 3
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = NOT_YET_IMPLEMENTED_ExprConstant
  # fmt: off
 -b,    c = 1, 2
 -d =    6  # fmt: skip
 -e = 5
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-+NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprTuple
++d = NOT_YET_IMPLEMENTED_ExprConstant  # fmt: skip
++e = NOT_YET_IMPLEMENTED_ExprConstant
  # fmt: on
 -f = [
 -    "This is a very long line that should be formatted into a clearer line ",
 -    "by rearranging.",
 -]
-+NOT_YET_IMPLEMENTED_StmtAssign
++f = [NOT_YET_IMPLEMENTED_ExprConstant, NOT_YET_IMPLEMENTED_ExprConstant]
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
+a = NOT_YET_IMPLEMENTED_ExprConstant
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprTuple
+d = NOT_YET_IMPLEMENTED_ExprConstant  # fmt: skip
+e = NOT_YET_IMPLEMENTED_ExprConstant
 # fmt: on
-NOT_YET_IMPLEMENTED_StmtAssign
+f = [NOT_YET_IMPLEMENTED_ExprConstant, NOT_YET_IMPLEMENTED_ExprConstant]
 ```
 
 ## Black Output

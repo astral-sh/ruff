@@ -71,13 +71,13 @@ def example8():
 @@ -1,85 +1,37 @@
 -x = 1
 -x = 1.2
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++x = NOT_YET_IMPLEMENTED_ExprConstant
++x = NOT_YET_IMPLEMENTED_ExprConstant
  
 -data = (
 -    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -).encode()
-+NOT_YET_IMPLEMENTED_StmtAssign
++data = NOT_YET_IMPLEMENTED_ExprCall
  
  
 -async def show_status():
@@ -173,10 +173,10 @@ def example8():
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+x = NOT_YET_IMPLEMENTED_ExprConstant
+x = NOT_YET_IMPLEMENTED_ExprConstant
 
-NOT_YET_IMPLEMENTED_StmtAssign
+data = NOT_YET_IMPLEMENTED_ExprCall
 
 
 NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef

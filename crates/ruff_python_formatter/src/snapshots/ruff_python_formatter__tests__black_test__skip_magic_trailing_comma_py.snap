@@ -65,27 +65,27 @@ func(
 -a: tuple[int,]
 -b = tuple[int,]
 +NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++b = NOT_YET_IMPLEMENTED_ExprSubscript
  
  # But commas in multiple element subscripts should be removed.
 -c: tuple[int, int]
 -d = tuple[int, int]
 +NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++d = NOT_YET_IMPLEMENTED_ExprSubscript
  
  # Remove commas for non-subscripts.
 -small_list = [1]
 -list_of_types = [tuple[int,]]
 -small_set = {1}
 -set_of_types = {tuple[int,]}
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++small_list = [NOT_YET_IMPLEMENTED_ExprConstant]
++list_of_types = [NOT_YET_IMPLEMENTED_ExprSubscript]
++small_set = NOT_YET_IMPLEMENTED_ExprSet
++set_of_types = NOT_YET_IMPLEMENTED_ExprSet
  
  # Except single element tuples
 -small_tuple = (1,)
-+NOT_YET_IMPLEMENTED_StmtAssign
++small_tuple = NOT_YET_IMPLEMENTED_ExprTuple
  
  # Trailing commas in multiple chained non-nested parens.
 -zero(one).two(three).four(five)
@@ -95,7 +95,7 @@ func(
 +NOT_YET_IMPLEMENTED_ExprCall
  
 -(a, b, c, d) = func1(arg1) and func2(arg2)
-+NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprBoolOp
  
 -func(argument1, (one, two), argument4, argument5, argument6)
 +NOT_YET_IMPLEMENTED_ExprCall
@@ -106,27 +106,27 @@ func(
 ```py
 # We should not remove the trailing comma in a single-element subscript.
 NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+b = NOT_YET_IMPLEMENTED_ExprSubscript
 
 # But commas in multiple element subscripts should be removed.
 NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+d = NOT_YET_IMPLEMENTED_ExprSubscript
 
 # Remove commas for non-subscripts.
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+small_list = [NOT_YET_IMPLEMENTED_ExprConstant]
+list_of_types = [NOT_YET_IMPLEMENTED_ExprSubscript]
+small_set = NOT_YET_IMPLEMENTED_ExprSet
+set_of_types = NOT_YET_IMPLEMENTED_ExprSet
 
 # Except single element tuples
-NOT_YET_IMPLEMENTED_StmtAssign
+small_tuple = NOT_YET_IMPLEMENTED_ExprTuple
 
 # Trailing commas in multiple chained non-nested parens.
 NOT_YET_IMPLEMENTED_ExprCall
 
 NOT_YET_IMPLEMENTED_ExprCall
 
-NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprBoolOp
 
 NOT_YET_IMPLEMENTED_ExprCall
 ```

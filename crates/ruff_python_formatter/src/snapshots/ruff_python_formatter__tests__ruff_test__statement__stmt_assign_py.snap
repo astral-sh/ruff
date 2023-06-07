@@ -21,15 +21,17 @@ a = asdf = fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakj
 ## Output
 ```py
 # break left hand side
-a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = (
-    cakjdshflkjahdslkfjlasfdahjlfds
-) = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = 3
+a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = cakjdshflkjahdslkfjlasfdahjlfds = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = (
+    NOT_YET_IMPLEMENTED_ExprConstant
+)
+
 # join left hand side
-a2 = b2 = 2
+a2 = (b2) = NOT_YET_IMPLEMENTED_ExprConstant
+
 # Break the last element
-a = asdf = (
-    fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal
-) = 1
+a = asdf = fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal = (
+    NOT_YET_IMPLEMENTED_ExprConstant
+)
 ```
 
 

@@ -138,7 +138,7 @@ async def wat():
 -# Some comment before a function.
 -y = 1
 +NOT_YET_IMPLEMENTED_StmtTry
-+NOT_YET_IMPLEMENTED_StmtAssign
++y = NOT_YET_IMPLEMENTED_ExprConstant
  (
      # some strings
      y  # type: ignore
@@ -166,7 +166,7 @@ async def wat():
  
  # Explains why we use global state.
 -GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
-+NOT_YET_IMPLEMENTED_StmtAssign
++GLOBAL_STATE = NOT_YET_IMPLEMENTED_ExprDict
  
  
  # Another comment!
@@ -236,7 +236,7 @@ NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
 
 NOT_YET_IMPLEMENTED_StmtTry
-NOT_YET_IMPLEMENTED_StmtAssign
+y = NOT_YET_IMPLEMENTED_ExprConstant
 (
     # some strings
     y  # type: ignore
@@ -247,7 +247,7 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Explains why we use global state.
-NOT_YET_IMPLEMENTED_StmtAssign
+GLOBAL_STATE = NOT_YET_IMPLEMENTED_ExprDict
 
 
 # Another comment!

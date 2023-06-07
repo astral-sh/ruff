@@ -152,11 +152,7 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,161 +1,90 @@
- # Test for https://github.com/psf/black/issues/246.
- 
--some = statement
-+NOT_YET_IMPLEMENTED_StmtAssign
+@@ -4,8 +4,7 @@
  
  
  # This comment should be split from the statement above by two lines.
@@ -165,10 +161,8 @@ def bar():
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
--some = statement
-+NOT_YET_IMPLEMENTED_StmtAssign
- 
- 
+ some = statement
+@@ -14,148 +13,78 @@
  # This multiline comments section
  # should be split from the statement
  # above by two lines.
@@ -177,8 +171,7 @@ def bar():
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
--some = statement
-+NOT_YET_IMPLEMENTED_StmtAssign
+ some = statement
  
  
  # This comment should be split from the statement above by two lines.
@@ -187,20 +180,18 @@ def bar():
 +NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
--some = statement
-+NOT_YET_IMPLEMENTED_StmtAssign
+ some = statement
  
  
  # This comment should be split from the statement above by two lines.
 -class MyClass:
 -    pass
 +NOT_YET_IMPLEMENTED_StmtClassDef
-+
-+
-+NOT_YET_IMPLEMENTED_StmtAssign
  
  
--some = statement
+ some = statement
++
++
  # This should be stick to the statement above
  
 -
@@ -221,8 +212,7 @@ def bar():
 +NOT_YET_IMPLEMENTED_StmtClassDef
  
  
--some = statement
-+NOT_YET_IMPLEMENTED_StmtAssign
+ some = statement
  
  
  # leading 1
@@ -238,8 +228,7 @@ def bar():
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
--some = statement
-+NOT_YET_IMPLEMENTED_StmtAssign
+ some = statement
  
  
  # leading 1
@@ -255,8 +244,7 @@ def bar():
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
--some = statement
-+NOT_YET_IMPLEMENTED_StmtAssign
+ some = statement
  
  
  # leading 1
@@ -270,18 +258,18 @@ def bar():
 -def decorated_with_split_leading_comments():
 -    pass
 -
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
 -def main():
 -    if a:
 -        # Leading comment before inline function
 -        def inline():
 -            pass
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -        # Another leading comment
 -        def another_inline():
 -            pass
--
+ 
 -    else:
 -        # More leading comments
 -        def inline_after_else():
@@ -303,16 +291,16 @@ def bar():
 -    # More leading comments
 -    def top_level_quote_inline_after_else():
 -        pass
--
--
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
 -class MyClass:
 -    # First method has no empty lines between bare class def.
 -    # More comments.
 -    def first_method(self):
 -        pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
- 
+-
+-
  # Regression test for https://github.com/psf/black/issues/3454.
 -def foo():
 -    pass
@@ -348,14 +336,14 @@ def bar():
 ```py
 # Test for https://github.com/psf/black/issues/246.
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # This comment should be split from the statement above by two lines.
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # This multiline comments section
@@ -364,21 +352,21 @@ NOT_YET_IMPLEMENTED_StmtAssign
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # This comment should be split from the statement above by two lines.
 NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # This comment should be split from the statement above by two lines.
 NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # This should be stick to the statement above
@@ -394,21 +382,21 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # leading 1
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # leading 1
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+some = statement
 
 
 # leading 1

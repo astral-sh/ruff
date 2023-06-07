@@ -44,11 +44,11 @@ e = 50  # one empty line before
 ```py
 # Removes the line above
 
-NOT_YET_IMPLEMENTED_StmtAssign  # Keeps the line above
+a = NOT_YET_IMPLEMENTED_ExprConstant  # Keeps the line above
 
 # Separated by one line from `a` and `b`
 
-NOT_YET_IMPLEMENTED_StmtAssign
+b = NOT_YET_IMPLEMENTED_ExprConstant
 
 
 # Adds two lines after `b`
@@ -57,7 +57,7 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 # two lines before, one line after
 
-NOT_YET_IMPLEMENTED_StmtAssign
+c = NOT_YET_IMPLEMENTED_ExprConstant
 
 while NOT_YET_IMPLEMENTED_ExprCompare:
     NOT_YET_IMPLEMENTED_ExprConstant
@@ -66,13 +66,13 @@ while NOT_YET_IMPLEMENTED_ExprCompare:
 
 # one line before this leading comment
 
-NOT_YET_IMPLEMENTED_StmtAssign
+d = NOT_YET_IMPLEMENTED_ExprConstant
 
 while NOT_YET_IMPLEMENTED_ExprCompare:
     NOT_YET_IMPLEMENTED_ExprConstant
     # no empty line before
 
-NOT_YET_IMPLEMENTED_StmtAssign  # one empty line before
+e = NOT_YET_IMPLEMENTED_ExprConstant  # one empty line before
 ```
 
 

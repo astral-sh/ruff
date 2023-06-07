@@ -267,7 +267,7 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -1,352 +1,253 @@
+@@ -1,352 +1,259 @@
 -"some_string"
 -b"\\xa3"
 +NOT_YET_IMPLEMENTED_ExprConstant
@@ -341,10 +341,7 @@ last_call()
 +v1 << NOT_YET_IMPLEMENTED_ExprConstant
 +NOT_YET_IMPLEMENTED_ExprConstant >> v2
 +NOT_YET_IMPLEMENTED_ExprConstant % finished
- (
--    (super_long_variable_name or None)
--    if (1 if super_long_test_name else 2)
--    else (str or bytes or None)
++(
 +    NOT_YET_IMPLEMENTED_ExprConstant
 +    + v2
 +    - v3 * NOT_YET_IMPLEMENTED_ExprConstant
@@ -352,6 +349,16 @@ last_call()
 +    **v6
 +    / NOT_YET_IMPLEMENTED_ExprConstant
 +    // NOT_YET_IMPLEMENTED_ExprConstant
++)
+ (
+-    (super_long_variable_name or None)
+-    if (1 if super_long_test_name else 2)
+-    else (str or bytes or None)
++    ((NOT_YET_IMPLEMENTED_ExprConstant + v2) - (v3 * NOT_YET_IMPLEMENTED_ExprConstant))
++    ^ (
++        ((NOT_YET_IMPLEMENTED_ExprConstant**v6) / NOT_YET_IMPLEMENTED_ExprConstant)
++        // NOT_YET_IMPLEMENTED_ExprConstant
++    )
  )
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
@@ -362,13 +369,6 @@ last_call()
 -(1,)
 -(1, 2)
 -(1, 2, 3)
-+(
-+    ((NOT_YET_IMPLEMENTED_ExprConstant + v2) - (v3 * NOT_YET_IMPLEMENTED_ExprConstant))
-+    ^ (
-+        ((NOT_YET_IMPLEMENTED_ExprConstant**v6) / NOT_YET_IMPLEMENTED_ExprConstant)
-+        // NOT_YET_IMPLEMENTED_ExprConstant
-+    )
-+)
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
@@ -382,8 +382,8 @@ last_call()
 +NOT_YET_IMPLEMENTED_ExprLambda
 +NOT_YET_IMPLEMENTED_ExprLambda
 +NOT_YET_IMPLEMENTED_ExprLambda
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++manylambdas = NOT_YET_IMPLEMENTED_ExprLambda
++foo = NOT_YET_IMPLEMENTED_ExprLambda
 +NOT_YET_IMPLEMENTED_ExprIfExp
 +NOT_YET_IMPLEMENTED_ExprIfExp
 +NOT_YET_IMPLEMENTED_ExprIfExp
@@ -417,33 +417,33 @@ last_call()
 +    (NOT_YET_IMPLEMENTED_ExprBoolOp),
 +    (NOT_YET_IMPLEMENTED_ExprBoolOp),
 +    (NOT_YET_IMPLEMENTED_ExprBoolOp),
-+]
-+[
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant,
  ]
 -[*a]
 -[*range(10)]
-+[NOT_YET_IMPLEMENTED_ExprStarred]
-+[NOT_YET_IMPLEMENTED_ExprStarred]
  [
 -    *a,
 -    4,
+-    5,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
+ ]
++[NOT_YET_IMPLEMENTED_ExprStarred]
++[NOT_YET_IMPLEMENTED_ExprStarred]
+ [
+-    4,
+-    *a,
 -    5,
 +    NOT_YET_IMPLEMENTED_ExprStarred,
 +    NOT_YET_IMPLEMENTED_ExprConstant,
 +    NOT_YET_IMPLEMENTED_ExprConstant,
  ]
  [
--    4,
--    *a,
--    5,
 +    NOT_YET_IMPLEMENTED_ExprConstant,
 +    NOT_YET_IMPLEMENTED_ExprStarred,
 +    NOT_YET_IMPLEMENTED_ExprConstant,
- ]
- [
++]
++[
      this_is_a_very_long_variable_which_will_force_a_delimiter_split,
      element,
      another,
@@ -648,10 +648,30 @@ last_call()
 -g = 1, *"ten"
 -what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
 -    vars_to_remove
--)
++NOT_YET_IMPLEMENTED_ExprTuple
++NOT_YET_IMPLEMENTED_ExprGeneratorExp
++NOT_YET_IMPLEMENTED_ExprGeneratorExp
++NOT_YET_IMPLEMENTED_ExprGeneratorExp
++NOT_YET_IMPLEMENTED_ExprGeneratorExp
++NOT_YET_IMPLEMENTED_ExprTuple
++NOT_YET_IMPLEMENTED_ExprDict
++a = NOT_YET_IMPLEMENTED_ExprTuple
++b = NOT_YET_IMPLEMENTED_ExprTuple
++c = NOT_YET_IMPLEMENTED_ExprConstant
++d = NOT_YET_IMPLEMENTED_ExprTuple + a + NOT_YET_IMPLEMENTED_ExprTuple
++e = NOT_YET_IMPLEMENTED_ExprCall
++f = NOT_YET_IMPLEMENTED_ExprTuple
++g = NOT_YET_IMPLEMENTED_ExprTuple
++what_is_up_with_those_new_coord_names = (
++    (coord_names + NOT_YET_IMPLEMENTED_ExprCall)
++    + NOT_YET_IMPLEMENTED_ExprCall
+ )
 -what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
 -    vars_to_remove
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_YET_IMPLEMENTED_ExprCall)
++    - NOT_YET_IMPLEMENTED_ExprCall
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -678,27 +698,11 @@ last_call()
 -    C: 0.1 * (10.0 / 12),
 -    D: 0.1 * (10.0 / 12),
 -}
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprGeneratorExp
-+NOT_YET_IMPLEMENTED_ExprTuple
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++result = NOT_YET_IMPLEMENTED_ExprCall
++result = NOT_YET_IMPLEMENTED_ExprCall
++Ø = NOT_YET_IMPLEMENTED_ExprCall
 +NOT_YET_IMPLEMENTED_ExprCall
-+NOT_YET_IMPLEMENTED_StmtAssign
++mapping = NOT_YET_IMPLEMENTED_ExprDict
  
  
 -def gen():
@@ -829,10 +833,10 @@ last_call()
 +while NOT_YET_IMPLEMENTED_ExprBoolOp:
 +    NOT_YET_IMPLEMENTED_ExprConstant
 +NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = NOT_YET_IMPLEMENTED_ExprCompare
++a = NOT_YET_IMPLEMENTED_ExprCompare
++a = NOT_YET_IMPLEMENTED_ExprCompare
++a = NOT_YET_IMPLEMENTED_ExprCompare
 +NOT_YET_IMPLEMENTED_StmtIf
 +NOT_YET_IMPLEMENTED_StmtIf
 +NOT_YET_IMPLEMENTED_StmtIf
@@ -846,7 +850,7 @@ last_call()
  (
      aaaaaaaaaaaaaaaa
      + aaaaaaaaaaaaaaaa
-@@ -363,8 +264,9 @@
+@@ -363,8 +270,9 @@
  bbbb >> bbbb * bbbb
  (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -917,8 +921,8 @@ NOT_YET_IMPLEMENTED_ExprLambda
 NOT_YET_IMPLEMENTED_ExprLambda
 NOT_YET_IMPLEMENTED_ExprLambda
 NOT_YET_IMPLEMENTED_ExprLambda
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+manylambdas = NOT_YET_IMPLEMENTED_ExprLambda
+foo = NOT_YET_IMPLEMENTED_ExprLambda
 NOT_YET_IMPLEMENTED_ExprIfExp
 NOT_YET_IMPLEMENTED_ExprIfExp
 NOT_YET_IMPLEMENTED_ExprIfExp
@@ -1063,20 +1067,26 @@ NOT_YET_IMPLEMENTED_ExprGeneratorExp
 NOT_YET_IMPLEMENTED_ExprGeneratorExp
 NOT_YET_IMPLEMENTED_ExprTuple
 NOT_YET_IMPLEMENTED_ExprDict
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+a = NOT_YET_IMPLEMENTED_ExprTuple
+b = NOT_YET_IMPLEMENTED_ExprTuple
+c = NOT_YET_IMPLEMENTED_ExprConstant
+d = NOT_YET_IMPLEMENTED_ExprTuple + a + NOT_YET_IMPLEMENTED_ExprTuple
+e = NOT_YET_IMPLEMENTED_ExprCall
+f = NOT_YET_IMPLEMENTED_ExprTuple
+g = NOT_YET_IMPLEMENTED_ExprTuple
+what_is_up_with_those_new_coord_names = (
+    (coord_names + NOT_YET_IMPLEMENTED_ExprCall)
+    + NOT_YET_IMPLEMENTED_ExprCall
+)
+what_is_up_with_those_new_coord_names = (
+    (coord_names | NOT_YET_IMPLEMENTED_ExprCall)
+    - NOT_YET_IMPLEMENTED_ExprCall
+)
+result = NOT_YET_IMPLEMENTED_ExprCall
+result = NOT_YET_IMPLEMENTED_ExprCall
+Ø = NOT_YET_IMPLEMENTED_ExprCall
 NOT_YET_IMPLEMENTED_ExprCall
-NOT_YET_IMPLEMENTED_StmtAssign
+mapping = NOT_YET_IMPLEMENTED_ExprDict
 
 
 NOT_YET_IMPLEMENTED_StmtFunctionDef
@@ -1099,10 +1109,10 @@ NOT_YET_IMPLEMENTED_StmtFor
 while NOT_YET_IMPLEMENTED_ExprBoolOp:
     NOT_YET_IMPLEMENTED_ExprConstant
 NOT_YET_IMPLEMENTED_StmtFor
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+a = NOT_YET_IMPLEMENTED_ExprCompare
+a = NOT_YET_IMPLEMENTED_ExprCompare
+a = NOT_YET_IMPLEMENTED_ExprCompare
+a = NOT_YET_IMPLEMENTED_ExprCompare
 NOT_YET_IMPLEMENTED_StmtIf
 NOT_YET_IMPLEMENTED_StmtIf
 NOT_YET_IMPLEMENTED_StmtIf

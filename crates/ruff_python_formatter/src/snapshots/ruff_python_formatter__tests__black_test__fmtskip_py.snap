@@ -20,17 +20,17 @@ d = 5
 -a, b = 1, 2
 -c =    6  # fmt: skip
 -d = 5
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-+NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprTuple
++c = NOT_YET_IMPLEMENTED_ExprConstant  # fmt: skip
++d = NOT_YET_IMPLEMENTED_ExprConstant
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprTuple
+c = NOT_YET_IMPLEMENTED_ExprConstant  # fmt: skip
+d = NOT_YET_IMPLEMENTED_ExprConstant
 ```
 
 ## Black Output

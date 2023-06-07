@@ -30,39 +30,65 @@ x = [
 ```diff
 --- Black
 +++ Ruff
-@@ -1,15 +1,9 @@
+@@ -1,15 +1,24 @@
  # fmt: off
--x = [
+ x = [
 -    1, 2,
 -    3, 4,
--]
-+NOT_YET_IMPLEMENTED_StmtAssign
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
+ ]
  # fmt: on
  
  # fmt: off
--x = [
+ x = [
 -    1, 2,
 -    3, 4,
--]
-+NOT_YET_IMPLEMENTED_StmtAssign
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
+ ]
  # fmt: on
  
 -x = [1, 2, 3, 4]
-+NOT_YET_IMPLEMENTED_StmtAssign
++x = [
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++]
 ```
 
 ## Ruff Output
 
 ```py
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtAssign
+x = [
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+]
 # fmt: on
 
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtAssign
+x = [
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+]
 # fmt: on
 
-NOT_YET_IMPLEMENTED_StmtAssign
+x = [
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+]
 ```
 
 ## Black Output

@@ -199,7 +199,7 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -1,224 +1,73 @@
+@@ -1,224 +1,77 @@
  #!/usr/bin/env python3
 -import asyncio
 -import sys
@@ -308,7 +308,7 @@ d={'a':1,
 -    a , b = *hello
 -    'unformatted'
 -    # fmt: on
-+NOT_YET_IMPLEMENTED_StmtAssign
++something = NOT_YET_IMPLEMENTED_ExprDict
  
  
 -def yield_expr():
@@ -454,8 +454,12 @@ d={'a':1,
 -l=[1,2,3]
 -d={'a':1,
 -   'b':2}
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++l = [
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++]
++d = NOT_YET_IMPLEMENTED_ExprDict
 ```
 
 ## Ruff Output
@@ -498,7 +502,7 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+something = NOT_YET_IMPLEMENTED_ExprDict
 
 
 NOT_YET_IMPLEMENTED_StmtFunctionDef
@@ -532,8 +536,12 @@ NOT_YET_IMPLEMENTED_ExprCall
 # fmt: off
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+l = [
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+]
+d = NOT_YET_IMPLEMENTED_ExprDict
 ```
 
 ## Black Output

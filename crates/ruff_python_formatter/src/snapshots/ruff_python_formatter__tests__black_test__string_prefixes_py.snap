@@ -41,7 +41,7 @@ def docstring_multiline():
 -(b"", b"")
 -("", "")
 -(r"", R"")
-+NOT_YET_IMPLEMENTED_StmtAssign
++name = NOT_YET_IMPLEMENTED_ExprConstant
 +NOT_YET_IMPLEMENTED_ExprTuple
 +NOT_YET_IMPLEMENTED_ExprTuple
 +NOT_YET_IMPLEMENTED_ExprTuple
@@ -70,7 +70,7 @@ def docstring_multiline():
 ```py
 #!/usr/bin/env python3
 
-NOT_YET_IMPLEMENTED_StmtAssign
+name = NOT_YET_IMPLEMENTED_ExprConstant
 NOT_YET_IMPLEMENTED_ExprTuple
 NOT_YET_IMPLEMENTED_ExprTuple
 NOT_YET_IMPLEMENTED_ExprTuple

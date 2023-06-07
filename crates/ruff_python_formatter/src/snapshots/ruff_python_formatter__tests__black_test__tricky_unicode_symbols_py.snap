@@ -29,31 +29,31 @@ A፩ = 8
 -x󠄀 = 4
 -មុ = 1
 -Q̇_per_meter = 4
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++ä = NOT_YET_IMPLEMENTED_ExprConstant
++µ = NOT_YET_IMPLEMENTED_ExprConstant
++蟒 = NOT_YET_IMPLEMENTED_ExprConstant
++x󠄀 = NOT_YET_IMPLEMENTED_ExprConstant
++មុ = NOT_YET_IMPLEMENTED_ExprConstant
++Q̇_per_meter = NOT_YET_IMPLEMENTED_ExprConstant
  
 -A᧚ = 3
 -A፩ = 8
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++A᧚ = NOT_YET_IMPLEMENTED_ExprConstant
++A፩ = NOT_YET_IMPLEMENTED_ExprConstant
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+ä = NOT_YET_IMPLEMENTED_ExprConstant
+µ = NOT_YET_IMPLEMENTED_ExprConstant
+蟒 = NOT_YET_IMPLEMENTED_ExprConstant
+x󠄀 = NOT_YET_IMPLEMENTED_ExprConstant
+មុ = NOT_YET_IMPLEMENTED_ExprConstant
+Q̇_per_meter = NOT_YET_IMPLEMENTED_ExprConstant
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+A᧚ = NOT_YET_IMPLEMENTED_ExprConstant
+A፩ = NOT_YET_IMPLEMENTED_ExprConstant
 ```
 
 ## Black Output

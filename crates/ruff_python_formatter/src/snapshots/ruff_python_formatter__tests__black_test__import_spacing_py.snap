@@ -62,7 +62,7 @@ __all__ = (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,64 +1,31 @@
+@@ -1,64 +1,42 @@
 -"""The asyncio package, tracking PEP 3156."""
 +NOT_YET_IMPLEMENTED_ExprConstant
  
@@ -135,7 +135,7 @@ __all__ = (
 +NOT_YET_IMPLEMENTED_StmtImportFrom
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
--__all__ = (
+ __all__ = (
 -    base_events.__all__
 -    + coroutines.__all__
 -    + events.__all__
@@ -146,8 +146,17 @@ __all__ = (
 -    + queues.__all__
 -    + streams.__all__
 -    + tasks.__all__
--)
-+NOT_YET_IMPLEMENTED_StmtAssign
++    NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
++    + NOT_YET_IMPLEMENTED_ExprAttribute
+ )
 ```
 
 ## Ruff Output
@@ -183,7 +192,18 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 NOT_YET_IMPLEMENTED_StmtImportFrom
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
-NOT_YET_IMPLEMENTED_StmtAssign
+__all__ = (
+    NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+    + NOT_YET_IMPLEMENTED_ExprAttribute
+)
 ```
 
 ## Black Output

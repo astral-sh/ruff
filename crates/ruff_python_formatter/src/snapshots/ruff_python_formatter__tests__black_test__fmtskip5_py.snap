@@ -32,14 +32,14 @@ else:
 -    print("I'm good!")
 -else:
 -    print("I'm bad")
-+NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprTuple
 +NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprTuple
 NOT_YET_IMPLEMENTED_StmtIf
 ```
 

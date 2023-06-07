@@ -131,7 +131,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 ```diff
 --- Black
 +++ Ruff
-@@ -1,118 +1,35 @@
+@@ -1,118 +1,40 @@
 -from typing import Any, Tuple
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
@@ -147,8 +147,9 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -def f(a, b, c, d, e, f, g, h, i):
 -    # type: (int, int, int, int, int, int, int, int, int) -> None
 -    pass
--
--
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+ 
 -def f(
 -    a,  # type: int
 -    b,  # type: int
@@ -162,8 +163,9 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -):
 -    # type: (...) -> None
 -    pass
--
--
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+ 
 -def f(
 -    arg,  # type: int
 -    *args,  # type: *Any
@@ -182,8 +184,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    d,  # type: int
 -):
 -    # type: (...) -> None
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
 -    element = 0  # type: int
 -    another_element = 1  # type: float
 -    another_element_with_long_name = 2  # type: int
@@ -191,12 +192,12 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -        3
 -    )  # type: int
 -    an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    tup = (
 -        another_element,
 -        another_really_really_long_element_with_a_unnecessarily_long_name_to_describe_what_it_does_enterprise_style,
 -    )  # type: Tuple[int, int]
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    a = (
 -        element
@@ -206,8 +207,8 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -        + another_element
 -        + another_element_with_long_name
 -    )  # type: int
- 
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
  
 -def f(
 -    x,  # not a type comment
@@ -215,15 +216,14 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -):
 -    # type: (...) -> None
 -    pass
- 
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
+-
 -def f(
 -    x,  # not a type comment
 -):  # type: (int) -> None
 -    pass
- 
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
  
 -def func(
 -    a=some_list[0],  # type: int
@@ -240,29 +240,34 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -        0.0789,
 -        a[-1],  # type: ignore
 -    )
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    c = call(
 -        "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa"  # type: ignore
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
++result = NOT_YET_IMPLEMENTED_ExprConstant  # aaa
  
 -result = (  # aaa
 -    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -)
-+NOT_YET_IMPLEMENTED_StmtAssign
++AAAAAAAAAAAAA = (
++    [AAAAAAAAAAAAA]
++    + SHARED_AAAAAAAAAAAAA
++    + USER_AAAAAAAAAAAAA
++    + AAAAAAAAAAAAA
++)  # type: ignore
  
 -AAAAAAAAAAAAA = [AAAAAAAAAAAAA] + SHARED_AAAAAAAAAAAAA + USER_AAAAAAAAAAAAA + AAAAAAAAAAAAA  # type: ignore
-+NOT_YET_IMPLEMENTED_StmtAssign  # type: ignore
++NOT_YET_IMPLEMENTED_ExprCall
  
 -call_to_some_function_asdf(
 -    foo,
 -    [AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, BBBBBBBBBBBB],  # type: ignore
 -)
-+NOT_YET_IMPLEMENTED_ExprCall
- 
+-
 -aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-+NOT_YET_IMPLEMENTED_StmtAssign  # type: ignore[arg-type]
++NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprCall  # type: ignore[arg-type]
 ```
 
 ## Ruff Output
@@ -296,13 +301,18 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign
+result = NOT_YET_IMPLEMENTED_ExprConstant  # aaa
 
-NOT_YET_IMPLEMENTED_StmtAssign  # type: ignore
+AAAAAAAAAAAAA = (
+    [AAAAAAAAAAAAA]
+    + SHARED_AAAAAAAAAAAAA
+    + USER_AAAAAAAAAAAAA
+    + AAAAAAAAAAAAA
+)  # type: ignore
 
 NOT_YET_IMPLEMENTED_ExprCall
 
-NOT_YET_IMPLEMENTED_StmtAssign  # type: ignore[arg-type]
+NOT_YET_IMPLEMENTED_ExprTuple = NOT_YET_IMPLEMENTED_ExprCall  # type: ignore[arg-type]
 ```
 
 ## Black Output

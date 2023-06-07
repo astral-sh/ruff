@@ -16,24 +16,30 @@ l = [1, 2, 3,]
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,3 @@
+@@ -1,7 +1,7 @@
 -a = 2
-+NOT_YET_IMPLEMENTED_StmtAssign
++a = NOT_YET_IMPLEMENTED_ExprConstant
  # fmt: skip
--l = [
+ l = [
 -    1,
 -    2,
 -    3,
--]
-+NOT_YET_IMPLEMENTED_StmtAssign
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
+ ]
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
+a = NOT_YET_IMPLEMENTED_ExprConstant
 # fmt: skip
-NOT_YET_IMPLEMENTED_StmtAssign
+l = [
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+]
 ```
 
 ## Black Output

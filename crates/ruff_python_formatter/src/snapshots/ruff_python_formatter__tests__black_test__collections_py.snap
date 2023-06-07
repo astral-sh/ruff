@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,99 +1,48 @@
+@@ -1,99 +1,54 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -128,26 +128,24 @@ if True:
 -    (4, 5, 6),
 -}
 -nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
--nested_long_lines = [
++a = NOT_YET_IMPLEMENTED_ExprSet
++b = NOT_YET_IMPLEMENTED_ExprSet
++c = NOT_YET_IMPLEMENTED_ExprSet
++x = NOT_YET_IMPLEMENTED_ExprTuple
++y = NOT_YET_IMPLEMENTED_ExprTuple
++nested = NOT_YET_IMPLEMENTED_ExprSet
++nested_no_trailing_comma = NOT_YET_IMPLEMENTED_ExprSet
+ nested_long_lines = [
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 -    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 -    "cccccccccccccccccccccccccccccccccccccccc",
 -    (1, 2, 3),
 -    "dddddddddddddddddddddddddddddddddddddddd",
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_ExprDict
-+NOT_YET_IMPLEMENTED_ExprDict
-+[
 +    NOT_YET_IMPLEMENTED_ExprConstant,
-+    NOT_YET_IMPLEMENTED_ExprConstant
-+    % NOT_YET_IMPLEMENTED_ExprTuple,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprTuple,
++    NOT_YET_IMPLEMENTED_ExprConstant,
  ]
 -{
 -    "oneple": (1,),
@@ -162,8 +160,15 @@ if True:
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
 -    % bar
 -)
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_ExprDict
++NOT_YET_IMPLEMENTED_ExprDict
++[
++    NOT_YET_IMPLEMENTED_ExprConstant,
++    NOT_YET_IMPLEMENTED_ExprConstant
++    % NOT_YET_IMPLEMENTED_ExprTuple,
++]
++x = NOT_YET_IMPLEMENTED_ExprDict
++y = NOT_YET_IMPLEMENTED_ExprDict
 +NOT_YET_IMPLEMENTED_StmtAssert
  
  # looping over a 1-tuple should also not get wrapped
@@ -185,7 +190,7 @@ if True:
  
 -division_result_tuple = (6 / 2,)
 -print("foo %r", (foo.bar,))
-+NOT_YET_IMPLEMENTED_StmtAssign
++division_result_tuple = NOT_YET_IMPLEMENTED_ExprTuple
 +NOT_YET_IMPLEMENTED_ExprCall
  
 -if True:
@@ -233,14 +238,20 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 # `as` works as well
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+a = NOT_YET_IMPLEMENTED_ExprSet
+b = NOT_YET_IMPLEMENTED_ExprSet
+c = NOT_YET_IMPLEMENTED_ExprSet
+x = NOT_YET_IMPLEMENTED_ExprTuple
+y = NOT_YET_IMPLEMENTED_ExprTuple
+nested = NOT_YET_IMPLEMENTED_ExprSet
+nested_no_trailing_comma = NOT_YET_IMPLEMENTED_ExprSet
+nested_long_lines = [
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+    NOT_YET_IMPLEMENTED_ExprTuple,
+    NOT_YET_IMPLEMENTED_ExprConstant,
+]
 NOT_YET_IMPLEMENTED_ExprDict
 NOT_YET_IMPLEMENTED_ExprDict
 [
@@ -248,8 +259,8 @@ NOT_YET_IMPLEMENTED_ExprDict
     NOT_YET_IMPLEMENTED_ExprConstant
     % NOT_YET_IMPLEMENTED_ExprTuple,
 ]
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+x = NOT_YET_IMPLEMENTED_ExprDict
+y = NOT_YET_IMPLEMENTED_ExprDict
 NOT_YET_IMPLEMENTED_StmtAssert
 
 # looping over a 1-tuple should also not get wrapped
@@ -262,7 +273,7 @@ NOT_YET_IMPLEMENTED_StmtFor
     NOT_YET_IMPLEMENTED_ExprConstant,
 ]
 
-NOT_YET_IMPLEMENTED_StmtAssign
+division_result_tuple = NOT_YET_IMPLEMENTED_ExprTuple
 NOT_YET_IMPLEMENTED_ExprCall
 
 NOT_YET_IMPLEMENTED_StmtIf

@@ -22,19 +22,19 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 -b =     5  # fmt:skip
 -c = 9  # fmt: skip
 -d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign  # fmt:skip
-+NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-+NOT_YET_IMPLEMENTED_StmtAssign  # fmt:skip
++a = NOT_YET_IMPLEMENTED_ExprConstant
++b = NOT_YET_IMPLEMENTED_ExprConstant  # fmt:skip
++c = NOT_YET_IMPLEMENTED_ExprConstant  # fmt: skip
++d = NOT_YET_IMPLEMENTED_ExprConstant  # fmt:skip
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign  # fmt:skip
-NOT_YET_IMPLEMENTED_StmtAssign  # fmt: skip
-NOT_YET_IMPLEMENTED_StmtAssign  # fmt:skip
+a = NOT_YET_IMPLEMENTED_ExprConstant
+b = NOT_YET_IMPLEMENTED_ExprConstant  # fmt:skip
+c = NOT_YET_IMPLEMENTED_ExprConstant  # fmt: skip
+d = NOT_YET_IMPLEMENTED_ExprConstant  # fmt:skip
 ```
 
 ## Black Output
