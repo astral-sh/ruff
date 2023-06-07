@@ -629,16 +629,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libafl_libfuzzer"
-version = "0.10.1"
-source = "git+https://github.com/AFLplusplus/LibAFL.git?branch=libfuzzer#ce0be4066016a40f92f1202621bbce93274655ce"
-dependencies = [
- "cc",
- "libfuzzer-sys",
- "rustversion",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.146"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1101,7 +1091,6 @@ name = "ruff-fuzz"
 version = "0.0.0"
 dependencies = [
  "arbitrary",
- "libafl_libfuzzer",
  "libfuzzer-sys",
  "ruff",
  "ruff_python_ast",

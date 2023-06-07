@@ -3,9 +3,6 @@
 
 #![no_main]
 
-#[cfg(feature = "libafl")]
-extern crate libafl_libfuzzer;
-
 use libfuzzer_sys::{fuzz_target, Corpus};
 use ruff_python_ast::source_code::round_trip;
 use similar::TextDiff;
