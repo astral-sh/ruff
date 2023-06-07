@@ -26,13 +26,16 @@ def f(): pass
 ```diff
 --- Black
 +++ Ruff
-@@ -4,17 +4,11 @@
-     3, 4,
- ])
- # fmt: on
+@@ -1,20 +1,5 @@
+ # fmt: off
+-@test([
+-    1, 2,
+-    3, 4,
+-])
+-# fmt: on
 -def f():
 -    pass
-+def f(): pass
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -@test(
@@ -45,30 +48,17 @@ def f(): pass
 -)
 -def f():
 -    pass
-+@test([
-+    1, 2,
-+    3, 4,
-+])
-+def f(): pass
++NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Ruff Output
 
 ```py
 # fmt: off
-@test([
-    1, 2,
-    3, 4,
-])
-# fmt: on
-def f(): pass
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-@test([
-    1, 2,
-    3, 4,
-])
-def f(): pass
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Black Output

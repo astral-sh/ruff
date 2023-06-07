@@ -94,51 +94,51 @@ async def main():
 ```diff
 --- Black
 +++ Ruff
-@@ -8,59 +8,64 @@
+@@ -1,93 +1,60 @@
+-import asyncio
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+ 
+ # Control example
+-async def main():
+-    await asyncio.sleep(1)
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+ 
  
  # Remove brackets for short coroutine/task
- async def main():
+-async def main():
 -    await asyncio.sleep(1)
-+    await (asyncio.sleep(1))
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- async def main():
+-async def main():
 -    await asyncio.sleep(1)
-+    await (
-+        asyncio.sleep(1)
-+    )
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- async def main():
+-async def main():
 -    await asyncio.sleep(1)
-+    await (asyncio.sleep(1)
-+    )
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
  # Check comments
- async def main():
+-async def main():
 -    await asyncio.sleep(1)  # Hello
-+    await (  # Hello
-+        asyncio.sleep(1)
-+    )
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- async def main():
+-async def main():
 -    await asyncio.sleep(1)  # Hello
-+    await (
-+        asyncio.sleep(1)  # Hello
-+    )
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- async def main():
+-async def main():
 -    await asyncio.sleep(1)  # Hello
-+    await (
-+        asyncio.sleep(1)
-+    )
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
  # Long lines
- async def main():
+-async def main():
 -    await asyncio.gather(
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
@@ -148,11 +148,11 @@ async def main():
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
 -    )
-+    await asyncio.gather(asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1))
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
  # Same as above but with magic trailing comma in function
- async def main():
+-async def main():
 -    await asyncio.gather(
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
@@ -162,145 +162,115 @@ async def main():
 -        asyncio.sleep(1),
 -        asyncio.sleep(1),
 -    )
-+    await asyncio.gather(asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1),)
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
  # Cr@zY Br@ck3Tz
- async def main():
+-async def main():
 -    await black(1)
-+    await (
-+        (((((((((((((
-+        (((        (((
-+        (((         (((
-+        (((         (((
-+        (((        (((
-+        ((black(1)))
-+        )))        )))
-+        )))         )))
-+        )))         )))
-+        )))        )))
-+        )))))))))))))
-+    )
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
  # Keep brackets around non power operations and nested awaits
-@@ -82,11 +87,11 @@
+-async def main():
+-    await (set_of_tasks | other_set)
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- async def main():
+-async def main():
 -    await (await asyncio.sleep(1))
-+    await (await (asyncio.sleep(1)))
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- async def main():
+ # It's awaits all the way down...
+-async def main():
+-    await (await x)
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+ 
+ 
+-async def main():
+-    await (yield x)
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+ 
+ 
+-async def main():
+-    await (await asyncio.sleep(1))
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+ 
+ 
+-async def main():
 -    await (await (await (await (await asyncio.sleep(1)))))
-+    await (await (await (await (await (asyncio.sleep(1))))))
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- async def main():
+-async def main():
+-    await (yield)
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 ```
 
 ## Ruff Output
 
 ```py
-import asyncio
+NOT_YET_IMPLEMENTED_StmtImport
 
 
 # Control example
-async def main():
-    await asyncio.sleep(1)
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # Remove brackets for short coroutine/task
-async def main():
-    await (asyncio.sleep(1))
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (
-        asyncio.sleep(1)
-    )
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (asyncio.sleep(1)
-    )
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # Check comments
-async def main():
-    await (  # Hello
-        asyncio.sleep(1)
-    )
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (
-        asyncio.sleep(1)  # Hello
-    )
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (
-        asyncio.sleep(1)
-    )
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # Long lines
-async def main():
-    await asyncio.gather(asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1))
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # Same as above but with magic trailing comma in function
-async def main():
-    await asyncio.gather(asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1), asyncio.sleep(1),)
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # Cr@zY Br@ck3Tz
-async def main():
-    await (
-        (((((((((((((
-        (((        (((
-        (((         (((
-        (((         (((
-        (((        (((
-        ((black(1)))
-        )))        )))
-        )))         )))
-        )))         )))
-        )))        )))
-        )))))))))))))
-    )
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # Keep brackets around non power operations and nested awaits
-async def main():
-    await (set_of_tasks | other_set)
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (await asyncio.sleep(1))
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # It's awaits all the way down...
-async def main():
-    await (await x)
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (yield x)
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (await (asyncio.sleep(1)))
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (await (await (await (await (asyncio.sleep(1))))))
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-async def main():
-    await (yield)
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 ```
 
 ## Black Output

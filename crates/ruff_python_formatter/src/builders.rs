@@ -191,16 +191,16 @@ no_leading_newline = 30
 
         assert_eq!(
             &printed,
-            r#"a = 10
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
 
 
-three_leading_newlines = 80
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
-two_leading_newlines = 20
+NOT_YET_IMPLEMENTED_StmtAssign
 
-one_leading_newline = 10
-no_leading_newline = 30"#
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign"#
         );
     }
 
@@ -211,14 +211,14 @@ no_leading_newline = 30"#
 
         assert_eq!(
             &printed,
-            r#"a = 10
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
 
-three_leading_newlines = 80
+NOT_YET_IMPLEMENTED_StmtAssign
 
-two_leading_newlines = 20
+NOT_YET_IMPLEMENTED_StmtAssign
 
-one_leading_newline = 10
-no_leading_newline = 30"#
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign"#
         );
     }
 
@@ -229,11 +229,11 @@ no_leading_newline = 30"#
 
         assert_eq!(
             &printed,
-            r#"a = 10
-three_leading_newlines = 80
-two_leading_newlines = 20
-one_leading_newline = 10
-no_leading_newline = 30"#
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign"#
         );
     }
 }

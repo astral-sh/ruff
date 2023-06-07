@@ -1,21 +1,14 @@
 use anyhow::{anyhow, Context, Result};
-use ruff_text_size::TextRange;
-use rustpython_parser::ast::Mod;
+use ruff_formatter::prelude::*;
+use ruff_formatter::{format, write};
+use ruff_formatter::{Formatted, IndentStyle, Printed, SimpleFormatOptions, SourceCode};
+use ruff_python_ast::node::{AnyNodeRef, AstNode, NodeKind};
+use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
+use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast::{Mod, Ranged};
 use rustpython_parser::lexer::lex;
 use rustpython_parser::{parse_tokens, Mode};
 use std::borrow::Cow;
-
-use ruff_formatter::format_element::tag::VerbatimKind;
-use ruff_formatter::formatter::Formatter;
-use ruff_formatter::prelude::{
-    dynamic_text, source_position, source_text_slice, ContainsNewlines, Tag,
-};
-use ruff_formatter::{
-    format, normalize_newlines, write, Buffer, Format, FormatElement, FormatResult, Formatted,
-    IndentStyle, Printed, SimpleFormatOptions, SourceCode,
-};
-use ruff_python_ast::node::AstNode;
-use ruff_python_ast::source_code::{CommentRanges, CommentRangesBuilder, Locator};
 
 use crate::comments::{
     dangling_node_comments, leading_node_comments, trailing_node_comments, Comments,
@@ -142,16 +135,49 @@ pub fn format_node<'a>(
     )
 }
 
+pub(crate) struct NotYetImplemented(NodeKind);
+
+/// Formats a placeholder for nodes that have not yet been implemented
+pub(crate) fn not_yet_implemented<'a, T>(node: T) -> NotYetImplemented
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    NotYetImplemented(node.into().kind())
+}
+
+impl Format<PyFormatContext<'_>> for NotYetImplemented {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let text = std::format!("NOT_YET_IMPLEMENTED_{:?}", self.0);
+
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
+                length: text.text_len(),
+            },
+        )))?;
+
+        f.write_element(FormatElement::DynamicText {
+            text: Box::from(text),
+        })?;
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        Ok(())
+    }
+}
+
 pub(crate) struct VerbatimText(TextRange);
 
-pub(crate) const fn verbatim_text(range: TextRange) -> VerbatimText {
-    VerbatimText(range)
+#[allow(unused)]
+pub(crate) fn verbatim_text<T>(item: &T) -> VerbatimText
+where
+    T: Ranged,
+{
+    VerbatimText(item.range())
 }
 
 impl Format<PyFormatContext<'_>> for VerbatimText {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(Tag::StartVerbatim(
-            VerbatimKind::Verbatim {
+            tag::VerbatimKind::Verbatim {
                 length: self.0.len(),
             },
         )))?;
@@ -203,8 +229,7 @@ if    True:
 # trailing
 "#;
         let expected = r#"# preceding
-if    True:
-    print( "hi" )
+NOT_YET_IMPLEMENTED_StmtIf
 # trailing
 "#;
         let actual = format_module(input)?.as_code().to_string();

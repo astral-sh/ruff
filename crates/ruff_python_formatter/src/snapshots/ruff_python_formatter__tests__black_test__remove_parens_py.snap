@@ -68,71 +68,75 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,5 +1,5 @@
+@@ -1,85 +1,37 @@
 -x = 1
 -x = 1.2
-+x = (1)
-+x = (1.2)
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
  
- data = (
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-@@ -11,75 +11,47 @@
-         try:
-             if report_host:
-                 data = (
+-data = (
+-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+-).encode()
++NOT_YET_IMPLEMENTED_StmtAssign
+ 
+ 
+-async def show_status():
+-    while True:
+-        try:
+-            if report_host:
+-                data = (
 -                    f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -                ).encode()
-+                   f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+               ).encode()
-         except Exception as e:
-             pass
+-        except Exception as e:
+-            pass
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
  
- def example():
+-def example():
 -    return "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+    return (("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example1():
+-def example1():
 -    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-+    return ((1111111111111111111111111111111111111111111111111111111111111111111111111111111111111))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example1point5():
+-def example1point5():
 -    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-+    return ((((((1111111111111111111111111111111111111111111111111111111111111111111111111111111111111))))))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example2():
+-def example2():
 -    return (
 -        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -    )
-+    return (("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example3():
+-def example3():
 -    return (
 -        1111111111111111111111111111111111111111111111111111111111111111111111111111111
 -    )
-+    return ((1111111111111111111111111111111111111111111111111111111111111111111111111111111))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example4():
+-def example4():
 -    return True
-+    return ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((True))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example5():
+-def example5():
 -    return ()
-+    return ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example6():
+-def example6():
 -    return {a: a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]}
-+    return ((((((((({a:a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]})))))))))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example7():
+-def example7():
 -    return {
 -        a: a
 -        for a in [
@@ -158,74 +162,54 @@ def example8():
 -            20000000000000000000,
 -        ]
 -    }
-+    return ((((((((({a:a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20000000000000000000]})))))))))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
- def example8():
+-def example8():
 -    return None
-+    return (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((None)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
++NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Ruff Output
 
 ```py
-x = (1)
-x = (1.2)
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
 
-data = (
-    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-).encode()
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
-async def show_status():
-    while True:
-        try:
-            if report_host:
-                data = (
-                   f"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-               ).encode()
-        except Exception as e:
-            pass
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
-def example():
-    return (("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example1():
-    return ((1111111111111111111111111111111111111111111111111111111111111111111111111111111111111))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example1point5():
-    return ((((((1111111111111111111111111111111111111111111111111111111111111111111111111111111111111))))))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example2():
-    return (("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example3():
-    return ((1111111111111111111111111111111111111111111111111111111111111111111111111111111))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example4():
-    return ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((True))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example5():
-    return ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((()))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example6():
-    return ((((((((({a:a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]})))))))))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example7():
-    return ((((((((({a:a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20000000000000000000]})))))))))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def example8():
-    return (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((None)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Black Output

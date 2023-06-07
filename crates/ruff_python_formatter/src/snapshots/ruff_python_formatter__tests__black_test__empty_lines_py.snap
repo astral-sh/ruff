@@ -105,162 +105,116 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,9 +3,9 @@
+@@ -1,89 +1,12 @@
+-"""Docstring."""
++NOT_YET_IMPLEMENTED_ExprConstant
+ 
  
  # leading comment
- def f():
+-def f():
 -    NO = ""
 -    SPACE = " "
 -    DOUBLESPACE = "  "
-+    NO = ''
-+    SPACE = ' '
-+    DOUBLESPACE = '  '
+-
+-    t = leaf.type
+-    p = leaf.parent  # trailing comment
+-    v = leaf.value
+-
+-    if t in ALWAYS_NO_SPACE:
+-        pass
+-    if t == token.COMMENT:  # another trailing comment
+-        return DOUBLESPACE
+-
+-    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
+-
+-    prev = leaf.prev_sibling
+-    if not prev:
+-        prevp = preceding_leaf(p)
+-        if not prevp or prevp.type in OPENING_BRACKETS:
+-            return NO
+-
+-        if prevp.type == token.EQUAL:
+-            if prevp.parent and prevp.parent.type in {
+-                syms.typedargslist,
+-                syms.varargslist,
+-                syms.parameters,
+-                syms.arglist,
+-                syms.argument,
+-            }:
+-                return NO
+-
+-        elif prevp.type == token.DOUBLESTAR:
+-            if prevp.parent and prevp.parent.type in {
+-                syms.typedargslist,
+-                syms.varargslist,
+-                syms.parameters,
+-                syms.arglist,
+-                syms.dictsetmaker,
+-            }:
+-                return NO
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
-     t = leaf.type
-     p = leaf.parent  # trailing comment
-@@ -16,14 +16,19 @@
-     if t == token.COMMENT:  # another trailing comment
-         return DOUBLESPACE
  
-+
-     assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
- 
-+
-     prev = leaf.prev_sibling
-     if not prev:
-         prevp = preceding_leaf(p)
-         if not prevp or prevp.type in OPENING_BRACKETS:
-+
-+
-             return NO
- 
-+
-         if prevp.type == token.EQUAL:
-             if prevp.parent and prevp.parent.type in {
-                 syms.typedargslist,
-@@ -48,12 +53,11 @@
  ###############################################################################
  # SECTION BECAUSE SECTIONS
  ###############################################################################
 -
  
- def g():
+-def g():
 -    NO = ""
 -    SPACE = " "
 -    DOUBLESPACE = "  "
-+    NO = ''
-+    SPACE = ' '
-+    DOUBLESPACE = '  '
- 
-     t = leaf.type
-     p = leaf.parent
-@@ -67,7 +71,7 @@
-         return DOUBLESPACE
- 
-     # Another comment because more comments
+-
+-    t = leaf.type
+-    p = leaf.parent
+-    v = leaf.value
+-
+-    # Comment because comments
+-
+-    if t in ALWAYS_NO_SPACE:
+-        pass
+-    if t == token.COMMENT:
+-        return DOUBLESPACE
+-
+-    # Another comment because more comments
 -    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-+    assert p is not None, f'INTERNAL ERROR: hand-made leaf without parent: {leaf!r}'
- 
-     prev = leaf.prev_sibling
-     if not prev:
+-
+-    prev = leaf.prev_sibling
+-    if not prev:
+-        prevp = preceding_leaf(p)
+-
+-        if not prevp or prevp.type in OPENING_BRACKETS:
+-            # Start of the line or a bracketed expression.
+-            # More than one line for the comment.
+-            return NO
+-
+-        if prevp.type == token.EQUAL:
+-            if prevp.parent and prevp.parent.type in {
+-                syms.typedargslist,
+-                syms.varargslist,
+-                syms.parameters,
+-                syms.arglist,
+-                syms.argument,
+-            }:
+-                return NO
++NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Ruff Output
 
 ```py
-"""Docstring."""
+NOT_YET_IMPLEMENTED_ExprConstant
 
 
 # leading comment
-def f():
-    NO = ''
-    SPACE = ' '
-    DOUBLESPACE = '  '
-
-    t = leaf.type
-    p = leaf.parent  # trailing comment
-    v = leaf.value
-
-    if t in ALWAYS_NO_SPACE:
-        pass
-    if t == token.COMMENT:  # another trailing comment
-        return DOUBLESPACE
-
-
-    assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-
-
-    prev = leaf.prev_sibling
-    if not prev:
-        prevp = preceding_leaf(p)
-        if not prevp or prevp.type in OPENING_BRACKETS:
-
-
-            return NO
-
-
-        if prevp.type == token.EQUAL:
-            if prevp.parent and prevp.parent.type in {
-                syms.typedargslist,
-                syms.varargslist,
-                syms.parameters,
-                syms.arglist,
-                syms.argument,
-            }:
-                return NO
-
-        elif prevp.type == token.DOUBLESTAR:
-            if prevp.parent and prevp.parent.type in {
-                syms.typedargslist,
-                syms.varargslist,
-                syms.parameters,
-                syms.arglist,
-                syms.dictsetmaker,
-            }:
-                return NO
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 ###############################################################################
 # SECTION BECAUSE SECTIONS
 ###############################################################################
 
-def g():
-    NO = ''
-    SPACE = ' '
-    DOUBLESPACE = '  '
-
-    t = leaf.type
-    p = leaf.parent
-    v = leaf.value
-
-    # Comment because comments
-
-    if t in ALWAYS_NO_SPACE:
-        pass
-    if t == token.COMMENT:
-        return DOUBLESPACE
-
-    # Another comment because more comments
-    assert p is not None, f'INTERNAL ERROR: hand-made leaf without parent: {leaf!r}'
-
-    prev = leaf.prev_sibling
-    if not prev:
-        prevp = preceding_leaf(p)
-
-        if not prevp or prevp.type in OPENING_BRACKETS:
-            # Start of the line or a bracketed expression.
-            # More than one line for the comment.
-            return NO
-
-        if prevp.type == token.EQUAL:
-            if prevp.parent and prevp.parent.type in {
-                syms.typedargslist,
-                syms.varargslist,
-                syms.parameters,
-                syms.arglist,
-                syms.argument,
-            }:
-                return NO
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Black Output
