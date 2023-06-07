@@ -97,16 +97,7 @@ elif   unformatted:
 ```diff
 --- Black
 +++ Ruff
-@@ -9,8 +9,6 @@
-             ]  # Includes an formatted indentation.
-     },
- )
--
--
- # Regression test for https://github.com/psf/black/issues/2015.
- run(
-     # fmt: off
-@@ -44,7 +42,7 @@
+@@ -44,7 +44,7 @@
          print ( "This won't be formatted" )
      print ( "This won't be formatted either" )
  else:
@@ -115,7 +106,7 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/3184.
-@@ -61,7 +59,7 @@
+@@ -61,7 +61,7 @@
              elif param[0:4] in ("ZZZZ",):
                  print ( "This won't be formatted either" )
  
@@ -124,7 +115,7 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/2985.
-@@ -72,10 +70,7 @@
+@@ -72,10 +72,7 @@
  
  
  class Factory(t.Protocol):
@@ -136,7 +127,7 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/3436.
-@@ -83,5 +78,5 @@
+@@ -83,5 +80,5 @@
      return x
  # fmt: off
  elif   unformatted:
@@ -160,6 +151,8 @@ setup(
             ]  # Includes an formatted indentation.
     },
 )
+
+
 # Regression test for https://github.com/psf/black/issues/2015.
 run(
     # fmt: off

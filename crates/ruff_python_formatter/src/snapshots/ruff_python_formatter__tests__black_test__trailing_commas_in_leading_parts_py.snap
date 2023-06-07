@@ -46,7 +46,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,28 +1,10 @@
+@@ -1,28 +1,11 @@
 -zero(
 -    one,
 -).two(
@@ -54,15 +54,15 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 -).four(
 -    five,
 -)
--
++zero(one,).two(three,).four(five,)
+ 
 -func1(arg1).func2(
 -    arg2,
 -).func3(arg3).func4(
 -    arg4,
 -).func5(arg5)
-+zero(one,).two(three,).four(five,)
- 
 +func1(arg1).func2(arg2,).func3(arg3).func4(arg4,).func5(arg5)
+ 
  # Inner one-element tuple shouldn't explode
  func1(arg1).func2(arg1, (one_tuple,)).func3(arg3)
  
@@ -78,14 +78,6 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
  
  
  # Example from https://github.com/psf/black/issues/3229
-@@ -41,7 +23,6 @@
-     long_module.long_class.long_func().another_func()
-     == long_module.long_class.long_func()["some_key"].another_func(arg1)
- )
--
- # Regression test for https://github.com/psf/black/issues/3414.
- assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
-     xxxxxxxxx
 ```
 
 ## Ruff Output
@@ -94,6 +86,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 zero(one,).two(three,).four(five,)
 
 func1(arg1).func2(arg2,).func3(arg3).func4(arg4,).func5(arg5)
+
 # Inner one-element tuple shouldn't explode
 func1(arg1).func2(arg1, (one_tuple,)).func3(arg3)
 
@@ -116,6 +109,7 @@ assert (
     long_module.long_class.long_func().another_func()
     == long_module.long_class.long_func()["some_key"].another_func(arg1)
 )
+
 # Regression test for https://github.com/psf/black/issues/3414.
 assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
     xxxxxxxxx

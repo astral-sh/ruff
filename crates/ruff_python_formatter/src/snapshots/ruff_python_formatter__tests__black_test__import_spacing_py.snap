@@ -62,7 +62,7 @@ __all__ = (
 ```diff
 --- Black
 +++ Ruff
-@@ -2,12 +2,13 @@
+@@ -2,8 +2,10 @@
  
  # flake8: noqa
  
@@ -74,11 +74,7 @@ __all__ = (
      ERROR,
  )
  import sys
--
- # This relies on each of the submodules having an __all__ variable.
- from .base_events import *
- from .coroutines import *
-@@ -22,33 +23,16 @@
+@@ -22,33 +24,16 @@
  from ..streams import *
  
  from some_library import (
@@ -134,6 +130,7 @@ from logging import (
     ERROR,
 )
 import sys
+
 # This relies on each of the submodules having an __all__ variable.
 from .base_events import *
 from .coroutines import *
