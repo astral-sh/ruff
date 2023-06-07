@@ -20,6 +20,7 @@ mod tests {
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
+    #[test_case(Rule::StaticKeyDictComprehension, Path::new("RUF011.py"))]
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
@@ -194,16 +195,6 @@ mod tests {
         let source_file = SourceFileBuilder::new("pyproject.toml", contents).finish();
         let messages = lint_pyproject_toml(source_file)?;
         assert_messages!(snapshot, messages);
-        Ok(())
-    }
-
-    #[test]
-    fn ruff_static_key_dict_comprehension() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/RUF011.py"),
-            &settings::Settings::for_rules(vec![Rule::StaticKeyDictComprehension]),
-        )?;
-        assert_messages!(diagnostics);
         Ok(())
     }
 }
