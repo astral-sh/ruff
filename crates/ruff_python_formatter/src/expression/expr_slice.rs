@@ -1,9 +1,7 @@
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{
-    not_yet_implemented_custom_text, FormatNodeRule, PyFormatter,
-};
+use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
 
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprSlice;
