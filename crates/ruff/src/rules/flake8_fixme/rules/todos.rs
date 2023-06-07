@@ -43,13 +43,13 @@ pub(crate) fn todos(directive_ranges: &[TodoComment]) -> Vec<Diagnostic> {
     directive_ranges
         .iter()
         .map(|TodoComment { directive, .. }| match directive.kind {
-            // T-001
+            // FIX001
             TodoDirectiveKind::Fixme => Diagnostic::new(LineContainsFixme, directive.range),
-            // T-002
+            // FIX002
             TodoDirectiveKind::Hack => Diagnostic::new(LineContainsHack, directive.range),
-            // T-003
+            // FIX003
             TodoDirectiveKind::Todo => Diagnostic::new(LineContainsTodo, directive.range),
-            // T-004
+            // FIX004
             TodoDirectiveKind::Xxx => Diagnostic::new(LineContainsXxx, directive.range),
         })
         .collect::<Vec<Diagnostic>>()

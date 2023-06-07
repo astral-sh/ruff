@@ -159,7 +159,7 @@ pub enum Linter {
     #[prefix = "TD"]
     Flake8Todos,
     /// [flake8-fixme](https://github.com/tommilligan/flake8-fixme)
-    #[prefix = "T"]
+    #[prefix = "FIX"]
     Flake8Fixme,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
