@@ -291,14 +291,14 @@ where
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
-                    // and the current scope.)
+                    // and the current scope, and, per standard resolution rules, any class scopes.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let binding_id = self
                             .semantic_model
                             .scopes
                             .ancestors(self.semantic_model.scope_id)
                             .skip(1)
-                            .take_while(|scope| !scope.kind.is_module())
+                            .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {

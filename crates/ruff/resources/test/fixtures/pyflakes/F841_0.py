@@ -126,3 +126,22 @@ def f(x: int):
 def f():
     if any((key := (value := x)) for x in ["ok"]):
         print(key)
+
+
+def f() -> None:
+    is_connected = False
+
+    class Foo:
+        @property
+        def is_connected(self):
+            nonlocal is_connected
+            return is_connected
+
+        def do_thing(self):
+            # This should resolve to the `is_connected` in the function scope.
+            nonlocal is_connected
+            print(is_connected)
+
+    obj = Foo()
+    obj.do_thing()
+
