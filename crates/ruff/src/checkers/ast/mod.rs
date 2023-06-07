@@ -2815,7 +2815,7 @@ where
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = self.semantic_model.scope_mut();
-                        scope.uses_locals = true;
+                        scope.set_uses_locals();
                     }
                 }
 
