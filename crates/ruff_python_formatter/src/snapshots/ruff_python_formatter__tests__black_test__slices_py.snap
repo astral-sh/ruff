@@ -76,127 +76,137 @@ x[
 ```diff
 --- Black
 +++ Ruff
-@@ -31,14 +31,17 @@
- ham[lower + offset : upper + offset]
+@@ -1,59 +1,37 @@
+-slice[a.b : c.d]
+-slice[d :: d + 1]
+-slice[d + 1 :: d]
+-slice[d::d]
+-slice[0]
+-slice[-1]
+-slice[:-1]
+-slice[::-1]
+-slice[:c, c - 1]
+-slice[c, c + 1, d::]
+-slice[ham[c::d] :: 1]
+-slice[ham[cheese**2 : -1] : 1 : 1, ham[1:2]]
+-slice[:-1:]
+-slice[lambda: None : lambda: None]
+-slice[lambda x, y, *args, really=2, **kwargs: None :, None::]
+-slice[1 or 2 : True and False]
+-slice[not so_simple : 1 < val <= 10]
+-slice[(1 for i in range(42)) : x]
+-slice[:: [i for i in range(42)]]
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
  
- slice[::, ::]
+ 
+-async def f():
+-    slice[await x : [i async for i in arange(42)] : 42]
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+ 
+ 
+ # These are from PEP-8:
+-ham[1:9], ham[1:9:3], ham[:9:3], ham[1::3], ham[1:9:]
+-ham[lower:upper], ham[lower:upper:], ham[lower::step]
++NOT_YET_IMPLEMENTED_ExprTuple
++NOT_YET_IMPLEMENTED_ExprTuple
+ # ham[lower+offset : upper+offset]
+-ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
+-ham[lower + offset : upper + offset]
++NOT_YET_IMPLEMENTED_ExprTuple
++NOT_YET_IMPLEMENTED_ExprSubscript
+ 
+-slice[::, ::]
 -slice[
-+(
-+    slice[
-     # A
-     :
-     # B
-     :
-     # C
- ]
+-    # A
+-    :
+-    # B
+-    :
+-    # C
+-]
 -slice[
-+)
-+(
-+    slice[
-     # A
-     1:
-     # B
-@@ -46,8 +49,10 @@
-     # C
-     3
- ]
-+)
+-    # A
+-    1:
+-    # B
+-    2:
+-    # C
+-    3
+-]
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
  
 -slice[
-+(
-+    slice[
-     # A
-     1
-     + 2 :
-@@ -56,4 +61,11 @@
-     # C
-     4
- ]
+-    # A
+-    1
+-    + 2 :
+-    # B
+-    3 :
+-    # C
+-    4
+-]
 -x[1:2:3]  # A  # B  # C
-+)
-+(
-+    x[
-+    1:  # A
-+    2:  # B
-+    3  # C
-+]
-+)
++NOT_YET_IMPLEMENTED_ExprSubscript
++NOT_YET_IMPLEMENTED_ExprSubscript
 ```
 
 ## Ruff Output
 
 ```py
-slice[a.b : c.d]
-slice[d :: d + 1]
-slice[d + 1 :: d]
-slice[d::d]
-slice[0]
-slice[-1]
-slice[:-1]
-slice[::-1]
-slice[:c, c - 1]
-slice[c, c + 1, d::]
-slice[ham[c::d] :: 1]
-slice[ham[cheese**2 : -1] : 1 : 1, ham[1:2]]
-slice[:-1:]
-slice[lambda: None : lambda: None]
-slice[lambda x, y, *args, really=2, **kwargs: None :, None::]
-slice[1 or 2 : True and False]
-slice[not so_simple : 1 < val <= 10]
-slice[(1 for i in range(42)) : x]
-slice[:: [i for i in range(42)]]
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
 
 
-async def f():
-    slice[await x : [i async for i in arange(42)] : 42]
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # These are from PEP-8:
-ham[1:9], ham[1:9:3], ham[:9:3], ham[1::3], ham[1:9:]
-ham[lower:upper], ham[lower:upper:], ham[lower::step]
+NOT_YET_IMPLEMENTED_ExprTuple
+NOT_YET_IMPLEMENTED_ExprTuple
 # ham[lower+offset : upper+offset]
-ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
-ham[lower + offset : upper + offset]
+NOT_YET_IMPLEMENTED_ExprTuple
+NOT_YET_IMPLEMENTED_ExprSubscript
 
-slice[::, ::]
-(
-    slice[
-    # A
-    :
-    # B
-    :
-    # C
-]
-)
-(
-    slice[
-    # A
-    1:
-    # B
-    2:
-    # C
-    3
-]
-)
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
 
-(
-    slice[
-    # A
-    1
-    + 2 :
-    # B
-    3 :
-    # C
-    4
-]
-)
-(
-    x[
-    1:  # A
-    2:  # B
-    3  # C
-]
-)
+NOT_YET_IMPLEMENTED_ExprSubscript
+NOT_YET_IMPLEMENTED_ExprSubscript
 ```
 
 ## Black Output

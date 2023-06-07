@@ -1,0 +1,56 @@
+[package]
+name = "ruff-fuzz"
+version = "0.0.0"
+authors = [
+  "Charlie Marsh <charlie.r.marsh@gmail.com>",
+  "Addison Crump <research@addisoncrump.info>",
+]
+publish = false
+edition = "2021"
+
+[features]
+default = ["libfuzzer"]
+full-idempotency = []
+libafl = ["libafl_libfuzzer"]
+libafl_merge = ["libafl", "libafl_libfuzzer/merge"]
+libfuzzer = ["libfuzzer-sys/link_libfuzzer"]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1.3.0", features = ["derive"] }
+libafl_libfuzzer = { git = "https://github.com/AFLplusplus/LibAFL.git", branch = "libfuzzer", optional = true }
+libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
+ruff = { path = "../crates/ruff" }
+ruff_python_ast = { path = "../crates/ruff_python_ast" }
+ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
+similar = { version = "2.2.1" }
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "ruff_parse_simple"
+path = "fuzz_targets/ruff_parse_simple.rs"
+
+[[bin]]
+name = "ruff_fix_validity"
+path = "fuzz_targets/ruff_fix_validity.rs"
+
+[[bin]]
+name = "ruff_parse_idempotency"
+path = "fuzz_targets/ruff_parse_idempotency.rs"
+
+[profile.release]
+opt-level = 3
+debug = true
+
+[profile.dev]
+opt-level = 3
+debug = true
+
+[profile.test]
+opt-level = 3
+debug = true

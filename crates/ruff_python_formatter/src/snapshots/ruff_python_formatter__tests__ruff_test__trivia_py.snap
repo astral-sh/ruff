@@ -1,0 +1,78 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+---
+## Input
+```py
+
+# Removes the line above
+
+a = 10  # Keeps the line above
+
+# Separated by one line from `a` and `b`
+
+b = 20
+# Adds two lines after `b`
+class Test:
+    def a(self):
+        pass
+        # trailing comment
+
+# two lines before, one line after
+
+c = 30
+
+while a == 10:
+    ...
+
+    # trailing comment with one line before
+
+# one line before this leading comment
+
+d = 40
+
+while b == 20:
+    ...
+    # no empty line before
+
+e = 50  # one empty line before
+```
+
+
+
+## Output
+```py
+# Removes the line above
+
+NOT_YET_IMPLEMENTED_StmtAssign  # Keeps the line above
+
+# Separated by one line from `a` and `b`
+
+NOT_YET_IMPLEMENTED_StmtAssign
+
+
+# Adds two lines after `b`
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+# two lines before, one line after
+
+NOT_YET_IMPLEMENTED_StmtAssign
+
+while NOT_YET_IMPLEMENTED_ExprCompare:
+    NOT_YET_IMPLEMENTED_ExprConstant
+
+    # trailing comment with one line before
+
+# one line before this leading comment
+
+NOT_YET_IMPLEMENTED_StmtAssign
+
+while NOT_YET_IMPLEMENTED_ExprCompare:
+    NOT_YET_IMPLEMENTED_ExprConstant
+    # no empty line before
+
+NOT_YET_IMPLEMENTED_StmtAssign  # one empty line before
+```
+
+

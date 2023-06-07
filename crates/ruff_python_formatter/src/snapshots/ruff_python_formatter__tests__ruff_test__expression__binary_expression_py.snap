@@ -65,53 +65,35 @@ not (aaaaaaaaaaaaaa + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     # leading right comment
     b
 )
+
+
 # Black breaks the right side first for the following expressions:
-(
-    aaaaaaaaaaaaaa
-    + caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaal(argument1, argument2, argument3)
-)
+aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprCall
 aaaaaaaaaaaaaa + [
     bbbbbbbbbbbbbbbbbbbbbb,
     ccccccccccccccccccccc,
     dddddddddddddddd,
     eeeeeee,
 ]
-(
-    aaaaaaaaaaaaaa
-    + (bbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc, dddddddddddddddd, eeeeeee)
-)
-(
-    aaaaaaaaaaaaaa
-    + { key1:bbbbbbbbbbbbbbbbbbbbbb, key2: ccccccccccccccccccccc, key3: dddddddddddddddd, key4: eeeeeee }
-)
-(
-    aaaaaaaaaaaaaa
-    + { bbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc, dddddddddddddddd, eeeeeee }
-)
-(
-    aaaaaaaaaaaaaa
-    + [a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ]
-)
-(
-    aaaaaaaaaaaaaa
-    + (a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb )
-)
-(
-    aaaaaaaaaaaaaa
-    + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
-)
+aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprTuple
+aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprDict
+aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSet
+aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprListComp
+aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprGeneratorExp
+aaaaaaaaaaaaaa + NOT_YET_IMPLEMENTED_ExprSetComp
+
 # Wraps it in parentheses if it needs to break both left and right
 (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + [bbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccccccccc, dddddddddddddddd, eee]
 )  # comment
+
+
 # But only for expressions that have a statement parent.
-(
-    not (aaaaaaaaaaaaaa + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb})
-)
-[
-    a + [bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb] in c,
-]
+NOT_YET_IMPLEMENTED_ExprUnaryOp
+[NOT_YET_IMPLEMENTED_ExprCompare]
+
+
 # leading comment
 (
     # comment

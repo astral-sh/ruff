@@ -1,4 +1,4 @@
-use crate::{verbatim_text, FormatNodeRule, PyFormatter};
+use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ModExpression;
 
@@ -7,6 +7,6 @@ pub struct FormatModExpression;
 
 impl FormatNodeRule<ModExpression> for FormatModExpression {
     fn fmt_fields(&self, item: &ModExpression, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [verbatim_text(item.range)])
+        write!(f, [not_yet_implemented(item)])
     }
 }

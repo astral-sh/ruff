@@ -35,5 +35,5 @@ mod rule_selector;
 pub mod rules;
 pub mod settings;
 
-#[cfg(test)]
-mod test;
+#[cfg(any(test, fuzzing))]
+pub mod test;

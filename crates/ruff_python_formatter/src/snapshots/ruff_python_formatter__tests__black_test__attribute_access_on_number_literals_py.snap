@@ -35,10 +35,9 @@ y = 100(no)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,21 +1,21 @@
+@@ -1,22 +1,21 @@
 -x = (123456789).bit_count()
-+x = 123456789 .bit_count()
- x = (123456).__abs__()
+-x = (123456).__abs__()
 -x = (0.1).is_integer()
 -x = (1.0).imag
 -x = (1e1).imag
@@ -53,53 +52,57 @@ y = 100(no)
 -x = 0o777.real
 -x = (0.000000006).hex()
 -x = -100.0000j
-+x = .1.is_integer()
-+x = 1. .imag
-+x = 1E+1.imag
-+x = 1E-1.real
-+x = 123456789.123456789.hex()
-+x = 123456789.123456789E123456789 .real
-+x = 123456789E123456789 .conjugate()
-+x = 123456789J.real
-+x = 123456789.123456789J.__add__(0b1011.bit_length())
-+x = 0XB1ACC.conjugate()
-+x = 0B1011 .conjugate()
-+x = 0O777 .real
-+x = 0.000000006  .hex()
-+x = -100.0000J
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
  
 -if (10).real:
-+if 10 .real:
-     ...
+-    ...
++NOT_YET_IMPLEMENTED_StmtIf
  
- y = 100[no]
+-y = 100[no]
+-y = 100(no)
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Ruff Output
 
 ```py
-x = 123456789 .bit_count()
-x = (123456).__abs__()
-x = .1.is_integer()
-x = 1. .imag
-x = 1E+1.imag
-x = 1E-1.real
-x = 123456789.123456789.hex()
-x = 123456789.123456789E123456789 .real
-x = 123456789E123456789 .conjugate()
-x = 123456789J.real
-x = 123456789.123456789J.__add__(0b1011.bit_length())
-x = 0XB1ACC.conjugate()
-x = 0B1011 .conjugate()
-x = 0O777 .real
-x = 0.000000006  .hex()
-x = -100.0000J
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
 
-if 10 .real:
-    ...
+NOT_YET_IMPLEMENTED_StmtIf
 
-y = 100[no]
-y = 100(no)
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Black Output

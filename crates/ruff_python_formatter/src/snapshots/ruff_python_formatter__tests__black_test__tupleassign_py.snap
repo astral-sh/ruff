@@ -20,7 +20,7 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 ```diff
 --- Black
 +++ Ruff
-@@ -1,12 +1,6 @@
+@@ -1,12 +1,7 @@
  # This is a standalone comment.
 -(
 -    sdfjklsdfsjldkflkjsf,
@@ -28,24 +28,26 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 -    sdfsdjfklsdfjlksdljkf,
 -    sdsfsdfjskdflsfsdf,
 -) = (1, 2, 3)
--
-+sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
++NOT_YET_IMPLEMENTED_StmtAssign
+ 
  # This is as well.
 -(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
-+this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
++NOT_YET_IMPLEMENTED_StmtAssign
  
- (a,) = call()
+-(a,) = call()
++NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Ruff Output
 
 ```py
 # This is a standalone comment.
-sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
-# This is as well.
-this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
+NOT_YET_IMPLEMENTED_StmtAssign
 
-(a,) = call()
+# This is as well.
+NOT_YET_IMPLEMENTED_StmtAssign
+
+NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Black Output

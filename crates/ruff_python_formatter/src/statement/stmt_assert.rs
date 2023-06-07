@@ -1,4 +1,4 @@
-use crate::{verbatim_text, FormatNodeRule, PyFormatter};
+use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::StmtAssert;
 
@@ -7,6 +7,6 @@ pub struct FormatStmtAssert;
 
 impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
     fn fmt_fields(&self, item: &StmtAssert, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [verbatim_text(item.range)])
+        write!(f, [not_yet_implemented(item)])
     }
 }
