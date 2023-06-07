@@ -66,7 +66,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Call(ast::ExprCall { func, keywords, .. }) = arg else {
+    let Expr::Call(ast::ExprCall { func, .. }) = arg else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {
@@ -76,16 +76,6 @@ pub(crate) fn unnecessary_call_around_sorted(
         return;
     }
     if !checker.semantic_model().is_builtin(inner) || !checker.semantic_model().is_builtin(outer) {
-        return;
-    }
-    // Avoid flagging when there's the `key` keyword argument present as it could
-    // lead to false positive (issue #4879).
-    if keywords.iter().any(|keyword| {
-        keyword
-            .arg
-            .as_ref()
-            .map_or(false, |id| id.as_str() == "key")
-    }) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
