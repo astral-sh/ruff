@@ -168,18 +168,18 @@ fn lint_path(
     match result {
         Ok(inner) => inner,
         Err(error) => {
-            let message = r#"This indicates a bug in `ruff`. If you could open an issue at:
+            warn!(
+                "{}{}{} This indicates a bug in `ruff`. If you could open an issue at:
 
-https://github.com/charliermarsh/ruff/issues/new?title=%5BLinter%20panic%5D
+{}/issues/new?title=%5BLinter%20panic%5D
 
 with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
-"#;
 
-            warn!(
-                "{}{}{} {message}\n{error}",
+{error}",
                 "Linting panicked ".bold(),
                 fs::relativize_path(path).bold(),
-                ":".bold()
+                ":".bold(),
+                env!("CARGO_PKG_REPOSITORY"),
             );
 
             Ok(Diagnostics::default())
