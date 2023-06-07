@@ -41,7 +41,7 @@ expression: parse_ast
     ),
     ClassDef(
         StmtClassDef {
-            range: 40..77,
+            range: 36..73,
             name: Identifier(
                 "Abcd",
             ),
@@ -50,14 +50,14 @@ expression: parse_ast
             body: [
                 Pass(
                     StmtPass {
-                        range: 73..77,
+                        range: 69..73,
                     },
                 ),
             ],
             decorator_list: [
                 Name(
                     ExprName {
-                        range: 41..56,
+                        range: 37..52,
                         id: Identifier(
                             "class_decorator",
                         ),

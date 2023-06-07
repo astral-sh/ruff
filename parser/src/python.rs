@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.19.8"
-// sha3: 82bdc299d8185d1aa4a2c969643cfcf7097ba66bb460cb6ae85023c1f358e750
+// sha3: 78e4fe2d25728ae4a1a411a48ffdc7845d05f16bacd09d23349a56b99a3eeaf4
 use crate::{
     ast::{self as ast, Ranged, bigint::BigInt},
     lexer::{LexicalError, LexicalErrorType},
@@ -25564,8 +25564,14 @@ fn __action158<
 {
     {
         a.as_ref().map(validate_arguments).transpose()?;
+
+        let range = optional_range(location, end_location);
         let args = a
-            .unwrap_or_else(|| ast::Arguments::empty(optional_range(location, end_location)));
+            .map(|mut arguments| {
+                arguments.range = range;
+                arguments
+            })
+            .unwrap_or_else(|| ast::Arguments::empty(range));
 
         Ok(args)
     }

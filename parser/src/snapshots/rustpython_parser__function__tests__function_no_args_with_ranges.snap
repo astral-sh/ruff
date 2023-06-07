@@ -1,0 +1,36 @@
+---
+source: parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        FunctionDef(
+            StmtFunctionDef {
+                range: 0..13,
+                name: Identifier(
+                    "f",
+                ),
+                args: Arguments {
+                    range: 5..7,
+                    posonlyargs: [],
+                    args: [],
+                    vararg: None,
+                    kwonlyargs: [],
+                    kw_defaults: [],
+                    kwarg: None,
+                    defaults: [],
+                },
+                body: [
+                    Pass(
+                        StmtPass {
+                            range: 9..13,
+                        },
+                    ),
+                ],
+                decorator_list: [],
+                returns: None,
+                type_comment: None,
+            },
+        ),
+    ],
+)
