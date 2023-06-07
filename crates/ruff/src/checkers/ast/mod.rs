@@ -463,6 +463,9 @@ where
                     if self.enabled(Rule::StrOrReprDefinedInStub) {
                         flake8_pyi::rules::str_or_repr_defined_in_stub(self, stmt);
                     }
+                    if self.enabled(Rule::NoReturnArgumentAnnotationInStub) {
+                        flake8_pyi::rules::no_return_argument_annotation(self, args);
+                    }
                 }
 
                 if self.enabled(Rule::DunderFunctionName) {
