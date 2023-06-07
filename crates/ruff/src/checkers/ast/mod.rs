@@ -3554,6 +3554,9 @@ where
                         pylint::rules::iteration_over_set(self, &generator.iter);
                     }
                 }
+                if self.enabled(Rule::StaticKeyDictComprehension) {
+                    ruff::rules::static_key_dict_comprehension(self, expr, key)
+                }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {
                 generators,
