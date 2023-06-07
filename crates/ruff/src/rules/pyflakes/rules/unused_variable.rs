@@ -7,7 +7,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_semantic::scope::{ScopeId, ScopeKind};
+use ruff_python_semantic::scope::ScopeId;
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -286,7 +286,7 @@ fn remove_unused_variable(
 /// F841
 pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
     let scope = &checker.semantic_model().scopes[scope];
-    if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
+    if scope.uses_locals() && scope.kind.is_any_function() {
         return;
     }
 
