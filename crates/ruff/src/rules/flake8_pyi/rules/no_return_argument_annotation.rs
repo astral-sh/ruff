@@ -1,3 +1,5 @@
+use std::fmt;
+
 use itertools::chain;
 use rustpython_parser::ast::Ranged;
 
@@ -10,57 +12,79 @@ use crate::settings::types::PythonVersion::Py311;
 
 #[violation]
 pub struct NoReturnArgumentAnnotationInStub {
-    is_never_builtin: bool,
+    module: TypingModule,
 }
 
 /// ## What it does
-/// Checks for usages of `typing.NoReturn` or `typing_extensions.NoReturn` in stubs.
+/// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) in
+/// stubs.
 ///
 /// ## Why is this bad?
-/// Use of `typing.Never` or `typing_extensions.Never` can make your intentions clearer. This is a
-/// purely stylistic choice in the name of readability.
+/// Prefer `typing.Never` (or `typing_extensions.Never`) over `typing.NoReturn`,
+/// as the former is more explicit about the intent of the annotation. This is
+/// a purely stylistic choice, as the two are semantically equivalent.
 ///
 /// ## Example
 /// ```python
-/// def foo(arg: typing.NoReturn): ...
+/// from typing import NoReturn
+///
+///
+/// def foo(x: NoReturn): ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(arg: typing.Never): ...
+/// from typing import Never
+///
+///
+/// def foo(x: Never): ...
 /// ```
 impl Violation for NoReturnArgumentAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let typing_name = if self.is_never_builtin {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-        format!("Prefer {typing_name}.Never over NoReturn for argument annotations.")
+        let NoReturnArgumentAnnotationInStub { module } = self;
+        format!("Prefer `{module}.Never` over `NoReturn` for argument annotations")
     }
 }
 
 /// PYI050
 pub(crate) fn no_return_argument_annotation(checker: &mut Checker, args: &Arguments) {
-    let annotations = chain!(
+    for annotation in chain!(
         args.args.iter(),
         args.posonlyargs.iter(),
         args.kwonlyargs.iter()
     )
-    .filter_map(|arg| arg.annotation.as_ref());
-
-    let is_never_builtin = checker.settings.target_version >= Py311;
-
-    for annotation in annotations {
+    .filter_map(|arg| arg.annotation.as_ref())
+    {
         if checker
             .semantic_model()
             .match_typing_expr(annotation, "NoReturn")
         {
             checker.diagnostics.push(Diagnostic::new(
-                NoReturnArgumentAnnotationInStub { is_never_builtin },
+                NoReturnArgumentAnnotationInStub {
+                    module: if checker.settings.target_version >= Py311 {
+                        TypingModule::Typing
+                    } else {
+                        TypingModule::TypingExtensions
+                    },
+                },
                 annotation.range(),
             ));
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum TypingModule {
+    Typing,
+    TypingExtensions,
+}
+
+impl fmt::Display for TypingModule {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TypingModule::Typing => fmt.write_str("typing"),
+            TypingModule::TypingExtensions => fmt.write_str("typing_extensions"),
         }
     }
 }
