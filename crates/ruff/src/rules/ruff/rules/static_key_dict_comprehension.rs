@@ -4,6 +4,24 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use rustpython_parser::ast::{self, Expr, Ranged};
 
+/// ## What it does
+/// Checks for dictionary comprehensions with a static value as key.
+///
+/// ## Why is this bad?
+/// This will create a dictionary with only one element: the static key mapped
+/// to whatever it is being mapped to in the comprehension.
+///
+/// ## Example
+/// ```python
+/// data = ["some", "Data"]
+/// {"key": value.upper() for value in data}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = "some string"
+/// {value: value.upper() for value in data}
+/// ```
 #[violation]
 pub struct StaticKeyDictComprehension;
 
