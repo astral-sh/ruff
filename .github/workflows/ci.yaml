@@ -96,8 +96,9 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: "Install cargo-binstall"
-        uses: taiki-e/install-action@cargo-binstall
-      - run: cargo binstall cargo-fuzz -y
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz@0.11
       - run: cargo fuzz build -s none
 
   cargo-test-wasm:
