@@ -293,7 +293,7 @@ pub(crate) fn todos(
         }
 
         if !has_issue_link {
-            // TD-003
+            // TD003
             diagnostics.push(Diagnostic::new(MissingTodoLink, directive.range));
         }
     }
@@ -359,7 +359,7 @@ fn static_errors(
                 trimmed.text_len()
             }
         } else {
-            // TD-002
+            // TD002
             diagnostics.push(Diagnostic::new(MissingTodoAuthor, directive.range));
 
             TextSize::new(0)
@@ -368,18 +368,18 @@ fn static_errors(
     let after_author = &post_directive[usize::from(author_end)..];
     if let Some(after_colon) = after_author.strip_prefix(':') {
         if after_colon.is_empty() {
-            // TD-005
+            // TD005
             diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
         } else if !after_colon.starts_with(char::is_whitespace) {
-            // TD-007
+            // TD007
             diagnostics.push(Diagnostic::new(MissingSpaceAfterTodoColon, directive.range));
         }
     } else {
-        // TD-004
+        // TD004
         diagnostics.push(Diagnostic::new(MissingTodoColon, directive.range));
 
         if after_author.is_empty() {
-            // TD-005
+            // TD005
             diagnostics.push(Diagnostic::new(MissingTodoDescription, directive.range));
         }
     }
