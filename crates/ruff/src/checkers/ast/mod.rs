@@ -2630,7 +2630,9 @@ where
                 if self.enabled(Rule::ZipWithoutExplicitStrict)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
-                    flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
+                    flake8_bugbear::rules::zip_without_explicit_strict(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.enabled(Rule::NoExplicitStacklevel) {
                     flake8_bugbear::rules::no_explicit_stacklevel(self, func, args, keywords);
