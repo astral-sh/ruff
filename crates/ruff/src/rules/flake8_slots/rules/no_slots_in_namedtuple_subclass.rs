@@ -87,7 +87,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass<F>(
                                     }
                                 }
                             }
-                            _ => return,
+                            _ => (),
                         }
                     }
                 }
