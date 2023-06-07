@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{self, Expr, Ranged};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
@@ -85,9 +85,14 @@ pub(crate) fn unnecessary_call_around_sorted(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        #[allow(deprecated)]
-        diagnostic.try_set_fix_from_edit(|| {
-            fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr)
+        diagnostic.try_set_fix(|| {
+            let edit =
+                fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr)?;
+            if outer == "reversed" {
+                Ok(Fix::suggested(edit))
+            } else {
+                Ok(Fix::automatic(edit))
+            }
         });
     }
     checker.diagnostics.push(diagnostic);
