@@ -3555,7 +3555,7 @@ where
                     }
                 }
                 if self.enabled(Rule::StaticKeyDictComprehension) {
-                    ruff::rules::static_key_dict_comprehension(self, expr, key)
+                    ruff::rules::static_key_dict_comprehension(self, key);
                 }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {

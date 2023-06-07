@@ -196,4 +196,14 @@ mod tests {
         assert_messages!(snapshot, messages);
         Ok(())
     }
+
+    #[test]
+    fn ruff_static_key_dict_comprehension() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF011.py"),
+            &settings::Settings::for_rules(vec![Rule::StaticKeyDictComprehension]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 }

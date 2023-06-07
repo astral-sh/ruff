@@ -38,14 +38,15 @@ fn is_constant_tuple(expr: &Expr) -> bool {
         // It's not a constant tuple if it's not a tuple
         return false;
     };
-    elts.iter().all(|item| item.is_constant_expr())
+    elts.iter()
+        .all(ruff_python_ast::prelude::Expr::is_constant_expr)
 }
 
 /// RUF011
-pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, expr: &Expr, key: &Expr) {
+pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, key: &Expr) {
     if key.is_constant_expr() || is_constant_tuple(key) {
         checker
             .diagnostics
-            .push(Diagnostic::new(StaticKeyDictComprehension, expr.range()));
+            .push(Diagnostic::new(StaticKeyDictComprehension, key.range()));
     }
 }
