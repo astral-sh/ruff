@@ -386,7 +386,9 @@ pub struct StringDotFormatExtraNamedArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
+impl Violation for StringDotFormatExtraNamedArguments {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatExtraNamedArguments { missing } = self;
@@ -394,10 +396,10 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
         format!("`.format` call has unused named argument(s): {message}")
     }
 
-    fn autofix_title(&self) -> String {
+    fn autofix_title(&self) -> Option<String> {
         let StringDotFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
-        format!("Remove extra named arguments: {message}")
+        Some(format!("Remove extra named arguments: {message}"))
     }
 }
 

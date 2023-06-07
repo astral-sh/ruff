@@ -23,6 +23,8 @@ pub struct Scope<'a> {
     bindings: FxHashMap<&'a str, BindingId>,
     /// A map from binding ID to binding ID that it shadows.
     shadowed_bindings: HashMap<BindingId, BindingId, BuildNoHashHasher<BindingId>>,
+    /// A list of all names that have been deleted in this scope.
+    deleted_symbols: Vec<&'a str>,
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
 }
@@ -36,6 +38,7 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
+            deleted_symbols: Vec::default(),
             globals_id: None,
         }
     }
@@ -48,6 +51,7 @@ impl<'a> Scope<'a> {
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
+            deleted_symbols: Vec::default(),
             globals_id: None,
         }
     }
@@ -67,14 +71,23 @@ impl<'a> Scope<'a> {
         }
     }
 
-    /// Returns `true` if this scope defines a binding with the given name.
-    pub fn defines(&self, name: &str) -> bool {
+    /// Removes the binding with the given name.
+    pub fn delete(&mut self, name: &'a str) -> Option<BindingId> {
+        self.deleted_symbols.push(name);
+        self.bindings.remove(name)
+    }
+
+    /// Returns `true` if this scope has a binding with the given name.
+    pub fn has(&self, name: &str) -> bool {
         self.bindings.contains_key(name)
     }
 
-    /// Removes the binding with the given name
-    pub fn remove(&mut self, name: &str) -> Option<BindingId> {
-        self.bindings.remove(name)
+    /// Returns `true` if the scope declares a symbol with the given name.
+    ///
+    /// Unlike [`Scope::has`], the name may no longer be bound to a value (e.g., it could be
+    /// deleted).
+    pub fn declares(&self, name: &str) -> bool {
+        self.has(name) || self.deleted_symbols.contains(&name)
     }
 
     /// Returns the ids of all bindings defined in this scope.

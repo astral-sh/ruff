@@ -276,17 +276,7 @@ last_call()
  Name
  None
  True
-@@ -22,119 +23,83 @@
- v1 << 2
- 1 >> v2
- 1 % finished
--1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
--((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
-+1 + v2 - v3 * 4 ^ 5 ** v6 / 7 // 8
-+((1 + v2) - (v3 * 4)) ^ (((5 ** v6) / 7) // 8)
- not great
- ~great
- +value
+@@ -30,56 +31,39 @@
  -1
  ~int and not v1 ^ 123 + v2 | True
  (~int) and (not ((v1 ^ (123 + v2)) | True))
@@ -312,14 +302,14 @@ last_call()
  (str or None) if True else (str or bytes or None)
  str or None if (1 if True else 2) else str or bytes or None
  (str or None) if (1 if True else 2) else (str or bytes or None)
--(
+ (
 -    (super_long_variable_name or None)
 -    if (1 if super_long_test_name else 2)
 -    else (str or bytes or None)
--)
++    (super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None)
+ )
 -{"2.7": dead, "3.7": (long_live or die_hard)}
 -{"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
-+(super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None)
 +{'2.7': dead, '3.7': (long_live or die_hard)}
 +{'2.7': dead, '3.7': (long_live or die_hard), **{'3.6': verygood}}
  {**a, **b, **c}
@@ -338,7 +328,7 @@ last_call()
 -    2,
 -    3,
 -]
-+[1, 2, 3,]
++[1, 2, 3]
  [*a]
  [*range(10)]
 -[
@@ -351,15 +341,14 @@ last_call()
 -    *a,
 -    5,
 -]
--[
--    this_is_a_very_long_variable_which_will_force_a_delimiter_split,
--    element,
--    another,
--    *more,
--]
-+[*a, 4, 5,]
-+[4, *a, 5,]
-+[this_is_a_very_long_variable_which_will_force_a_delimiter_split, element, another, *more]
++[*a, 4, 5]
++[4, *a, 5]
+ [
+     this_is_a_very_long_variable_which_will_force_a_delimiter_split,
+     element,
+@@ -87,54 +71,44 @@
+     *more,
+ ]
  {i for i in (1, 2, 3)}
 -{(i**2) for i in (1, 2, 3)}
 -{(i**2) for i, _ in ((1, "a"), (2, "b"), (3, "c"))}
@@ -417,18 +406,21 @@ last_call()
  dict[str, int]
  tuple[str, ...]
 -tuple[str, int, float, dict[str, int]]
- tuple[
+-tuple[
 -    str,
 -    int,
 -    float,
 -    dict[str, int],
++(
++    tuple[
 +    str, int, float, dict[str, int]
  ]
++)
 +tuple[str, int, float, dict[str, int],]
  very_long_variable_name_filters: t.List[
      t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
  ]
-@@ -144,9 +109,9 @@
+@@ -144,9 +118,9 @@
  xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
      sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
  )
@@ -441,7 +433,7 @@ last_call()
  slice[0]
  slice[0:1]
  slice[0:1:2]
-@@ -174,57 +139,29 @@
+@@ -174,57 +148,29 @@
  numpy[:, ::-1]
  numpy[np.newaxis, :]
  (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
@@ -450,9 +442,8 @@ last_call()
 +{'2.7': dead, '3.7': long_live or die_hard}
 +{'2.7', '3.6', '3.7', '3.8', '3.9', '4.0' if gilectomy else '3.10'}
  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
--(SomeName)
+ (SomeName)
  SomeName
-+SomeName
  (Good, Bad, Ugly)
  (i for i in (1, 2, 3))
 -((i**2) for i in (1, 2, 3))
@@ -511,7 +502,7 @@ last_call()
  Ø = set()
  authors.łukasz.say_thanks()
  mapping = {
-@@ -237,134 +174,86 @@
+@@ -237,114 +183,80 @@
  
  def gen():
      yield from outside_of_generator
@@ -655,30 +646,7 @@ last_call()
 +    ~ aaaaaaaaaaaaaaaa.a + aaaaaaaaaaaaaaaa.b - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h ^ aaaaaaaaaaaaaaaa.i << aaaaaaaaaaaaaaaa.k >> aaaaaaaaaaaaaaaa.l ** aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
  ):
      return True
--(
--    aaaaaaaaaaaaaaaa
--    + aaaaaaaaaaaaaaaa
--    - aaaaaaaaaaaaaaaa
--    * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
--    / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
--)
-+aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa - aaaaaaaaaaaaaaaa * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa) / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
- aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
--(
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    >> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    << aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--)
-+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa << aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
- bbbb >> bbbb * bbbb
--(
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--)
-+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ^bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
- last_call()
- # standalone comment at ENDMARKER
+ (
 ```
 
 ## Ruff Output
@@ -709,8 +677,8 @@ Name1 or Name2 and Name3 or Name4
 v1 << 2
 1 >> v2
 1 % finished
-1 + v2 - v3 * 4 ^ 5 ** v6 / 7 // 8
-((1 + v2) - (v3 * 4)) ^ (((5 ** v6) / 7) // 8)
+1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
+((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
 not great
 ~great
 +value
@@ -731,7 +699,9 @@ str or None if True else str or bytes or None
 (str or None) if True else (str or bytes or None)
 str or None if (1 if True else 2) else str or bytes or None
 (str or None) if (1 if True else 2) else (str or bytes or None)
-(super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None)
+(
+    (super_long_variable_name or None) if (1 if super_long_test_name else 2) else (str or bytes or None)
+)
 {'2.7': dead, '3.7': (long_live or die_hard)}
 {'2.7': dead, '3.7': (long_live or die_hard), **{'3.6': verygood}}
 {**a, **b, **c}
@@ -743,12 +713,17 @@ str or None if (1 if True else 2) else str or bytes or None
 (1, 2, 3)
 []
 [1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
-[1, 2, 3,]
+[1, 2, 3]
 [*a]
 [*range(10)]
-[*a, 4, 5,]
-[4, *a, 5,]
-[this_is_a_very_long_variable_which_will_force_a_delimiter_split, element, another, *more]
+[*a, 4, 5]
+[4, *a, 5]
+[
+    this_is_a_very_long_variable_which_will_force_a_delimiter_split,
+    element,
+    another,
+    *more,
+]
 {i for i in (1, 2, 3)}
 {(i ** 2) for i in (1, 2, 3)}
 {(i ** 2) for i, _ in ((1, 'a'), (2, 'b'), (3, 'c'))}
@@ -782,9 +757,11 @@ call.me(maybe)
 list[str]
 dict[str, int]
 tuple[str, ...]
-tuple[
+(
+    tuple[
     str, int, float, dict[str, int]
 ]
+)
 tuple[str, int, float, dict[str, int],]
 very_long_variable_name_filters: t.List[
     t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
@@ -828,7 +805,7 @@ numpy[np.newaxis, :]
 {'2.7': dead, '3.7': long_live or die_hard}
 {'2.7', '3.6', '3.7', '3.8', '3.9', '4.0' if gilectomy else '3.10'}
 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10 or A, 11 or B, 12 or C]
-SomeName
+(SomeName)
 SomeName
 (Good, Bad, Ugly)
 (i for i in (1, 2, 3))
@@ -936,11 +913,25 @@ if (
     ~ aaaaaaaaaaaaaaaa.a + aaaaaaaaaaaaaaaa.b - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e | aaaaaaaaaaaaaaaa.f & aaaaaaaaaaaaaaaa.g % aaaaaaaaaaaaaaaa.h ^ aaaaaaaaaaaaaaaa.i << aaaaaaaaaaaaaaaa.k >> aaaaaaaaaaaaaaaa.l ** aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 ):
     return True
-aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa - aaaaaaaaaaaaaaaa * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa) / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+(
+    aaaaaaaaaaaaaaaa
+    + aaaaaaaaaaaaaaaa
+    - aaaaaaaaaaaaaaaa
+    * (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+    / (aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa)
+)
 aaaaaaaaaaaaaaaa + aaaaaaaaaaaaaaaa
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa >> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa << aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    >> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    << aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+)
 bbbb >> bbbb * bbbb
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ^bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+)
 last_call()
 # standalone comment at ENDMARKER
 ```

@@ -51,7 +51,7 @@ impl Violation for UndefinedExport {
 pub(crate) fn undefined_export(name: &str, range: TextRange, scope: &Scope) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     if !scope.uses_star_imports() {
-        if !scope.defines(name) {
+        if !scope.has(name) {
             diagnostics.push(Diagnostic::new(
                 UndefinedExport {
                     name: (*name).to_string(),
