@@ -12,7 +12,7 @@ use crate::registry::AsRule;
 ///
 /// ## Why is this bad?
 /// `if` expressions that return `True` if a condition is truthy and `False` if
-/// it is falsy can be replaced with boolean casts.
+/// it is falsey can be replaced with boolean casts.
 ///
 /// ## Example
 /// ```python
@@ -51,7 +51,7 @@ impl Violation for IfExprWithTrueFalse {
 ///
 /// ## Why is this bad?
 /// `if` expressions that return `False` if a condition is truthy and `True` if
-/// it is falsy can be replaced by negating the condition.
+/// it is falsey can be replaced by negating the condition.
 ///
 /// ## Example
 /// ```python

@@ -80,7 +80,7 @@ impl Violation for CollapsibleIf {
 ///
 /// ## Why is this bad?
 /// `if` statements that return `True` if a condition is truthy and `False` if
-/// the condition is falsy can be replaced by boolean casts.
+/// the condition is falsey can be replaced by boolean casts.
 ///
 /// ## Example
 /// ```python
