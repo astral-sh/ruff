@@ -11,6 +11,29 @@ use crate::checkers::ast::Checker;
 use crate::line_width::LineWidth;
 use crate::registry::{AsRule, Rule};
 
+/// ## What it does
+/// Checks for `for` loops that can be replaced with a builtin function.
+///
+/// ## Why is this bad?
+/// Using a builtin function is more concise and readable. Builtins are also
+/// more efficient than `for` loops.
+///
+/// ## Example
+/// ```python
+/// for item in iterable:
+///     if predicate(item):
+///         return True
+/// return False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// return any(predicate(item) for item in iterable)
+/// ```
+///
+/// ## References
+/// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
+/// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
 #[violation]
 pub struct ReimplementedBuiltin {
     repl: String,

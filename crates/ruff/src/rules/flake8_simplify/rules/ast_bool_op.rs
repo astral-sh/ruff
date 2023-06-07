@@ -70,6 +70,27 @@ impl Violation for DuplicateIsinstanceCall {
     }
 }
 
+/// ## What it does
+/// Checks for multiple equality comparisons with the same target.
+///
+/// ## Why is this bad?
+/// To check if an object is equal to any one of multiple values, it is more
+/// concise to use the `in` operator with a tuple of values.
+///
+/// ## Example
+/// ```python
+/// if foo == x or foo == y:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if foo in (x, y):
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[violation]
 pub struct CompareWithTuple {
     replacement: String,
@@ -88,6 +109,25 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
     }
 }
 
+/// ## What it does
+/// Check for `and` expressions that operate on an expression and its negation.
+///
+/// ## Why is this bad?
+/// The expression is always `False`. Replacing the expression with `False` is
+/// more concise and easier to understand.
+///
+/// ## Example
+/// ```python
+/// a and not a
+/// ```
+///
+/// Use instead:
+/// ```python
+/// False
+/// ```
+///
+/// ## References
+/// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[violation]
 pub struct ExprAndNotExpr {
     name: String,
@@ -105,6 +145,25 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
     }
 }
 
+/// ## What it does
+/// Check for `or` expressions that operate on an expression and its negation.
+///
+/// ## Why is this bad?
+/// The expression is always `True`. Replacing the expression with `True` is
+/// more concise and easier to understand.
+///
+/// ## Example
+/// ```python
+/// a or not a
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True
+/// ```
+///
+/// ## References
+/// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[violation]
 pub struct ExprOrNotExpr {
     name: String,

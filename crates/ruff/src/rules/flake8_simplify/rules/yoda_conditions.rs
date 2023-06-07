@@ -12,6 +12,35 @@ use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for conditions that place the constant on the left-hand side of the
+/// comparison operator.
+///
+/// ## Why is this bad?
+/// These conditions (Yoda conditions) are less readable than conditions that
+/// place the variable on the left-hand side of the comparison operator.
+///
+/// The purpose of Yoda conditions is to prevent accidental assignment in
+/// conditions by accidentally typing `=` instead of `==`. However, this is not
+/// a problem in Python because Python does not allow assignments in conditions
+/// unless using the `:=` operator.
+///
+/// ## Example
+/// ```python
+/// if "Foo" == foo:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if foo == "Foo":
+///     ...
+/// ```
+///
+/// ## References
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
+/// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
+/// - [Wikipedia: Yoda conditions](https://en.wikipedia.org/wiki/Yoda_conditions)
 #[violation]
 pub struct YodaConditions {
     pub suggestion: Option<String>,

@@ -11,6 +11,36 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `try`-`except`-`pass` blocks that can be replaced with
+/// `contextlib.suppress`.
+///
+/// ## Why is this bad?
+/// Using `contextlib.suppress` is more concise and readable.
+///
+/// _Note: `contextlib.suppress` is slower than `try`-`except`-`pass`. You may
+/// want to use `try`-`except`-`pass` if performance is important._
+///
+/// ## Example
+/// ```python
+/// try:
+///     1 / 0
+/// except ZeroDivisionError:
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import contextlib
+///
+/// with contextlib.suppress(ZeroDivisionError):
+///     1 / 0
+/// ```
+///
+/// ## References
+/// - [Python documentation: `contextlib.suppress`](https://docs.python.org/3/library/contextlib.html#contextlib.suppress)
+/// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
+/// - [Django ticket #27818](https://code.djangoproject.com/ticket/27818#comment:7)
 #[violation]
 pub struct SuppressibleException {
     exception: String,

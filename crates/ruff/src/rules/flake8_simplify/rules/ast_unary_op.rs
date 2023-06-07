@@ -8,6 +8,24 @@ use ruff_python_semantic::scope::ScopeKind;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for negated `==` operators.
+///
+/// ## Why is this bad?
+/// Negated `==` operators are less readable than `!=` operators.
+///
+/// ## Example
+/// ```python
+/// not a == b
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a != b
+/// ```
+///
+/// ## References
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct NegateEqualOp {
     left: String,
@@ -26,6 +44,24 @@ impl AlwaysAutofixableViolation for NegateEqualOp {
     }
 }
 
+/// ## What it does
+/// Checks for negated `!=` operators.
+///
+/// ## Why is this bad?
+/// Negated `!=` operators are less readable than `==` operators.
+///
+/// ## Example
+/// ```python
+/// not a != b
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a == b
+/// ```
+///
+/// ## References
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct NegateNotEqualOp {
     left: String,
@@ -44,6 +80,24 @@ impl AlwaysAutofixableViolation for NegateNotEqualOp {
     }
 }
 
+/// ## What it does
+/// Checks for double negations.
+///
+/// ## Why is this bad?
+/// A double negation is redundant.
+///
+/// ## Example
+/// ```python
+/// not (not a)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a
+/// ```
+///
+/// ## References
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct DoubleNegation {
     expr: String,

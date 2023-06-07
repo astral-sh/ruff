@@ -7,6 +7,25 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `if` expressions that can be replaced with `bool()`.
+///
+/// ## Why is this bad?
+/// `if` expressions that return `True` if a condition is truthy and `False` if
+/// it is falsy can be replaced with boolean casts.
+///
+/// ## Example
+/// ```python
+/// True if a else False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bool(a)
+/// ```
+///
+/// ## References
+/// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct IfExprWithTrueFalse {
     expr: String,
@@ -27,6 +46,25 @@ impl Violation for IfExprWithTrueFalse {
     }
 }
 
+/// ## What it does
+/// Checks for `if` expressions that can be replaced by negating the condition.
+///
+/// ## Why is this bad?
+/// `if` expressions that return `False` if a condition is truthy and `True` if
+/// it is falsy can be replaced by negating the condition.
+///
+/// ## Example
+/// ```python
+/// False if a else True
+/// ```
+///
+/// Use instead:
+/// ```python
+/// not a
+/// ```
+///
+/// ## References
+/// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct IfExprWithFalseTrue {
     expr: String,
@@ -45,6 +83,25 @@ impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
     }
 }
 
+/// ## What it does
+/// Checks for `if` expressions that check against a negated condition.
+///
+/// ## Why is this bad?
+/// `if` expressions that check against a negated condition are more difficult
+/// to read than `if` expressions that check against the condition directly.
+///
+/// ## Example
+/// ```python
+/// b if not a else a
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a if a else b
+/// ```
+///
+/// ## References
+/// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct IfExprWithTwistedArms {
     expr_body: String,
