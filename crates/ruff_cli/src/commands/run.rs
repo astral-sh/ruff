@@ -143,6 +143,8 @@ pub(crate) fn run(
             acc
         });
 
+    println!("Ready to print diagnostics");
+
     diagnostics.messages.sort();
 
     let duration = start.elapsed();

@@ -153,6 +153,8 @@ pub(crate) fn lint_path(
         (std::fs::read_to_string(path)?, None)
     };
 
+    // println!("{}", contents);
+
     // Lint the file.
     let (
         LinterResult {
@@ -184,10 +186,13 @@ pub(crate) fn lint_path(
         } else {
             // If we fail to autofix, lint the original source code.
             let result = lint_only(&contents, path, package, &settings.lib, noqa);
+
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
+        println!("We are in the lint only method");
+
         let result = lint_only(&contents, path, package, &settings.lib, noqa);
         let fixed = FxHashMap::default();
         (result, fixed)

@@ -75,6 +75,9 @@ fn apply_fixes<'a>(
             }
         }
 
+        // Printing the rule here before applying the fix
+        println!("Applying fix for rule: {:?}", rule);
+
         for edit in fix
             .edits()
             .iter()
@@ -84,8 +87,15 @@ fn apply_fixes<'a>(
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
 
+            // Print the line before the fix.
+            let original_line = locator.slice(TextRange::new(edit.start(), edit.end()));
+            println!("-- '{}'", original_line);
+
             // Add the patch itself.
             output.push_str(edit.content().unwrap_or_default());
+
+            // Print the line after the fix.
+            println!("++ '{}'", edit.content().unwrap_or_default());
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());

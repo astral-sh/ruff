@@ -374,7 +374,12 @@ fn diagnostics_to_messages(
         .into_iter()
         .map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
-            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
+            let message = Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset);
+
+            // Insert print statement here
+            // println!("{:?}", message);
+
+            message
         })
         .collect()
 }
