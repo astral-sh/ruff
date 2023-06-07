@@ -3,6 +3,7 @@ use phf::phf_map;
 
 /// Via: <https://github.com/hediet/vscode-unicode-data/blob/main/out/ambiguous.json>
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
+#[allow(clippy::unreadable_literal)]
 pub(crate) static CONFUSABLES: phf::Map<u32, u8> = phf_map! {
    1000u32 => 50,
    10088u32 => 40,
