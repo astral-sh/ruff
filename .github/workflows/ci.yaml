@@ -95,7 +95,9 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - uses: Swatinem/rust-cache@v2
-      - run: cargo install cargo-fuzz
+      - name: "Install cargo-binstall"
+        uses: taiki-e/install-action@cargo-binstall
+      - run: cargo binstall cargo-fuzz -y
       - run: cargo fuzz build -s none
 
   cargo-test-wasm:
