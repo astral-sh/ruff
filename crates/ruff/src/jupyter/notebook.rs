@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter;
@@ -10,10 +9,11 @@ use once_cell::sync::OnceCell;
 use serde::Serialize;
 use serde_json::error::Category;
 
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::Diagnostic;
 use ruff_newlines::NewlineWithTrailingNewline;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::autofix::source_map::{SourceMap, SourceMarker};
 use crate::jupyter::index::JupyterIndex;
 use crate::jupyter::{Cell, CellType, RawNotebook, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
@@ -208,48 +208,32 @@ impl Notebook {
         })
     }
 
-    /// Update the cell offsets as per the given edits.
-    fn update_cell_offsets(&mut self, edits: BTreeSet<&Edit>) {
-        for edit in edits.into_iter().rev() {
-            let idx = self
-                .cell_offsets
-                .iter()
-                .tuple_windows::<(_, _)>()
-                .find_position(|(&offset1, &offset2)| {
-                    offset1 <= edit.start() && edit.end() <= offset2
-                })
-                .map_or_else(
-                    || panic!("edit outside of any cells: {edit:?}"),
-                    |(idx, _)| idx,
-                );
+    fn update_cell_offsets(&mut self, source_map: &SourceMap) {
+        let mut last_marker: Option<&SourceMarker> = None;
 
-            if edit.is_deletion() {
-                for offset in &mut self.cell_offsets[idx + 1..] {
-                    *offset -= edit.range().len();
+        // The first offset is always going to be at 0, so skip it.
+        for offset in self.cell_offsets.iter_mut().skip(1).rev() {
+            let closest_marker = match last_marker {
+                Some(marker) if marker.source <= *offset => marker,
+                _ => {
+                    let Some(marker) = source_map
+                        .markers()
+                        .iter()
+                        .rev()
+                        .find(|m| m.source <= *offset) else {
+                            // There are no markers above the current offset, so we can
+                            // stop here.
+                            break;
+                        };
+                    last_marker = Some(marker);
+                    marker
                 }
-            } else if edit.is_insertion() {
-                let new_text_size = TextSize::of(edit.content().unwrap_or_default());
-                for offset in &mut self.cell_offsets[idx + 1..] {
-                    *offset += new_text_size;
-                }
-            } else if edit.is_replacement() {
-                let current_text_size = edit.range().len();
-                let new_text_size = TextSize::of(edit.content().unwrap_or_default());
-                match new_text_size.cmp(&current_text_size) {
-                    Ordering::Less => {
-                        for offset in &mut self.cell_offsets[idx + 1..] {
-                            *offset -= current_text_size - new_text_size;
-                        }
-                    }
-                    Ordering::Greater => {
-                        for offset in &mut self.cell_offsets[idx + 1..] {
-                            *offset += new_text_size - current_text_size;
-                        }
-                    }
-                    Ordering::Equal => (),
-                };
-            } else {
-                panic!("unexpected edit: {edit:?}");
+            };
+
+            match closest_marker.source.cmp(&closest_marker.dest) {
+                Ordering::Less => *offset += closest_marker.dest - closest_marker.source,
+                Ordering::Greater => *offset -= closest_marker.source - closest_marker.dest,
+                Ordering::Equal => (),
             }
         }
     }
@@ -339,8 +323,8 @@ impl Notebook {
     }
 
     /// Update the notebook with the given edits and transformed content.
-    pub fn update(&mut self, edits: BTreeSet<&Edit>, transformed: &str) {
-        self.update_cell_offsets(edits);
+    pub fn update(&mut self, source_map: &SourceMap, transformed: &str) {
+        self.update_cell_offsets(source_map);
         self.update_cell_content(transformed);
         self.content = transformed.to_string();
     }

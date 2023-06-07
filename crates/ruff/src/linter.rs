@@ -468,7 +468,7 @@ pub fn lint_fix<'a>(
         if let Some(FixResult {
             code: fixed_contents,
             fixes: applied,
-            edits,
+            source_map,
         }) = fix_file(&result.data.0, &locator)
         {
             if iterations < MAX_ITERATIONS {
@@ -478,7 +478,7 @@ pub fn lint_fix<'a>(
                 }
 
                 if let SourceKind::Jupyter(notebook) = source_kind {
-                    notebook.update(edits, &fixed_contents);
+                    notebook.update(&source_map, &fixed_contents);
                 }
 
                 // Store the fixed contents.

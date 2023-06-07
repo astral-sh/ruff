@@ -2,32 +2,30 @@ use std::collections::BTreeSet;
 
 use itertools::Itertools;
 use nohash_hasher::IntSet;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
 use ruff_python_ast::source_code::Locator;
 
+use crate::autofix::source_map::SourceMap;
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
 pub(crate) mod codemods;
 pub(crate) mod edits;
+pub(crate) mod source_map;
 
-pub(crate) struct FixResult<'a> {
+pub(crate) struct FixResult {
     /// The resulting source code, after applying all fixes.
     pub(crate) code: String,
     /// The number of fixes applied for each [`Rule`].
     pub(crate) fixes: FixTable,
-    /// The set of [`Edit`] that were applied.
-    pub(crate) edits: BTreeSet<&'a Edit>,
+    pub(crate) source_map: SourceMap,
 }
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub(crate) fn fix_file<'a>(
-    diagnostics: &'a [Diagnostic],
-    locator: &'a Locator,
-) -> Option<FixResult<'a>> {
+pub(crate) fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<FixResult> {
     let mut with_fixes = diagnostics
         .iter()
         .filter(|diag| diag.fix.is_some())
@@ -44,12 +42,13 @@ pub(crate) fn fix_file<'a>(
 fn apply_fixes<'a>(
     diagnostics: impl Iterator<Item = &'a Diagnostic>,
     locator: &'a Locator<'a>,
-) -> FixResult<'a> {
+) -> FixResult {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
     let mut isolated: IntSet<u32> = IntSet::default();
     let mut fixed = FxHashMap::default();
+    let mut source_map = SourceMap::default();
 
     for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
@@ -93,8 +92,14 @@ fn apply_fixes<'a>(
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
 
+            // Add the start source marker for the patch.
+            source_map.push_start_marker(edit, output.text_len());
+
             // Add the patch itself.
             output.push_str(edit.content().unwrap_or_default());
+
+            // Add the end source marker for the added patch.
+            source_map.push_end_marker(edit, output.text_len());
 
             // Track that the edit was applied.
             last_pos = Some(edit.end());
@@ -111,7 +116,7 @@ fn apply_fixes<'a>(
     FixResult {
         code: output,
         fixes: fixed,
-        edits: applied,
+        source_map,
     }
 }
 
