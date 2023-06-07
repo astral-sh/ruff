@@ -1,7 +1,7 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
-
 use crate::comments::CommentTextPosition;
 use crate::trivia::find_first_non_trivia_character_in_range;
+use ruff_newlines::StrExt;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
@@ -21,6 +21,9 @@ pub(super) fn place_comment<'a>(
         .or_else(|comment| handle_trailing_body_comment(comment, locator))
         .or_else(handle_trailing_end_of_line_body_comment)
         .or_else(|comment| handle_trailing_end_of_line_condition_comment(comment, locator))
+        .or_else(|comment| {
+            handle_module_level_own_line_comment_before_class_or_function_comment(comment, locator)
+        })
         .or_else(|comment| handle_positional_only_arguments_separator_comment(comment, locator))
         .or_else(|comment| {
             handle_trailing_binary_expression_left_or_operator_comment(comment, locator)
@@ -726,6 +729,76 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
     }
 }
 
+/// Handles own line comments on the module level before a class or function statement.
+/// A comment only becomes the leading comment of a class or function if it isn't separated by an empty
+/// line from the class. Comments that are separated by at least one empty line from the header of the
+/// class are considered trailing comments of the previous statement.
+///
+/// This handling is necessary because Ruff inserts two empty lines before each class or function.
+/// Let's take this example:
+///
+/// ```python
+/// some = statement
+/// # This should be stick to the statement above
+///
+///
+/// # This should be split from the above by two lines
+/// class MyClassWithComplexLeadingComments:
+///     pass
+/// ```
+///
+/// By default, the `# This should be stick to the statement above` would become a leading comment
+/// of the `class` AND the `Suite` formatting separates the comment by two empty lines from the
+/// previous statement, so that the result becomes:
+///
+/// ```python
+/// some = statement
+///
+///
+/// # This should be stick to the statement above
+///
+///
+/// # This should be split from the above by two lines
+/// class MyClassWithComplexLeadingComments:
+///     pass
+/// ```
+///
+/// Which is not what we want. The work around is to make the `# This should be stick to the statement above`
+/// a trailing comment of the previous statement.
+fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
+    comment: DecoratedComment<'a>,
+    locator: &Locator,
+) -> CommentPlacement<'a> {
+    // Only applies for own line comments on the module level...
+    if !comment.text_position().is_own_line() || !comment.enclosing_node().is_module() {
+        return CommentPlacement::Default(comment);
+    }
+
+    // ... for comments with a preceding and following node,
+    let (Some(preceding), Some(following)) = (comment.preceding_node(), comment.following_node()) else {
+        return CommentPlacement::Default(comment)
+    };
+
+    // ... where the following is a function or class statement.
+    if !matches!(
+        following,
+        AnyNodeRef::StmtAsyncFunctionDef(_)
+            | AnyNodeRef::StmtFunctionDef(_)
+            | AnyNodeRef::StmtClassDef(_)
+    ) {
+        return CommentPlacement::Default(comment);
+    }
+
+    // Make the comment a leading comment if there's no empty line between the comment and the function / class header
+    if max_empty_lines(locator.slice(TextRange::new(comment.slice().end(), following.start()))) == 0
+    {
+        CommentPlacement::leading(following, comment)
+    } else {
+        // Otherwise attach the comment as trailing comment to the previous statement
+        CommentPlacement::trailing(preceding, comment)
+    }
+}
+
 /// Finds the offset of the `/` that separates the positional only and arguments from the other arguments.
 /// Returns `None` if the positional only separator `/` isn't present in the specified range.
 fn find_pos_only_slash_offset(
@@ -864,5 +937,72 @@ fn is_first_statement_in_enclosing_alternate_body(
         }
 
         _ => false,
+    }
+}
+
+/// Counts the number of newlines in `contents`.
+fn max_empty_lines(contents: &str) -> usize {
+    let mut empty_lines = 0;
+    let mut max_empty_lines = 0;
+
+    for line in contents.universal_newlines().skip(1) {
+        if line.trim().is_empty() {
+            empty_lines += 1;
+        } else {
+            max_empty_lines = max_empty_lines.max(empty_lines);
+            empty_lines = 0;
+        }
+    }
+
+    max_empty_lines
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::comments::placement::max_empty_lines;
+
+    #[test]
+    fn count_empty_lines_in_trivia() {
+        assert_eq!(max_empty_lines(""), 0);
+        assert_eq!(max_empty_lines("# trailing comment\n # other comment\n"), 0);
+        assert_eq!(
+            max_empty_lines("# trailing comment\n# own line comment\n"),
+            0
+        );
+        assert_eq!(
+            max_empty_lines("# trailing comment\n\n# own line comment\n"),
+            1
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n# an other own line comment"
+            ),
+            1
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n# an other own line comment\n# block"
+            ),
+            1
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                "# trailing comment\n\n# own line comment\n\n\n# an other own line comment\n# block"
+            ),
+            2
+        );
+
+        assert_eq!(
+            max_empty_lines(
+                r#"# This multiline comments section
+# should be split from the statement
+# above by two lines.
+"#
+            ),
+            0
+        );
     }
 }
