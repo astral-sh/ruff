@@ -7,7 +7,7 @@ edition = "2021"
 rust-version = "1.70"
 homepage = "https://beta.ruff.rs/docs/"
 documentation = "https://beta.ruff.rs/docs/"
-repository = "https://github.com/charliermarsh/ruff"
+repository = "https://github.com/astral-sh/ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 
 [workspace.dependencies]

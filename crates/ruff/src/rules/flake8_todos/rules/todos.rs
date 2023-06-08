@@ -87,7 +87,7 @@ impl Violation for MissingTodoAuthor {
 /// Use one of these instead:
 /// ```python
 /// # TODO(charlie): this comment has an issue link
-/// # https://github.com/charliermarsh/ruff/issues/3870
+/// # https://github.com/astral-sh/ruff/issues/3870
 ///
 /// # TODO(charlie): this comment has a 3-digit issue code
 /// # 003

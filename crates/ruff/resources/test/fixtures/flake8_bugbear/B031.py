@@ -149,7 +149,7 @@ for group in groupby(items, key=lambda p: p[1]):
     collect_shop_items("Joe", group[1])
 
 
-# https://github.com/charliermarsh/ruff/issues/4050
+# https://github.com/astral-sh/ruff/issues/4050
 for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     if _section == "greens":
         for item in section_items:

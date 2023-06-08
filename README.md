@@ -2,11 +2,11 @@
 
 # Ruff
 
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/charliermarsh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![image](https://img.shields.io/pypi/v/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
-[![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
+[![Actions status](https://github.com/astral-sh/ruff/workflows/CI/badge.svg)](https://github.com/astral-sh/ruff/actions)
 
 [**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
@@ -88,7 +88,7 @@ creator of [isort](https://github.com/PyCQA/isort):
 > Just switched my first project to Ruff. Only one downside so far: it's so fast I couldn't believe
 > it was working till I intentionally introduced some errors.
 
-[**Tim Abbott**](https://github.com/charliermarsh/ruff/issues/465#issuecomment-1317400028), lead
+[**Tim Abbott**](https://github.com/astral-sh/ruff/issues/465#issuecomment-1317400028), lead
 developer of [Zulip](https://github.com/zulip/zulip):
 
 > This is just ridiculously fast... `ruff` is amazing.
@@ -254,7 +254,7 @@ quality tools, including:
 - [flake8-2020](https://pypi.org/project/flake8-2020/)
 - [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 - [flake8-async](https://pypi.org/project/flake8-async)
-- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
+- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/astral-sh/ruff/issues/1646))
 - [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
 - [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
 - [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
@@ -288,7 +288,7 @@ quality tools, including:
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
 - [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
 - [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
-- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/charliermarsh/ruff/issues/2102))
+- [flynt](https://pypi.org/project/flynt/) ([#2102](https://github.com/astral-sh/ruff/issues/2102))
 - [isort](https://pypi.org/project/isort/)
 - [mccabe](https://pypi.org/project/mccabe/)
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
@@ -311,8 +311,8 @@ You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
 ## Support
 
-Having trouble? Check out the existing issues on [**GitHub**](https://github.com/charliermarsh/ruff/issues),
-or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
+Having trouble? Check out the existing issues on [**GitHub**](https://github.com/astral-sh/ruff/issues),
+or feel free to [**open a new one**](https://github.com/astral-sh/ruff/issues/new).
 
 You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
@@ -334,7 +334,7 @@ and again draws on both the APIs and implementation details of [Rome](https://gi
 Ruff is also influenced by a number of tools outside the Python ecosystem, like
 [Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).
 
-Ruff is the beneficiary of a large number of [contributors](https://github.com/charliermarsh/ruff/graphs/contributors).
+Ruff is the beneficiary of a large number of [contributors](https://github.com/astral-sh/ruff/graphs/contributors).
 
 Ruff is released under the MIT license.
 
@@ -413,21 +413,21 @@ Ruff is used by a number of major open-source projects and companies, including:
 If you're using Ruff, consider adding the Ruff badge to project's `README.md`:
 
 ```md
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/charliermarsh/ruff)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 ```
 
 ...or `README.rst`:
 
 ```rst
 .. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json
-    :target: https://github.com/charliermarsh/ruff
+    :target: https://github.com/astral-sh/ruff
     :alt: Ruff
 ```
 
 ...or, as HTML:
 
 ```html
-<a href="https://github.com/charliermarsh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
+<a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="Ruff" style="max-width:100%;"></a>
 ```
 
 ## License

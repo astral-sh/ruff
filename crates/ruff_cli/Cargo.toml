@@ -4,9 +4,9 @@ version = "0.0.272"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
-documentation = "https://github.com/charliermarsh/ruff"
-homepage = "https://github.com/charliermarsh/ruff"
-repository = "https://github.com/charliermarsh/ruff"
+documentation = "https://github.com/astral-sh/ruff"
+homepage = "https://github.com/astral-sh/ruff"
+repository = "https://github.com/astral-sh/ruff"
 readme = "../../README.md"
 license = "MIT"
 

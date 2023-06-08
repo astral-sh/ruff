@@ -39,9 +39,9 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/charliermarsh/ruff"
+Repository = "https://github.com/astral-sh/ruff"
 Documentation = "https://beta.ruff.rs/docs/"
-Changelog = "https://github.com/charliermarsh/ruff/releases"
+Changelog = "https://github.com/astral-sh/ruff/releases"
 
 [tool.maturin]
 bindings = "bin"
