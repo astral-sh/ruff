@@ -75,6 +75,64 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                 return;
             }
 
+            // Ignore accesses on instances within special methods (e.g., `__eq__`).
+            if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
+                checker.semantic_model().scope().kind
+            {
+                if matches!(
+                    name.as_str(),
+                    "__lt__"
+                        | "__le__"
+                        | "__eq__"
+                        | "__ne__"
+                        | "__gt__"
+                        | "__ge__"
+                        | "__add__"
+                        | "__sub__"
+                        | "__mul__"
+                        | "__matmul__"
+                        | "__truediv__"
+                        | "__floordiv__"
+                        | "__mod__"
+                        | "__divmod__"
+                        | "__pow__"
+                        | "__lshift__"
+                        | "__rshift__"
+                        | "__and__"
+                        | "__xor__"
+                        | "__or__"
+                        | "__radd__"
+                        | "__rsub__"
+                        | "__rmul__"
+                        | "__rmatmul__"
+                        | "__rtruediv__"
+                        | "__rfloordiv__"
+                        | "__rmod__"
+                        | "__rdivmod__"
+                        | "__rpow__"
+                        | "__rlshift__"
+                        | "__rrshift__"
+                        | "__rand__"
+                        | "__rxor__"
+                        | "__ror__"
+                        | "__iadd__"
+                        | "__isub__"
+                        | "__imul__"
+                        | "__imatmul__"
+                        | "__itruediv__"
+                        | "__ifloordiv__"
+                        | "__imod__"
+                        | "__ipow__"
+                        | "__ilshift__"
+                        | "__irshift__"
+                        | "__iand__"
+                        | "__ixor__"
+                        | "__ior__"
+                ) {
+                    return;
+                }
+            }
+
             if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                 // Ignore `super()` calls.
                 if let Some(call_path) = collect_call_path(func) {
@@ -82,43 +140,41 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
                         return;
                     }
                 }
-            } else {
+            } else if let Some(call_path) = collect_call_path(value) {
                 // Ignore `self` and `cls` accesses.
-                if let Some(call_path) = collect_call_path(value) {
-                    if call_path.as_slice() == ["self"]
-                        || call_path.as_slice() == ["cls"]
-                        || call_path.as_slice() == ["mcs"]
-                    {
-                        return;
-                    }
+                if call_path.as_slice() == ["self"]
+                    || call_path.as_slice() == ["cls"]
+                    || call_path.as_slice() == ["mcs"]
+                {
+                    return;
+                }
 
-                    // Ignore accesses on class members from _within_ the class.
-                    if checker
-                        .semantic_model()
-                        .scopes
-                        .iter()
-                        .rev()
-                        .find_map(|scope| match &scope.kind {
-                            ScopeKind::Class(ast::StmtClassDef { name, .. }) => Some(name),
-                            _ => None,
-                        })
-                        .map_or(false, |name| {
-                            if call_path.as_slice() == [name.as_str()] {
-                                checker.semantic_model().find_binding(name).map_or(
-                                    false,
-                                    |binding| {
-                                        // TODO(charlie): Could the name ever be bound to a
-                                        // _different_ class here?
-                                        binding.kind.is_class_definition()
-                                    },
-                                )
-                            } else {
-                                false
-                            }
-                        })
-                    {
-                        return;
-                    }
+                // Ignore accesses on class members from _within_ the class.
+                if checker
+                    .semantic_model()
+                    .scopes
+                    .iter()
+                    .rev()
+                    .find_map(|scope| match &scope.kind {
+                        ScopeKind::Class(ast::StmtClassDef { name, .. }) => Some(name),
+                        _ => None,
+                    })
+                    .map_or(false, |name| {
+                        if call_path.as_slice() == [name.as_str()] {
+                            checker
+                                .semantic_model()
+                                .find_binding(name)
+                                .map_or(false, |binding| {
+                                    // TODO(charlie): Could the name ever be bound to a
+                                    // _different_ class here?
+                                    binding.kind.is_class_definition()
+                                })
+                        } else {
+                            false
+                        }
+                    })
+                {
+                    return;
                 }
             }
 
