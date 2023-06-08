@@ -24,7 +24,7 @@ foo not in foo
 
 "foo" == "foo"  # This is flagged by `comparison-of-constant` instead.
 
-foo == "foo"  # Should only check names, not values.
+foo == "foo"
 
 foo == bar
 

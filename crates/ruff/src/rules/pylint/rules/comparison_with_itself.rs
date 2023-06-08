@@ -1,61 +1,26 @@
-use std::fmt;
-
 use itertools::Itertools;
 use rustpython_parser::ast::{Cmpop, Expr};
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::ViolationsCmpop;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum ViolationsCmpop {
-    Eq,
-    NotEq,
-    Lt,
-    LtE,
-    Gt,
-    GtE,
-    Is,
-    IsNot,
-    In,
-    NotIn,
-}
-
-impl From<&Cmpop> for ViolationsCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Eq => Self::Eq,
-            Cmpop::NotEq => Self::NotEq,
-            Cmpop::Lt => Self::Lt,
-            Cmpop::LtE => Self::LtE,
-            Cmpop::Gt => Self::Gt,
-            Cmpop::GtE => Self::GtE,
-            Cmpop::Is => Self::Is,
-            Cmpop::IsNot => Self::IsNot,
-            Cmpop::In => Self::In,
-            Cmpop::NotIn => Self::NotIn,
-        }
-    }
-}
-
-impl fmt::Display for ViolationsCmpop {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let representation = match self {
-            Self::Eq => "==",
-            Self::NotEq => "!=",
-            Self::Lt => "<",
-            Self::LtE => "<=",
-            Self::Gt => ">",
-            Self::GtE => ">=",
-            Self::Is => "is",
-            Self::IsNot => "is not",
-            Self::In => "in",
-            Self::NotIn => "not in",
-        };
-        write!(f, "{representation}")
-    }
-}
-
+/// ## What it does
+/// Checks for comparisons of a name with itself.
+///
+/// ## Why is this bad?
+/// Comparing a name with itself will always resolve to the same value, so the
+/// comparison is redundant. It is also indicative of a mistake, as the
+/// comparison is unlikely to be what the programmer intended.
+///
+/// ## Example
+/// ```python
+/// foo == foo
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct ComparisonWithItself {
     left_constant: String,
