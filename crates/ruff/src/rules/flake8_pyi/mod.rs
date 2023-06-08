@@ -32,6 +32,8 @@ mod tests {
     #[test_case(Rule::NonSelfReturnType, Path::new("PYI034.pyi"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.py"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.pyi"))]
+    #[test_case(Rule::NoReturnArgumentAnnotationInStub, Path::new("PYI050.py"))]
+    #[test_case(Rule::NoReturnArgumentAnnotationInStub, Path::new("PYI050.pyi"))]
     #[test_case(Rule::NumericLiteralTooLong, Path::new("PYI054.py"))]
     #[test_case(Rule::NumericLiteralTooLong, Path::new("PYI054.pyi"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.py"))]

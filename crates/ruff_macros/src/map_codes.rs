@@ -262,7 +262,7 @@ We firstly want to allow rules to be selected by their names (and report them by
 and before we can do that we have to rename all our rules to match our naming convention
 (see CONTRIBUTING.md) because after that change every rule rename will be a breaking change.
 
-See also https://github.com/charliermarsh/ruff/issues/2186.
+See also https://github.com/astral-sh/ruff/issues/2186.
 ",
             rule_name.ident
         );

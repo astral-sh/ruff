@@ -1,7 +1,7 @@
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::{lines_after, lines_before};
+use crate::trivia::{lines_after, lines_before, skip_trailing_trivia};
 use ruff_formatter::{format_args, write, FormatError, SourceCode};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::AstNode;
@@ -86,9 +86,10 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
 
             write!(f, [leading_comments(self.comments)])?;
         } else if let Some(last_preceding) = self.last_node {
+            let full_end = skip_trailing_trivia(last_preceding.end(), f.context().contents());
             // The leading comments formatting ensures that it preserves the right amount of lines after
             // We need to take care of this ourselves, if there's no leading `else` comment.
-            if lines_after(last_preceding.end(), f.context().contents()) > 1 {
+            if lines_after(full_end, f.context().contents()) > 1 {
                 write!(f, [empty_line()])?;
             }
         }

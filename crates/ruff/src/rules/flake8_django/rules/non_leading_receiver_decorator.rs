@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, Decorator, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,7 +49,7 @@ impl Violation for DjangoNonLeadingReceiverDecorator {
 
 /// DJ013
 pub(crate) fn non_leading_receiver_decorator<'a, F>(
-    decorator_list: &'a [Expr],
+    decorator_list: &'a [Decorator],
     resolve_call_path: F,
 ) -> Vec<Diagnostic>
 where
@@ -58,7 +58,7 @@ where
     let mut diagnostics = vec![];
     let mut seen_receiver = false;
     for (i, decorator) in decorator_list.iter().enumerate() {
-        let is_receiver = match decorator {
+        let is_receiver = match &decorator.expression {
             Expr::Call(ast::ExprCall { func, .. }) => resolve_call_path(func)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["django", "dispatch", "receiver"]

@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_formatter/src/trivia.rs
+expression: tokens
+---
+[
+    Token {
+        kind: LParen,
+        range: 0..1,
+    },
+    Token {
+        kind: Whitespace,
+        range: 1..2,
+    },
+    Token {
+        kind: Continuation,
+        range: 2..3,
+    },
+    Token {
+        kind: Newline,
+        range: 3..4,
+    },
+    Token {
+        kind: Whitespace,
+        range: 4..5,
+    },
+    Token {
+        kind: RParen,
+        range: 5..6,
+    },
+]

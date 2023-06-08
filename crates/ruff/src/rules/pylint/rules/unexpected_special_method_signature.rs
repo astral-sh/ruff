@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use rustpython_parser::ast::{Arguments, Expr, Stmt};
+use rustpython_parser::ast::{Arguments, Decorator, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -141,7 +141,7 @@ pub(crate) fn unexpected_special_method_signature(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    decorator_list: &[Expr],
+    decorator_list: &[Decorator],
     args: &Arguments,
     locator: &Locator,
 ) {

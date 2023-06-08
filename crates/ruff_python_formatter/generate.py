@@ -77,6 +77,11 @@ for group, group_nodes in nodes_grouped.items():
     # )
     # src.joinpath(groups[group]).joinpath("mod.rs").write_text(rustfmt(mod_section))
     for node in group_nodes:
+        node_path = src.joinpath(groups[group]).joinpath(f"{to_camel_case(node)}.rs")
+        # Don't override existing manual implementations
+        if node_path.exists():
+            continue
+
         code = f"""
             use crate::{{verbatim_text, FormatNodeRule, PyFormatter}};
             use ruff_formatter::{{write, Buffer, FormatResult}};
@@ -91,9 +96,8 @@ for group, group_nodes in nodes_grouped.items():
                 }}
             }}
             """.strip()  # noqa: E501
-        src.joinpath(groups[group]).joinpath(f"{to_camel_case(node)}.rs").write_text(
-            rustfmt(code)
-        )
+
+        node_path.write_text(rustfmt(code))
 
 # %%
 # Generate `FormatRule`, `AsFormat` and `IntoFormat`

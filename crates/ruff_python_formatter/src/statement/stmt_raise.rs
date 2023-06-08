@@ -1,4 +1,4 @@
-use crate::{verbatim_text, FormatNodeRule, PyFormatter};
+use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::StmtRaise;
 
@@ -7,6 +7,6 @@ pub struct FormatStmtRaise;
 
 impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
     fn fmt_fields(&self, item: &StmtRaise, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [verbatim_text(item.range)])
+        write!(f, [not_yet_implemented(item)])
     }
 }

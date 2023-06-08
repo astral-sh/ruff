@@ -86,69 +86,96 @@ if __name__ == "__main__":
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,6 @@
+@@ -1,33 +1,18 @@
  while True:
-     if something.changed:
+-    if something.changed:
 -        do.stuff()  # trailing comment
 -        # Comment belongs to the `if` block.
-+        do.stuff()
++    NOT_YET_IMPLEMENTED_StmtIf
      # This one belongs to the `while` block.
  
      # Should this one, too?  I guess so.
-@@ -15,7 +14,6 @@
  
-     # then we do this
-     print(i)
+ # This one is properly standalone now.
+ 
+-for i in range(100):
+-    # first we do this
+-    if i % 33 == 0:
+-        break
++NOT_YET_IMPLEMENTED_StmtFor
+ 
+-    # then we do this
+-    print(i)
 -    # and finally we loop around
++NOT_YET_IMPLEMENTED_StmtWith
  
- with open(some_temp_file) as f:
-     data = f.read()
-@@ -33,7 +31,6 @@
+-with open(some_temp_file) as f:
+-    data = f.read()
++NOT_YET_IMPLEMENTED_StmtTry
+ 
+-try:
+-    with open(some_other_file) as w:
+-        w.write(data)
+-
+-except OSError:
+-    print("problems")
+-
+-import sys
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+ 
  # leading function comment
- def wat():
+@@ -42,7 +27,7 @@
+ # leading 1
+ @deco1
+ # leading 2
+-@deco2(with_args=True)
++@NOT_IMPLEMENTED_call()
+ # leading 3
+ @deco3
+ def decorated1():
+@@ -52,7 +37,7 @@
+ # leading 1
+ @deco1
+ # leading 2
+-@deco2(with_args=True)
++@NOT_IMPLEMENTED_call()
+ # leading function comment
+ def decorated1():
      ...
--    # trailing function comment
+@@ -69,5 +54,4 @@
+     ...
  
  
- # SECTION COMMENT
+-if __name__ == "__main__":
+-    main()
++NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Ruff Output
 
 ```py
 while True:
-    if something.changed:
-        do.stuff()
+    NOT_YET_IMPLEMENTED_StmtIf
     # This one belongs to the `while` block.
 
     # Should this one, too?  I guess so.
 
 # This one is properly standalone now.
 
-for i in range(100):
-    # first we do this
-    if i % 33 == 0:
-        break
+NOT_YET_IMPLEMENTED_StmtFor
 
-    # then we do this
-    print(i)
+NOT_YET_IMPLEMENTED_StmtWith
 
-with open(some_temp_file) as f:
-    data = f.read()
+NOT_YET_IMPLEMENTED_StmtTry
 
-try:
-    with open(some_other_file) as w:
-        w.write(data)
-
-except OSError:
-    print("problems")
-
-import sys
+NOT_YET_IMPLEMENTED_StmtImport
 
 
 # leading function comment
 def wat():
     ...
+    # trailing function comment
 
 
 # SECTION COMMENT
@@ -157,7 +184,7 @@ def wat():
 # leading 1
 @deco1
 # leading 2
-@deco2(with_args=True)
+@NOT_IMPLEMENTED_call()
 # leading 3
 @deco3
 def decorated1():
@@ -167,7 +194,7 @@ def decorated1():
 # leading 1
 @deco1
 # leading 2
-@deco2(with_args=True)
+@NOT_IMPLEMENTED_call()
 # leading function comment
 def decorated1():
     ...
@@ -184,8 +211,7 @@ def g():
     ...
 
 
-if __name__ == "__main__":
-    main()
+NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Black Output

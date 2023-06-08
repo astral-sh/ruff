@@ -33,7 +33,7 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
     path.extension()
         .map_or(false, |ext| ext == JUPYTER_NOTEBOOK_EXT)
         // For now this is feature gated here, the long term solution depends on
-        // https://github.com/charliermarsh/ruff/issues/3410
+        // https://github.com/astral-sh/ruff/issues/3410
         && cfg!(feature = "jupyter_notebook")
 }
 

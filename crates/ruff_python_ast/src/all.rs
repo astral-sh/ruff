@@ -45,11 +45,23 @@ where
                 // Allow comprehensions, even though we can't statically analyze them.
                 return (None, AllNamesFlags::empty());
             }
+            Expr::Name(ast::ExprName { id, .. }) => {
+                // Ex) `__all__ = __all__ + multiprocessing.__all__`
+                if id == "__all__" {
+                    return (None, AllNamesFlags::empty());
+                }
+            }
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                // Ex) `__all__ = __all__ + multiprocessing.__all__`
+                if attr == "__all__" {
+                    return (None, AllNamesFlags::empty());
+                }
+            }
             Expr::Call(ast::ExprCall {
                 func,
                 args,
                 keywords,
-                range: _range,
+                ..
             }) => {
                 // Allow `tuple()` and `list()` calls.
                 if keywords.is_empty() && args.len() <= 1 {

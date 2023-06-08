@@ -16,12 +16,12 @@ enum EqCmpop {
     NotEq,
 }
 
-impl From<&Cmpop> for EqCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Eq => EqCmpop::Eq,
-            Cmpop::NotEq => EqCmpop::NotEq,
-            _ => panic!("Expected Cmpop::Eq | Cmpop::NotEq"),
+impl EqCmpop {
+    fn try_from(value: Cmpop) -> Option<EqCmpop> {
+        match value {
+            Cmpop::Eq => Some(EqCmpop::Eq),
+            Cmpop::NotEq => Some(EqCmpop::NotEq),
+            _ => None,
         }
     }
 }
@@ -154,54 +154,64 @@ pub(crate) fn literal_comparisons(
     let next = &comparators[0];
 
     if !helpers::is_constant_non_singleton(next) {
-        if check_none_comparisons
-            && matches!(
-                comparator,
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::None,
-                    kind: None,
-                    range: _
-                })
-            )
-        {
-            if matches!(op, Cmpop::Eq) {
-                let diagnostic = Diagnostic::new(NoneComparison(op.into()), comparator.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    bad_ops.insert(0, Cmpop::Is);
-                }
-                diagnostics.push(diagnostic);
-            }
-            if matches!(op, Cmpop::NotEq) {
-                let diagnostic = Diagnostic::new(NoneComparison(op.into()), comparator.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    bad_ops.insert(0, Cmpop::IsNot);
-                }
-                diagnostics.push(diagnostic);
-            }
-        }
-
-        if check_true_false_comparisons {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Bool(value),
-                kind: None,
-                range: _,
-            }) = comparator
+        if let Some(op) = EqCmpop::try_from(*op) {
+            if check_none_comparisons
+                && matches!(
+                    comparator,
+                    Expr::Constant(ast::ExprConstant {
+                        value: Constant::None,
+                        kind: None,
+                        range: _
+                    })
+                )
             {
-                if matches!(op, Cmpop::Eq) {
-                    let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(*value, op.into()), comparator.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(0, Cmpop::Is);
+                match op {
+                    EqCmpop::Eq => {
+                        let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            bad_ops.insert(0, Cmpop::Is);
+                        }
+                        diagnostics.push(diagnostic);
                     }
-                    diagnostics.push(diagnostic);
+                    EqCmpop::NotEq => {
+                        let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            bad_ops.insert(0, Cmpop::IsNot);
+                        }
+                        diagnostics.push(diagnostic);
+                    }
                 }
-                if matches!(op, Cmpop::NotEq) {
-                    let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(*value, op.into()), comparator.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(0, Cmpop::IsNot);
+            }
+
+            if check_true_false_comparisons {
+                if let Expr::Constant(ast::ExprConstant {
+                    value: Constant::Bool(value),
+                    kind: None,
+                    range: _,
+                }) = comparator
+                {
+                    match op {
+                        EqCmpop::Eq => {
+                            let diagnostic = Diagnostic::new(
+                                TrueFalseComparison(*value, op),
+                                comparator.range(),
+                            );
+                            if checker.patch(diagnostic.kind.rule()) {
+                                bad_ops.insert(0, Cmpop::Is);
+                            }
+                            diagnostics.push(diagnostic);
+                        }
+                        EqCmpop::NotEq => {
+                            let diagnostic = Diagnostic::new(
+                                TrueFalseComparison(*value, op),
+                                comparator.range(),
+                            );
+                            if checker.patch(diagnostic.kind.rule()) {
+                                bad_ops.insert(0, Cmpop::IsNot);
+                            }
+                            diagnostics.push(diagnostic);
+                        }
                     }
-                    diagnostics.push(diagnostic);
                 }
             }
         }
@@ -214,53 +224,60 @@ pub(crate) fn literal_comparisons(
             continue;
         }
 
-        if check_none_comparisons
-            && matches!(
-                next,
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::None,
-                    kind: None,
-                    range: _
-                })
-            )
-        {
-            if matches!(op, Cmpop::Eq) {
-                let diagnostic = Diagnostic::new(NoneComparison(op.into()), next.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    bad_ops.insert(idx, Cmpop::Is);
-                }
-                diagnostics.push(diagnostic);
-            }
-            if matches!(op, Cmpop::NotEq) {
-                let diagnostic = Diagnostic::new(NoneComparison(op.into()), next.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    bad_ops.insert(idx, Cmpop::IsNot);
-                }
-                diagnostics.push(diagnostic);
-            }
-        }
-
-        if check_true_false_comparisons {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Bool(value),
-                kind: None,
-                range: _,
-            }) = next
+        if let Some(op) = EqCmpop::try_from(*op) {
+            if check_none_comparisons
+                && matches!(
+                    next,
+                    Expr::Constant(ast::ExprConstant {
+                        value: Constant::None,
+                        kind: None,
+                        range: _
+                    })
+                )
             {
-                if op.is_eq() {
-                    let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(*value, op.into()), next.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(idx, Cmpop::Is);
+                match op {
+                    EqCmpop::Eq => {
+                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            bad_ops.insert(idx, Cmpop::Is);
+                        }
+                        diagnostics.push(diagnostic);
                     }
-                    diagnostics.push(diagnostic);
-                } else if op.is_not_eq() {
-                    let diagnostic =
-                        Diagnostic::new(TrueFalseComparison(*value, op.into()), next.range());
-                    if checker.patch(diagnostic.kind.rule()) {
-                        bad_ops.insert(idx, Cmpop::IsNot);
+                    EqCmpop::NotEq => {
+                        let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
+                        if checker.patch(diagnostic.kind.rule()) {
+                            bad_ops.insert(idx, Cmpop::IsNot);
+                        }
+                        diagnostics.push(diagnostic);
                     }
-                    diagnostics.push(diagnostic);
+                }
+            }
+
+            if check_true_false_comparisons {
+                if let Expr::Constant(ast::ExprConstant {
+                    value: Constant::Bool(value),
+                    kind: None,
+                    range: _,
+                }) = next
+                {
+                    match op {
+                        EqCmpop::Eq => {
+                            let diagnostic =
+                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                bad_ops.insert(idx, Cmpop::Is);
+                            }
+                            diagnostics.push(diagnostic);
+                        }
+                        EqCmpop::NotEq => {
+                            let diagnostic =
+                                Diagnostic::new(TrueFalseComparison(*value, op), next.range());
+                            if checker.patch(diagnostic.kind.rule()) {
+                                bad_ops.insert(idx, Cmpop::IsNot);
+                            }
+                            diagnostics.push(diagnostic);
+                        }
+                    }
                 }
             }
         }

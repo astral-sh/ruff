@@ -291,14 +291,14 @@ where
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
-                    // and the current scope.)
+                    // and the current scope, and, per standard resolution rules, any class scopes.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let binding_id = self
                             .semantic_model
                             .scopes
                             .ancestors(self.semantic_model.scope_id)
                             .skip(1)
-                            .take_while(|scope| !scope.kind.is_module())
+                            .filter(|scope| !(scope.kind.is_module() || scope.kind.is_class()))
                             .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
@@ -307,9 +307,18 @@ where
                                 stmt.range(),
                                 ExecutionContext::Runtime,
                             );
-                        } else {
-                            // Ensure that every nonlocal has an existing binding from a parent scope.
-                            if self.enabled(Rule::NonlocalWithoutBinding) {
+                        }
+
+                        // Ensure that every nonlocal has an existing binding from a parent scope.
+                        if self.enabled(Rule::NonlocalWithoutBinding) {
+                            if self
+                                .semantic_model
+                                .scopes
+                                .ancestors(self.semantic_model.scope_id)
+                                .skip(1)
+                                .take_while(|scope| !scope.kind.is_module())
+                                .all(|scope| !scope.declares(name.as_str()))
+                            {
                                 self.diagnostics.push(Diagnostic::new(
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
@@ -453,6 +462,9 @@ where
                     }
                     if self.enabled(Rule::StrOrReprDefinedInStub) {
                         flake8_pyi::rules::str_or_repr_defined_in_stub(self, stmt);
+                    }
+                    if self.enabled(Rule::NoReturnArgumentAnnotationInStub) {
+                        flake8_pyi::rules::no_return_argument_annotation(self, args);
                     }
                 }
 
@@ -1824,8 +1836,8 @@ where
             }) => {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
-                for expr in decorator_list {
-                    self.visit_expr(expr);
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
@@ -1934,8 +1946,8 @@ where
                 for keyword in keywords {
                     self.visit_keyword(keyword);
                 }
-                for expr in decorator_list {
-                    self.visit_expr(expr);
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
                 }
 
                 let definition = docstrings::extraction::extract_definition(
@@ -2624,7 +2636,9 @@ where
                 if self.enabled(Rule::ZipWithoutExplicitStrict)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
-                    flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
+                    flake8_bugbear::rules::zip_without_explicit_strict(
+                        self, expr, func, args, keywords,
+                    );
                 }
                 if self.enabled(Rule::NoExplicitStacklevel) {
                     flake8_bugbear::rules::no_explicit_stacklevel(self, func, args, keywords);
@@ -2809,7 +2823,7 @@ where
                 if let Expr::Name(ast::ExprName { id, ctx, range: _ }) = func.as_ref() {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
                         let scope = self.semantic_model.scope_mut();
-                        scope.uses_locals = true;
+                        scope.set_uses_locals();
                     }
                 }
 
@@ -4042,7 +4056,7 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self.semantic_model.scope().defines(name) {
+                        if self.semantic_model.scope().has(name) {
                             self.handle_node_store(
                                 name,
                                 &Expr::Name(ast::ExprName {
@@ -4067,7 +4081,7 @@ where
 
                         if let Some(binding_id) = {
                             let scope = self.semantic_model.scope_mut();
-                            scope.remove(name)
+                            scope.delete(name)
                         } {
                             if !self.semantic_model.is_used(binding_id) {
                                 if self.enabled(Rule::UnusedVariable) {
@@ -4697,19 +4711,16 @@ impl<'a> Checker<'a> {
         }
 
         let scope = self.semantic_model.scope_mut();
-        if scope.remove(id.as_str()).is_some() {
-            return;
+        if scope.delete(id.as_str()).is_none() {
+            if self.enabled(Rule::UndefinedName) {
+                self.diagnostics.push(Diagnostic::new(
+                    pyflakes::rules::UndefinedName {
+                        name: id.to_string(),
+                    },
+                    expr.range(),
+                ));
+            }
         }
-        if !self.enabled(Rule::UndefinedName) {
-            return;
-        }
-
-        self.diagnostics.push(Diagnostic::new(
-            pyflakes::rules::UndefinedName {
-                name: id.to_string(),
-            },
-            expr.range(),
-        ));
     }
 
     fn check_deferred_future_type_definitions(&mut self) {
@@ -4977,7 +4988,7 @@ impl<'a> Checker<'a> {
                         .collect();
                     if !sources.is_empty() {
                         for (name, range) in &exports {
-                            if !scope.defines(name) {
+                            if !scope.has(name) {
                                 diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: (*name).to_string(),
@@ -5061,22 +5072,19 @@ impl<'a> Checker<'a> {
                         .copied()
                         .collect()
                 };
-                for binding_id in scope.binding_ids() {
-                    let binding = &self.semantic_model.bindings[binding_id];
 
-                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                        self,
-                        binding,
-                        &mut diagnostics,
-                    );
+                flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                    self,
+                    scope,
+                    &mut diagnostics,
+                );
 
-                    flake8_type_checking::rules::typing_only_runtime_import(
-                        self,
-                        binding,
-                        &runtime_imports,
-                        &mut diagnostics,
-                    );
-                }
+                flake8_type_checking::rules::typing_only_runtime_import(
+                    self,
+                    scope,
+                    &runtime_imports,
+                    &mut diagnostics,
+                );
             }
 
             if self.enabled(Rule::UnusedImport) {

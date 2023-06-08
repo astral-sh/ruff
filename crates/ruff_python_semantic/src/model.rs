@@ -178,7 +178,7 @@ impl<'a> SemanticModel<'a> {
     pub fn resolve_reference(&mut self, symbol: &str, range: TextRange) -> ResolvedReference {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
-        if self.in_deferred_type_definition() {
+        if self.in_forward_reference() {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 // Mark the binding as used.
                 let context = self.execution_context();
@@ -239,9 +239,7 @@ impl<'a> SemanticModel<'a> {
                 //
                 // The `name` in `print(name)` should be treated as unresolved, but the `name` in
                 // `name: str` should be treated as used.
-                if !self.in_deferred_type_definition()
-                    && self.bindings[binding_id].kind.is_annotation()
-                {
+                if !self.in_forward_reference() && self.bindings[binding_id].kind.is_annotation() {
                     continue;
                 }
 
@@ -754,6 +752,27 @@ impl<'a> SemanticModel<'a> {
         self.in_simple_string_type_definition()
             || self.in_complex_string_type_definition()
             || self.in_future_type_definition()
+    }
+
+    /// Return `true` if the context is in a forward type reference.
+    ///
+    /// Includes deferred string types, and future types in annotations.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from __future__ import annotations
+    ///
+    /// from threading import Thread
+    ///
+    ///
+    /// x: Thread  # Forward reference
+    /// cast("Thread", x)  # Forward reference
+    /// cast(Thread, x)  # Non-forward reference
+    /// ```
+    pub const fn in_forward_reference(&self) -> bool {
+        self.in_simple_string_type_definition()
+            || self.in_complex_string_type_definition()
+            || (self.in_future_type_definition() && self.in_annotation())
     }
 
     /// Return `true` if the context is in an exception handler.
