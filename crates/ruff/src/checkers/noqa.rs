@@ -18,10 +18,9 @@ pub(crate) fn check_noqa(
     locator: &Locator,
     comment_ranges: &[TextRange],
     noqa_line_for: &NoqaMapping,
+    analyze_directives: bool,
     settings: &Settings,
 ) -> Vec<usize> {
-    let enforce_noqa = settings.rules.enabled(Rule::UnusedNOQA);
-
     // Identify any codes that are globally exempted (within the current file).
     let exemption = noqa::file_exemption(locator.contents(), comment_ranges);
 
@@ -93,7 +92,7 @@ pub(crate) fn check_noqa(
     }
 
     // Enforce that the noqa directive was actually used (RUF100).
-    if enforce_noqa {
+    if analyze_directives && settings.rules.enabled(Rule::UnusedNOQA) {
         for line in noqa_directives.lines() {
             match &line.directive {
                 Directive::All(leading_spaces, noqa_range, trailing_spaces) => {

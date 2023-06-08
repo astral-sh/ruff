@@ -1,12 +1,13 @@
 [workspace]
 members = ["crates/*"]
+resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.69"
+rust-version = "1.70"
 homepage = "https://beta.ruff.rs/docs/"
 documentation = "https://beta.ruff.rs/docs/"
-repository = "https://github.com/charliermarsh/ruff"
+repository = "https://github.com/astral-sh/ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 
 [workspace.dependencies]
@@ -34,11 +35,11 @@ proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
-ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd" }
-rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["all-nodes-with-ranges"]}
-rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd" }
-rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd" }
-rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "7a3eedbf6fb4ea7068a1bf7fe0e97e963ea95ffd", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
+ruff_text_size = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db" }
+rustpython-ast = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db", default-features = false, features = ["all-nodes-with-ranges"]}
+rustpython-format = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db" }
+rustpython-literal = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db" }
+rustpython-parser = { git = "https://github.com/astral-sh/RustPython-Parser.git", rev = "0dc8fdf52d146698c5bcf0b842fddc9e398ad8db", default-features = false, features = ["full-lexer", "all-nodes-with-ranges"] }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }

@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/flake8_fixme/mod.rs
+---
+T00.py:3:3: FIX003 Line contains XXX
+  |
+3 | # TODO: todo
+4 | # todo: todo
+5 | # XXX: xxx
+  |   ^^^ FIX003
+6 | # xxx: xxx
+7 | # HACK: hack
+  |
+
+T00.py:4:3: FIX003 Line contains XXX
+  |
+4 | # todo: todo
+5 | # XXX: xxx
+6 | # xxx: xxx
+  |   ^^^ FIX003
+7 | # HACK: hack
+8 | # hack: hack
+  |
+
+

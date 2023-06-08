@@ -1,4 +1,6 @@
-//! Extract `# noqa` and `# isort: skip` directives from tokenized source.
+//! Extract `# noqa`, `# isort: skip`, and `# TODO` directives from tokenized source.
+
+use std::str::FromStr;
 
 use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -217,6 +219,133 @@ fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDirect
     }
 }
 
+/// A comment that contains a [`TodoDirective`]
+pub(crate) struct TodoComment<'a> {
+    /// The comment's text
+    pub(crate) content: &'a str,
+    /// The directive found within the comment.
+    pub(crate) directive: TodoDirective<'a>,
+    /// The comment's actual [`TextRange`].
+    pub(crate) range: TextRange,
+    /// The comment range's position in [`Indexer`].comment_ranges()
+    pub(crate) range_index: usize,
+}
+
+impl<'a> TodoComment<'a> {
+    /// Attempt to transform a normal comment into a [`TodoComment`].
+    pub(crate) fn from_comment(
+        content: &'a str,
+        range: TextRange,
+        range_index: usize,
+    ) -> Option<Self> {
+        TodoDirective::from_comment(content, range).map(|directive| Self {
+            content,
+            directive,
+            range,
+            range_index,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct TodoDirective<'a> {
+    /// The actual directive
+    pub(crate) content: &'a str,
+    /// The directive's [`TextRange`] in the file.
+    pub(crate) range: TextRange,
+    /// The directive's kind: HACK, XXX, FIXME, or TODO.
+    pub(crate) kind: TodoDirectiveKind,
+}
+
+impl<'a> TodoDirective<'a> {
+    /// Extract a [`TodoDirective`] from a comment.
+    pub(crate) fn from_comment(comment: &'a str, comment_range: TextRange) -> Option<Self> {
+        // The directive's offset from the start of the comment.
+        let mut relative_offset = TextSize::new(0);
+        let mut subset_opt = Some(comment);
+
+        // Loop over `#`-delimited sections of the comment to check for directives. This will
+        // correctly handle cases like `# foo # TODO`.
+        while let Some(subset) = subset_opt {
+            let trimmed = subset.trim_start_matches('#').trim_start();
+
+            let offset = subset.text_len() - trimmed.text_len();
+            relative_offset += offset;
+
+            // If we detect a TodoDirectiveKind variant substring in the comment, construct and
+            // return the appropriate TodoDirective
+            if let Ok(directive_kind) = trimmed.parse::<TodoDirectiveKind>() {
+                let len = directive_kind.len();
+
+                return Some(Self {
+                    content: &comment[TextRange::at(relative_offset, len)],
+                    range: TextRange::at(comment_range.start() + relative_offset, len),
+                    kind: directive_kind,
+                });
+            }
+
+            // Shrink the subset to check for the next phrase starting with "#".
+            subset_opt = if let Some(new_offset) = trimmed.find('#') {
+                relative_offset += TextSize::try_from(new_offset).unwrap();
+                subset.get(relative_offset.to_usize()..)
+            } else {
+                None
+            };
+        }
+
+        None
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum TodoDirectiveKind {
+    Todo,
+    Fixme,
+    Xxx,
+    Hack,
+}
+
+impl FromStr for TodoDirectiveKind {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // The lengths of the respective variant strings: TODO, FIXME, HACK, XXX
+        for length in [3, 4, 5] {
+            let Some(substr) = s.get(..length) else {
+                break;
+            };
+
+            match substr.to_lowercase().as_str() {
+                "fixme" => {
+                    return Ok(TodoDirectiveKind::Fixme);
+                }
+                "hack" => {
+                    return Ok(TodoDirectiveKind::Hack);
+                }
+                "todo" => {
+                    return Ok(TodoDirectiveKind::Todo);
+                }
+                "xxx" => {
+                    return Ok(TodoDirectiveKind::Xxx);
+                }
+                _ => continue,
+            }
+        }
+
+        Err(())
+    }
+}
+
+impl TodoDirectiveKind {
+    fn len(&self) -> TextSize {
+        match self {
+            TodoDirectiveKind::Xxx => TextSize::new(3),
+            TodoDirectiveKind::Hack | TodoDirectiveKind::Todo => TextSize::new(4),
+            TodoDirectiveKind::Fixme => TextSize::new(5),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -225,7 +354,9 @@ mod tests {
 
     use ruff_python_ast::source_code::{Indexer, Locator};
 
-    use crate::directives::{extract_isort_directives, extract_noqa_line_for};
+    use crate::directives::{
+        extract_isort_directives, extract_noqa_line_for, TodoDirective, TodoDirectiveKind,
+    };
     use crate::noqa::NoqaMapping;
 
     fn noqa_mappings(contents: &str) -> NoqaMapping {
@@ -426,6 +557,64 @@ z = x + 1";
         assert_eq!(
             extract_isort_directives(&lxr, &Locator::new(contents)).splits,
             vec![TextSize::from(13)]
+        );
+    }
+
+    #[test]
+    fn todo_directives() {
+        let test_comment = "# TODO: todo tag";
+        let test_comment_range = TextRange::at(TextSize::new(0), test_comment.text_len());
+        let expected = TodoDirective {
+            content: "TODO",
+            range: TextRange::new(TextSize::new(2), TextSize::new(6)),
+            kind: TodoDirectiveKind::Todo,
+        };
+        assert_eq!(
+            expected,
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
+        );
+
+        let test_comment = "#TODO: todo tag";
+        let test_comment_range = TextRange::at(TextSize::new(0), test_comment.text_len());
+        let expected = TodoDirective {
+            content: "TODO",
+            range: TextRange::new(TextSize::new(1), TextSize::new(5)),
+            kind: TodoDirectiveKind::Todo,
+        };
+        assert_eq!(
+            expected,
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
+        );
+
+        let test_comment = "# fixme: fixme tag";
+        let test_comment_range = TextRange::at(TextSize::new(0), test_comment.text_len());
+        let expected = TodoDirective {
+            content: "fixme",
+            range: TextRange::new(TextSize::new(2), TextSize::new(7)),
+            kind: TodoDirectiveKind::Fixme,
+        };
+        assert_eq!(
+            expected,
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
+        );
+
+        let test_comment = "# noqa # TODO: todo";
+        let test_comment_range = TextRange::at(TextSize::new(0), test_comment.text_len());
+        let expected = TodoDirective {
+            content: "TODO",
+            range: TextRange::new(TextSize::new(9), TextSize::new(13)),
+            kind: TodoDirectiveKind::Todo,
+        };
+        assert_eq!(
+            expected,
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
+        );
+
+        let test_comment = "# no directive";
+        let test_comment_range = TextRange::at(TextSize::new(0), test_comment.text_len());
+        assert_eq!(
+            None,
+            TodoDirective::from_comment(test_comment, test_comment_range)
         );
     }
 }

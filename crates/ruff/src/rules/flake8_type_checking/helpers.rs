@@ -63,7 +63,9 @@ fn runtime_evaluated_decorators(semantic_model: &SemanticModel, decorators: &[St
     if let ScopeKind::Class(ast::StmtClassDef { decorator_list, .. }) = &semantic_model.scope().kind
     {
         for decorator in decorator_list.iter() {
-            if let Some(call_path) = semantic_model.resolve_call_path(map_callable(decorator)) {
+            if let Some(call_path) =
+                semantic_model.resolve_call_path(map_callable(&decorator.expression))
+            {
                 if decorators
                     .iter()
                     .any(|decorator| from_qualified_name(decorator) == call_path)

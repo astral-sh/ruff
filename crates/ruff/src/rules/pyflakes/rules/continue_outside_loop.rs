@@ -3,6 +3,21 @@ use rustpython_parser::ast::{self, Ranged, Stmt};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for `continue` statements outside of loops.
+///
+/// ## Why is this bad?
+/// The use of a `continue` statement outside of a `for` or `while` loop will
+/// raise a `SyntaxError`.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     continue  # SyntaxError
+/// ```
+///
+/// ## References
+/// - [Python documentation: `continue`](https://docs.python.org/3/reference/simple_stmts.html#the-continue-statement)
 #[violation]
 pub struct ContinueOutsideLoop;
 

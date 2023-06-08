@@ -28,25 +28,26 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 -    sdfsdjfklsdfjlksdljkf,
 -    sdsfsdfjskdflsfsdf,
 -) = (1, 2, 3)
-+sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
++(1, 2) = (1, 2)
  
  # This is as well.
 -(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
-+this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
++(1, 2) = NOT_IMPLEMENTED_call()
  
- (a,) = call()
+-(a,) = call()
++(1, 2) = NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
 # This is a standalone comment.
-sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
+(1, 2) = (1, 2)
 
 # This is as well.
-this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
+(1, 2) = NOT_IMPLEMENTED_call()
 
-(a,) = call()
+(1, 2) = NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

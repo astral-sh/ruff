@@ -1,0 +1,199 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtonoff2.py
+---
+## Input
+
+```py
+import pytest
+
+TmSt = 1
+TmEx = 2
+
+# fmt: off
+
+# Test data:
+#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+
+@pytest.mark.parametrize('test', [
+
+    # Test don't manage the volume
+    [
+        ('stuff', 'in')
+    ],
+])
+def test_fader(test):
+    pass
+
+def check_fader(test):
+
+    pass
+
+def verify_fader(test):
+  # misaligned comment
+    pass
+
+def verify_fader(test):
+    """Hey, ho."""
+    assert test.passed()
+
+def test_calculate_fades():
+    calcs = [
+        # one is zero/none
+        (0, 4, 0, 0, 10,        0, 0, 6, 10),
+        (None, 4, 0, 0, 10,     0, 0, 6, 10),
+    ]
+
+# fmt: on
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,40 +1,38 @@
+-import pytest
++NOT_YET_IMPLEMENTED_StmtImport
+ 
+ TmSt = 1
+ TmEx = 2
+ 
+ # fmt: off
+ 
++
+ # Test data:
+ #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+ 
+-@pytest.mark.parametrize('test', [
+-
+-    # Test don't manage the volume
+-    [
+-        ('stuff', 'in')
+-    ],
+-])
++@NOT_IMPLEMENTED_call()
+ def test_fader(test):
+     pass
+ 
++
+ def check_fader(test):
++    pass
+ 
+-    pass
+ 
+ def verify_fader(test):
+-  # misaligned comment
++    # misaligned comment
+     pass
+ 
++
+ def verify_fader(test):
+-    """Hey, ho."""
+-    assert test.passed()
++    "NOT_YET_IMPLEMENTED_STRING"
++    NOT_YET_IMPLEMENTED_StmtAssert
++
+ 
+ def test_calculate_fades():
+     calcs = [
+         # one is zero/none
+-        (0, 4, 0, 0, 10,        0, 0, 6, 10),
+-        (None, 4, 0, 0, 10,     0, 0, 6, 10),
++        (1, 2),
++        (1, 2),
+     ]
+ 
+ # fmt: on
+```
+
+## Ruff Output
+
+```py
+NOT_YET_IMPLEMENTED_StmtImport
+
+TmSt = 1
+TmEx = 2
+
+# fmt: off
+
+
+# Test data:
+#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+
+@NOT_IMPLEMENTED_call()
+def test_fader(test):
+    pass
+
+
+def check_fader(test):
+    pass
+
+
+def verify_fader(test):
+    # misaligned comment
+    pass
+
+
+def verify_fader(test):
+    "NOT_YET_IMPLEMENTED_STRING"
+    NOT_YET_IMPLEMENTED_StmtAssert
+
+
+def test_calculate_fades():
+    calcs = [
+        # one is zero/none
+        (1, 2),
+        (1, 2),
+    ]
+
+# fmt: on
+```
+
+## Black Output
+
+```py
+import pytest
+
+TmSt = 1
+TmEx = 2
+
+# fmt: off
+
+# Test data:
+#   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
+
+@pytest.mark.parametrize('test', [
+
+    # Test don't manage the volume
+    [
+        ('stuff', 'in')
+    ],
+])
+def test_fader(test):
+    pass
+
+def check_fader(test):
+
+    pass
+
+def verify_fader(test):
+  # misaligned comment
+    pass
+
+def verify_fader(test):
+    """Hey, ho."""
+    assert test.passed()
+
+def test_calculate_fades():
+    calcs = [
+        # one is zero/none
+        (0, 4, 0, 0, 10,        0, 0, 6, 10),
+        (None, 4, 0, 0, 10,     0, 0, 6, 10),
+    ]
+
+# fmt: on
+```
+
+

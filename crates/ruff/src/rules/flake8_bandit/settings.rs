@@ -6,7 +6,7 @@ use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
 fn default_tmp_dirs() -> Vec<String> {
     ["/tmp", "/var/tmp", "/dev/shm"]
-        .map(std::string::ToString::to_string)
+        .map(ToString::to_string)
         .to_vec()
 }
 

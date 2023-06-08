@@ -1,11 +1,9 @@
-use log::error;
 use rustpython_parser::ast::{Ranged, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 
-use crate::autofix::edits::delete_stmt;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -35,33 +33,21 @@ pub(crate) fn pass_in_class_body<'a>(
     }
 
     for stmt in body {
-        if stmt.is_pass_stmt() {
-            let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
-
-            if checker.patch(diagnostic.kind.rule()) {
-                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-                match delete_stmt(
-                    stmt,
-                    Some(parent),
-                    &deleted,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                ) {
-                    Ok(fix) => {
-                        if fix.is_deletion() || fix.content() == Some("pass") {
-                            checker.deletions.insert(RefEquality(stmt));
-                        }
-                        #[allow(deprecated)]
-                        diagnostic.set_fix_from_edit(fix);
-                    }
-                    Err(e) => {
-                        error!("Failed to delete `pass` statement: {}", e);
-                    }
-                };
-            };
-
-            checker.diagnostics.push(diagnostic);
+        if !stmt.is_pass_stmt() {
+            continue;
         }
+
+        let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
+        if checker.patch(diagnostic.kind.rule()) {
+            let edit = autofix::edits::delete_stmt(
+                stmt,
+                Some(parent),
+                checker.locator,
+                checker.indexer,
+                checker.stylist,
+            );
+            diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(parent))));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }

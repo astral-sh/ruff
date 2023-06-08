@@ -38,7 +38,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::For(ast::StmtFor { body, .. })
             | Stmt::AsyncFor(ast::StmtAsyncFor { body, .. }) => {
-                walk_stmt(checker, body, |stmt| matches!(stmt, Stmt::Return(_)));
+                walk_stmt(checker, body, Stmt::is_return_stmt);
             }
             Stmt::If(ast::StmtIf { body, .. })
             | Stmt::Try(ast::StmtTry { body, .. })

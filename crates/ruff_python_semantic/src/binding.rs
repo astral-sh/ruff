@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
 use ruff_text_size::TextRange;
+use rustpython_parser::ast::Ranged;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::helpers;
@@ -48,41 +49,36 @@ impl<'a> Binding<'a> {
     /// Return `true` if this binding redefines the given binding.
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Importation(Importation { full_name, .. }) => {
+            BindingKind::Importation(Importation { qualified_name }) => {
                 if let BindingKind::SubmoduleImportation(SubmoduleImportation {
-                    full_name: existing,
-                    ..
+                    qualified_name: existing,
                 }) = &existing.kind
                 {
-                    return full_name == existing;
+                    return qualified_name == existing;
                 }
             }
-            BindingKind::FromImportation(FromImportation { full_name, .. }) => {
+            BindingKind::FromImportation(FromImportation { qualified_name }) => {
                 if let BindingKind::SubmoduleImportation(SubmoduleImportation {
-                    full_name: existing,
-                    ..
+                    qualified_name: existing,
                 }) = &existing.kind
                 {
-                    return full_name == existing;
+                    return qualified_name == existing;
                 }
             }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => {
+            BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
                 match &existing.kind {
                     BindingKind::Importation(Importation {
-                        full_name: existing,
-                        ..
+                        qualified_name: existing,
                     })
                     | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                        full_name: existing,
-                        ..
+                        qualified_name: existing,
                     }) => {
-                        return full_name == existing;
+                        return qualified_name == existing;
                     }
                     BindingKind::FromImportation(FromImportation {
-                        full_name: existing,
-                        ..
+                        qualified_name: existing,
                     }) => {
-                        return full_name == existing;
+                        return qualified_name == existing;
                     }
                     _ => {}
                 }
@@ -106,6 +102,37 @@ impl<'a> Binding<'a> {
         )
     }
 
+    /// Returns the fully-qualified symbol name, if this symbol was imported from another module.
+    pub fn qualified_name(&self) -> Option<&str> {
+        match &self.kind {
+            BindingKind::Importation(Importation { qualified_name }) => Some(qualified_name),
+            BindingKind::FromImportation(FromImportation { qualified_name }) => {
+                Some(qualified_name)
+            }
+            BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+                Some(qualified_name)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the fully-qualified name of the module from which this symbol was imported, if this
+    /// symbol was imported from another module.
+    pub fn module_name(&self) -> Option<&str> {
+        match &self.kind {
+            BindingKind::Importation(Importation { qualified_name })
+            | BindingKind::SubmoduleImportation(SubmoduleImportation { qualified_name }) => {
+                Some(qualified_name.split('.').next().unwrap_or(qualified_name))
+            }
+            BindingKind::FromImportation(FromImportation { qualified_name }) => Some(
+                qualified_name
+                    .rsplit_once('.')
+                    .map_or(qualified_name, |(module, _)| module),
+            ),
+            _ => None,
+        }
+    }
+
     /// Returns the appropriate visual range for highlighting this binding.
     pub fn trimmed_range(&self, semantic_model: &SemanticModel, locator: &Locator) -> TextRange {
         match self.kind {
@@ -116,6 +143,19 @@ impl<'a> Binding<'a> {
             }
             _ => self.range,
         }
+    }
+
+    /// Returns the range of the binding's parent.
+    pub fn parent_range(&self, semantic_model: &SemanticModel) -> Option<TextRange> {
+        self.source
+            .map(|node_id| semantic_model.stmts[node_id])
+            .and_then(|parent| {
+                if parent.is_import_from_stmt() {
+                    Some(parent.range())
+                } else {
+                    None
+                }
+            })
     }
 }
 
@@ -211,38 +251,35 @@ pub struct Export<'a> {
     pub names: Vec<&'a str>,
 }
 
+/// A binding for an `import`, keyed on the name to which the import is bound.
+/// Ex) `import foo` would be keyed on "foo".
+/// Ex) `import foo as bar` would be keyed on "bar".
 #[derive(Clone, Debug)]
 pub struct Importation<'a> {
-    /// The name to which the import is bound.
-    /// Given `import foo`, `name` would be "foo".
-    /// Given `import foo as bar`, `name` would be "bar".
-    pub name: &'a str,
     /// The full name of the module being imported.
-    /// Given `import foo`, `full_name` would be "foo".
-    /// Given `import foo as bar`, `full_name` would be "foo".
-    pub full_name: &'a str,
+    /// Ex) Given `import foo`, `qualified_name` would be "foo".
+    /// Ex) Given `import foo as bar`, `qualified_name` would be "foo".
+    pub qualified_name: &'a str,
 }
 
+/// A binding for a member imported from a module, keyed on the name to which the member is bound.
+/// Ex) `from foo import bar` would be keyed on "bar".
+/// Ex) `from foo import bar as baz` would be keyed on "baz".
 #[derive(Clone, Debug)]
-pub struct FromImportation<'a> {
-    /// The name to which the import is bound.
-    /// Given `from foo import bar`, `name` would be "bar".
-    /// Given `from foo import bar as baz`, `name` would be "baz".
-    pub name: &'a str,
-    /// The full name of the module being imported.
-    /// Given `from foo import bar`, `full_name` would be "foo.bar".
-    /// Given `from foo import bar as baz`, `full_name` would be "foo.bar".
-    pub full_name: String,
+pub struct FromImportation {
+    /// The full name of the member being imported.
+    /// Ex) Given `from foo import bar`, `qualified_name` would be "foo.bar".
+    /// Ex) Given `from foo import bar as baz`, `qualified_name` would be "foo.bar".
+    pub qualified_name: String,
 }
 
+/// A binding for a submodule imported from a module, keyed on the name of the parent module.
+/// Ex) `import foo.bar` would be keyed on "foo".
 #[derive(Clone, Debug)]
 pub struct SubmoduleImportation<'a> {
-    /// The parent module imported by the submodule import.
-    /// Given `import foo.bar`, `module` would be "foo".
-    pub name: &'a str,
     /// The full name of the submodule being imported.
-    /// Given `import foo.bar`, `full_name` would be "foo.bar".
-    pub full_name: &'a str,
+    /// Ex) Given `import foo.bar`, `qualified_name` would be "foo.bar".
+    pub qualified_name: &'a str,
 }
 
 #[derive(Clone, Debug, is_macro::Is)]
@@ -261,7 +298,7 @@ pub enum BindingKind<'a> {
     Export(Export<'a>),
     FutureImportation,
     Importation(Importation<'a>),
-    FromImportation(FromImportation<'a>),
+    FromImportation(FromImportation),
     SubmoduleImportation(SubmoduleImportation<'a>),
 }
 

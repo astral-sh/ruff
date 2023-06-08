@@ -1,11 +1,10 @@
-use log::error;
-use rustpython_parser::ast::{Ranged, Stmt};
+use rustpython_parser::ast;
+use rustpython_parser::ast::Ranged;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 
-use crate::autofix::edits::delete_stmt;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -48,39 +47,29 @@ impl AlwaysAutofixableViolation for EmptyTypeCheckingBlock {
 }
 
 /// TCH005
-pub(crate) fn empty_type_checking_block<'a, 'b>(
-    checker: &mut Checker<'a>,
-    stmt: &'a Stmt,
-    body: &'a [Stmt],
-) where
-    'b: 'a,
-{
-    if body.len() == 1 && body[0].is_pass_stmt() {
-        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, body[0].range());
-
-        // Delete the entire type-checking block.
-        if checker.patch(diagnostic.kind.rule()) {
-            let parent = checker.semantic_model().stmts.parent(stmt);
-            let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-            match delete_stmt(
-                stmt,
-                parent,
-                &deleted,
-                checker.locator,
-                checker.indexer,
-                checker.stylist,
-            ) {
-                Ok(edit) => {
-                    if edit.is_deletion() || edit.content() == Some("pass") {
-                        checker.deletions.insert(RefEquality(stmt));
-                    }
-                    #[allow(deprecated)]
-                    diagnostic.set_fix(Fix::unspecified(edit));
-                }
-                Err(e) => error!("Failed to remove empty type-checking block: {e}"),
-            }
-        }
-
-        checker.diagnostics.push(diagnostic);
+pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtIf) {
+    if stmt.body.len() != 1 {
+        return;
     }
+
+    let stmt = &stmt.body[0];
+    if !stmt.is_pass_stmt() {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, stmt.range());
+    if checker.patch(diagnostic.kind.rule()) {
+        // Delete the entire type-checking block.
+        let stmt = checker.semantic_model().stmt();
+        let parent = checker.semantic_model().stmt_parent();
+        let edit = autofix::edits::delete_stmt(
+            stmt,
+            parent,
+            checker.locator,
+            checker.indexer,
+            checker.stylist,
+        );
+        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(parent)));
+    }
+    checker.diagnostics.push(diagnostic);
 }

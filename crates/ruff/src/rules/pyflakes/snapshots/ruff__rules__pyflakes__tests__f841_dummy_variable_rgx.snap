@@ -131,10 +131,9 @@ F841_0.py:37:5: F841 [*] Local variable `_discarded` is assigned to but never us
 35 35 |     _ = 1
 36 36 |     __ = 1
 37    |-    _discarded = 1
-   37 |+    pass
-38 38 | 
-39 39 | 
-40 40 | a = 1
+38 37 | 
+39 38 | 
+40 39 | a = 1
 
 F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
    |

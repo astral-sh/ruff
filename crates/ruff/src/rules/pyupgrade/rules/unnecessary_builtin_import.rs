@@ -1,10 +1,8 @@
 use itertools::Itertools;
-use log::error;
 use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -80,6 +78,7 @@ pub(crate) fn unnecessary_builtin_import(
         _ => return,
     };
 
+    // Do this with a filter?
     let mut unused_imports: Vec<&Alias> = vec![];
     for alias in names {
         if alias.asname.is_some() {
@@ -93,6 +92,7 @@ pub(crate) fn unnecessary_builtin_import(
     if unused_imports.is_empty() {
         return;
     }
+
     let mut diagnostic = Diagnostic::new(
         UnnecessaryBuiltinImport {
             names: unused_imports
@@ -103,33 +103,24 @@ pub(crate) fn unnecessary_builtin_import(
         },
         stmt.range(),
     );
-
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.semantic_model().stmt();
-        let defined_in = checker.semantic_model().stmt_parent();
-        let unused_imports: Vec<String> = unused_imports
-            .iter()
-            .map(|alias| format!("{module}.{}", alias.name))
-            .collect();
-        match autofix::edits::remove_unused_imports(
-            unused_imports.iter().map(String::as_str),
-            defined_by,
-            defined_in,
-            &deleted,
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        ) {
-            Ok(edit) => {
-                if edit.is_deletion() || edit.content() == Some("pass") {
-                    checker.deletions.insert(RefEquality(defined_by));
-                }
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(edit));
-            }
-            Err(e) => error!("Failed to remove builtin import: {e}"),
-        }
+        diagnostic.try_set_fix(|| {
+            let stmt = checker.semantic_model().stmt();
+            let parent = checker.semantic_model().stmt_parent();
+            let unused_imports: Vec<String> = unused_imports
+                .iter()
+                .map(|alias| format!("{module}.{}", alias.name))
+                .collect();
+            let edit = autofix::edits::remove_unused_imports(
+                unused_imports.iter().map(String::as_str),
+                stmt,
+                parent,
+                checker.locator,
+                checker.indexer,
+                checker.stylist,
+            )?;
+            Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
+        });
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 
-use log::error;
 use num_bigint::{BigInt, Sign};
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{self, Cmpop, Constant, Expr, Ranged, Stmt};
@@ -9,7 +8,6 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::autofix::edits::delete_stmt;
@@ -180,7 +178,7 @@ fn compare_version(if_version: &[u32], py_version: PythonVersion, or_equal: bool
 
 /// Convert a [`Stmt::If`], retaining the `else`.
 fn fix_py2_block(
-    checker: &mut Checker,
+    checker: &Checker,
     stmt: &Stmt,
     orelse: &[Stmt],
     block: &BlockMetadata,
@@ -190,31 +188,16 @@ fn fix_py2_block(
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
-        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.semantic_model().stmt();
-        let defined_in = checker.semantic_model().stmt_parent();
-        return match delete_stmt(
-            defined_by,
-            if matches!(block.leading_token.tok, StartTok::If) {
-                defined_in
-            } else {
-                None
-            },
-            &deleted,
+        let stmt = checker.semantic_model().stmt();
+        let parent = checker.semantic_model().stmt_parent();
+        let edit = delete_stmt(
+            stmt,
+            if matches!(block.leading_token.tok, StartTok::If) { parent } else { None },
             checker.locator,
             checker.indexer,
             checker.stylist,
-        ) {
-            Ok(edit) => {
-                checker.deletions.insert(RefEquality(defined_by));
-                #[allow(deprecated)]
-                Some(Fix::unspecified(edit))
-            }
-            Err(err) => {
-                error!("Failed to remove block: {}", err);
-                None
-            }
-        };
+        );
+        return Some(Fix::suggested(edit));
     };
 
     match (&leading_token.tok, &trailing_token.tok) {

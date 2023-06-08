@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Excepthandler, Expr, ExprContext, Ranged};
+use rustpython_parser::ast::{self, Excepthandler, Expr, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -43,20 +43,13 @@ impl Violation for VerboseLogMessage {
 
 #[derive(Default)]
 struct NameVisitor<'a> {
-    names: Vec<(&'a str, &'a Expr)>,
+    names: Vec<&'a ast::ExprName>,
 }
 
-impl<'a, 'b> Visitor<'b> for NameVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'b Expr) {
+impl<'a> Visitor<'a> for NameVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(ast::ExprName {
-                id,
-                ctx: ExprContext::Load,
-                range: _,
-            }) => self.names.push((id, expr)),
+            Expr::Name(name) if name.ctx.is_load() => self.names.push(name),
             Expr::Attribute(_) => {}
             _ => visitor::walk_expr(self, expr),
         }
@@ -79,24 +72,21 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandl
             visitor.calls
         };
 
-        for (expr, func) in calls {
-            let Expr::Call(ast::ExprCall { args, .. }) = expr else {
-                continue;
-            };
-            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func {
+        for expr in calls {
+            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr.func.as_ref() {
                 if attr == "exception" {
                     // Collect all referenced names in the `logging.exception` call.
-                    let names: Vec<(&str, &Expr)> = {
+                    let names: Vec<&ast::ExprName> = {
                         let mut names = Vec::new();
-                        for arg in args {
+                        for arg in &expr.args {
                             let mut visitor = NameVisitor::default();
                             visitor.visit_expr(arg);
                             names.extend(visitor.names);
                         }
                         names
                     };
-                    for (id, expr) in names {
-                        if target == id {
+                    for expr in names {
+                        if expr.id == *target {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(VerboseLogMessage, expr.range()));

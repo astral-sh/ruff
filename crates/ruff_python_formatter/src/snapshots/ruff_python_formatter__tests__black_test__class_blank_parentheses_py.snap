@@ -36,71 +36,65 @@ class NormalClass (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,30 +1,23 @@
+@@ -1,18 +1,10 @@
 -class SimpleClassWithBlankParentheses:
-+class SimpleClassWithBlankParentheses():
-     pass
--
--
+-    pass
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
 -class ClassWithSpaceParentheses:
-+class ClassWithSpaceParentheses ( ):
-     first_test_data = 90
-     second_test_data = 100
+-    first_test_data = 90
+-    second_test_data = 100
 -
-     def test_func(self):
-         return None
--
-+class ClassWithEmptyFunc(object):
+-    def test_func(self):
+-        return None
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
  
 -class ClassWithEmptyFunc(object):
-     def func_with_blank_parentheses():
-         return 5
+-    def func_with_blank_parentheses():
+-        return 5
++NOT_YET_IMPLEMENTED_StmtClassDef
  
  
  def public_func_with_blank_parentheses():
-     return None
--
--
+@@ -20,11 +12,7 @@
+ 
+ 
  def class_under_the_func_with_blank_parentheses():
 -    class InsideFunc:
-+    class InsideFunc():
-         pass
--
--
+-        pass
++    NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
 -class NormalClass:
-+class NormalClass (
-+):
-     def func_for_testing(self, first, second):
-         sum = first + second
-         return sum
+-    def func_for_testing(self, first, second):
+-        sum = first + second
+-        return sum
++NOT_YET_IMPLEMENTED_StmtClassDef
 ```
 
 ## Ruff Output
 
 ```py
-class SimpleClassWithBlankParentheses():
-    pass
-class ClassWithSpaceParentheses ( ):
-    first_test_data = 90
-    second_test_data = 100
-    def test_func(self):
-        return None
-class ClassWithEmptyFunc(object):
+NOT_YET_IMPLEMENTED_StmtClassDef
 
-    def func_with_blank_parentheses():
-        return 5
+
+NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 def public_func_with_blank_parentheses():
     return None
+
+
 def class_under_the_func_with_blank_parentheses():
-    class InsideFunc():
-        pass
-class NormalClass (
-):
-    def func_for_testing(self, first, second):
-        sum = first + second
-        return sum
+    NOT_YET_IMPLEMENTED_StmtClassDef
+
+
+NOT_YET_IMPLEMENTED_StmtClassDef
 ```
 
 ## Black Output

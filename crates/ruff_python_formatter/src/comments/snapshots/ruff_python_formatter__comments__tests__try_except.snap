@@ -1,0 +1,66 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtTry,
+        range: 17..136,
+        source: `try:⏎`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing function comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtPass,
+        range: 30..34,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing try comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ExcepthandlerExceptHandler,
+        range: 100..136,
+        source: `except Exception as ex:⏎`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# leading handler comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: StmtPass,
+        range: 132..136,
+        source: `pass`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# Trailing except comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+}

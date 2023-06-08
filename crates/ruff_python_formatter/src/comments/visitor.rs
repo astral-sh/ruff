@@ -1,19 +1,16 @@
-use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
 use crate::comments::{CommentTextPosition, CommentsMap, SourceComment};
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::prelude::*;
-use ruff_python_ast::source_code::CommentRanges;
-use std::cell::Cell;
+use ruff_python_ast::source_code::{CommentRanges, Locator};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::preorder::*;
 use ruff_python_ast::whitespace::is_python_whitespace;
 use ruff_text_size::TextRange;
-use std::cmp::Ordering;
 use std::iter::Peekable;
 
 /// Visitor extracting the comments from an AST.
@@ -68,12 +65,15 @@ impl<'a> CommentsVisitor<'a> {
                 enclosing: enclosing_node,
                 preceding: self.preceding_node,
                 following: Some(node),
+                parent: self.parents.iter().rev().nth(1).copied(),
                 text_position: text_position(*comment_range, self.source_code),
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder
-                .add_comment(place_comment(comment, self.source_code));
+            self.builder.add_comment(place_comment(
+                comment,
+                &Locator::new(self.source_code.as_str()),
+            ));
             self.comment_ranges.next();
         }
 
@@ -121,13 +121,16 @@ impl<'a> CommentsVisitor<'a> {
             let comment = DecoratedComment {
                 enclosing: node,
                 preceding: self.preceding_node,
+                parent: self.parents.last().copied(),
                 following: None,
                 text_position: text_position(*comment_range, self.source_code),
                 slice: self.source_code.slice(*comment_range),
             };
 
-            self.builder
-                .add_comment(place_comment(comment, self.source_code));
+            self.builder.add_comment(place_comment(
+                comment,
+                &Locator::new(self.source_code.as_str()),
+            ));
 
             self.comment_ranges.next();
         }
@@ -135,7 +138,7 @@ impl<'a> CommentsVisitor<'a> {
         self.preceding_node = Some(node);
     }
 
-    fn finish(mut self) -> CommentsMap<'a> {
+    fn finish(self) -> CommentsMap<'a> {
         self.builder.finish()
     }
 }
@@ -160,6 +163,13 @@ impl<'ast> PreorderVisitor<'ast> for CommentsVisitor<'ast> {
             walk_expr(self, expr);
         }
         self.finish_node(expr);
+    }
+
+    fn visit_decorator(&mut self, decorator: &'ast Decorator) {
+        if self.start_node(decorator).is_traverse() {
+            walk_decorator(self, decorator);
+        }
+        self.finish_node(decorator);
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
@@ -264,6 +274,7 @@ pub(super) struct DecoratedComment<'a> {
     enclosing: AnyNodeRef<'a>,
     preceding: Option<AnyNodeRef<'a>>,
     following: Option<AnyNodeRef<'a>>,
+    parent: Option<AnyNodeRef<'a>>,
     text_position: CommentTextPosition,
     slice: SourceCodeSlice,
 }
@@ -287,6 +298,11 @@ impl<'a> DecoratedComment<'a> {
     /// `a` and `b` are children of the list expression and `comment` is between the two nodes.
     pub(super) fn enclosing_node(&self) -> AnyNodeRef<'a> {
         self.enclosing
+    }
+
+    /// Returns the parent of the enclosing node, if any
+    pub(super) fn enclosing_parent(&self) -> Option<AnyNodeRef<'a>> {
+        self.parent
     }
 
     /// Returns the slice into the source code.
@@ -408,7 +424,7 @@ impl From<DecoratedComment<'_>> for SourceComment {
             slice: decorated.slice,
             position: decorated.text_position,
             #[cfg(debug_assertions)]
-            formatted: Cell::new(false),
+            formatted: std::cell::Cell::new(false),
         }
     }
 }

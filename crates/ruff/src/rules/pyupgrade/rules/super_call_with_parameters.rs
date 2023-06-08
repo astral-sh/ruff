@@ -61,8 +61,7 @@ pub(crate) fn super_call_with_parameters(
     // Find the enclosing function definition (if any).
     let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
         args: parent_args, ..
-    })) = parents
-        .find(|stmt| stmt.is_function_def_stmt()) else {
+    })) = parents.find(|stmt| stmt.is_function_def_stmt()) else {
         return;
     };
 
@@ -76,8 +75,7 @@ pub(crate) fn super_call_with_parameters(
     // Find the enclosing class definition (if any).
     let Some(Stmt::ClassDef(ast::StmtClassDef {
         name: parent_name, ..
-    })) = parents
-        .find(|stmt| matches!(stmt, Stmt::ClassDef (_))) else {
+    })) = parents.find(|stmt| stmt.is_class_def_stmt()) else {
         return;
     };
 
@@ -97,11 +95,11 @@ pub(crate) fn super_call_with_parameters(
     }
 
     drop(parents);
+
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(edit) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(edit));
+            diagnostic.set_fix(Fix::suggested(edit));
         }
     }
     checker.diagnostics.push(diagnostic);

@@ -1,10 +1,8 @@
 use itertools::Itertools;
-use log::error;
 use rustpython_parser::ast::{Alias, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -85,31 +83,23 @@ pub(crate) fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, name
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        let defined_by = checker.semantic_model().stmt();
-        let defined_in = checker.semantic_model().stmt_parent();
-        let unused_imports: Vec<String> = unused_imports
-            .iter()
-            .map(|alias| format!("__future__.{}", alias.name))
-            .collect();
-        match autofix::edits::remove_unused_imports(
-            unused_imports.iter().map(String::as_str),
-            defined_by,
-            defined_in,
-            &deleted,
-            checker.locator,
-            checker.indexer,
-            checker.stylist,
-        ) {
-            Ok(fix) => {
-                if fix.is_deletion() || fix.content() == Some("pass") {
-                    checker.deletions.insert(RefEquality(defined_by));
-                }
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(fix));
-            }
-            Err(e) => error!("Failed to remove `__future__` import: {e}"),
-        }
+        diagnostic.try_set_fix(|| {
+            let unused_imports: Vec<String> = unused_imports
+                .iter()
+                .map(|alias| format!("__future__.{}", alias.name))
+                .collect();
+            let stmt = checker.semantic_model().stmt();
+            let parent = checker.semantic_model().stmt_parent();
+            let edit = autofix::edits::remove_unused_imports(
+                unused_imports.iter().map(String::as_str),
+                stmt,
+                parent,
+                checker.locator,
+                checker.indexer,
+                checker.stylist,
+            )?;
+            Ok(Fix::suggested(edit).isolate(checker.isolation(parent)))
+        });
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -20,26 +20,15 @@ print("hello, world")
 ```diff
 --- Black
 +++ Ruff
-@@ -1 +1,7 @@
-+\
-+
-+
-+
-+
-+
- print("hello, world")
+@@ -1 +1 @@
+-print("hello, world")
++NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
-\
-
-
-
-
-
-print("hello, world")
+NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

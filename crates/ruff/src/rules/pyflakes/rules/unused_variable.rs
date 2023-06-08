@@ -1,6 +1,5 @@
 use itertools::Itertools;
-use log::error;
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{self, Ranged, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -8,8 +7,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::RefEquality;
-use ruff_python_semantic::scope::{ScopeId, ScopeKind};
+use ruff_python_semantic::scope::ScopeId;
 
 use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -63,142 +61,139 @@ impl Violation for UnusedVariable {
     }
 }
 
-/// Return the [`TextRange`] of the token after the next match of
-/// the predicate, skipping over any bracketed expressions.
-fn match_token_after<F, T>(located: &T, locator: &Locator, f: F) -> TextRange
+/// Return the [`TextRange`] of the token before the next match of the predicate
+fn match_token_before<F>(location: TextSize, locator: &Locator, f: F) -> Option<TextRange>
 where
     F: Fn(Tok) -> bool,
-    T: Ranged,
 {
-    let contents = locator.after(located.start());
+    let contents = locator.after(location);
+    for ((_, range), (tok, _)) in lexer::lex_starts_at(contents, Mode::Module, location)
+        .flatten()
+        .tuple_windows()
+    {
+        if f(tok) {
+            return Some(range);
+        }
+    }
+    None
+}
+
+/// Return the [`TextRange`] of the token after the next match of the predicate, skipping over
+/// any bracketed expressions.
+fn match_token_after<F>(location: TextSize, locator: &Locator, f: F) -> Option<TextRange>
+where
+    F: Fn(Tok) -> bool,
+{
+    let contents = locator.after(location);
 
     // Track the bracket depth.
-    let mut par_count = 0;
-    let mut sqb_count = 0;
-    let mut brace_count = 0;
+    let mut par_count = 0u32;
+    let mut sqb_count = 0u32;
+    let mut brace_count = 0u32;
 
-    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, Mode::Module, located.start())
+    for ((tok, _), (_, range)) in lexer::lex_starts_at(contents, Mode::Module, location)
         .flatten()
         .tuple_windows()
     {
         match tok {
             Tok::Lpar => {
-                par_count += 1;
+                par_count = par_count.saturating_add(1);
             }
             Tok::Lsqb => {
-                sqb_count += 1;
+                sqb_count = sqb_count.saturating_add(1);
             }
             Tok::Lbrace => {
-                brace_count += 1;
+                brace_count = brace_count.saturating_add(1);
             }
             Tok::Rpar => {
-                par_count -= 1;
-                // If this is a closing bracket, continue.
-                if par_count == 0 {
-                    continue;
-                }
+                par_count = par_count.saturating_sub(1);
             }
             Tok::Rsqb => {
-                sqb_count -= 1;
-                // If this is a closing bracket, continue.
-                if sqb_count == 0 {
-                    continue;
-                }
+                sqb_count = sqb_count.saturating_sub(1);
             }
             Tok::Rbrace => {
-                brace_count -= 1;
-                // If this is a closing bracket, continue.
-                if brace_count == 0 {
-                    continue;
-                }
+                brace_count = brace_count.saturating_sub(1);
             }
             _ => {}
         }
+
         // If we're in nested brackets, continue.
         if par_count > 0 || sqb_count > 0 || brace_count > 0 {
             continue;
         }
 
         if f(tok) {
-            return range;
+            return Some(range);
         }
     }
-    unreachable!("No token after matched");
+    None
 }
 
-/// Return the [`TextRange`] of the token matching the predicate,
-/// skipping over any bracketed expressions.
-fn match_token<F, T>(located: &T, locator: &Locator, f: F) -> TextRange
+/// Return the [`TextRange`] of the token matching the predicate or the first mismatched
+/// bracket, skipping over any bracketed expressions.
+fn match_token_or_closing_brace<F>(location: TextSize, locator: &Locator, f: F) -> Option<TextRange>
 where
     F: Fn(Tok) -> bool,
-    T: Ranged,
 {
-    let contents = locator.after(located.start());
+    let contents = locator.after(location);
 
     // Track the bracket depth.
-    let mut par_count = 0;
-    let mut sqb_count = 0;
-    let mut brace_count = 0;
+    let mut par_count = 0u32;
+    let mut sqb_count = 0u32;
+    let mut brace_count = 0u32;
 
-    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, located.start()).flatten() {
+    for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, location).flatten() {
         match tok {
             Tok::Lpar => {
-                par_count += 1;
+                par_count = par_count.saturating_add(1);
             }
             Tok::Lsqb => {
-                sqb_count += 1;
+                sqb_count = sqb_count.saturating_add(1);
             }
             Tok::Lbrace => {
-                brace_count += 1;
+                brace_count = brace_count.saturating_add(1);
             }
             Tok::Rpar => {
-                par_count -= 1;
-                // If this is a closing bracket, continue.
                 if par_count == 0 {
-                    continue;
+                    return Some(range);
                 }
+                par_count = par_count.saturating_sub(1);
             }
             Tok::Rsqb => {
-                sqb_count -= 1;
-                // If this is a closing bracket, continue.
                 if sqb_count == 0 {
-                    continue;
+                    return Some(range);
                 }
+                sqb_count = sqb_count.saturating_sub(1);
             }
             Tok::Rbrace => {
-                brace_count -= 1;
-                // If this is a closing bracket, continue.
                 if brace_count == 0 {
-                    continue;
+                    return Some(range);
                 }
+                brace_count = brace_count.saturating_sub(1);
             }
             _ => {}
         }
+
         // If we're in nested brackets, continue.
         if par_count > 0 || sqb_count > 0 || brace_count > 0 {
             continue;
         }
 
         if f(tok) {
-            return range;
+            return Some(range);
         }
     }
-    unreachable!("No token after matched");
-}
-
-#[derive(Copy, Clone)]
-enum DeletionKind {
-    Whole,
-    Partial,
+    None
 }
 
 /// Generate a [`Edit`] to remove an unused variable assignment, given the
 /// enclosing [`Stmt`] and the [`TextRange`] of the variable binding.
 fn remove_unused_variable(
     stmt: &Stmt,
+    parent: Option<&Stmt>,
     range: TextRange,
     checker: &Checker,
-) -> Option<(DeletionKind, Fix)> {
+) -> Option<Fix> {
     // First case: simple assignment (`x = 1`)
     if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
         if let Some(target) = targets.iter().find(|target| range == target.range()) {
@@ -208,34 +203,21 @@ fn remove_unused_variable(
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
-                    #[allow(deprecated)]
-                    Some((
-                        DeletionKind::Partial,
-                        Fix::unspecified(Edit::deletion(
-                            target.start(),
-                            match_token_after(target, checker.locator, |tok| tok == Tok::Equal)
-                                .start(),
-                        )),
-                    ))
+                    let start = target.start();
+                    let end =
+                        match_token_after(start, checker.locator, |tok| tok == Tok::Equal)?.start();
+                    let edit = Edit::deletion(start, end);
+                    Some(Fix::suggested(edit))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let parent = checker.semantic_model().stmts.parent(stmt);
-                    let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-                    match delete_stmt(
+                    let edit = delete_stmt(
                         stmt,
                         parent,
-                        &deleted,
                         checker.locator,
                         checker.indexer,
                         checker.stylist,
-                    ) {
-                        #[allow(deprecated)]
-                        Ok(fix) => Some((DeletionKind::Whole, Fix::unspecified(fix))),
-                        Err(err) => {
-                            error!("Failed to delete unused variable: {}", err);
-                            None
-                        }
-                    }
+                    );
+                    Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
                 };
             }
         }
@@ -252,33 +234,21 @@ fn remove_unused_variable(
             return if contains_effect(value, |id| checker.semantic_model().is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
-                #[allow(deprecated)]
-                Some((
-                    DeletionKind::Partial,
-                    Fix::unspecified(Edit::deletion(
-                        stmt.start(),
-                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal).start(),
-                    )),
-                ))
+                let start = stmt.start();
+                let end =
+                    match_token_after(start, checker.locator, |tok| tok == Tok::Equal)?.start();
+                let edit = Edit::deletion(start, end);
+                Some(Fix::suggested(edit))
             } else {
-                // If assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = checker.semantic_model().stmts.parent(stmt);
-                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-                match delete_stmt(
+                // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
+                let edit = delete_stmt(
                     stmt,
                     parent,
-                    &deleted,
                     checker.locator,
                     checker.indexer,
                     checker.stylist,
-                ) {
-                    #[allow(deprecated)]
-                    Ok(edit) => Some((DeletionKind::Whole, Fix::unspecified(edit))),
-                    Err(err) => {
-                        error!("Failed to delete unused variable: {}", err);
-                        None
-                    }
-                }
+                );
+                Some(Fix::suggested(edit).isolate(checker.isolation(parent)))
             };
         }
     }
@@ -290,19 +260,21 @@ fn remove_unused_variable(
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == range {
-                    #[allow(deprecated)]
-                    return Some((
-                        DeletionKind::Partial,
-                        Fix::unspecified(Edit::deletion(
-                            item.context_expr.end(),
-                            // The end of the `Withitem` is the colon, comma, or closing
-                            // parenthesis following the `optional_vars`.
-                            match_token(&item.context_expr, checker.locator, |tok| {
-                                tok == Tok::Colon || tok == Tok::Comma || tok == Tok::Rpar
-                            })
-                            .start(),
-                        )),
-                    ));
+                    // Find the first token before the `as` keyword.
+                    let start =
+                        match_token_before(item.context_expr.start(), checker.locator, |tok| {
+                            tok == Tok::As
+                        })?
+                        .end();
+
+                    // Find the first colon, comma, or closing bracket after the `as` keyword.
+                    let end = match_token_or_closing_brace(start, checker.locator, |tok| {
+                        tok == Tok::Colon || tok == Tok::Comma
+                    })?
+                    .start();
+
+                    let edit = Edit::deletion(start, end);
+                    return Some(Fix::suggested(edit));
                 }
             }
         }
@@ -314,7 +286,7 @@ fn remove_unused_variable(
 /// F841
 pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
     let scope = &checker.semantic_model().scopes[scope];
-    if scope.uses_locals && matches!(scope.kind, ScopeKind::Function(..)) {
+    if scope.uses_locals() && scope.kind.is_any_function() {
         return;
     }
 
@@ -339,19 +311,15 @@ pub(crate) fn unused_variable(checker: &mut Checker, scope: ScopeId) {
 
     for (name, range, source) in bindings {
         let mut diagnostic = Diagnostic::new(UnusedVariable { name }, range);
-
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(source) = source {
                 let stmt = checker.semantic_model().stmts[source];
-                if let Some((kind, fix)) = remove_unused_variable(stmt, range, checker) {
-                    if matches!(kind, DeletionKind::Whole) {
-                        checker.deletions.insert(RefEquality(stmt));
-                    }
+                let parent = checker.semantic_model().stmts.parent(stmt);
+                if let Some(fix) = remove_unused_variable(stmt, parent, range, checker) {
                     diagnostic.set_fix(fix);
                 }
             }
         }
-
         checker.diagnostics.push(diagnostic);
     }
 }

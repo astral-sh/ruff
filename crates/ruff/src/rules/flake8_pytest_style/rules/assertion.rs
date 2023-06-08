@@ -3,12 +3,13 @@ use std::borrow::Cow;
 use anyhow::bail;
 use anyhow::Result;
 use libcst_native::{
-    Assert, BooleanOp, Codegen, CodegenState, CompoundStatement, Expression,
-    ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
-    SmallStatement, Statement, TrailingWhitespace, UnaryOp, UnaryOperation,
+    Assert, BooleanOp, CompoundStatement, Expression, ParenthesizableWhitespace, ParenthesizedNode,
+    SimpleStatementLine, SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace, UnaryOp,
+    UnaryOperation,
 };
 use rustpython_parser::ast::{self, Boolop, Excepthandler, Expr, Keyword, Ranged, Stmt, Unaryop};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, Truthiness};
@@ -410,15 +411,8 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         }));
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
     // Reconstruct and reformat the code.
-    let module_text = state.to_string();
+    let module_text = tree.codegen_stylist(stylist);
     let contents = if outer_indent.is_empty() {
         module_text
     } else {

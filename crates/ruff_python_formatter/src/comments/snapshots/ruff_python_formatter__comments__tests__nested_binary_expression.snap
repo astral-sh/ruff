@@ -1,0 +1,51 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: ExprBinOp,
+        range: 11..126,
+        source: `(5 # trailing left comment⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# trailing operator comment",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
+        kind: ExprConstant,
+        range: 12..13,
+        source: `5`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing left comment",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ExprConstant,
+        range: 125..126,
+        source: `3`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# leading right comment",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+}

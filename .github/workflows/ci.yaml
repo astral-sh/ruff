@@ -87,6 +87,22 @@ jobs:
           name: ruff
           path: target/debug/ruff
 
+  cargo-fuzz:
+    runs-on: ubuntu-latest
+    name: "cargo fuzz"
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "fuzz -> target"
+      - name: "Install cargo-fuzz"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz@0.11
+      - run: cargo fuzz build -s none
+
   cargo-test-wasm:
     runs-on: ubuntu-latest
     name: "cargo test (wasm)"

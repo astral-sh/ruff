@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use nohash_hasher::IntSet;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel};
 use ruff_python_ast::source_code::Locator;
 
 use crate::linter::FixTable;
@@ -38,6 +39,7 @@ fn apply_fixes<'a>(
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<TextSize> = None;
     let mut applied: BTreeSet<&Edit> = BTreeSet::default();
+    let mut isolated: IntSet<u32> = IntSet::default();
     let mut fixed = FxHashMap::default();
 
     for (rule, fix) in diagnostics
@@ -63,6 +65,14 @@ fn apply_fixes<'a>(
                 .map_or(false, |fix_location| last_pos >= fix_location)
         }) {
             continue;
+        }
+
+        // If this fix requires isolation, and we've already applied another fix in the
+        // same isolation group, skip it.
+        if let IsolationLevel::Group(id) = fix.isolation() {
+            if !isolated.insert(id) {
+                continue;
+            }
         }
 
         for edit in fix
@@ -100,6 +110,13 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
             // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
             (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
             (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+            // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
+            (Rule::IfElseBlockInsteadOfDictGet, Rule::IfElseBlockInsteadOfIfExp) => {
+                std::cmp::Ordering::Less
+            }
+            (Rule::IfElseBlockInsteadOfIfExp, Rule::IfElseBlockInsteadOfDictGet) => {
+                std::cmp::Ordering::Greater
+            }
             _ => std::cmp::Ordering::Equal,
         })
 }

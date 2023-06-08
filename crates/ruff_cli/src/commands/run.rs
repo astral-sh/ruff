@@ -170,7 +170,7 @@ fn lint_path(
         Err(error) => {
             let message = r#"This indicates a bug in `ruff`. If you could open an issue at:
 
-https://github.com/charliermarsh/ruff/issues/new?title=%5BLinter%20panic%5D
+https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
 with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
 "#;

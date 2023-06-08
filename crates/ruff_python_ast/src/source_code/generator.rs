@@ -132,11 +132,11 @@ impl<'a> Generator<'a> {
     }
 
     fn body<U>(&mut self, stmts: &[Stmt<U>]) {
-        self.indent_depth += 1;
+        self.indent_depth = self.indent_depth.saturating_add(1);
         for stmt in stmts {
             self.unparse_stmt(stmt);
         }
-        self.indent_depth -= 1;
+        self.indent_depth = self.indent_depth.saturating_sub(1);
     }
 
     fn p(&mut self, s: &str) {
@@ -209,14 +209,13 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(&decorator.expression, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.p("@");
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("def ");
                     self.p_id(name);
                     self.p("(");
@@ -242,13 +241,13 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(&decorator.expression, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("async def ");
                     self.p_id(name);
                     self.p("(");
@@ -274,13 +273,13 @@ impl<'a> Generator<'a> {
                 range: _range,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
+                for decorator in decorator_list {
+                    statement!({
+                        self.p("@");
+                        self.unparse_expr(&decorator.expression, precedence::MAX);
+                    });
+                }
                 statement!({
-                    for decorator in decorator_list {
-                        statement!({
-                            self.unparse_expr(decorator, precedence::MAX);
-                        });
-                    }
-                    self.newline();
                     self.p("class ");
                     self.p_id(name);
                     let mut first = true;
@@ -531,11 +530,11 @@ impl<'a> Generator<'a> {
                     self.p(":");
                 });
                 for case in cases {
-                    self.indent_depth += 1;
+                    self.indent_depth = self.indent_depth.saturating_add(1);
                     statement!({
                         self.unparse_match_case(case);
                     });
-                    self.indent_depth -= 1;
+                    self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
             }
             Stmt::Raise(ast::StmtRaise {
@@ -1614,6 +1613,29 @@ except* Exception as e:
         );
         assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
         assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);
+        assert_round_trip!(
+            r#"def f():
+
+    def f():
+        pass"#
+        );
+        assert_round_trip!(
+            r#"@foo
+def f():
+
+    @foo
+    def f():
+        pass"#
+        );
+
+        assert_round_trip!(
+            r#"@foo
+class Foo:
+
+    @foo
+    def f():
+        pass"#
+        );
     }
 
     #[test]

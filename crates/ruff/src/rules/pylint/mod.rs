@@ -52,8 +52,8 @@ mod tests {
     #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
+    #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
-    #[test_case(Rule::DuplicateValue, Path::new("duplicate_value.py"))]
     #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
     #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"))]
     #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]
@@ -64,6 +64,7 @@ mod tests {
     )]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
+    #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]
     #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"))]
     #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"))]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
@@ -110,6 +111,19 @@ mod tests {
             &Settings::for_rules(vec![rule_code]),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn repeated_isinstance_calls() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/repeated_isinstance_calls.py"),
+            &Settings {
+                target_version: PythonVersion::Py39,
+                ..Settings::for_rules(vec![Rule::RepeatedIsinstanceCalls])
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

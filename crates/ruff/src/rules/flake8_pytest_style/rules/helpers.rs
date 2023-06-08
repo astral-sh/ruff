@@ -1,12 +1,14 @@
-use rustpython_parser::ast::{self, Constant, Expr, Keyword};
+use rustpython_parser::ast::{self, Constant, Decorator, Expr, Keyword};
 
 use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::model::SemanticModel;
 
-pub(super) fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (&Expr, CallPath)> {
+pub(super) fn get_mark_decorators(
+    decorators: &[Decorator],
+) -> impl Iterator<Item = (&Decorator, CallPath)> {
     decorators.iter().filter_map(|decorator| {
-        let Some(call_path) = collect_call_path(map_callable(decorator)) else {
+        let Some(call_path) = collect_call_path(map_callable(&decorator.expression)) else {
             return None;
         };
         if call_path.len() > 2 && call_path.as_slice()[..2] == ["pytest", "mark"] {
@@ -23,25 +25,25 @@ pub(super) fn is_pytest_fail(model: &SemanticModel, call: &Expr) -> bool {
     })
 }
 
-pub(super) fn is_pytest_fixture(model: &SemanticModel, decorator: &Expr) -> bool {
+pub(super) fn is_pytest_fixture(model: &SemanticModel, decorator: &Decorator) -> bool {
     model
-        .resolve_call_path(map_callable(decorator))
+        .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "fixture"]
         })
 }
 
-pub(super) fn is_pytest_yield_fixture(model: &SemanticModel, decorator: &Expr) -> bool {
+pub(super) fn is_pytest_yield_fixture(model: &SemanticModel, decorator: &Decorator) -> bool {
     model
-        .resolve_call_path(map_callable(decorator))
+        .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "yield_fixture"]
         })
 }
 
-pub(super) fn is_pytest_parametrize(model: &SemanticModel, decorator: &Expr) -> bool {
+pub(super) fn is_pytest_parametrize(model: &SemanticModel, decorator: &Decorator) -> bool {
     model
-        .resolve_call_path(map_callable(decorator))
+        .resolve_call_path(map_callable(&decorator.expression))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "mark", "parametrize"]
         })

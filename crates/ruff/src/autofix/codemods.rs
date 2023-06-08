@@ -11,6 +11,23 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_statement;
 
+/// Glue code to make libcst codegen work with ruff's Stylist
+pub(crate) trait CodegenStylist<'a>: Codegen<'a> {
+    fn codegen_stylist(&self, stylist: &'a Stylist) -> String;
+}
+
+impl<'a, T: Codegen<'a>> CodegenStylist<'a> for T {
+    fn codegen_stylist(&self, stylist: &'a Stylist) -> String {
+        let mut state = CodegenState {
+            default_newline: stylist.line_ending().as_str(),
+            default_indent: stylist.indentation(),
+            ..Default::default()
+        };
+        self.codegen(&mut state);
+        state.to_string()
+    }
+}
+
 /// Given an import statement, remove any imports that are specified in the `imports` iterator.
 ///
 /// Returns `Ok(None)` if the statement is empty after removing the imports.
@@ -40,11 +57,11 @@ pub(crate) fn remove_imports<'a>(
                 // entire statement.
                 let mut found_star = false;
                 for import in imports {
-                    let full_name = match import_body.module.as_ref() {
+                    let qualified_name = match import_body.module.as_ref() {
                         Some(module_name) => format!("{}.*", compose_module_path(module_name)),
                         None => "*".to_string(),
                     };
-                    if import == full_name {
+                    if import == qualified_name {
                         found_star = true;
                     } else {
                         bail!("Expected \"*\" for unused import (got: \"{}\")", import);
@@ -66,26 +83,26 @@ pub(crate) fn remove_imports<'a>(
 
     for import in imports {
         let alias_index = aliases.iter().position(|alias| {
-            let full_name = match import_module {
+            let qualified_name = match import_module {
                 Some((relative, module)) => {
                     let module = module.map(compose_module_path);
                     let member = compose_module_path(&alias.name);
-                    let mut full_name = String::with_capacity(
+                    let mut qualified_name = String::with_capacity(
                         relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
                     );
                     for _ in 0..relative.len() {
-                        full_name.push('.');
+                        qualified_name.push('.');
                     }
                     if let Some(module) = module {
-                        full_name.push_str(&module);
-                        full_name.push('.');
+                        qualified_name.push_str(&module);
+                        qualified_name.push('.');
                     }
-                    full_name.push_str(&member);
-                    full_name
+                    qualified_name.push_str(&member);
+                    qualified_name
                 }
                 None => compose_module_path(&alias.name),
             };
-            full_name == import
+            qualified_name == import
         });
 
         if let Some(index) = alias_index {
@@ -114,14 +131,7 @@ pub(crate) fn remove_imports<'a>(
         return Ok(None);
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-
-    Ok(Some(state.to_string()))
+    Ok(Some(tree.codegen_stylist(stylist)))
 }
 
 /// Given an import statement, remove any imports that are not specified in the `imports` slice.
@@ -160,26 +170,26 @@ pub(crate) fn retain_imports(
 
     aliases.retain(|alias| {
         imports.iter().any(|import| {
-            let full_name = match import_module {
+            let qualified_name = match import_module {
                 Some((relative, module)) => {
                     let module = module.map(compose_module_path);
                     let member = compose_module_path(&alias.name);
-                    let mut full_name = String::with_capacity(
+                    let mut qualified_name = String::with_capacity(
                         relative.len() + module.as_ref().map_or(0, String::len) + member.len() + 1,
                     );
                     for _ in 0..relative.len() {
-                        full_name.push('.');
+                        qualified_name.push('.');
                     }
                     if let Some(module) = module {
-                        full_name.push_str(&module);
-                        full_name.push('.');
+                        qualified_name.push_str(&module);
+                        qualified_name.push('.');
                     }
-                    full_name.push_str(&member);
-                    full_name
+                    qualified_name.push_str(&member);
+                    qualified_name
                 }
                 None => compose_module_path(&alias.name),
             };
-            full_name == *import
+            qualified_name == *import
         })
     });
 
@@ -200,11 +210,5 @@ pub(crate) fn retain_imports(
         }
     }
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    tree.codegen(&mut state);
-    Ok(state.to_string())
+    Ok(tree.codegen_stylist(stylist))
 }

@@ -58,9 +58,9 @@ impl Violation for OsRename {
 
 // PTH105
 #[violation]
-pub struct PathlibReplace;
+pub struct OsReplace;
 
-impl Violation for PathlibReplace {
+impl Violation for OsReplace {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.replace()` should be replaced by `Path.replace()`")

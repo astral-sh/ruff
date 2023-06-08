@@ -6,11 +6,11 @@ pub(crate) use f_string_missing_placeholders::{
     f_string_missing_placeholders, FStringMissingPlaceholders,
 };
 pub(crate) use forward_annotation_syntax_error::ForwardAnnotationSyntaxError;
+pub(crate) use future_feature_not_defined::{future_feature_not_defined, FutureFeatureNotDefined};
 pub(crate) use if_tuple::{if_tuple, IfTuple};
 pub(crate) use imports::{
-    future_feature_not_defined, FutureFeatureNotDefined, ImportShadowedByLoopVar, LateFutureImport,
-    UndefinedLocalWithImportStar, UndefinedLocalWithImportStarUsage,
-    UndefinedLocalWithNestedImportStarUsage, UnusedImport, UnusedImportContext,
+    ImportShadowedByLoopVar, LateFutureImport, UndefinedLocalWithImportStar,
+    UndefinedLocalWithImportStarUsage, UndefinedLocalWithNestedImportStarUsage,
 };
 pub(crate) use invalid_literal_comparisons::{invalid_literal_comparison, IsLiteral};
 pub(crate) use invalid_print_syntax::{invalid_print_syntax, InvalidPrintSyntax};
@@ -41,6 +41,7 @@ pub(crate) use undefined_export::{undefined_export, UndefinedExport};
 pub(crate) use undefined_local::{undefined_local, UndefinedLocal};
 pub(crate) use undefined_name::UndefinedName;
 pub(crate) use unused_annotation::{unused_annotation, UnusedAnnotation};
+pub(crate) use unused_import::{unused_import, UnusedImport};
 pub(crate) use unused_variable::{unused_variable, UnusedVariable};
 pub(crate) use yield_outside_function::{yield_outside_function, YieldOutsideFunction};
 
@@ -50,6 +51,7 @@ mod continue_outside_loop;
 mod default_except_not_last;
 mod f_string_missing_placeholders;
 mod forward_annotation_syntax_error;
+mod future_feature_not_defined;
 mod if_tuple;
 mod imports;
 mod invalid_literal_comparisons;
@@ -64,5 +66,6 @@ mod undefined_export;
 mod undefined_local;
 mod undefined_name;
 mod unused_annotation;
+mod unused_import;
 mod unused_variable;
 mod yield_outside_function;

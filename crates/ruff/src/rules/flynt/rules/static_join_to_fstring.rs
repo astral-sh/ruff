@@ -1,5 +1,6 @@
+use itertools::Itertools;
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{self, Expr, Ranged};
+use rustpython_parser::ast::{self, Constant, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -27,15 +28,48 @@ impl AlwaysAutofixableViolation for StaticJoinToFString {
 }
 
 fn is_static_length(elts: &[Expr]) -> bool {
-    elts.iter().all(|e| !matches!(e, Expr::Starred(_)))
+    elts.iter().all(|e| !e.is_starred_expr())
 }
 
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
+    // If all elements are string constants, join them into a single string.
+    if joinees.iter().all(|expr| {
+        matches!(
+            expr,
+            Expr::Constant(ast::ExprConstant {
+                value: Constant::Str(_),
+                ..
+            })
+        )
+    }) {
+        let node = ast::ExprConstant {
+            value: Constant::Str(
+                joinees
+                    .iter()
+                    .filter_map(|expr| {
+                        if let Expr::Constant(ast::ExprConstant {
+                            value: Constant::Str(string),
+                            ..
+                        }) = expr
+                        {
+                            Some(string.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .join(joiner),
+            ),
+            range: TextRange::default(),
+            kind: None,
+        };
+        return Some(node.into());
+    }
+
     let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
     let mut first = true;
 
     for expr in joinees {
-        if matches!(expr, Expr::JoinedStr(_)) {
+        if expr.is_joined_str_expr() {
             // Oops, already an f-string. We don't know how to handle those
             // gracefully right now.
             return None;
@@ -58,7 +92,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
         args,
         keywords,
         ..
-    })= expr else {
+    }) = expr else {
         return;
     };
 

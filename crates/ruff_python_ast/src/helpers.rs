@@ -363,7 +363,9 @@ where
                         .map_or(false, |expr| any_over_expr(expr, func))
                 })
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
                 || returns
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
@@ -380,7 +382,9 @@ where
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
                 || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list.iter().any(|expr| any_over_expr(expr, func))
+                || decorator_list
+                    .iter()
+                    .any(|decorator| any_over_expr(&decorator.expression, func))
         }
         Stmt::Return(ast::StmtReturn {
             value,
@@ -684,9 +688,24 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 /// callable.
 pub fn map_callable(decorator: &Expr) -> &Expr {
     if let Expr::Call(ast::ExprCall { func, .. }) = decorator {
+        // Ex) `@decorator()`
         func
     } else {
+        // Ex) `@decorator`
         decorator
+    }
+}
+
+/// Given an [`Expr`] that can be callable or not (like a decorator, which could
+/// be used with or without explicit call syntax), return the underlying
+/// callable.
+pub fn map_subscript(expr: &Expr) -> &Expr {
+    if let Expr::Subscript(ast::ExprSubscript { value, .. }) = expr {
+        // Ex) `Iterable[T]`
+        value
+    } else {
+        // Ex) `Iterable`
+        expr
     }
 }
 
@@ -785,7 +804,7 @@ pub fn format_import_from(level: Option<u32>, module: Option<&str>) -> String {
 /// assert_eq!(format_import_from_member(Some(1), Some("foo"), "bar"), ".foo.bar".to_string());
 /// ```
 pub fn format_import_from_member(level: Option<u32>, module: Option<&str>, member: &str) -> String {
-    let mut full_name = String::with_capacity(
+    let mut qualified_name = String::with_capacity(
         (level.unwrap_or(0) as usize)
             + module.as_ref().map_or(0, |module| module.len())
             + 1
@@ -793,15 +812,15 @@ pub fn format_import_from_member(level: Option<u32>, module: Option<&str>, membe
     );
     if let Some(level) = level {
         for _ in 0..level {
-            full_name.push('.');
+            qualified_name.push('.');
         }
     }
     if let Some(module) = module {
-        full_name.push_str(module);
-        full_name.push('.');
+        qualified_name.push_str(module);
+        qualified_name.push('.');
     }
-    full_name.push_str(member);
-    full_name
+    qualified_name.push_str(member);
+    qualified_name
 }
 
 /// Create a module path from a (package, path) pair.
@@ -892,7 +911,7 @@ pub fn resolve_imported_module_path<'a>(
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
-    pub returns: Vec<Option<&'a Expr>>,
+    pub returns: Vec<&'a ast::StmtReturn>,
 }
 
 impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
@@ -904,10 +923,7 @@ where
             Stmt::FunctionDef(_) | Stmt::AsyncFunctionDef(_) => {
                 // Don't recurse.
             }
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _range,
-            }) => self.returns.push(value.as_deref()),
+            Stmt::Return(stmt) => self.returns.push(stmt),
             _ => walk_stmt(self, stmt),
         }
     }
@@ -1026,7 +1042,7 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
 
     let mut fix_start = None;
     let mut fix_end = None;
-    let mut count: usize = 0;
+    let mut count = 0u32;
 
     for (tok, range) in lexer::lex_starts_at(contents, Mode::Module, start).flatten() {
         match tok {
@@ -1034,10 +1050,10 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
                 if count == 0 {
                     fix_start = Some(range.start());
                 }
-                count += 1;
+                count = count.saturating_add(1);
             }
             Tok::Rpar => {
-                count -= 1;
+                count = count.saturating_sub(1);
                 if count == 0 {
                     fix_end = Some(range.end());
                     break;
@@ -1433,16 +1449,16 @@ impl LocatedCmpop {
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
     let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];
-    let mut count: usize = 0;
+    let mut count = 0u32;
     loop {
         let Some((tok, range)) = tok_iter.next() else {
             break;
         };
         if matches!(tok, Tok::Lpar) {
-            count += 1;
+            count = count.saturating_add(1);
             continue;
         } else if matches!(tok, Tok::Rpar) {
-            count -= 1;
+            count = count.saturating_sub(1);
             continue;
         }
         if count == 0 {

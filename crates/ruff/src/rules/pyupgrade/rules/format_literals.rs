@@ -1,9 +1,10 @@
 use anyhow::{anyhow, bail, Result};
-use libcst_native::{Arg, Codegen, CodegenState};
+use libcst_native::Arg;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{Expr, Ranged};
 
+use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -89,7 +90,7 @@ fn generate_call(
 ) -> Result<String> {
     let module_text = locator.slice(expr.range());
     let mut expression = match_expression(module_text)?;
-    let mut call = match_call_mut(&mut expression)?;
+    let call = match_call_mut(&mut expression)?;
 
     // Fix the call arguments.
     if !is_sequential(correct_order) {
@@ -99,27 +100,16 @@ fn generate_call(
     // Fix the string itself.
     let item = match_attribute(&mut call.func)?;
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    item.codegen(&mut state);
-    let cleaned = remove_specifiers(&state.to_string());
+    let cleaned = remove_specifiers(&item.codegen_stylist(stylist));
 
     call.func = Box::new(match_expression(&cleaned)?);
 
-    let mut state = CodegenState {
-        default_newline: &stylist.line_ending(),
-        default_indent: stylist.indentation(),
-        ..CodegenState::default()
-    };
-    expression.codegen(&mut state);
-    if module_text == state.to_string() {
+    let state = expression.codegen_stylist(stylist);
+    if module_text == state {
         // Ex) `'{' '0}'.format(1)`
         bail!("Failed to generate call expression for: {module_text}")
     }
-    Ok(state.to_string())
+    Ok(state)
 }
 
 /// UP030

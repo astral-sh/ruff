@@ -41,7 +41,7 @@ pub(crate) fn test_expression(expr: &Expr, model: &SemanticModel) -> Resolution 
                         | BindingKind::Global
                         | BindingKind::Nonlocal => Resolution::RelevantLocal,
                         BindingKind::Importation(Importation {
-                            full_name: module, ..
+                            qualified_name: module,
                         }) if module == "pandas" => Resolution::PandasModule,
                         _ => Resolution::IrrelevantBinding,
                     }

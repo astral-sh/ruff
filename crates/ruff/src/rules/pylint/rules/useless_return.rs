@@ -1,13 +1,11 @@
-use log::error;
 use rustpython_parser::ast::{self, Constant, Expr, Ranged, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::types::RefEquality;
 
-use crate::autofix::edits::delete_stmt;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -57,14 +55,12 @@ pub(crate) fn useless_return<'a>(
         return;
     }
 
-    // Skip empty functions.
-    if body.is_empty() {
-        return;
-    }
-
     // Find the last statement in the function.
-    let last_stmt = body.last().unwrap();
-    if !matches!(last_stmt, Stmt::Return(_)) {
+    let Some(last_stmt) = body.last() else {
+        // Skip empty functions.
+        return;
+    };
+    if !last_stmt.is_return_stmt() {
         return;
     }
 
@@ -107,26 +103,14 @@ pub(crate) fn useless_return<'a>(
 
     let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
-        match delete_stmt(
+        let edit = autofix::edits::delete_stmt(
             last_stmt,
             Some(stmt),
-            &deleted,
             checker.locator,
             checker.indexer,
             checker.stylist,
-        ) {
-            Ok(edit) => {
-                if edit.is_deletion() || edit.content() == Some("pass") {
-                    checker.deletions.insert(RefEquality(last_stmt));
-                }
-                #[allow(deprecated)]
-                diagnostic.set_fix(Fix::unspecified(edit));
-            }
-            Err(e) => {
-                error!("Failed to delete `return` statement: {}", e);
-            }
-        };
+        );
+        diagnostic.set_fix(Fix::automatic(edit).isolate(checker.isolation(Some(stmt))));
     }
     checker.diagnostics.push(diagnostic);
 }

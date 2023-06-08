@@ -320,7 +320,7 @@ macro_rules! format {
 /// the content up to the first non-soft line break without exceeding the configured print width.
 /// This definition differs from groups as that non-soft line breaks make group expand.
 ///
-/// [crate::BestFitting] acts as a "break" boundary, meaning that it is considered to fit
+/// [crate::FormatBestFitting] acts as a "break" boundary, meaning that it is considered to fit
 ///
 ///
 /// [`Flat`]: crate::format_element::PrintMode::Flat
@@ -330,7 +330,7 @@ macro_rules! format {
 macro_rules! best_fitting {
     ($least_expanded:expr, $($tail:expr),+ $(,)?) => {{
         unsafe {
-            $crate::BestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
+            $crate::FormatBestFitting::from_arguments_unchecked($crate::format_args!($least_expanded, $($tail),+))
         }
     }}
 }
