@@ -1,4 +1,5 @@
 from itertools import count, cycle, repeat
+
 zip()
 zip(range(3))
 zip("a", "b")
@@ -10,7 +11,13 @@ zip(range(3), strict=True)
 zip("a", "b", strict=False)
 zip("a", "b", "c", strict=True)
 
-# Uses infinite iterator, so should not detect
-zip("abc", count())
-zip("abc", cycle("ABC"))
-zip(repeat("abc"), "abc")
+# Ignore infinite iterators.
+zip([1, 2, 3], cycle("ABCDEF"))
+zip([1, 2, 3], count())
+zip([1, 2, 3], repeat(1))
+zip([1, 2, 3], repeat(1, None))
+zip([1, 2, 3], repeat(1, times=None))
+
+# Unless a limit is specified.
+zip([1, 2, 3], repeat(1, 1))
+zip([1, 2, 3], repeat(1, times=4))

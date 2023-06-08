@@ -1,72 +1,88 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-B905.py:2:1: B905 `zip()` without an explicit `strict=` parameter
-  |
-2 | from itertools import count, cycle, repeat
-3 | zip()
-  | ^^^^^ B905
-4 | zip(range(3))
-5 | zip("a", "b")
-  |
-
 B905.py:3:1: B905 `zip()` without an explicit `strict=` parameter
   |
 3 | from itertools import count, cycle, repeat
-4 | zip()
-5 | zip(range(3))
-  | ^^^^^^^^^^^^^ B905
-6 | zip("a", "b")
-7 | zip("a", "b", *zip("c"))
+4 | 
+5 | zip()
+  | ^^^^^ B905
+6 | zip(range(3))
+7 | zip("a", "b")
   |
 
 B905.py:4:1: B905 `zip()` without an explicit `strict=` parameter
   |
 4 | zip()
 5 | zip(range(3))
-6 | zip("a", "b")
   | ^^^^^^^^^^^^^ B905
+6 | zip("a", "b")
 7 | zip("a", "b", *zip("c"))
-8 | zip(zip("a"), strict=False)
   |
 
 B905.py:5:1: B905 `zip()` without an explicit `strict=` parameter
   |
-5 | zip(range(3))
-6 | zip("a", "b")
-7 | zip("a", "b", *zip("c"))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^ B905
-8 | zip(zip("a"), strict=False)
-9 | zip(zip("a", strict=True))
+5 | zip()
+6 | zip(range(3))
+7 | zip("a", "b")
+  | ^^^^^^^^^^^^^ B905
+8 | zip("a", "b", *zip("c"))
+9 | zip(zip("a"), strict=False)
   |
 
-B905.py:5:16: B905 `zip()` without an explicit `strict=` parameter
-  |
-5 | zip(range(3))
-6 | zip("a", "b")
-7 | zip("a", "b", *zip("c"))
-  |                ^^^^^^^^ B905
-8 | zip(zip("a"), strict=False)
-9 | zip(zip("a", strict=True))
-  |
-
-B905.py:6:5: B905 `zip()` without an explicit `strict=` parameter
-  |
-6 | zip("a", "b")
-7 | zip("a", "b", *zip("c"))
-8 | zip(zip("a"), strict=False)
-  |     ^^^^^^^^ B905
-9 | zip(zip("a", strict=True))
-  |
-
-B905.py:7:1: B905 `zip()` without an explicit `strict=` parameter
+B905.py:6:1: B905 `zip()` without an explicit `strict=` parameter
    |
- 7 | zip("a", "b", *zip("c"))
- 8 | zip(zip("a"), strict=False)
- 9 | zip(zip("a", strict=True))
+ 6 | zip(range(3))
+ 7 | zip("a", "b")
+ 8 | zip("a", "b", *zip("c"))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ B905
+ 9 | zip(zip("a"), strict=False)
+10 | zip(zip("a", strict=True))
+   |
+
+B905.py:6:16: B905 `zip()` without an explicit `strict=` parameter
+   |
+ 6 | zip(range(3))
+ 7 | zip("a", "b")
+ 8 | zip("a", "b", *zip("c"))
+   |                ^^^^^^^^ B905
+ 9 | zip(zip("a"), strict=False)
+10 | zip(zip("a", strict=True))
+   |
+
+B905.py:7:5: B905 `zip()` without an explicit `strict=` parameter
+   |
+ 7 | zip("a", "b")
+ 8 | zip("a", "b", *zip("c"))
+ 9 | zip(zip("a"), strict=False)
+   |     ^^^^^^^^ B905
+10 | zip(zip("a", strict=True))
+   |
+
+B905.py:8:1: B905 `zip()` without an explicit `strict=` parameter
+   |
+ 8 | zip("a", "b", *zip("c"))
+ 9 | zip(zip("a"), strict=False)
+10 | zip(zip("a", strict=True))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
-10 | 
-11 | zip(range(3), strict=True)
+11 | 
+12 | zip(range(3), strict=True)
+   |
+
+B905.py:22:1: B905 `zip()` without an explicit `strict=` parameter
+   |
+22 | # Unless a limit is specified.
+23 | zip([1, 2, 3], repeat(1, 1))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
+24 | zip([1, 2, 3], repeat(1, times=4))
+   |
+
+B905.py:23:1: B905 `zip()` without an explicit `strict=` parameter
+   |
+23 | # Unless a limit is specified.
+24 | zip([1, 2, 3], repeat(1, 1))
+25 | zip([1, 2, 3], repeat(1, times=4))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
    |
 
 

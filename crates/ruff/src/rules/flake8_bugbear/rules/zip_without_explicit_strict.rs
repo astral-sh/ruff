@@ -2,14 +2,10 @@ use rustpython_parser::ast::{self, Expr, Keyword, Ranged};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
+use ruff_python_semantic::model::SemanticModel;
 
 use crate::checkers::ast::Checker;
-
-const INFINITE_ITERATORS: &[&[&str]] = &[
-    &["itertools", "count"],
-    &["itertools", "cycle"],
-    &["itertools", "repeat"],
-];
 
 #[violation]
 pub struct ZipWithoutExplicitStrict;
@@ -32,12 +28,12 @@ pub(crate) fn zip_without_explicit_strict(
     if let Expr::Name(ast::ExprName { id, .. }) = func {
         if id == "zip"
             && checker.semantic_model().is_builtin("zip")
-            && !args
-                .iter()
-                .any(|arg| check_infinite_iterators(checker, arg))
             && !kwargs
                 .iter()
                 .any(|keyword| keyword.arg.as_ref().map_or(false, |name| name == "strict"))
+            && !args
+                .iter()
+                .any(|arg| is_infinite_iterator(arg, checker.semantic_model()))
         {
             checker
                 .diagnostics
@@ -46,17 +42,39 @@ pub(crate) fn zip_without_explicit_strict(
     }
 }
 
-fn check_infinite_iterators(checker: &mut Checker, arg: &Expr) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. }) = &arg else {
+/// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
+/// `itertools.cycle` or similar).
+fn is_infinite_iterator(arg: &Expr, model: &SemanticModel) -> bool {
+    let Expr::Call(ast::ExprCall { func, args, keywords, .. }) = &arg else {
         return false;
     };
 
-    return checker
-        .semantic_model()
+    return model
         .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            INFINITE_ITERATORS
-                .iter()
-                .any(|target| &call_path.as_slice() == target)
+        .map_or(false, |call_path| match call_path.as_slice() {
+            ["itertools", "cycle" | "count"] => true,
+            ["itertools", "repeat"] => {
+                // Ex) `itertools.repeat(1)`
+                if keywords.is_empty() && args.len() == 1 {
+                    return true;
+                }
+
+                // Ex) `itertools.repeat(1, None)`
+                if args.len() == 2 && is_const_none(&args[1]) {
+                    return true;
+                }
+
+                // Ex) `iterools.repeat(1, times=None)`
+                for keyword in keywords {
+                    if keyword.arg.as_ref().map_or(false, |name| name == "times") {
+                        if is_const_none(&keyword.value) {
+                            return true;
+                        }
+                    }
+                }
+
+                false
+            }
+            _ => false,
         });
 }
