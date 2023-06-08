@@ -178,7 +178,7 @@ instruction()#comment with bad spacing
 ```diff
 --- Black
 +++ Ruff
-@@ -1,173 +1,68 @@
+@@ -1,31 +1,27 @@
 -from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
 -    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 -)
@@ -195,16 +195,16 @@ instruction()#comment with bad spacing
 -    "Any",
 -    "Callable",
 -    "ClassVar",
-+    0x42,
-+    0x42,
-+    0x42,
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
      # ABCs (from collections.abc).
 -    "AbstractSet",  # collections.abc.Set.
 -    "ByteString",
 -    "Container",
-+    0x42,  # collections.abc.Set.
-+    0x42,
-+    0x42,
++    "NOT_YET_IMPLEMENTED_STRING",  # collections.abc.Set.
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
      # Concrete collection types.
 -    "Counter",
 -    "Deque",
@@ -215,39 +215,30 @@ instruction()#comment with bad spacing
 -    "FrozenSet",
 -    "NamedTuple",  # Not really a type.
 -    "Generator",
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,  # Not really a type.
-+    0x42,
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",  # Not really a type.
++    "NOT_YET_IMPLEMENTED_STRING",
  ]
  
  not_shareables = [
-     # singletons
--    True,
--    False,
-+    0x42,
-+    0x42,
-     NotImplemented,
--    ...,
-+    0x42,
+@@ -37,129 +33,28 @@
      # builtin types and objects
      type,
      object,
 -    object(),
 -    Exception(),
--    42,
--    100.0,
++    NOT_IMPLEMENTED_call(),
++    NOT_IMPLEMENTED_call(),
+     42,
+     100.0,
 -    "spam",
-+    NOT_IMPLEMENTED_call(),
-+    NOT_IMPLEMENTED_call(),
-+    0x42,
-+    0x42,
-+    0x42,
++    "NOT_YET_IMPLEMENTED_STRING",
      # user-defined types and objects
      Cheese,
 -    Cheese("Wensleydale"),
@@ -308,10 +299,9 @@ instruction()#comment with bad spacing
 -""",
 -        arg3=True,
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
 -    ############################################################################
- 
+-
 -    call2(
 -        # short
 -        arg1,
@@ -346,17 +336,16 @@ instruction()#comment with bad spacing
 -    while True:
 -        if False:
 -            continue
-+CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
- 
+-
 -            # and round and round we go
 -        # and round and round we go
- 
+-
 -    # let's return
 -    return Node(
 -        syms.simple_stmt,
 -        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
 -    )
-+NOT_YET_IMPLEMENTED_StmtClassDef
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
  
 -CONFIG_FILES = (
@@ -366,16 +355,18 @@ instruction()#comment with bad spacing
 -    + SHARED_CONFIG_FILES
 -    + USER_CONFIG_FILES
 -)  # type: Final
--
--
++CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
+ 
+ 
 -class Test:
 -    def _init_host(self, parsed) -> None:
 -        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
 -            pass
--
--
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
  #######################
- ### SECTION COMMENT ###
+@@ -167,7 +62,7 @@
  #######################
  
  
@@ -396,39 +387,39 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 
 __all__ = [
     # Super-special typing primitives.
-    0x42,
-    0x42,
-    0x42,
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
     # ABCs (from collections.abc).
-    0x42,  # collections.abc.Set.
-    0x42,
-    0x42,
+    "NOT_YET_IMPLEMENTED_STRING",  # collections.abc.Set.
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
     # Concrete collection types.
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,  # Not really a type.
-    0x42,
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",  # Not really a type.
+    "NOT_YET_IMPLEMENTED_STRING",
 ]
 
 not_shareables = [
     # singletons
-    0x42,
-    0x42,
+    True,
+    False,
     NotImplemented,
-    0x42,
+    ...,
     # builtin types and objects
     type,
     object,
     NOT_IMPLEMENTED_call(),
     NOT_IMPLEMENTED_call(),
-    0x42,
-    0x42,
-    0x42,
+    42,
+    100.0,
+    "NOT_YET_IMPLEMENTED_STRING",
     # user-defined types and objects
     Cheese,
     NOT_IMPLEMENTED_call(),

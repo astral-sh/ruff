@@ -87,40 +87,39 @@ if __name__ == "__main__":
 --- Black
 +++ Ruff
 @@ -1,61 +1,33 @@
--while True:
+ while True:
 -    if something.changed:
 -        do.stuff()  # trailing comment
 -        # Comment belongs to the `if` block.
-+while 0x42:
 +    NOT_YET_IMPLEMENTED_StmtIf
      # This one belongs to the `while` block.
  
      # Should this one, too?  I guess so.
  
  # This one is properly standalone now.
- 
+-
 -for i in range(100):
 -    # first we do this
 -    if i % 33 == 0:
 -        break
-+NOT_YET_IMPLEMENTED_StmtFor
- 
+-
 -    # then we do this
 -    print(i)
 -    # and finally we loop around
-+NOT_YET_IMPLEMENTED_StmtWith
  
 -with open(some_temp_file) as f:
 -    data = f.read()
--
++NOT_YET_IMPLEMENTED_StmtFor
+ 
 -try:
 -    with open(some_other_file) as w:
 -        w.write(data)
-+NOT_YET_IMPLEMENTED_StmtTry
++NOT_YET_IMPLEMENTED_StmtWith
  
 -except OSError:
 -    print("problems")
--
++NOT_YET_IMPLEMENTED_StmtTry
+ 
 -import sys
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -174,7 +173,7 @@ if __name__ == "__main__":
 ## Ruff Output
 
 ```py
-while 0x42:
+while True:
     NOT_YET_IMPLEMENTED_StmtIf
     # This one belongs to the `while` block.
 

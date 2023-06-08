@@ -74,13 +74,11 @@ func(
 +d = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  # Remove commas for non-subscripts.
--small_list = [1]
+ small_list = [1]
 -list_of_types = [tuple[int,]]
--small_set = {1}
--set_of_types = {tuple[int,]}
-+small_list = [0x42]
 +list_of_types = [NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]]
-+small_set = {0x42}
+ small_set = {1}
+-set_of_types = {tuple[int,]}
 +set_of_types = {NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]}
  
  # Except single element tuples
@@ -113,9 +111,9 @@ NOT_YET_IMPLEMENTED_StmtAnnAssign
 d = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 # Remove commas for non-subscripts.
-small_list = [0x42]
+small_list = [1]
 list_of_types = [NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]]
-small_set = {0x42}
+small_set = {1}
 set_of_types = {NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]}
 
 # Except single element tuples

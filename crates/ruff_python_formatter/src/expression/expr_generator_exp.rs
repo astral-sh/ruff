@@ -9,11 +9,8 @@ use rustpython_parser::ast::ExprGeneratorExp;
 pub struct FormatExprGeneratorExp;
 
 impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
-    fn fmt_fields(&self, item: &ExprGeneratorExp, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(
-            f,
-            [not_yet_implemented_custom_text(item, "(i for i in [])")]
-        )
+    fn fmt_fields(&self, _item: &ExprGeneratorExp, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [not_yet_implemented_custom_text("(i for i in [])")])
     }
 }
 

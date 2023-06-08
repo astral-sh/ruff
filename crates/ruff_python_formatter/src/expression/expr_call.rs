@@ -9,13 +9,10 @@ use rustpython_parser::ast::ExprCall;
 pub struct FormatExprCall;
 
 impl FormatNodeRule<ExprCall> for FormatExprCall {
-    fn fmt_fields(&self, item: &ExprCall, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &ExprCall, f: &mut PyFormatter) -> FormatResult<()> {
         write!(
             f,
-            [not_yet_implemented_custom_text(
-                item,
-                "NOT_IMPLEMENTED_call()"
-            )]
+            [not_yet_implemented_custom_text("NOT_IMPLEMENTED_call()")]
         )
     }
 }

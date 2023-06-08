@@ -9,8 +9,8 @@ use rustpython_parser::ast::ExprTuple;
 pub struct FormatExprTuple;
 
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
-    fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented_custom_text(item, "(1, 2)")])
+    fn fmt_fields(&self, _item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [not_yet_implemented_custom_text("(1, 2)")])
     }
 }
 

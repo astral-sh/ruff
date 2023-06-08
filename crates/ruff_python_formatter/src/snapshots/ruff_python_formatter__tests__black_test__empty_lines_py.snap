@@ -107,7 +107,7 @@ def g():
 +++ Ruff
 @@ -1,89 +1,12 @@
 -"""Docstring."""
-+0x42
++"NOT_YET_IMPLEMENTED_STRING"
  
  
  # leading comment
@@ -203,7 +203,7 @@ def g():
 ## Ruff Output
 
 ```py
-0x42
+"NOT_YET_IMPLEMENTED_STRING"
 
 
 # leading comment

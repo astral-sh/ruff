@@ -40,7 +40,7 @@ while (
 
 ## Output
 ```py
-while 0x42:  # trailing test comment
+while 34:  # trailing test comment
     NOT_YET_IMPLEMENTED_StmtPass  # trailing last statement comment
 
     # trailing while body comment
@@ -59,7 +59,7 @@ while (
     NOT_YET_IMPLEMENTED_StmtPass
 
 else:
-    0x42
+    ...
 
 while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:  # comment
     NOT_IMPLEMENTED_call()

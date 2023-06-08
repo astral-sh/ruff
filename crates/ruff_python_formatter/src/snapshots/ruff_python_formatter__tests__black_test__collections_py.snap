@@ -84,7 +84,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,99 +1,40 @@
+@@ -1,99 +1,46 @@
 -import core, time, a
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -115,7 +115,8 @@ if True:
 -    2,
 -    3,
 -}
--b = {1, 2, 3}
++a = {1, 2, 3}
+ b = {1, 2, 3}
 -c = {
 -    1,
 -    2,
@@ -128,13 +129,23 @@ if True:
 -    (4, 5, 6),
 -}
 -nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
--nested_long_lines = [
++c = {1, 2, 3}
++x = (1, 2)
++y = (1, 2)
++nested = {(1, 2), (1, 2)}
++nested_no_trailing_comma = {(1, 2), (1, 2)}
+ nested_long_lines = [
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 -    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 -    "cccccccccccccccccccccccccccccccccccccccc",
 -    (1, 2, 3),
 -    "dddddddddddddddddddddddddddddddddddddddd",
--]
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    (1, 2),
++    "NOT_YET_IMPLEMENTED_STRING",
+ ]
 -{
 -    "oneple": (1,),
 -}
@@ -148,17 +159,9 @@ if True:
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa wraps %s"
 -    % bar
 -)
-+a = {0x42, 0x42, 0x42}
-+b = {0x42, 0x42, 0x42}
-+c = {0x42, 0x42, 0x42}
-+x = (1, 2)
-+y = (1, 2)
-+nested = {(1, 2), (1, 2)}
-+nested_no_trailing_comma = {(1, 2), (1, 2)}
-+nested_long_lines = [0x42, 0x42, 0x42, (1, 2), 0x42]
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+[0x42, 0x42 % (1, 2)]
++["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (1, 2)]
 +x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +NOT_YET_IMPLEMENTED_StmtAssert
@@ -176,7 +179,7 @@ if True:
 -    2,
 -    3,
 -]
-+[0x42, 0x42, 0x42]
++[1, 2, 3]
  
 -division_result_tuple = (6 / 2,)
 -print("foo %r", (foo.bar,))
@@ -228,17 +231,23 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 # `as` works as well
 NOT_YET_IMPLEMENTED_StmtImportFrom
 
-a = {0x42, 0x42, 0x42}
-b = {0x42, 0x42, 0x42}
-c = {0x42, 0x42, 0x42}
+a = {1, 2, 3}
+b = {1, 2, 3}
+c = {1, 2, 3}
 x = (1, 2)
 y = (1, 2)
 nested = {(1, 2), (1, 2)}
 nested_no_trailing_comma = {(1, 2), (1, 2)}
-nested_long_lines = [0x42, 0x42, 0x42, (1, 2), 0x42]
+nested_long_lines = [
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    (1, 2),
+    "NOT_YET_IMPLEMENTED_STRING",
+]
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-[0x42, 0x42 % (1, 2)]
+["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (1, 2)]
 x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 NOT_YET_IMPLEMENTED_StmtAssert
@@ -247,7 +256,7 @@ NOT_YET_IMPLEMENTED_StmtAssert
 NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 
-[0x42, 0x42, 0x42]
+[1, 2, 3]
 
 division_result_tuple = (1, 2)
 NOT_IMPLEMENTED_call()

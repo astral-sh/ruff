@@ -9,11 +9,10 @@ use rustpython_parser::ast::ExprBoolOp;
 pub struct FormatExprBoolOp;
 
 impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
-    fn fmt_fields(&self, item: &ExprBoolOp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &ExprBoolOp, f: &mut PyFormatter) -> FormatResult<()> {
         write!(
             f,
             [not_yet_implemented_custom_text(
-                item,
                 "NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2"
             )]
         )

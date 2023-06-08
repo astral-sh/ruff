@@ -69,10 +69,8 @@ def example8():
 --- Black
 +++ Ruff
 @@ -1,85 +1,37 @@
--x = 1
--x = 1.2
-+x = 0x42
-+x = 0x42
+ x = 1
+ x = 1.2
  
 -data = (
 -    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -173,8 +171,8 @@ def example8():
 ## Ruff Output
 
 ```py
-x = 0x42
-x = 0x42
+x = 1
+x = 1.2
 
 data = NOT_IMPLEMENTED_call()
 

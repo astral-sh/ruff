@@ -1,24 +1,38 @@
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{not_yet_implemented_custom_text, AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::text;
-use ruff_formatter::{write, Buffer, FormatResult};
-use rustpython_parser::ast::ExprAttribute;
+use crate::prelude::*;
+use crate::{not_yet_implemented_custom_text, FormatNodeRule};
+use ruff_formatter::write;
+use rustpython_parser::ast::{Constant, Expr, ExprAttribute, ExprConstant};
 
 #[derive(Default)]
 pub struct FormatExprAttribute;
 
 impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     fn fmt_fields(&self, item: &ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {
-        // We need to write the value - which is also a dummy - already because power op spacing
-        // depends on it
+        let ExprAttribute {
+            value,
+            range: _,
+            attr: _,
+            ctx: _,
+        } = item;
+
+        let requires_space = matches!(
+            value.as_ref(),
+            Expr::Constant(ExprConstant {
+                value: Constant::Int(_) | Constant::Float(_),
+                ..
+            })
+        );
+
         write!(
             f,
             [
                 item.value.format(),
+                requires_space.then_some(space()),
                 text("."),
-                not_yet_implemented_custom_text(item, "NOT_IMPLEMENTED_attr")
+                not_yet_implemented_custom_text("NOT_IMPLEMENTED_attr")
             ]
         )
     }

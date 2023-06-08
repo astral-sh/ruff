@@ -9,11 +9,10 @@ use rustpython_parser::ast::ExprIfExp;
 pub struct FormatExprIfExp;
 
 impl FormatNodeRule<ExprIfExp> for FormatExprIfExp {
-    fn fmt_fields(&self, item: &ExprIfExp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &ExprIfExp, f: &mut PyFormatter) -> FormatResult<()> {
         write!(
             f,
             [not_yet_implemented_custom_text(
-                item,
                 "NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false"
             )]
         )

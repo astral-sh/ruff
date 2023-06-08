@@ -454,7 +454,7 @@ d={'a':1,
 -l=[1,2,3]
 -d={'a':1,
 -   'b':2}
-+l = [0x42, 0x42, 0x42]
++l = [1, 2, 3]
 +d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 ```
 
@@ -532,7 +532,7 @@ NOT_IMPLEMENTED_call()
 # fmt: off
 NOT_YET_IMPLEMENTED_ExprYield
 # No formatting to the end of the file
-l = [0x42, 0x42, 0x42]
+l = [1, 2, 3]
 d = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 ```
 

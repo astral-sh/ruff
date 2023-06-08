@@ -10,11 +10,10 @@ use rustpython_parser::ast::ExprCompare;
 pub struct FormatExprCompare;
 
 impl FormatNodeRule<ExprCompare> for FormatExprCompare {
-    fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
         write!(
             f,
             [not_yet_implemented_custom_text(
-                item,
                 "NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right"
             )]
         )

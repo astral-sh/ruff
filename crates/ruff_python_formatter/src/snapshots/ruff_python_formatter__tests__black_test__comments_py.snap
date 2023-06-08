@@ -114,51 +114,50 @@ async def wat():
  # Has many lines. Many, many lines.
  # Many, many, many lines.
 -"""Module docstring.
-+0x42
- 
+-
 -Possibly also many, many lines.
 -"""
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
- 
+-
 -import os.path
 -import sys
 -
 -import a
 -from b.c import X  # some noqa comment
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
++"NOT_YET_IMPLEMENTED_STRING"
  
 -try:
 -    import fast
 -except ImportError:
 -    import slow as fast
--
--
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
+ 
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
+ 
 -# Some comment before a function.
--y = 1
 +NOT_YET_IMPLEMENTED_StmtTry
-+y = 0x42
+ y = 1
  (
      # some strings
      y  # type: ignore
  )
 -
- 
+-
 -def function(default=None):
 -    """Docstring comes first.
- 
+-
 -    Possibly many lines.
 -    """
 -    # FIXME: Some comment about why this function is crap but still in production.
 -    import inner_imports
--
+ 
 -    if inner_imports.are_evil():
 -        # Explains why we have this if.
 -        # In great detail indeed.
 -        x = X()
 -        return x.method1()  # type: ignore
--
+ 
 -    # This return is also commented for some reason.
 -    return default
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
@@ -171,11 +170,11 @@ async def wat():
  
  # Another comment!
  # This time two lines.
--
+ 
  
 -class Foo:
 -    """Docstring for class Foo.  Example from Sphinx docs."""
- 
+-
 -    #: Doc comment for class attribute Foo.bar.
 -    #: It can have multiple lines.
 -    bar = 1
@@ -188,12 +187,12 @@ async def wat():
 -    def __init__(self):
 -        #: Doc comment for instance attribute qux.
 -        self.qux = 3
--
--        self.spam = 4
--        """Docstring for instance attribute spam."""
 +NOT_YET_IMPLEMENTED_StmtClassDef
  
+-        self.spam = 4
+-        """Docstring for instance attribute spam."""
  
+-
  #' <h1>This is pweave!</h1>
  
  
@@ -227,7 +226,7 @@ async def wat():
 #
 # Has many lines. Many, many lines.
 # Many, many, many lines.
-0x42
+"NOT_YET_IMPLEMENTED_STRING"
 
 NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImport
@@ -236,7 +235,7 @@ NOT_YET_IMPLEMENTED_StmtImport
 NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
 
 NOT_YET_IMPLEMENTED_StmtTry
-y = 0x42
+y = 1
 (
     # some strings
     y  # type: ignore
