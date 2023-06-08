@@ -48,7 +48,7 @@ pub trait Visitor<R = crate::text_size::TextRange> {
             self.visit_stmt(value);
         }
         for value in node.decorator_list {
-            self.visit_expr(value);
+            self.visit_decorator(value);
         }
         if let Some(value) = node.returns {
             self.visit_expr(*value);
@@ -66,7 +66,7 @@ pub trait Visitor<R = crate::text_size::TextRange> {
             self.visit_stmt(value);
         }
         for value in node.decorator_list {
-            self.visit_expr(value);
+            self.visit_decorator(value);
         }
         if let Some(value) = node.returns {
             self.visit_expr(*value);
@@ -86,7 +86,7 @@ pub trait Visitor<R = crate::text_size::TextRange> {
             self.visit_stmt(value);
         }
         for value in node.decorator_list {
-            self.visit_expr(value);
+            self.visit_decorator(value);
         }
     }
     fn visit_stmt_return(&mut self, node: StmtReturn<R>) {
@@ -810,4 +810,8 @@ pub trait Visitor<R = crate::text_size::TextRange> {
             self.visit_pattern(value);
         }
     }
+    fn visit_decorator(&mut self, node: Decorator<R>) {
+        self.generic_visit_decorator(node)
+    }
+    fn generic_visit_decorator(&mut self, node: Decorator<R>) {}
 }

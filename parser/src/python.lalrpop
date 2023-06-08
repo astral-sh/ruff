@@ -1151,9 +1151,9 @@ ClassDef: ast::Stmt = {
 };
 
 // Decorators:
-Decorator: ast::Expr = {
-    <location:@L> "@" <p:NamedExpressionTest> "\n" => {
-        p
+Decorator: ast::Decorator = {
+    <location:@L> "@" <p:NamedExpressionTest> <end_location:@R> "\n" => {
+        ast::Decorator { range: optional_range(location, end_location), expression: p }
     },
 };
 

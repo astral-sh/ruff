@@ -3993,6 +3993,39 @@ impl TypeIgnoreTypeIgnore {
     }
 }
 
+#[pyclass(module="rustpython_ast.located", name="_decorator", extends=super::Ast, frozen)]
+#[derive(Clone, Debug)]
+pub struct Decorator(pub &'static ast::Decorator<SourceRange>);
+
+impl From<&'static ast::Decorator<SourceRange>> for Decorator {
+    fn from(node: &'static ast::Decorator<SourceRange>) -> Self {
+        Decorator(node)
+    }
+}
+
+impl ToPyObject for Decorator {
+    fn to_object(&self, py: Python) -> PyObject {
+        let initializer = PyClassInitializer::from(Ast).add_subclass(self.clone());
+        Py::new(py, initializer).unwrap().into_py(py)
+    }
+}
+
+impl ToPyWrapper for ast::Decorator<SourceRange> {
+    #[inline]
+    fn to_py_wrapper(&'static self, py: Python) -> PyResult<Py<PyAny>> {
+        Ok(Decorator(self).to_object(py))
+    }
+}
+
+#[pymethods]
+impl Decorator {
+    #[getter]
+    #[inline]
+    fn get_expression(&self, py: Python) -> PyResult<PyObject> {
+        self.0.expression.to_py_wrapper(py)
+    }
+}
+
 impl ToPyWrapper for ast::ExprContext {
     #[inline]
     fn to_py_wrapper(&self, py: Python) -> PyResult<Py<PyAny>> {
@@ -4409,5 +4442,6 @@ pub fn add_to_module(py: Python, m: &PyModule) -> PyResult<()> {
     super::init_type::<PatternMatchOr, ast::PatternMatchOr>(py, m)?;
     super::init_type::<TypeIgnore, ast::TypeIgnore>(py, m)?;
     super::init_type::<TypeIgnoreTypeIgnore, ast::TypeIgnoreTypeIgnore>(py, m)?;
+    super::init_type::<Decorator, ast::Decorator>(py, m)?;
     Ok(())
 }

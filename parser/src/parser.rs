@@ -1102,7 +1102,7 @@ def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
     }
 
     #[test]
-    #[cfg(not(feature = "all-nodes-with-ranges"))]
+    #[cfg(feature = "all-nodes-with-ranges")]
     fn decorator_ranges() {
         let parse_ast = parse_program(
             r#"

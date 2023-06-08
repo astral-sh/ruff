@@ -944,6 +944,14 @@ impl<R> PyNode for ast::TypeIgnoreTypeIgnore<R> {
     }
 }
 
+impl<R> PyNode for ast::Decorator<R> {
+    #[inline]
+    fn py_type_cache() -> &'static OnceCell<(Py<PyAny>, Py<PyAny>)> {
+        static PY_TYPE: OnceCell<(Py<PyAny>, Py<PyAny>)> = OnceCell::new();
+        &PY_TYPE
+    }
+}
+
 impl ToPyAst for ast::ExprContext {
     #[inline]
     fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
@@ -2600,6 +2608,22 @@ impl ToPyAst for ast::TypeIgnoreTypeIgnore<TextRange> {
 
         let instance = Py::<PyAny>::as_ref(&cache.0, py)
             .call1((lineno.to_u32().to_object(py), tag.to_py_ast(py)?))?;
+
+        Ok(instance)
+    }
+}
+
+impl ToPyAst for ast::Decorator<TextRange> {
+    #[inline]
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let cache = Self::py_type_cache().get().unwrap();
+
+        let Self {
+            expression,
+            range: _range,
+        } = self;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((expression.to_py_ast(py)?,))?;
 
         Ok(instance)
     }
@@ -4717,6 +4741,22 @@ impl ToPyAst for ast::TypeIgnoreTypeIgnore<SourceRange> {
     }
 }
 
+impl ToPyAst for ast::Decorator<SourceRange> {
+    #[inline]
+    fn to_py_ast<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let cache = Self::py_type_cache().get().unwrap();
+
+        let Self {
+            expression,
+            range: _range,
+        } = self;
+
+        let instance = Py::<PyAny>::as_ref(&cache.0, py).call1((expression.to_py_ast(py)?,))?;
+
+        Ok(instance)
+    }
+}
+
 fn init_types(py: Python) -> PyResult<()> {
     let ast_module = PyModule::import(py, "_ast")?;
     cache_py_type::<ast::Mod>(ast_module)?;
@@ -4837,5 +4877,6 @@ fn init_types(py: Python) -> PyResult<()> {
     cache_py_type::<ast::PatternMatchOr>(ast_module)?;
     cache_py_type::<ast::TypeIgnore>(ast_module)?;
     cache_py_type::<ast::TypeIgnoreTypeIgnore>(ast_module)?;
+    cache_py_type::<ast::Decorator>(ast_module)?;
     Ok(())
 }
