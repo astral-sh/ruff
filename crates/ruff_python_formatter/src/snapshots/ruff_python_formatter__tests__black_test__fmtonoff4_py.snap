@@ -35,8 +35,7 @@ def f(): pass
 +@NOT_IMPLEMENTED_call()
  # fmt: on
  def f():
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
 -@test(
@@ -49,8 +48,7 @@ def f(): pass
 -)
 +@NOT_IMPLEMENTED_call()
  def f():
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
 ```
 
 ## Ruff Output
@@ -60,12 +58,12 @@ def f(): pass
 @NOT_IMPLEMENTED_call()
 # fmt: on
 def f():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 @NOT_IMPLEMENTED_call()
 def f():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 ```
 
 ## Black Output

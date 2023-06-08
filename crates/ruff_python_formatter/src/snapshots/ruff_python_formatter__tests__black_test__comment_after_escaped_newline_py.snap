@@ -24,17 +24,15 @@ def bobtwo(): \
 +++ Ruff
 @@ -1,6 +1,8 @@
 -def bob():  # pylint: disable=W9016
--    pass
 +def bob():
 +    # pylint: disable=W9016
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
 -def bobtwo():  # some comment here
--    pass
 +def bobtwo():
 +    # some comment here
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
 ```
 
 ## Ruff Output
@@ -42,12 +40,12 @@ def bobtwo(): \
 ```py
 def bob():
     # pylint: disable=W9016
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def bobtwo():
     # some comment here
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 ```
 
 ## Black Output

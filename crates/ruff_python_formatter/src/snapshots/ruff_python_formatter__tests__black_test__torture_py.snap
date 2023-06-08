@@ -99,7 +99,7 @@ assert (
 -        othr.meta_data,
 -        othr.schedule,
 -    )
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
  
  
 -assert a_function(
@@ -130,7 +130,7 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 def test(self, othr):
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 
 
 NOT_YET_IMPLEMENTED_StmtAssert

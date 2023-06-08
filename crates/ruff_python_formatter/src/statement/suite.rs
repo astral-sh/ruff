@@ -259,11 +259,11 @@ trailing_statement = 1
 
 
 def func():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def trailing_func():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 "#
         );
     }
@@ -288,10 +288,10 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 trailing_statement = 1
 
 def func():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 def trailing_func():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 "#
         );
     }

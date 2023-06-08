@@ -86,7 +86,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 -        },
 -        api_key=api_key,
 -    )["extensions"]["sdk"]["token"]
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  
  # Edge case where a bug in a working-in-progress version of
@@ -121,7 +121,7 @@ NOT_IMPLEMENTED_call()
 
 # Example from https://github.com/psf/black/issues/3229
 def refresh_token(self, device_family, refresh_token, api_key):
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
 # Edge case where a bug in a working-in-progress version of

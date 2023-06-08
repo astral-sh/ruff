@@ -222,7 +222,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,125 +16,127 @@
+@@ -18,109 +16,109 @@
  
  # fmt: off
  def func_no_args():
@@ -241,7 +241,7 @@ d={'a':1,
 +    NOT_YET_IMPLEMENTED_StmtIf
 +    NOT_YET_IMPLEMENTED_StmtFor
 +    NOT_IMPLEMENTED_call()
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return None
 +
 +
  async def coroutine(arg, exec=False):
@@ -270,7 +270,7 @@ d={'a':1,
 +    debug: bool = False,
 +    **kwargs,
 +) -> str:
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +
 +
  # fmt: on
@@ -392,10 +392,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
- 
-     # fmt: on
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
+@@ -130,13 +128,15 @@
  
  
  def on_and_off_broken():
@@ -536,7 +533,7 @@ def func_no_args():
     NOT_YET_IMPLEMENTED_StmtIf
     NOT_YET_IMPLEMENTED_StmtFor
     NOT_IMPLEMENTED_call()
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return None
 
 
 async def coroutine(arg, exec=False):
@@ -554,7 +551,7 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
 # fmt: on
@@ -637,7 +634,7 @@ def off_and_on_without_data():
     # hey, that won't work
 
     # fmt: on
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def on_and_off_broken():

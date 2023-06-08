@@ -101,13 +101,13 @@ def test(
 ### Different function argument wrappings
 
 def single_line(aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccccccccc):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def arguments_on_their_own_line(
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbb, ccccccccccc, ddddddddddddd, eeeeeee
 ):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def argument_per_line(
@@ -118,7 +118,7 @@ def argument_per_line(
     eeeeeeeeeeeeeeee,
     ffffffffffff,
 ):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def last_pos_only_trailing_comma(
@@ -126,11 +126,11 @@ def last_pos_only_trailing_comma(
     b,
     /,
 ):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def last_pos_no_trailing_comma(a, b, /):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def varg_with_leading_comments(

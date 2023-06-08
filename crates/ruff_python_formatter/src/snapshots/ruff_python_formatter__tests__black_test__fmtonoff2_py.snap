@@ -65,9 +65,9 @@ def test_calculate_fades():
 +
  # Test data:
  #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
--
--@pytest.mark.parametrize('test', [
  
+-@pytest.mark.parametrize('test', [
+-
 -    # Test don't manage the volume
 -    [
 -        ('stuff', 'in')
@@ -75,22 +75,20 @@ def test_calculate_fades():
 -])
 +@NOT_IMPLEMENTED_call()
  def test_fader(test):
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
-+
+     pass
  
++
  def check_fader(test):
-+    NOT_YET_IMPLEMENTED_StmtPass
++    pass
  
 -    pass
  
  def verify_fader(test):
 -  # misaligned comment
--    pass
 +    # misaligned comment
-+    NOT_YET_IMPLEMENTED_StmtPass
-+
+     pass
  
++
  def verify_fader(test):
 -    """Hey, ho."""
 -    assert test.passed()
@@ -126,16 +124,16 @@ TmEx = 2
 
 @NOT_IMPLEMENTED_call()
 def test_fader(test):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def check_fader(test):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def verify_fader(test):
     # misaligned comment
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def verify_fader(test):

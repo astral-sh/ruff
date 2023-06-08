@@ -1,4 +1,4 @@
-use crate::comments::trailing_comments;
+use crate::comments::{trailing_comments, Comments};
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parenthesize,
 };
@@ -171,8 +171,13 @@ impl FormatRule<Operator, PyFormatContext<'_>> for FormatOperator {
 }
 
 impl NeedsParentheses for ExprBinOp {
-    fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
-        match default_expression_needs_parentheses(self.into(), parenthesize, source) {
+    fn needs_parentheses(
+        &self,
+        parenthesize: Parenthesize,
+        source: &str,
+        comments: &Comments,
+    ) -> Parentheses {
+        match default_expression_needs_parentheses(self.into(), parenthesize, source, comments) {
             Parentheses::Optional => {
                 if should_binary_break_right_side_first(self) {
                     Parentheses::Custom

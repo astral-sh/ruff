@@ -154,19 +154,8 @@ some_module.some_function(
  
  
  # The type annotation shouldn't get a trailing comma since that would change its type.
-@@ -71,44 +31,25 @@
- def some_function_with_a_really_long_name() -> (
-     returning_a_deeply_nested_import_of_a_type_i_suppose
- ):
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
- 
- 
- def some_method_with_a_really_long_name(
-     very_long_parameter_so_yeah: str, another_long_parameter: int
- ) -> another_case_of_returning_a_deeply_nested_import_of_a_type_i_suppose_cause_why_not:
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
+@@ -80,35 +40,16 @@
+     pass
  
  
 -def func() -> (
@@ -174,9 +163,8 @@ some_module.some_function(
 -        this_shouldn_t_get_a_trailing_comma_too
 -    )
 -):
--    pass
 +def func() -> NOT_IMPLEMENTED_call():
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
 -def func() -> (
@@ -184,9 +172,8 @@ some_module.some_function(
 -        this_shouldn_t_get_a_trailing_comma_too
 -    )
 -):
--    pass
 +def func() -> NOT_IMPLEMENTED_call():
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
  # Make sure inner one-element tuple won't explode
@@ -245,21 +232,21 @@ def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 def some_function_with_a_really_long_name() -> (
     returning_a_deeply_nested_import_of_a_type_i_suppose
 ):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def some_method_with_a_really_long_name(
     very_long_parameter_so_yeah: str, another_long_parameter: int
 ) -> another_case_of_returning_a_deeply_nested_import_of_a_type_i_suppose_cause_why_not:
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def func() -> NOT_IMPLEMENTED_call():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def func() -> NOT_IMPLEMENTED_call():
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 # Make sure inner one-element tuple won't explode

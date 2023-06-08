@@ -68,7 +68,7 @@ def example8():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,85 +1,49 @@
+@@ -1,24 +1,16 @@
  x = 1
  x = 1.2
  
@@ -92,46 +92,39 @@ def example8():
  
  def example():
 -    return "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return "NOT_YET_IMPLEMENTED_STRING"
  
  
  def example1():
--    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-+    NOT_YET_IMPLEMENTED_StmtReturn
- 
- 
- def example1point5():
--    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-+    NOT_YET_IMPLEMENTED_StmtReturn
+@@ -30,15 +22,11 @@
  
  
  def example2():
 -    return (
 -        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -    )
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return "NOT_YET_IMPLEMENTED_STRING"
  
  
  def example3():
 -    return (
 -        1111111111111111111111111111111111111111111111111111111111111111111111111111111
 -    )
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111
  
  
  def example4():
--    return True
-+    NOT_YET_IMPLEMENTED_StmtReturn
+@@ -46,39 +34,15 @@
  
  
  def example5():
 -    return ()
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return (1, 2)
  
  
  def example6():
 -    return {a: a for a in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]}
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
  
  
  def example7():
@@ -160,12 +153,10 @@ def example8():
 -            20000000000000000000,
 -        ]
 -    }
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
  
  
  def example8():
--    return None
-+    NOT_YET_IMPLEMENTED_StmtReturn
 ```
 
 ## Ruff Output
@@ -183,43 +174,43 @@ async def show_status():
 
 
 def example():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return "NOT_YET_IMPLEMENTED_STRING"
 
 
 def example1():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
 
 
 def example1point5():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111111111
 
 
 def example2():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return "NOT_YET_IMPLEMENTED_STRING"
 
 
 def example3():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return 1111111111111111111111111111111111111111111111111111111111111111111111111111111
 
 
 def example4():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return True
 
 
 def example5():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return (1, 2)
 
 
 def example6():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 
 
 def example7():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}
 
 
 def example8():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return None
 ```
 
 ## Black Output

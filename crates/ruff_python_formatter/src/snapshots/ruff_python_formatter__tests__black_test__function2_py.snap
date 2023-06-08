@@ -83,7 +83,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -    )
 +    NOT_YET_IMPLEMENTED_StmtWith
 +    NOT_IMPLEMENTED_call()  # negate top
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_IMPLEMENTED_call()
  
  
  def g():
@@ -91,8 +91,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 +    "NOT_YET_IMPLEMENTED_STRING"
  
      def inner():
--        pass
-+        NOT_YET_IMPLEMENTED_StmtPass
+         pass
  
 -    print("Inner defs should breathe a little.")
 +    NOT_IMPLEMENTED_call()
@@ -109,23 +108,22 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -    import termios
 -
 -    def i_should_be_followed_by_only_one_newline():
--        pass
--
+         pass
+ 
 -elif os.name == "nt":
 -    try:
 -        import msvcrt
-+        NOT_YET_IMPLEMENTED_StmtPass
- 
--        def i_should_be_followed_by_only_one_newline():
--            pass
 +    NOT_IMPLEMENTED_call()
  
+-        def i_should_be_followed_by_only_one_newline():
+-            pass
+ 
 -    except ImportError:
++NOT_YET_IMPLEMENTED_StmtIf
  
 -        def i_should_be_followed_by_only_one_newline():
 -            pass
-+NOT_YET_IMPLEMENTED_StmtIf
- 
+-
 -elif False:
 -
 -    class IHopeYouAreHavingALovelyDay:
@@ -152,21 +150,21 @@ def f(
 ) -> A:
     NOT_YET_IMPLEMENTED_StmtWith
     NOT_IMPLEMENTED_call()  # negate top
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_IMPLEMENTED_call()
 
 
 def g():
     "NOT_YET_IMPLEMENTED_STRING"
 
     def inner():
-        NOT_YET_IMPLEMENTED_StmtPass
+        pass
 
     NOT_IMPLEMENTED_call()
 
 
 def h():
     def inner():
-        NOT_YET_IMPLEMENTED_StmtPass
+        pass
 
     NOT_IMPLEMENTED_call()
 

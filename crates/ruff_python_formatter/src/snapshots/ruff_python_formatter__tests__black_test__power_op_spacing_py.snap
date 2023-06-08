@@ -76,14 +76,6 @@ return np.divide(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,6 @@
- def function(**kwargs):
-     t = a**2 + b**3
--    return t**2
-+    NOT_YET_IMPLEMENTED_StmtReturn
- 
- 
- def function_replace_spaces(**kwargs):
 @@ -8,56 +8,48 @@
  
  
@@ -185,7 +177,7 @@ return np.divide(
 ```py
 def function(**kwargs):
     t = a**2 + b**3
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return t**2
 
 
 def function_replace_spaces(**kwargs):

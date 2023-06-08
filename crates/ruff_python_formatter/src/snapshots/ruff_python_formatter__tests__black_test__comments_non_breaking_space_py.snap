@@ -59,8 +59,7 @@ def function(a:int=42):
 +    "NOT_YET_IMPLEMENTED_STRING"
      #    There's a NBSP + 3 spaces before
      #    And 4 spaces on the next line
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
 ```
 
 ## Ruff Output
@@ -80,7 +79,7 @@ def function(a: int = 42):
     "NOT_YET_IMPLEMENTED_STRING"
     #    There's a NBSP + 3 spaces before
     #    And 4 spaces on the next line
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 ```
 
 ## Black Output

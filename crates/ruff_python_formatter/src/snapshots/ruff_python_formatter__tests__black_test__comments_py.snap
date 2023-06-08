@@ -114,27 +114,27 @@ async def wat():
  # Has many lines. Many, many lines.
  # Many, many, many lines.
 -"""Module docstring.
-+"NOT_YET_IMPLEMENTED_STRING"
- 
+-
 -Possibly also many, many lines.
 -"""
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
++"NOT_YET_IMPLEMENTED_STRING"
  
 -import os.path
 -import sys
--
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
+ 
 -import a
 -from b.c import X  # some noqa comment
--
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
+ 
 -try:
 -    import fast
 -except ImportError:
 -    import slow as fast
 -
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
- 
+-
 -# Some comment before a function.
 +NOT_YET_IMPLEMENTED_StmtTry
  y = 1
@@ -161,8 +161,7 @@ async def wat():
 +    NOT_YET_IMPLEMENTED_StmtIf
  
      # This return is also commented for some reason.
--    return default
-+    NOT_YET_IMPLEMENTED_StmtReturn
+     return default
  
  
  # Explains why we use global state.
@@ -172,7 +171,7 @@ async def wat():
  
  # Another comment!
  # This time two lines.
- 
+-
  
 -class Foo:
 -    """Docstring for class Foo.  Example from Sphinx docs."""
@@ -180,7 +179,7 @@ async def wat():
 -    #: Doc comment for class attribute Foo.bar.
 -    #: It can have multiple lines.
 -    bar = 1
--
+ 
 -    flox = 1.5  #: Doc comment for Foo.flox. One line only.
 -
 -    baz = 2
@@ -254,7 +253,7 @@ def function(default=None):
     NOT_YET_IMPLEMENTED_StmtIf
 
     # This return is also commented for some reason.
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return default
 
 
 # Explains why we use global state.

@@ -36,7 +36,7 @@ class NormalClass (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,30 +1,18 @@
+@@ -1,18 +1,10 @@
 -class SimpleClassWithBlankParentheses:
 -    pass
 +NOT_YET_IMPLEMENTED_StmtClassDef
@@ -58,8 +58,7 @@ class NormalClass (
  
  
  def public_func_with_blank_parentheses():
--    return None
-+    NOT_YET_IMPLEMENTED_StmtReturn
+@@ -20,11 +12,7 @@
  
  
  def class_under_the_func_with_blank_parentheses():
@@ -88,7 +87,7 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 def public_func_with_blank_parentheses():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return None
 
 
 def class_under_the_func_with_blank_parentheses():

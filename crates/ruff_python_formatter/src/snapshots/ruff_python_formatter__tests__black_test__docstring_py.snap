@@ -252,35 +252,31 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -    """This is a docstring with
 -    some lines of text here
 -    """
--    return
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtReturn
+     return
  
  
  def bar():
 -    """This is another docstring
 -    with more lines of text
 -    """
--    return
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtReturn
+     return
  
  
  def baz():
 -    '''"This" is a string with some
 -    embedded "quotes"'''
--    return
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtReturn
+     return
  
  
  def troz():
 -    """Indentation with tabs
 -    is just as OK
 -    """
--    return
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtReturn
+     return
  
  
  def zort():
@@ -288,9 +284,8 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -    multiline
 -    docstring
 -    """
--    pass
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
  def poit():
@@ -304,9 +299,8 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -       - quis nostrud exercitation ullamco laboris nisi
 -     - aliquip ex ea commodo consequat
 -    """
--    pass
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
  def under_indent():
@@ -314,9 +308,8 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -      These lines are indented in a way that does not
 -    make sense.
 -    """
--    pass
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
  def over_indent():
@@ -325,16 +318,14 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -      - But some lines are deeper
 -      - And the closing quote is too deep
 -    """
--    pass
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
  def single_line():
 -    """But with a newline after it!"""
--    pass
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
  def this():
@@ -421,9 +412,8 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -
 -    line ends with some tabs
 -    """
--    pass
 +    "NOT_YET_IMPLEMENTED_STRING"
-+    NOT_YET_IMPLEMENTED_StmtPass
+     pass
  
  
  def backslash_space():
@@ -475,12 +465,12 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
  
  def docstring_almost_at_line_limit2():
 -    """long docstring.................................................................
-+    "NOT_YET_IMPLEMENTED_STRING"
- 
+-
 -    ..................................................................................
 -    """
++    "NOT_YET_IMPLEMENTED_STRING"
  
--
+ 
  def docstring_at_line_limit():
 -    """long docstring................................................................"""
 +    "NOT_YET_IMPLEMENTED_STRING"
@@ -509,47 +499,47 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 def foo():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return
 
 
 def bar():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return
 
 
 def baz():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return
 
 
 def troz():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return
 
 
 def zort():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def poit():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def under_indent():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def over_indent():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def single_line():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def this():
@@ -602,7 +592,7 @@ def docstring_with_inline_tabs_and_space_indentation():
 
 def docstring_with_inline_tabs_and_tab_indentation():
     "NOT_YET_IMPLEMENTED_STRING"
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def backslash_space():

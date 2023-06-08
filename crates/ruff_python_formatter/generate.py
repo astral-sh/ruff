@@ -97,9 +97,7 @@ for group, group_nodes in nodes_grouped.items():
             }}
             """.strip()  # noqa: E501
 
-        node_path.write_text(
-            rustfmt(code)
-        )
+        node_path.write_text(rustfmt(code))
 
 # %%
 # Generate `FormatRule`, `AsFormat` and `IntoFormat`

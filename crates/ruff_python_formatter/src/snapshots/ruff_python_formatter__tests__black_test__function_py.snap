@@ -137,12 +137,11 @@ def __await__(): return (yield)
 -        print(i)
 -        continue
 -    exec("new-style exec", {}, {})
--    return None
 +    NOT_YET_IMPLEMENTED_StmtIf
 +    NOT_YET_IMPLEMENTED_StmtIf
 +    NOT_YET_IMPLEMENTED_StmtFor
 +    NOT_IMPLEMENTED_call()
-+    NOT_YET_IMPLEMENTED_StmtReturn
+     return None
  
  
  async def coroutine(arg, exec=False):
@@ -169,7 +168,7 @@ def __await__(): return (yield)
      **kwargs,
  ) -> str:
 -    return text[number:-1]
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
@@ -295,12 +294,12 @@ def __await__(): return (yield)
 -            **kwargs,
 -        )
 -    )
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_YET_IMPLEMENTED_ExprYieldFrom
  
  
  def __await__():
 -    return (yield)
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_YET_IMPLEMENTED_ExprYield
 ```
 
 ## Ruff Output
@@ -324,7 +323,7 @@ def func_no_args():
     NOT_YET_IMPLEMENTED_StmtIf
     NOT_YET_IMPLEMENTED_StmtFor
     NOT_IMPLEMENTED_call()
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return None
 
 
 async def coroutine(arg, exec=False):
@@ -342,7 +341,7 @@ def function_signature_stress_test(
     debug: bool = False,
     **kwargs,
 ) -> str:
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
 def spaces(
@@ -395,11 +394,11 @@ def f(
     a,
     **kwargs,
 ) -> A:
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_YET_IMPLEMENTED_ExprYieldFrom
 
 
 def __await__():
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_YET_IMPLEMENTED_ExprYield
 ```
 
 ## Black Output

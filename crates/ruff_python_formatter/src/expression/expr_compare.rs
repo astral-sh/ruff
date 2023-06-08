@@ -3,6 +3,7 @@ use crate::expression::parentheses::{
 };
 use crate::{not_yet_implemented_custom_text, FormatNodeRule, PyFormatter};
 
+use crate::comments::Comments;
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprCompare;
 
@@ -21,7 +22,12 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 }
 
 impl NeedsParentheses for ExprCompare {
-    fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses {
-        default_expression_needs_parentheses(self.into(), parenthesize, source)
+    fn needs_parentheses(
+        &self,
+        parenthesize: Parenthesize,
+        source: &str,
+        comments: &Comments,
+    ) -> Parentheses {
+        default_expression_needs_parentheses(self.into(), parenthesize, source, comments)
     }
 }

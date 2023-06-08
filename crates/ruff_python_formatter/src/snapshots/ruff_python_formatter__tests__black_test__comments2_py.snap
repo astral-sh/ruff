@@ -351,7 +351,7 @@ instruction()#comment with bad spacing
 -        syms.simple_stmt,
 -        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
 -    )
-+    NOT_YET_IMPLEMENTED_StmtReturn
++    return NOT_IMPLEMENTED_call()
  
  
 -CONFIG_FILES = (
@@ -461,7 +461,7 @@ def inline_comments_in_brackets_ruin_everything():
         # and round and round we go
 
     # let's return
-    NOT_YET_IMPLEMENTED_StmtReturn
+    return NOT_IMPLEMENTED_call()
 
 
 CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final

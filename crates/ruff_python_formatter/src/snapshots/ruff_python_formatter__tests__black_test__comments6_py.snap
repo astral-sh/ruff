@@ -131,41 +131,9 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 ```diff
 --- Black
 +++ Ruff
-@@ -1,16 +1,16 @@
+@@ -1,4 +1,4 @@
 -from typing import Any, Tuple
 +NOT_YET_IMPLEMENTED_StmtImportFrom
- 
- 
- def f(
-     a,  # type: int
- ):
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
- 
- 
- # test type comments
- def f(a, b, c, d, e, f, g, h, i):
-     # type: (int, int, int, int, int, int, int, int, int) -> None
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
- 
- 
- def f(
-@@ -25,7 +25,7 @@
-     i,  # type: int
- ):
-     # type: (...) -> None
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
- 
- 
- def f(
-@@ -35,7 +35,7 @@
-     **kwargs,  # type: **Any
- ):
-     # type: (...) -> None
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
  
  
  def f(
@@ -188,19 +156,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  
      a = (
          element
-@@ -74,45 +69,32 @@
-     y,  # type: int
- ):
-     # type: (...) -> None
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
- 
- 
- def f(
-     x,  # not a type comment
- ):  # type: (int) -> None
--    pass
-+    NOT_YET_IMPLEMENTED_StmtPass
+@@ -84,35 +79,22 @@
  
  
  def func(
@@ -259,13 +215,13 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 def f(
     a,  # type: int
 ):
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 # test type comments
 def f(a, b, c, d, e, f, g, h, i):
     # type: (int, int, int, int, int, int, int, int, int) -> None
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def f(
@@ -280,7 +236,7 @@ def f(
     i,  # type: int
 ):
     # type: (...) -> None
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def f(
@@ -290,7 +246,7 @@ def f(
     **kwargs,  # type: **Any
 ):
     # type: (...) -> None
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def f(
@@ -324,13 +280,13 @@ def f(
     y,  # type: int
 ):
     # type: (...) -> None
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def f(
     x,  # not a type comment
 ):  # type: (int) -> None
-    NOT_YET_IMPLEMENTED_StmtPass
+    pass
 
 
 def func(
