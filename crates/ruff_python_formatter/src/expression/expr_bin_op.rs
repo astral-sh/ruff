@@ -39,35 +39,35 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
         let should_break_right = self.parentheses == Some(Parentheses::Custom);
 
         if should_break_right {
-            let left = left.format().memoized();
-            let right = right.format().memoized();
+            let left_group = f.group_id("BinaryLeft");
 
             write!(
                 f,
-                [best_fitting![
-                    // The whole expression on a single line
-                    format_args![left, space(), op.format(), space(), right],
-                    // Break the right, but keep the left flat
-                    format_args![
-                        left,
-                        space(),
-                        op.format(),
-                        space(),
-                        group(&right).should_expand(true),
-                    ],
-                    // Break after the operator, try to keep the right flat, otherwise expand it
-                    format_args![
-                        text("("),
-                        block_indent(&format_args![
-                            left,
-                            hard_line_break(),
-                            op.format(),
-                            space(),
-                            group(&right),
-                        ]),
-                        text(")")
-                    ],
-                ]]
+                [
+                    // Wrap the left in a group and gives it an id. The printer first breaks the
+                    // right side if `right` contains any line break because the printer breaks
+                    // sequences of groups from right to left.
+                    // Indents the left side if the group breaks.
+                    group(&format_args![
+                        if_group_breaks(&text("(")),
+                        indent_if_group_breaks(
+                            &format_args![
+                                soft_line_break(),
+                                left.format(),
+                                soft_line_break_or_space(),
+                                op.format(),
+                                space()
+                            ],
+                            left_group
+                        )
+                    ])
+                    .with_group_id(Some(left_group)),
+                    // Wrap the right in a group and indents its content but only if the left side breaks
+                    group(&indent_if_group_breaks(&right.format(), left_group)),
+                    // If the left side breaks, insert a hard line break to finish the indent and close the open paren.
+                    if_group_breaks(&format_args![hard_line_break(), text(")")])
+                        .with_group_id(Some(left_group))
+                ]
             )
         } else {
             let comments = f.context().comments().clone();
