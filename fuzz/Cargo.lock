@@ -1029,7 +1029,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.271"
+version = "0.0.272"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
