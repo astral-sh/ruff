@@ -246,7 +246,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -        "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa", "aaaaaaaa"  # type: ignore
 -    )
  
-+result = 0x42  # aaa
++result = "NOT_YET_IMPLEMENTED_STRING"  # aaa
  
 -result = (  # aaa
 -    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -301,7 +301,7 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-result = 0x42  # aaa
+result = "NOT_YET_IMPLEMENTED_STRING"  # aaa
 
 AAAAAAAAAAAAA = (
     [AAAAAAAAAAAAA]

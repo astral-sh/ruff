@@ -234,22 +234,22 @@ def trailing_func():
 
         assert_eq!(
             formatted,
-            r#"a = 0x42
+            r#"a = 10
 
 
-three_leading_newlines = 0x42
+three_leading_newlines = 80
 
 
-two_leading_newlines = 0x42
+two_leading_newlines = 20
 
-one_leading_newline = 0x42
-no_leading_newline = 0x42
+one_leading_newline = 10
+no_leading_newline = 30
 
 
 NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-trailing_statement = 0x42
+trailing_statement = 1
 
 
 NOT_YET_IMPLEMENTED_StmtFunctionDef
@@ -265,18 +265,18 @@ NOT_YET_IMPLEMENTED_StmtFunctionDef"#
 
         assert_eq!(
             formatted,
-            r#"a = 0x42
+            r#"a = 10
 
-three_leading_newlines = 0x42
+three_leading_newlines = 80
 
-two_leading_newlines = 0x42
+two_leading_newlines = 20
 
-one_leading_newline = 0x42
-no_leading_newline = 0x42
+one_leading_newline = 10
+no_leading_newline = 30
 
 NOT_YET_IMPLEMENTED_StmtClassDef
 
-trailing_statement = 0x42
+trailing_statement = 1
 
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 

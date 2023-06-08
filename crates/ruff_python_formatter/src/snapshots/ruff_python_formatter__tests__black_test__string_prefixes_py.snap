@@ -41,7 +41,7 @@ def docstring_multiline():
 -(b"", b"")
 -("", "")
 -(r"", R"")
-+name = 0x42
++name = "NOT_YET_IMPLEMENTED_STRING"
 +(1, 2)
 +(1, 2)
 +(1, 2)
@@ -70,7 +70,7 @@ def docstring_multiline():
 ```py
 #!/usr/bin/env python3
 
-name = 0x42
+name = "NOT_YET_IMPLEMENTED_STRING"
 (1, 2)
 (1, 2)
 (1, 2)

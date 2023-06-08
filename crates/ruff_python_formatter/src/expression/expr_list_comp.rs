@@ -9,11 +9,8 @@ use rustpython_parser::ast::ExprListComp;
 pub struct FormatExprListComp;
 
 impl FormatNodeRule<ExprListComp> for FormatExprListComp {
-    fn fmt_fields(&self, item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(
-            f,
-            [not_yet_implemented_custom_text(item, "[i for i in []]")]
-        )
+    fn fmt_fields(&self, _item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [not_yet_implemented_custom_text("[i for i in []]")])
     }
 }
 

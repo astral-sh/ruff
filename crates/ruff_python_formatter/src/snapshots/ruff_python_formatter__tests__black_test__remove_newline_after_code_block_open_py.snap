@@ -170,13 +170,13 @@ with open("/path/to/file.txt", mode="r") as read_file:
 -for i in range(5):
 -    for j in range(7):
 -        print(f"{i}) The lines above me should be removed!")
+-
+-
+-if random.randint(0, 3) == 0:
+-    print("The new line above me is about to be removed!")
 +NOT_YET_IMPLEMENTED_StmtIf
  
  
--if random.randint(0, 3) == 0:
--    print("The new line above me is about to be removed!")
--
--
 -if random.randint(0, 3) == 0:
 -    print("The new lines above me is about to be removed!")
 +NOT_YET_IMPLEMENTED_StmtIf
@@ -188,23 +188,19 @@ with open("/path/to/file.txt", mode="r") as read_file:
 +NOT_YET_IMPLEMENTED_StmtIf
  
  
--while True:
+ while True:
 -    print("The newline above me should be deleted!")
-+while 0x42:
 +    NOT_IMPLEMENTED_call()
  
  
--while True:
+ while True:
 -    print("The newlines above me should be deleted!")
-+while 0x42:
 +    NOT_IMPLEMENTED_call()
  
  
--while True:
--    while False:
+ while True:
+     while False:
 -        print("The newlines above me should be deleted!")
-+while 0x42:
-+    while 0x42:
 +        NOT_IMPLEMENTED_call()
  
  
@@ -263,16 +259,16 @@ NOT_YET_IMPLEMENTED_StmtIf
 NOT_YET_IMPLEMENTED_StmtIf
 
 
-while 0x42:
+while True:
     NOT_IMPLEMENTED_call()
 
 
-while 0x42:
+while True:
     NOT_IMPLEMENTED_call()
 
 
-while 0x42:
-    while 0x42:
+while True:
+    while False:
         NOT_IMPLEMENTED_call()
 
 

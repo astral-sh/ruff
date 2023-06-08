@@ -22,15 +22,15 @@ a = asdf = fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakj
 ```py
 # break left hand side
 a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = cakjdshflkjahdslkfjlasfdahjlfds = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = (
-    0x42
+    3
 )
 
 # join left hand side
-a2 = (b2) = 0x42
+a2 = (b2) = 2
 
 # Break the last element
 a = asdf = fjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfalflaflapamsakjsdhflakjdslfjhalsdljfal = (
-    0x42
+    1
 )
 ```
 

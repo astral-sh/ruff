@@ -10,11 +10,10 @@ use rustpython_parser::ast::ExprSubscript;
 pub struct FormatExprSubscript;
 
 impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
-    fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
         write!(
             f,
             [not_yet_implemented_custom_text(
-                item,
                 "NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]"
             )]
         )

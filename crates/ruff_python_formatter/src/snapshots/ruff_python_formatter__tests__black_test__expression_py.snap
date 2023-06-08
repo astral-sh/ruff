@@ -267,19 +267,19 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -1,352 +1,247 @@
+@@ -1,5 +1,6 @@
 -"some_string"
 -b"\\xa3"
-+0x42
-+0x42
-+0x42
++...
++"NOT_YET_IMPLEMENTED_STRING"
++b"NOT_YET_IMPLEMENTED_BYTE_STRING"
  Name
--None
--True
--False
--1
--1.0
--1j
+ None
+ True
+@@ -7,346 +8,240 @@
+ 1
+ 1.0
+ 1j
 -True or False
 -True or False or None
 -True and False
@@ -292,11 +292,23 @@ last_call()
 -Name1 and Name2 or Name3 and Name4
 -Name1 or (Name2 and Name3) or Name4
 -Name1 or Name2 and Name3 or Name4
--v1 << 2
--1 >> v2
--1 % finished
--1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
--((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
++NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
+ v1 << 2
+ 1 >> v2
+ 1 % finished
+ 1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
+ ((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
 -not great
 -~great
 -+value
@@ -332,29 +344,6 @@ last_call()
 -({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 -()
 -(1,)
-+0x42
-+0x42
-+0x42
-+0x42
-+0x42
-+0x42
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-+v1 << 0x42
-+0x42 >> v2
-+0x42 % finished
-+0x42 + v2 - v3 * 0x42 ^ 0x42**v6 / 0x42 // 0x42
-+((0x42 + v2) - (v3 * 0x42)) ^ (((0x42**v6) / 0x42) // 0x42)
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
 +NOT_YET_IMPLEMENTED_ExprUnaryOp
@@ -380,11 +369,11 @@ last_call()
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +{
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
 +    (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 +}
 +NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
@@ -396,39 +385,34 @@ last_call()
  []
 -[1, 2, 3, 4, 5, 6, 7, 8, 9, (10 or A), (11 or B), (12 or C)]
  [
--    1,
--    2,
--    3,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
-+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
-+    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
- ]
+     1,
+     2,
+     3,
+-]
 -[*a]
 -[*range(10)]
 -[
 -    *a,
--    4,
--    5,
--]
+     4,
+     5,
++    6,
++    7,
++    8,
++    9,
++    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
++    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
++    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
+ ]
 -[
 -    4,
 -    *a,
 -    5,
 -]
-+[0x42, 0x42, 0x42]
++[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
-+[NOT_YET_IMPLEMENTED_ExprStarred, 0x42, 0x42]
-+[0x42, NOT_YET_IMPLEMENTED_ExprStarred, 0x42]
++[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
++[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
  [
      this_is_a_very_long_variable_which_will_force_a_delimiter_split,
      element,
@@ -475,9 +459,9 @@ last_call()
 +NOT_IMPLEMENTED_call()
 +lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
 +NOT_IMPLEMENTED_call()
-+0x42.NOT_IMPLEMENTED_attr
-+0x42.NOT_IMPLEMENTED_attr
-+0x42.NOT_IMPLEMENTED_attr
++1 .NOT_IMPLEMENTED_attr
++1.0 .NOT_IMPLEMENTED_attr
++....NOT_IMPLEMENTED_attr
 +NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 +NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
@@ -518,11 +502,11 @@ last_call()
  {
 -    k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
 +    NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
  }
 -Python3 > Python2 > COBOL
@@ -558,15 +542,15 @@ last_call()
 -    float,
 -    dict[str, int],
 +[
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
-+    0x42,
++    1,
++    2,
++    3,
++    4,
++    5,
++    6,
++    7,
++    8,
++    9,
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
@@ -632,24 +616,6 @@ last_call()
 -}
 -a = (1,)
 -b = (1,)
--c = 1
--d = (1,) + a + (2,)
--e = (1,).count(1)
--f = 1, *range(10)
--g = 1, *"ten"
--what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
--    vars_to_remove
--)
--what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
--    vars_to_remove
--)
--result = (
--    session.query(models.Customer.id)
--    .filter(
--        models.Customer.account_id == account_id, models.Customer.email == email_address
--    )
--    .order_by(models.Customer.id.asc())
--    .all()
 +(1, 2)
 +(i for i in [])
 +(i for i in [])
@@ -659,7 +625,13 @@ last_call()
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +a = (1, 2)
 +b = (1, 2)
-+c = 0x42
+ c = 1
+-d = (1,) + a + (2,)
+-e = (1,).count(1)
+-f = 1, *range(10)
+-g = 1, *"ten"
+-what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
+-    vars_to_remove
 +d = (1, 2) + a + (1, 2)
 +e = NOT_IMPLEMENTED_call()
 +f = (1, 2)
@@ -668,6 +640,20 @@ last_call()
 +    (coord_names + NOT_IMPLEMENTED_call())
 +    + NOT_IMPLEMENTED_call()
  )
+-what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
+-    vars_to_remove
++what_is_up_with_those_new_coord_names = (
++    (coord_names | NOT_IMPLEMENTED_call())
++    - NOT_IMPLEMENTED_call()
+ )
+-result = (
+-    session.query(models.Customer.id)
+-    .filter(
+-        models.Customer.account_id == account_id, models.Customer.email == email_address
+-    )
+-    .order_by(models.Customer.id.asc())
+-    .all()
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -677,10 +663,7 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names | NOT_IMPLEMENTED_call())
-+    - NOT_IMPLEMENTED_call()
- )
+-)
 -Ø = set()
 -authors.łukasz.say_thanks()
 -mapping = {
@@ -728,7 +711,19 @@ last_call()
 -for j in 1 + (2 + 3):
 -    ...
 -while this and that:
--    ...
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_IMPLEMENTED_call()
++NOT_YET_IMPLEMENTED_StmtAssert
++NOT_YET_IMPLEMENTED_StmtAssert
++NOT_YET_IMPLEMENTED_StmtAssert
++NOT_YET_IMPLEMENTED_StmtFor
++NOT_YET_IMPLEMENTED_StmtFor
++NOT_YET_IMPLEMENTED_StmtFor
++NOT_YET_IMPLEMENTED_StmtFor
++NOT_YET_IMPLEMENTED_StmtFor
++while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+     ...
 -for (
 -    addr_family,
 -    addr_type,
@@ -810,19 +805,6 @@ last_call()
 -    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
 -):
 -    return True
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_IMPLEMENTED_call()
-+NOT_YET_IMPLEMENTED_StmtAssert
-+NOT_YET_IMPLEMENTED_StmtAssert
-+NOT_YET_IMPLEMENTED_StmtAssert
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+NOT_YET_IMPLEMENTED_StmtFor
-+while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
-+    0x42
 +NOT_YET_IMPLEMENTED_StmtFor
 +a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 +a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
@@ -858,16 +840,16 @@ last_call()
 ## Ruff Output
 
 ```py
-0x42
-0x42
-0x42
+...
+"NOT_YET_IMPLEMENTED_STRING"
+b"NOT_YET_IMPLEMENTED_BYTE_STRING"
 Name
-0x42
-0x42
-0x42
-0x42
-0x42
-0x42
+None
+True
+False
+1
+1.0
+1j
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
@@ -880,11 +862,11 @@ NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
-v1 << 0x42
-0x42 >> v2
-0x42 % finished
-0x42 + v2 - v3 * 0x42 ^ 0x42**v6 / 0x42 // 0x42
-((0x42 + v2) - (v3 * 0x42)) ^ (((0x42**v6) / 0x42) // 0x42)
+v1 << 2
+1 >> v2
+1 % finished
+1 + v2 - v3 * 4 ^ 5**v6 / 7 // 8
+((1 + v2) - (v3 * 4)) ^ (((5**v6) / 7) // 8)
 NOT_YET_IMPLEMENTED_ExprUnaryOp
 NOT_YET_IMPLEMENTED_ExprUnaryOp
 NOT_YET_IMPLEMENTED_ExprUnaryOp
@@ -910,11 +892,11 @@ NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 {
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
     (NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false),
 }
 NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
@@ -924,24 +906,24 @@ NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 (1, 2)
 []
 [
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
     (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
     (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
     (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
 ]
-[0x42, 0x42, 0x42]
+[1, 2, 3]
 [NOT_YET_IMPLEMENTED_ExprStarred]
 [NOT_YET_IMPLEMENTED_ExprStarred]
-[NOT_YET_IMPLEMENTED_ExprStarred, 0x42, 0x42]
-[0x42, NOT_YET_IMPLEMENTED_ExprStarred, 0x42]
+[NOT_YET_IMPLEMENTED_ExprStarred, 4, 5]
+[4, NOT_YET_IMPLEMENTED_ExprStarred, 5]
 [
     this_is_a_very_long_variable_which_will_force_a_delimiter_split,
     element,
@@ -975,9 +957,9 @@ NOT_IMPLEMENTED_call()
 NOT_IMPLEMENTED_call()
 lukasz.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
 NOT_IMPLEMENTED_call()
-0x42.NOT_IMPLEMENTED_attr
-0x42.NOT_IMPLEMENTED_attr
-0x42.NOT_IMPLEMENTED_attr
+1 .NOT_IMPLEMENTED_attr
+1.0 .NOT_IMPLEMENTED_attr
+....NOT_IMPLEMENTED_attr
 NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
@@ -1016,23 +998,23 @@ NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 {
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
+    "NOT_YET_IMPLEMENTED_STRING",
     NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
 }
 [
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
-    0x42,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
     NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
     NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
     NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
@@ -1048,7 +1030,7 @@ SomeName
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 a = (1, 2)
 b = (1, 2)
-c = 0x42
+c = 1
 d = (1, 2) + a + (1, 2)
 e = NOT_IMPLEMENTED_call()
 f = (1, 2)
@@ -1086,7 +1068,7 @@ NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 while NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
-    0x42
+    ...
 NOT_YET_IMPLEMENTED_StmtFor
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right

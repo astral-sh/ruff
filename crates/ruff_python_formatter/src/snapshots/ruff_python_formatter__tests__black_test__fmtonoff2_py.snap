@@ -57,12 +57,10 @@ def test_calculate_fades():
 -import pytest
 +NOT_YET_IMPLEMENTED_StmtImport
  
--TmSt = 1
--TmEx = 2
-+TmSt = 0x42
-+TmEx = 0x42
-+
+ TmSt = 1
+ TmEx = 2
  
++
  # fmt: off
  
  # Test data:
@@ -112,8 +110,8 @@ def test_calculate_fades():
 ```py
 NOT_YET_IMPLEMENTED_StmtImport
 
-TmSt = 0x42
-TmEx = 0x42
+TmSt = 1
+TmEx = 2
 
 
 # fmt: off

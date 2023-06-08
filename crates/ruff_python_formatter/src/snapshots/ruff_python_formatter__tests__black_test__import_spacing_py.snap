@@ -64,7 +64,7 @@ __all__ = (
 +++ Ruff
 @@ -1,64 +1,42 @@
 -"""The asyncio package, tracking PEP 3156."""
-+0x42
++"NOT_YET_IMPLEMENTED_STRING"
  
  # flake8: noqa
  
@@ -162,7 +162,7 @@ __all__ = (
 ## Ruff Output
 
 ```py
-0x42
+"NOT_YET_IMPLEMENTED_STRING"
 
 # flake8: noqa
 

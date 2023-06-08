@@ -9,11 +9,10 @@ use rustpython_parser::ast::ExprDictComp;
 pub struct FormatExprDictComp;
 
 impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
-    fn fmt_fields(&self, item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
         write!(
             f,
             [not_yet_implemented_custom_text(
-                item,
                 "{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value for key, value in NOT_IMPLEMENTED_dict}"
             )]
         )

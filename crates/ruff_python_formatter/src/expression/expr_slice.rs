@@ -10,11 +10,10 @@ use rustpython_parser::ast::ExprSlice;
 pub struct FormatExprSlice;
 
 impl FormatNodeRule<ExprSlice> for FormatExprSlice {
-    fn fmt_fields(&self, item: &ExprSlice, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &ExprSlice, f: &mut PyFormatter) -> FormatResult<()> {
         write!(
             f,
             [not_yet_implemented_custom_text(
-                item,
                 "NOT_IMPLEMENTED_start:NOT_IMPLEMENTED_end"
             )]
         )

@@ -9,8 +9,8 @@ use rustpython_parser::ast::ExprLambda;
 pub struct FormatExprLambda;
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
-    fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [not_yet_implemented_custom_text(item, "lambda x: True")])
+    fn fmt_fields(&self, _item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [not_yet_implemented_custom_text("lambda x: True")])
     }
 }
 

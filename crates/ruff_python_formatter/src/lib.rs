@@ -39,19 +39,17 @@ where
     N: AstNode,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [source_position(node.start())])?;
         self.fmt_leading_comments(node, f)?;
         self.fmt_node(node, f)?;
         self.fmt_dangling_comments(node, f)?;
-        self.fmt_trailing_comments(node, f)?;
-        write!(f, [source_position(node.end())])
+        self.fmt_trailing_comments(node, f)
     }
 
     /// Formats the node without comments. Ignores any suppression comments.
     fn fmt_node(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
+        write!(f, [source_position(node.start())])?;
         self.fmt_fields(node, f)?;
-
-        Ok(())
+        write!(f, [source_position(node.end())])
     }
 
     /// Formats the node's fields.
@@ -164,33 +162,26 @@ impl Format<PyFormatContext<'_>> for NotYetImplemented {
     }
 }
 
-pub(crate) struct NotYetImplementedCustomText(NodeKind, String);
+pub(crate) struct NotYetImplementedCustomText(&'static str);
 
 /// Formats a placeholder for nodes that have not yet been implemented
-pub(crate) fn not_yet_implemented_custom_text<'a, T>(
-    node: T,
-    text: impl AsRef<str>,
-) -> NotYetImplementedCustomText
-where
-    T: Into<AnyNodeRef<'a>>,
-{
-    NotYetImplementedCustomText(node.into().kind(), text.as_ref().to_string())
+pub(crate) const fn not_yet_implemented_custom_text(
+    text: &'static str,
+) -> NotYetImplementedCustomText {
+    NotYetImplementedCustomText(text)
 }
 
 impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         f.write_element(FormatElement::Tag(Tag::StartVerbatim(
             tag::VerbatimKind::Verbatim {
-                length: self.1.text_len(),
+                length: self.0.text_len(),
             },
         )))?;
 
-        f.write_element(FormatElement::DynamicText {
-            text: Box::from(self.1.clone()),
-        })?;
+        text(self.0).fmt(f)?;
 
-        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
-        Ok(())
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))
     }
 }
 
@@ -417,12 +408,11 @@ Formatted twice:
     #[ignore]
     #[test]
     fn quick_test() {
-        let src = r#"AAAAAAAAAAAAA = AAAAAAAAAAAAA  # type: ignore
+        let src = r#"
+def test(): ...
 
-call_to_some_function_asdf(
-    foo,
-    [AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, AAAAAAAAAAAAAAAAAAAAAAA, BBBBBBBBBBBB],  # type: ignore
-)
+# Comment
+def with_leading_comment(): ...
 "#;
         // Tokenize once
         let mut tokens = Vec::new();
