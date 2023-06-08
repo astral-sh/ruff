@@ -1,23 +1,36 @@
-use ruff_diagnostics::Edit;
 use ruff_text_size::TextSize;
 
+use ruff_diagnostics::Edit;
+
+/// Lightweight sourcemap marker representing the source and destination
+/// position for an [`Edit`].
 #[derive(Debug)]
 pub struct SourceMarker {
-    /// Position of the marker in the original source
+    /// Position of the marker in the original source.
     pub source: TextSize,
-    /// Position of the marker in the output code
+    /// Position of the marker in the transformed code.
     pub dest: TextSize,
 }
 
 /// A collection of [`SourceMarker`].
+///
+/// Sourcemaps are used to map positions in the original source to positions in
+/// the transformed code. Here, only the boundaries of edits are tracked instead
+/// of every single character.
 #[derive(Default)]
 pub struct SourceMap(Vec<SourceMarker>);
 
 impl SourceMap {
+    /// Returns a slice of all the markers in the sourcemap in the order they
+    /// were added.
     pub fn markers(&self) -> &[SourceMarker] {
         &self.0
     }
 
+    /// Push the start marker for an [`Edit`].
+    ///
+    /// The `output_length` is the length of the transformed string before the
+    /// edit is applied.
     pub fn push_start_marker(&mut self, edit: &Edit, output_length: TextSize) {
         self.0.push(SourceMarker {
             source: edit.start(),
@@ -25,6 +38,10 @@ impl SourceMap {
         });
     }
 
+    /// Push the end marker for an [`Edit`].
+    ///
+    /// The `output_length` is the length of the transformed string after the
+    /// edit has been applied.
     pub fn push_end_marker(&mut self, edit: &Edit, output_length: TextSize) {
         if edit.is_insertion() {
             self.0.push(SourceMarker {
@@ -39,11 +56,4 @@ impl SourceMap {
             });
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{SourceMap, SourceMarker};
-
-    // TODO(dhruvmanila): Write tests
 }
