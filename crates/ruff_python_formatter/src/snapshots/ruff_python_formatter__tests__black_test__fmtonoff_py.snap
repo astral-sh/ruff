@@ -199,7 +199,7 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -1,224 +1,73 @@
+@@ -1,224 +1,72 @@
  #!/usr/bin/env python3
 -import asyncio
 -import sys
@@ -219,13 +219,11 @@ d={'a':1,
  # fmt: on
 -f"trigger 3.6 mode"
 +NOT_YET_IMPLEMENTED_ExprJoinedStr
-+
-+
  # Comment 1
  
  # Comment 2
  
--
+ 
  # fmt: off
 -def func_no_args():
 -  a; b; c
@@ -253,7 +251,12 @@ d={'a':1,
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
++
++
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
++
  
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def spaces_types(
 -    a: int = 1,
@@ -267,21 +270,21 @@ d={'a':1,
 -    i: str = r"",
 -):
 -    ...
-+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
  
++# fmt: on
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def spaces2(result=_core.Value(None)):
 -    ...
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -something = {
 -    # fmt: off
 -    key: 'value',
 -}
-+# fmt: on
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def subscriptlist():
 -    atom[
@@ -292,24 +295,24 @@ d={'a':1,
 -        goes + here,
 -        andhere,
 -    ]
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
++something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
 -def import_as_names():
 -    # fmt: off
 -    from hello import a,        b
 -    'unformatted'
 -    # fmt: on
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def testlist_star_expr():
 -    # fmt: off
 -    a , b = *hello
 -    'unformatted'
 -    # fmt: on
-+something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def yield_expr():
 -    # fmt: off
@@ -321,8 +324,8 @@ d={'a':1,
 -    ( yield hello )
 -    'unformatted'
 -    # fmt: on
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def example(session):
 -    # fmt: off
@@ -333,24 +336,23 @@ d={'a':1,
 -        .order_by(models.Customer.id.asc())\
 -        .all()
 -    # fmt: on
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def off_and_on_without_data():
 -    """All comments here are technically on the same prefix.
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    The comments between will be formatted. This is a known limitation.
 -    """
 -    # fmt: off
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    # hey, that won't work
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    # fmt: on
 -    pass
- 
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
  
 -def on_and_off_broken():
 -    """Another known limitation."""
@@ -364,8 +366,8 @@ d={'a':1,
 -    # fmt: off
 -    # ...but comments still get reformatted even though they should not be
 -    # fmt: on
- 
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
  
 -def long_lines():
 -    if True:
@@ -406,18 +408,14 @@ d={'a':1,
 -        re.MULTILINE|re.VERBOSE
 -        # fmt: on
 -    )
- 
 +NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
  
 -def single_literal_yapf_disable():
 -    """Black does not support this."""
 -    BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
-+
-+
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
-+
  
 -cfg.rule(
 -    "Default",
@@ -472,11 +470,10 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 NOT_YET_IMPLEMENTED_StmtImportFrom
 # fmt: on
 NOT_YET_IMPLEMENTED_ExprJoinedStr
-
-
 # Comment 1
 
 # Comment 2
+
 
 # fmt: off
 NOT_YET_IMPLEMENTED_StmtFunctionDef

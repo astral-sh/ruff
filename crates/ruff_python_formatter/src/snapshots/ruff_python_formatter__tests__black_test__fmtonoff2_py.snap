@@ -60,9 +60,9 @@ def test_calculate_fades():
  TmSt = 1
  TmEx = 2
  
-+
  # fmt: off
  
++
  # Test data:
  #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
  
@@ -113,8 +113,8 @@ NOT_YET_IMPLEMENTED_StmtImport
 TmSt = 1
 TmEx = 2
 
-
 # fmt: off
+
 
 # Test data:
 #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
