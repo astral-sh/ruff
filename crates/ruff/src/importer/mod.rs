@@ -7,14 +7,14 @@ use libcst_native::{ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{self, Ranged, Stmt, Suite};
 
-use crate::autofix;
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::imports::{AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_semantic::model::SemanticModel;
 use ruff_textwrap::indent;
 
+use crate::autofix;
+use crate::autofix::codemods::CodegenStylist;
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::importer::insertion::Insertion;
 
