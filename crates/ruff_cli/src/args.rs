@@ -107,7 +107,7 @@ pub struct CheckArgs {
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
-    /// Specify file to write output to (default: stdout).
+    /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long)]
     pub output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
