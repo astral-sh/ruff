@@ -22,7 +22,7 @@ else:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,9 +1,2 @@
+@@ -1,9 +1,5 @@
 -a, b, c = 3, 4, 5
 -if (
 -    a == 3
@@ -30,17 +30,22 @@ else:
 -    and c is not None
 -):
 -    print("I'm good!")
--else:
--    print("I'm bad")
 +(1, 2) = (1, 2)
-+NOT_YET_IMPLEMENTED_StmtIf
++if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
++    NOT_IMPLEMENTED_call()
+ else:
+-    print("I'm bad")
++    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
 (1, 2) = (1, 2)
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    NOT_IMPLEMENTED_call()
+else:
+    NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

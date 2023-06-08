@@ -121,7 +121,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,78 +1,64 @@
+@@ -1,78 +1,68 @@
 -import random
 +NOT_YET_IMPLEMENTED_StmtImport
  
@@ -175,18 +175,22 @@ with open("/path/to/file.txt", mode="r") as read_file:
  
 -if random.randint(0, 3) == 0:
 -    print("The new line above me is about to be removed!")
-+NOT_YET_IMPLEMENTED_StmtIf
++if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++    NOT_IMPLEMENTED_call()
  
  
 -if random.randint(0, 3) == 0:
 -    print("The new lines above me is about to be removed!")
-+NOT_YET_IMPLEMENTED_StmtIf
++if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++    NOT_IMPLEMENTED_call()
  
  
 -if random.randint(0, 3) == 0:
 -    if random.uniform(0, 1) > 0.5:
 -        print("Two lines above me are about to be removed!")
-+NOT_YET_IMPLEMENTED_StmtIf
++if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++        NOT_IMPLEMENTED_call()
  
  
  while True:
@@ -259,13 +263,17 @@ NOT_YET_IMPLEMENTED_StmtFor
 NOT_YET_IMPLEMENTED_StmtFor
 
 
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+        NOT_IMPLEMENTED_call()
 
 
 while True:

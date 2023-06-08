@@ -66,7 +66,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -2,64 +2,27 @@
+@@ -2,64 +2,39 @@
      a,
      **kwargs,
  ) -> A:
@@ -99,42 +99,46 @@ with hmm_but_this_should_get_two_preceding_newlines():
  
  def h():
      def inner():
--        pass
--
--    print("Inner defs should breathe a little.")
--
--
--if os.name == "posix":
--    import termios
--
--    def i_should_be_followed_by_only_one_newline():
          pass
  
+-    print("Inner defs should breathe a little.")
++    NOT_IMPLEMENTED_call()
+ 
+ 
+-if os.name == "posix":
+-    import termios
++if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++    NOT_YET_IMPLEMENTED_StmtImport
+ 
+     def i_should_be_followed_by_only_one_newline():
+         pass
+-
 -elif os.name == "nt":
 -    try:
 -        import msvcrt
-+    NOT_IMPLEMENTED_call()
- 
--        def i_should_be_followed_by_only_one_newline():
--            pass
- 
--    except ImportError:
-+NOT_YET_IMPLEMENTED_StmtIf
- 
+-
 -        def i_should_be_followed_by_only_one_newline():
 -            pass
 -
--elif False:
+-    except ImportError:
+-
+-        def i_should_be_followed_by_only_one_newline():
+-            pass
++elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
++    NOT_YET_IMPLEMENTED_StmtTry
+ 
+ elif False:
 -
 -    class IHopeYouAreHavingALovelyDay:
 -        def __call__(self):
 -            print("i_should_be_followed_by_only_one_newline")
 -
--else:
++    NOT_YET_IMPLEMENTED_StmtClassDef
+ else:
 -
--    def foo():
--        pass
--
+     def foo():
+         pass
+ 
 -
 -with hmm_but_this_should_get_two_preceding_newlines():
 -    pass
@@ -169,7 +173,19 @@ def h():
     NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    NOT_YET_IMPLEMENTED_StmtImport
+
+    def i_should_be_followed_by_only_one_newline():
+        pass
+elif NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    NOT_YET_IMPLEMENTED_StmtTry
+
+elif False:
+    NOT_YET_IMPLEMENTED_StmtClassDef
+else:
+    def foo():
+        pass
 
 NOT_YET_IMPLEMENTED_StmtWith
 ```

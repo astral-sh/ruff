@@ -248,7 +248,8 @@ if    True:
 # trailing
 "#;
         let expected = r#"# preceding
-NOT_YET_IMPLEMENTED_StmtIf
+if True:
+    NOT_IMPLEMENTED_call()
 # trailing
 "#;
         let actual = format_module(input)?.as_code().to_string();
@@ -435,6 +436,11 @@ def with_leading_comment(): ...
         // dbg!(formatted
         //     .document()
         //     .display(formatted.context().source_code()));
+
+        // dbg!(formatted
+        //     .context()
+        //     .comments()
+        //     .debug(formatted.context().source_code()));
 
         let printed = formatted.print().unwrap();
 

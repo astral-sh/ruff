@@ -97,7 +97,7 @@ elif   unformatted:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,87 +1,33 @@
+@@ -1,33 +1,15 @@
  # Regression test for https://github.com/psf/black/issues/3129.
 -setup(
 -    entry_points={
@@ -130,25 +130,23 @@ elif   unformatted:
  def test_func():
      # yapf: disable
 -    if  unformatted(  args  ):
--        return True
--    # yapf: enable
--    elif b:
--        return True
-+    NOT_YET_IMPLEMENTED_StmtIf
- 
-     return False
- 
- 
++    if NOT_IMPLEMENTED_call():
+         return True
+     # yapf: enable
+     elif b:
+@@ -39,49 +21,27 @@
  # Regression test for https://github.com/psf/black/issues/2567.
--if True:
--    # fmt: off
+ if True:
+     # fmt: off
 -    for _ in range( 1 ):
 -    # fmt: on
 -        print ( "This won't be formatted" )
 -    print ( "This won't be formatted either" )
--else:
++    NOT_YET_IMPLEMENTED_StmtFor
++    NOT_IMPLEMENTED_call()
+ else:
 -    print("This will be formatted")
-+NOT_YET_IMPLEMENTED_StmtIf
++    NOT_IMPLEMENTED_call()
  
  
  # Regression test for https://github.com/psf/black/issues/3184.
@@ -161,14 +159,14 @@ elif   unformatted:
 -            )  :
 -                # fmt: on
 -                print ( "This won't be formatted" )
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
+-
 -            elif param[0:4] in ("ZZZZ",):
 -                print ( "This won't be formatted either" )
- 
+-
 -        print("This will be formatted")
--
--
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
  # Regression test for https://github.com/psf/black/issues/2985.
 -class Named(t.Protocol):
 -    # fmt: off
@@ -186,13 +184,14 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/3436.
--if x:
--    return x
--# fmt: off
+ if x:
+     return x
+ # fmt: off
 -elif   unformatted:
--    # fmt: on
++elif unformatted:
+     # fmt: on
 -    will_be_formatted()
-+NOT_YET_IMPLEMENTED_StmtIf
++    NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
@@ -209,13 +208,22 @@ NOT_IMPLEMENTED_call()
 # Regression test for https://github.com/psf/black/issues/3026.
 def test_func():
     # yapf: disable
-    NOT_YET_IMPLEMENTED_StmtIf
+    if NOT_IMPLEMENTED_call():
+        return True
+    # yapf: enable
+    elif b:
+        return True
 
     return False
 
 
 # Regression test for https://github.com/psf/black/issues/2567.
-NOT_YET_IMPLEMENTED_StmtIf
+if True:
+    # fmt: off
+    NOT_YET_IMPLEMENTED_StmtFor
+    NOT_IMPLEMENTED_call()
+else:
+    NOT_IMPLEMENTED_call()
 
 
 # Regression test for https://github.com/psf/black/issues/3184.
@@ -230,7 +238,12 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 # Regression test for https://github.com/psf/black/issues/3436.
-NOT_YET_IMPLEMENTED_StmtIf
+if x:
+    return x
+# fmt: off
+elif unformatted:
+    # fmt: on
+    NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

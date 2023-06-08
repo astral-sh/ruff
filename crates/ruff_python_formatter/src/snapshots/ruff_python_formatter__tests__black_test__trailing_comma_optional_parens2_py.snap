@@ -16,20 +16,21 @@ if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1 @@
+@@ -1,6 +1,2 @@
 -if e123456.get_tk_patchlevel() >= (8, 6, 0, "final") or (
 -    8,
 -    5,
 -    8,
 -) <= get_tk_patchlevel() < (8, 6):
--    pass
-+NOT_YET_IMPLEMENTED_StmtIf
++if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+     pass
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    pass
 ```
 
 ## Black Output

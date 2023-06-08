@@ -74,7 +74,7 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,69 +1,29 @@
+@@ -1,69 +1,30 @@
  def f(
      a,
  ):
@@ -130,11 +130,11 @@ some_module.some_function(
 -            "h": 8,
 -        }["a"]
 -    ):
--        pass
 +    NOT_IMPLEMENTED_call()
 +    NOT_IMPLEMENTED_call()
 +    x = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-+    NOT_YET_IMPLEMENTED_StmtIf
++    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+         pass
  
  
 -def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
@@ -154,7 +154,7 @@ some_module.some_function(
  
  
  # The type annotation shouldn't get a trailing comma since that would change its type.
-@@ -80,35 +40,16 @@
+@@ -80,35 +41,16 @@
      pass
  
  
@@ -220,7 +220,8 @@ def f(
     NOT_IMPLEMENTED_call()
     NOT_IMPLEMENTED_call()
     x = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
-    NOT_YET_IMPLEMENTED_StmtIf
+    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+        pass
 
 
 def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:

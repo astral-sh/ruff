@@ -222,7 +222,7 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
-@@ -18,109 +16,109 @@
+@@ -18,109 +16,111 @@
  
  # fmt: off
  def func_no_args():
@@ -237,8 +237,10 @@ d={'a':1,
 +    a
 +    b
 +    c
-+    NOT_YET_IMPLEMENTED_StmtIf
-+    NOT_YET_IMPLEMENTED_StmtIf
++    if True:
++        NOT_YET_IMPLEMENTED_StmtRaise
++    if False:
++        ...
 +    NOT_YET_IMPLEMENTED_StmtFor
 +    NOT_IMPLEMENTED_call()
 +    return None
@@ -392,7 +394,7 @@ d={'a':1,
      # fmt: off
  
      # hey, that won't work
-@@ -130,13 +128,15 @@
+@@ -130,13 +130,15 @@
  
  
  def on_and_off_broken():
@@ -413,11 +415,10 @@ d={'a':1,
      # fmt: on
      # fmt: off
      # ...but comments still get reformatted even though they should not be
-@@ -144,81 +144,18 @@
- 
+@@ -145,80 +147,21 @@
  
  def long_lines():
--    if True:
+     if True:
 -        typedargslist.extend(
 -            gen_annotated_params(
 -                ast_args.kwonlyargs,
@@ -426,11 +427,13 @@ d={'a':1,
 -                implicit_default=True,
 -            )
 -        )
--        # fmt: off
++        NOT_IMPLEMENTED_call()
+         # fmt: off
 -        a = (
 -            unnecessary_bracket()
 -        )
--        # fmt: on
++        a = NOT_IMPLEMENTED_call()
+         # fmt: on
 -    _type_comment_re = re.compile(
 -        r"""
 -        ^
@@ -455,7 +458,6 @@ d={'a':1,
 -        re.MULTILINE|re.VERBOSE
 -        # fmt: on
 -    )
-+    NOT_YET_IMPLEMENTED_StmtIf
 +    _type_comment_re = NOT_IMPLEMENTED_call()
  
  
@@ -529,8 +531,10 @@ def func_no_args():
     a
     b
     c
-    NOT_YET_IMPLEMENTED_StmtIf
-    NOT_YET_IMPLEMENTED_StmtIf
+    if True:
+        NOT_YET_IMPLEMENTED_StmtRaise
+    if False:
+        ...
     NOT_YET_IMPLEMENTED_StmtFor
     NOT_IMPLEMENTED_call()
     return None
@@ -654,7 +658,11 @@ def on_and_off_broken():
 
 
 def long_lines():
-    NOT_YET_IMPLEMENTED_StmtIf
+    if True:
+        NOT_IMPLEMENTED_call()
+        # fmt: off
+        a = NOT_IMPLEMENTED_call()
+        # fmt: on
     _type_comment_re = NOT_IMPLEMENTED_call()
 
 
