@@ -241,7 +241,11 @@ impl Printer {
         Ok(())
     }
 
-    pub(crate) fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub(crate) fn write_statistics(
+        &self,
+        diagnostics: &Diagnostics,
+        writer: &mut impl Write,
+    ) -> Result<()> {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
@@ -277,7 +281,6 @@ impl Printer {
             return Ok(());
         }
 
-        let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
             SerializationFormat::Text => {
                 // Compute the maximum number of digits in the count and code, for all messages,
@@ -302,7 +305,7 @@ impl Printer {
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in statistics {
                     writeln!(
-                        stdout,
+                        writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
                         statistic.code.to_string().red().bold(),
@@ -321,7 +324,7 @@ impl Printer {
                 return Ok(());
             }
             SerializationFormat::Json => {
-                writeln!(stdout, "{}", serde_json::to_string_pretty(&statistics)?)?;
+                writeln!(writer, "{}", serde_json::to_string_pretty(&statistics)?)?;
             }
             _ => {
                 anyhow::bail!(
@@ -331,7 +334,7 @@ impl Printer {
             }
         }
 
-        stdout.flush()?;
+        writer.flush()?;
 
         Ok(())
     }
