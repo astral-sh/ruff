@@ -77,7 +77,7 @@ pub(crate) fn lambda_assignment(
             // carrying a type annotation that will be used by some
             // package like dataclasses, which wouldn't consider the
             // rewritten function definition to be equivalent.
-            // See https://github.com/charliermarsh/ruff/issues/3046
+            // See https://github.com/astral-sh/ruff/issues/3046
             if checker.patch(diagnostic.kind.rule())
                 && !checker.semantic_model().scope().kind.is_class()
                 && !has_leading_content(stmt, checker.locator)

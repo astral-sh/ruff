@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 
 schemastore_fork = "https://github.com/astral-sh/schemastore"
 schemastore_upstream = "https://github.com/SchemaStore/schemastore"
-ruff_repo = "https://github.com/charliermarsh/ruff"
+ruff_repo = "https://github.com/astral-sh/ruff"
 root = Path(
     check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip(),
 )
