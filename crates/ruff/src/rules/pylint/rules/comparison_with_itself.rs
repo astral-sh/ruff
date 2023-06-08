@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for comparisons of a name with itself.
 ///
 /// ## Why is this bad?
-/// Comparing a name with itself will always resolve to the same value, so the
+/// Comparing a name with itself will always evaluate to the same value, so the
 /// comparison is redundant. It is also indicative of a mistake, as the
 /// comparison is unlikely to be what the programmer intended.
 ///
