@@ -99,6 +99,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
             write!(f, [if_group_breaks(&text(","))])?;
 
+            // Expand the group if the source has a trailing *magic* comma.
             if let Some(last_node) = last_node {
                 let ends_with_pos_only_argument_separator = !posonlyargs.is_empty()
                     && args.is_empty()

@@ -31,10 +31,13 @@ impl FormatNodeRule<Arg> for FormatArg {
         } = item;
         write!(
             f,
-            [source_text_slice(
-                TextRange::at(range.start(), arg.text_len()),
-                ContainsNewlines::No
-            )]
+            [
+                // The name of the argument
+                source_text_slice(
+                    TextRange::at(range.start(), arg.text_len()),
+                    ContainsNewlines::No
+                )
+            ]
         )?;
 
         if let Some(annotation) = annotation {
