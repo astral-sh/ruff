@@ -183,6 +183,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E2513") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidCharacterEsc),
         (Pylint, "E2514") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidCharacterNul),
         (Pylint, "E2515") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidCharacterZeroWidthSpace),
+        (Pylint, "R0124") => (RuleGroup::Unspecified, rules::pylint::rules::ComparisonWithItself),
         (Pylint, "R0133") => (RuleGroup::Unspecified, rules::pylint::rules::ComparisonOfConstant),
         (Pylint, "R0206") => (RuleGroup::Unspecified, rules::pylint::rules::PropertyWithParameters),
         (Pylint, "R0402") => (RuleGroup::Unspecified, rules::pylint::rules::ManualFromImport),
