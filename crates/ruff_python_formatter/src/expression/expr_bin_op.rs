@@ -90,9 +90,8 @@ impl FormatNodeRule<ExprBinOp> for FormatExprBinOp {
                 ]
             )?;
 
-            // Format the operator on its own line if the operator has trailing comments and the right side has leading comments.
-            if !operator_comments.is_empty() && comments.has_leading_comments(right.as_ref().into())
-            {
+            // Format the operator on its own line if the right side has any leading comments.
+            if comments.has_leading_comments(right.as_ref().into()) {
                 write!(f, [hard_line_break()])?;
             } else if needs_space {
                 write!(f, [space()])?;
