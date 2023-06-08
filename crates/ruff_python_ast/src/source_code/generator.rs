@@ -212,7 +212,7 @@ impl<'a> Generator<'a> {
                 for decorator in decorator_list {
                     statement!({
                         self.p("@");
-                        self.unparse_expr(decorator, precedence::MAX);
+                        self.unparse_expr(&decorator.expression, precedence::MAX);
                     });
                 }
                 statement!({
@@ -244,7 +244,7 @@ impl<'a> Generator<'a> {
                 for decorator in decorator_list {
                     statement!({
                         self.p("@");
-                        self.unparse_expr(decorator, precedence::MAX);
+                        self.unparse_expr(&decorator.expression, precedence::MAX);
                     });
                 }
                 statement!({
@@ -276,7 +276,7 @@ impl<'a> Generator<'a> {
                 for decorator in decorator_list {
                     statement!({
                         self.p("@");
-                        self.unparse_expr(decorator, precedence::MAX);
+                        self.unparse_expr(&decorator.expression, precedence::MAX);
                     });
                 }
                 statement!({

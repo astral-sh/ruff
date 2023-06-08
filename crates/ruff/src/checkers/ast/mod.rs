@@ -1833,8 +1833,8 @@ where
             }) => {
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
-                for expr in decorator_list {
-                    self.visit_expr(expr);
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
@@ -1943,8 +1943,8 @@ where
                 for keyword in keywords {
                     self.visit_keyword(keyword);
                 }
-                for expr in decorator_list {
-                    self.visit_expr(expr);
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
                 }
 
                 let definition = docstrings::extraction::extract_definition(

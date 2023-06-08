@@ -51,7 +51,7 @@ pub(crate) fn should_ignore_definition(
     }) = definition
     {
         for decorator in cast::decorator_list(stmt) {
-            if let Some(call_path) = model.resolve_call_path(map_callable(decorator)) {
+            if let Some(call_path) = model.resolve_call_path(map_callable(&decorator.expression)) {
                 if ignore_decorators
                     .iter()
                     .any(|decorator| from_qualified_name(decorator) == call_path)

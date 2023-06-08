@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::Decorator;
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
@@ -22,18 +22,18 @@ pub fn classify(
     model: &SemanticModel,
     scope: &Scope,
     name: &str,
-    decorator_list: &[Expr],
+    decorator_list: &[Decorator],
     classmethod_decorators: &[String],
     staticmethod_decorators: &[String],
 ) -> FunctionType {
     let ScopeKind::Class(scope) = &scope.kind else {
         return FunctionType::Function;
     };
-    if decorator_list.iter().any(|expr| {
+    if decorator_list.iter().any(|decorator| {
         // The method is decorated with a static method decorator (like
         // `@staticmethod`).
         model
-            .resolve_call_path(map_callable(expr))
+            .resolve_call_path(map_callable(&decorator.expression))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "staticmethod"]
                     || staticmethod_decorators
@@ -52,9 +52,9 @@ pub fn classify(
                     .any(|(module, member)| call_path.as_slice() == [*module, *member])
             })
         })
-        || decorator_list.iter().any(|expr| {
+        || decorator_list.iter().any(|decorator| {
             // The method is decorated with a class method decorator (like `@classmethod`).
-            model.resolve_call_path(map_callable(expr)).map_or(false, |call_path| {
+            model.resolve_call_path(map_callable(&decorator.expression)).map_or(false, |call_path| {
                 call_path.as_slice() == ["", "classmethod"] ||
                 classmethod_decorators
                     .iter()

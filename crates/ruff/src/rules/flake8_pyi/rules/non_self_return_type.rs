@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{self, Arguments, Expr, Stmt};
+use rustpython_parser::ast::{self, Arguments, Decorator, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -114,7 +114,7 @@ pub(crate) fn non_self_return_type(
     checker: &mut Checker,
     stmt: &Stmt,
     name: &str,
-    decorator_list: &[Expr],
+    decorator_list: &[Decorator],
     returns: Option<&Expr>,
     args: &Arguments,
     async_: bool,
