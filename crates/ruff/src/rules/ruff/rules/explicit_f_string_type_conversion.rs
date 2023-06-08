@@ -1,16 +1,16 @@
 use anyhow::{bail, Result};
+use libcst_native::{
+    ConcatenatedString, Expression, FormattedStringContent, FormattedStringExpression,
+};
 use rustpython_parser::ast::{self, Expr, Ranged};
 
-use crate::autofix::codemods::CodegenStylist;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 
+use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
-use crate::cst::matchers::{
-    match_call_mut, match_expression, match_formatted_string, match_formatted_string_expression,
-    match_name,
-};
+use crate::cst::matchers::{match_call_mut, match_expression, match_name};
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -46,57 +46,26 @@ impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
     }
 }
 
-fn fix_explicit_f_string_type_conversion(
-    expr: &Expr,
-    index: usize,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Fix> {
-    // Replace the call node with its argument and a conversion flag.
-    let range = expr.range();
-    let content = locator.slice(range);
-    let mut expression = match_expression(content)?;
-    let formatted_string = match_formatted_string(&mut expression)?;
-
-    // Replace the formatted call expression at `index` with a conversion flag.
-    let formatted_string_expression =
-        match_formatted_string_expression(&mut formatted_string.parts[index])?;
-    let call = match_call_mut(&mut formatted_string_expression.expression)?;
-    let name = match_name(&call.func)?;
-    match name.value {
-        "str" => {
-            formatted_string_expression.conversion = Some("s");
-        }
-        "repr" => {
-            formatted_string_expression.conversion = Some("r");
-        }
-        "ascii" => {
-            formatted_string_expression.conversion = Some("a");
-        }
-        _ => bail!("Unexpected function call: `{:?}`", name.value),
-    }
-    formatted_string_expression.expression = call.args[0].value.clone();
-
-    Ok(Fix::automatic(Edit::range_replacement(
-        expression.codegen_stylist(stylist),
-        range,
-    )))
-}
-
 /// RUF010
 pub(crate) fn explicit_f_string_type_conversion(
     checker: &mut Checker,
     expr: &Expr,
     values: &[Expr],
 ) {
-    for (index, formatted_value) in values.iter().enumerate() {
-        let Expr::FormattedValue(ast::ExprFormattedValue {
-            conversion,
-            value,
-            ..
-        }) = &formatted_value else {
-            continue;
-        };
+    for (index, formatted_value) in values
+        .iter()
+        .filter_map(|expr| {
+            if let Expr::FormattedValue(expr) = &expr {
+                Some(expr)
+            } else {
+                None
+            }
+        })
+        .enumerate()
+    {
+        let ast::ExprFormattedValue {
+            value, conversion, ..
+        } = formatted_value;
 
         // Skip if there's already a conversion flag.
         if !conversion.is_none() {
@@ -137,4 +106,101 @@ pub(crate) fn explicit_f_string_type_conversion(
         }
         checker.diagnostics.push(diagnostic);
     }
+}
+
+/// Generate a [`Fix`] to replace an explicit type conversion with a conversion flag.
+fn fix_explicit_f_string_type_conversion(
+    expr: &Expr,
+    index: usize,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<Fix> {
+    // Parenthesize the expression, to support implicit concatenation.
+    let range = expr.range();
+    let content = locator.slice(range);
+    let parenthesized_content = format!("({content})");
+    let mut expression = match_expression(&parenthesized_content)?;
+
+    // Replace the formatted call expression at `index` with a conversion flag.
+    let mut formatted_string_expression = match_part(index, &mut expression)?;
+    let call = match_call_mut(&mut formatted_string_expression.expression)?;
+    let name = match_name(&call.func)?;
+    match name.value {
+        "str" => {
+            formatted_string_expression.conversion = Some("s");
+        }
+        "repr" => {
+            formatted_string_expression.conversion = Some("r");
+        }
+        "ascii" => {
+            formatted_string_expression.conversion = Some("a");
+        }
+        _ => bail!("Unexpected function call: `{:?}`", name.value),
+    }
+    formatted_string_expression.expression = call.args[0].value.clone();
+
+    // Remove the parentheses (first and last characters).
+    let mut content = expression.codegen_stylist(stylist);
+    content.remove(0);
+    content.pop();
+
+    Ok(Fix::automatic(Edit::range_replacement(content, range)))
+}
+
+/// Return the [`FormattedStringContent`] at the given index in an f-string or implicit
+/// string concatenation.
+fn match_part<'a, 'b>(
+    index: usize,
+    expr: &'a mut Expression<'b>,
+) -> Result<&'a mut FormattedStringExpression<'b>> {
+    match expr {
+        Expression::ConcatenatedString(expr) => Ok(collect_parts(expr).remove(index)),
+        Expression::FormattedString(expr) => {
+            // Find the formatted expression at the given index. The `parts` field contains a mix
+            // of string literals and expressions, but our `index` only counts expressions. All
+            // the boxing and mutability makes this difficult to write in a functional style.
+            let mut format_index = 0;
+            for part in &mut expr.parts {
+                if let FormattedStringContent::Expression(expr) = part {
+                    if format_index == index {
+                        return Ok(expr);
+                    }
+                    format_index += 1;
+                }
+            }
+
+            bail!("Index out of bounds: `{index}`")
+        }
+        _ => bail!("Unexpected expression: `{:?}`", expr),
+    }
+}
+
+/// Given an implicit string concatenation, return a list of all the formatted expressions.
+fn collect_parts<'a, 'b>(
+    expr: &'a mut ConcatenatedString<'b>,
+) -> Vec<&'a mut FormattedStringExpression<'b>> {
+    fn inner<'a, 'b>(
+        string: &'a mut libcst_native::String<'b>,
+        formatted_expressions: &mut Vec<&'a mut FormattedStringExpression<'b>>,
+    ) {
+        match string {
+            libcst_native::String::Formatted(expr) => {
+                for part in &mut expr.parts {
+                    if let FormattedStringContent::Expression(expr) = part {
+                        formatted_expressions.push(expr);
+                    }
+                }
+            }
+            libcst_native::String::Concatenated(expr) => {
+                inner(&mut expr.left, formatted_expressions);
+                inner(&mut expr.right, formatted_expressions);
+            }
+            libcst_native::String::Simple(_) => {}
+        }
+    }
+
+    let mut formatted_expressions = vec![];
+    inner(&mut expr.left, &mut formatted_expressions);
+    inner(&mut expr.right, &mut formatted_expressions);
+    formatted_expressions
 }
