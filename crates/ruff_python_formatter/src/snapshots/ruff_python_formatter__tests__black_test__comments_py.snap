@@ -109,31 +109,107 @@ async def wat():
 ```diff
 --- Black
 +++ Ruff
-@@ -4,10 +4,12 @@
+@@ -4,93 +4,42 @@
  #
  # Has many lines. Many, many lines.
  # Many, many, many lines.
 -"""Module docstring.
-+(
-+    """Module docstring.
++NOT_YET_IMPLEMENTED_ExprConstant
  
- Possibly also many, many lines.
- """
-+)
+-Possibly also many, many lines.
+-"""
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
  
- import os.path
- import sys
-@@ -19,9 +21,6 @@
-     import fast
- except ImportError:
-     import slow as fast
+-import os.path
+-import sys
+-
+-import a
+-from b.c import X  # some noqa comment
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
+ 
+-try:
+-    import fast
+-except ImportError:
+-    import slow as fast
 -
 -
 -# Some comment before a function.
- y = 1
+-y = 1
++NOT_YET_IMPLEMENTED_StmtTry
++NOT_YET_IMPLEMENTED_StmtAssign
  (
      # some strings
-@@ -93,4 +92,4 @@
+     y  # type: ignore
+ )
+-
+ 
+-def function(default=None):
+-    """Docstring comes first.
+ 
+-    Possibly many lines.
+-    """
+-    # FIXME: Some comment about why this function is crap but still in production.
+-    import inner_imports
+-
+-    if inner_imports.are_evil():
+-        # Explains why we have this if.
+-        # In great detail indeed.
+-        x = X()
+-        return x.method1()  # type: ignore
+-
+-    # This return is also commented for some reason.
+-    return default
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+ 
+ # Explains why we use global state.
+-GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
++NOT_YET_IMPLEMENTED_StmtAssign
+ 
+ 
+ # Another comment!
+ # This time two lines.
+-
+ 
+-class Foo:
+-    """Docstring for class Foo.  Example from Sphinx docs."""
+ 
+-    #: Doc comment for class attribute Foo.bar.
+-    #: It can have multiple lines.
+-    bar = 1
+-
+-    flox = 1.5  #: Doc comment for Foo.flox. One line only.
+-
+-    baz = 2
+-    """Docstring for class attribute Foo.baz."""
+-
+-    def __init__(self):
+-        #: Doc comment for instance attribute qux.
+-        self.qux = 3
+-
+-        self.spam = 4
+-        """Docstring for instance attribute spam."""
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
+ #' <h1>This is pweave!</h1>
+ 
+ 
+-@fast(really=True)
+-async def wat():
+-    # This comment, for some reason \
+-    # contains a trailing backslash.
+-    async with X.open_async() as x:  # Some more comments
+-        result = await x.method1()
+-    # Comment after ending a block.
+-    if result:
+-        print("A OK", file=sys.stdout)
+-        # Comment between things.
+-        print()
++NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+ 
  
  # Some closing comments.
  # Maybe Vim or Emacs directives for formatting.
@@ -151,90 +227,40 @@ async def wat():
 #
 # Has many lines. Many, many lines.
 # Many, many, many lines.
-(
-    """Module docstring.
+NOT_YET_IMPLEMENTED_ExprConstant
 
-Possibly also many, many lines.
-"""
-)
+NOT_YET_IMPLEMENTED_StmtImport
+NOT_YET_IMPLEMENTED_StmtImport
 
-import os.path
-import sys
+NOT_YET_IMPLEMENTED_StmtImport
+NOT_YET_IMPLEMENTED_StmtImportFrom  # some noqa comment
 
-import a
-from b.c import X  # some noqa comment
-
-try:
-    import fast
-except ImportError:
-    import slow as fast
-y = 1
+NOT_YET_IMPLEMENTED_StmtTry
+NOT_YET_IMPLEMENTED_StmtAssign
 (
     # some strings
     y  # type: ignore
 )
 
 
-def function(default=None):
-    """Docstring comes first.
-
-    Possibly many lines.
-    """
-    # FIXME: Some comment about why this function is crap but still in production.
-    import inner_imports
-
-    if inner_imports.are_evil():
-        # Explains why we have this if.
-        # In great detail indeed.
-        x = X()
-        return x.method1()  # type: ignore
-
-    # This return is also commented for some reason.
-    return default
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
 # Explains why we use global state.
-GLOBAL_STATE = {"a": a(1), "b": a(2), "c": a(3)}
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
 # Another comment!
 # This time two lines.
 
 
-class Foo:
-    """Docstring for class Foo.  Example from Sphinx docs."""
-
-    #: Doc comment for class attribute Foo.bar.
-    #: It can have multiple lines.
-    bar = 1
-
-    flox = 1.5  #: Doc comment for Foo.flox. One line only.
-
-    baz = 2
-    """Docstring for class attribute Foo.baz."""
-
-    def __init__(self):
-        #: Doc comment for instance attribute qux.
-        self.qux = 3
-
-        self.spam = 4
-        """Docstring for instance attribute spam."""
+NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 #' <h1>This is pweave!</h1>
 
 
-@fast(really=True)
-async def wat():
-    # This comment, for some reason \
-    # contains a trailing backslash.
-    async with X.open_async() as x:  # Some more comments
-        result = await x.method1()
-    # Comment after ending a block.
-    if result:
-        print("A OK", file=sys.stdout)
-        # Comment between things.
-        print()
+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
 
 
 # Some closing comments.

@@ -16,23 +16,20 @@ if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,3 @@
+@@ -1,6 +1 @@
 -if e123456.get_tk_patchlevel() >= (8, 6, 0, "final") or (
 -    8,
 -    5,
 -    8,
 -) <= get_tk_patchlevel() < (8, 6):
-+if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
-+    (8, 5, 8) <= get_tk_patchlevel() < (8, 6)):
-     pass
+-    pass
++NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Ruff Output
 
 ```py
-if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
-    (8, 5, 8) <= get_tk_patchlevel() < (8, 6)):
-    pass
+NOT_YET_IMPLEMENTED_StmtIf
 ```
 
 ## Black Output

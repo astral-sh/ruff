@@ -25,11 +25,14 @@ list_of_types = [tuple[int,],]
 ```diff
 --- Black
 +++ Ruff
-@@ -2,21 +2,9 @@
+@@ -1,22 +1,12 @@
+ # We should not treat the trailing comma
  # in a single-element subscript.
- a: tuple[int,]
- b = tuple[int,]
--
+-a: tuple[int,]
+-b = tuple[int,]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAssign
+ 
  # The magic comma still applies to multi-element subscripts.
 -c: tuple[
 -    int,
@@ -39,9 +42,9 @@ list_of_types = [tuple[int,],]
 -    int,
 -    int,
 -]
--
-+c: tuple[int, int,]
-+d = tuple[int, int,]
++NOT_YET_IMPLEMENTED_StmtAnnAssign
++NOT_YET_IMPLEMENTED_StmtAssign
+ 
  # Magic commas still work as expected for non-subscripts.
 -small_list = [
 -    1,
@@ -49,8 +52,8 @@ list_of_types = [tuple[int,],]
 -list_of_types = [
 -    tuple[int,],
 -]
-+small_list = [1,]
-+list_of_types = [tuple[int,],]
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Ruff Output
@@ -58,14 +61,16 @@ list_of_types = [tuple[int,],]
 ```py
 # We should not treat the trailing comma
 # in a single-element subscript.
-a: tuple[int,]
-b = tuple[int,]
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+
 # The magic comma still applies to multi-element subscripts.
-c: tuple[int, int,]
-d = tuple[int, int,]
+NOT_YET_IMPLEMENTED_StmtAnnAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+
 # Magic commas still work as expected for non-subscripts.
-small_list = [1,]
-list_of_types = [tuple[int,],]
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
 ```
 
 ## Black Output

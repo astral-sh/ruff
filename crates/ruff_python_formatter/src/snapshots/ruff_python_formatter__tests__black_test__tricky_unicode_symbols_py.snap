@@ -1,0 +1,73 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/tricky_unicode_symbols.py
+---
+## Input
+
+```py
+ä = 1
+µ = 2
+蟒 = 3
+x󠄀 = 4
+មុ = 1
+Q̇_per_meter = 4
+
+A᧚ = 3
+A፩ = 8
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,9 +1,9 @@
+-ä = 1
+-µ = 2
+-蟒 = 3
+-x󠄀 = 4
+-មុ = 1
+-Q̇_per_meter = 4
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
+ 
+-A᧚ = 3
+-A፩ = 8
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
+```
+
+## Ruff Output
+
+```py
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+```
+
+## Black Output
+
+```py
+ä = 1
+µ = 2
+蟒 = 3
+x󠄀 = 4
+មុ = 1
+Q̇_per_meter = 4
+
+A᧚ = 3
+A፩ = 8
+```
+
+

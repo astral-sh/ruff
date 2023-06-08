@@ -1,7 +1,8 @@
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::trivia::lines_before;
+use crate::trivia::{lines_after, skip_trailing_trivia};
 use ruff_formatter::write;
+use ruff_text_size::TextSize;
 use rustpython_parser::ast::Ranged;
 
 /// Provides Python specific extensions to [`Formatter`].
@@ -26,7 +27,7 @@ impl<'buf, 'ast> PyFormatterExtensions<'ast, 'buf> for PyFormatter<'ast, 'buf> {
 pub(crate) struct JoinNodesBuilder<'fmt, 'ast, 'buf> {
     fmt: &'fmt mut PyFormatter<'ast, 'buf>,
     result: FormatResult<()>,
-    has_elements: bool,
+    last_end: Option<TextSize>,
     node_level: NodeLevel,
 }
 
@@ -35,7 +36,7 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
         Self {
             fmt,
             result: Ok(()),
-            has_elements: false,
+            last_end: None,
             node_level: level,
         }
     }
@@ -47,22 +48,43 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
         T: Ranged,
     {
         let node_level = self.node_level;
-        let separator = format_with(|f: &mut PyFormatter| match node_level {
-            NodeLevel::TopLevel => match lines_before(node.start(), f.context().contents()) {
-                0 | 1 => hard_line_break().fmt(f),
-                2 => empty_line().fmt(f),
-                _ => write!(f, [empty_line(), empty_line()]),
-            },
-            NodeLevel::CompoundStatement => {
-                match lines_before(node.start(), f.context().contents()) {
-                    0 | 1 => hard_line_break().fmt(f),
-                    _ => empty_line().fmt(f),
-                }
-            }
-            NodeLevel::Expression => hard_line_break().fmt(f),
-        });
 
-        self.entry_with_separator(&separator, content);
+        self.result = self.result.and_then(|_| {
+            if let Some(last_end) = self.last_end.replace(node.end()) {
+                let source = self.fmt.context().contents();
+                let count_lines = |offset| {
+                    // It's necessary to skip any trailing line comment because RustPython doesn't include trailing comments
+                    // in the node's range
+                    // ```python
+                    // a # The range of `a` ends right before this comment
+                    //
+                    // b
+                    // ```
+                    //
+                    // Simply using `lines_after` doesn't work if a statement has a trailing comment because
+                    // it then counts the lines between the statement and the trailing comment, which is
+                    // always 0. This is why it skips any trailing trivia (trivia that's on the same line)
+                    // and counts the lines after.
+                    let after_trailing_trivia = skip_trailing_trivia(offset, source);
+                    lines_after(after_trailing_trivia, source)
+                };
+
+                match node_level {
+                    NodeLevel::TopLevel => match count_lines(last_end) {
+                        0 | 1 => hard_line_break().fmt(self.fmt),
+                        2 => empty_line().fmt(self.fmt),
+                        _ => write!(self.fmt, [empty_line(), empty_line()]),
+                    },
+                    NodeLevel::CompoundStatement => match count_lines(last_end) {
+                        0 | 1 => hard_line_break().fmt(self.fmt),
+                        _ => empty_line().fmt(self.fmt),
+                    },
+                    NodeLevel::Expression => hard_line_break().fmt(self.fmt),
+                }?;
+            }
+
+            content.fmt(self.fmt)
+        });
     }
 
     /// Writes a sequence of node with their content tuples, inserting the appropriate number of line breaks between any two of them
@@ -98,17 +120,20 @@ impl<'fmt, 'ast, 'buf> JoinNodesBuilder<'fmt, 'ast, 'buf> {
     }
 
     /// Writes a single entry using the specified separator to separate the entry from a previous entry.
-    pub(crate) fn entry_with_separator(
+    pub(crate) fn entry_with_separator<T>(
         &mut self,
         separator: &dyn Format<PyFormatContext<'ast>>,
         content: &dyn Format<PyFormatContext<'ast>>,
-    ) {
+        node: &T,
+    ) where
+        T: Ranged,
+    {
         self.result = self.result.and_then(|_| {
-            if self.has_elements {
+            if self.last_end.is_some() {
                 separator.fmt(self.fmt)?;
             }
 
-            self.has_elements = true;
+            self.last_end = Some(node.end());
 
             content.fmt(self.fmt)
         });
@@ -166,16 +191,16 @@ no_leading_newline = 30
 
         assert_eq!(
             &printed,
-            r#"a = 10
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
 
 
-three_leading_newlines = 80
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
-two_leading_newlines = 20
+NOT_YET_IMPLEMENTED_StmtAssign
 
-one_leading_newline = 10
-no_leading_newline = 30"#
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign"#
         );
     }
 
@@ -186,14 +211,14 @@ no_leading_newline = 30"#
 
         assert_eq!(
             &printed,
-            r#"a = 10
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
 
-three_leading_newlines = 80
+NOT_YET_IMPLEMENTED_StmtAssign
 
-two_leading_newlines = 20
+NOT_YET_IMPLEMENTED_StmtAssign
 
-one_leading_newline = 10
-no_leading_newline = 30"#
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign"#
         );
     }
 
@@ -204,11 +229,11 @@ no_leading_newline = 30"#
 
         assert_eq!(
             &printed,
-            r#"a = 10
-three_leading_newlines = 80
-two_leading_newlines = 20
-one_leading_newline = 10
-no_leading_newline = 30"#
+            r#"NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign"#
         );
     }
 }

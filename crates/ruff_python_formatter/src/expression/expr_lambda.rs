@@ -1,7 +1,7 @@
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{verbatim_text, FormatNodeRule, PyFormatter};
+use crate::{not_yet_implemented, FormatNodeRule, PyFormatter};
 use ruff_formatter::{write, Buffer, FormatResult};
 use rustpython_parser::ast::ExprLambda;
 
@@ -10,7 +10,7 @@ pub struct FormatExprLambda;
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
     fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
-        write!(f, [verbatim_text(item.range)])
+        write!(f, [not_yet_implemented(item)])
     }
 }
 

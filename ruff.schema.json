@@ -528,7 +528,7 @@
       ]
     },
     "target-version": {
-      "description": "The Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, the target version will be inferred from the `project.requires-python` field in the relevant `pyproject.toml` (e.g., `requires-python = \">=3.8\"`), if present.",
+      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -1918,6 +1918,13 @@
         "FBT001",
         "FBT002",
         "FBT003",
+        "FIX",
+        "FIX0",
+        "FIX00",
+        "FIX001",
+        "FIX002",
+        "FIX003",
+        "FIX004",
         "FLY",
         "FLY0",
         "FLY00",
@@ -2254,6 +2261,7 @@
         "PYI045",
         "PYI048",
         "PYI05",
+        "PYI050",
         "PYI052",
         "PYI053",
         "PYI054",
@@ -2407,13 +2415,6 @@
         "SLF00",
         "SLF001",
         "T",
-        "T",
-        "T0",
-        "T00",
-        "T001",
-        "T002",
-        "T003",
-        "T004",
         "T1",
         "T10",
         "T100",

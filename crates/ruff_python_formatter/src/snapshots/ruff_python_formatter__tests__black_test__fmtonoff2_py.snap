@@ -53,46 +53,67 @@ def test_calculate_fades():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,6 +3,7 @@
- TmSt = 1
- TmEx = 2
+@@ -1,40 +1,26 @@
+-import pytest
++NOT_YET_IMPLEMENTED_StmtImport
  
+-TmSt = 1
+-TmEx = 2
++NOT_YET_IMPLEMENTED_StmtAssign
++NOT_YET_IMPLEMENTED_StmtAssign
 +
+ 
  # fmt: off
  
  # Test data:
-@@ -18,18 +19,22 @@
- def test_fader(test):
-     pass
+ #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
  
+-@pytest.mark.parametrize('test', [
++NOT_YET_IMPLEMENTED_StmtFunctionDef
 +
- def check_fader(test):
- 
-     pass
- 
 +
- def verify_fader(test):
-   # misaligned comment
-     pass
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
-+
- def verify_fader(test):
-     """Hey, ho."""
-     assert test.passed()
+-    # Test don't manage the volume
+-    [
+-        ('stuff', 'in')
+-    ],
+-])
+-def test_fader(test):
+-    pass
  
-+
- def test_calculate_fades():
-     calcs = [
-         # one is zero/none
+-def check_fader(test):
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+-    pass
+ 
+-def verify_fader(test):
+-  # misaligned comment
+-    pass
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+-def verify_fader(test):
+-    """Hey, ho."""
+-    assert test.passed()
+ 
+-def test_calculate_fades():
+-    calcs = [
+-        # one is zero/none
+-        (0, 4, 0, 0, 10,        0, 0, 6, 10),
+-        (None, 4, 0, 0, 10,     0, 0, 6, 10),
+-    ]
++NOT_YET_IMPLEMENTED_StmtFunctionDef
+ 
+ # fmt: on
 ```
 
 ## Ruff Output
 
 ```py
-import pytest
+NOT_YET_IMPLEMENTED_StmtImport
 
-TmSt = 1
-TmEx = 2
+NOT_YET_IMPLEMENTED_StmtAssign
+NOT_YET_IMPLEMENTED_StmtAssign
 
 
 # fmt: off
@@ -100,38 +121,19 @@ TmEx = 2
 # Test data:
 #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
 
-@pytest.mark.parametrize('test', [
-
-    # Test don't manage the volume
-    [
-        ('stuff', 'in')
-    ],
-])
-def test_fader(test):
-    pass
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def check_fader(test):
-
-    pass
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def verify_fader(test):
-  # misaligned comment
-    pass
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def verify_fader(test):
-    """Hey, ho."""
-    assert test.passed()
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-def test_calculate_fades():
-    calcs = [
-        # one is zero/none
-        (0, 4, 0, 0, 10,        0, 0, 6, 10),
-        (None, 4, 0, 0, 10,     0, 0, 6, 10),
-    ]
+NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 # fmt: on
 ```
