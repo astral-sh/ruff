@@ -6,6 +6,7 @@ use rustpython_parser::ast::{self, Expr, Ranged};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::prelude::ConversionFlag;
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::autofix::codemods::CodegenStylist;
@@ -21,29 +22,60 @@ use crate::registry::AsRule;
 /// f-strings support dedicated conversion flags for these types, which are
 /// more succinct and idiomatic.
 ///
+/// In the case of `str()`, it's also redundant, since `str()` is the default
+/// conversion.
+///
 /// ## Example
 /// ```python
 /// a = "some string"
+/// f"{str(a)}"
 /// f"{repr(a)}"
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// a = "some string"
+/// f"{a}"
 /// f"{a!r}"
 /// ```
 #[violation]
-pub struct ExplicitFStringTypeConversion;
+pub struct ExplicitFStringTypeConversion {
+    operation: Operation,
+}
 
 impl AlwaysAutofixableViolation for ExplicitFStringTypeConversion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use conversion in f-string")
+        let ExplicitFStringTypeConversion { operation } = self;
+        match operation {
+            Operation::ConvertCallToConversionFlag => {
+                format!("Use explicit conversion flag")
+            }
+            Operation::RemoveCall => format!("Remove unnecessary `str` conversion"),
+            Operation::RemoveConversionFlag => format!("Remove unnecessary conversion flag"),
+        }
     }
 
     fn autofix_title(&self) -> String {
-        "Replace f-string function call with conversion".to_string()
+        let ExplicitFStringTypeConversion { operation } = self;
+        match operation {
+            Operation::ConvertCallToConversionFlag => {
+                format!("Replace with conversion flag")
+            }
+            Operation::RemoveCall => format!("Remove `str` call"),
+            Operation::RemoveConversionFlag => format!("Remove conversion flag"),
+        }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Operation {
+    /// Ex) Convert `f"{repr(bla)}"` to `f"{bla!r}"`
+    ConvertCallToConversionFlag,
+    /// Ex) Convert `f"{bla!s}"` to `f"{bla}"`
+    RemoveConversionFlag,
+    /// Ex) Convert `f"{str(bla)}"` to `f"{bla}"`
+    RemoveCall,
 }
 
 /// RUF010
@@ -64,52 +96,158 @@ pub(crate) fn explicit_f_string_type_conversion(
         .enumerate()
     {
         let ast::ExprFormattedValue {
-            value, conversion, ..
+            value,
+            conversion,
+            format_spec,
+            range: _,
         } = formatted_value;
 
-        // Skip if there's already a conversion flag.
-        if !conversion.is_none() {
-            continue;
+        match conversion {
+            ConversionFlag::Ascii | ConversionFlag::Repr => {
+                // Nothing to do.
+                continue;
+            }
+            ConversionFlag::Str => {
+                // Skip if there's a format spec.
+                if format_spec.is_some() {
+                    continue;
+                }
+
+                // Remove the conversion flag entirely.
+                // Ex) `f"{bla!s}"`
+                let mut diagnostic = Diagnostic::new(
+                    ExplicitFStringTypeConversion {
+                        operation: Operation::RemoveConversionFlag,
+                    },
+                    value.range(),
+                );
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.try_set_fix(|| {
+                        remove_conversion_flag(expr, index, checker.locator, checker.stylist)
+                    });
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+            ConversionFlag::None => {
+                // Replace with the appropriate conversion flag.
+                let Expr::Call(ast::ExprCall {
+                    func,
+                    args,
+                    keywords,
+                    ..
+                }) = value.as_ref() else {
+                    continue;
+                };
+
+                // Can't be a conversion otherwise.
+                if args.len() != 1 || !keywords.is_empty() {
+                    continue;
+                }
+
+                let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+                    continue;
+                };
+
+                if !matches!(id.as_str(), "str" | "repr" | "ascii") {
+                    continue;
+                };
+
+                if !checker.semantic_model().is_builtin(id) {
+                    continue;
+                }
+
+                if id == "str" && format_spec.is_none() {
+                    // Ex) `f"{str(bla)}"`
+                    let mut diagnostic = Diagnostic::new(
+                        ExplicitFStringTypeConversion {
+                            operation: Operation::RemoveCall,
+                        },
+                        value.range(),
+                    );
+                    if checker.patch(diagnostic.kind.rule()) {
+                        diagnostic.try_set_fix(|| {
+                            remove_conversion_call(expr, index, checker.locator, checker.stylist)
+                        });
+                    }
+                    checker.diagnostics.push(diagnostic);
+                } else {
+                    // Ex) `f"{repr(bla)}"`
+                    let mut diagnostic = Diagnostic::new(
+                        ExplicitFStringTypeConversion {
+                            operation: Operation::ConvertCallToConversionFlag,
+                        },
+                        value.range(),
+                    );
+                    if checker.patch(diagnostic.kind.rule()) {
+                        diagnostic.try_set_fix(|| {
+                            convert_call_to_conversion_flag(
+                                expr,
+                                index,
+                                checker.locator,
+                                checker.stylist,
+                            )
+                        });
+                    }
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
         }
-
-        let Expr::Call(ast::ExprCall {
-            func,
-            args,
-            keywords,
-            ..
-        }) = value.as_ref() else {
-            continue;
-        };
-
-        // Can't be a conversion otherwise.
-        if args.len() != 1 || !keywords.is_empty() {
-            continue;
-        }
-
-        let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
-            continue;
-        };
-
-        if !matches!(id.as_str(), "str" | "repr" | "ascii") {
-            continue;
-        };
-
-        if !checker.semantic_model().is_builtin(id) {
-            continue;
-        }
-
-        let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, value.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fix_explicit_f_string_type_conversion(expr, index, checker.locator, checker.stylist)
-            });
-        }
-        checker.diagnostics.push(diagnostic);
     }
 }
 
+/// Generate a [`Fix`] to remove a conversion flag from a formatted expression.
+fn remove_conversion_flag(
+    expr: &Expr,
+    index: usize,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<Fix> {
+    // Parenthesize the expression, to support implicit concatenation.
+    let range = expr.range();
+    let content = locator.slice(range);
+    let parenthesized_content = format!("({content})");
+    let mut expression = match_expression(&parenthesized_content)?;
+
+    // Replace the formatted call expression at `index` with a conversion flag.
+    let mut formatted_string_expression = match_part(index, &mut expression)?;
+    formatted_string_expression.conversion = None;
+
+    // Remove the parentheses (first and last characters).
+    let mut content = expression.codegen_stylist(stylist);
+    content.remove(0);
+    content.pop();
+
+    Ok(Fix::automatic(Edit::range_replacement(content, range)))
+}
+
+/// Generate a [`Fix`] to remove a call from a formatted expression.
+fn remove_conversion_call(
+    expr: &Expr,
+    index: usize,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<Fix> {
+    // Parenthesize the expression, to support implicit concatenation.
+    let range = expr.range();
+    let content = locator.slice(range);
+    let parenthesized_content = format!("({content})");
+    let mut expression = match_expression(&parenthesized_content)?;
+
+    // Replace the formatted call expression at `index` with a conversion flag.
+    let mut formatted_string_expression = match_part(index, &mut expression)?;
+    let call = match_call_mut(&mut formatted_string_expression.expression)?;
+    formatted_string_expression.expression = call.args[0].value.clone();
+
+    // Remove the parentheses (first and last characters).
+    let mut content = expression.codegen_stylist(stylist);
+    content.remove(0);
+    content.pop();
+
+    Ok(Fix::automatic(Edit::range_replacement(content, range)))
+}
+
 /// Generate a [`Fix`] to replace an explicit type conversion with a conversion flag.
-fn fix_explicit_f_string_type_conversion(
+fn convert_call_to_conversion_flag(
     expr: &Expr,
     index: usize,
     locator: &Locator,
