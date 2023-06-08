@@ -1,11 +1,11 @@
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::comments::CommentTextPosition;
-use crate::trivia::find_first_non_trivia_character_in_range;
+use crate::trivia::{SimpleTokenizer, TokenKind};
 use ruff_newlines::StrExt;
 use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::whitespace;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Ranged;
 use std::cmp::Ordering;
 
@@ -521,14 +521,16 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
     // If the preceding is the node before the `colon`
     // `while true:` The node before the `colon` is the `true` constant.
     if preceding.ptr_eq(last_before_colon) {
-        let mut start = preceding.end();
-        while let Some((offset, c)) = find_first_non_trivia_character_in_range(
-            TextRange::new(start, following.start()),
+        let tokens = SimpleTokenizer::new(
             locator.contents(),
-        ) {
-            match c {
-                ':' => {
-                    if comment.slice().start() > offset {
+            TextRange::new(preceding.end(), following.start()),
+        )
+        .skip_trivia();
+
+        for token in tokens {
+            match token.kind() {
+                TokenKind::Colon => {
+                    if comment.slice().start() > token.start() {
                         // Comment comes after the colon
                         // ```python
                         // while a: # comment
@@ -546,9 +548,8 @@ fn handle_trailing_end_of_line_condition_comment<'a>(
                     // ```
                     break;
                 }
-                ')' => {
+                TokenKind::RParen => {
                     // Skip over any closing parentheses
-                    start = offset + ')'.text_len();
                 }
                 _ => {
                     unreachable!("Only ')' or ':' should follow the condition")
@@ -652,21 +653,17 @@ fn handle_trailing_binary_expression_left_or_operator_comment<'a>(
         return CommentPlacement::Default(comment);
     }
 
-    let mut between_operands_range = TextRange::new(
+    let between_operands_range = TextRange::new(
         binary_expression.left.end(),
         binary_expression.right.start(),
     );
 
-    let operator_offset = loop {
-        match find_first_non_trivia_character_in_range(between_operands_range, locator.contents()) {
-            // Skip over closing parens
-            Some((offset, ')')) => {
-                between_operands_range =
-                    TextRange::new(offset + TextSize::new(1), between_operands_range.end());
-            }
-            Some((offset, _)) => break offset,
-            None => return CommentPlacement::Default(comment),
-        }
+    let mut tokens = SimpleTokenizer::new(locator.contents(), between_operands_range).skip_trivia();
+    let operator_offset = if let Some(non_r_paren) = tokens.find(|t| t.kind() != TokenKind::RParen)
+    {
+        non_r_paren.start()
+    } else {
+        return CommentPlacement::Default(comment);
     };
 
     let comment_range = comment.slice().range();
@@ -805,29 +802,22 @@ fn find_pos_only_slash_offset(
     between_arguments_range: TextRange,
     locator: &Locator,
 ) -> Option<TextSize> {
-    // First find the comma separating the two arguments
-    find_first_non_trivia_character_in_range(between_arguments_range, locator.contents()).and_then(
-        |(comma_offset, comma)| {
-            debug_assert_eq!(comma, ',');
+    let mut tokens =
+        SimpleTokenizer::new(locator.contents(), between_arguments_range).skip_trivia();
 
-            // Then find the position of the `/` operator
-            find_first_non_trivia_character_in_range(
-                TextRange::new(
-                    comma_offset + TextSize::new(1),
-                    between_arguments_range.end(),
-                ),
-                locator.contents(),
-            )
-            .and_then(|(offset, c)| {
-                if c == '/' {
-                    Some(offset)
-                } else {
-                    debug_assert_eq!(c, ')');
-                    None
-                }
-            })
-        },
-    )
+    if let Some(comma) = tokens.next() {
+        debug_assert_eq!(comma.kind(), TokenKind::Comma);
+
+        if let Some(maybe_slash) = tokens.next() {
+            if maybe_slash.kind() == TokenKind::Slash {
+                return Some(maybe_slash.start());
+            }
+
+            debug_assert_eq!(maybe_slash.kind(), TokenKind::RParen);
+        }
+    }
+
+    None
 }
 
 /// Returns `true` if `right` is `Some` and `left` and `right` are referentially equal.

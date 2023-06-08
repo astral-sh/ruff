@@ -1,7 +1,6 @@
-use crate::trivia::{
-    find_first_non_trivia_character_after, find_first_non_trivia_character_before,
-};
+use crate::trivia::{first_non_trivia_token, first_non_trivia_token_rev, Token, TokenKind};
 use ruff_python_ast::node::AnyNodeRef;
+use rustpython_parser::ast::Ranged;
 
 pub(crate) trait NeedsParentheses {
     fn needs_parentheses(&self, parenthesize: Parenthesize, source: &str) -> Parentheses;
@@ -73,21 +72,17 @@ pub enum Parentheses {
 }
 
 fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
-    use rustpython_parser::ast::Ranged;
-
-    debug_assert!(
-        expr.is_expression(),
-        "Should only be called for expressions"
-    );
-
-    // Search backwards to avoid ambiguity with `(a, )` and because it's faster
     matches!(
-        find_first_non_trivia_character_after(expr.end(), contents),
-        Some((_, ')'))
-    )
-        // Search forwards to confirm that this is not a nested expression `(5 + d * 3)`
-        && matches!(
-        find_first_non_trivia_character_before(expr.start(), contents),
-        Some((_, '('))
+        first_non_trivia_token(expr.end(), contents),
+        Some(Token {
+            kind: TokenKind::RParen,
+            ..
+        })
+    ) && matches!(
+        first_non_trivia_token_rev(expr.start(), contents),
+        Some(Token {
+            kind: TokenKind::LParen,
+            ..
+        })
     )
 }

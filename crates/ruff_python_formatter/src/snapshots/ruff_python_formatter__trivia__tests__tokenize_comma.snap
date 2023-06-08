@@ -1,0 +1,22 @@
+---
+source: crates/ruff_python_formatter/src/trivia.rs
+expression: tokens
+---
+[
+    Token {
+        kind: Comma,
+        range: 0..1,
+    },
+    Token {
+        kind: Comma,
+        range: 1..2,
+    },
+    Token {
+        kind: Comma,
+        range: 2..3,
+    },
+    Token {
+        kind: Comma,
+        range: 3..4,
+    },
+]
