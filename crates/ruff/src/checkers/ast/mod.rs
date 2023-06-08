@@ -5069,22 +5069,19 @@ impl<'a> Checker<'a> {
                         .copied()
                         .collect()
                 };
-                for binding_id in scope.binding_ids() {
-                    let binding = &self.semantic_model.bindings[binding_id];
 
-                    flake8_type_checking::rules::runtime_import_in_type_checking_block(
-                        self,
-                        binding,
-                        &mut diagnostics,
-                    );
+                flake8_type_checking::rules::runtime_import_in_type_checking_block(
+                    self,
+                    scope,
+                    &mut diagnostics,
+                );
 
-                    flake8_type_checking::rules::typing_only_runtime_import(
-                        self,
-                        binding,
-                        &runtime_imports,
-                        &mut diagnostics,
-                    );
-                }
+                flake8_type_checking::rules::typing_only_runtime_import(
+                    self,
+                    scope,
+                    &runtime_imports,
+                    &mut diagnostics,
+                );
             }
 
             if self.enabled(Rule::UnusedImport) {
