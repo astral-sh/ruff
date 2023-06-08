@@ -178,7 +178,7 @@ return np.divide(
 -return np.divide(
 -    where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
 -)
-+NOT_YET_IMPLEMENTED_StmtReturn
++return NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
@@ -234,7 +234,7 @@ q = [i for i in []]
 # WE SHOULD DEFINITELY NOT EAT THESE COMMENTS (https://github.com/psf/black/issues/2873)
 NOT_YET_IMPLEMENTED_StmtIf
 
-NOT_YET_IMPLEMENTED_StmtReturn
+return NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output
