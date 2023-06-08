@@ -234,65 +234,64 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,219 +1,105 @@
+@@ -1,219 +1,149 @@
 -class MyClass:
 -    """Multiline
 -    class docstring
 -    """
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
+-
 -    def method(self):
 -        """Multiline
 -        method docstring
 -        """
 -        pass
++NOT_YET_IMPLEMENTED_StmtClassDef
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def foo():
+ def foo():
 -    """This is a docstring with
 -    some lines of text here
 -    """
--    return
++    "NOT_YET_IMPLEMENTED_STRING"
+     return
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def bar():
+ def bar():
 -    """This is another docstring
 -    with more lines of text
 -    """
--    return
++    "NOT_YET_IMPLEMENTED_STRING"
+     return
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def baz():
+ def baz():
 -    '''"This" is a string with some
 -    embedded "quotes"'''
--    return
++    "NOT_YET_IMPLEMENTED_STRING"
+     return
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def troz():
+ def troz():
 -    """Indentation with tabs
 -    is just as OK
 -    """
--    return
++    "NOT_YET_IMPLEMENTED_STRING"
+     return
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def zort():
+ def zort():
 -    """Another
 -    multiline
 -    docstring
 -    """
--    pass
++    "NOT_YET_IMPLEMENTED_STRING"
+     pass
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def poit():
+ def poit():
 -    """
 -    Lorem ipsum dolor sit amet.
- 
+-
 -    Consectetur adipiscing elit:
 -     - sed do eiusmod tempor incididunt ut labore
 -     - dolore magna aliqua
@@ -300,99 +299,99 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -       - quis nostrud exercitation ullamco laboris nisi
 -     - aliquip ex ea commodo consequat
 -    """
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
+     pass
  
  
--def under_indent():
+ def under_indent():
 -    """
 -      These lines are indented in a way that does not
 -    make sense.
 -    """
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
+     pass
  
  
--def over_indent():
+ def over_indent():
 -    """
 -    This has a shallow indent
 -      - But some lines are deeper
 -      - And the closing quote is too deep
 -    """
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
+     pass
  
  
--def single_line():
+ def single_line():
 -    """But with a newline after it!"""
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
+     pass
  
  
--def this():
+ def this():
 -    r"""
 -    'hey ho'
 -    """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def that():
+ def that():
 -    """ "hey yah" """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def and_that():
+ def and_that():
 -    """
 -    "hey yah" """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def and_this():
+ def and_this():
 -    '''
 -    "hey yah"'''
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def multiline_whitespace():
+ def multiline_whitespace():
 -    """ """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def oneline_whitespace():
+ def oneline_whitespace():
 -    """ """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def empty():
+ def empty():
 -    """"""
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def single_quotes():
+ def single_quotes():
 -    "testing"
--
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
--def believe_it_or_not_this_is_in_the_py_stdlib():
+ 
+ def believe_it_or_not_this_is_in_the_py_stdlib():
 -    '''
 -    "hey yah"'''
++    "NOT_YET_IMPLEMENTED_STRING"
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def ignored_docstring():
+ def ignored_docstring():
 -    """a => \
 -b"""
++    "NOT_YET_IMPLEMENTED_STRING"
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def single_line_docstring_with_whitespace():
+ def single_line_docstring_with_whitespace():
 -    """This should be stripped"""
++    "NOT_YET_IMPLEMENTED_STRING"
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def docstring_with_inline_tabs_and_space_indentation():
+ def docstring_with_inline_tabs_and_space_indentation():
 -    """hey
- 
+-
 -    tab	separated	value
 -        tab at start of line and then a tab	separated	value
 -                                multiple tabs at the beginning	and	inline
@@ -400,12 +399,12 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -
 -    line ends with some tabs
 -    """
--
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
--def docstring_with_inline_tabs_and_tab_indentation():
+ 
+ def docstring_with_inline_tabs_and_tab_indentation():
 -    """hey
- 
+-
 -    tab	separated	value
 -            tab at start of line and then a tab	separated	value
 -                                    multiple tabs at the beginning	and	inline
@@ -413,82 +412,83 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -
 -    line ends with some tabs
 -    """
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
+     pass
  
  
--def backslash_space():
+ def backslash_space():
 -    """\ """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def multiline_backslash_1():
+ def multiline_backslash_1():
 -    """
 -  hey\there\
 -  \ """
--
--
--def multiline_backslash_2():
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+ 
+ def multiline_backslash_2():
 -    """
 -    hey there \ """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
  # Regression test for #3425
--def multiline_backslash_really_long_dont_crash():
+ def multiline_backslash_really_long_dont_crash():
 -    """
 -    hey there hello guten tag hi hoow are you ola zdravstvuyte ciao como estas ca va \ """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def multiline_backslash_3():
+ def multiline_backslash_3():
 -    """
 -    already escaped \\"""
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def my_god_its_full_of_stars_1():
+ def my_god_its_full_of_stars_1():
 -    "I'm sorry Dave\u2001"
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
  # the space below is actually a \u2001, removed in output
--def my_god_its_full_of_stars_2():
+ def my_god_its_full_of_stars_2():
 -    "I'm sorry Dave"
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def docstring_almost_at_line_limit():
+ def docstring_almost_at_line_limit():
 -    """long docstring................................................................."""
--
--
--def docstring_almost_at_line_limit2():
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+ 
+ def docstring_almost_at_line_limit2():
 -    """long docstring.................................................................
 -
 -    ..................................................................................
 -    """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def docstring_at_line_limit():
+ def docstring_at_line_limit():
 -    """long docstring................................................................"""
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
  
  
--def multiline_docstring_at_line_limit():
+ def multiline_docstring_at_line_limit():
 -    """first line-----------------------------------------------------------------------
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
 -    second line----------------------------------------------------------------------"""
++    "NOT_YET_IMPLEMENTED_STRING"
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def stable_quote_normalization_with_immediate_inner_single_quote(self):
+ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 -    """'<text here>
- 
+-
 -    <text here, since without another non-empty line black is stable>
 -    """
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 ## Ruff Output
@@ -497,108 +497,152 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo():
+    "NOT_YET_IMPLEMENTED_STRING"
+    return
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def bar():
+    "NOT_YET_IMPLEMENTED_STRING"
+    return
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def baz():
+    "NOT_YET_IMPLEMENTED_STRING"
+    return
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def troz():
+    "NOT_YET_IMPLEMENTED_STRING"
+    return
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def zort():
+    "NOT_YET_IMPLEMENTED_STRING"
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def poit():
+    "NOT_YET_IMPLEMENTED_STRING"
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def under_indent():
+    "NOT_YET_IMPLEMENTED_STRING"
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def over_indent():
+    "NOT_YET_IMPLEMENTED_STRING"
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def single_line():
+    "NOT_YET_IMPLEMENTED_STRING"
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def this():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def that():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def and_that():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def and_this():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def multiline_whitespace():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def oneline_whitespace():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def empty():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def single_quotes():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def believe_it_or_not_this_is_in_the_py_stdlib():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def ignored_docstring():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def single_line_docstring_with_whitespace():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def docstring_with_inline_tabs_and_space_indentation():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def docstring_with_inline_tabs_and_tab_indentation():
+    "NOT_YET_IMPLEMENTED_STRING"
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def backslash_space():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def multiline_backslash_1():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def multiline_backslash_2():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
 # Regression test for #3425
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def multiline_backslash_really_long_dont_crash():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def multiline_backslash_3():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def my_god_its_full_of_stars_1():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
 # the space below is actually a \u2001, removed in output
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def my_god_its_full_of_stars_2():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def docstring_almost_at_line_limit():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def docstring_almost_at_line_limit2():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def docstring_at_line_limit():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def multiline_docstring_at_line_limit():
+    "NOT_YET_IMPLEMENTED_STRING"
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def stable_quote_normalization_with_immediate_inner_single_quote(self):
+    "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 ## Black Output

@@ -103,7 +103,7 @@ use crate::comments::map::MultiMap;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::CommentsVisitor;
 pub(crate) use format::{
-    dangling_comments, dangling_node_comments, leading_alternate_branch_comments,
+    dangling_comments, dangling_node_comments, leading_alternate_branch_comments, leading_comments,
     leading_node_comments, trailing_comments, trailing_node_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
@@ -293,6 +293,14 @@ impl<'a> Comments<'a> {
     #[inline]
     pub(crate) fn has_trailing_comments(&self, node: AnyNodeRef) -> bool {
         !self.trailing_comments(node).is_empty()
+    }
+
+    /// Returns `true` if the given `node` has any [trailing own line comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing_own_line_comments(&self, node: AnyNodeRef) -> bool {
+        self.trailing_comments(node)
+            .iter()
+            .any(|comment| comment.position().is_own_line())
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.

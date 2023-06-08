@@ -22,24 +22,30 @@ def bobtwo(): \
 ```diff
 --- Black
 +++ Ruff
-@@ -1,6 +1,4 @@
+@@ -1,6 +1,8 @@
 -def bob():  # pylint: disable=W9016
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def bob():
++    # pylint: disable=W9016
+     pass
  
  
 -def bobtwo():  # some comment here
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++def bobtwo():
++    # some comment here
+     pass
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def bob():
+    # pylint: disable=W9016
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def bobtwo():
+    # some comment here
+    pass
 ```
 
 ## Black Output

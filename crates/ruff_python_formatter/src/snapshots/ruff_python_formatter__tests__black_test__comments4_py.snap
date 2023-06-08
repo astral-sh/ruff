@@ -107,7 +107,7 @@ def foo3(list_a, list_b):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,94 +1,14 @@
+@@ -1,94 +1,22 @@
 -from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
 -    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 -)
@@ -169,7 +169,7 @@ def foo3(list_a, list_b):
 +NOT_YET_IMPLEMENTED_StmtClassDef
  
  
--def foo(list_a, list_b):
+ def foo(list_a, list_b):
 -    results = (
 -        User.query.filter(User.foo == "bar")
 -        .filter(  # Because foo.
@@ -182,12 +182,12 @@ def foo3(list_a, list_b):
 -        .with_for_update(key_share=True)
 -        .all()
 -    )
--    return results
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    results = NOT_IMPLEMENTED_call()
+     return results
  
  
--def foo2(list_a, list_b):
--    # Standalone comment reasonably placed.
+ def foo2(list_a, list_b):
+     # Standalone comment reasonably placed.
 -    return (
 -        User.query.filter(User.foo == "bar")
 -        .filter(
@@ -195,19 +195,19 @@ def foo3(list_a, list_b):
 -        )
 -        .filter(User.xyz.is_(None))
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    return NOT_IMPLEMENTED_call()
  
  
--def foo3(list_a, list_b):
--    return (
--        # Standalone comment but weirdly placed.
+ def foo3(list_a, list_b):
+     return (
+         # Standalone comment but weirdly placed.
 -        User.query.filter(User.foo == "bar")
 -        .filter(
 -            db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
 -        )
 -        .filter(User.xyz.is_(None))
--    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++        NOT_IMPLEMENTED_call()
+     )
 ```
 
 ## Ruff Output
@@ -220,13 +220,21 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo(list_a, list_b):
+    results = NOT_IMPLEMENTED_call()
+    return results
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo2(list_a, list_b):
+    # Standalone comment reasonably placed.
+    return NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo3(list_a, list_b):
+    return (
+        # Standalone comment but weirdly placed.
+        NOT_IMPLEMENTED_call()
+    )
 ```
 
 ## Black Output

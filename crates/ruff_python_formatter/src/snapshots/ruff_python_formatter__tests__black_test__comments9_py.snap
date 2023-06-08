@@ -152,35 +152,7 @@ def bar():
 ```diff
 --- Black
 +++ Ruff
-@@ -4,8 +4,7 @@
- 
- 
- # This comment should be split from the statement above by two lines.
--def function():
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
- 
- some = statement
-@@ -14,24 +13,21 @@
- # This multiline comments section
- # should be split from the statement
- # above by two lines.
--def function():
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
- 
- some = statement
- 
- 
- # This comment should be split from the statement above by two lines.
--async def async_function():
--    pass
-+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
- 
- 
- some = statement
+@@ -30,8 +30,7 @@
  
  
  # This comment should be split from the statement above by two lines.
@@ -190,7 +162,7 @@ def bar():
  
  
  some = statement
-@@ -39,123 +35,55 @@
+@@ -39,17 +38,14 @@
  
  
  # This should be split from the above by two lines
@@ -211,54 +183,37 @@ def bar():
  
  
  some = statement
- 
- 
- # leading 1
--@deco1
--# leading 2
--# leading 2 extra
+@@ -59,7 +55,7 @@
+ @deco1
+ # leading 2
+ # leading 2 extra
 -@deco2(with_args=True)
--# leading 3
--@deco3
--# leading 4
--def decorated():
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
- 
- some = statement
- 
- 
++@NOT_IMPLEMENTED_call()
+ # leading 3
+ @deco3
+ # leading 4
+@@ -73,7 +69,7 @@
  # leading 1
--@deco1
--# leading 2
+ @deco1
+ # leading 2
 -@deco2(with_args=True)
--
--# leading 3 that already has an empty line
--@deco3
--# leading 4
--def decorated_with_split_leading_comments():
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++@NOT_IMPLEMENTED_call()
  
- 
- some = statement
- 
- 
+ # leading 3 that already has an empty line
+ @deco3
+@@ -88,7 +84,7 @@
  # leading 1
--@deco1
--# leading 2
+ @deco1
+ # leading 2
 -@deco2(with_args=True)
--# leading 3
--@deco3
--
--# leading 4 that already has an empty line
--def decorated_with_split_leading_comments():
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++@NOT_IMPLEMENTED_call()
+ # leading 3
+ @deco3
+ 
+@@ -98,41 +94,13 @@
  
  
--def main():
+ def main():
 -    if a:
 -        # Leading comment before inline function
 -        def inline():
@@ -267,19 +222,20 @@ def bar():
 -        # Another leading comment
 -        def another_inline():
 -            pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtIf
  
 -    else:
 -        # More leading comments
 -        def inline_after_else():
 -            pass
--
+ 
++NOT_YET_IMPLEMENTED_StmtIf
  
 -if a:
 -    # Leading comment before "top-level inline" function
 -    def top_level_quote_inline():
 -        pass
--
+ 
 -    # Another leading comment
 -    def another_top_level_quote_inline_inline():
 -        pass
@@ -288,9 +244,8 @@ def bar():
 -    # More leading comments
 -    def top_level_quote_inline_after_else():
 -        pass
-+NOT_YET_IMPLEMENTED_StmtIf
- 
- 
+-
+-
 -class MyClass:
 -    # First method has no empty lines between bare class def.
 -    # More comments.
@@ -300,33 +255,6 @@ def bar():
  
  
  # Regression test for https://github.com/psf/black/issues/3454.
--def foo():
--    pass
--    # Trailing comment that belongs to this function
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
- 
--@decorator1
--@decorator2  # fmt: skip
--def bar():
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
- 
- # Regression test for https://github.com/psf/black/issues/3454.
--def foo():
--    pass
--    # Trailing comment that belongs to this function.
--    # NOTE this comment only has one empty line below, and the formatter
--    # should enforce two blank lines.
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
- 
--@decorator1
--# A standalone comment
--def bar():
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
 ```
 
 ## Ruff Output
@@ -338,7 +266,8 @@ some = statement
 
 
 # This comment should be split from the statement above by two lines.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def function():
+    pass
 
 
 some = statement
@@ -347,14 +276,16 @@ some = statement
 # This multiline comments section
 # should be split from the statement
 # above by two lines.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def function():
+    pass
 
 
 some = statement
 
 
 # This comment should be split from the statement above by two lines.
-NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+async def async_function():
+    pass
 
 
 some = statement
@@ -383,24 +314,49 @@ some = statement
 
 
 # leading 1
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+@deco1
+# leading 2
+# leading 2 extra
+@NOT_IMPLEMENTED_call()
+# leading 3
+@deco3
+# leading 4
+def decorated():
+    pass
 
 
 some = statement
 
 
 # leading 1
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+@deco1
+# leading 2
+@NOT_IMPLEMENTED_call()
+
+# leading 3 that already has an empty line
+@deco3
+# leading 4
+def decorated_with_split_leading_comments():
+    pass
 
 
 some = statement
 
 
 # leading 1
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+@deco1
+# leading 2
+@NOT_IMPLEMENTED_call()
+# leading 3
+@deco3
+
+# leading 4 that already has an empty line
+def decorated_with_split_leading_comments():
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def main():
+    NOT_YET_IMPLEMENTED_StmtIf
 
 
 NOT_YET_IMPLEMENTED_StmtIf
@@ -410,17 +366,29 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 # Regression test for https://github.com/psf/black/issues/3454.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo():
+    pass
+    # Trailing comment that belongs to this function
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+@decorator1
+@decorator2  # fmt: skip
+def bar():
+    pass
 
 
 # Regression test for https://github.com/psf/black/issues/3454.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def foo():
+    pass
+    # Trailing comment that belongs to this function.
+    # NOTE this comment only has one empty line below, and the formatter
+    # should enforce two blank lines.
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+@decorator1
+# A standalone comment
+def bar():
+    pass
 ```
 
 ## Black Output

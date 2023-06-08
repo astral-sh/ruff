@@ -42,7 +42,7 @@ assert (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,58 +1,21 @@
+@@ -1,58 +1,22 @@
  importA
  (
 -    ()
@@ -79,7 +79,7 @@ assert (
 +NOT_YET_IMPLEMENTED_StmtClassDef
  
  
--def test(self, othr):
+ def test(self, othr):
 -    return 1 == 2 and (
 -        name,
 -        description,
@@ -99,7 +99,7 @@ assert (
 -        othr.meta_data,
 -        othr.schedule,
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
  
  
 -assert a_function(
@@ -129,7 +129,8 @@ importA
 NOT_YET_IMPLEMENTED_StmtClassDef
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def test(self, othr):
+    return NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 
 
 NOT_YET_IMPLEMENTED_StmtAssert

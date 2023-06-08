@@ -225,18 +225,16 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::{Formatter, Write};
-    use std::fs;
-    use std::path::Path;
-
     use anyhow::Result;
     use insta::assert_snapshot;
+    use ruff_python_ast::source_code::CommentRangesBuilder;
+    use ruff_testing_macros::fixture;
     use rustpython_parser::lexer::lex;
     use rustpython_parser::{parse_tokens, Mode};
     use similar::TextDiff;
-
-    use ruff_python_ast::source_code::CommentRangesBuilder;
-    use ruff_testing_macros::fixture;
+    use std::fmt::{Formatter, Write};
+    use std::fs;
+    use std::path::Path;
 
     use crate::{format_module, format_node};
 

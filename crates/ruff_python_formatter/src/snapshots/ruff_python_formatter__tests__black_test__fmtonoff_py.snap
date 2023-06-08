@@ -199,7 +199,7 @@ d={'a':1,
 ```diff
 --- Black
 +++ Ruff
-@@ -1,224 +1,72 @@
+@@ -1,16 +1,14 @@
  #!/usr/bin/env python3
 -import asyncio
 -import sys
@@ -207,10 +207,10 @@ d={'a':1,
 +NOT_YET_IMPLEMENTED_StmtImport
  
 -from third_party import X, Y, Z
+-
+-from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  
--from library import some_connection, some_decorator
--
 +NOT_YET_IMPLEMENTED_StmtImportFrom
  # fmt: off
 -from third_party import (X,
@@ -222,10 +222,10 @@ d={'a':1,
  # Comment 1
  
  # Comment 2
- 
+@@ -18,109 +16,109 @@
  
  # fmt: off
--def func_no_args():
+ def func_no_args():
 -  a; b; c
 -  if True: raise RuntimeError
 -  if False: ...
@@ -234,7 +234,17 @@ d={'a':1,
 -    continue
 -  exec('new-style exec', {}, {})
 -  return None
--async def coroutine(arg, exec=False):
++    a
++    b
++    c
++    NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_StmtFor
++    NOT_IMPLEMENTED_call()
++    return None
++
++
+ async def coroutine(arg, exec=False):
 - 'Single-line docstring. Multiline is harder to reformat.'
 - async with some_connection() as conn:
 -     await conn.do_what_i_mean('SELECT bobby, tables FROM xkcd', timeout=2)
@@ -246,47 +256,75 @@ d={'a':1,
 -)
 -def function_signature_stress_test(number:int,no_annotation=None,text:str='default',* ,debug:bool=False,**kwargs) -> str:
 - return text[number:-1]
--# fmt: on
++    "NOT_YET_IMPLEMENTED_STRING"
++    NOT_YET_IMPLEMENTED_StmtAsyncWith
++    await NOT_IMPLEMENTED_call()
++
++
++@asyncio.NOT_IMPLEMENTED_attr
++@NOT_IMPLEMENTED_call()
++def function_signature_stress_test(
++    number: int,
++    no_annotation=None,
++    text: str = "NOT_YET_IMPLEMENTED_STRING",
++    debug: bool = False,
++    **kwargs,
++) -> str:
++    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++
++
+ # fmt: on
 -def spaces(a=1, b=(), c=[], d={}, e=True, f=-1, g=1 if False else 2, h="", i=r""):
 -    offset = attr.ib(default=attr.Factory(lambda: _r.uniform(1, 2)))
 -    assert task._cancel_stack[: len(old_stack)] == old_stack
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
-+
-+
-+NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
-+
++def spaces(
++    a=1,
++    b=(1, 2),
++    c=[],
++    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
++    e=True,
++    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
++    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++    h="NOT_YET_IMPLEMENTED_STRING",
++    i="NOT_YET_IMPLEMENTED_STRING",
++):
++    offset = NOT_IMPLEMENTED_call()
++    NOT_YET_IMPLEMENTED_StmtAssert
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def spaces_types(
--    a: int = 1,
+ def spaces_types(
+     a: int = 1,
 -    b: tuple = (),
--    c: list = [],
++    b: tuple = (1, 2),
+     c: list = [],
 -    d: dict = {},
--    e: bool = True,
++    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+     e: bool = True,
 -    f: int = -1,
 -    g: int = 1 if False else 2,
 -    h: str = "",
 -    i: str = r"",
--):
--    ...
++    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
++    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
++    h: str = "NOT_YET_IMPLEMENTED_STRING",
++    i: str = "NOT_YET_IMPLEMENTED_STRING",
+ ):
+     ...
  
-+# fmt: on
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -def spaces2(result=_core.Value(None)):
--    ...
++def spaces2(result=NOT_IMPLEMENTED_call()):
+     ...
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -something = {
 -    # fmt: off
 -    key: 'value',
 -}
++something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def subscriptlist():
+ def subscriptlist():
 -    atom[
 -        # fmt: off
 -        'some big and',
@@ -295,81 +333,90 @@ d={'a':1,
 -        goes + here,
 -        andhere,
 -    ]
++    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
-+something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
  
--def import_as_names():
--    # fmt: off
+ def import_as_names():
+     # fmt: off
 -    from hello import a,        b
 -    'unformatted'
--    # fmt: on
++    NOT_YET_IMPLEMENTED_StmtImportFrom
++    "NOT_YET_IMPLEMENTED_STRING"
+     # fmt: on
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def testlist_star_expr():
--    # fmt: off
+ def testlist_star_expr():
+     # fmt: off
 -    a , b = *hello
 -    'unformatted'
--    # fmt: on
++    (1, 2) = NOT_YET_IMPLEMENTED_ExprStarred
++    "NOT_YET_IMPLEMENTED_STRING"
+     # fmt: on
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def yield_expr():
--    # fmt: off
+ def yield_expr():
+     # fmt: off
 -    yield hello
 -    'unformatted'
--    # fmt: on
++    NOT_YET_IMPLEMENTED_ExprYield
++    "NOT_YET_IMPLEMENTED_STRING"
+     # fmt: on
 -    "formatted"
--    # fmt: off
++    "NOT_YET_IMPLEMENTED_STRING"
+     # fmt: off
 -    ( yield hello )
 -    'unformatted'
--    # fmt: on
++    (NOT_YET_IMPLEMENTED_ExprYield)
++    "NOT_YET_IMPLEMENTED_STRING"
+     # fmt: on
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def example(session):
--    # fmt: off
+ def example(session):
+     # fmt: off
 -    result = session\
 -        .query(models.Customer.id)\
 -        .filter(models.Customer.account_id == account_id,
 -                models.Customer.email == email_address)\
 -        .order_by(models.Customer.id.asc())\
 -        .all()
--    # fmt: on
++    result = NOT_IMPLEMENTED_call()
+     # fmt: on
  
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
--def off_and_on_without_data():
+ def off_and_on_without_data():
 -    """All comments here are technically on the same prefix.
- 
+-
 -    The comments between will be formatted. This is a known limitation.
 -    """
--    # fmt: off
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
+     # fmt: off
  
--    # hey, that won't work
- 
--    # fmt: on
--    pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
+     # hey, that won't work
+@@ -130,13 +128,15 @@
  
  
--def on_and_off_broken():
+ def on_and_off_broken():
 -    """Another known limitation."""
--    # fmt: on
--    # fmt: off
++    "NOT_YET_IMPLEMENTED_STRING"
+     # fmt: on
+     # fmt: off
 -    this=should.not_be.formatted()
 -    and_=indeed . it  is  not  formatted
 -    because . the . handling . inside . generate_ignored_nodes()
 -    now . considers . multiple . fmt . directives . within . one . prefix
--    # fmt: on
--    # fmt: off
--    # ...but comments still get reformatted even though they should not be
--    # fmt: on
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    this = NOT_IMPLEMENTED_call()
++    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++    NOT_IMPLEMENTED_call()
++    (
++        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
++    )
+     # fmt: on
+     # fmt: off
+     # ...but comments still get reformatted even though they should not be
+@@ -144,81 +144,18 @@
  
  
--def long_lines():
+ def long_lines():
 -    if True:
 -        typedargslist.extend(
 -            gen_annotated_params(
@@ -408,13 +455,15 @@ d={'a':1,
 -        re.MULTILINE|re.VERBOSE
 -        # fmt: on
 -    )
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtIf
++    _type_comment_re = NOT_IMPLEMENTED_call()
  
  
--def single_literal_yapf_disable():
+ def single_literal_yapf_disable():
 -    """Black does not support this."""
 -    BAZ = {(1, 2, 3, 4), (5, 6, 7, 8), (9, 10, 11, 12)}  # yapf: disable
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    "NOT_YET_IMPLEMENTED_STRING"
++    BAZ = {(1, 2), (1, 2), (1, 2)}  # yapf: disable
  
  
 -cfg.rule(
@@ -476,53 +525,142 @@ NOT_YET_IMPLEMENTED_ExprJoinedStr
 
 
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def func_no_args():
+    a
+    b
+    c
+    NOT_YET_IMPLEMENTED_StmtIf
+    NOT_YET_IMPLEMENTED_StmtIf
+    NOT_YET_IMPLEMENTED_StmtFor
+    NOT_IMPLEMENTED_call()
+    return None
 
 
-NOT_YET_IMPLEMENTED_StmtAsyncFunctionDef
+async def coroutine(arg, exec=False):
+    "NOT_YET_IMPLEMENTED_STRING"
+    NOT_YET_IMPLEMENTED_StmtAsyncWith
+    await NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+@asyncio.NOT_IMPLEMENTED_attr
+@NOT_IMPLEMENTED_call()
+def function_signature_stress_test(
+    number: int,
+    no_annotation=None,
+    text: str = "NOT_YET_IMPLEMENTED_STRING",
+    debug: bool = False,
+    **kwargs,
+) -> str:
+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
 # fmt: on
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def spaces(
+    a=1,
+    b=(1, 2),
+    c=[],
+    d={NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    e=True,
+    f=NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    g=NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    h="NOT_YET_IMPLEMENTED_STRING",
+    i="NOT_YET_IMPLEMENTED_STRING",
+):
+    offset = NOT_IMPLEMENTED_call()
+    NOT_YET_IMPLEMENTED_StmtAssert
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def spaces_types(
+    a: int = 1,
+    b: tuple = (1, 2),
+    c: list = [],
+    d: dict = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value},
+    e: bool = True,
+    f: int = NOT_YET_IMPLEMENTED_ExprUnaryOp,
+    g: int = NOT_IMPLEMENTED_true if NOT_IMPLEMENTED_cond else NOT_IMPLEMENTED_false,
+    h: str = "NOT_YET_IMPLEMENTED_STRING",
+    i: str = "NOT_YET_IMPLEMENTED_STRING",
+):
+    ...
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def spaces2(result=NOT_IMPLEMENTED_call()):
+    ...
 
 
 something = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def subscriptlist():
+    NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def import_as_names():
+    # fmt: off
+    NOT_YET_IMPLEMENTED_StmtImportFrom
+    "NOT_YET_IMPLEMENTED_STRING"
+    # fmt: on
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def testlist_star_expr():
+    # fmt: off
+    (1, 2) = NOT_YET_IMPLEMENTED_ExprStarred
+    "NOT_YET_IMPLEMENTED_STRING"
+    # fmt: on
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def yield_expr():
+    # fmt: off
+    NOT_YET_IMPLEMENTED_ExprYield
+    "NOT_YET_IMPLEMENTED_STRING"
+    # fmt: on
+    "NOT_YET_IMPLEMENTED_STRING"
+    # fmt: off
+    (NOT_YET_IMPLEMENTED_ExprYield)
+    "NOT_YET_IMPLEMENTED_STRING"
+    # fmt: on
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def example(session):
+    # fmt: off
+    result = NOT_IMPLEMENTED_call()
+    # fmt: on
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def off_and_on_without_data():
+    "NOT_YET_IMPLEMENTED_STRING"
+    # fmt: off
+
+    # hey, that won't work
+
+    # fmt: on
+    pass
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def on_and_off_broken():
+    "NOT_YET_IMPLEMENTED_STRING"
+    # fmt: on
+    # fmt: off
+    this = NOT_IMPLEMENTED_call()
+    and_ = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
+    NOT_IMPLEMENTED_call()
+    (
+        now.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr.NOT_IMPLEMENTED_attr
+    )
+    # fmt: on
+    # fmt: off
+    # ...but comments still get reformatted even though they should not be
+    # fmt: on
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def long_lines():
+    NOT_YET_IMPLEMENTED_StmtIf
+    _type_comment_re = NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def single_literal_yapf_disable():
+    "NOT_YET_IMPLEMENTED_STRING"
+    BAZ = {(1, 2), (1, 2), (1, 2)}  # yapf: disable
 
 
 NOT_IMPLEMENTED_call()

@@ -66,11 +66,10 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,65 +1,12 @@
--def f(
--    a,
--    **kwargs,
--) -> A:
+@@ -2,64 +2,27 @@
+     a,
+     **kwargs,
+ ) -> A:
 -    with cache_dir():
 -        if something:
 -            result = CliRunner().invoke(
@@ -82,19 +81,24 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -        very_long_argument_name2=-very.long.value.for_the_argument,
 -        **kwargs,
 -    )
--
--
--def g():
++    NOT_YET_IMPLEMENTED_StmtWith
++    NOT_IMPLEMENTED_call()  # negate top
++    return NOT_IMPLEMENTED_call()
+ 
+ 
+ def g():
 -    "Docstring."
--
--    def inner():
--        pass
--
++    "NOT_YET_IMPLEMENTED_STRING"
+ 
+     def inner():
+         pass
+ 
 -    print("Inner defs should breathe a little.")
--
--
--def h():
--    def inner():
++    NOT_IMPLEMENTED_call()
+ 
+ 
+ def h():
+     def inner():
 -        pass
 -
 -    print("Inner defs should breathe a little.")
@@ -104,36 +108,34 @@ with hmm_but_this_should_get_two_preceding_newlines():
 -    import termios
 -
 -    def i_should_be_followed_by_only_one_newline():
--        pass
--
+         pass
+ 
 -elif os.name == "nt":
 -    try:
 -        import msvcrt
--
++    NOT_IMPLEMENTED_call()
+ 
 -        def i_should_be_followed_by_only_one_newline():
 -            pass
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    except ImportError:
++NOT_YET_IMPLEMENTED_StmtIf
  
 -        def i_should_be_followed_by_only_one_newline():
 -            pass
 -
 -elif False:
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
 -    class IHopeYouAreHavingALovelyDay:
 -        def __call__(self):
 -            print("i_should_be_followed_by_only_one_newline")
- 
+-
 -else:
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
 -    def foo():
 -        pass
- 
-+NOT_YET_IMPLEMENTED_StmtIf
- 
+-
+-
 -with hmm_but_this_should_get_two_preceding_newlines():
 -    pass
 +NOT_YET_IMPLEMENTED_StmtWith
@@ -142,13 +144,29 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def f(
+    a,
+    **kwargs,
+) -> A:
+    NOT_YET_IMPLEMENTED_StmtWith
+    NOT_IMPLEMENTED_call()  # negate top
+    return NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def g():
+    "NOT_YET_IMPLEMENTED_STRING"
+
+    def inner():
+        pass
+
+    NOT_IMPLEMENTED_call()
 
 
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def h():
+    def inner():
+        pass
+
+    NOT_IMPLEMENTED_call()
 
 
 NOT_YET_IMPLEMENTED_StmtIf

@@ -46,7 +46,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ```diff
 --- Black
 +++ Ruff
-@@ -1,50 +1,20 @@
+@@ -1,50 +1,21 @@
 -zero(
 -    one,
 -).two(
@@ -79,14 +79,14 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
  
  
  # Example from https://github.com/psf/black/issues/3229
--def refresh_token(self, device_family, refresh_token, api_key):
+ def refresh_token(self, device_family, refresh_token, api_key):
 -    return self.orchestration.refresh_token(
 -        data={
 -            "refreshToken": refresh_token,
 -        },
 -        api_key=api_key,
 -    )["extensions"]["sdk"]["token"]
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  
  # Edge case where a bug in a working-in-progress version of
@@ -120,7 +120,8 @@ NOT_IMPLEMENTED_call()
 
 
 # Example from https://github.com/psf/black/issues/3229
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def refresh_token(self, device_family, refresh_token, api_key):
+    return NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 
 # Edge case where a bug in a working-in-progress version of

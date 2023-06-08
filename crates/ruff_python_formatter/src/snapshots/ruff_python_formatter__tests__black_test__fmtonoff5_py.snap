@@ -97,7 +97,7 @@ elif   unformatted:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,87 +1,29 @@
+@@ -1,87 +1,33 @@
  # Regression test for https://github.com/psf/black/issues/3129.
 -setup(
 -    entry_points={
@@ -127,18 +127,18 @@ elif   unformatted:
  
  
  # Regression test for https://github.com/psf/black/issues/3026.
--def test_func():
--    # yapf: disable
+ def test_func():
+     # yapf: disable
 -    if  unformatted(  args  ):
 -        return True
 -    # yapf: enable
 -    elif b:
 -        return True
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
++    NOT_YET_IMPLEMENTED_StmtIf
  
--    return False
+     return False
  
--
+ 
  # Regression test for https://github.com/psf/black/issues/2567.
 -if True:
 -    # fmt: off
@@ -161,14 +161,14 @@ elif   unformatted:
 -            )  :
 -                # fmt: on
 -                print ( "This won't be formatted" )
--
--            elif param[0:4] in ("ZZZZ",):
--                print ( "This won't be formatted either" )
--
--        print("This will be formatted")
 +NOT_YET_IMPLEMENTED_StmtClassDef
  
+-            elif param[0:4] in ("ZZZZ",):
+-                print ( "This won't be formatted either" )
  
+-        print("This will be formatted")
+-
+-
  # Regression test for https://github.com/psf/black/issues/2985.
 -class Named(t.Protocol):
 -    # fmt: off
@@ -180,10 +180,10 @@ elif   unformatted:
 -class Factory(t.Protocol):
 -    def this_will_be_formatted(self, **kwargs) -> Named:
 -        ...
+-
+-    # fmt: on
 +NOT_YET_IMPLEMENTED_StmtClassDef
  
--    # fmt: on
--
  
  # Regression test for https://github.com/psf/black/issues/3436.
 -if x:
@@ -207,7 +207,11 @@ NOT_IMPLEMENTED_call()
 
 
 # Regression test for https://github.com/psf/black/issues/3026.
-NOT_YET_IMPLEMENTED_StmtFunctionDef
+def test_func():
+    # yapf: disable
+    NOT_YET_IMPLEMENTED_StmtIf
+
+    return False
 
 
 # Regression test for https://github.com/psf/black/issues/2567.
