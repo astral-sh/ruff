@@ -1,7 +1,7 @@
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
 use ruff_formatter::prelude::{
     format_with, group, if_group_breaks, soft_block_indent, soft_line_break_or_space, text,
 };
@@ -16,11 +16,10 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
         let ExprSet { range: _, elts } = item;
         // That would be a dict expression
         assert!(!elts.is_empty());
+        // Avoid second mutable borrow of f
         let joined = format_with(|f| {
-            let a = text(",");
-            let b = soft_line_break_or_space();
-            f.join_with(format_args!(a, b))
-                .entries(elts.iter().map(AsFormat::format))
+            f.join_with(format_args!(text(","), soft_line_break_or_space()))
+                .entries(elts.iter().formatted())
                 .finish()
         });
         write!(
