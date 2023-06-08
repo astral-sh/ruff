@@ -1,0 +1,104 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+comparison_with_itself.py:3:1: PLR0124 Name compared with itself, consider replacing `foo == foo`
+  |
+3 | # Errors.
+4 | 
+5 | foo == foo
+  | ^^^ PLR0124
+6 | 
+7 | foo != foo
+  |
+
+comparison_with_itself.py:5:1: PLR0124 Name compared with itself, consider replacing `foo != foo`
+  |
+5 | foo == foo
+6 | 
+7 | foo != foo
+  | ^^^ PLR0124
+8 | 
+9 | foo > foo
+  |
+
+comparison_with_itself.py:7:1: PLR0124 Name compared with itself, consider replacing `foo > foo`
+   |
+ 7 | foo != foo
+ 8 | 
+ 9 | foo > foo
+   | ^^^ PLR0124
+10 | 
+11 | foo >= foo
+   |
+
+comparison_with_itself.py:9:1: PLR0124 Name compared with itself, consider replacing `foo >= foo`
+   |
+ 9 | foo > foo
+10 | 
+11 | foo >= foo
+   | ^^^ PLR0124
+12 | 
+13 | foo < foo
+   |
+
+comparison_with_itself.py:11:1: PLR0124 Name compared with itself, consider replacing `foo < foo`
+   |
+11 | foo >= foo
+12 | 
+13 | foo < foo
+   | ^^^ PLR0124
+14 | 
+15 | foo <= foo
+   |
+
+comparison_with_itself.py:13:1: PLR0124 Name compared with itself, consider replacing `foo <= foo`
+   |
+13 | foo < foo
+14 | 
+15 | foo <= foo
+   | ^^^ PLR0124
+16 | 
+17 | foo is foo
+   |
+
+comparison_with_itself.py:15:1: PLR0124 Name compared with itself, consider replacing `foo is foo`
+   |
+15 | foo <= foo
+16 | 
+17 | foo is foo
+   | ^^^ PLR0124
+18 | 
+19 | foo is not foo
+   |
+
+comparison_with_itself.py:17:1: PLR0124 Name compared with itself, consider replacing `foo is not foo`
+   |
+17 | foo is foo
+18 | 
+19 | foo is not foo
+   | ^^^ PLR0124
+20 | 
+21 | foo in foo
+   |
+
+comparison_with_itself.py:19:1: PLR0124 Name compared with itself, consider replacing `foo in foo`
+   |
+19 | foo is not foo
+20 | 
+21 | foo in foo
+   | ^^^ PLR0124
+22 | 
+23 | foo not in foo
+   |
+
+comparison_with_itself.py:21:1: PLR0124 Name compared with itself, consider replacing `foo not in foo`
+   |
+21 | foo in foo
+22 | 
+23 | foo not in foo
+   | ^^^ PLR0124
+24 | 
+25 | # Non-errors.
+   |
+
+
