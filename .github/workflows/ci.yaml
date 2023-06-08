@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -54,7 +54,7 @@ jobs:
   cargo-test:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ ubuntu-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     name: "cargo test | ${{ matrix.os }}"
     steps:
@@ -194,12 +194,12 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install nightly Rust toolchain"
         # Only pinned to make caching work, update freely
-        run: rustup toolchain install nightly-2023-03-30
+        run: rustup toolchain install nightly-2023-06-08
       - uses: Swatinem/rust-cache@v2
       - name: "Install cargo-udeps"
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
-        run: cargo +nightly-2023-03-30 udeps
+        run: cargo +nightly-2023-06-08 udeps
 
 
   python-package:
@@ -211,6 +211,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
+      - uses: Swatinem/rust-cache@v2
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
@@ -223,6 +224,8 @@ jobs:
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           ruff --help
           python -m ruff --help
+      - name: "Remove wheels from cache"
+        run: rm -rf target/wheels
 
   pre-commit:
     name: "pre-commit"
@@ -240,8 +243,8 @@ jobs:
       - name: "Cache pre-commit"
         uses: actions/cache@v3
         with:
-            path: ~/.cache/pre-commit
-            key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
       - name: "Run pre-commit"
         run: |
           echo '```console' > $GITHUB_STEP_SUMMARY
