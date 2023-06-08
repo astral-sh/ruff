@@ -24,11 +24,15 @@ for name, (value1, _) in some_dict.items():  # OK
     pass
 
 
-for ((key1, _), (_, _)) in some_dict.items():  # W8102
+for (key1, _), (_, _) in some_dict.items():  # W8102
     pass
 
 
-for ((_, _), (value, _)) in some_dict.items():  # W8102
+for (_, (_, _)), (value, _) in some_dict.items():  # W8102
+    pass
+
+
+for (_, key2), (value1, _) in some_dict.items():  # OK
     pass
 
 
@@ -36,7 +40,15 @@ for ((_, key2), (value1, _)) in some_dict.items():  # OK
     pass
 
 
-for ((_, _, _, variants), (r_language, _, _, _)) in some_dict.items():  # OK
+for ((_, key2), (_, _)) in some_dict.items():  # W8102
+    pass
+
+
+for (_, _, _, variants), (r_language, _, _, _) in some_dict.items():  # OK
+    pass
+
+
+for (_, _, (_, variants)), (_, (_, (r_language, _))) in some_dict.items():  # OK
     pass
 
 
