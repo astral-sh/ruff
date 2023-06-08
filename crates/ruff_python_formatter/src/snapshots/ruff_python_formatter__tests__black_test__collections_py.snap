@@ -122,28 +122,25 @@ if True:
 -    2,
 -    3,
 -}
--x = (1,)
++c = {1, 2, 3}
+ x = (1,)
 -y = (narf(),)
 -nested = {
 -    (1, 2, 3),
 -    (4, 5, 6),
 -}
--nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
-+c = {1, 2, 3}
-+x = (1, 2)
-+y = (1, 2)
-+nested = {(1, 2), (1, 2)}
-+nested_no_trailing_comma = {(1, 2), (1, 2)}
++y = (NOT_IMPLEMENTED_call(),)
++nested = {(1, 2, 3), (4, 5, 6)}
+ nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
  nested_long_lines = [
 -    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 -    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 -    "cccccccccccccccccccccccccccccccccccccccc",
--    (1, 2, 3),
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
++    "NOT_YET_IMPLEMENTED_STRING",
+     (1, 2, 3),
 -    "dddddddddddddddddddddddddddddddddddddddd",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    "NOT_YET_IMPLEMENTED_STRING",
-+    (1, 2),
 +    "NOT_YET_IMPLEMENTED_STRING",
  ]
 -{
@@ -161,7 +158,7 @@ if True:
 -)
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +{NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-+["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (1, 2)]
++["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
 +x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 +NOT_YET_IMPLEMENTED_StmtAssert
@@ -181,9 +178,8 @@ if True:
 -]
 +[1, 2, 3]
  
--division_result_tuple = (6 / 2,)
+ division_result_tuple = (6 / 2,)
 -print("foo %r", (foo.bar,))
-+division_result_tuple = (1, 2)
 +NOT_IMPLEMENTED_call()
  
  if True:
@@ -238,20 +234,20 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 a = {1, 2, 3}
 b = {1, 2, 3}
 c = {1, 2, 3}
-x = (1, 2)
-y = (1, 2)
-nested = {(1, 2), (1, 2)}
-nested_no_trailing_comma = {(1, 2), (1, 2)}
+x = (1,)
+y = (NOT_IMPLEMENTED_call(),)
+nested = {(1, 2, 3), (4, 5, 6)}
+nested_no_trailing_comma = {(1, 2, 3), (4, 5, 6)}
 nested_long_lines = [
     "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING",
     "NOT_YET_IMPLEMENTED_STRING",
-    (1, 2),
+    (1, 2, 3),
     "NOT_YET_IMPLEMENTED_STRING",
 ]
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
-["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (1, 2)]
+["NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING" % (foo,)]
 x = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 y = {NOT_IMPLEMENTED_dict_key: NOT_IMPLEMENTED_dict_value}
 NOT_YET_IMPLEMENTED_StmtAssert
@@ -262,7 +258,7 @@ NOT_YET_IMPLEMENTED_StmtFor
 
 [1, 2, 3]
 
-division_result_tuple = (1, 2)
+division_result_tuple = (6 / 2,)
 NOT_IMPLEMENTED_call()
 
 if True:
