@@ -116,8 +116,8 @@ async def test_async_with():
  
 -while  some_condition(  unformatted,  args  ):  # fmt: skip
 -    print("Do something")
-+while NOT_YET_IMPLEMENTED_ExprCall:  # fmt: skip
-+    NOT_YET_IMPLEMENTED_ExprCall
++while NOT_IMPLEMENTED_call():  # fmt: skip
++    NOT_IMPLEMENTED_call()
  
  
 -for  i  in  some_iter(  unformatted,  args  ):  # fmt: skip
@@ -170,8 +170,8 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 NOT_YET_IMPLEMENTED_StmtIf  # fmt: skip
 
 
-while NOT_YET_IMPLEMENTED_ExprCall:  # fmt: skip
-    NOT_YET_IMPLEMENTED_ExprCall
+while NOT_IMPLEMENTED_call():  # fmt: skip
+    NOT_IMPLEMENTED_call()
 
 
 NOT_YET_IMPLEMENTED_StmtFor  # fmt: skip

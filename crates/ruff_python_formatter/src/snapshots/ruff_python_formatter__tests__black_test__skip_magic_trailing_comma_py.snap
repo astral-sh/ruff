@@ -65,40 +65,40 @@ func(
 -a: tuple[int,]
 -b = tuple[int,]
 +NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++b = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  # But commas in multiple element subscripts should be removed.
 -c: tuple[int, int]
 -d = tuple[int, int]
 +NOT_YET_IMPLEMENTED_StmtAnnAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++d = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
  
  # Remove commas for non-subscripts.
 -small_list = [1]
 -list_of_types = [tuple[int,]]
 -small_set = {1}
 -set_of_types = {tuple[int,]}
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++small_list = [0x42]
++list_of_types = [NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]]
++small_set = {0x42}
++set_of_types = {NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]}
  
  # Except single element tuples
 -small_tuple = (1,)
-+NOT_YET_IMPLEMENTED_StmtAssign
++small_tuple = (1, 2)
  
  # Trailing commas in multiple chained non-nested parens.
 -zero(one).two(three).four(five)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
  
 -func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
  
 -(a, b, c, d) = func1(arg1) and func2(arg2)
-+NOT_YET_IMPLEMENTED_StmtAssign
++(1, 2) = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
  
 -func(argument1, (one, two), argument4, argument5, argument6)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
@@ -106,29 +106,29 @@ func(
 ```py
 # We should not remove the trailing comma in a single-element subscript.
 NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+b = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 # But commas in multiple element subscripts should be removed.
 NOT_YET_IMPLEMENTED_StmtAnnAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+d = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 
 # Remove commas for non-subscripts.
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+small_list = [0x42]
+list_of_types = [NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]]
+small_set = {0x42}
+set_of_types = {NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]}
 
 # Except single element tuples
-NOT_YET_IMPLEMENTED_StmtAssign
+small_tuple = (1, 2)
 
 # Trailing commas in multiple chained non-nested parens.
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 
-NOT_YET_IMPLEMENTED_StmtAssign
+(1, 2) = NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2
 
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

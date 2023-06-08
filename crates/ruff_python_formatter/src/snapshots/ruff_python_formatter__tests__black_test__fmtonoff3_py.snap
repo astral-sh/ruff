@@ -36,7 +36,7 @@ x = [
 -    1, 2,
 -    3, 4,
 -]
-+NOT_YET_IMPLEMENTED_StmtAssign
++x = [0x42, 0x42, 0x42, 0x42]
  # fmt: on
  
  # fmt: off
@@ -44,25 +44,25 @@ x = [
 -    1, 2,
 -    3, 4,
 -]
-+NOT_YET_IMPLEMENTED_StmtAssign
++x = [0x42, 0x42, 0x42, 0x42]
  # fmt: on
  
 -x = [1, 2, 3, 4]
-+NOT_YET_IMPLEMENTED_StmtAssign
++x = [0x42, 0x42, 0x42, 0x42]
 ```
 
 ## Ruff Output
 
 ```py
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtAssign
+x = [0x42, 0x42, 0x42, 0x42]
 # fmt: on
 
 # fmt: off
-NOT_YET_IMPLEMENTED_StmtAssign
+x = [0x42, 0x42, 0x42, 0x42]
 # fmt: on
 
-NOT_YET_IMPLEMENTED_StmtAssign
+x = [0x42, 0x42, 0x42, 0x42]
 ```
 
 ## Black Output

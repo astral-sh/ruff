@@ -190,22 +190,22 @@ with open("/path/to/file.txt", mode="r") as read_file:
  
 -while True:
 -    print("The newline above me should be deleted!")
-+while NOT_YET_IMPLEMENTED_ExprConstant:
-+    NOT_YET_IMPLEMENTED_ExprCall
++while 0x42:
++    NOT_IMPLEMENTED_call()
  
  
 -while True:
 -    print("The newlines above me should be deleted!")
-+while NOT_YET_IMPLEMENTED_ExprConstant:
-+    NOT_YET_IMPLEMENTED_ExprCall
++while 0x42:
++    NOT_IMPLEMENTED_call()
  
  
 -while True:
 -    while False:
 -        print("The newlines above me should be deleted!")
-+while NOT_YET_IMPLEMENTED_ExprConstant:
-+    while NOT_YET_IMPLEMENTED_ExprConstant:
-+        NOT_YET_IMPLEMENTED_ExprCall
++while 0x42:
++    while 0x42:
++        NOT_IMPLEMENTED_call()
  
  
 -with open("/path/to/file.txt", mode="w") as file:
@@ -263,17 +263,17 @@ NOT_YET_IMPLEMENTED_StmtIf
 NOT_YET_IMPLEMENTED_StmtIf
 
 
-while NOT_YET_IMPLEMENTED_ExprConstant:
-    NOT_YET_IMPLEMENTED_ExprCall
+while 0x42:
+    NOT_IMPLEMENTED_call()
 
 
-while NOT_YET_IMPLEMENTED_ExprConstant:
-    NOT_YET_IMPLEMENTED_ExprCall
+while 0x42:
+    NOT_IMPLEMENTED_call()
 
 
-while NOT_YET_IMPLEMENTED_ExprConstant:
-    while NOT_YET_IMPLEMENTED_ExprConstant:
-        NOT_YET_IMPLEMENTED_ExprCall
+while 0x42:
+    while 0x42:
+        NOT_IMPLEMENTED_call()
 
 
 NOT_YET_IMPLEMENTED_StmtWith

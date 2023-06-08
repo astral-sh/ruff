@@ -29,31 +29,31 @@ A፩ = 8
 -x󠄀 = 4
 -មុ = 1
 -Q̇_per_meter = 4
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++ä = 0x42
++µ = 0x42
++蟒 = 0x42
++x󠄀 = 0x42
++មុ = 0x42
++Q̇_per_meter = 0x42
  
 -A᧚ = 3
 -A፩ = 8
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++A᧚ = 0x42
++A፩ = 0x42
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+ä = 0x42
+µ = 0x42
+蟒 = 0x42
+x󠄀 = 0x42
+មុ = 0x42
+Q̇_per_meter = 0x42
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+A᧚ = 0x42
+A፩ = 0x42
 ```
 
 ## Black Output

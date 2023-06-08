@@ -107,7 +107,7 @@ def g():
 +++ Ruff
 @@ -1,89 +1,12 @@
 -"""Docstring."""
-+NOT_YET_IMPLEMENTED_ExprConstant
++0x42
  
  
  # leading comment
@@ -203,7 +203,7 @@ def g():
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_ExprConstant
+0x42
 
 
 # leading comment

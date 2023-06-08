@@ -59,8 +59,8 @@ def test_calculate_fades():
  
 -TmSt = 1
 -TmEx = 2
-+NOT_YET_IMPLEMENTED_StmtAssign
-+NOT_YET_IMPLEMENTED_StmtAssign
++TmSt = 0x42
++TmEx = 0x42
 +
  
  # fmt: off
@@ -112,8 +112,8 @@ def test_calculate_fades():
 ```py
 NOT_YET_IMPLEMENTED_StmtImport
 
-NOT_YET_IMPLEMENTED_StmtAssign
-NOT_YET_IMPLEMENTED_StmtAssign
+TmSt = 0x42
+TmEx = 0x42
 
 
 # fmt: off

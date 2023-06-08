@@ -178,7 +178,7 @@ instruction()#comment with bad spacing
 ```diff
 --- Black
 +++ Ruff
-@@ -1,165 +1,23 @@
+@@ -1,173 +1,68 @@
 -from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
 -    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 -)
@@ -190,16 +190,22 @@ instruction()#comment with bad spacing
  
  # Please keep __all__ alphabetized within each category.
  
--__all__ = [
--    # Super-special typing primitives.
+ __all__ = [
+     # Super-special typing primitives.
 -    "Any",
 -    "Callable",
 -    "ClassVar",
--    # ABCs (from collections.abc).
++    0x42,
++    0x42,
++    0x42,
+     # ABCs (from collections.abc).
 -    "AbstractSet",  # collections.abc.Set.
 -    "ByteString",
 -    "Container",
--    # Concrete collection types.
++    0x42,  # collections.abc.Set.
++    0x42,
++    0x42,
+     # Concrete collection types.
 -    "Counter",
 -    "Deque",
 -    "Dict",
@@ -209,29 +215,46 @@ instruction()#comment with bad spacing
 -    "FrozenSet",
 -    "NamedTuple",  # Not really a type.
 -    "Generator",
--]
-+NOT_YET_IMPLEMENTED_StmtAssign
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,
++    0x42,  # Not really a type.
++    0x42,
+ ]
  
--not_shareables = [
--    # singletons
+ not_shareables = [
+     # singletons
 -    True,
 -    False,
--    NotImplemented,
++    0x42,
++    0x42,
+     NotImplemented,
 -    ...,
--    # builtin types and objects
--    type,
--    object,
++    0x42,
+     # builtin types and objects
+     type,
+     object,
 -    object(),
 -    Exception(),
 -    42,
 -    100.0,
 -    "spam",
--    # user-defined types and objects
--    Cheese,
++    NOT_IMPLEMENTED_call(),
++    NOT_IMPLEMENTED_call(),
++    0x42,
++    0x42,
++    0x42,
+     # user-defined types and objects
+     Cheese,
 -    Cheese("Wensleydale"),
 -    SubBytes(b"spam"),
--]
-+NOT_YET_IMPLEMENTED_StmtAssign
++    NOT_IMPLEMENTED_call(),
++    NOT_IMPLEMENTED_call(),
+ ]
  
 -if "PYTHON" in os.environ:
 -    add_compiler(compiler_from_env())
@@ -275,8 +298,7 @@ instruction()#comment with bad spacing
 -        # two
 -        2,
 -    ]
-+NOT_YET_IMPLEMENTED_StmtFunctionDef
- 
+-
 -    # no newline after
 -    call(
 -        arg1,
@@ -286,9 +308,10 @@ instruction()#comment with bad spacing
 -""",
 -        arg3=True,
 -    )
++NOT_YET_IMPLEMENTED_StmtFunctionDef
  
 -    ############################################################################
--
+ 
 -    call2(
 -        # short
 -        arg1,
@@ -323,7 +346,7 @@ instruction()#comment with bad spacing
 -    while True:
 -        if False:
 -            continue
-+NOT_YET_IMPLEMENTED_StmtAssign  # type: Final
++CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
  
 -            # and round and round we go
 -        # and round and round we go
@@ -333,8 +356,9 @@ instruction()#comment with bad spacing
 -        syms.simple_stmt,
 -        [Node(statement, result), Leaf(token.NEWLINE, "\n")],  # FIXME: \r\n?
 -    )
--
--
++NOT_YET_IMPLEMENTED_StmtClassDef
+ 
+ 
 -CONFIG_FILES = (
 -    [
 -        CONFIG_FILE,
@@ -348,16 +372,15 @@ instruction()#comment with bad spacing
 -    def _init_host(self, parsed) -> None:
 -        if parsed.hostname is None or not parsed.hostname.strip():  # type: ignore
 -            pass
-+NOT_YET_IMPLEMENTED_StmtClassDef
- 
- 
+-
+-
  #######################
-@@ -167,7 +25,7 @@
+ ### SECTION COMMENT ###
  #######################
  
  
 -instruction()  # comment with bad spacing
-+NOT_YET_IMPLEMENTED_ExprCall  # comment with bad spacing
++NOT_IMPLEMENTED_call()  # comment with bad spacing
  
  # END COMMENTS
  # MORE END COMMENTS
@@ -371,9 +394,46 @@ NOT_YET_IMPLEMENTED_StmtImportFrom
 
 # Please keep __all__ alphabetized within each category.
 
-NOT_YET_IMPLEMENTED_StmtAssign
+__all__ = [
+    # Super-special typing primitives.
+    0x42,
+    0x42,
+    0x42,
+    # ABCs (from collections.abc).
+    0x42,  # collections.abc.Set.
+    0x42,
+    0x42,
+    # Concrete collection types.
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,
+    0x42,  # Not really a type.
+    0x42,
+]
 
-NOT_YET_IMPLEMENTED_StmtAssign
+not_shareables = [
+    # singletons
+    0x42,
+    0x42,
+    NotImplemented,
+    0x42,
+    # builtin types and objects
+    type,
+    object,
+    NOT_IMPLEMENTED_call(),
+    NOT_IMPLEMENTED_call(),
+    0x42,
+    0x42,
+    0x42,
+    # user-defined types and objects
+    Cheese,
+    NOT_IMPLEMENTED_call(),
+    NOT_IMPLEMENTED_call(),
+]
 
 NOT_YET_IMPLEMENTED_StmtIf
 
@@ -382,7 +442,7 @@ NOT_YET_IMPLEMENTED_StmtIf
 NOT_YET_IMPLEMENTED_StmtFunctionDef
 
 
-NOT_YET_IMPLEMENTED_StmtAssign  # type: Final
+CONFIG_FILES = [CONFIG_FILE] + SHARED_CONFIG_FILES + USER_CONFIG_FILES  # type: Final
 
 
 NOT_YET_IMPLEMENTED_StmtClassDef
@@ -393,7 +453,7 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 #######################
 
 
-NOT_YET_IMPLEMENTED_ExprCall  # comment with bad spacing
+NOT_IMPLEMENTED_call()  # comment with bad spacing
 
 # END COMMENTS
 # MORE END COMMENTS

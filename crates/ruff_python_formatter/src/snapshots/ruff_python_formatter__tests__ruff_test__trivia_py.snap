@@ -44,11 +44,11 @@ e = 50  # one empty line before
 ```py
 # Removes the line above
 
-NOT_YET_IMPLEMENTED_StmtAssign  # Keeps the line above
+a = 0x42  # Keeps the line above
 
 # Separated by one line from `a` and `b`
 
-NOT_YET_IMPLEMENTED_StmtAssign
+b = 0x42
 
 
 # Adds two lines after `b`
@@ -57,22 +57,22 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 # two lines before, one line after
 
-NOT_YET_IMPLEMENTED_StmtAssign
+c = 0x42
 
-while NOT_YET_IMPLEMENTED_ExprCompare:
-    NOT_YET_IMPLEMENTED_ExprConstant
+while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    0x42
 
     # trailing comment with one line before
 
 # one line before this leading comment
 
-NOT_YET_IMPLEMENTED_StmtAssign
+d = 0x42
 
-while NOT_YET_IMPLEMENTED_ExprCompare:
-    NOT_YET_IMPLEMENTED_ExprConstant
+while NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
+    0x42
     # no empty line before
 
-NOT_YET_IMPLEMENTED_StmtAssign  # one empty line before
+e = 0x42  # one empty line before
 ```
 
 

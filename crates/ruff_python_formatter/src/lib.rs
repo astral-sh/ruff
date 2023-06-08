@@ -164,6 +164,36 @@ impl Format<PyFormatContext<'_>> for NotYetImplemented {
     }
 }
 
+pub(crate) struct NotYetImplementedCustomText(NodeKind, String);
+
+/// Formats a placeholder for nodes that have not yet been implemented
+pub(crate) fn not_yet_implemented_custom_text<'a, T>(
+    node: T,
+    text: impl AsRef<str>,
+) -> NotYetImplementedCustomText
+where
+    T: Into<AnyNodeRef<'a>>,
+{
+    NotYetImplementedCustomText(node.into().kind(), text.as_ref().to_string())
+}
+
+impl Format<PyFormatContext<'_>> for NotYetImplementedCustomText {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        f.write_element(FormatElement::Tag(Tag::StartVerbatim(
+            tag::VerbatimKind::Verbatim {
+                length: self.1.text_len(),
+            },
+        )))?;
+
+        f.write_element(FormatElement::DynamicText {
+            text: Box::from(self.1.clone()),
+        })?;
+
+        f.write_element(FormatElement::Tag(Tag::EndVerbatim))?;
+        Ok(())
+    }
+}
+
 pub(crate) struct VerbatimText(TextRange);
 
 #[allow(unused)]
@@ -250,11 +280,15 @@ NOT_YET_IMPLEMENTED_StmtIf
 
         let formatted_code = printed.as_code();
 
-        let reformatted = format_module(formatted_code).unwrap_or_else(|err| {
-            panic!(
-                "Formatted code resulted introduced a syntax error {err:#?}. Code:\n{formatted_code}"
-            )
-        });
+        let reformatted = match format_module(formatted_code) {
+            Ok(reformatted) => reformatted,
+            Err(err) => {
+                panic!(
+                    "Expected formatted code to be valid syntax: {err}:\
+                    \n---\n{formatted_code}---\n",
+                );
+            }
+        };
 
         if reformatted.as_code() != formatted_code {
             let diff = TextDiff::from_lines(formatted_code, reformatted.as_code())
@@ -263,13 +297,16 @@ NOT_YET_IMPLEMENTED_StmtIf
                 .to_string();
             panic!(
                 r#"Reformatting the formatted code a second time resulted in formatting changes.
-{diff}
+---
+{diff}---
 
 Formatted once:
-{formatted_code}
+---
+{formatted_code}---
 
 Formatted twice:
-{}"#,
+---
+{}---"#,
                 reformatted.as_code()
             );
         }

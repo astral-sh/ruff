@@ -91,7 +91,7 @@ if __name__ == "__main__":
 -    if something.changed:
 -        do.stuff()  # trailing comment
 -        # Comment belongs to the `if` block.
-+while NOT_YET_IMPLEMENTED_ExprConstant:
++while 0x42:
 +    NOT_YET_IMPLEMENTED_StmtIf
      # This one belongs to the `while` block.
  
@@ -174,7 +174,7 @@ if __name__ == "__main__":
 ## Ruff Output
 
 ```py
-while NOT_YET_IMPLEMENTED_ExprConstant:
+while 0x42:
     NOT_YET_IMPLEMENTED_StmtIf
     # This one belongs to the `while` block.
 

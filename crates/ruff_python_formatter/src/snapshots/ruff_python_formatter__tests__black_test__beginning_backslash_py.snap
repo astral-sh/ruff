@@ -22,13 +22,13 @@ print("hello, world")
 +++ Ruff
 @@ -1 +1 @@
 -print("hello, world")
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
 ```
 
 ## Ruff Output
 
 ```py
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 ```
 
 ## Black Output

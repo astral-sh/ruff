@@ -109,7 +109,7 @@ elif   unformatted:
 -            ]  # Includes an formatted indentation.
 -    },
 -)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
  
  
  # Regression test for https://github.com/psf/black/issues/2015.
@@ -123,7 +123,7 @@ elif   unformatted:
 -    + path,
 -    check=True,
 -)
-+NOT_YET_IMPLEMENTED_ExprCall
++NOT_IMPLEMENTED_call()
  
  
  # Regression test for https://github.com/psf/black/issues/3026.
@@ -199,11 +199,11 @@ elif   unformatted:
 
 ```py
 # Regression test for https://github.com/psf/black/issues/3129.
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 
 
 # Regression test for https://github.com/psf/black/issues/2015.
-NOT_YET_IMPLEMENTED_ExprCall
+NOT_IMPLEMENTED_call()
 
 
 # Regression test for https://github.com/psf/black/issues/3026.
