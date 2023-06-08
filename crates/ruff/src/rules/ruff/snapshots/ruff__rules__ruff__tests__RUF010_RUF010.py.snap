@@ -226,4 +226,22 @@ RUF010.py:15:29: RUF010 [*] Use conversion in f-string
 17 17 | f"{foo(bla)}"  # OK
 18 18 | 
 
+RUF010.py:35:20: RUF010 [*] Use conversion in f-string
+   |
+35 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
+36 |     " intermediary content "
+37 |     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
+   |                    ^^^^^^^^^ RUF010
+38 | )
+   |
+   = help: Replace f-string function call with conversion
+
+ℹ Fix
+32 32 | (
+33 33 |     f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
+34 34 |     " intermediary content "
+35    |-    f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
+   35 |+    f" that flows {obj!r} of type {type(obj)}.{additional_message}"  # RUF010
+36 36 | )
+
 

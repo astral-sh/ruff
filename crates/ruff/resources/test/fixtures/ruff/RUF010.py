@@ -28,3 +28,9 @@ def ascii(arg):
 
 
 f"{ascii(bla)}"  # OK
+
+(
+    f"Member of tuple mismatches type at index {i}. Expected {of_shape_i}. Got "
+    " intermediary content "
+    f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
+)
