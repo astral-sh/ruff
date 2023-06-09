@@ -76,7 +76,7 @@ return np.divide(
 ```diff
 --- Black
 +++ Ruff
-@@ -8,56 +8,48 @@
+@@ -8,56 +8,49 @@
  
  
  def function_dont_replace_spaces():
@@ -164,7 +164,8 @@ return np.divide(
 -        out=np.full(view.sum_of_weights.shape, np.nan),  # type: ignore[union-attr]
 -        where=view.sum_of_weights**2 > view.sum_of_weights_squared,  # type: ignore[union-attr]
 -    )
-+NOT_YET_IMPLEMENTED_StmtIf
++if NOT_IMPLEMENTED_call():
++    return NOT_IMPLEMENTED_call()
  
 -return np.divide(
 -    where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
@@ -227,7 +228,8 @@ q = [i for i in []]
 
 
 # WE SHOULD DEFINITELY NOT EAT THESE COMMENTS (https://github.com/psf/black/issues/2873)
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_call():
+    return NOT_IMPLEMENTED_call()
 
 return NOT_IMPLEMENTED_call()
 ```

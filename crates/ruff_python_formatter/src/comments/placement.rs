@@ -215,6 +215,26 @@ fn handle_in_between_bodies_own_line_comment<'a>(
             return CommentPlacement::Default(comment);
         }
 
+        // If there's any non-trivia token between the preceding node and the comment, than it means that
+        // we're past the case of the alternate branch, defer to the default rules
+        // ```python
+        // if a:
+        //      pass
+        //  else:
+        //      # leading comment
+        //      def inline_after_else(): ...
+        // ```
+        if SimpleTokenizer::new(
+            locator.contents(),
+            TextRange::new(preceding.end(), comment.slice().start()),
+        )
+        .skip_trivia()
+        .next()
+        .is_some()
+        {
+            return CommentPlacement::Default(comment);
+        }
+
         // it now depends on the indentation level of the comment if it is a leading comment for e.g.
         // the following `elif` or indeed a trailing comment of the previous body's last statement.
         let comment_indentation =

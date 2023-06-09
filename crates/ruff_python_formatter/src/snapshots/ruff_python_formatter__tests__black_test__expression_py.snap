@@ -276,7 +276,7 @@ last_call()
  Name
  None
  True
-@@ -7,346 +8,245 @@
+@@ -7,294 +8,236 @@
  1
  1.0
  1j
@@ -395,6 +395,11 @@ last_call()
 -    *a,
      4,
      5,
+-]
+-[
+-    4,
+-    *a,
+-    5,
 +    6,
 +    7,
 +    8,
@@ -403,11 +408,6 @@ last_call()
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
 +    (NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2),
  ]
--[
--    4,
--    *a,
--    5,
--]
 +[1, 2, 3]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
 +[NOT_YET_IMPLEMENTED_ExprStarred]
@@ -541,9 +541,6 @@ last_call()
 -    int,
 -    float,
 -    dict[str, int],
--]
--very_long_variable_name_filters: t.List[
--    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
 +[
 +    1,
 +    2,
@@ -558,6 +555,9 @@ last_call()
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
 +    NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2,
  ]
+-very_long_variable_name_filters: t.List[
+-    t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
+-]
 -xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)
@@ -756,49 +756,50 @@ last_call()
 -    and threading.current_thread() != threading.main_thread()
 -    or signal.getsignal(signal.SIGINT) != signal.default_int_handler
 -):
--    return True
--if (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--):
--    return True
--if (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--):
--    return True
--if (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--):
--    return True
--if (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--):
--    return True
--if (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    * aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--):
--    return True
--if (
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--    / aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
--):
--    return True
--if (
++NOT_YET_IMPLEMENTED_StmtFor
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
++if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+     return True
+ if (
+     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@@ -327,24 +270,44 @@
+ ):
+     return True
+ if (
 -    ~aaaa.a + aaaa.b - aaaa.c * aaaa.d / aaaa.e
 -    | aaaa.f & aaaa.g % aaaa.h ^ aaaa.i << aaaa.k >> aaaa.l**aaaa.m // aaaa.n
--):
--    return True
--if (
++    NOT_YET_IMPLEMENTED_ExprUnaryOp
++    + aaaa.NOT_IMPLEMENTED_attr
++    - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
++    | aaaa.NOT_IMPLEMENTED_attr
++    & aaaa.NOT_IMPLEMENTED_attr % aaaa.NOT_IMPLEMENTED_attr
++    ^ aaaa.NOT_IMPLEMENTED_attr
++    << aaaa.NOT_IMPLEMENTED_attr
++    >> aaaa.NOT_IMPLEMENTED_attr**aaaa.NOT_IMPLEMENTED_attr // aaaa.NOT_IMPLEMENTED_attr
+ ):
+     return True
+ if (
 -    ~aaaaaaaa.a + aaaaaaaa.b - aaaaaaaa.c @ aaaaaaaa.d / aaaaaaaa.e
 -    | aaaaaaaa.f & aaaaaaaa.g % aaaaaaaa.h
 -    ^ aaaaaaaa.i << aaaaaaaa.k >> aaaaaaaa.l**aaaaaaaa.m // aaaaaaaa.n
--):
--    return True
--if (
++    NOT_YET_IMPLEMENTED_ExprUnaryOp
++    + aaaaaaaa.NOT_IMPLEMENTED_attr
++    - aaaaaaaa.NOT_IMPLEMENTED_attr
++    @ aaaaaaaa.NOT_IMPLEMENTED_attr
++    / aaaaaaaa.NOT_IMPLEMENTED_attr
++    | aaaaaaaa.NOT_IMPLEMENTED_attr
++    & aaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaa.NOT_IMPLEMENTED_attr
++    ^ aaaaaaaa.NOT_IMPLEMENTED_attr
++    << aaaaaaaa.NOT_IMPLEMENTED_attr
++    >> aaaaaaaa.NOT_IMPLEMENTED_attr
++    **aaaaaaaa.NOT_IMPLEMENTED_attr
++    // aaaaaaaa.NOT_IMPLEMENTED_attr
+ ):
+     return True
+ if (
 -    ~aaaaaaaaaaaaaaaa.a
 -    + aaaaaaaaaaaaaaaa.b
 -    - aaaaaaaaaaaaaaaa.c * aaaaaaaaaaaaaaaa.d @ aaaaaaaaaaaaaaaa.e
@@ -806,27 +807,22 @@ last_call()
 -    ^ aaaaaaaaaaaaaaaa.i
 -    << aaaaaaaaaaaaaaaa.k
 -    >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
--):
--    return True
-+NOT_YET_IMPLEMENTED_StmtFor
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
-+NOT_YET_IMPLEMENTED_StmtIf
++    NOT_YET_IMPLEMENTED_ExprUnaryOp
++    + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    @ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    | aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    & aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    ^ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    << aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    >> aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    **aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
++    // aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+ ):
+     return True
  (
-     aaaaaaaaaaaaaaaa
-     + aaaaaaaaaaaaaaaa
-@@ -363,8 +263,9 @@
+@@ -363,8 +326,9 @@
  bbbb >> bbbb * bbbb
  (
      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -1082,16 +1078,79 @@ a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
 a = NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
-NOT_YET_IMPLEMENTED_StmtIf
+if NOT_IMPLEMENTED_bool_op1 and NOT_IMPLEMENTED_bool_op2:
+    return True
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+):
+    return True
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+):
+    return True
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+):
+    return True
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+):
+    return True
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    * aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+):
+    return True
+if (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    / aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+):
+    return True
+if (
+    NOT_YET_IMPLEMENTED_ExprUnaryOp
+    + aaaa.NOT_IMPLEMENTED_attr
+    - aaaa.NOT_IMPLEMENTED_attr * aaaa.NOT_IMPLEMENTED_attr / aaaa.NOT_IMPLEMENTED_attr
+    | aaaa.NOT_IMPLEMENTED_attr
+    & aaaa.NOT_IMPLEMENTED_attr % aaaa.NOT_IMPLEMENTED_attr
+    ^ aaaa.NOT_IMPLEMENTED_attr
+    << aaaa.NOT_IMPLEMENTED_attr
+    >> aaaa.NOT_IMPLEMENTED_attr**aaaa.NOT_IMPLEMENTED_attr // aaaa.NOT_IMPLEMENTED_attr
+):
+    return True
+if (
+    NOT_YET_IMPLEMENTED_ExprUnaryOp
+    + aaaaaaaa.NOT_IMPLEMENTED_attr
+    - aaaaaaaa.NOT_IMPLEMENTED_attr
+    @ aaaaaaaa.NOT_IMPLEMENTED_attr
+    / aaaaaaaa.NOT_IMPLEMENTED_attr
+    | aaaaaaaa.NOT_IMPLEMENTED_attr
+    & aaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaa.NOT_IMPLEMENTED_attr
+    ^ aaaaaaaa.NOT_IMPLEMENTED_attr
+    << aaaaaaaa.NOT_IMPLEMENTED_attr
+    >> aaaaaaaa.NOT_IMPLEMENTED_attr
+    **aaaaaaaa.NOT_IMPLEMENTED_attr
+    // aaaaaaaa.NOT_IMPLEMENTED_attr
+):
+    return True
+if (
+    NOT_YET_IMPLEMENTED_ExprUnaryOp
+    + aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    - aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    * aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    @ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    | aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    & aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr % aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    ^ aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    << aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    >> aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    **aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+    // aaaaaaaaaaaaaaaa.NOT_IMPLEMENTED_attr
+):
+    return True
 (
     aaaaaaaaaaaaaaaa
     + aaaaaaaaaaaaaaaa

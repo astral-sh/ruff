@@ -75,7 +75,7 @@ async def test_async_with():
 ```diff
 --- Black
 +++ Ruff
-@@ -1,62 +1,40 @@
+@@ -1,62 +1,46 @@
  # Make sure a leading comment is not removed.
 -def some_func(  unformatted,  args  ):  # fmt: skip
 -    print("I am some_func")
@@ -109,12 +109,17 @@ async def test_async_with():
  # Make sure a leading comment is not removed.
 -if  unformatted_call(  args  ):  # fmt: skip
 -    print("First branch")
--    # Make sure this is not removed.
++if NOT_IMPLEMENTED_call():  # fmt: skip
++    NOT_IMPLEMENTED_call()
+     # Make sure this is not removed.
 -elif  another_unformatted_call(  args  ):  # fmt: skip
 -    print("Second branch")
 -else  :  # fmt: skip
 -    print("Last branch")
-+NOT_YET_IMPLEMENTED_StmtIf  # fmt: skip
++elif NOT_IMPLEMENTED_call():  # fmt: skip
++    NOT_IMPLEMENTED_call()
++else:  # fmt: skip
++    NOT_IMPLEMENTED_call()
  
  
 -while  some_condition(  unformatted,  args  ):  # fmt: skip
@@ -175,7 +180,13 @@ NOT_YET_IMPLEMENTED_StmtClassDef
 
 
 # Make sure a leading comment is not removed.
-NOT_YET_IMPLEMENTED_StmtIf  # fmt: skip
+if NOT_IMPLEMENTED_call():  # fmt: skip
+    NOT_IMPLEMENTED_call()
+    # Make sure this is not removed.
+elif NOT_IMPLEMENTED_call():  # fmt: skip
+    NOT_IMPLEMENTED_call()
+else:  # fmt: skip
+    NOT_IMPLEMENTED_call()
 
 
 while NOT_IMPLEMENTED_call():  # fmt: skip

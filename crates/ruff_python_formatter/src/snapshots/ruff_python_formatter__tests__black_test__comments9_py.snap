@@ -210,42 +210,25 @@ def bar():
  # leading 3
  @deco3
  
-@@ -98,41 +94,13 @@
- 
- 
- def main():
--    if a:
--        # Leading comment before inline function
--        def inline():
--            pass
+@@ -106,7 +102,6 @@
+         # Another leading comment
+         def another_inline():
+             pass
 -
--        # Another leading comment
--        def another_inline():
--            pass
-+    NOT_YET_IMPLEMENTED_StmtIf
- 
--    else:
--        # More leading comments
--        def inline_after_else():
--            pass
- 
-+NOT_YET_IMPLEMENTED_StmtIf
- 
--if a:
--    # Leading comment before "top-level inline" function
--    def top_level_quote_inline():
--        pass
- 
--    # Another leading comment
--    def another_top_level_quote_inline_inline():
--        pass
+     else:
+         # More leading comments
+         def inline_after_else():
+@@ -121,18 +116,13 @@
+     # Another leading comment
+     def another_top_level_quote_inline_inline():
+         pass
 -
--else:
--    # More leading comments
--    def top_level_quote_inline_after_else():
--        pass
--
--
+ else:
+     # More leading comments
+     def top_level_quote_inline_after_else():
+         pass
+ 
+ 
 -class MyClass:
 -    # First method has no empty lines between bare class def.
 -    # More comments.
@@ -356,10 +339,32 @@ def decorated_with_split_leading_comments():
 
 
 def main():
-    NOT_YET_IMPLEMENTED_StmtIf
+    if a:
+        # Leading comment before inline function
+        def inline():
+            pass
+
+        # Another leading comment
+        def another_inline():
+            pass
+    else:
+        # More leading comments
+        def inline_after_else():
+            pass
 
 
-NOT_YET_IMPLEMENTED_StmtIf
+if a:
+    # Leading comment before "top-level inline" function
+    def top_level_quote_inline():
+        pass
+
+    # Another leading comment
+    def another_top_level_quote_inline_inline():
+        pass
+else:
+    # More leading comments
+    def top_level_quote_inline_after_else():
+        pass
 
 
 NOT_YET_IMPLEMENTED_StmtClassDef

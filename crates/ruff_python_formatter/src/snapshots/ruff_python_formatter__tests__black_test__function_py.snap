@@ -108,37 +108,36 @@ def __await__(): return (yield)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,148 +1,94 @@
+@@ -1,12 +1,11 @@
  #!/usr/bin/env python3
 -import asyncio
 -import sys
-+NOT_YET_IMPLEMENTED_StmtImport
-+NOT_YET_IMPLEMENTED_StmtImport
- 
+-
 -from third_party import X, Y, Z
-+NOT_YET_IMPLEMENTED_StmtImportFrom
++NOT_YET_IMPLEMENTED_StmtImport
++NOT_YET_IMPLEMENTED_StmtImport
  
 -from library import some_connection, some_decorator
 +NOT_YET_IMPLEMENTED_StmtImportFrom
-+NOT_YET_IMPLEMENTED_ExprJoinedStr
  
 -f"trigger 3.6 mode"
--
++NOT_YET_IMPLEMENTED_StmtImportFrom
++NOT_YET_IMPLEMENTED_ExprJoinedStr
+ 
  
  def func_no_args():
-     a
+@@ -14,135 +13,86 @@
      b
      c
--    if True:
+     if True:
 -        raise RuntimeError
--    if False:
--        ...
++        NOT_YET_IMPLEMENTED_StmtRaise
+     if False:
+         ...
 -    for i in range(10):
 -        print(i)
 -        continue
 -    exec("new-style exec", {}, {})
-+    NOT_YET_IMPLEMENTED_StmtIf
-+    NOT_YET_IMPLEMENTED_StmtIf
 +    NOT_YET_IMPLEMENTED_StmtFor
 +    NOT_IMPLEMENTED_call()
      return None
@@ -229,7 +228,7 @@ def __await__(): return (yield)
  
  
  def long_lines():
--    if True:
+     if True:
 -        typedargslist.extend(
 -            gen_annotated_params(
 -                ast_args.kwonlyargs,
@@ -269,7 +268,8 @@ def __await__(): return (yield)
 -        """,
 -        re.MULTILINE | re.VERBOSE,
 -    )
-+    NOT_YET_IMPLEMENTED_StmtIf
++        NOT_IMPLEMENTED_call()
++        NOT_IMPLEMENTED_call()
 +    _type_comment_re = NOT_IMPLEMENTED_call()
  
  
@@ -319,8 +319,10 @@ def func_no_args():
     a
     b
     c
-    NOT_YET_IMPLEMENTED_StmtIf
-    NOT_YET_IMPLEMENTED_StmtIf
+    if True:
+        NOT_YET_IMPLEMENTED_StmtRaise
+    if False:
+        ...
     NOT_YET_IMPLEMENTED_StmtFor
     NOT_IMPLEMENTED_call()
     return None
@@ -382,7 +384,9 @@ def example(session):
 
 
 def long_lines():
-    NOT_YET_IMPLEMENTED_StmtIf
+    if True:
+        NOT_IMPLEMENTED_call()
+        NOT_IMPLEMENTED_call()
     _type_comment_re = NOT_IMPLEMENTED_call()
 
 

@@ -35,7 +35,7 @@ y = 100(no)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,22 +1,21 @@
+@@ -1,22 +1,22 @@
 -x = (123456789).bit_count()
 -x = (123456).__abs__()
 -x = (0.1).is_integer()
@@ -70,8 +70,8 @@ y = 100(no)
 +x = NOT_YET_IMPLEMENTED_ExprUnaryOp
  
 -if (10).real:
--    ...
-+NOT_YET_IMPLEMENTED_StmtIf
++if 10 .NOT_IMPLEMENTED_attr:
+     ...
  
 -y = 100[no]
 -y = 100(no)
@@ -99,7 +99,8 @@ x = 0O777 .NOT_IMPLEMENTED_attr
 x = NOT_IMPLEMENTED_call()
 x = NOT_YET_IMPLEMENTED_ExprUnaryOp
 
-NOT_YET_IMPLEMENTED_StmtIf
+if 10 .NOT_IMPLEMENTED_attr:
+    ...
 
 y = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
 y = NOT_IMPLEMENTED_call()
