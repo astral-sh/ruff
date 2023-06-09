@@ -8,11 +8,12 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `if` expressions that can be replaced with `bool()`.
+/// Checks for `if` expressions that can be replaced with `bool()` calls.
 ///
 /// ## Why is this bad?
-/// `if` expressions that return `True` if a condition is truthy and `False` if
-/// it is falsey can be replaced with boolean casts.
+/// `if` expressions that evaluate to `True` for a truthy condition an `False`
+/// for a falsey condition can be replaced with `bool()` calls, which are more
+/// concise and readable.
 ///
 /// ## Example
 /// ```python
@@ -47,11 +48,13 @@ impl Violation for IfExprWithTrueFalse {
 }
 
 /// ## What it does
-/// Checks for `if` expressions that can be replaced by negating the condition.
+/// Checks for `if` expressions that can be replaced by negating a given
+/// condition.
 ///
 /// ## Why is this bad?
-/// `if` expressions that return `False` if a condition is truthy and `True` if
-/// it is falsey can be replaced by negating the condition.
+/// `if` expressions that evaluate to `False` for a truthy condition an `True`
+/// for a falsey condition can be replaced with `not` operators, which are more
+/// concise and readable.
 ///
 /// ## Example
 /// ```python

@@ -15,28 +15,25 @@ use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `key in dict.keys()` expressions.
+/// Checks for key-existence checks against `dict.keys()` calls.
 ///
 /// ## Why is this bad?
-/// `key in dict` is more readable and more efficient than `key in dict.keys()`.
+/// When checking for the existence of a key in a given dictionary, using
+/// `key in dict` is more readable and efficient than `key in dict.keys()`,
+/// while having the same semantics.
 ///
 /// ## Example
 /// ```python
-/// foo: dict = ...
-///
 /// key in foo.keys()
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// foo: dict = ...
-///
 /// key in foo
 /// ```
 ///
 /// ## References
-/// - [Python documentation: Mapping Types — `dict`](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
-/// - [StackOverflow: Why dict.get(key) instead of dict[key]?](https://stackoverflow.com/questions/11041405/why-dict-getkey-instead-of-dictkey)
+/// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[violation]
 pub struct InDictKeys {
     key: String,

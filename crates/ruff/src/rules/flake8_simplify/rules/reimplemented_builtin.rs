@@ -12,7 +12,8 @@ use crate::line_width::LineWidth;
 use crate::registry::{AsRule, Rule};
 
 /// ## What it does
-/// Checks for `for` loops that can be replaced with a builtin function.
+/// Checks for `for` loops that can be replaced with a builtin function, like
+/// `any` or `all`.
 ///
 /// ## Why is this bad?
 /// Using a builtin function is more concise and readable. Builtins are also

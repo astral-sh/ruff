@@ -11,10 +11,10 @@ use crate::registry::AsRule;
 /// Check for environment variables that are not capitalized.
 ///
 /// ## Why is this bad?
-/// By convention, environment variables are capitalized.
+/// By convention, environment variables should be capitalized.
 ///
 /// On Windows, environment variables are case-insensitive and are converted to
-/// uppercase, so using lowercase environment variables cause confusion.
+/// uppercase, so using lowercase environment variables can lead to subtle bugs.
 ///
 /// ## Example
 /// ```python

@@ -12,14 +12,16 @@ use crate::importer::ImportRequest;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `try`-`except`-`pass` blocks that can be replaced with
-/// `contextlib.suppress`.
+/// Checks for `try`-`except`-`pass` blocks that can be replaced with the
+/// `contextlib.suppress` context manager.
 ///
 /// ## Why is this bad?
-/// Using `contextlib.suppress` is more concise and readable.
+/// Using `contextlib.suppress` is more concise and directly communicates the
+/// intent of the code: to suppress a given exception.
 ///
-/// _Note: `contextlib.suppress` is slower than `try`-`except`-`pass`. You may
-/// want to use `try`-`except`-`pass` if performance is important._
+/// Note that `contextlib.suppress` is slower than using `try`-`except`-`pass`
+/// directly. For performance-critical code, consider retaining the
+/// `try`-`except`-`pass` pattern.
 ///
 /// ## Example
 /// ```python
@@ -40,7 +42,7 @@ use crate::registry::AsRule;
 /// ## References
 /// - [Python documentation: `contextlib.suppress`](https://docs.python.org/3/library/contextlib.html#contextlib.suppress)
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
-/// - [Django ticket #27818](https://code.djangoproject.com/ticket/27818#comment:7)
+/// - [a simpler `try`/`except` (and why maybe shouldn't)](https://www.youtube.com/watch?v=MZAJ8qnC7mk)
 #[violation]
 pub struct SuppressibleException {
     exception: String,

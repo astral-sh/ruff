@@ -12,7 +12,8 @@ use crate::registry::AsRule;
 /// Checks for negated `==` operators.
 ///
 /// ## Why is this bad?
-/// Negated `==` operators are less readable than `!=` operators.
+/// Negated `==` operators are less readable than `!=` operators. When testing
+/// for non-equality, it is more common to use `!=` than `==`.
 ///
 /// ## Example
 /// ```python
@@ -48,7 +49,8 @@ impl AlwaysAutofixableViolation for NegateEqualOp {
 /// Checks for negated `!=` operators.
 ///
 /// ## Why is this bad?
-/// Negated `!=` operators are less readable than `==` operators.
+/// Negated `!=` operators are less readable than `==` operators, as they avoid a
+/// double negation.
 ///
 /// ## Example
 /// ```python
@@ -81,10 +83,11 @@ impl AlwaysAutofixableViolation for NegateNotEqualOp {
 }
 
 /// ## What it does
-/// Checks for double negations.
+/// Checks for double negations (i.e., multiple `not` operators).
 ///
 /// ## Why is this bad?
-/// A double negation is redundant.
+/// A double negation is redundant and less readable than omitting the `not`
+/// operators entirely.
 ///
 /// ## Example
 /// ```python

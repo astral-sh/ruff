@@ -40,8 +40,9 @@ fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
 /// statement.
 ///
 /// ## Why is this bad?
-/// Nested `if` statements are harder to read and understand. It is better to
-/// combine the conditions into a single `if` statement with `and`.
+/// Nesting `if` statements leads to deeper indentation and makes code harder to
+/// read. Instead, combine the conditions into a single `if` statement with an
+/// `and` operator.
 ///
 /// ## Example
 /// ```python
@@ -79,8 +80,8 @@ impl Violation for CollapsibleIf {
 /// Checks for `if` statements that can be replaced with `bool`.
 ///
 /// ## Why is this bad?
-/// `if` statements that return `True` if a condition is truthy and `False` if
-/// the condition is falsey can be replaced by boolean casts.
+/// `if` statements that return `True` for a truthy condition and `False` for
+/// a falsey condition can be replaced with boolean casts.
 ///
 /// ## Example
 /// ```python
@@ -151,8 +152,8 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
 /// Check for `if`-`else`-blocks that can be replaced with a ternary operator.
 ///
 /// ## Why is this bad?
-/// `if`-`else`-blocks that assign a value to a variable can be replaced with a
-/// ternary operator. This is more concise and easier to read.
+/// `if`-`else`-blocks that assign a value to a variable in both branches can
+/// be expressed more concisely by using a ternary operator.
 ///
 /// ## Example
 /// ```python
@@ -220,29 +221,29 @@ impl Violation for IfWithSameArms {
 }
 
 /// ## What it does
-/// Checks for `if` statements that check for the existence of a key in a
-/// dictionary that can be replaced with `dict.get()`.
+/// Checks for `if` statements that can be replaced with `dict.get` calls.
 ///
 /// ## Why is this bad?
-/// `dict.get()` is more concise and easier to read than an `if` statement.
+/// `dict.get()` calls can be used to replace `if` statements that assign a
+/// value to a variable in both branches, falling back to a default value if
+/// the key is not found. When possible, using `dict.get` is more concise and
+/// more idiomatic.
 ///
 /// ## Example
 /// ```python
-/// foo: dict = ...
-///
-/// if key in foo:
-///     value = foo[key]
+/// if "bar" in foo:
+///     value = foo["bar"]
 /// else:
-///     value = "Not found"
+///     value = 0
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// value = foo.get(key, "Not found")
+/// value = foo.get("bar", 0)
 /// ```
 ///
 /// ## References
-/// - [Python documentation: Mapping Types — dict](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
+/// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[violation]
 pub struct IfElseBlockInsteadOfDictGet {
     contents: String,

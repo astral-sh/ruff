@@ -71,10 +71,11 @@ impl Violation for DuplicateIsinstanceCall {
 }
 
 /// ## What it does
-/// Checks for multiple equality comparisons with the same target.
+/// Checks for boolean expressions that contain multiple equality comparisons
+/// to the same value.
 ///
 /// ## Why is this bad?
-/// To check if an object is equal to any one of multiple values, it is more
+/// To check if an object is equal to any one of multiple values, it's more
 /// concise to use the `in` operator with a tuple of values.
 ///
 /// ## Example
@@ -110,20 +111,16 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
 }
 
 /// ## What it does
-/// Check for `and` expressions that operate on an expression and its negation.
+/// Checks for `and` expressions that include both an expression and its
+/// negation.
 ///
 /// ## Why is this bad?
-/// The expression is always `False`. Replacing the expression with `False` is
-/// more concise and easier to understand.
+/// An `and` expression that includes both an expression and its negation will
+/// always evaluate to `False`.
 ///
 /// ## Example
 /// ```python
-/// a and not a
-/// ```
-///
-/// Use instead:
-/// ```python
-/// False
+/// x and not x
 /// ```
 ///
 /// ## References
@@ -146,20 +143,16 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
 }
 
 /// ## What it does
-/// Check for `or` expressions that operate on an expression and its negation.
+/// Checks for `or` expressions that include both an expression and its
+/// negation.
 ///
 /// ## Why is this bad?
-/// The expression is always `True`. Replacing the expression with `True` is
-/// more concise and easier to understand.
+/// An `or` expression that includes both an expression and its negation will
+/// always evaluate to `True`.
 ///
 /// ## Example
 /// ```python
-/// a or not a
-/// ```
-///
-/// Use instead:
-/// ```python
-/// True
+/// x and not x
 /// ```
 ///
 /// ## References
