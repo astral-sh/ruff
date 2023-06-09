@@ -48,9 +48,9 @@ use crate::rules::{
     flake8_debugger, flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
     flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle,
-    pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_simplify, flake8_slots, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, flake8_use_pathlib, flynt, mccabe, numpy, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -682,14 +682,16 @@ where
                     pylint::rules::return_in_init(self, stmt);
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                name,
-                bases,
-                keywords,
-                decorator_list,
-                body,
-                range: _,
-            }) => {
+            Stmt::ClassDef(
+                class_def @ ast::StmtClassDef {
+                    name,
+                    bases,
+                    keywords,
+                    decorator_list,
+                    body,
+                    range: _,
+                },
+            ) => {
                 if self.enabled(Rule::DjangoNullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
@@ -817,6 +819,18 @@ where
 
                 if self.enabled(Rule::DuplicateBases) {
                     pylint::rules::duplicate_bases(self, name, bases);
+                }
+
+                if self.enabled(Rule::NoSlotsInStrSubclass) {
+                    flake8_slots::rules::no_slots_in_str_subclass(self, stmt, class_def);
+                }
+
+                if self.enabled(Rule::NoSlotsInTupleSubclass) {
+                    flake8_slots::rules::no_slots_in_tuple_subclass(self, stmt, class_def);
+                }
+
+                if self.enabled(Rule::NoSlotsInNamedtupleSubclass) {
+                    flake8_slots::rules::no_slots_in_namedtuple_subclass(self, stmt, class_def);
                 }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {

@@ -782,6 +782,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Fixme, "003") => (RuleGroup::Unspecified, rules::flake8_fixme::rules::LineContainsXxx),
         (Flake8Fixme, "004") => (RuleGroup::Unspecified, rules::flake8_fixme::rules::LineContainsHack),
 
+        // flake8-slots
+        (Flake8Slots, "000") => (RuleGroup::Unspecified, rules::flake8_slots::rules::NoSlotsInStrSubclass),
+        (Flake8Slots, "001") => (RuleGroup::Unspecified, rules::flake8_slots::rules::NoSlotsInTupleSubclass),
+        (Flake8Slots, "002") => (RuleGroup::Unspecified, rules::flake8_slots::rules::NoSlotsInNamedtupleSubclass),
+
         _ => return None,
     })
 }
