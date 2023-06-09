@@ -55,6 +55,9 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                 ]
             )?;
 
+            // RustPython models `elif` by setting the body to a single `if` statement. The `orelse`
+            // of the most inner `if` statement then becomes the `else` of the whole `if` chain.
+            // That's why it's necessary to take the comments here from the most inner `elif`.
             else_comments = trailing_alternate_comments;
             last_node_of_previous_body = body.last();
 
