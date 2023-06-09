@@ -87,7 +87,7 @@ pub(crate) fn fix_unnecessary_generator_set(
     let content = tree.codegen_stylist(stylist);
 
     Ok(Edit::range_replacement(
-        formatted_expression(content, expr.range(), checker),
+        pad_expression(content, expr.range(), checker),
         expr.range(),
     ))
 }
@@ -130,7 +130,7 @@ pub(crate) fn fix_unnecessary_generator_dict(
     }));
 
     Ok(Edit::range_replacement(
-        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -165,7 +165,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_set(
     }));
 
     Ok(Edit::range_replacement(
-        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -209,7 +209,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
     }));
 
     Ok(Edit::range_replacement(
-        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -296,7 +296,7 @@ pub(crate) fn fix_unnecessary_literal_set(
     }
 
     Ok(Edit::range_replacement(
-        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -362,7 +362,7 @@ pub(crate) fn fix_unnecessary_literal_dict(
     }));
 
     Ok(Edit::range_replacement(
-        formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker),
+        pad_expression(tree.codegen_stylist(stylist), expr.range(), checker),
         expr.range(),
     ))
 }
@@ -481,7 +481,7 @@ pub(crate) fn fix_unnecessary_collection_call(
 
     Ok(Edit::range_replacement(
         if matches!(collection, Collection::Dict) {
-            formatted_expression(tree.codegen_stylist(stylist), expr.range(), checker)
+            pad_expression(tree.codegen_stylist(stylist), expr.range(), checker)
         } else {
             tree.codegen_stylist(stylist)
         },
@@ -501,7 +501,7 @@ pub(crate) fn fix_unnecessary_collection_call(
 /// However, this is a syntax error under the f-string grammar. As such,
 /// this method will pad the start and end of an expression as needed to
 /// avoid producing invalid syntax.
-fn formatted_expression(content: String, range: TextRange, checker: &Checker) -> String {
+fn pad_expression(content: String, range: TextRange, checker: &Checker) -> String {
     if !checker.semantic_model().in_f_string() {
         return content;
     }
