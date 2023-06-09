@@ -12,6 +12,7 @@ use ruff_formatter::prelude::{
 };
 use ruff_formatter::{format_args, write, Buffer, Format, FormatResult};
 use ruff_python_ast::prelude::{Expr, Ranged};
+use ruff_text_size::TextRange;
 
 use rustpython_parser::ast::ExprTuple;
 
@@ -21,7 +22,7 @@ pub struct FormatExprTuple;
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprTuple {
-            range: _,
+            range,
             elts,
             ctx: _,
         } = item;
@@ -72,6 +73,18 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                     &text(")"),
                 ]
             )?;
+        } else if is_parenthesized(*range, elts, f) {
+            // If the tuple has parentheses, keep them. Note that unlike other expr parentheses,
+            // those are actually part of the range
+            write!(
+                f,
+                [group(&format_args![
+                    // If it was previously parenthesized, add them again
+                    &text("("),
+                    soft_block_indent(&ExprSequence::new(elts)),
+                    &text(")"),
+                ])]
+            )?;
         } else {
             write!(
                 f,
@@ -106,23 +119,12 @@ impl<'a> ExprSequence<'a> {
 
 impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        for (pos, entry) in self.elts.iter().enumerate() {
-            // We need a trailing comma on the last entry of an expanded group since we have more
-            // than one element
-            if pos == self.elts.len() - 1 {
-                write!(
-                    f,
-                    [
-                        entry.format(),
-                        if_group_breaks(&text(",")),
-                        soft_line_break()
-                    ]
-                )?;
-            } else {
-                write!(f, [entry.format(), text(","), soft_line_break_or_space()])?;
-            }
-        }
-        Ok(())
+        f.join_with(&format_args!(text(","), soft_line_break_or_space()))
+            .entries(self.elts.iter().formatted())
+            .finish()?;
+        // We need a trailing comma on the last entry of an expanded group since we have more
+        // than one element
+        write!(f, [if_group_breaks(&text(",")), soft_line_break()])
     }
 }
 
@@ -138,4 +140,30 @@ impl NeedsParentheses for ExprTuple {
             parentheses => parentheses,
         }
     }
+}
+
+/// Check if a tuple has already had parentheses in the input
+fn is_parenthesized(
+    tuple_range: TextRange,
+    elts: &[Expr],
+    f: &mut Formatter<PyFormatContext<'_>>,
+) -> bool {
+    let parentheses = '(';
+    let first_char = &f.context().contents()[usize::from(tuple_range.start())..]
+        .chars()
+        .next();
+    let Some(first_char) = first_char else {
+        return false;
+    };
+    if *first_char != parentheses {
+        return false;
+    }
+
+    // Consider `a = (1, 2), 3`: The first char of the current expr starts is a parentheses, but
+    // it's not its own but that of its first tuple child. We know that it belongs to the child
+    // because if it wouldn't, the child would start (at least) a char later
+    let Some(first_child) = elts.first() else {
+        return false;
+    };
+    first_child.range().start() != tuple_range.start()
 }

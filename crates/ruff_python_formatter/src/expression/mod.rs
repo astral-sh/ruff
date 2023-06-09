@@ -5,6 +5,7 @@ use crate::prelude::*;
 use ruff_formatter::{
     format_args, write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
 };
+use ruff_python_ast::prelude::Ranged;
 use rustpython_parser::ast::Expr;
 
 pub(crate) mod expr_attribute;
@@ -52,6 +53,7 @@ impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
 
 impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
     fn fmt(&self, item: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
+        item.range();
         let parentheses = item.needs_parentheses(
             self.parenthesize,
             f.context().contents(),

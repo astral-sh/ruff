@@ -58,6 +58,11 @@ g2 = ( # a
     2, # e
     # f
 ) # g
+
+# Ensure the correct number of parentheses
+h1 = ((((1, 2))))
+h2 = ((((1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"))))
+h3 = 1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"
 ```
 
 
@@ -252,6 +257,11 @@ g2 = (
     2,  # e
     # f
 )  # g
+
+# Ensure the correct number of parentheses
+h1 = (1, 2)
+h2 = (1, "NOT_YET_IMPLEMENTED_STRING")
+h3 = 1, "NOT_YET_IMPLEMENTED_STRING"
 ```
 
 
