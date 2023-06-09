@@ -36,7 +36,10 @@ impl Format<PyFormatContext<'_>> for FormatLeadingComments<'_> {
             FormatLeadingComments::Comments(comments) => comments,
         };
 
-        for comment in leading_comments {
+        for comment in leading_comments
+            .iter()
+            .filter(|comment| comment.is_unformatted())
+        {
             let slice = comment.slice();
 
             let lines_after_comment = lines_after(slice.end(), f.context().contents());
@@ -127,7 +130,10 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
 
         let mut has_trailing_own_line_comment = false;
 
-        for trailing in trailing_comments {
+        for trailing in trailing_comments
+            .iter()
+            .filter(|comment| comment.is_unformatted())
+        {
             let slice = trailing.slice();
 
             has_trailing_own_line_comment |= trailing.position().is_own_line();
@@ -198,7 +204,10 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
         };
 
         let mut first = true;
-        for comment in dangling_comments {
+        for comment in dangling_comments
+            .iter()
+            .filter(|comment| comment.is_unformatted())
+        {
             if first && comment.position().is_end_of_line() {
                 write!(f, [space(), space()])?;
             }

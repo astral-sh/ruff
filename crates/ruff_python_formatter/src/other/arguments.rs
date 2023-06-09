@@ -1,6 +1,5 @@
 use crate::comments::{dangling_node_comments, leading_node_comments};
 use crate::context::NodeLevel;
-use crate::other::arg::ArgumentKind;
 use crate::prelude::*;
 use crate::trivia::{first_non_trivia_token, SimpleTokenizer, Token, TokenKind};
 use crate::FormatNodeRule;
@@ -63,7 +62,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 joiner.entry(&format_args![
                     leading_node_comments(vararg.as_ref()),
                     text("*"),
-                    vararg.format().with_options(ArgumentKind::Varg)
+                    vararg.format()
                 ]);
                 last_node = Some(vararg.as_any_node_ref());
             }
@@ -90,7 +89,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 joiner.entry(&format_args![
                     leading_node_comments(kwarg.as_ref()),
                     text("**"),
-                    kwarg.format().with_options(ArgumentKind::Kwarg)
+                    kwarg.format()
                 ]);
                 last_node = Some(kwarg.as_any_node_ref());
             }

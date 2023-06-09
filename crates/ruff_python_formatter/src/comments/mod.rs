@@ -115,33 +115,42 @@ use ruff_python_ast::source_code::CommentRanges;
 pub(crate) struct SourceComment {
     /// The location of the comment in the source document.
     slice: SourceCodeSlice,
-
     /// Whether the comment has been formatted or not.
-    #[cfg(debug_assertions)]
     formatted: std::cell::Cell<bool>,
-
     position: CommentTextPosition,
 }
 
 impl SourceComment {
+    fn new(slice: SourceCodeSlice, position: CommentTextPosition) -> Self {
+        Self {
+            slice,
+            position,
+            formatted: std::cell::Cell::new(false),
+        }
+    }
+
     /// Returns the location of the comment in the original source code.
     /// Allows retrieving the text of the comment.
-    pub(crate) fn slice(&self) -> &SourceCodeSlice {
+    pub(crate) const fn slice(&self) -> &SourceCodeSlice {
         &self.slice
     }
 
-    pub(crate) fn position(&self) -> CommentTextPosition {
+    pub(crate) const fn position(&self) -> CommentTextPosition {
         self.position
     }
 
-    #[cfg(not(debug_assertions))]
-    #[inline(always)]
-    pub(crate) fn mark_formatted(&self) {}
-
     /// Marks the comment as formatted
-    #[cfg(debug_assertions)]
     pub(crate) fn mark_formatted(&self) {
         self.formatted.set(true);
+    }
+
+    /// If the comment has already been formatted
+    pub(crate) fn is_formatted(&self) -> bool {
+        self.formatted.get()
+    }
+
+    pub(crate) fn is_unformatted(&self) -> bool {
+        !self.is_formatted()
     }
 }
 

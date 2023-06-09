@@ -420,12 +420,7 @@ impl<'a> DecoratedComment<'a> {
 
 impl From<DecoratedComment<'_>> for SourceComment {
     fn from(decorated: DecoratedComment) -> Self {
-        Self {
-            slice: decorated.slice,
-            position: decorated.text_position,
-            #[cfg(debug_assertions)]
-            formatted: std::cell::Cell::new(false),
-        }
+        Self::new(decorated.slice, decorated.text_position)
     }
 }
 
