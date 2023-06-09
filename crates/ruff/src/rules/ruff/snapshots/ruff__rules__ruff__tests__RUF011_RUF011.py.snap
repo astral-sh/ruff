@@ -1,0 +1,40 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF011.py:10:2: RUF011 Dictionary comprehension uses static key: `"key"`
+   |
+10 | # Errors
+11 | {"key": value.upper() for value in data}
+   |  ^^^^^ RUF011
+12 | {True: value.upper() for value in data}
+13 | {0: value.upper() for value in data}
+   |
+
+RUF011.py:11:2: RUF011 Dictionary comprehension uses static key: `True`
+   |
+11 | # Errors
+12 | {"key": value.upper() for value in data}
+13 | {True: value.upper() for value in data}
+   |  ^^^^ RUF011
+14 | {0: value.upper() for value in data}
+15 | {(1, "a"): value.upper() for value in data} # constant tuple
+   |
+
+RUF011.py:12:2: RUF011 Dictionary comprehension uses static key: `0`
+   |
+12 | {"key": value.upper() for value in data}
+13 | {True: value.upper() for value in data}
+14 | {0: value.upper() for value in data}
+   |  ^ RUF011
+15 | {(1, "a"): value.upper() for value in data} # constant tuple
+   |
+
+RUF011.py:13:2: RUF011 Dictionary comprehension uses static key: `(1, "a")`
+   |
+13 | {True: value.upper() for value in data}
+14 | {0: value.upper() for value in data}
+15 | {(1, "a"): value.upper() for value in data} # constant tuple
+   |  ^^^^^^^^ RUF011
+   |
+
+

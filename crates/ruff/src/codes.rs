@@ -183,6 +183,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E2513") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidCharacterEsc),
         (Pylint, "E2514") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidCharacterNul),
         (Pylint, "E2515") => (RuleGroup::Unspecified, rules::pylint::rules::InvalidCharacterZeroWidthSpace),
+        (Pylint, "R0124") => (RuleGroup::Unspecified, rules::pylint::rules::ComparisonWithItself),
         (Pylint, "R0133") => (RuleGroup::Unspecified, rules::pylint::rules::ComparisonOfConstant),
         (Pylint, "R0206") => (RuleGroup::Unspecified, rules::pylint::rules::PropertyWithParameters),
         (Pylint, "R0402") => (RuleGroup::Unspecified, rules::pylint::rules::ManualFromImport),
@@ -746,6 +747,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "008") => (RuleGroup::Unspecified, rules::ruff::rules::MutableDataclassDefault),
         (Ruff, "009") => (RuleGroup::Unspecified, rules::ruff::rules::FunctionCallInDataclassDefaultArgument),
         (Ruff, "010") => (RuleGroup::Unspecified, rules::ruff::rules::ExplicitFStringTypeConversion),
+        (Ruff, "011") => (RuleGroup::Unspecified, rules::ruff::rules::StaticKeyDictComprehension),
         (Ruff, "100") => (RuleGroup::Unspecified, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Unspecified, rules::ruff::rules::InvalidPyprojectToml),
 

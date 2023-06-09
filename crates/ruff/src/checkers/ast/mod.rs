@@ -3377,6 +3377,10 @@ where
                     );
                 }
 
+                if self.enabled(Rule::ComparisonWithItself) {
+                    pylint::rules::comparison_with_itself(self, left, ops, comparators);
+                }
+
                 if self.enabled(Rule::ComparisonOfConstant) {
                     pylint::rules::comparison_of_constant(self, left, ops, comparators);
                 }
@@ -3578,6 +3582,9 @@ where
                     for generator in generators {
                         pylint::rules::iteration_over_set(self, &generator.iter);
                     }
+                }
+                if self.enabled(Rule::StaticKeyDictComprehension) {
+                    ruff::rules::static_key_dict_comprehension(self, key);
                 }
             }
             Expr::GeneratorExp(ast::ExprGeneratorExp {

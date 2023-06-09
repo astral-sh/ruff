@@ -1,5 +1,3 @@
-use std::fmt;
-
 use itertools::Itertools;
 use rustpython_parser::ast::{self, Cmpop, Expr, Ranged};
 
@@ -7,55 +5,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum ViolationsCmpop {
-    Eq,
-    NotEq,
-    Lt,
-    LtE,
-    Gt,
-    GtE,
-    Is,
-    IsNot,
-    In,
-    NotIn,
-}
-
-impl From<&Cmpop> for ViolationsCmpop {
-    fn from(cmpop: &Cmpop) -> Self {
-        match cmpop {
-            Cmpop::Eq => Self::Eq,
-            Cmpop::NotEq => Self::NotEq,
-            Cmpop::Lt => Self::Lt,
-            Cmpop::LtE => Self::LtE,
-            Cmpop::Gt => Self::Gt,
-            Cmpop::GtE => Self::GtE,
-            Cmpop::Is => Self::Is,
-            Cmpop::IsNot => Self::IsNot,
-            Cmpop::In => Self::In,
-            Cmpop::NotIn => Self::NotIn,
-        }
-    }
-}
-
-impl fmt::Display for ViolationsCmpop {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let representation = match self {
-            Self::Eq => "==",
-            Self::NotEq => "!=",
-            Self::Lt => "<",
-            Self::LtE => "<=",
-            Self::Gt => ">",
-            Self::GtE => ">=",
-            Self::Is => "is",
-            Self::IsNot => "is not",
-            Self::In => "in",
-            Self::NotIn => "not in",
-        };
-        write!(f, "{representation}")
-    }
-}
+use crate::rules::pylint::helpers::CmpopExt;
 
 /// ## What it does
 /// Checks for comparisons between constants.
@@ -80,7 +30,7 @@ impl fmt::Display for ViolationsCmpop {
 #[violation]
 pub struct ComparisonOfConstant {
     left_constant: String,
-    op: ViolationsCmpop,
+    op: Cmpop,
     right_constant: String,
 }
 
@@ -94,8 +44,8 @@ impl Violation for ComparisonOfConstant {
         } = self;
 
         format!(
-            "Two constants compared in a comparison, consider replacing `{left_constant} {op} \
-             {right_constant}`"
+            "Two constants compared in a comparison, consider replacing `{left_constant} {} {right_constant}`",
+            CmpopExt::from(op)
         )
     }
 }
@@ -126,7 +76,7 @@ pub(crate) fn comparison_of_constant(
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
                     left_constant: checker.generator().constant(left_constant),
-                    op: op.into(),
+                    op: *op,
                     right_constant: checker.generator().constant(right_constant),
                 },
                 left.range(),

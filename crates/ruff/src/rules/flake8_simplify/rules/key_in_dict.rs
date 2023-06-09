@@ -13,6 +13,26 @@ use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_attribute, match_call_mut, match_expression};
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for key-existence checks against `dict.keys()` calls.
+///
+/// ## Why is this bad?
+/// When checking for the existence of a key in a given dictionary, using
+/// `key in dict` is more readable and efficient than `key in dict.keys()`,
+/// while having the same semantics.
+///
+/// ## Example
+/// ```python
+/// key in foo.keys()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// key in foo
+/// ```
+///
+/// ## References
+/// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[violation]
 pub struct InDictKeys {
     key: String,
