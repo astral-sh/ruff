@@ -208,7 +208,12 @@ impl Notebook {
         })
     }
 
+    /// Update the cell offsets as per the given [`SourceMap`].
     fn update_cell_offsets(&mut self, source_map: &SourceMap) {
+        // When there are multiple cells without any edits, the offsets of those
+        // cells will be updated using the same marker. So, we can keep track of
+        // the last marker used to update the offsets and check if it's still
+        // the closest marker to the current offset.
         let mut last_marker: Option<&SourceMarker> = None;
 
         // The first offset is always going to be at 0, so skip it.
@@ -238,6 +243,13 @@ impl Notebook {
         }
     }
 
+    /// Update the cell contents with the transformed content.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if the transformed content is out of bounds for any cell. This
+    /// can happen only if the cell offsets were not updated before calling
+    /// this method or the offsets were updated incorrectly.
     fn update_cell_content(&mut self, transformed: &str) {
         for (&pos, (start, end)) in self
             .valid_code_cells
@@ -247,10 +259,12 @@ impl Notebook {
             let cell_content = transformed
                 .get(start.to_usize()..end.to_usize())
                 .unwrap_or_else(|| {
-                    panic!("cell content out of bounds ({start:?}..{end:?}): {transformed}")
+                    panic!("Transformed content out of bounds ({start:?}..{end:?}) for cell {pos}");
                 });
             self.raw.cells[pos as usize].source = SourceValue::String(
                 cell_content
+                    // We only need to strip the trailing newline which we added
+                    // while concatenating the cell contents.
                     .strip_suffix('\n')
                     .unwrap_or(cell_content)
                     .to_string(),
@@ -322,8 +336,10 @@ impl Notebook {
         &self.cell_offsets
     }
 
-    /// Update the notebook with the given edits and transformed content.
+    /// Update the notebook with the given sourcemap and transformed content.
     pub fn update(&mut self, source_map: &SourceMap, transformed: &str) {
+        // Cell offsets must be updated before updating the cell content as
+        // it depends on the offsets to extract the cell content.
         self.update_cell_offsets(source_map);
         self.update_cell_content(transformed);
         self.content = transformed.to_string();
@@ -454,5 +470,6 @@ mutable_argument()
                 row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5],
             }
         );
+        assert_eq!(notebook.cell_offsets(), &[0.into(), 90.into(), 168.into()]);
     }
 }
