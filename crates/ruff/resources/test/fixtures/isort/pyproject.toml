@@ -1,7 +1,8 @@
 [tool.ruff]
-line-length = 88
+line-length = 120
 
 [tool.ruff.isort]
+line-length = 88
 lines-after-imports = 3
 lines-between-types = 2
 known-local-folder = ["ruff"]

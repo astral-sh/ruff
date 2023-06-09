@@ -1192,6 +1192,17 @@
             "type": "string"
           }
         },
+        "line-length": {
+          "description": "The line length to use when enforcing I001 violations, long import lines.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineLength"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "lines-after-imports": {
           "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.",
           "type": [

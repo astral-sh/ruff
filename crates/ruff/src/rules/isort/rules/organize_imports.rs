@@ -113,12 +113,20 @@ pub(crate) fn organize_imports(
         trailing_lines_end(block.imports.last().unwrap(), locator)
     };
 
+    // If isort line length setting is explicitly set and greater than default
+    // ruff line line length we use that, otherwise we fall back to default ruff length
+    let line_length = match settings.isort.line_length {
+        Some(isort_length) if isort_length < settings.line_length => settings.line_length,
+        Some(isort_length) => isort_length,
+        None => settings.line_length,
+    };
+
     // Generate the sorted import block.
     let expected = format_imports(
         block,
         comments,
         locator,
-        settings.line_length,
+        line_length,
         LineWidth::new(settings.tab_size).add_str(indentation),
         stylist,
         &settings.src,

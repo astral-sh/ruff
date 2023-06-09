@@ -9,6 +9,7 @@ use strum::IntoEnumIterator;
 
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
+use crate::line_width::LineLength;
 use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::ImportType;
 use crate::warn_user_once;
@@ -43,6 +44,16 @@ impl Default for RelativeImportsOrder {
 )]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
+    #[option(
+        default = "",
+        value_type = "int",
+        example = r#"
+        # Allow import lines to be as long as 120 characters.
+        line-length = 120
+        "#
+    )]
+    /// The line length to use when enforcing I001 violations, long import lines.
+    pub line_length: Option<LineLength>,
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -299,6 +310,7 @@ pub struct Options {
 #[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
+    pub line_length: Option<LineLength>,
     pub required_imports: BTreeSet<String>,
     pub combine_as_imports: bool,
     pub force_single_line: bool,
@@ -323,6 +335,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            line_length: None,
             required_imports: BTreeSet::new(),
             combine_as_imports: false,
             force_single_line: false,
@@ -425,6 +438,7 @@ impl From<Options> for Settings {
         }
 
         Self {
+            line_length: options.line_length,
             required_imports: BTreeSet::from_iter(options.required_imports.unwrap_or_default()),
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
             force_single_line: options.force_single_line.unwrap_or(false),
@@ -459,6 +473,7 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
+            line_length: settings.line_length,
             required_imports: Some(settings.required_imports.into_iter().collect()),
             combine_as_imports: Some(settings.combine_as_imports),
             extra_standard_library: Some(
