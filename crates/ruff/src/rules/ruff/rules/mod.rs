@@ -15,11 +15,10 @@ pub(crate) use mutable_defaults_in_dataclass_fields::{
     FunctionCallInDataclassDefaultArgument, MutableDataclassDefault,
 };
 pub(crate) use pairwise_over_zipped::{pairwise_over_zipped, PairwiseOverZipped};
-pub(crate) use unused_noqa::{UnusedCodes, UnusedNOQA};
-
 pub(crate) use static_key_dict_comprehension::{
     static_key_dict_comprehension, StaticKeyDictComprehension,
 };
+pub(crate) use unused_noqa::{UnusedCodes, UnusedNOQA};
 
 mod ambiguous_unicode_character;
 mod asyncio_dangling_task;
