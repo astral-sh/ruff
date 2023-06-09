@@ -1,5 +1,4 @@
 # Errors.
-
 foo == foo
 
 foo != foo
@@ -21,7 +20,6 @@ foo in foo
 foo not in foo
 
 # Non-errors.
-
 "foo" == "foo"  # This is flagged by `comparison-of-constant` instead.
 
 foo == "foo"

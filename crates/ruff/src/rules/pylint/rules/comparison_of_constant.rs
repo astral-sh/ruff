@@ -5,7 +5,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::ViolationsCmpop;
+use crate::rules::pylint::helpers::CmpopExt;
 
 /// ## What it does
 /// Checks for comparisons between constants.
@@ -30,7 +30,7 @@ use crate::rules::pylint::helpers::ViolationsCmpop;
 #[violation]
 pub struct ComparisonOfConstant {
     left_constant: String,
-    op: ViolationsCmpop,
+    op: Cmpop,
     right_constant: String,
 }
 
@@ -44,8 +44,8 @@ impl Violation for ComparisonOfConstant {
         } = self;
 
         format!(
-            "Two constants compared in a comparison, consider replacing `{left_constant} {op} \
-             {right_constant}`"
+            "Two constants compared in a comparison, consider replacing `{left_constant} {} {right_constant}`",
+            CmpopExt::from(op)
         )
     }
 }
@@ -76,7 +76,7 @@ pub(crate) fn comparison_of_constant(
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
                     left_constant: checker.generator().constant(left_constant),
-                    op: op.into(),
+                    op: *op,
                     right_constant: checker.generator().constant(right_constant),
                 },
                 left.range(),

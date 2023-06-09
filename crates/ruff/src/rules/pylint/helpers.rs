@@ -3,6 +3,7 @@ use ruff_python_semantic::analyze::function_type::FunctionType;
 use ruff_python_semantic::model::SemanticModel;
 use ruff_python_semantic::scope::ScopeKind;
 use rustpython_parser::ast;
+use rustpython_parser::ast::Cmpop;
 use std::fmt;
 
 use crate::settings::Settings;
@@ -46,50 +47,29 @@ pub(crate) fn in_dunder_init(model: &SemanticModel, settings: &Settings) -> bool
     true
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum ViolationsCmpop {
-    Eq,
-    NotEq,
-    Lt,
-    LtE,
-    Gt,
-    GtE,
-    Is,
-    IsNot,
-    In,
-    NotIn,
-}
+/// A wrapper around [`Cmpop`] that implements `Display`.
+#[derive(Debug)]
+pub(crate) struct CmpopExt(Cmpop);
 
-impl From<&ast::Cmpop> for ViolationsCmpop {
-    fn from(cmpop: &ast::Cmpop) -> Self {
-        match cmpop {
-            ast::Cmpop::Eq => Self::Eq,
-            ast::Cmpop::NotEq => Self::NotEq,
-            ast::Cmpop::Lt => Self::Lt,
-            ast::Cmpop::LtE => Self::LtE,
-            ast::Cmpop::Gt => Self::Gt,
-            ast::Cmpop::GtE => Self::GtE,
-            ast::Cmpop::Is => Self::Is,
-            ast::Cmpop::IsNot => Self::IsNot,
-            ast::Cmpop::In => Self::In,
-            ast::Cmpop::NotIn => Self::NotIn,
-        }
+impl From<&Cmpop> for CmpopExt {
+    fn from(cmpop: &Cmpop) -> Self {
+        CmpopExt(*cmpop)
     }
 }
 
-impl fmt::Display for ViolationsCmpop {
+impl fmt::Display for CmpopExt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let representation = match self {
-            Self::Eq => "==",
-            Self::NotEq => "!=",
-            Self::Lt => "<",
-            Self::LtE => "<=",
-            Self::Gt => ">",
-            Self::GtE => ">=",
-            Self::Is => "is",
-            Self::IsNot => "is not",
-            Self::In => "in",
-            Self::NotIn => "not in",
+        let representation = match self.0 {
+            Cmpop::Eq => "==",
+            Cmpop::NotEq => "!=",
+            Cmpop::Lt => "<",
+            Cmpop::LtE => "<=",
+            Cmpop::Gt => ">",
+            Cmpop::GtE => ">=",
+            Cmpop::Is => "is",
+            Cmpop::IsNot => "is not",
+            Cmpop::In => "in",
+            Cmpop::NotIn => "not in",
         };
         write!(f, "{representation}")
     }

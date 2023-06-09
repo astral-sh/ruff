@@ -1,18 +1,18 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Cmpop, Expr};
+use rustpython_parser::ast::{Cmpop, Expr, Ranged};
 
-use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::ViolationsCmpop;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::CmpopExt;
+
 /// ## What it does
-/// Checks for comparisons of a name with itself.
+/// Checks for operations that compare a name to itself.
 ///
 /// ## Why is this bad?
-/// Comparing a name with itself will always evaluate to the same value, so the
-/// comparison is redundant. It is also indicative of a mistake, as the
-/// comparison is unlikely to be what the programmer intended.
+/// Comparing a name to itself always results in the same value, and is likely
+/// a mistake.
 ///
 /// ## Example
 /// ```python
@@ -20,26 +20,21 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```
 ///
 /// ## References
-/// - [Python documentation](https://docs.python.org/3/reference/expressions.html#comparisons)
+/// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]
 pub struct ComparisonWithItself {
-    left_constant: String,
-    op: ViolationsCmpop,
-    right_constant: String,
+    left: String,
+    op: Cmpop,
+    right: String,
 }
 
 impl Violation for ComparisonWithItself {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComparisonWithItself {
-            left_constant,
-            op,
-            right_constant,
-        } = self;
-
+        let ComparisonWithItself { left, op, right } = self;
         format!(
-            "Name compared with itself, consider replacing `{left_constant} {op} \
-             {right_constant}`"
+            "Name compared with itself, consider replacing `{left} {} {right}`",
+            CmpopExt::from(op)
         )
     }
 }
@@ -56,18 +51,16 @@ pub(crate) fn comparison_with_itself(
         .tuple_windows()
         .zip(ops)
     {
-        if let (Expr::Name(left_expr), Expr::Name(right_expr)) = (left, right) {
-            if left_expr.id == right_expr.id {
-                let diagnostic = Diagnostic::new(
+        if let (Expr::Name(left), Expr::Name(right)) = (left, right) {
+            if left.id == right.id {
+                checker.diagnostics.push(Diagnostic::new(
                     ComparisonWithItself {
-                        left_constant: left_expr.id.to_string(),
-                        op: op.into(),
-                        right_constant: right_expr.id.to_string(),
+                        left: left.id.to_string(),
+                        op: *op,
+                        right: right.id.to_string(),
                     },
-                    left_expr.range,
-                );
-
-                checker.diagnostics.push(diagnostic);
+                    left.range(),
+                ));
             }
         }
     }
