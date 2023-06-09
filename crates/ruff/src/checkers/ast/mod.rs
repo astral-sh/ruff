@@ -822,21 +822,15 @@ where
                 }
 
                 if self.enabled(Rule::NoSlotsInStrSubclass) {
-                    flake8_slots::rules::no_slots_in_str_subclass(self, class_def, || {
-                        helpers::identifier_range(stmt, self.locator)
-                    });
+                    flake8_slots::rules::no_slots_in_str_subclass(self, stmt, class_def);
                 }
 
                 if self.enabled(Rule::NoSlotsInTupleSubclass) {
-                    flake8_slots::rules::no_slots_in_tuple_subclass(self, class_def, || {
-                        helpers::identifier_range(stmt, self.locator)
-                    });
+                    flake8_slots::rules::no_slots_in_tuple_subclass(self, stmt, class_def);
                 }
 
                 if self.enabled(Rule::NoSlotsInNamedtupleSubclass) {
-                    flake8_slots::rules::no_slots_in_namedtuple_subclass(self, class_def, || {
-                        helpers::identifier_range(stmt, self.locator)
-                    });
+                    flake8_slots::rules::no_slots_in_namedtuple_subclass(self, stmt, class_def);
                 }
             }
             Stmt::Import(ast::StmtImport { names, range: _ }) => {

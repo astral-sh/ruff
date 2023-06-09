@@ -1,21 +1,28 @@
-use ruff_text_size::TextRange;
-use rustpython_parser::ast;
-use rustpython_parser::ast::{Expr, StmtClassDef};
+use rustpython_parser::ast::{Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_slots::rules::helpers::has_slots;
 
 /// ## What it does
-/// Checks if subclasses of `str` have not defined a value for `__slots__`
+/// Checks for subclasses of `str` that lack a `__slots__` definition.
 ///
 /// ## Why is this bad?
-/// `__slots__` allow us to explicitly declare data members (like properties) and deny the creation
-/// of `__dict__` and `__weakref__` (unless explicitly declared in `__slots__` or available in a
-/// parent.) The space saved over using `__dict__` can be significant. Attribute lookup speed can be
-/// significantly improved as well.
+/// In Python, the `__slots__` attribute allows you to explicitly define the
+/// attributes (instance variables) that a class can have. By default, Python
+/// uses a dictionary to store an object's attributes, which incurs some memory
+/// overhead. However, when `__slots__` is defined, Python uses a more compact
+/// internal structure to store the object's attributes, resulting in memory
+/// savings.
+///
+/// Subclasses of `str` inherit all the attributes and methods of the built-in
+/// `str` class. Since strings are typically immutable, they don't require
+/// additional attributes beyond what the `str` class provides. Defining
+/// `__slots__` for subclasses of `str` prevents the creation of a dictionary
+/// for each instance, reducing memory consumption.
 ///
 /// ## Example
 /// ```python
@@ -26,11 +33,11 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// Use instead:
 /// ```python
 /// class Foo(str):
-///     __slots__ = ["foo"]
+///     __slots__ = ()
 /// ```
+///
 /// ## References
-/// - [Python Docs](https://docs.python.org/3.7/reference/datamodel.html#slots)
-/// - [StackOverflow](https://stackoverflow.com/questions/472000/usage-of-slots)
+/// - [Python documentation: `__slots__`](https://docs.python.org/3.7/reference/datamodel.html#slots)
 #[violation]
 pub struct NoSlotsInStrSubclass;
 
@@ -42,25 +49,20 @@ impl Violation for NoSlotsInStrSubclass {
 }
 
 /// SLOT000
-pub(crate) fn no_slots_in_str_subclass<F>(checker: &mut Checker, class: &StmtClassDef, locate: F)
-where
-    F: FnOnce() -> TextRange,
-{
-    if class.bases.len() != 1 {
-        return;
-    }
-
-    let Expr::Name(ast::ExprName { id, .. }) = &class.bases[0] else {
-        return;
-    };
-
-    if !(id.as_str() == "str" && checker.semantic_model().is_builtin("str")) {
-        return;
-    }
-
-    if !has_slots(&class.body) {
+pub(crate) fn no_slots_in_str_subclass(checker: &mut Checker, stmt: &Stmt, class: &StmtClassDef) {
+    if class.bases.iter().any(|base| {
         checker
-            .diagnostics
-            .push(Diagnostic::new(NoSlotsInStrSubclass, locate()));
+            .semantic_model()
+            .resolve_call_path(base)
+            .map_or(false, |call_path| {
+                matches!(call_path.as_slice(), ["" | "builtins", "str"])
+            })
+    }) {
+        if !has_slots(&class.body) {
+            checker.diagnostics.push(Diagnostic::new(
+                NoSlotsInStrSubclass,
+                identifier_range(stmt, checker.locator),
+            ));
+        }
     }
 }

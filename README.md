@@ -283,6 +283,7 @@ quality tools, including:
 - [flake8-return](https://pypi.org/project/flake8-return/)
 - [flake8-self](https://pypi.org/project/flake8-self/)
 - [flake8-simplify](https://pypi.org/project/flake8-simplify/)
+- [flake8-slots](https://pypi.org/project/flake8-slots/)
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 - [flake8-todos](https://pypi.org/project/flake8-todos/)
