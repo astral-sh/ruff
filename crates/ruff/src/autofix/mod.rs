@@ -170,9 +170,59 @@ mod tests {
     fn empty_file() {
         let locator = Locator::new(r#""#);
         let diagnostics = create_diagnostics([]);
-        let FixResult { code, fixes, .. } = apply_fixes(diagnostics.iter(), &locator);
+        let FixResult {
+            code,
+            fixes,
+            source_map,
+        } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(code, "");
         assert_eq!(fixes.values().sum::<usize>(), 0);
+        assert!(source_map.markers().is_empty());
+    }
+
+    #[test]
+    fn apply_one_insertion() {
+        let locator = Locator::new(
+            r#"
+import os
+
+print("hello world")
+"#
+            .trim(),
+        );
+        let diagnostics = create_diagnostics([Edit::insertion(
+            "import sys\n".to_string(),
+            TextSize::new(10),
+        )]);
+        let FixResult {
+            code,
+            fixes,
+            source_map,
+        } = apply_fixes(diagnostics.iter(), &locator);
+        assert_eq!(
+            code,
+            r#"
+import os
+import sys
+
+print("hello world")
+"#
+            .trim()
+        );
+        assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(
+            source_map.markers(),
+            &[
+                SourceMarker {
+                    source: 10.into(),
+                    dest: 10.into(),
+                },
+                SourceMarker {
+                    source: 10.into(),
+                    dest: 21.into(),
+                },
+            ]
+        );
     }
 
     #[test]
