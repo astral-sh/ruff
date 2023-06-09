@@ -94,7 +94,7 @@ some_module.some_function(
      }
      tup = (
          1,
-@@ -24,45 +24,18 @@
+@@ -24,45 +24,23 @@
  def f(
      a: int = 1,
  ):
@@ -106,7 +106,9 @@ some_module.some_function(
 -    call2(
 -        arg=[1, 2, 3],
 -    )
--    x = {
++    NOT_IMPLEMENTED_call()
++    NOT_IMPLEMENTED_call()
+     x = {
 -        "a": 1,
 -        "b": 2,
 -    }["a"]
@@ -123,9 +125,11 @@ some_module.some_function(
 -            "h": 8,
 -        }["a"]
 -    ):
-+    NOT_IMPLEMENTED_call()
-+    NOT_IMPLEMENTED_call()
-+    x = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++        "NOT_YET_IMPLEMENTED_STRING": 1,
++        "NOT_YET_IMPLEMENTED_STRING": 2,
++    }[
++        "NOT_YET_IMPLEMENTED_STRING"
++    ]
 +    if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
          pass
  
@@ -133,7 +137,7 @@ some_module.some_function(
 -def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
 -    Set["xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
 -):
-+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
++def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set["NOT_YET_IMPLEMENTED_STRING"]:
      json = {
 -        "k": {
 -            "k2": {
@@ -148,7 +152,7 @@ some_module.some_function(
      }
  
  
-@@ -80,35 +53,16 @@
+@@ -80,35 +58,16 @@
      pass
  
  
@@ -221,12 +225,17 @@ def f(
 ):
     NOT_IMPLEMENTED_call()
     NOT_IMPLEMENTED_call()
-    x = NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+    x = {
+        "NOT_YET_IMPLEMENTED_STRING": 1,
+        "NOT_YET_IMPLEMENTED_STRING": 2,
+    }[
+        "NOT_YET_IMPLEMENTED_STRING"
+    ]
     if NOT_IMPLEMENTED_left < NOT_IMPLEMENTED_right:
         pass
 
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]:
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set["NOT_YET_IMPLEMENTED_STRING"]:
     json = {
         "NOT_YET_IMPLEMENTED_STRING": {
             "NOT_YET_IMPLEMENTED_STRING": {"NOT_YET_IMPLEMENTED_STRING": [1]},

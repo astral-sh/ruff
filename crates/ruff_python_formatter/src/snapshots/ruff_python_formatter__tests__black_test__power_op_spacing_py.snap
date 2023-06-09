@@ -92,7 +92,7 @@ return np.divide(
 -j = super().name ** 5
 -k = [(2**idx, value) for idx, value in pairs]
 -l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
-+d = 5 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++d = 5 ** f["NOT_YET_IMPLEMENTED_STRING"]
 +e = NOT_IMPLEMENTED_call()
 +f = NOT_IMPLEMENTED_call() ** 5
 +g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
@@ -125,7 +125,7 @@ return np.divide(
 -j = super().name ** 5.0
 -k = [(2.0**idx, value) for idx, value in pairs]
 -l = mod.weights_[0] == pytest.approx(0.95**100, abs=0.001)
-+d = 5.0 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
++d = 5.0 ** f["NOT_YET_IMPLEMENTED_STRING"]
 +e = NOT_IMPLEMENTED_call()
 +f = NOT_IMPLEMENTED_call() ** 5.0
 +g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
@@ -181,7 +181,7 @@ def function_dont_replace_spaces():
 a = 5**~4
 b = 5 ** NOT_IMPLEMENTED_call()
 c = -(5**2)
-d = 5 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+d = 5 ** f["NOT_YET_IMPLEMENTED_STRING"]
 e = NOT_IMPLEMENTED_call()
 f = NOT_IMPLEMENTED_call() ** 5
 g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
@@ -200,7 +200,7 @@ r = x**y
 a = 5.0**~4.0
 b = 5.0 ** NOT_IMPLEMENTED_call()
 c = -(5.0**2.0)
-d = 5.0 ** NOT_IMPLEMENTED_value[NOT_IMPLEMENTED_key]
+d = 5.0 ** f["NOT_YET_IMPLEMENTED_STRING"]
 e = NOT_IMPLEMENTED_call()
 f = NOT_IMPLEMENTED_call() ** 5.0
 g = a.NOT_IMPLEMENTED_attr**c.NOT_IMPLEMENTED_attr
