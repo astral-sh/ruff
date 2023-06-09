@@ -21,6 +21,7 @@ pub(crate) struct FixResult {
     pub(crate) code: String,
     /// The number of fixes applied for each [`Rule`].
     pub(crate) fixes: FixTable,
+    /// Source map for the fixed source code.
     pub(crate) source_map: SourceMap,
 }
 
@@ -148,6 +149,7 @@ mod tests {
     use ruff_diagnostics::Fix;
     use ruff_python_ast::source_code::Locator;
 
+    use crate::autofix::source_map::SourceMarker;
     use crate::autofix::{apply_fixes, FixResult};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
@@ -187,7 +189,11 @@ class A(object):
             TextSize::new(8),
             TextSize::new(14),
         )]);
-        let FixResult { code, fixes, .. } = apply_fixes(diagnostics.iter(), &locator);
+        let FixResult {
+            code,
+            fixes,
+            source_map,
+        } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             code,
             r#"
@@ -197,6 +203,19 @@ class A(Bar):
             .trim(),
         );
         assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(
+            source_map.markers(),
+            &[
+                SourceMarker {
+                    source: 8.into(),
+                    dest: 8.into(),
+                },
+                SourceMarker {
+                    source: 14.into(),
+                    dest: 11.into(),
+                },
+            ]
+        );
     }
 
     #[test]
@@ -209,7 +228,11 @@ class A(object):
             .trim(),
         );
         let diagnostics = create_diagnostics([Edit::deletion(TextSize::new(7), TextSize::new(15))]);
-        let FixResult { code, fixes, .. } = apply_fixes(diagnostics.iter(), &locator);
+        let FixResult {
+            code,
+            fixes,
+            source_map,
+        } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             code,
             r#"
@@ -219,6 +242,19 @@ class A:
             .trim()
         );
         assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(
+            source_map.markers(),
+            &[
+                SourceMarker {
+                    source: 7.into(),
+                    dest: 7.into()
+                },
+                SourceMarker {
+                    source: 15.into(),
+                    dest: 7.into()
+                }
+            ]
+        );
     }
 
     #[test]
@@ -234,7 +270,11 @@ class A(object, object, object):
             Edit::deletion(TextSize::from(8), TextSize::from(16)),
             Edit::deletion(TextSize::from(22), TextSize::from(30)),
         ]);
-        let FixResult { code, fixes, .. } = apply_fixes(diagnostics.iter(), &locator);
+        let FixResult {
+            code,
+            fixes,
+            source_map,
+        } = apply_fixes(diagnostics.iter(), &locator);
 
         assert_eq!(
             code,
@@ -245,6 +285,27 @@ class A(object):
             .trim()
         );
         assert_eq!(fixes.values().sum::<usize>(), 2);
+        assert_eq!(
+            source_map.markers(),
+            &[
+                SourceMarker {
+                    source: 8.into(),
+                    dest: 8.into()
+                },
+                SourceMarker {
+                    source: 16.into(),
+                    dest: 8.into()
+                },
+                SourceMarker {
+                    source: 22.into(),
+                    dest: 14.into(),
+                },
+                SourceMarker {
+                    source: 30.into(),
+                    dest: 14.into(),
+                }
+            ]
+        );
     }
 
     #[test]
@@ -260,7 +321,11 @@ class A(object):
             Edit::deletion(TextSize::from(7), TextSize::from(15)),
             Edit::replacement("ignored".to_string(), TextSize::from(9), TextSize::from(11)),
         ]);
-        let FixResult { code, fixes, .. } = apply_fixes(diagnostics.iter(), &locator);
+        let FixResult {
+            code,
+            fixes,
+            source_map,
+        } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             code,
             r#"
@@ -270,5 +335,18 @@ class A:
             .trim(),
         );
         assert_eq!(fixes.values().sum::<usize>(), 1);
+        assert_eq!(
+            source_map.markers(),
+            &[
+                SourceMarker {
+                    source: 7.into(),
+                    dest: 7.into(),
+                },
+                SourceMarker {
+                    source: 15.into(),
+                    dest: 7.into(),
+                }
+            ]
+        );
     }
 }

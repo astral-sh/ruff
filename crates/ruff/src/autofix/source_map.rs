@@ -4,7 +4,7 @@ use ruff_diagnostics::Edit;
 
 /// Lightweight sourcemap marker representing the source and destination
 /// position for an [`Edit`].
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SourceMarker {
     /// Position of the marker in the original source.
     pub source: TextSize,
@@ -17,7 +17,7 @@ pub struct SourceMarker {
 /// Sourcemaps are used to map positions in the original source to positions in
 /// the transformed code. Here, only the boundaries of edits are tracked instead
 /// of every single character.
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq)]
 pub struct SourceMap(Vec<SourceMarker>);
 
 impl SourceMap {
