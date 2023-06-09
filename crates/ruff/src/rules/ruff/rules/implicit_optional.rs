@@ -183,34 +183,34 @@ impl<'a> TypingTarget<'a> {
     /// Check if the [`TypingTarget`] explicitly allows `None`.
     fn contains_none(&self, model: &SemanticModel) -> bool {
         match self {
-            Self::None | Self::Optional | Self::Any => true,
-            Self::Literal(elements) => elements.iter().any(|element| {
-                let Some(new_target) = Self::try_from_expr(model, element) else {
+            TypingTarget::None | TypingTarget::Optional | TypingTarget::Any => true,
+            TypingTarget::Literal(elements) => elements.iter().any(|element| {
+                let Some(new_target) = TypingTarget::try_from_expr(model, element) else {
                 return false;
             };
                 // Literal can only contain `None`, a literal value, other `Literal`
                 // or an enum value.
                 match new_target {
-                    Self::None => true,
-                    Self::Literal(_) => new_target.contains_none(model),
+                    TypingTarget::None => true,
+                    TypingTarget::Literal(_) => new_target.contains_none(model),
                     _ => false,
                 }
             }),
-            Self::Union(elements) => elements.iter().any(|element| {
-                let Some(new_target) = Self::try_from_expr(model, element) else {
+            TypingTarget::Union(elements) => elements.iter().any(|element| {
+                let Some(new_target) = TypingTarget::try_from_expr(model, element) else {
                 return false;
             };
                 match new_target {
-                    Self::None => true,
+                    TypingTarget::None => true,
                     _ => new_target.contains_none(model),
                 }
             }),
-            Self::Annotated(element) => {
-                let Some(new_target) = Self::try_from_expr(model, element) else {
+            TypingTarget::Annotated(element) => {
+                let Some(new_target) = TypingTarget::try_from_expr(model, element) else {
                 return false;
             };
                 match new_target {
-                    Self::None => true,
+                    TypingTarget::None => true,
                     _ => new_target.contains_none(model),
                 }
             }
