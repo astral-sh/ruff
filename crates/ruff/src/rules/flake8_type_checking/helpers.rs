@@ -1,9 +1,10 @@
+use rustpython_parser::ast;
+
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::binding::{Binding, BindingKind};
 use ruff_python_semantic::model::SemanticModel;
 use ruff_python_semantic::scope::ScopeKind;
-use rustpython_parser::ast;
 
 pub(crate) fn is_valid_runtime_import(semantic_model: &SemanticModel, binding: &Binding) -> bool {
     if matches!(
@@ -15,8 +16,7 @@ pub(crate) fn is_valid_runtime_import(semantic_model: &SemanticModel, binding: &
         binding.context.is_runtime()
             && binding.references().any(|reference_id| {
                 semantic_model
-                    .references
-                    .resolve(reference_id)
+                    .reference(reference_id)
                     .context()
                     .is_runtime()
             })

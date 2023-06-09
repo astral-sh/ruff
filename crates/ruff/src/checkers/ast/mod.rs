@@ -29,7 +29,7 @@ use ruff_python_semantic::binding::{
 use ruff_python_semantic::context::ExecutionContext;
 use ruff_python_semantic::definition::{ContextualizedDefinition, Module, ModuleKind};
 use ruff_python_semantic::globals::Globals;
-use ruff_python_semantic::model::{ResolvedReference, SemanticModel, SemanticModelFlags};
+use ruff_python_semantic::model::{ResolvedRead, SemanticModel, SemanticModelFlags};
 use ruff_python_semantic::scope::{Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -4506,11 +4506,11 @@ impl<'a> Checker<'a> {
         let Expr::Name(ast::ExprName { id, .. } )= expr else {
             return;
         };
-        match self.semantic_model.resolve_reference(id, expr.range()) {
-            ResolvedReference::Resolved(..) | ResolvedReference::ImplicitGlobal => {
+        match self.semantic_model.resolve_read(id, expr.range()) {
+            ResolvedRead::Resolved(..) | ResolvedRead::ImplicitGlobal => {
                 // Nothing to do.
             }
-            ResolvedReference::StarImport => {
+            ResolvedRead::StarImport => {
                 // F405
                 if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
                     let sources: Vec<String> = self
@@ -4533,7 +4533,7 @@ impl<'a> Checker<'a> {
                     ));
                 }
             }
-            ResolvedReference::NotFound => {
+            ResolvedRead::NotFound => {
                 // F821
                 if self.enabled(Rule::UndefinedName) {
                     // Allow __path__.
@@ -5040,12 +5040,11 @@ impl<'a> Checker<'a> {
             // the bindings are in different scopes.
             if self.enabled(Rule::RedefinedWhileUnused) {
                 for (name, binding_id) in scope.bindings() {
-                    if let Some(shadowed) = self.semantic_model.shadowed_binding(binding_id) {
+                    if let Some(shadowed_id) = self.semantic_model.shadowed_binding(binding_id) {
+                        let shadowed = &self.semantic_model.bindings[shadowed_id];
                         if shadowed.is_used() {
                             continue;
                         }
-
-                        let binding = &self.semantic_model.bindings[binding_id];
 
                         #[allow(deprecated)]
                         let line = self.locator.compute_line_index(
@@ -5054,6 +5053,7 @@ impl<'a> Checker<'a> {
                                 .start(),
                         );
 
+                        let binding = &self.semantic_model.bindings[binding_id];
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::RedefinedWhileUnused {
                                 name: (*name).to_string(),
