@@ -1440,14 +1440,21 @@ impl LocatedCmpop {
     }
 }
 
-/// Extract all [`Cmpop`] operators from a source code snippet, with appropriate
+/// Extract all [`Cmpop`] operators from an expression snippet, with appropriate
 /// ranges.
 ///
 /// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
 /// `CPython` doesn't either. This method iterates over the token stream and
 /// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
-    let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
+    let mut tok_iter = lexer::lex(contents, Mode::Expression)
+        .flatten()
+        .filter(|(tok, _)|
+            // Skip whitespace, including Tok::Newline. It should be sufficient to skip
+            // Tok::NonLogicalNewline, but the lexer doesn't know that we're within an
+            // expression, and so it may confusion logical and non-logical newlines.
+            !matches!(tok, Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(_)))
+        .peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];
     let mut count = 0u32;
     loop {
