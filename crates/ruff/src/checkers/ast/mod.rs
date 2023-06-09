@@ -4628,7 +4628,7 @@ impl<'a> Checker<'a> {
             self.add_binding(
                 id,
                 expr.range(),
-                BindingKind::Binding,
+                BindingKind::UnpackedAssignment,
                 BindingFlags::empty(),
             );
             return;

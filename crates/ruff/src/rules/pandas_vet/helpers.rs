@@ -36,7 +36,7 @@ pub(crate) fn test_expression(expr: &Expr, model: &SemanticModel) -> Resolution 
                         | BindingKind::Argument
                         | BindingKind::Assignment
                         | BindingKind::NamedExprAssignment
-                        | BindingKind::Binding
+                        | BindingKind::UnpackedAssignment
                         | BindingKind::LoopVar
                         | BindingKind::Global
                         | BindingKind::Nonlocal => Resolution::RelevantLocal,
