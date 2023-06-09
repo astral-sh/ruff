@@ -55,9 +55,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         };
 
         let magic_trailing_comma = USE_MAGIC_TRAILING_COMMA
-            && first_non_trivia_token(last.range().end(), f.context().contents())
-                .map(|token| token.kind)
-                == Some(TokenKind::Comma);
+            && matches!(first_non_trivia_token(last.range().end(), f.context().contents()), Some(Token { kind: TokenKind::Comma }))
 
         if magic_trailing_comma {
             // A magic trailing comma forces us to print in expanded mode since we have more than
