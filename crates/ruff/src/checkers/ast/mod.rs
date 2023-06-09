@@ -136,34 +136,34 @@ impl<'a> Checker<'a> {
 
     /// Create a [`Generator`] to generate source code based on the current AST state.
     pub(crate) fn generator(&self) -> Generator {
-        fn quote_style(
-            model: &SemanticModel,
-            locator: &Locator,
-            indexer: &Indexer,
-        ) -> Option<Quote> {
-            if !model.in_f_string() {
-                return None;
-            }
-
-            // Find the quote character used to start the containing f-string.
-            let expr = model.expr()?;
-            let string_range = indexer.f_string_range(expr.start())?;
-            let trailing_quote = trailing_quote(locator.slice(string_range))?;
-
-            // Invert the quote character, if it's a single quote.
-            match *trailing_quote {
-                "'" => Some(Quote::Double),
-                "\"" => Some(Quote::Single),
-                _ => None,
-            }
-        }
-
         Generator::new(
             self.stylist.indentation(),
-            quote_style(&self.semantic_model, self.locator, self.indexer)
-                .unwrap_or(self.stylist.quote()),
+            self.f_string_quote_style().unwrap_or(self.stylist.quote()),
             self.stylist.line_ending(),
         )
+    }
+
+    /// Returns the appropriate quoting for f-string by reversing the one used outside of
+    /// the f-string.
+    ///
+    /// If the current expression in the context is not an f-string, returns ``None``.
+    pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
+        let model = &self.semantic_model;
+        if !model.in_f_string() {
+            return None;
+        }
+
+        // Find the quote character used to start the containing f-string.
+        let expr = model.expr()?;
+        let string_range = self.indexer.f_string_range(expr.start())?;
+        let trailing_quote = trailing_quote(self.locator.slice(string_range))?;
+
+        // Invert the quote character, if it's a single quote.
+        match *trailing_quote {
+            "'" => Some(Quote::Double),
+            "\"" => Some(Quote::Single),
+            _ => None,
+        }
     }
 
     /// Returns the [`IsolationLevel`] for fixes in the current context.
@@ -2729,22 +2729,12 @@ where
                 }
                 if self.enabled(Rule::UnnecessaryGeneratorSet) {
                     flake8_comprehensions::rules::unnecessary_generator_set(
-                        self,
-                        expr,
-                        self.semantic_model.expr_parent(),
-                        func,
-                        args,
-                        keywords,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.enabled(Rule::UnnecessaryGeneratorDict) {
                     flake8_comprehensions::rules::unnecessary_generator_dict(
-                        self,
-                        expr,
-                        self.semantic_model.expr_parent(),
-                        func,
-                        args,
-                        keywords,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.enabled(Rule::UnnecessaryListComprehensionSet) {
