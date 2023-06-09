@@ -1,5 +1,5 @@
 {
   "cell_type": "code",
   "metadata": {},
-  "source": ["def foo():n", "    pass"]
+  "source": ["def foo():\n", "    pass"]
 }

@@ -410,8 +410,9 @@ mod test {
     }
 
     #[test_case(Path::new("markdown.json"), false; "markdown")]
-    #[test_case(Path::new("python_magic.json"), false; "python_magic")]
-    #[test_case(Path::new("python_no_magic.json"), true; "python_no_magic")]
+    #[test_case(Path::new("only_magic.json"), false; "only_magic")]
+    #[test_case(Path::new("code_and_magic.json"), false; "code_and_magic")]
+    #[test_case(Path::new("only_code.json"), true; "only_code")]
     fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
         assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
         Ok(())
