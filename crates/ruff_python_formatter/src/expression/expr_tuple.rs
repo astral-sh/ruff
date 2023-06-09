@@ -120,7 +120,7 @@ impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
             .finish()?;
         // We need a trailing comma on the last entry of an expanded group since we have more
         // than one element
-        write!(f, [if_group_breaks(&text(",")), soft_line_break()])
+        write!(f, [if_group_breaks(&text(","))])
     }
 }
 
