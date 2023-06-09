@@ -1,3 +1,4 @@
+use bitflags::bitflags;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
@@ -14,8 +15,6 @@ use crate::globals::GlobalsId;
 pub struct Scope<'a> {
     pub kind: ScopeKind<'a>,
     pub parent: Option<ScopeId>,
-    /// Whether this scope uses the `locals()` builtin.
-    pub uses_locals: bool,
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
     star_imports: Vec<StarImportation<'a>>,
@@ -27,6 +26,8 @@ pub struct Scope<'a> {
     deleted_symbols: Vec<&'a str>,
     /// Index into the globals arena, if the scope contains any globally-declared symbols.
     globals_id: Option<GlobalsId>,
+    /// Flags for the [`Scope`].
+    flags: ScopeFlags,
 }
 
 impl<'a> Scope<'a> {
@@ -34,12 +35,12 @@ impl<'a> Scope<'a> {
         Scope {
             kind: ScopeKind::Module,
             parent: None,
-            uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
             deleted_symbols: Vec::default(),
             globals_id: None,
+            flags: ScopeFlags::empty(),
         }
     }
 
@@ -47,12 +48,12 @@ impl<'a> Scope<'a> {
         Scope {
             kind,
             parent: Some(parent),
-            uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             shadowed_bindings: IntMap::default(),
             deleted_symbols: Vec::default(),
             globals_id: None,
+            flags: ScopeFlags::empty(),
         }
     }
 
@@ -131,6 +132,25 @@ impl<'a> Scope<'a> {
     /// Returns the globals pointer for this scope.
     pub fn globals_id(&self) -> Option<GlobalsId> {
         self.globals_id
+    }
+
+    /// Sets the [`ScopeFlags::USES_LOCALS`] flag.
+    pub fn set_uses_locals(&mut self) {
+        self.flags.insert(ScopeFlags::USES_LOCALS);
+    }
+
+    /// Returns `true` if this scope uses locals (e.g., `locals()`).
+    pub const fn uses_locals(&self) -> bool {
+        self.flags.contains(ScopeFlags::USES_LOCALS)
+    }
+}
+
+bitflags! {
+    /// Flags on a [`Scope`].
+    #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+    pub struct ScopeFlags: u8 {
+        /// The scope uses locals (e.g., `locals()`).
+        const USES_LOCALS = 1 << 0;
     }
 }
 

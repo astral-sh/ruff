@@ -14,6 +14,12 @@ __all__ = (x for x in ["Hello", "world"])  # [invalid-all-format]
 
 __all__ = {x for x in ["Hello", "world"]}  # [invalid-all-format]
 
+__all__ = foo  # [invalid-all-format]
+
+__all__ = foo.bar  # [invalid-all-format]
+
+__all__ = foo["bar"]  # [invalid-all-format]
+
 __all__ = ["Hello"]
 
 __all__ = ("Hello",)
@@ -29,3 +35,8 @@ __all__ = list({"Hello", "world"})
 __all__ = list(["Hello"]) + list(["world"])
 
 __all__ = tuple(["Hello"]) + ("world",)
+
+__all__ = __all__ + ["Hello"]
+
+__all__ = __all__ + multiprocessing.__all__
+

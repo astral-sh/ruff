@@ -22,7 +22,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.271
+  rev: v0.0.272
   hooks:
     - id: ruff
 ```
@@ -32,7 +32,7 @@ Or, to enable autofix:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.271
+  rev: v0.0.272
   hooks:
     - id: ruff
       args: [ --fix, --exit-non-zero-on-fix ]
@@ -53,7 +53,7 @@ alongside any other editor through the [Ruff LSP](https://github.com/astral-sh/r
 Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
 
 By default, `ruff-action` runs as a pass-fail test to ensure that a given repository doesn't contain
-any lint rule violations as per its [configuration](https://github.com/charliermarsh/ruff/blob/main/docs/configuration.md).
+any lint rule violations as per its [configuration](https://github.com/astral-sh/ruff/blob/main/docs/configuration.md).
 However, under-the-hood, `ruff-action` installs and runs `ruff` directly, so it can be used to
 execute any supported `ruff` command (e.g., `ruff check --fix`).
 

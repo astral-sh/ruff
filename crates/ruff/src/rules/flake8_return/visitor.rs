@@ -87,8 +87,8 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .push(stmt.start());
 
                 // Don't recurse into the body, but visit the decorators, etc.
-                for expr in decorator_list {
-                    visitor::walk_expr(self, expr);
+                for decorator in decorator_list {
+                    visitor::walk_decorator(self, decorator);
                 }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -113,8 +113,8 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .push(stmt.start());
 
                 // Don't recurse into the body, but visit the decorators, etc.
-                for expr in decorator_list {
-                    visitor::walk_expr(self, expr);
+                for decorator in decorator_list {
+                    visitor::walk_decorator(self, decorator);
                 }
                 if let Some(returns) = returns {
                     visitor::walk_expr(self, returns);

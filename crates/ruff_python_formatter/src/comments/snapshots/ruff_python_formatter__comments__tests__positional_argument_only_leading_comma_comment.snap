@@ -4,24 +4,9 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: Arg,
-        range: 15..16,
-        source: `a`,
-    }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
-            SourceComment {
-                text: "# trailing positional comment",
-                position: EndOfLine,
-                formatted: false,
-            },
-        ],
-    },
-    Node {
         kind: Arguments,
-        range: 15..168,
-        source: `a # trailing positional comment⏎`,
+        range: 9..170,
+        source: `(⏎`,
     }: {
         "leading": [],
         "dangling": [
@@ -37,6 +22,21 @@ expression: comments.debug(test_case.source_code)
             },
         ],
         "trailing": [],
+    },
+    Node {
+        kind: Arg,
+        range: 15..16,
+        source: `a`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing positional comment",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
     },
     Node {
         kind: Arg,

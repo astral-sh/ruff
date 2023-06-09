@@ -1,7 +1,7 @@
 use crate::node::AnyNodeRef;
 use ruff_text_size::TextRange;
 use rustpython_ast::{
-    Arguments, Expr, Identifier, Ranged, StmtAsyncFunctionDef, StmtFunctionDef, Suite,
+    Arguments, Decorator, Expr, Identifier, Ranged, StmtAsyncFunctionDef, StmtFunctionDef, Suite,
 };
 
 /// Enum that represents any python function definition.
@@ -65,7 +65,7 @@ impl<'a> AnyFunctionDefinition<'a> {
     }
 
     /// Returns the decorators attributing the function.
-    pub fn decorators(self) -> &'a [Expr] {
+    pub fn decorators(self) -> &'a [Decorator] {
         match self {
             Self::FunctionDefinition(definition) => &definition.decorator_list,
             Self::AsyncFunctionDefinition(definition) => &definition.decorator_list,
@@ -110,5 +110,24 @@ impl<'a> From<&'a StmtFunctionDef> for AnyFunctionDefinition<'a> {
 impl<'a> From<&'a StmtAsyncFunctionDef> for AnyFunctionDefinition<'a> {
     fn from(value: &'a StmtAsyncFunctionDef) -> Self {
         Self::AsyncFunctionDefinition(value)
+    }
+}
+
+impl<'a> From<AnyFunctionDefinition<'a>> for AnyNodeRef<'a> {
+    fn from(value: AnyFunctionDefinition<'a>) -> Self {
+        match value {
+            AnyFunctionDefinition::FunctionDefinition(function_def) => {
+                AnyNodeRef::StmtFunctionDef(function_def)
+            }
+            AnyFunctionDefinition::AsyncFunctionDefinition(async_def) => {
+                AnyNodeRef::StmtAsyncFunctionDef(async_def)
+            }
+        }
+    }
+}
+
+impl<'a> From<&'a AnyFunctionDefinition<'a>> for AnyNodeRef<'a> {
+    fn from(value: &'a AnyFunctionDefinition<'a>) -> Self {
+        (*value).into()
     }
 }

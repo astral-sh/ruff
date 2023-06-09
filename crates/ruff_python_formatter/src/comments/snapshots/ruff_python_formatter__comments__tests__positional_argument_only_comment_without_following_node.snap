@@ -4,6 +4,26 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
+        kind: Arguments,
+        range: 9..166,
+        source: `(⏎`,
+    }: {
+        "leading": [],
+        "dangling": [
+            SourceComment {
+                text: "# Positional arguments only after here",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# trailing positional argument comment.",
+                position: EndOfLine,
+                formatted: false,
+            },
+        ],
+        "trailing": [],
+    },
+    Node {
         kind: Arg,
         range: 15..16,
         source: `a`,
@@ -16,42 +36,11 @@ expression: comments.debug(test_case.source_code)
                 position: EndOfLine,
                 formatted: false,
             },
-        ],
-    },
-    Node {
-        kind: Arguments,
-        range: 15..97,
-        source: `a, # trailing positional comment⏎`,
-    }: {
-        "leading": [],
-        "dangling": [
-            SourceComment {
-                text: "# Positional arguments only after here",
-                position: OwnLine,
-                formatted: false,
-            },
-        ],
-        "trailing": [
-            SourceComment {
-                text: "# trailing positional argument comment.",
-                position: EndOfLine,
-                formatted: false,
-            },
-        ],
-    },
-    Node {
-        kind: StmtPass,
-        range: 168..172,
-        source: `pass`,
-    }: {
-        "leading": [
             SourceComment {
                 text: "# Trailing on new line",
                 position: OwnLine,
                 formatted: false,
             },
         ],
-        "dangling": [],
-        "trailing": [],
     },
 }
