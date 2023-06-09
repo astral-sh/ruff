@@ -38,6 +38,26 @@ e4 = (
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
     "incididunt"
 )
+
+# Empty tuples and comments
+f1 = (
+	# empty
+)
+f2 = ()
+
+# Comments in other tuples
+g1 = ( # a
+    # b
+    1, # c
+    # d
+) # e
+g2 = ( # a
+    # b
+    1, # c
+    # d
+    2, # e
+    # f
+) # g
 ```
 
 
@@ -210,6 +230,28 @@ e2 = (
 )
 e3 = (1,)
 e4 = ("NOT_YET_IMPLEMENTED_STRING", "NOT_YET_IMPLEMENTED_STRING")
+
+# Empty tuples and comments
+f1 = (
+    # empty
+)
+f2 = ()
+
+# Comments in other tuples
+g1 = (
+    # a
+    # b
+    1,  # c
+    # d
+)  # e
+g2 = (
+    # a
+    # b
+    1,  # c
+    # d
+    2,  # e
+    # f
+)  # g
 ```
 
 

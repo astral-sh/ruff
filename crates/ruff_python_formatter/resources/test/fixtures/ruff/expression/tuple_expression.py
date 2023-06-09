@@ -32,3 +32,28 @@ e4 = (
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
     "incididunt"
 )
+
+# Empty tuples and comments
+f1 = (
+	# empty
+)
+f2 = ()
+
+# Comments in other tuples
+g1 = ( # a
+    # b
+    1, # c
+    # d
+) # e
+g2 = ( # a
+    # b
+    1, # c
+    # d
+    2, # e
+    # f
+) # g
+
+# Ensure the correct number of parentheses
+h1 = ((((1, 2))))
+h2 = ((((1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"))))
+h3 = 1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"

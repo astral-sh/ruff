@@ -1,10 +1,10 @@
-use crate::comments::Comments;
-use crate::context::{NodeLevel, PyFormatContext};
+use crate::comments::{dangling_node_comments, Comments};
+use crate::context::PyFormatContext;
 use crate::expression::parentheses::{
     default_expression_needs_parentheses, NeedsParentheses, Parentheses, Parenthesize,
 };
 use crate::trivia::{first_non_trivia_token, TokenKind};
-use crate::{AsFormat, FormatNodeRule, PyFormatter, USE_MAGIC_TRAILING_COMMA};
+use crate::{AsFormat, FormatNodeRule, FormattedIterExt, PyFormatter, USE_MAGIC_TRAILING_COMMA};
 use ruff_formatter::formatter::Formatter;
 use ruff_formatter::prelude::{
     block_indent, group, hard_line_break, if_group_breaks, soft_block_indent, soft_line_break,
@@ -12,7 +12,7 @@ use ruff_formatter::prelude::{
 };
 use ruff_formatter::{format_args, write, Buffer, Format, FormatResult};
 use ruff_python_ast::prelude::{Expr, Ranged};
-use ruff_text_size::{TextLen, TextRange};
+
 use rustpython_parser::ast::ExprTuple;
 
 #[derive(Default)]
@@ -21,7 +21,7 @@ pub struct FormatExprTuple;
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
     fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprTuple {
-            range,
+            range: _,
             elts,
             ctx: _,
         } = item;
@@ -29,7 +29,15 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         // Handle the edge cases of an empty tuple and a tuple with one element
         let last = match &elts[..] {
             [] => {
-                return text("()").fmt(f);
+                return write!(
+                    f,
+                    [group(&format_args![
+                        // A single element tuple always needs parentheses
+                        &text("("),
+                        block_indent(&dangling_node_comments(item)),
+                        &text(")"),
+                    ])]
+                );
             }
             [single] => {
                 return write!(
@@ -37,17 +45,13 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                     [group(&format_args![
                         // A single element tuple always needs parentheses
                         &text("("),
-                        soft_block_indent(&group(&format_args![single.format(), &text(",")])),
+                        soft_block_indent(&format_args![single.format(), &text(",")]),
                         &text(")"),
                     ])]
                 );
             }
             [.., last] => last,
         };
-
-        let saved_level = f.context().node_level();
-        // Tell the children they need parentheses
-        f.context_mut().set_node_level(NodeLevel::Expression);
 
         let magic_trailing_comma = USE_MAGIC_TRAILING_COMMA
             && first_non_trivia_token(last.range().end(), f.context().contents())
@@ -59,26 +63,14 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             // one element
             write!(
                 f,
-                [group(&format_args![
+                [
                     // An expanded group always needs parentheses
                     &text("("),
                     hard_line_break(),
                     block_indent(&ExprSequence::new(elts)),
                     hard_line_break(),
                     &text(")"),
-                ])]
-            )?;
-        } else if is_parenthesized(*range, elts, f) {
-            // If the tuple has parentheses, keep them. Also only top level tuples are allowed to
-            // elide them
-            write!(
-                f,
-                [group(&format_args![
-                    // If it was previously parenthesized, add them again
-                    &text("("),
-                    soft_block_indent(&ExprSequence::new(elts)),
-                    &text(")"),
-                ])]
+                ]
             )?;
         } else {
             write!(
@@ -92,7 +84,11 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             )?;
         }
 
-        f.context_mut().set_node_level(saved_level);
+        Ok(())
+    }
+
+    fn fmt_dangling_comments(&self, _node: &ExprTuple, _f: &mut PyFormatter) -> FormatResult<()> {
+        // Handled in `fmt_fields`
         Ok(())
     }
 }
@@ -128,27 +124,6 @@ impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
         }
         Ok(())
     }
-}
-
-/// Check if a tuple has already had parentheses in the input
-fn is_parenthesized(
-    range: TextRange,
-    elts: &[Expr],
-    f: &mut Formatter<PyFormatContext<'_>>,
-) -> bool {
-    let parentheses = "(";
-    let first_char = &f.context().contents()[TextRange::at(range.start(), parentheses.text_len())];
-    if first_char != parentheses {
-        return false;
-    }
-
-    // Consider `a = (1, 2), 3`: The first char of the current expr starts is a parentheses, but
-    // it's not its own but that of its first tuple child. We know that it belongs to the child
-    // because if it wouldn't, the child would start (at least) a char later
-    let Some(first_child) = elts.first() else {
-        return false;
-    };
-    first_child.range().start() != range.start()
 }
 
 impl NeedsParentheses for ExprTuple {
