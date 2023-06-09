@@ -58,6 +58,7 @@ pub(crate) fn global_statement(checker: &mut Checker, name: &str) {
     let scope = checker.semantic_model().scope();
     if let Some(binding_id) = scope.get(name) {
         let binding = &checker.semantic_model().bindings[binding_id];
+        // XXX: This usage is fine, since we're gating on `is_global()`.
         if binding.kind.is_global() {
             let source = checker.semantic_model().stmts[binding
                 .source

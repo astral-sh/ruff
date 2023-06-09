@@ -83,10 +83,10 @@ impl<'a> Binding<'a> {
                     _ => {}
                 }
             }
-            BindingKind::Annotation => {
-                return false;
-            }
-            BindingKind::FutureImportation => {
+            BindingKind::Deletion
+            | BindingKind::Annotation
+            | BindingKind::FutureImportation
+            | BindingKind::Builtin => {
                 return false;
             }
             _ => {}
@@ -95,7 +95,6 @@ impl<'a> Binding<'a> {
             existing.kind,
             BindingKind::ClassDefinition
                 | BindingKind::FunctionDefinition
-                | BindingKind::Builtin
                 | BindingKind::Importation(..)
                 | BindingKind::FromImportation(..)
                 | BindingKind::SubmoduleImportation(..)
@@ -299,6 +298,12 @@ pub enum BindingKind<'a> {
     /// x = 1
     /// ```
     Assignment,
+
+    /// A binding for a deletion, like `x` in:
+    /// ```python
+    /// del x
+    /// ```
+    Deletion,
 
     /// A binding for a for-loop variable, like `x` in:
     /// ```python

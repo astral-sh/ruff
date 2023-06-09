@@ -4336,6 +4336,18 @@ impl<'a> Checker<'a> {
         binding_id
     }
 
+    /// Delete a binding from the scope, if it exists.
+    fn delete_binding(&mut self, name: &'a str, range: TextRange) -> Option<BindingId> {
+        // Create a binding to model the deletion.
+        let binding_id =
+            self.semantic_model
+                .push_binding(range, BindingKind::Deletion, BindingFlags::empty());
+
+        // Add the binding to the scope.
+        let scope = self.semantic_model.scope_mut();
+        scope.add(name, binding_id)
+    }
+
     fn bind_builtins(&mut self) {
         for builtin in BUILTINS
             .iter()
@@ -4563,8 +4575,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let scope = self.semantic_model.scope_mut();
-        if scope.delete(id.as_str()).is_none() {
+        if self.delete_binding(id.as_str(), expr.range()).is_none() {
             if self.enabled(Rule::UndefinedName) {
                 self.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedName {
@@ -5019,9 +5030,11 @@ impl<'a> Checker<'a> {
         }
 
         // Compute visibility of all definitions.
+
         let exports: Option<Vec<&str>> = {
             let global_scope = self.semantic_model.global_scope();
             global_scope
+                // XXX: This usage is fine, since we're gating on `is_export()`.
                 .bindings_for_name("__all__")
                 .map(|binding_id| &self.semantic_model.bindings[binding_id])
                 .filter_map(|binding| match &binding.kind {
