@@ -280,12 +280,20 @@ impl Notebook {
         for &pos in &self.valid_code_cells {
             match &self.raw.cells[pos as usize].source {
                 SourceValue::String(string) => {
-                    let line_count =
-                        u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap();
+                    // Empty cell is a special case because it doesn't have any
+                    // newlines. So, we need to add the row number manually.
+                    let empty_cell = usize::from(string.is_empty());
+                    let line_count = u32::try_from(
+                        NewlineWithTrailingNewline::from(string).count() + empty_cell,
+                    )
+                    .unwrap();
                     row_to_cell.extend(iter::repeat(pos + 1).take(line_count as usize));
                     row_to_row_in_cell.extend(1..=line_count);
                 }
                 SourceValue::StringArray(string_array) => {
+                    // Empty cell is a special case because it doesn't have any
+                    // newlines. So, we need to add the row number manually.
+                    let empty_cell = usize::from(string_array.is_empty());
                     // Trailing newlines for each line are part of the string itself.
                     // So, to count the actual number of visible lines, we need to
                     // check for any trailing newline for the last line.
@@ -300,10 +308,10 @@ impl Notebook {
                     // Here, the array suggests 2 lines but there are 3 visible lines.
                     let trailing_newline =
                         usize::from(string_array.last().map_or(false, |s| s.ends_with('\n')));
-                    row_to_cell
-                        .extend(iter::repeat(pos + 1).take(string_array.len() + trailing_newline));
-                    row_to_row_in_cell
-                        .extend(1..=u32::try_from(string_array.len() + trailing_newline).unwrap());
+                    let line_count =
+                        u32::try_from(string_array.len() + trailing_newline + empty_cell).unwrap();
+                    row_to_cell.extend(iter::repeat(pos + 1).take(line_count as usize));
+                    row_to_row_in_cell.extend(1..=line_count);
                 }
             }
         }
@@ -461,15 +469,29 @@ def mutable_argument(z=set()):
 
 mutable_argument()
 
+
+
+
+print("after empty cells")
 "#
         );
         assert_eq!(
             notebook.index(),
             &JupyterIndex {
-                row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3],
-                row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5],
+                row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 5, 7, 7, 8],
+                row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 1, 1, 2, 1],
             }
         );
-        assert_eq!(notebook.cell_offsets(), &[0.into(), 90.into(), 168.into()]);
+        assert_eq!(
+            notebook.cell_offsets(),
+            &[
+                0.into(),
+                90.into(),
+                168.into(),
+                169.into(),
+                171.into(),
+                198.into()
+            ]
+        );
     }
 }
