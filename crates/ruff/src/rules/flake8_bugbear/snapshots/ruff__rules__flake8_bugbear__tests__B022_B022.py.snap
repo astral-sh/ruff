@@ -3,20 +3,20 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B022.py:9:6: B022 No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant
    |
- 9 | from contextlib import suppress
-10 | 
-11 | with contextlib.suppress():
+ 7 | from contextlib import suppress
+ 8 | 
+ 9 | with contextlib.suppress():
    |      ^^^^^^^^^^^^^^^^^^^^^ B022
-12 |     raise ValueError
+10 |     raise ValueError
    |
 
 B022.py:12:6: B022 No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant
    |
-12 |     raise ValueError
-13 | 
-14 | with suppress():
+10 |     raise ValueError
+11 | 
+12 | with suppress():
    |      ^^^^^^^^^^ B022
-15 |     raise ValueError
+13 |     raise ValueError
    |
 
 

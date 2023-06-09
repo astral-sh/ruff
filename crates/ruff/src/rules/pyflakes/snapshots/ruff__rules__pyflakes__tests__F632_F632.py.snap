@@ -18,11 +18,11 @@ F632.py:1:4: F632 [*] Use `==` to compare constant literals
 
 F632.py:4:4: F632 [*] Use `!=` to compare constant literals
   |
-4 |     pass
-5 | 
-6 | if 123 is not y:
+2 |     pass
+3 | 
+4 | if 123 is not y:
   |    ^^^^^^^^^^^^ F632
-7 |     pass
+5 |     pass
   |
   = help: Replace `is not` with `!=`
 
@@ -37,16 +37,16 @@ F632.py:4:4: F632 [*] Use `!=` to compare constant literals
 7 7 | if 123 is \
 
 F632.py:7:4: F632 [*] Use `!=` to compare constant literals
-   |
- 7 |       pass
- 8 |   
- 9 |   if 123 is \
-   |  ____^
-10 | |         not y:
-   | |_____________^ F632
-11 |       pass
-   |
-   = help: Replace `is not` with `!=`
+  |
+5 |       pass
+6 |   
+7 |   if 123 is \
+  |  ____^
+8 | |         not y:
+  | |_____________^ F632
+9 |       pass
+  |
+  = help: Replace `is not` with `!=`
 
 ℹ Suggested fix
 4 4 | if 123 is not y:
@@ -61,11 +61,11 @@ F632.py:7:4: F632 [*] Use `!=` to compare constant literals
 
 F632.py:11:4: F632 [*] Use `==` to compare constant literals
    |
-11 |     pass
-12 | 
-13 | if "123" is x < 3:
+ 9 |     pass
+10 | 
+11 | if "123" is x < 3:
    |    ^^^^^^^^^^^^^^ F632
-14 |     pass
+12 |     pass
    |
    = help: Replace `is` with `==`
 
@@ -81,11 +81,11 @@ F632.py:11:4: F632 [*] Use `==` to compare constant literals
 
 F632.py:14:4: F632 [*] Use `==` to compare constant literals
    |
-14 |     pass
-15 | 
-16 | if "123" != x is 3:
+12 |     pass
+13 | 
+14 | if "123" != x is 3:
    |    ^^^^^^^^^^^^^^^ F632
-17 |     pass
+15 |     pass
    |
    = help: Replace `is` with `==`
 
@@ -101,11 +101,11 @@ F632.py:14:4: F632 [*] Use `==` to compare constant literals
 
 F632.py:17:4: F632 [*] Use `==` to compare constant literals
    |
-17 |     pass
-18 | 
-19 | if ("123" != x) is 3:
+15 |     pass
+16 | 
+17 | if ("123" != x) is 3:
    |    ^^^^^^^^^^^^^^^^^ F632
-20 |     pass
+18 |     pass
    |
    = help: Replace `is` with `==`
 
@@ -121,11 +121,11 @@ F632.py:17:4: F632 [*] Use `==` to compare constant literals
 
 F632.py:20:14: F632 [*] Use `==` to compare constant literals
    |
-20 |     pass
-21 | 
-22 | if "123" != (x is 3):
+18 |     pass
+19 | 
+20 | if "123" != (x is 3):
    |              ^^^^^^ F632
-23 |     pass
+21 |     pass
    |
    = help: Replace `is` with `==`
 
@@ -141,11 +141,11 @@ F632.py:20:14: F632 [*] Use `==` to compare constant literals
 
 F632.py:23:2: F632 [*] Use `!=` to compare constant literals
    |
-23 |       pass
-24 |   
-25 |   {2 is
+21 |       pass
+22 |   
+23 |   {2 is
    |  __^
-26 | | not ''}
+24 | | not ''}
    | |______^ F632
    |
    = help: Replace `is not` with `!=`

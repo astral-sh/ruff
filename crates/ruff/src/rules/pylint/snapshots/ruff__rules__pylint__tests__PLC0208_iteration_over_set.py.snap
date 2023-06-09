@@ -3,51 +3,51 @@ source: crates/ruff/src/rules/pylint/mod.rs
 ---
 iteration_over_set.py:3:13: PLC0208 Use a sequence type instead of a `set` when iterating over values
   |
-3 | # Errors
-4 | 
-5 | for item in {"apples", "lemons", "water"}:  # flags in-line set literals
+1 | # Errors
+2 | 
+3 | for item in {"apples", "lemons", "water"}:  # flags in-line set literals
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0208
-6 |     print(f"I like {item}.")
+4 |     print(f"I like {item}.")
   |
 
 iteration_over_set.py:6:28: PLC0208 Use a sequence type instead of a `set` when iterating over values
-   |
- 6 |     print(f"I like {item}.")
- 7 | 
- 8 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
-   |                            ^^^^^^^^^ PLC0208
- 9 | 
-10 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
-   |
+  |
+4 |     print(f"I like {item}.")
+5 | 
+6 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
+  |                            ^^^^^^^^^ PLC0208
+7 | 
+8 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
+  |
 
 iteration_over_set.py:8:27: PLC0208 Use a sequence type instead of a `set` when iterating over values
    |
- 8 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
- 9 | 
-10 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
+ 6 | numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
+ 7 | 
+ 8 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
    |                           ^^^^^^^^^ PLC0208
-11 | 
-12 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+ 9 | 
+10 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
    |
 
 iteration_over_set.py:10:36: PLC0208 Use a sequence type instead of a `set` when iterating over values
    |
-10 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
-11 | 
-12 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+ 8 | numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
+ 9 | 
+10 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
    |                                    ^^^^^^^^^ PLC0208
-13 | 
-14 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
+11 | 
+12 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
    |
 
 iteration_over_set.py:12:27: PLC0208 Use a sequence type instead of a `set` when iterating over values
    |
-12 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
-13 | 
-14 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
+10 | numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+11 | 
+12 | numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
    |                           ^^^^^^^^^ PLC0208
-15 | 
-16 | # Non-errors
+13 | 
+14 | # Non-errors
    |
 
 

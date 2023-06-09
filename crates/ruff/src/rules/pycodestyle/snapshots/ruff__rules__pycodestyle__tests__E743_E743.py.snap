@@ -17,10 +17,10 @@ E743.py:5:5: E743 Ambiguous function name: `I`
 
 E743.py:10:9: E743 Ambiguous function name: `O`
    |
-10 | class X:
-11 |     def O(self):
+ 9 | class X:
+10 |     def O(self):
    |         ^ E743
-12 |         pass
+11 |         pass
    |
 
 

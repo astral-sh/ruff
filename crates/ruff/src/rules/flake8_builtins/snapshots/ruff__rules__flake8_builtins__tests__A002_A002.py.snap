@@ -44,28 +44,28 @@ A002.py:5:17: A002 Argument `bytes` is shadowing a Python builtin
   |
 
 A002.py:8:17: A002 Argument `id` is shadowing a Python builtin
-   |
- 8 |     pass
- 9 | 
-10 | async def func3(id, dir):
-   |                 ^^ A002
-11 |     pass
-   |
+  |
+6 |     pass
+7 | 
+8 | async def func3(id, dir):
+  |                 ^^ A002
+9 |     pass
+  |
 
 A002.py:8:21: A002 Argument `dir` is shadowing a Python builtin
-   |
- 8 |     pass
- 9 | 
-10 | async def func3(id, dir):
-   |                     ^^^ A002
-11 |     pass
-   |
+  |
+6 |     pass
+7 | 
+8 | async def func3(id, dir):
+  |                     ^^^ A002
+9 |     pass
+  |
 
 A002.py:11:16: A002 Argument `float` is shadowing a Python builtin
    |
-11 |     pass
-12 | 
-13 | map([], lambda float: ...)
+ 9 |     pass
+10 | 
+11 | map([], lambda float: ...)
    |                ^^^^^ A002
    |
 

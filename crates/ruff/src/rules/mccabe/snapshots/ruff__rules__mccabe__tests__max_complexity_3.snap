@@ -3,21 +3,21 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 ---
 C901.py:73:5: C901 `try_else` is too complex (4 > 3)
    |
-73 | # Complexity = 4
-74 | def try_else():
+72 | # Complexity = 4
+73 | def try_else():
    |     ^^^^^^^^ C901
-75 |     try:
-76 |         print(1)
+74 |     try:
+75 |         print(1)
    |
 
 C901.py:113:9: C901 `handle` is too complex (9 > 3)
     |
-113 | # Complexity = 9
-114 | class Class:
-115 |     def handle(self, *args, **options):
+111 | # Complexity = 9
+112 | class Class:
+113 |     def handle(self, *args, **options):
     |         ^^^^^^ C901
-116 |         if args:
-117 |             return
+114 |         if args:
+115 |             return
     |
 
 

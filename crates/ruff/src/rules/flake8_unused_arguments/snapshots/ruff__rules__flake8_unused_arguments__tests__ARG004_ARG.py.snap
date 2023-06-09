@@ -3,26 +3,26 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
 ARG.py:49:11: ARG004 Unused static method argument: `cls`
    |
-49 |     @staticmethod
-50 |     def f(cls, x):
+48 |     @staticmethod
+49 |     def f(cls, x):
    |           ^^^ ARG004
-51 |         print("Hello, world!")
+50 |         print("Hello, world!")
    |
 
 ARG.py:49:16: ARG004 Unused static method argument: `x`
    |
-49 |     @staticmethod
-50 |     def f(cls, x):
+48 |     @staticmethod
+49 |     def f(cls, x):
    |                ^ ARG004
-51 |         print("Hello, world!")
+50 |         print("Hello, world!")
    |
 
 ARG.py:53:11: ARG004 Unused static method argument: `x`
    |
-53 |     @staticmethod
-54 |     def f(x):
+52 |     @staticmethod
+53 |     def f(x):
    |           ^ ARG004
-55 |         print("Hello, world!")
+54 |         print("Hello, world!")
    |
 
 

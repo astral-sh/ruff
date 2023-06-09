@@ -3,16 +3,16 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
 DJ003.py:5:42: DJ003 Avoid passing `locals()` as context to a `render` function
   |
-5 | def test_view1(request):
-6 |     return render(request, "index.html", locals())
+4 | def test_view1(request):
+5 |     return render(request, "index.html", locals())
   |                                          ^^^^^^^^ DJ003
   |
 
 DJ003.py:9:50: DJ003 Avoid passing `locals()` as context to a `render` function
-   |
- 9 | def test_view2(request):
-10 |     return render(request, "index.html", context=locals())
-   |                                                  ^^^^^^^^ DJ003
-   |
+  |
+8 | def test_view2(request):
+9 |     return render(request, "index.html", context=locals())
+  |                                                  ^^^^^^^^ DJ003
+  |
 
 

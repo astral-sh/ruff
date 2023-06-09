@@ -11,17 +11,17 @@ N814.py:1:8: N814 Camelcase `Camel` imported as constant `CAMEL`
 
 N814.py:2:17: N814 Camelcase `CamelCase` imported as constant `CAMELCASE`
   |
-2 | import mod.Camel as CAMEL
-3 | from mod import CamelCase as CAMELCASE
+1 | import mod.Camel as CAMEL
+2 | from mod import CamelCase as CAMELCASE
   |                 ^^^^^^^^^^^^^^^^^^^^^^ N814
-4 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+3 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
   |
 
 N814.py:3:17: N814 Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`
   |
-3 | import mod.Camel as CAMEL
-4 | from mod import CamelCase as CAMELCASE
-5 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+1 | import mod.Camel as CAMEL
+2 | from mod import CamelCase as CAMELCASE
+3 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N814
   |
 

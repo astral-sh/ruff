@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F633.py:4:1: F633 Use of `>>` is invalid with `print` function
   |
-4 | import sys
-5 | 
-6 | print >> sys.stderr, "Hello"
+2 | import sys
+3 | 
+4 | print >> sys.stderr, "Hello"
   | ^^^^^ F633
   |
 

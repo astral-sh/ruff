@@ -3,62 +3,62 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E11.py:30:1: E115 Expected an indented block (comment)
    |
-30 | def start(self):
-31 |     if True:
-32 | #       try:
+28 | def start(self):
+29 |     if True:
+30 | #       try:
    |  E115
-33 | #           self.master.start()
-34 | #       except MasterExit:
+31 | #           self.master.start()
+32 | #       except MasterExit:
    |
 
 E11.py:31:1: E115 Expected an indented block (comment)
    |
-31 |     if True:
-32 | #       try:
-33 | #           self.master.start()
+29 |     if True:
+30 | #       try:
+31 | #           self.master.start()
    |  E115
-34 | #       except MasterExit:
-35 | #           self.shutdown()
+32 | #       except MasterExit:
+33 | #           self.shutdown()
    |
 
 E11.py:32:1: E115 Expected an indented block (comment)
    |
-32 | #       try:
-33 | #           self.master.start()
-34 | #       except MasterExit:
+30 | #       try:
+31 | #           self.master.start()
+32 | #       except MasterExit:
    |  E115
-35 | #           self.shutdown()
-36 | #       finally:
+33 | #           self.shutdown()
+34 | #       finally:
    |
 
 E11.py:33:1: E115 Expected an indented block (comment)
    |
-33 | #           self.master.start()
-34 | #       except MasterExit:
-35 | #           self.shutdown()
+31 | #           self.master.start()
+32 | #       except MasterExit:
+33 | #           self.shutdown()
    |  E115
-36 | #       finally:
-37 | #           sys.exit()
+34 | #       finally:
+35 | #           sys.exit()
    |
 
 E11.py:34:1: E115 Expected an indented block (comment)
    |
-34 | #       except MasterExit:
-35 | #           self.shutdown()
-36 | #       finally:
+32 | #       except MasterExit:
+33 | #           self.shutdown()
+34 | #       finally:
    |  E115
-37 | #           sys.exit()
-38 |         self.master.start()
+35 | #           sys.exit()
+36 |         self.master.start()
    |
 
 E11.py:35:1: E115 Expected an indented block (comment)
    |
-35 | #           self.shutdown()
-36 | #       finally:
-37 | #           sys.exit()
+33 | #           self.shutdown()
+34 | #       finally:
+35 | #           sys.exit()
    |  E115
-38 |         self.master.start()
-39 | #: E117
+36 |         self.master.start()
+37 | #: E117
    |
 
 

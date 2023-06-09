@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
 G002.py:3:14: G002 Logging statement uses `%`
   |
-3 | import logging
-4 | 
-5 | logging.info("Hello %s" % "World!")
+1 | import logging
+2 | 
+3 | logging.info("Hello %s" % "World!")
   |              ^^^^^^^^^^^^^^^^^^^^^ G002
-6 | logging.log(logging.INFO, "Hello %s" % "World!")
+4 | logging.log(logging.INFO, "Hello %s" % "World!")
   |
 
 G002.py:4:27: G002 Logging statement uses `%`
   |
-4 | logging.info("Hello %s" % "World!")
-5 | logging.log(logging.INFO, "Hello %s" % "World!")
+3 | logging.info("Hello %s" % "World!")
+4 | logging.log(logging.INFO, "Hello %s" % "World!")
   |                           ^^^^^^^^^^^^^^^^^^^^^ G002
   |
 

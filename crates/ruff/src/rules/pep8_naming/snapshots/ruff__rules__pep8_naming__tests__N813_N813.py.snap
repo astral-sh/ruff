@@ -11,17 +11,17 @@ N813.py:1:8: N813 Camelcase `Camel` imported as lowercase `camel`
 
 N813.py:2:17: N813 Camelcase `CamelCase` imported as lowercase `camelcase`
   |
-2 | import mod.Camel as camel
-3 | from mod import CamelCase as camelcase
+1 | import mod.Camel as camel
+2 | from mod import CamelCase as camelcase
   |                 ^^^^^^^^^^^^^^^^^^^^^^ N813
-4 | from mod import AnotherCamelCase as another_camelcase
+3 | from mod import AnotherCamelCase as another_camelcase
   |
 
 N813.py:3:17: N813 Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
   |
-3 | import mod.Camel as camel
-4 | from mod import CamelCase as camelcase
-5 | from mod import AnotherCamelCase as another_camelcase
+1 | import mod.Camel as camel
+2 | from mod import CamelCase as camelcase
+3 | from mod import AnotherCamelCase as another_camelcase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N813
   |
 

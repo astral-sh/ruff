@@ -3,71 +3,71 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
 RET508.py:8:9: RET508 Unnecessary `elif` after `break` statement
    |
- 8 |         if i > y:  # [no-else-break]
- 9 |             break
-10 |         elif i > w:
+ 6 |         if i > y:  # [no-else-break]
+ 7 |             break
+ 8 |         elif i > w:
    |         ^^^^ RET508
-11 |             break
-12 |         else:
+ 9 |             break
+10 |         else:
    |
 
 RET508.py:22:9: RET508 Unnecessary `elif` after `break` statement
    |
-22 |                 b = 2
-23 |             break
-24 |         elif z:
+20 |                 b = 2
+21 |             break
+22 |         elif z:
    |         ^^^^ RET508
-25 |             c = 2
-26 |         else:
+23 |             c = 2
+24 |         else:
    |
 
 RET508.py:33:9: RET508 Unnecessary `else` after `break` statement
    |
-33 |         if i > y:  # [no-else-break]
-34 |             break
-35 |         else:
+31 |         if i > y:  # [no-else-break]
+32 |             break
+33 |         else:
    |         ^^^^ RET508
-36 |             a = z
+34 |             a = z
    |
 
 RET508.py:44:13: RET508 Unnecessary `else` after `break` statement
    |
-44 |                 b = 2
-45 |                 break
-46 |             else:
+42 |                 b = 2
+43 |                 break
+44 |             else:
    |             ^^^^ RET508
-47 |                 c = 3
-48 |                 break
+45 |                 c = 3
+46 |                 break
    |
 
 RET508.py:60:9: RET508 Unnecessary `else` after `break` statement
    |
-60 |                 b = 2
-61 |             break
-62 |         else:
+58 |                 b = 2
+59 |             break
+60 |         else:
    |         ^^^^ RET508
-63 |             c = 3
-64 |         break
+61 |             c = 3
+62 |         break
    |
 
 RET508.py:71:13: RET508 Unnecessary `else` after `break` statement
    |
-71 |                 a = 4
-72 |                 break
-73 |             else:
+69 |                 a = 4
+70 |                 break
+71 |             else:
    |             ^^^^ RET508
-74 |                 b = 2
-75 |         else:
+72 |                 b = 2
+73 |         else:
    |
 
 RET508.py:82:9: RET508 Unnecessary `else` after `break` statement
    |
-82 |         if x:  # [no-else-break]
-83 |             break
-84 |         else:
+80 |         if x:  # [no-else-break]
+81 |             break
+82 |         else:
    |         ^^^^ RET508
-85 |             try:
-86 |                 return
+83 |             try:
+84 |                 return
    |
 
 

@@ -2,21 +2,21 @@
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
 yield_in_init.py:9:9: PLE0100 `__init__` method is a generator
-   |
- 9 | class A:
-10 |     def __init__(self):
-11 |         yield
-   |         ^^^^^ PLE0100
-   |
+  |
+7 | class A:
+8 |     def __init__(self):
+9 |         yield
+  |         ^^^^^ PLE0100
+  |
 
 yield_in_init.py:14:9: PLE0100 `__init__` method is a generator
    |
-14 | class B:
-15 |     def __init__(self):
-16 |         yield from self.gen()
+12 | class B:
+13 |     def __init__(self):
+14 |         yield from self.gen()
    |         ^^^^^^^^^^^^^^^^^^^^^ PLE0100
-17 | 
-18 |     def gen(self):
+15 | 
+16 |     def gen(self):
    |
 
 

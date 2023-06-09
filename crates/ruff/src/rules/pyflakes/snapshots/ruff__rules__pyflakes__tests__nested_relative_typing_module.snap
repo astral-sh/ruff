@@ -3,15 +3,15 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 baz.py:26:17: F821 Undefined name `foo`
    |
-26 |     # F821
-27 |     x: Literal["foo"]
+25 |     # F821
+26 |     x: Literal["foo"]
    |                 ^^^ F821
    |
 
 baz.py:33:17: F821 Undefined name `foo`
    |
-33 |     # F821
-34 |     x: Literal["foo"]
+32 |     # F821
+33 |     x: Literal["foo"]
    |                 ^^^ F821
    |
 

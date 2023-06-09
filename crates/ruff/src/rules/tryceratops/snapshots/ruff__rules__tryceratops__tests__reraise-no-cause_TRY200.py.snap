@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
 TRY200.py:15:9: TRY200 Use `raise from` to specify exception cause
    |
-15 |         a = 1
-16 |     except Exception:
-17 |         raise MyException()
+13 |         a = 1
+14 |     except Exception:
+15 |         raise MyException()
    |         ^^^^^^^^^^^^^^^^^^^ TRY200
    |
 
 TRY200.py:23:13: TRY200 Use `raise from` to specify exception cause
    |
-23 |     except Exception:
-24 |         if True:
-25 |             raise MyException()
+21 |     except Exception:
+22 |         if True:
+23 |             raise MyException()
    |             ^^^^^^^^^^^^^^^^^^^ TRY200
    |
 

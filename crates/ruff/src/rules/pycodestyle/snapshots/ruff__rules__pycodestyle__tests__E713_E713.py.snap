@@ -3,11 +3,11 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
 E713.py:2:8: E713 [*] Test for membership should be `not in`
   |
-2 | #: E713
-3 | if not X in Y:
+1 | #: E713
+2 | if not X in Y:
   |        ^^^^^^ E713
-4 |     pass
-5 | #: E713
+3 |     pass
+4 | #: E713
   |
   = help: Convert to `not in`
 
@@ -21,12 +21,12 @@ E713.py:2:8: E713 [*] Test for membership should be `not in`
 
 E713.py:5:8: E713 [*] Test for membership should be `not in`
   |
-5 |     pass
-6 | #: E713
-7 | if not X.B in Y:
+3 |     pass
+4 | #: E713
+5 | if not X.B in Y:
   |        ^^^^^^^^ E713
-8 |     pass
-9 | #: E713
+6 |     pass
+7 | #: E713
   |
   = help: Convert to `not in`
 
@@ -42,12 +42,12 @@ E713.py:5:8: E713 [*] Test for membership should be `not in`
 
 E713.py:8:8: E713 [*] Test for membership should be `not in`
    |
- 8 |     pass
- 9 | #: E713
-10 | if not X in Y and Z == "zero":
+ 6 |     pass
+ 7 | #: E713
+ 8 | if not X in Y and Z == "zero":
    |        ^^^^^^ E713
-11 |     pass
-12 | #: E713
+ 9 |     pass
+10 | #: E713
    |
    = help: Convert to `not in`
 
@@ -63,12 +63,12 @@ E713.py:8:8: E713 [*] Test for membership should be `not in`
 
 E713.py:11:23: E713 [*] Test for membership should be `not in`
    |
-11 |     pass
-12 | #: E713
-13 | if X == "zero" or not Y in Z:
+ 9 |     pass
+10 | #: E713
+11 | if X == "zero" or not Y in Z:
    |                       ^^^^^^ E713
-14 |     pass
-15 | #: E713
+12 |     pass
+13 | #: E713
    |
    = help: Convert to `not in`
 
@@ -84,11 +84,11 @@ E713.py:11:23: E713 [*] Test for membership should be `not in`
 
 E713.py:14:9: E713 [*] Test for membership should be `not in`
    |
-14 |     pass
-15 | #: E713
-16 | if not (X in Y):
+12 |     pass
+13 | #: E713
+14 | if not (X in Y):
    |         ^^^^^^ E713
-17 |     pass
+15 |     pass
    |
    = help: Convert to `not in`
 

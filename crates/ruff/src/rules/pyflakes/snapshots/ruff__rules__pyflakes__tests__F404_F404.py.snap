@@ -2,21 +2,21 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
 F404.py:6:1: F404 `from __future__` imports must occur at the beginning of the file
-   |
- 6 | from collections import namedtuple
- 7 | 
- 8 | from __future__ import print_function
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F404
- 9 | 
-10 | import __future__
-   |
+  |
+4 | from collections import namedtuple
+5 | 
+6 | from __future__ import print_function
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F404
+7 | 
+8 | import __future__
+  |
 
 F404.py:8:1: F404 `from __future__` imports must occur at the beginning of the file
-   |
- 8 | from __future__ import print_function
- 9 | 
-10 | import __future__
-   | ^^^^^^^^^^^^^^^^^ F404
-   |
+  |
+6 | from __future__ import print_function
+7 | 
+8 | import __future__
+  | ^^^^^^^^^^^^^^^^^ F404
+  |
 
 

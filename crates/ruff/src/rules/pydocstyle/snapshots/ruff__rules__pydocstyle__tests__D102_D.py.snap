@@ -3,26 +3,26 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
 D.py:23:9: D102 Missing docstring in public method
    |
-23 |     @expect('D102: Missing docstring in public method')
-24 |     def method(self=None):
+22 |     @expect('D102: Missing docstring in public method')
+23 |     def method(self=None):
    |         ^^^^^^ D102
-25 |         pass
+24 |         pass
    |
 
 D.py:56:9: D102 Missing docstring in public method
    |
-56 |     @expect('D102: Missing docstring in public method')
-57 |     def __new__(self=None):
+55 |     @expect('D102: Missing docstring in public method')
+56 |     def __new__(self=None):
    |         ^^^^^^^ D102
-58 |         pass
+57 |         pass
    |
 
 D.py:68:9: D102 Missing docstring in public method
    |
-68 |     @expect('D102: Missing docstring in public method')
-69 |     def __call__(self=None, x=None, y=None, z=None):
+67 |     @expect('D102: Missing docstring in public method')
+68 |     def __call__(self=None, x=None, y=None, z=None):
    |         ^^^^^^^^ D102
-70 |         pass
+69 |         pass
    |
 
 

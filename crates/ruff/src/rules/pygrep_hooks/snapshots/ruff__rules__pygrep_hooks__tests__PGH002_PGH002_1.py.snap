@@ -3,17 +3,17 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 ---
 PGH002_1.py:4:1: PGH002 `warn` is deprecated in favor of `warning`
   |
-4 | from logging import warn
-5 | 
-6 | logging.warn("this is not ok")
+2 | from logging import warn
+3 | 
+4 | logging.warn("this is not ok")
   | ^^^^^^^^^^^^ PGH002
-7 | warn("not ok")
+5 | warn("not ok")
   |
 
 PGH002_1.py:5:1: PGH002 `warn` is deprecated in favor of `warning`
   |
-5 | logging.warn("this is not ok")
-6 | warn("not ok")
+4 | logging.warn("this is not ok")
+5 | warn("not ok")
   | ^^^^ PGH002
   |
 

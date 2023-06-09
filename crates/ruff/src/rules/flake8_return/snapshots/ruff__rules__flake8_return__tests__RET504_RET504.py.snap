@@ -3,25 +3,25 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
 RET504.py:6:12: RET504 Unnecessary variable assignment before `return` statement
   |
-6 | def x():
-7 |     a = 1
-8 |     return a  # RET504
+4 | def x():
+5 |     a = 1
+6 |     return a  # RET504
   |            ^ RET504
   |
 
 RET504.py:250:12: RET504 Unnecessary variable assignment before `return` statement
     |
-250 | def get_queryset():
-251 |     queryset = Model.filter(a=1)
-252 |     return queryset  # RET504
+248 | def get_queryset():
+249 |     queryset = Model.filter(a=1)
+250 |     return queryset  # RET504
     |            ^^^^^^^^ RET504
     |
 
 RET504.py:268:12: RET504 Unnecessary variable assignment before `return` statement
     |
-268 |         return val
-269 |     val = 1
-270 |     return val  # RET504
+266 |         return val
+267 |     val = 1
+268 |     return val  # RET504
     |            ^^^ RET504
     |
 

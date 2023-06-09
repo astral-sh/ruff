@@ -3,57 +3,57 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B904.py:10:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-10 | except ValueError:
-11 |     if "abc":
-12 |         raise TypeError
+ 8 | except ValueError:
+ 9 |     if "abc":
+10 |         raise TypeError
    |         ^^^^^^^^^^^^^^^ B904
-13 |     raise UserWarning
-14 | except AssertionError:
+11 |     raise UserWarning
+12 | except AssertionError:
    |
 
 B904.py:11:5: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-11 |     if "abc":
-12 |         raise TypeError
-13 |     raise UserWarning
+ 9 |     if "abc":
+10 |         raise TypeError
+11 |     raise UserWarning
    |     ^^^^^^^^^^^^^^^^^ B904
-14 | except AssertionError:
-15 |     raise  # Bare `raise` should not be an error
+12 | except AssertionError:
+13 |     raise  # Bare `raise` should not be an error
    |
 
 B904.py:16:5: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-16 | except Exception as err:
-17 |     assert err
-18 |     raise Exception("No cause here...")
+14 | except Exception as err:
+15 |     assert err
+16 |     raise Exception("No cause here...")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
-19 | except BaseException as base_err:
-20 |     # Might use this instead of bare raise with the `.with_traceback()` method
+17 | except BaseException as base_err:
+18 |     # Might use this instead of bare raise with the `.with_traceback()` method
    |
 
 B904.py:62:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-62 | except Exception as e:
-63 |     if ...:
-64 |         raise RuntimeError("boom!")
+60 | except Exception as e:
+61 |     if ...:
+62 |         raise RuntimeError("boom!")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
-65 |     else:
-66 |         raise RuntimeError("bang!")
+63 |     else:
+64 |         raise RuntimeError("bang!")
    |
 
 B904.py:64:9: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-64 |         raise RuntimeError("boom!")
-65 |     else:
-66 |         raise RuntimeError("bang!")
+62 |         raise RuntimeError("boom!")
+63 |     else:
+64 |         raise RuntimeError("bang!")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
    |
 
 B904.py:72:13: B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
    |
-72 |     match 0:
-73 |         case 0:
-74 |             raise RuntimeError("boom!")
+70 |     match 0:
+71 |         case 0:
+72 |             raise RuntimeError("boom!")
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B904
    |
 

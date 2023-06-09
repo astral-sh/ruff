@@ -2,15 +2,15 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
 UP030_2.py:6:1: UP030 [*] Use implicit references for positional format fields
-   |
- 6 | kwargs = {x: x for x in range(10)}
- 7 | 
- 8 | "{0}".format(*args)
-   | ^^^^^^^^^^^^^^^^^^^ UP030
- 9 | 
-10 | "{0}".format(**kwargs)
-   |
-   = help: Remove explicit positional indices
+  |
+4 | kwargs = {x: x for x in range(10)}
+5 | 
+6 | "{0}".format(*args)
+  | ^^^^^^^^^^^^^^^^^^^ UP030
+7 | 
+8 | "{0}".format(**kwargs)
+  |
+  = help: Remove explicit positional indices
 
 ℹ Suggested fix
 3 3 | args = list(range(10))
@@ -24,12 +24,12 @@ UP030_2.py:6:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:8:1: UP030 [*] Use implicit references for positional format fields
    |
- 8 | "{0}".format(*args)
- 9 | 
-10 | "{0}".format(**kwargs)
+ 6 | "{0}".format(*args)
+ 7 | 
+ 8 | "{0}".format(**kwargs)
    | ^^^^^^^^^^^^^^^^^^^^^^ UP030
-11 | 
-12 | "{0}_{1}".format(*args)
+ 9 | 
+10 | "{0}_{1}".format(*args)
    |
    = help: Remove explicit positional indices
 
@@ -45,12 +45,12 @@ UP030_2.py:8:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:10:1: UP030 [*] Use implicit references for positional format fields
    |
-10 | "{0}".format(**kwargs)
-11 | 
-12 | "{0}_{1}".format(*args)
+ 8 | "{0}".format(**kwargs)
+ 9 | 
+10 | "{0}_{1}".format(*args)
    | ^^^^^^^^^^^^^^^^^^^^^^^ UP030
-13 | 
-14 | "{0}_{1}".format(1, *args)
+11 | 
+12 | "{0}_{1}".format(1, *args)
    |
    = help: Remove explicit positional indices
 
@@ -66,12 +66,12 @@ UP030_2.py:10:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:12:1: UP030 [*] Use implicit references for positional format fields
    |
-12 | "{0}_{1}".format(*args)
-13 | 
-14 | "{0}_{1}".format(1, *args)
+10 | "{0}_{1}".format(*args)
+11 | 
+12 | "{0}_{1}".format(1, *args)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-15 | 
-16 | "{1}_{0}".format(*args)
+13 | 
+14 | "{1}_{0}".format(*args)
    |
    = help: Remove explicit positional indices
 
@@ -87,23 +87,23 @@ UP030_2.py:12:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:14:1: UP030 Use implicit references for positional format fields
    |
-14 | "{0}_{1}".format(1, *args)
-15 | 
-16 | "{1}_{0}".format(*args)
+12 | "{0}_{1}".format(1, *args)
+13 | 
+14 | "{1}_{0}".format(*args)
    | ^^^^^^^^^^^^^^^^^^^^^^^ UP030
-17 | 
-18 | "{1}_{0}".format(1, *args)
+15 | 
+16 | "{1}_{0}".format(1, *args)
    |
    = help: Remove explicit positional indices
 
 UP030_2.py:16:1: UP030 [*] Use implicit references for positional format fields
    |
-16 | "{1}_{0}".format(*args)
-17 | 
-18 | "{1}_{0}".format(1, *args)
+14 | "{1}_{0}".format(*args)
+15 | 
+16 | "{1}_{0}".format(1, *args)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-19 | 
-20 | "{0}_{1}".format(1, 2, *args)
+17 | 
+18 | "{0}_{1}".format(1, 2, *args)
    |
    = help: Remove explicit positional indices
 
@@ -119,12 +119,12 @@ UP030_2.py:16:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:18:1: UP030 [*] Use implicit references for positional format fields
    |
-18 | "{1}_{0}".format(1, *args)
-19 | 
-20 | "{0}_{1}".format(1, 2, *args)
+16 | "{1}_{0}".format(1, *args)
+17 | 
+18 | "{0}_{1}".format(1, 2, *args)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-21 | 
-22 | "{0}_{1}".format(*args, 1, 2)
+19 | 
+20 | "{0}_{1}".format(*args, 1, 2)
    |
    = help: Remove explicit positional indices
 
@@ -140,12 +140,12 @@ UP030_2.py:18:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:20:1: UP030 [*] Use implicit references for positional format fields
    |
-20 | "{0}_{1}".format(1, 2, *args)
-21 | 
-22 | "{0}_{1}".format(*args, 1, 2)
+18 | "{0}_{1}".format(1, 2, *args)
+19 | 
+20 | "{0}_{1}".format(*args, 1, 2)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-23 | 
-24 | "{0}_{1}_{2}".format(1, **kwargs)
+21 | 
+22 | "{0}_{1}_{2}".format(1, **kwargs)
    |
    = help: Remove explicit positional indices
 
@@ -161,12 +161,12 @@ UP030_2.py:20:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:22:1: UP030 [*] Use implicit references for positional format fields
    |
-22 | "{0}_{1}".format(*args, 1, 2)
-23 | 
-24 | "{0}_{1}_{2}".format(1, **kwargs)
+20 | "{0}_{1}".format(*args, 1, 2)
+21 | 
+22 | "{0}_{1}_{2}".format(1, **kwargs)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-25 | 
-26 | "{0}_{1}_{2}".format(1, 2, **kwargs)
+23 | 
+24 | "{0}_{1}_{2}".format(1, 2, **kwargs)
    |
    = help: Remove explicit positional indices
 
@@ -182,12 +182,12 @@ UP030_2.py:22:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:24:1: UP030 [*] Use implicit references for positional format fields
    |
-24 | "{0}_{1}_{2}".format(1, **kwargs)
-25 | 
-26 | "{0}_{1}_{2}".format(1, 2, **kwargs)
+22 | "{0}_{1}_{2}".format(1, **kwargs)
+23 | 
+24 | "{0}_{1}_{2}".format(1, 2, **kwargs)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-27 | 
-28 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
+25 | 
+26 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
    |
    = help: Remove explicit positional indices
 
@@ -203,12 +203,12 @@ UP030_2.py:24:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:26:1: UP030 [*] Use implicit references for positional format fields
    |
-26 | "{0}_{1}_{2}".format(1, 2, **kwargs)
-27 | 
-28 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
+24 | "{0}_{1}_{2}".format(1, 2, **kwargs)
+25 | 
+26 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
-29 | 
-30 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
+27 | 
+28 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
    |
    = help: Remove explicit positional indices
 
@@ -223,9 +223,9 @@ UP030_2.py:26:1: UP030 [*] Use implicit references for positional format fields
 
 UP030_2.py:28:1: UP030 [*] Use implicit references for positional format fields
    |
-28 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
-29 | 
-30 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
+26 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
+27 | 
+28 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
    |
    = help: Remove explicit positional indices

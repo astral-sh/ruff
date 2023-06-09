@@ -19,11 +19,11 @@ UP003.py:1:1: UP003 [*] Use `str` instead of `type(...)`
 
 UP003.py:2:1: UP003 [*] Use `bytes` instead of `type(...)`
   |
-2 | type("")
-3 | type(b"")
+1 | type("")
+2 | type(b"")
   | ^^^^^^^^^ UP003
-4 | type(0)
-5 | type(0.0)
+3 | type(0)
+4 | type(0.0)
   |
   = help: Replace `type(...)` with `bytes`
 
@@ -37,12 +37,12 @@ UP003.py:2:1: UP003 [*] Use `bytes` instead of `type(...)`
 
 UP003.py:3:1: UP003 [*] Use `int` instead of `type(...)`
   |
-3 | type("")
-4 | type(b"")
-5 | type(0)
+1 | type("")
+2 | type(b"")
+3 | type(0)
   | ^^^^^^^ UP003
-6 | type(0.0)
-7 | type(0j)
+4 | type(0.0)
+5 | type(0j)
   |
   = help: Replace `type(...)` with `int`
 
@@ -57,11 +57,11 @@ UP003.py:3:1: UP003 [*] Use `int` instead of `type(...)`
 
 UP003.py:4:1: UP003 [*] Use `float` instead of `type(...)`
   |
-4 | type(b"")
-5 | type(0)
-6 | type(0.0)
+2 | type(b"")
+3 | type(0)
+4 | type(0.0)
   | ^^^^^^^^^ UP003
-7 | type(0j)
+5 | type(0j)
   |
   = help: Replace `type(...)` with `float`
 
@@ -77,12 +77,12 @@ UP003.py:4:1: UP003 [*] Use `float` instead of `type(...)`
 
 UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
   |
-5 | type(0)
-6 | type(0.0)
-7 | type(0j)
+3 | type(0)
+4 | type(0.0)
+5 | type(0j)
   | ^^^^^^^^ UP003
-8 | 
-9 | # OK
+6 | 
+7 | # OK
   |
   = help: Replace `type(...)` with `complex`
 

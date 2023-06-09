@@ -3,16 +3,16 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
 B002.py:15:9: B002 Python does not support the unary prefix increment
    |
-15 | def this_is_buggy(n):
-16 |     x = ++n
+14 | def this_is_buggy(n):
+15 |     x = ++n
    |         ^^^ B002
-17 |     return x
+16 |     return x
    |
 
 B002.py:20:12: B002 Python does not support the unary prefix increment
    |
-20 | def this_is_buggy_too(n):
-21 |     return ++n
+19 | def this_is_buggy_too(n):
+20 |     return ++n
    |            ^^^ B002
    |
 

@@ -183,10 +183,10 @@ UP007.py:34:11: UP007 [*] Use `X | Y` for type annotations
 
 UP007.py:47:8: UP007 [*] Use `X | Y` for type annotations
    |
-47 | def f() -> None:
-48 |     x: Optional[str]
+46 | def f() -> None:
+47 |     x: Optional[str]
    |        ^^^^^^^^^^^^^ UP007
-49 |     x = Optional[str]
+48 |     x = Optional[str]
    |
    = help: Convert to `X | Y`
 
@@ -202,33 +202,33 @@ UP007.py:47:8: UP007 [*] Use `X | Y` for type annotations
 
 UP007.py:48:9: UP007 Use `X | Y` for type annotations
    |
-48 | def f() -> None:
-49 |     x: Optional[str]
-50 |     x = Optional[str]
+46 | def f() -> None:
+47 |     x: Optional[str]
+48 |     x = Optional[str]
    |         ^^^^^^^^^^^^^ UP007
-51 | 
-52 |     x = Union[str, int]
+49 | 
+50 |     x = Union[str, int]
    |
    = help: Convert to `X | Y`
 
 UP007.py:50:9: UP007 Use `X | Y` for type annotations
    |
-50 |     x = Optional[str]
-51 | 
-52 |     x = Union[str, int]
+48 |     x = Optional[str]
+49 | 
+50 |     x = Union[str, int]
    |         ^^^^^^^^^^^^^^^ UP007
-53 |     x = Union["str", "int"]
-54 |     x: Union[str, int]
+51 |     x = Union["str", "int"]
+52 |     x: Union[str, int]
    |
    = help: Convert to `X | Y`
 
 UP007.py:52:8: UP007 [*] Use `X | Y` for type annotations
    |
-52 |     x = Union[str, int]
-53 |     x = Union["str", "int"]
-54 |     x: Union[str, int]
+50 |     x = Union[str, int]
+51 |     x = Union["str", "int"]
+52 |     x: Union[str, int]
    |        ^^^^^^^^^^^^^^^ UP007
-55 |     x: Union["str", "int"]
+53 |     x: Union["str", "int"]
    |
    = help: Convert to `X | Y`
 

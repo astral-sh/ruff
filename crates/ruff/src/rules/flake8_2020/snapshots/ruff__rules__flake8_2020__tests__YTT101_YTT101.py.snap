@@ -2,31 +2,31 @@
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
 YTT101.py:6:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
-   |
- 6 | print(sys.version)
- 7 | 
- 8 | print(sys.version[:3])
-   |       ^^^^^^^^^^^ YTT101
- 9 | print(version[:3])
-10 | print(v[:3])
-   |
+  |
+4 | print(sys.version)
+5 | 
+6 | print(sys.version[:3])
+  |       ^^^^^^^^^^^ YTT101
+7 | print(version[:3])
+8 | print(v[:3])
+  |
 
 YTT101.py:7:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
   |
-7 | print(sys.version[:3])
-8 | print(version[:3])
+6 | print(sys.version[:3])
+7 | print(version[:3])
   |       ^^^^^^^ YTT101
-9 | print(v[:3])
+8 | print(v[:3])
   |
 
 YTT101.py:8:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
    |
- 8 | print(sys.version[:3])
- 9 | print(version[:3])
-10 | print(v[:3])
+ 6 | print(sys.version[:3])
+ 7 | print(version[:3])
+ 8 | print(v[:3])
    |       ^ YTT101
-11 | 
-12 | # the tool is timid and only flags certain numeric slices
+ 9 | 
+10 | # the tool is timid and only flags certain numeric slices
    |
 
 
