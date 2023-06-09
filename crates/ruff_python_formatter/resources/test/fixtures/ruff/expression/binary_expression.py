@@ -41,3 +41,14 @@ not (aaaaaaaaaaaaaa + {a for x in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     # comment
     content + b
 )
+
+
+if (
+    aaaaaaaaaaaaaaaaaa +
+    # has the child process finished?
+    bbbbbbbbbbbbbbb +
+    # the child process has finished, but the
+    # transport hasn't been notified yet?
+    ccccccccccc
+):
+    pass
